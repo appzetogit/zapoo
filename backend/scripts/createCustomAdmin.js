@@ -25,8 +25,8 @@ const createCustomAdmin = async () => {
         console.log("Creating custom admin user...");
 
         const adminCredentials = {
-            email: "panchalajay717@gmail.com",
-            password: "123456",
+            email: "zapoo.startup@gmail.com",
+            password: "Zapoo@2026",
             // OPT/OTP provided: 110211 - Not stored in DB as per schema, potentially for 2FA or verification if implemented later.
             // For now, we just create the user.
         };
@@ -72,7 +72,8 @@ const createCustomAdmin = async () => {
 
         process.exit(0);
     } catch (error) {
-        console.error("❌ Error creating admin:", error);
+        console.error("❌ Error creating admin DETAILS:", error);
+        console.error("Stack:", error.stack);
         process.exit(1);
     }
 };
