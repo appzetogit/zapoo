@@ -15,9 +15,9 @@ const updateCredentials = async () => {
 
     console.log("📝 Updating Cloudinary Credentials...");
     // Values provided by user
-    envVars.CLOUDINARY_CLOUD_NAME = "dciu4uawr";
-    envVars.CLOUDINARY_API_KEY = "321367185532319";
-    envVars.CLOUDINARY_API_SECRET = "YGxziMfOehQo2MCBfZsm2CPI5Uo";
+    envVars.CLOUDINARY_CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME || "dlttlwzlm";
+    envVars.CLOUDINARY_API_KEY = process.env.CLOUDINARY_API_KEY || "381417573627185";
+    envVars.CLOUDINARY_API_SECRET = process.env.CLOUDINARY_API_SECRET || "d44IgZkvbxfU9fZ_I2idx9_Kc7Y";
 
     await envVars.save();
     console.log("✅ Cloudinary Credentials updated successfully!");

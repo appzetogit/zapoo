@@ -11,7 +11,15 @@ import cron from 'node-cron';
 import mongoose from 'mongoose';
 
 // Load environment variables
+// Load environment variables
 dotenv.config();
+
+console.log('✅ server.js: Environment Variables Loaded');
+console.log(`✅ PORT: ${process.env.PORT}`);
+console.log(`✅ CLOUDINARY_CLOUD_NAME: ${process.env.CLOUDINARY_CLOUD_NAME || '❌ MISSING'}`);
+console.log(`✅ CLOUDINARY_API_KEY: ${process.env.CLOUDINARY_API_KEY ? '✅ Present' : '❌ MISSING'}`);
+console.log(`✅ CLOUDINARY_API_SECRET: ${process.env.CLOUDINARY_API_SECRET ? '✅ Present' : '❌ MISSING'}`);
+
 
 // Import configurations
 import { connectDB } from './config/database.js';
@@ -221,7 +229,7 @@ restaurantNamespace.on('connection', (socket) => {
         room: room,
         socketId: socket.id
       });
-      
+
       // Log all rooms this socket is now in
       const socketRooms = Array.from(socket.rooms).filter(r => r.startsWith('restaurant:'));
       console.log(`📋 Socket ${socket.id} is now in restaurant rooms:`, socketRooms);
