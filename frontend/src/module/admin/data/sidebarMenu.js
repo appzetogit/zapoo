@@ -50,6 +50,12 @@ export const sidebarMenuData = [
         icon: "MapPin",
       },
       {
+        type: "link",
+        label: "Tier Management",
+        path: "/admin/tiers",
+        icon: "Layers",
+      },
+      {
         type: "expandable",
         label: "Restaurants",
         icon: "UtensilsCrossed",
@@ -132,6 +138,22 @@ export const sidebarMenuData = [
         label: "Push Notification",
         path: "/admin/push-notification",
         icon: "Bell",
+      },
+    ],
+  },
+  {
+    type: "section",
+    label: "MARKETING MANAGEMENT",
+    items: [
+      {
+        type: "expandable",
+        label: "Advertisements",
+        icon: "Megaphone",
+        subItems: [
+          { label: "Ad Requests", path: "/admin/marketing/ad-requests" },
+          { label: "Active Campaigns", path: "/admin/marketing/active-campaigns" },
+          { label: "Slot Configuration", path: "/admin/marketing/slots" },
+        ],
       },
     ],
   },

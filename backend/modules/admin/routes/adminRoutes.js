@@ -29,6 +29,7 @@ import {
   getAllOffers,
   getRestaurantAnalytics,
   getCustomerWalletReport,
+  extendRestaurantSubscription,
 } from "../controllers/adminController.js";
 import {
   getBusinessSettings,
@@ -292,6 +293,7 @@ router.post("/restaurants/:id/reverify", reverifyRestaurant);
 router.put("/restaurants/:id/status", updateRestaurantStatus);
 router.put("/restaurants/:id/dining-settings", updateRestaurantDiningSettings);
 router.delete("/restaurants/:id", deleteRestaurant);
+router.post("/restaurants/:id/extend-subscription", extendRestaurantSubscription);
 
 // Category Management
 router.get("/categories", getCategories);

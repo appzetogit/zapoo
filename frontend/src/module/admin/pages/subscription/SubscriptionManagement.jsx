@@ -44,10 +44,16 @@ export default function SubscriptionManagement() {
         try {
             // Format data
             const formattedData = {
-                ...data,
-                price: parseFloat(data.price),
+                name: data.name,
                 durationInDays: parseInt(data.durationInDays),
-                features: data.features.split('\n').filter(f => f.trim() !== '')
+                features: data.features.split('\n').filter(f => f.trim() !== ''),
+                isActive: data.isActive,
+                pricing: {
+                    tier1: parseFloat(data.priceTier1),
+                    tier2: parseFloat(data.priceTier2),
+                    tier3: parseFloat(data.priceTier3),
+                    tier4: parseFloat(data.priceTier4)
+                }
             };
 
             if (editingPlan) {
@@ -71,10 +77,17 @@ export default function SubscriptionManagement() {
     const handleEdit = (plan) => {
         setEditingPlan(plan);
         setValue("name", plan.name);
-        setValue("price", plan.price);
         setValue("durationInDays", plan.durationInDays);
         setValue("features", plan.features.join('\n'));
         setValue("isActive", plan.isActive);
+
+        // Handle old pricing structure fallback
+        const pricing = plan.pricing || {};
+        setValue("priceTier1", pricing.tier1 || plan.price || 0);
+        setValue("priceTier2", pricing.tier2 || plan.price || 0);
+        setValue("priceTier3", pricing.tier3 || plan.price || 0);
+        setValue("priceTier4", pricing.tier4 || plan.price || 0);
+
         setIsDialogOpen(true);
     };
 
@@ -177,10 +190,7 @@ export default function SubscriptionManagement() {
                     {/* Action Bar */}
                     <div className="flex items-center justify-between">
                         <h2 className="text-lg font-semibold text-neutral-900">Available Plans</h2>
-                        <Button onClick={openNewDialog} className="flex items-center gap-2 bg-orange-600 hover:bg-orange-700 text-white shadow-sm">
-                            <Plus className="w-4 h-4" />
-                            Create Plan
-                        </Button>
+
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -198,8 +208,17 @@ export default function SubscriptionManagement() {
                                         </Badge>
                                     </div>
                                     <CardDescription className="flex items-baseline gap-1 mt-2">
-                                        <span className={`text-2xl font-bold ${!plan.isActive ? 'text-neutral-400' : 'text-neutral-900'}`}>₹{plan.price}</span>
-                                        <span className="text-neutral-500">/ {plan.durationInDays} days</span>
+                                        {plan.pricing ? (
+                                            <div className="flex flex-col">
+                                                <span className={`text-xl font-bold ${!plan.isActive ? 'text-neutral-400' : 'text-neutral-900'}`}>
+                                                    ₹{plan.pricing.tier1} - ₹{plan.pricing.tier4}
+                                                </span>
+                                                <span className="text-xs text-neutral-500">Tier based pricing</span>
+                                            </div>
+                                        ) : (
+                                            <span className={`text-2xl font-bold ${!plan.isActive ? 'text-neutral-400' : 'text-neutral-900'}`}>₹{plan.price}</span>
+                                        )}
+                                        <span className="text-neutral-500 ml-1">/ {plan.durationInDays} days</span>
                                     </CardDescription>
                                 </CardHeader>
                                 <CardContent className="flex-1">
@@ -229,23 +248,14 @@ export default function SubscriptionManagement() {
                                         <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => handleEdit(plan)}>
                                             <Edit className="w-4 h-4 text-neutral-600" />
                                         </Button>
-                                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0 hover:bg-red-50 hover:text-red-600" onClick={() => handleDelete(plan._id)}>
-                                            <Trash2 className="w-4 h-4 text-neutral-400 hover:text-red-500" />
-                                        </Button>
+
                                     </div>
                                 </CardFooter>
                             </Card>
                         ))}
                     </div>
 
-                    {plans.length === 0 && (
-                        <div className="text-center py-12 bg-neutral-50 rounded-lg border border-dashed border-neutral-300">
-                            <DollarSign className="w-12 h-12 text-neutral-300 mx-auto mb-3" />
-                            <h3 className="text-lg font-medium text-neutral-900">No plans created yet</h3>
-                            <p className="text-neutral-500 mt-1 mb-6">Create your first subscription plan to get started.</p>
-                            <Button onClick={openNewDialog} className="bg-orange-600 hover:bg-orange-700 text-white">Create Plan</Button>
-                        </div>
-                    )}
+
                 </div>
             ) : (
                 <div className="flex flex-col items-center justify-center py-20 bg-neutral-50 rounded-lg border border-dashed border-neutral-300">
@@ -316,22 +326,28 @@ export default function SubscriptionManagement() {
                         </div>
 
                         <div className="grid grid-cols-2 gap-5">
-                            <div className="space-y-2">
-                                <Label htmlFor="price" className="text-neutral-700 font-medium">Price (₹)</Label>
-                                <div className="relative">
-                                    <DollarSign className="absolute left-3 top-2.5 h-4 w-4 text-neutral-400" />
-                                    <Input
-                                        id="price"
-                                        type="number"
-                                        min="0"
-                                        step="0.01"
-                                        placeholder="999"
-                                        className="pl-9 focus-visible:ring-orange-500/30 border-neutral-200"
-                                        {...register("price", { required: "Price is required", min: 0 })}
-                                    />
+                            <div className="col-span-2 space-y-2">
+                                <Label className="text-neutral-700 font-medium">Tier Pricing (₹)</Label>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <Label className="text-xs text-neutral-500 mb-1 block">Tier 1 (Small)</Label>
+                                        <Input type="number" step="0.01" placeholder="0" {...register("priceTier1", { required: "Required", min: 0 })} />
+                                    </div>
+                                    <div>
+                                        <Label className="text-xs text-neutral-500 mb-1 block">Tier 2 (Medium)</Label>
+                                        <Input type="number" step="0.01" placeholder="0" {...register("priceTier2", { required: "Required", min: 0 })} />
+                                    </div>
+                                    <div>
+                                        <Label className="text-xs text-neutral-500 mb-1 block">Tier 3 (Large)</Label>
+                                        <Input type="number" step="0.01" placeholder="0" {...register("priceTier3", { required: "Required", min: 0 })} />
+                                    </div>
+                                    <div>
+                                        <Label className="text-xs text-neutral-500 mb-1 block">Tier 4 (XL)</Label>
+                                        <Input type="number" step="0.01" placeholder="0" {...register("priceTier4", { required: "Required", min: 0 })} />
+                                    </div>
                                 </div>
-                                {errors.price && <p className="text-xs text-red-500 font-medium">{errors.price.message}</p>}
                             </div>
+
 
                             <div className="space-y-2">
                                 <Label htmlFor="durationInDays" className="text-neutral-700 font-medium">Duration (Days)</Label>

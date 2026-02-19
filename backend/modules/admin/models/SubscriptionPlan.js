@@ -8,10 +8,11 @@ const subscriptionPlanSchema = new mongoose.Schema(
             trim: true,
             unique: true,
         },
-        price: {
-            type: Number,
-            required: true,
-            min: 0,
+        pricing: {
+            tier1: { type: Number, required: true, default: 0 },
+            tier2: { type: Number, required: true, default: 0 },
+            tier3: { type: Number, required: true, default: 0 },
+            tier4: { type: Number, required: true, default: 0 }
         },
         durationInDays: {
             type: Number,
@@ -29,20 +30,6 @@ const subscriptionPlanSchema = new mongoose.Schema(
             type: Boolean,
             default: true,
         },
-        // Optional: Zone-specific pricing can be handled here or via a separate mapping
-        // For now, keeping it simple as a base plan
-        zonePricing: [
-            {
-                zoneId: {
-                    type: mongoose.Schema.Types.ObjectId,
-                    ref: "Zone",
-                },
-                price: {
-                    type: Number,
-                    required: true,
-                },
-            },
-        ],
     },
     {
         timestamps: true,

@@ -12,7 +12,6 @@ export const getPlans = async (req, res) => {
         let query = { isActive: true };
 
         // If admin is requesting, return all plans
-        // Check for req.admin (set by authenticateAdmin) or req.user.role === 'admin'
         if ((req.admin) || (req.user && req.user.role === 'admin')) {
             query = {};
         }
@@ -23,24 +22,40 @@ export const getPlans = async (req, res) => {
         if (req.user && (req.user.restaurantId || req.user.role === 'restaurant')) {
             try {
                 const restaurantId = req.user.restaurantId || req.user.id;
-                const restaurant = await Restaurant.findById(restaurantId).select('zoneId');
+                const restaurant = await Restaurant.findById(restaurantId).populate({
+                    path: 'zoneId',
+                    populate: { path: 'tierId' }
+                });
 
-                if (restaurant && restaurant.zoneId) {
-                    // Adjust prices based on zone
+
+                if (restaurant && restaurant.zoneId && restaurant.zoneId.tierId && restaurant.zoneId.tierId.rank) {
+                    const tierRank = restaurant.zoneId.tierId.rank; // Assuming 1, 2, 3, 4
+                    const tierKey = `tier${tierRank}`;
+
+                    // Adjust prices based on zone tier
                     plans.forEach(plan => {
-                        if (plan.zonePricing && plan.zonePricing.length > 0) {
-                            const zonePrice = plan.zonePricing.find(zp => zp.zoneId.toString() === restaurant.zoneId.toString());
-                            if (zonePrice) {
-                                plan.price = zonePrice.price;
-                                plan.originalPrice = zonePrice.price; // For UI reference if needed
-                            }
+                        if (plan.pricing && plan.pricing[tierKey] !== undefined) {
+                            plan.price = plan.pricing[tierKey];
+                            plan.tierName = restaurant.zoneId.tierId.name;
+                        } else {
+                            // Fallback to Tier 1 if specific tier price not found
+                            plan.price = plan.pricing?.tier1 || 0;
                         }
+                    });
+                } else {
+                    // Fallback if no tier assigned
+                    plans.forEach(plan => {
+                        plan.price = plan.pricing?.tier1 || 0;
                     });
                 }
             } catch (err) {
                 console.error("Error applying zone pricing:", err);
                 // Continue with base prices if error occurs
             }
+        } else {
+            // For Admin or Public view, maybe show range or base price
+            // For simplicity, we can default to showing the pricing object or a range
+            // Front-end will handle display for Admin
         }
 
         res.status(200).json({
@@ -211,11 +226,11 @@ export const cancelSubscription = async (req, res) => {
  */
 export const createPlan = async (req, res) => {
     try {
-        const { name, price, durationInDays, features, isActive } = req.body;
+        const { name, pricing, durationInDays, features, isActive } = req.body;
 
         const plan = await SubscriptionPlan.create({
             name,
-            price,
+            pricing,
             durationInDays,
             features,
             isActive

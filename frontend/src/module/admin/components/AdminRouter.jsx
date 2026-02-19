@@ -17,6 +17,9 @@ const FeeSettings = lazy(() => import("../pages/fee-settings/FeeSettings"));
 const SubscriptionManagement = lazy(() => import("../pages/subscription/SubscriptionManagement"));
 // Restaurant Management
 const ZoneSetup = lazy(() => import("../pages/restaurant/ZoneSetup"));
+const TierManagement = lazy(() => import("../pages/tier/TierManagement"));
+const TierZones = lazy(() => import("../pages/tier/TierZones"));
+const ZoneRestaurants = lazy(() => import("../pages/tier/ZoneRestaurants"));
 const AddZone = lazy(() => import("../pages/restaurant/AddZone"));
 const ViewZone = lazy(() => import("../pages/restaurant/ViewZone"));
 const AllZonesMap = lazy(() => import("../pages/restaurant/AllZonesMap"));
@@ -41,6 +44,7 @@ const PromotionalBanner = lazy(() => import("../pages/PromotionalBanner"));
 const NewAdvertisement = lazy(() => import("../pages/advertisement/NewAdvertisement"));
 const AdRequests = lazy(() => import("../pages/advertisement/AdRequests"));
 const AdsList = lazy(() => import("../pages/advertisement/AdsList"));
+const SlotConfiguration = lazy(() => import("../pages/advertisement/SlotConfiguration"));
 const PushNotification = lazy(() => import("../pages/PushNotification"));
 // Help & Support
 const Chattings = lazy(() => import("../pages/Chattings"));
@@ -169,6 +173,9 @@ export default function AdminRouter() {
 
           {/* RESTAURANT MANAGEMENT */}
           <Route path="zone-setup" element={<ZoneSetup />} />
+          <Route path="tiers" element={<TierManagement />} />
+          <Route path="tiers/:id/zones" element={<TierZones />} />
+          <Route path="tiers/zones/:zoneId/restaurants" element={<ZoneRestaurants />} />
           <Route path="zone-setup/map" element={<AllZonesMap />} />
           <Route path="zone-setup/delivery-boy-view" element={<DeliveryBoyViewMap />} />
           <Route path="zone-setup/add" element={<AddZone />} />
@@ -207,6 +214,9 @@ export default function AdminRouter() {
           <Route path="advertisement/new" element={<NewAdvertisement />} />
           <Route path="advertisement/requests" element={<AdRequests />} />
           <Route path="advertisement" element={<AdsList />} />
+          <Route path="marketing/ad-requests" element={<AdRequests />} />
+          <Route path="marketing/active-campaigns" element={<AdsList />} />
+          <Route path="marketing/slots" element={<SlotConfiguration />} />
           <Route path="push-notification" element={<PushNotification />} />
 
           {/* HELP & SUPPORT */}

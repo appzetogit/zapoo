@@ -46,6 +46,26 @@ const zoneSchema = new mongoose.Schema(
       ref: 'Tier',
       required: false
     },
+    deliveryPricing: {
+      baseFee: {
+        type: Number,
+        default: 0,
+        min: 0
+      },
+      freeDeliveryThreshold: {
+        type: Number,
+        default: 0,
+        min: 0
+      },
+      isOverridden: {
+        type: Boolean,
+        default: false
+      },
+      lastUpdated: {
+        type: Date,
+        default: Date.now
+      }
+    },
     area: {
       type: Number,
       default: 0,
@@ -166,6 +186,18 @@ zoneSchema.pre('save', async function (next) {
 
       if (tier) {
         this.tierId = tier._id;
+
+        // Inherit pricing from Tier if not overridden
+        if (!this.deliveryPricing || !this.deliveryPricing.isOverridden) {
+          if (tier.deliveryPricing) {
+            this.deliveryPricing = {
+              baseFee: tier.deliveryPricing.baseFee,
+              freeDeliveryThreshold: tier.deliveryPricing.freeDeliveryThreshold,
+              isOverridden: false,
+              lastUpdated: new Date()
+            };
+          }
+        }
       } else {
         this.tierId = null;
       }
@@ -182,21 +214,27 @@ zoneSchema.methods.containsPoint = function (latitude, longitude) {
     return false;
   }
 
-  // Simple point-in-polygon check using ray casting algorithm
-  const coords = this.boundary.coordinates[0];
+  // GeoJSON coords are [longitude, latitude]
+  // Ray casting: cast a horizontal ray from the point eastward
+  // and count how many polygon edges it crosses.
+  const coords = this.boundary.coordinates[0]; // [[lng, lat], ...]
   let inside = false;
 
   for (let i = 0, j = coords.length - 1; i < coords.length; j = i++) {
-    const xi = coords[i][0], yi = coords[i][1];
-    const xj = coords[j][0], yj = coords[j][1];
+    const lngI = coords[i][0], latI = coords[i][1]; // edge vertex i
+    const lngJ = coords[j][0], latJ = coords[j][1]; // edge vertex j
 
-    const intersect = ((yi > longitude) !== (yj > longitude)) &&
-      (longitude < (xj - xi) * (longitude - yi) / (yj - yi) + xi);
+    // Check if the horizontal ray from (longitude, latitude) crosses this edge
+    const latCrossed = (latI > latitude) !== (latJ > latitude);
+    const lngAtCross = lngI + (lngJ - lngI) * (latitude - latI) / (latJ - latI);
 
-    if (intersect) inside = !inside;
+    if (latCrossed && longitude < lngAtCross) {
+      inside = !inside;
+    }
   }
 
   return inside;
 };
+
 
 export default mongoose.model('Zone', zoneSchema);

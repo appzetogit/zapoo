@@ -2479,9 +2479,9 @@ export const getRestaurantAnalytics = asyncHandler(async (req, res) => {
     const avgMonthlyProfit =
       monthlyEarningsMap.size > 0
         ? Array.from(monthlyEarningsMap.values()).reduce(
-            (sum, val) => sum + val,
-            0,
-          ) / monthlyEarningsMap.size
+          (sum, val) => sum + val,
+          0,
+        ) / monthlyEarningsMap.size
         : 0;
 
     // Get commission percentage from RestaurantCommission
@@ -3039,5 +3039,74 @@ export const getCustomerWalletReport = asyncHandler(async (req, res) => {
       500,
       error.message || "Failed to fetch customer wallet report",
     );
+  }
+});
+
+/**
+ * Extend Restaurant Subscription
+ * POST /api/admin/restaurants/:id/extend-subscription
+ */
+export const extendRestaurantSubscription = asyncHandler(async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { days } = req.body;
+
+    if (!days || isNaN(days) || days <= 0) {
+      return errorResponse(res, 400, "Valid number of days is required");
+    }
+
+    const restaurant = await Restaurant.findById(id);
+
+    if (!restaurant) {
+      return errorResponse(res, 404, "Restaurant not found");
+    }
+
+    // Initialize subscription if it doesn't exist
+    if (!restaurant.subscription) {
+      restaurant.subscription = {
+        status: "inactive",
+        endDate: new Date(),
+        features: [],
+      };
+    }
+
+    const currentEndDate = restaurant.subscription.endDate
+      ? new Date(restaurant.subscription.endDate)
+      : new Date();
+
+    // If subscription is already expired, start from today
+    let newEndDate;
+    if (currentEndDate < new Date()) {
+      newEndDate = new Date();
+      newEndDate.setDate(newEndDate.getDate() + parseInt(days));
+    } else {
+      // Extend from current end date
+      newEndDate = new Date(currentEndDate);
+      newEndDate.setDate(newEndDate.getDate() + parseInt(days));
+    }
+
+    restaurant.subscription.endDate = newEndDate;
+    restaurant.subscription.status = "active";
+    // Also set autoRenew to true if we are manually extending, usually implies active intent
+    restaurant.subscription.autoRenew = true;
+
+    // Ensure business model is updated if needed
+    if (restaurant.businessModel !== "Subscription Base") {
+      restaurant.businessModel = "Subscription Base";
+    }
+
+    await restaurant.save();
+
+    logger.info(`Restaurant subscription extended: ${id} by ${days} days`, {
+      adminId: req.user._id,
+      newEndDate,
+    });
+
+    return successResponse(res, 200, "Subscription extended successfully", {
+      subscription: restaurant.subscription,
+    });
+  } catch (error) {
+    logger.error(`Error extending subscription: ${error.message}`);
+    return errorResponse(res, 500, "Failed to extend subscription");
   }
 });
