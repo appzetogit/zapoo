@@ -771,6 +771,100 @@ export const restaurantAPI = {
   },
 };
 
+// Export marketing API helper functions
+export const marketingAPI = {
+  // Get the restaurant's own zone with pricing
+  getMyZone: () => {
+    return apiClient.get(API_ENDPOINTS.MARKETING.MY_ZONE);
+  },
+
+  // Submit new ad request
+  submitAdRequest: (formData) => {
+    return apiClient.post(API_ENDPOINTS.MARKETING.REQUEST, formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+  },
+
+  // Update an existing (pending) ad request
+  updateAdRequest: (adId, formData) => {
+    return apiClient.put(
+      API_ENDPOINTS.MARKETING.UPDATE_REQUEST.replace(":adId", adId),
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      }
+    );
+  },
+
+  // Get authenticated restaurant's ads
+  getMyAds: () => {
+    return apiClient.get(API_ENDPOINTS.MARKETING.MY_ADS);
+  },
+
+  // Get ad details by ID
+  getAdDetails: (adId) => {
+    return apiClient.get(API_ENDPOINTS.MARKETING.AD_DETAILS.replace(":adId", adId));
+  },
+
+  // Track ad metric (impression/click/order)
+  trackMetric: (adId, type) => {
+    return apiClient.post(API_ENDPOINTS.MARKETING.TRACK.replace(":adId", adId), { type });
+  },
+
+  // Get active ads for a zone (user app)
+  getActiveAds: (zoneId) => {
+    return apiClient.get(API_ENDPOINTS.MARKETING.ACTIVE_BY_ZONE.replace(":zoneId", zoneId));
+  },
+
+  // Admin: Get all ad requests
+  getAllRequests: () => {
+    return apiClient.get(API_ENDPOINTS.MARKETING.ALL_REQUESTS);
+  },
+
+  // Admin: Update ad status
+  updateStatus: (adId, status, notes = "") => {
+    return apiClient.put(API_ENDPOINTS.MARKETING.UPDATE_STATUS.replace(":adId", adId), { status, notes });
+  },
+
+  // Admin: Get/Set slot configurations
+  getSlots: (zoneId) => {
+    return apiClient.get(API_ENDPOINTS.MARKETING.SLOTS, { params: { zoneId } });
+  },
+
+  configureSlots: (zoneId, maxSlots) => {
+    return apiClient.post(API_ENDPOINTS.MARKETING.CONFIGURE_SLOTS, { zoneId, maxSlots });
+  },
+};
+
+// Export tier API helper functions
+export const tierAPI = {
+  // Tier CRUD
+  getAllTiers: () => {
+    return apiClient.get('/admin/tiers');
+  },
+  createTier: (data) => {
+    return apiClient.post('/admin/tiers', data);
+  },
+  updateTier: (id, data) => {
+    return apiClient.put(`/admin/tiers/${id}`, data);
+  },
+  deleteTier: (id) => {
+    return apiClient.delete(`/admin/tiers/${id}`);
+  },
+  // Drill down
+  getZonesByTier: (id) => {
+    return apiClient.get(`/admin/tiers/${id}/zones`);
+  },
+  getRestaurantsByZone: (zoneId, filter) => {
+    const params = filter ? { filter } : {};
+    return apiClient.get(`/admin/tiers/zones/${zoneId}/restaurants`, { params });
+  }
+};
+
 // Export delivery API helper functions
 export const deliveryAPI = {
   // Delivery Authentication
@@ -1133,6 +1227,14 @@ export const adminAPI = {
   deleteRestaurant: (id) => {
     return apiClient.delete(
       API_ENDPOINTS.ADMIN.RESTAURANT_DELETE.replace(":id", id),
+    );
+  },
+
+  // Extend restaurant subscription
+  extendRestaurantSubscription: (id, days) => {
+    return apiClient.post(
+      `/admin/restaurants/${id}/extend-subscription`,
+      { days }
     );
   },
 
@@ -1978,3 +2080,4 @@ export const heroBannerAPI = {
     return apiClient.get(API_ENDPOINTS.HERO_BANNER.GOURMET_PUBLIC);
   },
 };
+

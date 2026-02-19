@@ -80,24 +80,24 @@ export const upsertOnboarding = async (req, res) => {
       completedSteps,
       step2Data: step2
         ? {
-            menuImageUrlsCount: step2.menuImageUrls?.length || 0,
-            hasProfileImage: !!step2.profileImageUrl,
-            cuisinesCount: step2.cuisines?.length || 0,
-            openDaysCount: step2.openDays?.length || 0,
-            deliveryTimings: step2.deliveryTimings,
-          }
+          menuImageUrlsCount: step2.menuImageUrls?.length || 0,
+          hasProfileImage: !!step2.profileImageUrl,
+          cuisinesCount: step2.cuisines?.length || 0,
+          openDaysCount: step2.openDays?.length || 0,
+          deliveryTimings: step2.deliveryTimings,
+        }
         : null,
       step3Data: step3
         ? {
-            hasPan: !!step3.pan,
-            hasGst: !!step3.gst,
-            hasFssai: !!step3.fssai,
-            hasBank: !!step3.bank,
-            panNumber: step3.pan?.panNumber,
-            gstRegistered: step3.gst?.isRegistered,
-            fssaiNumber: step3.fssai?.registrationNumber,
-            bankAccount: step3.bank?.accountNumber,
-          }
+          hasPan: !!step3.pan,
+          hasGst: !!step3.gst,
+          hasFssai: !!step3.fssai,
+          hasBank: !!step3.bank,
+          panNumber: step3.pan?.panNumber,
+          gstRegistered: step3.gst?.isRegistered,
+          fssaiNumber: step3.fssai?.registrationNumber,
+          bankAccount: step3.bank?.accountNumber,
+        }
         : null,
       updateKeys: Object.keys(update),
     });
@@ -123,31 +123,31 @@ export const upsertOnboarding = async (req, res) => {
       step1Saved: !!onboarding.step1,
       step2Saved: onboarding.step2
         ? {
-            menuImageUrlsCount: onboarding.step2.menuImageUrls?.length || 0,
-            hasProfileImage: !!onboarding.step2.profileImageUrl,
-            cuisinesCount: onboarding.step2.cuisines?.length || 0,
-            openDaysCount: onboarding.step2.openDays?.length || 0,
-          }
+          menuImageUrlsCount: onboarding.step2.menuImageUrls?.length || 0,
+          hasProfileImage: !!onboarding.step2.profileImageUrl,
+          cuisinesCount: onboarding.step2.cuisines?.length || 0,
+          openDaysCount: onboarding.step2.openDays?.length || 0,
+        }
         : null,
       step3Saved: onboarding.step3
         ? {
-            hasPan: !!onboarding.step3.pan,
-            hasGst: !!onboarding.step3.gst,
-            hasFssai: !!onboarding.step3.fssai,
-            hasBank: !!onboarding.step3.bank,
-            panNumber: onboarding.step3.pan?.panNumber,
-            gstRegistered: onboarding.step3.gst?.isRegistered,
-            fssaiNumber: onboarding.step3.fssai?.registrationNumber,
-            bankAccount: onboarding.step3.bank?.accountNumber,
-          }
+          hasPan: !!onboarding.step3.pan,
+          hasGst: !!onboarding.step3.gst,
+          hasFssai: !!onboarding.step3.fssai,
+          hasBank: !!onboarding.step3.bank,
+          panNumber: onboarding.step3.pan?.panNumber,
+          gstRegistered: onboarding.step3.gst?.isRegistered,
+          fssaiNumber: onboarding.step3.fssai?.registrationNumber,
+          bankAccount: onboarding.step3.bank?.accountNumber,
+        }
         : null,
       step4Saved: onboarding.step4
         ? {
-            estimatedDeliveryTime: onboarding.step4.estimatedDeliveryTime,
-            distance: onboarding.step4.distance,
-            priceRange: onboarding.step4.priceRange,
-            featuredDish: onboarding.step4.featuredDish,
-          }
+          estimatedDeliveryTime: onboarding.step4.estimatedDeliveryTime,
+          distance: onboarding.step4.distance,
+          priceRange: onboarding.step4.priceRange,
+          featuredDish: onboarding.step4.featuredDish,
+        }
         : null,
     });
 
@@ -191,6 +191,51 @@ export const upsertOnboarding = async (req, res) => {
             Object.keys(updateData),
           );
         }
+
+        // ─── AUTO ZONE DETECTION ─────────────────────────────────────────────
+        // When location is saved, detect which zone the restaurant falls into
+        // and automatically assign restaurant.zoneId
+        if (step1.location?.latitude && step1.location?.longitude) {
+          try {
+            const Zone = (await import("../../admin/models/Zone.js")).default;
+
+            const lat = parseFloat(step1.location.latitude);
+            const lng = parseFloat(step1.location.longitude);
+
+            const activeZones = await Zone.find({ isActive: true });
+            let detectedZone = null;
+
+            for (const zone of activeZones) {
+              // Use the Zone model's built-in containsPoint() method
+              if (zone.containsPoint(lat, lng)) {
+                detectedZone = zone;
+                break;
+              }
+            }
+
+            if (detectedZone) {
+              await Restaurant.findByIdAndUpdate(restaurantId, {
+                $set: { zoneId: detectedZone._id },
+              });
+              console.log(
+                `✅ Auto-assigned restaurant to zone: ${detectedZone.name || detectedZone.zoneName} (${detectedZone._id})`,
+              );
+            } else {
+              console.warn(
+                `⚠️ Restaurant location (${lat}, ${lng}) does not fall within any active zone. zoneId not set.`,
+              );
+            }
+          } catch (zoneDetectError) {
+            console.error(
+              "⚠️ Error during auto zone detection:",
+              zoneDetectError,
+            );
+            // Don't fail the request, just log the error
+          }
+        }
+        // ─────────────────────────────────────────────────────────────────────
+
+
       } catch (step1UpdateError) {
         console.error(
           "⚠️ Error updating restaurant schema with step1 data:",

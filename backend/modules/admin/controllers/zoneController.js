@@ -9,8 +9,8 @@ import mongoose from 'mongoose';
  */
 export const getZones = asyncHandler(async (req, res) => {
   try {
-    const { 
-      page = 1, 
+    const {
+      page = 1,
       limit = 50,
       search,
       restaurantId,
@@ -48,6 +48,7 @@ export const getZones = asyncHandler(async (req, res) => {
         match: { _id: { $exists: true } }
       })
       .populate('createdBy', 'name email')
+      .populate('tierId', 'name rank')
       .sort({ createdAt: -1 })
       .limit(parseInt(limit))
       .skip(skip)
@@ -120,7 +121,8 @@ export const createZone = asyncHandler(async (req, res) => {
       peakZoneSelectionDuration,
       peakZoneDuration,
       peakZoneSurgePercentage,
-      isActive
+      isActive,
+      deliveryPricing
     } = req.body;
 
     // Validation - For customer zones, country and zoneName are required instead of restaurantId
@@ -175,6 +177,7 @@ export const createZone = asyncHandler(async (req, res) => {
       peakZoneDuration: peakZoneDuration || 0,
       peakZoneSurgePercentage: peakZoneSurgePercentage || 0,
       isActive: isActive !== undefined ? isActive : true,
+      deliveryPricing,
       createdBy: req.admin?._id || null
     };
 
@@ -306,9 +309,9 @@ export const getZonesByRestaurant = asyncHandler(async (req, res) => {
   try {
     const { restaurantId } = req.params;
 
-    const zones = await Zone.find({ 
+    const zones = await Zone.find({
       restaurantId: new mongoose.Types.ObjectId(restaurantId),
-      isActive: true 
+      isActive: true
     })
       .populate({
         path: 'restaurantId',
@@ -334,7 +337,7 @@ export const getZonesByRestaurant = asyncHandler(async (req, res) => {
 export const detectUserZone = asyncHandler(async (req, res) => {
   try {
     const { lat, lng, latitude, longitude } = req.query;
-    
+
     // Support both lat/lng and latitude/longitude
     const userLat = parseFloat(lat || latitude);
     const userLng = parseFloat(lng || longitude);
@@ -379,11 +382,11 @@ export const detectUserZone = asyncHandler(async (req, res) => {
           const yi = typeof coordI === 'object' ? (coordI.longitude || coordI.lng) : null;
           const xj = typeof coordJ === 'object' ? (coordJ.latitude || coordJ.lat) : null;
           const yj = typeof coordJ === 'object' ? (coordJ.longitude || coordJ.lng) : null;
-          
+
           if (xi === null || yi === null || xj === null || yj === null) continue;
-          
-          const intersect = ((yi > userLng) !== (yj > userLng)) && 
-                           (userLat < (xj - xi) * (userLng - yi) / (yj - yi) + xi);
+
+          const intersect = ((yi > userLng) !== (yj > userLng)) &&
+            (userLat < (xj - xi) * (userLng - yi) / (yj - yi) + xi);
           if (intersect) inside = !inside;
         }
         isInZone = inside;
@@ -393,7 +396,7 @@ export const detectUserZone = asyncHandler(async (req, res) => {
         // Calculate distance to zone centroid for buffer logic
         const centroid = calculateZoneCentroid(zone.coordinates);
         const distance = calculateDistance(userLat, userLng, centroid.lat, centroid.lng);
-        
+
         if (distance < minDistance) {
           minDistance = distance;
           userZone = zone;
@@ -404,13 +407,13 @@ export const detectUserZone = asyncHandler(async (req, res) => {
     // If user is not in any zone, check buffer area (50-100 meters)
     if (!userZone) {
       const BUFFER_DISTANCE = 0.1; // 100 meters in km
-      
+
       for (const zone of activeZones) {
         if (!zone.coordinates || zone.coordinates.length < 3) continue;
-        
+
         const centroid = calculateZoneCentroid(zone.coordinates);
         const distance = calculateDistance(userLat, userLng, centroid.lat, centroid.lng);
-        
+
         // Find nearest zone within buffer
         if (distance <= BUFFER_DISTANCE && distance < minDistance) {
           minDistance = distance;
@@ -477,7 +480,7 @@ function calculateDistance(lat1, lng1, lat2, lng2) {
   const R = 6371; // Earth's radius in km
   const dLat = (lat2 - lat1) * Math.PI / 180;
   const dLng = (lng2 - lng1) * Math.PI / 180;
-  const a = 
+  const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
     Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
     Math.sin(dLng / 2) * Math.sin(dLng / 2);

@@ -23,17 +23,20 @@ export default function RestaurantsList() {
   const [banning, setBanning] = useState(false)
   const [deleteConfirmDialog, setDeleteConfirmDialog] = useState(null) // { restaurant }
   const [deleting, setDeleting] = useState(false)
+  const [extensionDays, setExtensionDays] = useState(30)
+  const [extending, setExtending] = useState(false)
+  const [showExtendInput, setShowExtendInput] = useState(false)
 
   // Format Restaurant ID to REST format (e.g., REST422829)
   const formatRestaurantId = (id) => {
     if (!id) return "REST000000"
-    
+
     const idString = String(id)
     // Extract last 6 digits from the ID
     // Handle formats like "REST-1768045396242-2829" or "1768045396242-2829"
     const parts = idString.split(/[-.]/)
     let lastDigits = ""
-    
+
     // Get the last part and extract digits
     if (parts.length > 0) {
       const lastPart = parts[parts.length - 1]
@@ -53,7 +56,7 @@ export default function RestaurantsList() {
         }
       }
     }
-    
+
     // If no digits found, use a hash of the ID
     if (!lastDigits) {
       const hash = idString.split("").reduce((acc, char) => {
@@ -61,7 +64,7 @@ export default function RestaurantsList() {
       }, 0)
       lastDigits = Math.abs(hash).toString().slice(-6).padStart(6, "0")
     }
-    
+
     return `REST${lastDigits}`
   }
 
@@ -71,7 +74,7 @@ export default function RestaurantsList() {
       try {
         setLoading(true)
         setError(null)
-        
+
         let response
         try {
           // Try admin API first
@@ -81,11 +84,11 @@ export default function RestaurantsList() {
           console.log("Admin restaurants endpoint not available, using fallback")
           response = await restaurantAPI.getRestaurants()
         }
-        
+
         if (response.data && response.data.success && response.data.data) {
           // Map backend data to frontend format
           const restaurantsData = response.data.data.restaurants || response.data.data || []
-          
+
           const mappedRestaurants = restaurantsData.map((restaurant, index) => ({
             id: restaurant._id || restaurant.id || index + 1,
             _id: restaurant._id, // Preserve original _id for API calls
@@ -93,8 +96,8 @@ export default function RestaurantsList() {
             ownerName: restaurant.ownerName || "N/A",
             ownerPhone: restaurant.ownerPhone || restaurant.phone || "N/A",
             zone: restaurant.location?.area || restaurant.location?.city || restaurant.zone || "N/A",
-            cuisine: Array.isArray(restaurant.cuisines) && restaurant.cuisines.length > 0 
-              ? restaurant.cuisines[0] 
+            cuisine: Array.isArray(restaurant.cuisines) && restaurant.cuisines.length > 0
+              ? restaurant.cuisines[0]
               : (restaurant.cuisine || "N/A"),
             status: restaurant.isActive !== false, // Default to true if not set
             rating: restaurant.ratings?.average || restaurant.rating || 0,
@@ -102,7 +105,7 @@ export default function RestaurantsList() {
             // Preserve original restaurant data for details modal
             originalData: restaurant,
           }))
-          
+
           setRestaurants(mappedRestaurants)
         } else {
           setRestaurants([])
@@ -115,7 +118,7 @@ export default function RestaurantsList() {
         setLoading(false)
       }
     }
-    
+
     fetchRestaurants()
   }, [])
   const [filters, setFilters] = useState({
@@ -127,7 +130,7 @@ export default function RestaurantsList() {
 
   const filteredRestaurants = useMemo(() => {
     let result = [...restaurants]
-    
+
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim()
       result = result.filter(restaurant =>
@@ -146,7 +149,7 @@ export default function RestaurantsList() {
     }
 
     if (filters.cuisine) {
-      result = result.filter(restaurant => 
+      result = result.filter(restaurant =>
         restaurant.cuisine.toLowerCase().includes(filters.cuisine.toLowerCase())
       )
     }
@@ -165,7 +168,7 @@ export default function RestaurantsList() {
         restaurant.id === id ? { ...restaurant, status: !restaurant.status } : restaurant
       )
       setRestaurants(updatedRestaurants)
-      
+
       // TODO: Call API to update restaurant status
       // await adminAPI.updateRestaurantStatus(id, !restaurants.find(r => r.id === id).status)
     } catch (err) {
@@ -204,7 +207,7 @@ export default function RestaurantsList() {
     setSelectedRestaurant(restaurant)
     setLoadingDetails(true)
     setRestaurantDetails(null)
-    
+
     try {
       // First, use original data if available (has all details)
       if (restaurant.originalData) {
@@ -213,12 +216,12 @@ export default function RestaurantsList() {
         setLoadingDetails(false)
         return
       }
-      
+
       // Try to fetch full restaurant details from API
       // Use _id if available, otherwise use id or restaurantId
       const restaurantId = restaurant._id || restaurant.id || restaurant.restaurantId
       let response = null
-      
+
       if (restaurantId) {
         try {
           // Try admin API first if it exists
@@ -228,7 +231,7 @@ export default function RestaurantsList() {
         } catch (err) {
           console.log("Admin API failed, trying restaurant API:", err)
         }
-        
+
         // Fallback to regular restaurant API
         if (!response || !response?.data?.success) {
           try {
@@ -238,7 +241,7 @@ export default function RestaurantsList() {
           }
         }
       }
-      
+
       // Check response structure
       if (response?.data?.success) {
         const data = response.data.data
@@ -281,38 +284,38 @@ export default function RestaurantsList() {
 
   const confirmBanRestaurant = async () => {
     if (!banConfirmDialog) return
-    
+
     const { restaurant, action } = banConfirmDialog
     const isBanning = action === 'ban'
     const newStatus = !isBanning // false for ban, true for unban
-    
+
     try {
       setBanning(true)
       const restaurantId = restaurant._id || restaurant.id
-      
+
       // Update restaurant status via API
       try {
         await adminAPI.updateRestaurantStatus(restaurantId, newStatus)
-        
+
         // Update local state on success
-        setRestaurants(prevRestaurants => 
-          prevRestaurants.map(r => 
+        setRestaurants(prevRestaurants =>
+          prevRestaurants.map(r =>
             r.id === restaurant.id || r._id === restaurant._id
               ? { ...r, status: newStatus }
               : r
           )
         )
-        
+
         // Close dialog
         setBanConfirmDialog(null)
-        
+
         // Show success message
         console.log(`Restaurant ${isBanning ? 'banned' : 'unbanned'} successfully`)
       } catch (apiErr) {
         console.error("API Error:", apiErr)
         // If API fails, still update locally for better UX
-        setRestaurants(prevRestaurants => 
-          prevRestaurants.map(r => 
+        setRestaurants(prevRestaurants =>
+          prevRestaurants.map(r =>
             r.id === restaurant.id || r._id === restaurant._id
               ? { ...r, status: newStatus }
               : r
@@ -321,7 +324,7 @@ export default function RestaurantsList() {
         setBanConfirmDialog(null)
         alert(`Restaurant ${isBanning ? 'banned' : 'unbanned'} locally. Please check backend connection.`)
       }
-      
+
     } catch (err) {
       console.error("Error banning/unbanning restaurant:", err)
       alert(`Failed to ${action} restaurant. Please try again.`)
@@ -341,34 +344,34 @@ export default function RestaurantsList() {
 
   const confirmDeleteRestaurant = async () => {
     if (!deleteConfirmDialog) return
-    
+
     const { restaurant } = deleteConfirmDialog
-    
+
     try {
       setDeleting(true)
       const restaurantId = restaurant._id || restaurant.id
-      
+
       // Delete restaurant via API
       try {
         await adminAPI.deleteRestaurant(restaurantId)
-        
+
         // Remove from local state on success
-        setRestaurants(prevRestaurants => 
-          prevRestaurants.filter(r => 
+        setRestaurants(prevRestaurants =>
+          prevRestaurants.filter(r =>
             r.id !== restaurant.id && r._id !== restaurant._id
           )
         )
-        
+
         // Close dialog
         setDeleteConfirmDialog(null)
-        
+
         // Show success message
         alert(`Restaurant "${restaurant.name}" deleted successfully!`)
       } catch (apiErr) {
         console.error("API Error:", apiErr)
         alert(apiErr.response?.data?.message || "Failed to delete restaurant. Please try again.")
       }
-      
+
     } catch (err) {
       console.error("Error deleting restaurant:", err)
       alert("Failed to delete restaurant. Please try again.")
@@ -379,6 +382,32 @@ export default function RestaurantsList() {
 
   const cancelDeleteRestaurant = () => {
     setDeleteConfirmDialog(null)
+  }
+
+  const handleExtendSubscription = async () => {
+    if (!restaurantDetails) return
+
+    try {
+      setExtending(true)
+      const restaurantId = restaurantDetails._id || restaurantDetails.id || restaurantDetails.restaurantId
+
+      const response = await adminAPI.extendRestaurantSubscription(restaurantId, extensionDays)
+
+      if (response.data && response.data.success) {
+        // Update local state
+        setRestaurantDetails(prev => ({
+          ...prev,
+          subscription: response.data.data.subscription
+        }))
+        setShowExtendInput(false)
+        alert("Subscription extended successfully!")
+      }
+    } catch (err) {
+      console.error("Error extending subscription:", err)
+      alert(err.response?.data?.message || "Failed to extend subscription")
+    } finally {
+      setExtending(false)
+    }
   }
 
   // Handle export functionality
@@ -410,7 +439,7 @@ export default function RestaurantsList() {
                 <p className="text-sm font-medium text-slate-600 mb-1">Total restaurants</p>
                 <p className="text-2xl font-bold text-slate-900">{totalRestaurants}</p>
               </div>
-              <div className="w-12 h-12 rounded-lg bg-blue-100 flex items-center justify-center">
+              <div className="w-12 h-12 rounded-lg bg-orange-100 flex items-center justify-center">
                 <img src={locationIcon} alt="Location" className="w-8 h-8" />
               </div>
             </div>
@@ -451,7 +480,7 @@ export default function RestaurantsList() {
             <div className="flex items-center gap-3">
               <button
                 onClick={() => navigate("/admin/restaurants/add")}
-                className="px-4 py-2.5 text-sm font-medium rounded-lg bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2 transition-all"
+                className="px-4 py-2.5 text-sm font-medium rounded-lg bg-orange-600 hover:bg-orange-700 text-white flex items-center gap-2 transition-all"
               >
                 <Plus className="w-4 h-4" />
                 <span>Add Restaurant</span>
@@ -462,7 +491,7 @@ export default function RestaurantsList() {
                   placeholder="Ex: search by Restaurant n"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 pr-4 py-2.5 w-full text-sm rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="pl-10 pr-4 py-2.5 w-full text-sm rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                 />
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               </div>
@@ -495,7 +524,7 @@ export default function RestaurantsList() {
           <div className="overflow-x-auto">
             {loading ? (
               <div className="flex items-center justify-center py-20">
-                <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+                <Loader2 className="w-8 h-8 animate-spin text-orange-600" />
                 <span className="ml-3 text-slate-600">Loading restaurants...</span>
               </div>
             ) : error ? (
@@ -507,43 +536,43 @@ export default function RestaurantsList() {
               <table className="w-full">
                 <thead className="bg-slate-50 border-b border-slate-200">
                   <tr>
-                    <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
                       <div className="flex items-center gap-1">
                         <span>SL</span>
                         <ArrowUpDown className="w-3 h-3 text-slate-400" />
                       </div>
                     </th>
-                    <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
                       <div className="flex items-center gap-1">
                         <span>Restaurant Info</span>
                         <ArrowUpDown className="w-3 h-3 text-slate-400" />
                       </div>
                     </th>
-                    <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
                       <div className="flex items-center gap-1">
                         <span>Owner Info</span>
                         <ArrowUpDown className="w-3 h-3 text-slate-400" />
                       </div>
                     </th>
-                    <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
                       <div className="flex items-center gap-1">
                         <span>Zone</span>
                         <ArrowUpDown className="w-3 h-3 text-slate-400" />
                       </div>
                     </th>
-                    <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
                       <div className="flex items-center gap-1">
                         <span>Cuisine</span>
                         <ArrowUpDown className="w-3 h-3 text-slate-400" />
                       </div>
                     </th>
-                    <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
                       <div className="flex items-center gap-1">
                         <span>Status</span>
                         <ArrowUpDown className="w-3 h-3 text-slate-400" />
                       </div>
                     </th>
-                    <th className="px-6 py-4 text-center text-[10px] font-bold text-slate-700 uppercase tracking-wider">Action</th>
+                    <th className="px-4 py-3 text-center text-[10px] font-bold text-slate-700 uppercase tracking-wider">Action</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-slate-100">
@@ -562,7 +591,7 @@ export default function RestaurantsList() {
                         key={restaurant.id}
                         className="hover:bg-slate-50 transition-colors"
                       >
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-4 py-3 whitespace-nowrap">
                           <span className="text-sm font-medium text-slate-700">{index + 1}</span>
                         </td>
                         <td className="px-6 py-4">
@@ -577,55 +606,52 @@ export default function RestaurantsList() {
                                 }}
                               />
                             </div>
-                            <div className="flex flex-col">
-                              <span className="text-sm font-medium text-slate-900">{restaurant.name}</span>
+                            <div className="flex flex-col min-w-0">
+                              <span className="text-sm font-medium text-slate-900 truncate max-w-[150px]" title={restaurant.name}>{restaurant.name}</span>
                               <span className="text-xs text-slate-500">ID #{formatRestaurantId(restaurant.originalData?.restaurantId || restaurant.originalData?._id || restaurant._id || restaurant.id)}</span>
                               <span className="text-xs text-slate-500">{renderStars(restaurant.rating)}</span>
                             </div>
                           </div>
                         </td>
-                        <td className="px-6 py-4">
-                          <div className="flex flex-col">
-                            <span className="text-sm font-medium text-slate-900">{restaurant.ownerName}</span>
+                        <td className="px-4 py-3">
+                          <div className="flex flex-col min-w-0">
+                            <span className="text-sm font-medium text-slate-900 truncate max-w-[150px]" title={restaurant.ownerName}>{restaurant.ownerName}</span>
                             <span className="text-xs text-slate-500">{formatPhone(restaurant.ownerPhone)}</span>
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-4 py-3 whitespace-nowrap">
                           <span className="text-sm text-slate-700">{restaurant.zone}</span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-4 py-3 whitespace-nowrap">
                           <span className="text-sm text-slate-700">{restaurant.cuisine}</span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-4 py-3 whitespace-nowrap">
                           <button
                             onClick={() => handleToggleStatus(restaurant.id)}
-                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-                              restaurant.status ? "bg-blue-600" : "bg-slate-300"
-                            }`}
+                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 ${restaurant.status ? "bg-orange-600" : "bg-slate-300"
+                              }`}
                           >
                             <span
-                              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                                restaurant.status ? "translate-x-6" : "translate-x-1"
-                              }`}
+                              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${restaurant.status ? "translate-x-6" : "translate-x-1"
+                                }`}
                             />
                           </button>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-center">
+                        <td className="px-4 py-3 whitespace-nowrap text-center">
                           <div className="flex items-center justify-center gap-2">
                             <button
                               onClick={() => handleViewDetails(restaurant)}
-                              className="p-1.5 rounded text-blue-600 hover:bg-blue-50 transition-colors"
+                              className="p-1.5 rounded text-orange-600 hover:bg-orange-50 transition-colors"
                               title="View Details"
                             >
                               <Eye className="w-4 h-4" />
                             </button>
                             <button
                               onClick={() => handleBanRestaurant(restaurant)}
-                              className={`p-1.5 rounded transition-colors ${
-                                !restaurant.status
-                                  ? "text-green-600 hover:bg-green-50"
-                                  : "text-red-600 hover:bg-red-50"
-                              }`}
+                              className={`p-1.5 rounded transition-colors ${!restaurant.status
+                                ? "text-green-600 hover:bg-green-50"
+                                : "text-red-600 hover:bg-red-50"
+                                }`}
                               title={!restaurant.status ? "Unban Restaurant" : "Ban Restaurant"}
                             >
                               <ShieldX className="w-4 h-4" />
@@ -668,7 +694,7 @@ export default function RestaurantsList() {
             <div className="p-6">
               {loadingDetails && (
                 <div className="flex items-center justify-center py-20">
-                  <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+                  <Loader2 className="w-8 h-8 animate-spin text-orange-600" />
                   <span className="ml-3 text-slate-600">Loading details...</span>
                 </div>
               )}
@@ -793,12 +819,12 @@ export default function RestaurantsList() {
                           <div className="flex flex-wrap gap-2">
                             {restaurantDetails?.cuisines && Array.isArray(restaurantDetails.cuisines) && restaurantDetails.cuisines.length > 0 ? (
                               restaurantDetails.cuisines.map((cuisine, idx) => (
-                                <span key={idx} className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">
+                                <span key={idx} className="px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-sm font-medium">
                                   {cuisine}
                                 </span>
                               ))
                             ) : (
-                              <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">
+                              <span className="px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-sm font-medium">
                                 {restaurantDetails?.cuisine || selectedRestaurant.cuisine || "N/A"}
                               </span>
                             )}
@@ -835,13 +861,96 @@ export default function RestaurantsList() {
                         )}
                         <div>
                           <p className="text-xs text-slate-500 mb-1">Status</p>
-                          <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                            (restaurantDetails?.isActive !== false) ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
-                          }`}>
+                          <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${(restaurantDetails?.isActive !== false) ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                            }`}>
                             {(restaurantDetails?.isActive !== false) ? "Active" : "Inactive"}
                           </span>
                         </div>
                       </div>
+                    </div>
+                  </div>
+
+                  {/* Subscription Details */}
+                  <div className="pt-6 border-t border-slate-200">
+                    <h4 className="text-lg font-semibold text-slate-900 mb-4 flex items-center justify-between">
+                      <span>Subscription Details</span>
+                      {!showExtendInput && (
+                        <button
+                          onClick={() => setShowExtendInput(true)}
+                          className="text-sm bg-orange-600 text-white px-3 py-1.5 rounded-lg hover:bg-orange-700 transition-colors"
+                        >
+                          Extend Subscription
+                        </button>
+                      )}
+                    </h4>
+
+                    {showExtendInput && (
+                      <div className="bg-orange-50 p-4 rounded-lg mb-4 border border-orange-100">
+                        <h5 className="font-medium text-orange-900 mb-2">Extend Subscription Period</h5>
+                        <div className="flex gap-3 items-end">
+                          <div>
+                            <label className="block text-xs text-orange-700 mb-1">Days to Extend</label>
+                            <input
+                              type="number"
+                              value={extensionDays}
+                              onChange={(e) => setExtensionDays(parseInt(e.target.value) || 0)}
+                              className="w-40 px-3 py-2 border border-orange-200 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                              min="1"
+                            />
+                          </div>
+                          <button
+                            onClick={handleExtendSubscription}
+                            disabled={extending || extensionDays <= 0}
+                            className="px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                          >
+                            {extending ? "Extending..." : "Confirm Extension"}
+                          </button>
+                          <button
+                            onClick={() => setShowExtendInput(false)}
+                            className="px-4 py-2 bg-white text-slate-600 border border-slate-300 rounded-md hover:bg-slate-50 text-sm"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                      {restaurantDetails?.subscription ? (
+                        <>
+                          <div>
+                            <p className="text-xs text-slate-500 mb-1">Current Plan Status</p>
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${restaurantDetails.subscription.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                              }`}>
+                              {restaurantDetails.subscription.status || 'Inactive'}
+                            </span>
+                          </div>
+                          <div>
+                            <p className="text-xs text-slate-500 mb-1">End Date</p>
+                            <p className="font-medium text-slate-900">
+                              {restaurantDetails.subscription.endDate ? new Date(restaurantDetails.subscription.endDate).toLocaleDateString('en-IN', {
+                                day: 'numeric', month: 'short', year: 'numeric'
+                              }) : 'N/A'}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-slate-500 mb-1">Start Date</p>
+                            <p className="font-medium text-slate-900">
+                              {restaurantDetails.subscription.startDate ? new Date(restaurantDetails.subscription.startDate).toLocaleDateString('en-IN', {
+                                day: 'numeric', month: 'short', year: 'numeric'
+                              }) : 'N/A'}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-slate-500 mb-1">Auto Renew</p>
+                            <p className="font-medium text-slate-900">
+                              {restaurantDetails.subscription.autoRenew ? 'Yes' : 'No'}
+                            </p>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="col-span-2 text-slate-500 italic">No active subscription information found. Extension will initialize a new subscription.</div>
+                      )}
                     </div>
                   </div>
 
@@ -944,7 +1053,7 @@ export default function RestaurantsList() {
                                     href={restaurantDetails.onboarding.step3.pan.image.url}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700"
+                                    className="inline-flex items-center gap-2 text-orange-600 hover:text-orange-700"
                                   >
                                     <ImageIcon className="w-4 h-4" />
                                     <span>View PAN Document</span>
@@ -995,7 +1104,7 @@ export default function RestaurantsList() {
                                     href={restaurantDetails.onboarding.step3.gst.image.url}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700"
+                                    className="inline-flex items-center gap-2 text-orange-600 hover:text-orange-700"
                                   >
                                     <ImageIcon className="w-4 h-4" />
                                     <span>View GST Document</span>
@@ -1040,7 +1149,7 @@ export default function RestaurantsList() {
                                     href={restaurantDetails.onboarding.step3.fssai.image.url}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700"
+                                    className="inline-flex items-center gap-2 text-orange-600 hover:text-orange-700"
                                   >
                                     <ImageIcon className="w-4 h-4" />
                                     <span>View FSSAI Document</span>
@@ -1154,7 +1263,7 @@ export default function RestaurantsList() {
                             <p className="text-xs text-slate-500 mb-2">Cuisines (at registration)</p>
                             <div className="flex flex-wrap gap-2">
                               {restaurantDetails.onboarding.step2.cuisines.map((cuisine, idx) => (
-                                <span key={idx} className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm font-medium">
+                                <span key={idx} className="px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-sm font-medium">
                                   {cuisine}
                                 </span>
                               ))}
@@ -1178,7 +1287,7 @@ export default function RestaurantsList() {
                             <p className="text-xs text-slate-500 mb-2">Open Days (at registration)</p>
                             <div className="flex flex-wrap gap-2">
                               {restaurantDetails.onboarding.step2.openDays.map((day, idx) => (
-                                <span key={idx} className="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-sm font-medium capitalize">
+                                <span key={idx} className="px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-sm font-medium capitalize">
                                   {day}
                                 </span>
                               ))}
@@ -1197,7 +1306,7 @@ export default function RestaurantsList() {
                               <img
                                 src={restaurantDetails.onboarding.step2.profileImageUrl.url}
                                 alt="Profile"
-                                className="w-32 h-32 rounded-lg object-cover border border-slate-200 hover:border-blue-500 transition-colors"
+                                className="w-32 h-32 rounded-lg object-cover border border-slate-200 hover:border-orange-500 transition-colors"
                                 onError={(e) => {
                                   e.target.src = "https://via.placeholder.com/128"
                                 }}
@@ -1299,12 +1408,10 @@ export default function RestaurantsList() {
           <div className="bg-white rounded-xl shadow-2xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
             <div className="p-6">
               <div className="flex items-center gap-4 mb-4">
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
-                  banConfirmDialog.action === 'ban' ? 'bg-red-100' : 'bg-green-100'
-                }`}>
-                  <AlertTriangle className={`w-6 h-6 ${
-                    banConfirmDialog.action === 'ban' ? 'text-red-600' : 'text-green-600'
-                  }`} />
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center ${banConfirmDialog.action === 'ban' ? 'bg-red-100' : 'bg-green-100'
+                  }`}>
+                  <AlertTriangle className={`w-6 h-6 ${banConfirmDialog.action === 'ban' ? 'text-red-600' : 'text-green-600'
+                    }`} />
                 </div>
                 <div>
                   <h3 className="text-lg font-bold text-slate-900">
@@ -1315,9 +1422,9 @@ export default function RestaurantsList() {
                   </p>
                 </div>
               </div>
-              
+
               <p className="text-sm text-slate-700 mb-6">
-                {banConfirmDialog.action === 'ban' 
+                {banConfirmDialog.action === 'ban'
                   ? 'Are you sure you want to ban this restaurant? They will not be able to receive orders or access their account.'
                   : 'Are you sure you want to unban this restaurant? They will be able to receive orders and access their account again.'
                 }
@@ -1334,11 +1441,10 @@ export default function RestaurantsList() {
                 <button
                   onClick={confirmBanRestaurant}
                   disabled={banning}
-                  className={`flex-1 px-4 py-2.5 text-sm font-medium rounded-lg text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-                    banConfirmDialog.action === 'ban'
-                      ? 'bg-red-600 hover:bg-red-700'
-                      : 'bg-green-600 hover:bg-green-700'
-                  }`}
+                  className={`flex-1 px-4 py-2.5 text-sm font-medium rounded-lg text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${banConfirmDialog.action === 'ban'
+                    ? 'bg-red-600 hover:bg-red-700'
+                    : 'bg-green-600 hover:bg-green-700'
+                    }`}
                 >
                   {banning ? (
                     <span className="flex items-center justify-center gap-2">
@@ -1371,7 +1477,7 @@ export default function RestaurantsList() {
                   </p>
                 </div>
               </div>
-              
+
               <p className="text-sm text-slate-700 mb-6">
                 Are you sure you want to delete this restaurant? This action cannot be undone and will permanently remove all restaurant data, including orders, menu items, and settings.
               </p>

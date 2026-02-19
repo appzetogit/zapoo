@@ -84,7 +84,7 @@ deliverySupportTicketSchema.index({ createdAt: -1 });
 deliverySupportTicketSchema.index({ ticketId: 1 });
 
 // Generate unique ticket ID before saving
-deliverySupportTicketSchema.pre('save', async function(next) {
+deliverySupportTicketSchema.pre('save', async function (next) {
   // Only generate ticketId if it doesn't exist (for new documents)
   if (!this.ticketId && this.isNew) {
     let attempts = 0;
@@ -126,7 +126,7 @@ deliverySupportTicketSchema.pre('save', async function(next) {
 });
 
 // Validate ticketId after save (ensure it was generated)
-deliverySupportTicketSchema.post('save', function(doc, next) {
+deliverySupportTicketSchema.post('save', function (doc, next) {
   if (!doc.ticketId) {
     console.error('Warning: ticketId was not generated for ticket:', doc._id);
   }

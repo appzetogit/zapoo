@@ -1,8 +1,10 @@
+import { marketingAPI } from "@/lib/api"
+import { toast } from "sonner"
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useNavigate } from "react-router-dom"
 import Lenis from "lenis"
-import { 
+import {
   ArrowLeft,
   MoreVertical,
   ChevronRight,
@@ -22,6 +24,24 @@ export default function AdvertisementsPage() {
   const [activeFilter, setActiveFilter] = useState("all")
   const [openMenuId, setOpenMenuId] = useState(null)
   const [showMenu, setShowMenu] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [advertisements, setAdvertisements] = useState([])
+
+  // Fetch ads from real backend
+  useEffect(() => {
+    const fetchAds = async () => {
+      try {
+        setLoading(true)
+        const res = await marketingAPI.getMyAds()
+        setAdvertisements(res.data.data || [])
+      } catch (error) {
+        toast.error("Failed to load advertisements")
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchAds()
+  }, [])
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -62,56 +82,22 @@ export default function AdvertisementsPage() {
     }
   }, [])
 
-  // Advertisement data matching the image
-  const advertisements = [
-    {
-      id: "1000000",
-      status: "Running",
-      type: "Restaurant Promotion",
-      adsPlaced: "03 Jul, 2024",
-      duration: {
-        start: "16 Jul 2025",
-        end: "13 Jun 2028"
-      }
-    },
-    {
-      id: "1000003",
-      status: "Running",
-      type: "Restaurant Promotion",
-      adsPlaced: "03 Jul, 2024",
-      duration: {
-        start: "16 Jul 2025",
-        end: "05 Mar 2028"
-      }
-    },
-    {
-      id: "1000005",
-      status: "Pending",
-      type: "Video Promotion",
-      adsPlaced: "03 Jul, 2024",
-      duration: {
-        start: "03 Jul 2024",
-        end: "13 Jul 2024"
-      }
-    }
-  ]
-
-  // Filter counts
+  // Filter counts dynamically
   const filterCounts = {
     all: advertisements.length,
     pending: advertisements.filter(ad => ad.status === "Pending").length,
-    running: advertisements.filter(ad => ad.status === "Running").length,
-    approve: 0
+    running: advertisements.filter(ad => ad.status === "Active").length,
+    approve: advertisements.filter(ad => ad.status === "Approved").length
   }
 
   // Filter advertisements based on active filter
-  const filteredAds = activeFilter === "all" 
-    ? advertisements 
+  const filteredAds = activeFilter === "all"
+    ? advertisements
     : activeFilter === "pending"
-    ? advertisements.filter(ad => ad.status === "Pending")
-    : activeFilter === "running"
-    ? advertisements.filter(ad => ad.status === "Running")
-    : advertisements.filter(ad => ad.status === "Approve")
+      ? advertisements.filter(ad => ad.status === "Pending")
+      : activeFilter === "running"
+        ? advertisements.filter(ad => ad.status === "Active")
+        : advertisements.filter(ad => ad.status === "Approved")
 
   const filters = [
     { id: "all", label: "All", count: filterCounts.all },
@@ -124,7 +110,7 @@ export default function AdvertisementsPage() {
     <div className="min-h-screen bg-[#f6e9dc] overflow-x-hidden pb-20 md:pb-6">
       {/* Header */}
       <div className="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-50 flex items-center gap-3">
-        <button 
+        <button
           onClick={() => navigate(-1)}
           className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
         >
@@ -145,11 +131,10 @@ export default function AdvertisementsPage() {
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={() => setActiveFilter(filter.id)}
-              className={`relative z-10 flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                activeFilter === filter.id
-                  ? "text-white"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              }`}
+              className={`relative z-10 flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-colors ${activeFilter === filter.id
+                ? "text-white"
+                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                }`}
             >
               {activeFilter === filter.id && (
                 <motion.div
@@ -168,124 +153,129 @@ export default function AdvertisementsPage() {
 
       {/* Advertisement List */}
       <div className="px-4 py-4 space-y-3">
-        <AnimatePresence mode="wait">
-          {filteredAds.map((ad, index) => (
-            <motion.div
-              key={ad.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.4, delay: index * 0.1, ease: [0.4, 0, 0.2, 1] }}
-              whileHover={{ y: -4, scale: 1.01 }}
-              whileTap={{ scale: 0.98 }}
-            >
-              <Card className="bg-white shadow-sm border border-gray-100 hover:shadow-md transition-shadow cursor-pointer"
-                onClick={() => navigate(`/restaurant/advertisements/${ad.id}`)}
+        {loading ? (
+          /* Skeleton Loader */
+          [1, 2, 3].map(i => (
+            <div key={i} className="bg-white rounded-xl p-4 animate-pulse h-32 border border-gray-100" />
+          ))
+        ) : (
+          <AnimatePresence mode="wait">
+            {filteredAds.map((ad, index) => (
+              <motion.div
+                key={ad.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.4, delay: index * 0.1, ease: [0.4, 0, 0.2, 1] }}
+                whileHover={{ y: -4, scale: 1.01 }}
+                whileTap={{ scale: 0.98 }}
               >
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    {/* Left Content */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-2">
-                        <h3 className="text-base font-bold text-gray-900">
-                          Ads ID # {ad.id}
-                        </h3>
-                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                          ad.status === "Running"
-                            ? "bg-blue-100 text-blue-700"
-                            : "bg-blue-100 text-blue-700"
-                        }`}>
-                          {ad.status}
-                        </span>
-                      </div>
-                      
-                      <p className="text-sm text-gray-700 mb-2">{ad.type}</p>
-                      
-                      <div className="space-y-1 text-xs text-gray-600">
-                        <p>Ads Placed: {ad.adsPlaced}</p>
-                        <p>Duration: {ad.duration.start} - {ad.duration.end}</p>
-                      </div>
-                    </div>
+                <Card className="bg-white shadow-sm border border-gray-100 hover:shadow-md transition-shadow cursor-pointer"
+                  onClick={() => navigate(`/restaurant/advertisements/${ad._id}`)}
+                >
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      {/* Left Content */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-2">
+                          <h3 className="text-base font-bold text-gray-900 truncate">
+                            ID: {ad._id.slice(-8).toUpperCase()}
+                          </h3>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${ad.status === "Active" ? "bg-green-100 text-green-700" :
+                              ad.status === "Pending" ? "bg-orange-100 text-orange-700" :
+                                "bg-blue-100 text-blue-700"
+                            }`}>
+                            {ad.status}
+                          </span>
+                        </div>
 
-                    {/* Right Icons */}
-                    <div className="flex items-center gap-2 flex-shrink-0 relative">
-                      <motion.button 
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.9 }}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setOpenMenuId(openMenuId === ad.id ? null : ad.id)
-                        }}
-                        className="p-2 hover:bg-gray-100 rounded-lg transition-colors relative"
-                        data-menu-id={ad.id}
-                      >
-                        <MoreVertical className="w-5 h-5 text-gray-600" />
-                      </motion.button>
-                      
-                      {/* Context Menu */}
-                      <AnimatePresence>
-                        {openMenuId === ad.id && (
-                          <motion.div
-                            initial={{ opacity: 0, scale: 0.95, y: -10 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                            transition={{ duration: 0.2, ease: "easeOut" }}
-                            className="absolute top-full right-0 mt-2 bg-white rounded-xl shadow-2xl border border-gray-200 py-2 z-50 min-w-[180px]"
-                            data-menu-id={ad.id}
-                          >
-                            {[
-                              { icon: Eye, label: "View Ads", action: () => navigate(`/restaurant/advertisements/${ad.id}`) },
-                              { icon: Edit, label: "Edit Ads", action: () => navigate(`/restaurant/advertisements/${ad.id}/edit`) },
-                              { icon: Pause, label: "Pause Ads", action: () => console.log("Pause:", ad.id) },
-                              { icon: Copy, label: "Copy Ads", action: () => console.log("Copy:", ad.id) },
-                              { icon: Trash2, label: "Delete Ads", action: () => console.log("Delete:", ad.id), isDanger: true }
-                            ].map((option, idx) => {
-                              const IconComponent = option.icon
-                              return (
-                                <motion.button
-                                  key={option.label}
-                                  initial={{ opacity: 0, x: -10 }}
-                                  animate={{ opacity: 1, x: 0 }}
-                                  transition={{ delay: idx * 0.03, duration: 0.2 }}
-                                  whileHover={{ x: 4 }}
-                                  whileTap={{ scale: 0.95 }}
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    option.action()
-                                    setOpenMenuId(null)
-                                  }}
-                                  className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors ${
-                                    option.isDanger
+                        <p className="text-sm font-semibold text-gray-800 mb-1 truncate">{ad.title}</p>
+
+                        <div className="space-y-1 text-[11px] text-gray-500">
+                          <p>Placed: {new Date(ad.createdAt).toLocaleDateString()}</p>
+                          <p>Dates: {new Date(ad.startDate).toLocaleDateString()} - {new Date(ad.endDate).toLocaleDateString()}</p>
+                        </div>
+                      </div>
+
+                      {/* Right Icons */}
+                      <div className="flex items-center gap-2 flex-shrink-0 relative">
+                        <motion.button
+                          whileHover={{ scale: 1.1 }}
+                          whileTap={{ scale: 0.9 }}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setOpenMenuId(openMenuId === ad.id ? null : ad.id)
+                          }}
+                          className="p-2 hover:bg-gray-100 rounded-lg transition-colors relative"
+                          data-menu-id={ad.id}
+                        >
+                          <MoreVertical className="w-5 h-5 text-gray-600" />
+                        </motion.button>
+
+                        {/* Context Menu */}
+                        <AnimatePresence>
+                          {openMenuId === ad.id && (
+                            <motion.div
+                              initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                              animate={{ opacity: 1, scale: 1, y: 0 }}
+                              exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                              transition={{ duration: 0.2, ease: "easeOut" }}
+                              className="absolute top-full right-0 mt-2 bg-white rounded-xl shadow-2xl border border-gray-200 py-2 z-50 min-w-[180px]"
+                              data-menu-id={ad.id}
+                            >
+                              {[
+                                { icon: Eye, label: "View Ads", action: () => navigate(`/restaurant/advertisements/${ad.id}`) },
+                                { icon: Edit, label: "Edit Ads", action: () => navigate(`/restaurant/advertisements/${ad.id}/edit`) },
+                                { icon: Pause, label: "Pause Ads", action: () => console.log("Pause:", ad.id) },
+                                { icon: Copy, label: "Copy Ads", action: () => console.log("Copy:", ad.id) },
+                                { icon: Trash2, label: "Delete Ads", action: () => console.log("Delete:", ad.id), isDanger: true }
+                              ].map((option, idx) => {
+                                const IconComponent = option.icon
+                                return (
+                                  <motion.button
+                                    key={option.label}
+                                    initial={{ opacity: 0, x: -10 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    transition={{ delay: idx * 0.03, duration: 0.2 }}
+                                    whileHover={{ x: 4 }}
+                                    whileTap={{ scale: 0.95 }}
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      option.action()
+                                      setOpenMenuId(null)
+                                    }}
+                                    className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors ${option.isDanger
                                       ? "text-red-600 hover:bg-red-50"
                                       : "text-gray-700 hover:bg-gray-50"
-                                  }`}
-                                >
-                                  <IconComponent className="w-4 h-4" />
-                                  <span>{option.label}</span>
-                                </motion.button>
-                              )
-                            })}
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
+                                      }`}
+                                  >
+                                    <IconComponent className="w-4 h-4" />
+                                    <span>{option.label}</span>
+                                  </motion.button>
+                                )
+                              })}
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
 
-                      <motion.button 
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.9 }}
-                        onClick={() => {
-                          navigate(`/restaurant/advertisements/${ad.id}`)
-                        }}
-                        className="p-2 bg-[#ff8100] hover:bg-[#e67300] rounded-lg transition-colors"
-                      >
-                        <ChevronRight className="w-5 h-5 text-white" />
-                      </motion.button>
+                        <motion.button
+                          whileHover={{ scale: 1.1 }}
+                          whileTap={{ scale: 0.9 }}
+                          onClick={() => {
+                            navigate(`/restaurant/advertisements/${ad.id}`)
+                          }}
+                          className="p-2 bg-[#ff8100] hover:bg-[#e67300] rounded-lg transition-colors"
+                        >
+                          <ChevronRight className="w-5 h-5 text-white" />
+                        </motion.button>
+                      </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          ))}
-        </AnimatePresence>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        )}
 
         {/* Empty State */}
         {filteredAds.length === 0 && (
@@ -312,7 +302,7 @@ export default function AdvertisementsPage() {
 
       {/* Bottom Navigation Bar */}
       <BottomNavbar onMenuClick={() => setShowMenu(true)} />
-      
+
       {/* Menu Overlay */}
       <MenuOverlay showMenu={showMenu} setShowMenu={setShowMenu} />
     </div>

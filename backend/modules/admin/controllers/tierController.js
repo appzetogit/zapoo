@@ -27,12 +27,20 @@ export const createTier = async (req, res) => {
             minArea,
             maxArea,
             description,
+            description,
             rank,
+            deliveryPricing: {
+                baseFee: req.body.baseFee || 0,
+                freeDeliveryThreshold: req.body.freeDeliveryThreshold || 0
+            }
         });
 
         return successResponse(res, 201, "Tier created successfully", tier);
     } catch (error) {
         console.error("Error creating tier:", error);
+        if (error.code === 11000) {
+            return errorResponse(res, 400, "Duplicate error: Name or Rank must be unique");
+        }
         return errorResponse(res, 500, "Failed to create tier", error.message);
     }
 };
@@ -56,28 +64,77 @@ export const getAllTiers = async (req, res) => {
 export const updateTier = async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, minArea, maxArea, description, rank, isActive } = req.body;
+        console.log("updateTier body:", req.body);
+        const { name, minArea, maxArea, description, rank, isActive, baseFee, freeDeliveryThreshold } = req.body;
 
         const tier = await Tier.findById(id);
         if (!tier) {
             return errorResponse(res, 404, "Tier not found");
         }
 
-        if (name) tier.name = name;
+        // Check for duplicate name if changing
+        if (name && name !== tier.name) {
+            const existingName = await Tier.findOne({ name, _id: { $ne: id } });
+            if (existingName) {
+                return errorResponse(res, 400, "Tier with this name already exists");
+            }
+            tier.name = name;
+        }
+
+        // Check for duplicate rank if changing
+        if (rank && rank !== tier.rank) {
+            const existingRank = await Tier.findOne({ rank, _id: { $ne: id } });
+            if (existingRank) {
+                return errorResponse(res, 400, "Tier with this rank already exists");
+            }
+            tier.rank = rank;
+        }
+
         if (minArea !== undefined) tier.minArea = minArea;
         if (maxArea !== undefined) tier.maxArea = maxArea;
         if (description) tier.description = description;
-        if (rank) tier.rank = rank;
         if (isActive !== undefined) tier.isActive = isActive;
+
+        // Update delivery pricing
+        if (baseFee !== undefined || freeDeliveryThreshold !== undefined) {
+            if (!tier.deliveryPricing) {
+                tier.deliveryPricing = {};
+            }
+            if (baseFee !== undefined) tier.deliveryPricing.baseFee = baseFee;
+            if (freeDeliveryThreshold !== undefined) tier.deliveryPricing.freeDeliveryThreshold = freeDeliveryThreshold;
+        }
 
         await tier.save();
 
-        // TODO: Optionally re-calculate zones if area ranges changed
-        // This could be an expensive operation, so maybe we trigger it manually or asynchronously
+        // Propagate pricing to non-overridden zones
+        if (baseFee !== undefined || freeDeliveryThreshold !== undefined) {
+            await Zone.updateMany(
+                {
+                    tierId: id,
+                    $or: [
+                        { "deliveryPricing.isOverridden": false },
+                        { "deliveryPricing.isOverridden": { $exists: false } }
+                    ]
+                },
+                {
+                    $set: {
+                        "deliveryPricing.baseFee": tier.deliveryPricing.baseFee,
+                        "deliveryPricing.freeDeliveryThreshold": tier.deliveryPricing.freeDeliveryThreshold,
+                        "deliveryPricing.lastUpdated": new Date()
+                    }
+                }
+            );
+        }
 
         return successResponse(res, 200, "Tier updated successfully", tier);
     } catch (error) {
         console.error("Error updating tier:", error);
+        if (error.code === 11000) {
+            return errorResponse(res, 400, "Duplicate error: Name or Rank must be unique");
+        }
+        if (error.name === 'ValidationError') {
+            return errorResponse(res, 400, "Validation Error", error.message);
+        }
         return errorResponse(res, 500, "Failed to update tier", error.message);
     }
 };
@@ -146,21 +203,23 @@ export const getRestaurantsByZone = async (req, res) => {
             return errorResponse(res, 404, "Zone not found");
         }
 
-        if (!zone.boundary || !zone.boundary.coordinates) {
-            return errorResponse(res, 400, "Zone has no boundary defined");
-        }
-
-        // 1. Find Restaurants in Zone
+        // 1. Find Restaurants in Zone — query by zoneId (set during onboarding auto-detection)
         const restaurants = await Restaurant.find({
-            "location.coordinates": {
-                $geoWithin: {
-                    $geometry: zone.boundary
-                }
-            }
-        }).select('restaurantId name location.address ownerName ownerPhone rating totalRatings image profileImage isAcceptingOrders').lean();
+            zoneId: zone._id
+        }).select('restaurantId name location ownerName ownerPhone rating totalRatings image profileImage isAcceptingOrders').lean();
 
         if (restaurants.length === 0) {
-            return successResponse(res, 200, "No restaurants found in this zone", []);
+            return successResponse(res, 200, "No restaurants found in this zone", {
+                zone: {
+                    name: zone.name,
+                    id: zone._id
+                },
+                restaurants: [],
+                meta: {
+                    avgRevenue: 0,
+                    totalRestaurants: 0
+                }
+            });
         }
 
         const restaurantIds = restaurants.map(r => r.restaurantId);

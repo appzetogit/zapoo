@@ -60,6 +60,7 @@ import locationRoutes from './modules/location/index.js';
 import heroBannerRoutes from './modules/heroBanner/index.js';
 import diningRoutes from './modules/dining/index.js';
 import diningAdminRoutes from './modules/dining/routes/diningAdminRoutes.js';
+import marketingRoutes from './modules/marketing/index.js';
 
 
 // Validate required environment variables
@@ -412,6 +413,7 @@ app.use('/api/location', locationRoutes);
 app.use('/api', heroBannerRoutes);
 app.use('/api/dining', diningRoutes);
 app.use('/api/admin/dining', diningAdminRoutes);
+app.use('/api/marketing', marketingRoutes);
 
 // 404 handler - but skip Socket.IO paths
 app.use((req, res, next) => {
@@ -650,6 +652,25 @@ function initializeScheduledTasks() {
     console.log('✅ Auto-reject order scheduler initialized (runs every 30 seconds)');
   }).catch((error) => {
     console.error('❌ Failed to initialize auto-reject service:', error);
+  });
+
+  // Import marketing campaign sync service
+  import('./modules/marketing/services/campaignService.js').then(({ syncCampaignStatuses }) => {
+    // Run every 5 minutes
+    cron.schedule('*/5 * * * *', async () => {
+      try {
+        const result = await syncCampaignStatuses();
+        if (result.activated > 0 || result.completed > 0) {
+          console.log(`[Marketing Cron] Updated ${result.activated} campaigns to Active, ${result.completed} to Completed`);
+        }
+      } catch (error) {
+        console.error('[Marketing Cron] Error:', error);
+      }
+    });
+
+    console.log('✅ Marketing campaign status synchronizer initialized (runs every 5 minutes)');
+  }).catch((error) => {
+    console.error('❌ Failed to initialize marketing campaign service:', error);
   });
 }
 

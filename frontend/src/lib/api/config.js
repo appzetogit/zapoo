@@ -223,6 +223,20 @@ export const API_ENDPOINTS = {
     BY_ID: "/restaurant/:id",
     BY_OWNER: "/restaurant/owner/me",
   },
+  // Marketing / Advertisement endpoints
+  MARKETING: {
+    MY_ZONE: "/marketing/ads/my-zone",
+    REQUEST: "/marketing/ads/request",
+    UPDATE_REQUEST: "/marketing/ads/request/:adId",
+    MY_ADS: "/marketing/ads/my-ads",
+    AD_DETAILS: "/marketing/ads/:adId",
+    UPDATE_STATUS: "/marketing/ads/:adId/status",
+    TRACK: "/marketing/ads/:adId/track",
+    ACTIVE_BY_ZONE: "/marketing/ads/active/:zoneId",
+    ALL_REQUESTS: "/marketing/ads/all",
+    SLOTS: "/marketing/slots",
+    CONFIGURE_SLOTS: "/marketing/slots/configure",
+  },
   // Delivery endpoints
   DELIVERY: {
     AUTH: {
@@ -276,6 +290,8 @@ export const API_ENDPOINTS = {
     },
     PROFILE: "/admin/profile",
     CHANGE_PASSWORD: "/admin/settings/change-password",
+    TIERS: "/admin/tiers",
+    TIER_BY_ID: "/admin/tiers/:id",
     USERS: "/admin/users",
     USER_BY_ID: "/admin/users/:id",
     USER_STATUS: "/admin/users/:id/status",

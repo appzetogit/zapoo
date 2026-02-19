@@ -162,23 +162,25 @@ export default function ZoneSetup() {
                 </div>
                 <div className="space-y-2 text-sm">
                   <div className="flex items-center justify-between">
-                    <span className="text-slate-600">Unit:</span>
-                    <span className="font-medium text-slate-900">{zone.unit || "km"}</span>
+                    <span className="text-slate-600">Tier:</span>
+                    <span className="font-medium text-slate-900">
+                      {zone.tierId?.name ? (
+                        <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-md text-xs">
+                          {zone.tierId.name}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400 italic">No Tier</span>
+                      )}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-slate-600">Status:</span>
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      zone.isActive ? "bg-green-100 text-green-800" : "bg-slate-100 text-slate-800"
-                    }`}>
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${zone.isActive ? "bg-green-100 text-green-800" : "bg-slate-100 text-slate-800"
+                      }`}>
                       {zone.isActive ? "Active" : "Inactive"}
                     </span>
                   </div>
-                  {zone.coordinates && zone.coordinates.length > 0 && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-600">Points:</span>
-                      <span className="font-medium text-slate-900">{zone.coordinates.length}</span>
-                    </div>
-                  )}
+
                 </div>
               </div>
             ))}
