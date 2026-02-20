@@ -157,7 +157,7 @@ export default function FoodApproval() {
                 placeholder="Ex: search by food name, restaurant name or ID"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full rounded-md border border-gray-300 bg-white py-1.5 pl-9 pr-3 text-sm focus:outline-none focus:border-[#006fbd] focus:ring-1 focus:ring-[#006fbd]"
+                className="w-full rounded-md border border-gray-300 bg-white py-1.5 pl-9 pr-3 text-sm focus:outline-none focus:border-[#FF5200] focus:ring-1 focus:ring-[#FF5200]"
               />
             </div>
           </div>
@@ -165,13 +165,13 @@ export default function FoodApproval() {
           {/* Table */}
           {loading ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 className="w-8 h-8 animate-spin text-[#006fbd]" />
+              <Loader2 className="w-8 h-8 animate-spin text-[#FF5200]" />
             </div>
           ) : (
             <div className="border-t border-gray-200">
               <div className="w-full overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200 text-sm">
-                  <thead style={{ backgroundColor: "rgba(0, 111, 189, 0.1)" }}>
+                  <thead style={{ backgroundColor: "rgba(255, 82, 0, 0.1)" }}>
                     <tr>
                       <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                         S.No
@@ -238,9 +238,9 @@ export default function FoodApproval() {
                               <button
                                 onClick={() => handleViewDetails(request)}
                                 className="inline-flex h-7 w-7 items-center justify-center rounded-md text-white transition-colors"
-                                style={{ backgroundColor: "#006fbd" }}
-                                onMouseEnter={(e) => (e.target.style.backgroundColor = "#005a9e")}
-                                onMouseLeave={(e) => (e.target.style.backgroundColor = "#006fbd")}
+                                style={{ backgroundColor: "#FF5200" }}
+                                onMouseEnter={(e) => (e.target.style.backgroundColor = "#E64A00")}
+                                onMouseLeave={(e) => (e.target.style.backgroundColor = "#FF5200")}
                                 title="View Details"
                               >
                                 <Eye className="w-4 h-4" />
@@ -288,7 +288,7 @@ export default function FoodApproval() {
           {selectedRequest && (
             <div className="p-6 space-y-4">
               {/* Restaurant Info */}
-              <div className="p-3 bg-blue-50 rounded-lg border border-blue-100">
+              <div className="p-3 bg-orange-50 rounded-lg border border-orange-100">
                 <h3 className="font-semibold text-sm text-gray-900 mb-2">Restaurant Information</h3>
                 <p className="text-sm text-gray-700"><span className="font-medium">Name:</span> {selectedRequest.restaurantName || '-'}</p>
                 <p className="text-sm text-gray-700"><span className="font-medium">ID:</span> {selectedRequest.restaurantId || '-'}</p>
@@ -325,32 +325,32 @@ export default function FoodApproval() {
                 {(() => {
                   // Collect all images - from images array, single image field, and item.images as fallback
                   const allImages = [];
-                  
+
                   // First, try images array from request
                   if (selectedRequest.images && Array.isArray(selectedRequest.images) && selectedRequest.images.length > 0) {
                     const validImages = selectedRequest.images.filter(img => img && typeof img === 'string' && img.trim() !== '');
                     allImages.push(...validImages);
                     console.log('Added images from request.images:', validImages.length, validImages);
                   }
-                  
+
                   // Also check item.images (even if request.images exists, item.images might have more)
                   if (selectedRequest.item?.images && Array.isArray(selectedRequest.item.images) && selectedRequest.item.images.length > 0) {
-                    const validItemImages = selectedRequest.item.images.filter(img => 
+                    const validItemImages = selectedRequest.item.images.filter(img =>
                       img && typeof img === 'string' && img.trim() !== '' && !allImages.includes(img)
                     );
                     allImages.push(...validItemImages);
                     console.log('Added images from item.images:', validItemImages.length, validItemImages);
                   }
-                  
+
                   // Add single image if it exists and not already in array
                   const singleImage = selectedRequest.image || selectedRequest.item?.image;
                   if (singleImage && singleImage.trim() !== '' && !allImages.includes(singleImage)) {
                     allImages.push(singleImage);
                     console.log('Added single image:', singleImage);
                   }
-                  
+
                   console.log('Total images collected:', allImages.length, allImages);
-                  
+
                   return allImages.length > 0 ? (
                     <div className="col-span-2">
                       <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -359,11 +359,11 @@ export default function FoodApproval() {
                       <div className="flex flex-wrap gap-3">
                         {allImages.map((img, idx) => (
                           img && img.trim() !== '' ? (
-                            <img 
+                            <img
                               key={idx}
-                              src={img} 
+                              src={img}
                               alt={`${selectedRequest.itemName} - Image ${idx + 1}`}
-                              className="w-32 h-32 object-cover rounded-lg border border-gray-200 hover:border-blue-400 transition-colors cursor-pointer"
+                              className="w-32 h-32 object-cover rounded-lg border border-gray-200 hover:border-orange-400 transition-colors cursor-pointer"
                               onClick={() => window.open(img, '_blank')}
                               title="Click to view full size"
                               onError={(e) => {
@@ -434,7 +434,7 @@ export default function FoodApproval() {
                   placeholder="Enter reason for rejection..."
                   required
                   rows={4}
-                  className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-1 focus:ring-[#006fbd] focus:border-[#006fbd]"
+                  className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-1 focus:ring-[#FF5200] focus:border-[#FF5200]"
                 />
               </div>
             </div>

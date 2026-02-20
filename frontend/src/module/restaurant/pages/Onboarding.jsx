@@ -152,7 +152,7 @@ function TimeSelector({ label, value, onChange }) {
                   borderColor: "#d1d5db",
                 },
                 "&.Mui-focused fieldset": {
-                  borderColor: "#000",
+                  borderColor: "#2563eb",
                 },
               },
               "& .MuiInputBase-input": {
@@ -988,7 +988,7 @@ export default function RestaurantOnboarding() {
   const renderStep1 = () => (
     <div className="space-y-6">
       <section className="bg-white p-4 sm:p-6 rounded-md">
-        <h2 className="text-lg font-semibold text-black mb-4">Restaurant information</h2>
+        <h2 className="text-lg font-semibold text-blue-600 mb-4">Restaurant information</h2>
         <p className="text-sm text-gray-600 mb-4">Restaurant name</p>
         <div className="space-y-3">
           <div>
@@ -1004,7 +1004,7 @@ export default function RestaurantOnboarding() {
       </section>
 
       <section className="bg-white p-4 sm:p-6 rounded-md">
-        <h2 className="text-lg font-semibold text-black mb-4">Owner details</h2>
+        <h2 className="text-lg font-semibold text-blue-600 mb-4">Owner details</h2>
         <p className="text-sm text-gray-600 mb-4">
           These details will be used for all business communications and updates.
         </p>
@@ -1041,7 +1041,7 @@ export default function RestaurantOnboarding() {
       </section>
 
       <section className="bg-white p-4 sm:p-6 rounded-md space-y-4">
-        <h2 className="text-lg font-semibold text-black">Restaurant contact & location</h2>
+        <h2 className="text-lg font-semibold text-blue-600">Restaurant contact & location</h2>
         <div>
           <Label className="text-xs text-gray-700">Primary contact number*</Label>
           <Input
@@ -1128,7 +1128,7 @@ export default function RestaurantOnboarding() {
     <div className="space-y-6">
       {/* Images section */}
       <section className="bg-white p-4 sm:p-6 rounded-md space-y-5">
-        <h2 className="text-lg font-semibold text-black">Menu & photos</h2>
+        <h2 className="text-lg font-semibold text-blue-600">Menu & photos</h2>
         <p className="text-xs text-gray-500">
           Add clear photos of your printed menu and a primary profile image. This helps customers
           understand what you serve.
@@ -1309,7 +1309,7 @@ export default function RestaurantOnboarding() {
                   key={cuisine}
                   type="button"
                   onClick={() => toggleCuisine(cuisine)}
-                  className={`px-3 py-1.5 text-xs rounded-full ${active ? "bg-black text-white" : "bg-gray-100 text-gray-800"
+                  className={`px-3 py-1.5 text-xs rounded-full ${active ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-800"
                     }`}
                 >
                   {cuisine}
@@ -1353,7 +1353,7 @@ export default function RestaurantOnboarding() {
                   key={day}
                   type="button"
                   onClick={() => toggleDay(day)}
-                  className={`aspect-square flex items-center justify-center rounded-md text-[11px] font-medium ${active ? "bg-black text-white" : "bg-gray-100 text-gray-800"
+                  className={`aspect-square flex items-center justify-center rounded-md text-[11px] font-medium ${active ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-800"
                     }`}
                 >
                   {day.charAt(0)}
@@ -1369,7 +1369,7 @@ export default function RestaurantOnboarding() {
   const renderStep3 = () => (
     <div className="space-y-6">
       <section className="bg-white p-4 sm:p-6 rounded-md space-y-4">
-        <h2 className="text-lg font-semibold text-black">PAN details</h2>
+        <h2 className="text-lg font-semibold text-blue-600">PAN details</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <Label className="text-xs text-gray-700">PAN number</Label>
@@ -1402,13 +1402,13 @@ export default function RestaurantOnboarding() {
       </section>
 
       <section className="bg-white p-4 sm:p-6 rounded-md space-y-4">
-        <h2 className="text-lg font-semibold text-black">GST details</h2>
+        <h2 className="text-lg font-semibold text-blue-600">GST details</h2>
         <div className="flex gap-4 items-center text-sm">
           <span className="text-gray-700">GST registered?</span>
           <button
             type="button"
             onClick={() => setStep3({ ...step3, gstRegistered: true })}
-            className={`px-3 py-1.5 text-xs rounded-full ${step3.gstRegistered ? "bg-black text-white" : "bg-gray-100 text-gray-800"
+            className={`px-3 py-1.5 text-xs rounded-full ${step3.gstRegistered ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-800"
               }`}
           >
             Yes
@@ -1416,7 +1416,7 @@ export default function RestaurantOnboarding() {
           <button
             type="button"
             onClick={() => setStep3({ ...step3, gstRegistered: false })}
-            className={`px-3 py-1.5 text-xs rounded-full ${!step3.gstRegistered ? "bg-black text-white" : "bg-gray-100 text-gray-800"
+            className={`px-3 py-1.5 text-xs rounded-full ${!step3.gstRegistered ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-800"
               }`}
           >
             No
@@ -1455,7 +1455,7 @@ export default function RestaurantOnboarding() {
       </section>
 
       <section className="bg-white p-4 sm:p-6 rounded-md space-y-4">
-        <h2 className="text-lg font-semibold text-black">FSSAI details</h2>
+        <h2 className="text-lg font-semibold text-blue-600">FSSAI details</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Input
             value={step3.fssaiNumber || ""}
@@ -1511,7 +1511,7 @@ export default function RestaurantOnboarding() {
       </section>
 
       <section className="bg-white p-4 sm:p-6 rounded-md space-y-4">
-        <h2 className="text-lg font-semibold text-black">Bank account details</h2>
+        <h2 className="text-lg font-semibold text-blue-600">Bank account details</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Input
             value={step3.accountNumber || ""}
@@ -1559,7 +1559,7 @@ export default function RestaurantOnboarding() {
   const renderStep4 = () => (
     <div className="space-y-6">
       <section className="bg-white p-4 sm:p-6 rounded-md space-y-4">
-        <h2 className="text-lg font-semibold text-black">Restaurant Display Information</h2>
+        <h2 className="text-lg font-semibold text-blue-600">Restaurant Display Information</h2>
         <p className="text-sm text-gray-600">
           Add information that will be displayed to customers on the home page
         </p>
@@ -1620,14 +1620,14 @@ export default function RestaurantOnboarding() {
     <LocalizationProvider dateAdapter={AdapterDateFns}>
       <div className="min-h-screen bg-gray-100 flex flex-col">
         <header className="px-4 py-4 sm:px-6 sm:py-5 bg-white flex items-center justify-between">
-          <div className="text-sm font-semibold text-black">Restaurant onboarding</div>
+          <div className="text-sm font-semibold text-blue-600">Restaurant onboarding</div>
           <div className="flex items-center gap-3">
             {import.meta.env.DEV && (
               <Button
                 onClick={fillDummyData}
                 variant="outline"
                 size="sm"
-                className="text-xs bg-yellow-50 border-yellow-300 text-yellow-700 hover:bg-yellow-100 flex items-center gap-1.5"
+                className="text-xs bg-blue-50 border-blue-300 text-blue-700 hover:bg-blue-100 flex items-center gap-1.5"
                 title="Fill with dummy data (Dev only)"
               >
                 <Sparkles className="w-3 h-3" />
@@ -1667,7 +1667,7 @@ export default function RestaurantOnboarding() {
             <Button
               onClick={handleNext}
               disabled={saving}
-              className="text-sm bg-black text-white px-6"
+              className="text-sm bg-blue-600 text-white px-6 hover:bg-blue-700"
             >
               {step === 4 ? (saving ? "Saving..." : "Finish") : saving ? "Saving..." : "Continue"}
             </Button>

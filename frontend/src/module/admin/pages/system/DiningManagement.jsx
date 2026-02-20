@@ -264,7 +264,7 @@ export default function DiningManagement() {
                 {/* Header */}
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-blue-500 flex items-center justify-center">
+                        <div className="w-10 h-10 rounded-lg bg-[#FF5200] flex items-center justify-center">
                             <UtensilsCrossed className="w-5 h-5 text-white" />
                         </div>
                         <div>
@@ -283,7 +283,7 @@ export default function DiningManagement() {
                                 <button
                                     key={tab.id}
                                     onClick={() => setActiveTab(tab.id)}
-                                    className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${activeTab === tab.id ? 'bg-blue-500 text-white' : 'text-slate-600 hover:bg-slate-100'
+                                    className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${activeTab === tab.id ? 'bg-[#FF5200] text-white' : 'text-slate-600 hover:bg-slate-100'
                                         }`}
                                 >
                                     <Icon className="w-4 h-4" />
@@ -313,7 +313,7 @@ export default function DiningManagement() {
                                         <Label>Image</Label>
                                         <Input type="file" ref={categoryFileInputRef} onChange={e => setCategoryFile(e.target.files[0])} accept="image/*" className="mt-1" />
                                     </div>
-                                    <Button onClick={handleCreateCategory} disabled={categoriesUploading} className="w-full bg-blue-600 hover:bg-blue-700">
+                                    <Button onClick={handleCreateCategory} disabled={categoriesUploading} className="w-full bg-[#FF5200] hover:bg-[#E64A00]">
                                         {categoriesUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Create Category"}
                                     </Button>
                                 </div>
@@ -322,7 +322,7 @@ export default function DiningManagement() {
                         <div className="lg:col-span-2">
                             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
                                 <h2 className="text-lg font-bold text-slate-900 mb-4">Categories List</h2>
-                                {categoriesLoading ? <div className="flex justify-center p-8"><Loader2 className="w-8 h-8 animate-spin text-blue-600" /></div> : (
+                                {categoriesLoading ? <div className="flex justify-center p-8"><Loader2 className="w-8 h-8 animate-spin text-[#FF5200]" /></div> : (
                                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                         {categories.map(cat => (
                                             <div key={cat._id} className="border rounded-lg overflow-hidden group relative">
@@ -374,7 +374,7 @@ export default function DiningManagement() {
                                             ))}
                                         </select>
                                     </div>
-                                    <Button onClick={handleSubmitBanner} disabled={bannersUploading} className="w-full bg-blue-600 hover:bg-blue-700">
+                                    <Button onClick={handleSubmitBanner} disabled={bannersUploading} className="w-full bg-[#FF5200] hover:bg-[#E64A00]">
                                         {bannersUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : (editingBannerId ? "Update Banner" : "Create Banner")}
                                     </Button>
                                     {editingBannerId && (
@@ -388,7 +388,7 @@ export default function DiningManagement() {
                         <div className="lg:col-span-2">
                             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
                                 <h2 className="text-lg font-bold text-slate-900 mb-4">Offer Banners List</h2>
-                                {bannersLoading ? <div className="flex justify-center p-8"><Loader2 className="w-8 h-8 animate-spin text-blue-600" /></div> : (
+                                {bannersLoading ? <div className="flex justify-center p-8"><Loader2 className="w-8 h-8 animate-spin text-[#FF5200]" /></div> : (
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         {banners.map(banner => (
                                             <div key={banner._id} className="border rounded-lg overflow-hidden group relative">
@@ -396,12 +396,12 @@ export default function DiningManagement() {
                                                 <div className="p-3 bg-white">
                                                     <p className="font-bold text-slate-900">{banner.percentageOff}</p>
                                                     <p className="text-sm text-slate-600">{banner.tagline}</p>
-                                                    <p className="text-xs text-blue-600 mt-1">{banner.restaurant?.name}</p>
+                                                    <p className="text-xs text-[#FF5200] mt-1">{banner.restaurant?.name}</p>
                                                 </div>
                                                 <button onClick={() => handleDeleteBanner(banner._id)} className="absolute top-2 right-2 p-1.5 bg-red-100 text-red-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
                                                     {bannersDeleting === banner._id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                                                 </button>
-                                                <button onClick={() => handleEditBanner(banner)} className="absolute top-2 right-10 p-1.5 bg-blue-100 text-blue-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button onClick={() => handleEditBanner(banner)} className="absolute top-2 right-10 p-1.5 bg-orange-100 text-[#FF5200] rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
                                                     <Edit className="w-4 h-4" />
                                                 </button>
                                             </div>
@@ -428,7 +428,7 @@ export default function DiningManagement() {
                                         <Label>Image</Label>
                                         <Input type="file" ref={storyFileInputRef} onChange={e => setStoryFile(e.target.files[0])} accept="image/*" className="mt-1" />
                                     </div>
-                                    <Button onClick={handleSubmitStory} disabled={storiesUploading} className="w-full bg-blue-600 hover:bg-blue-700">
+                                    <Button onClick={handleSubmitStory} disabled={storiesUploading} className="w-full bg-[#FF5200] hover:bg-[#E64A00]">
                                         {storiesUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : (editingStoryId ? "Update Story" : "Create Story")}
                                     </Button>
                                     {editingStoryId && (
@@ -442,7 +442,7 @@ export default function DiningManagement() {
                         <div className="lg:col-span-2">
                             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
                                 <h2 className="text-lg font-bold text-slate-900 mb-4">Stories List</h2>
-                                {storiesLoading ? <div className="flex justify-center p-8"><Loader2 className="w-8 h-8 animate-spin text-blue-600" /></div> : (
+                                {storiesLoading ? <div className="flex justify-center p-8"><Loader2 className="w-8 h-8 animate-spin text-[#FF5200]" /></div> : (
                                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                         {stories.map(story => (
                                             <div key={story._id} className="border rounded-lg overflow-hidden group relative">
@@ -453,7 +453,7 @@ export default function DiningManagement() {
                                                 <button onClick={() => handleDeleteStory(story._id)} className="absolute top-2 right-2 p-1.5 bg-red-100 text-red-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
                                                     {storiesDeleting === story._id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                                                 </button>
-                                                <button onClick={() => handleEditStory(story)} className="absolute top-2 right-10 p-1.5 bg-blue-100 text-blue-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button onClick={() => handleEditStory(story)} className="absolute top-2 right-10 p-1.5 bg-orange-100 text-[#FF5200] rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
                                                     <Edit className="w-4 h-4" />
                                                 </button>
                                             </div>

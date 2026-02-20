@@ -25,7 +25,7 @@ export default function SendFeedback() {
       const response = await api.post(API_ENDPOINTS.ADMIN.FEEDBACK_CREATE, {
         message: feedback.trim()
       })
-      
+
       if (response.data.success) {
         setIsSubmitted(true)
         setFeedback("")
@@ -106,7 +106,7 @@ export default function SendFeedback() {
             <Button
               onClick={handleSubmit}
               disabled={!feedback.trim() || isSubmitting}
-              className="w-full bg-green-600 hover:bg-green-700 text-white text-sm md:text-base h-10 md:h-12 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full bg-[#FF5200] hover:bg-[#FF5200]/90 text-white text-sm md:text-base h-10 md:h-12 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSubmitting ? (
                 <>

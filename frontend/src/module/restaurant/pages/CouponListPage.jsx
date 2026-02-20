@@ -2,7 +2,7 @@ import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useNavigate } from "react-router-dom"
 import Lenis from "lenis"
-import { 
+import {
   ArrowLeft,
   MoreVertical,
   Plus,
@@ -76,7 +76,7 @@ export default function CouponListPage() {
     <div className="min-h-screen bg-[#f6e9dc] overflow-x-hidden pb-24 md:pb-6">
       {/* Header */}
       <div className="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-50 flex items-center gap-3">
-        <button 
+        <button
           onClick={() => navigate(-1)}
           className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
         >
@@ -113,7 +113,7 @@ export default function CouponListPage() {
                   >
                     <MoreVertical className="w-4 h-4 text-[#ff8100]" />
                   </motion.button>
-                  
+
                   {/* Context Menu */}
                   <AnimatePresence>
                     {openMenuId === coupon.id && (
@@ -125,37 +125,36 @@ export default function CouponListPage() {
                         className="absolute top-full right-0 mt-2 bg-white rounded-xl shadow-2xl border border-gray-200 py-2 z-50 min-w-[180px]"
                         data-menu-id={coupon.id}
                       >
-                            {[
-                              { 
-                                label: "Edit Coupon", 
-                                action: () => navigate(`/restaurant/coupon/${coupon.id}/edit`) 
-                              },
-                              { label: "Delete Coupon", action: () => console.log("Delete:", coupon.id), isDanger: true }
-                            ].map((option, idx) => (
-                              <motion.button
-                                key={option.label}
-                                initial={{ opacity: 0, x: -10 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                transition={{ delay: idx * 0.03, duration: 0.2 }}
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  option.action()
-                                  setOpenMenuId(null)
-                                }}
-                                whileHover={{ x: 4 }}
-                                whileTap={{ scale: 0.95 }}
-                                className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors ${
-                                  option.isDanger
-                                    ? "text-red-600 hover:bg-red-50"
-                                    : "text-gray-700 hover:bg-gray-50"
-                                }`}
-                              >
-                                <span>{option.label}</span>
-                              </motion.button>
-                            ))}
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
+                        {[
+                          {
+                            label: "Edit Coupon",
+                            action: () => navigate(`/restaurant/coupon/${coupon.id}/edit`)
+                          },
+                          { label: "Delete Coupon", action: () => console.log("Delete:", coupon.id), isDanger: true }
+                        ].map((option, idx) => (
+                          <motion.button
+                            key={option.label}
+                            initial={{ opacity: 0, x: -10 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: idx * 0.03, duration: 0.2 }}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              option.action()
+                              setOpenMenuId(null)
+                            }}
+                            whileHover={{ x: 4 }}
+                            whileTap={{ scale: 0.95 }}
+                            className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors ${option.isDanger
+                                ? "text-red-600 hover:bg-red-50"
+                                : "text-gray-700 hover:bg-gray-50"
+                              }`}
+                          >
+                            <span>{option.label}</span>
+                          </motion.button>
+                        ))}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
 
                 <div className="flex">
@@ -231,7 +230,7 @@ export default function CouponListPage() {
 
       {/* Bottom Navigation Bar */}
       <BottomNavbar onMenuClick={() => setShowMenu(true)} />
-      
+
       {/* Menu Overlay */}
       <MenuOverlay showMenu={showMenu} setShowMenu={setShowMenu} />
     </div>

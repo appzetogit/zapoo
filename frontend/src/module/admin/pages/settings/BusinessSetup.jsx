@@ -163,7 +163,7 @@ export default function BusinessSetup() {
   if (loading) {
     return (
       <div className="p-4 lg:p-6 bg-slate-50 min-h-screen flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+        <Loader2 className="w-8 h-8 animate-spin text-[#FF5200]" />
       </div>
     );
   }
@@ -210,7 +210,7 @@ export default function BusinessSetup() {
                   placeholder="Enter Your Company Name"
                   value={formData.companyName}
                   onChange={(e) => handleInputChange("companyName", e.target.value)}
-                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#FF5200] focus:border-[#FF5200]"
                 />
               </div>
 
@@ -223,7 +223,7 @@ export default function BusinessSetup() {
                   placeholder="Enter Your Email"
                   value={formData.email}
                   onChange={(e) => handleInputChange("email", e.target.value)}
-                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#FF5200] focus:border-[#FF5200]"
                 />
               </div>
 
@@ -234,7 +234,7 @@ export default function BusinessSetup() {
                 <select
                   value={formData.region}
                   onChange={(e) => handleInputChange("region", e.target.value)}
-                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#FF5200] focus:border-[#FF5200]"
                 >
                   <option value="India">India</option>
                   <option value="UK">UK</option>
@@ -251,7 +251,7 @@ export default function BusinessSetup() {
                     <select
                       value={formData.phoneCountryCode}
                       onChange={(e) => handleInputChange("phoneCountryCode", e.target.value)}
-                      className="w-full pl-8 pr-6 py-2 text-xs border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none"
+                      className="w-full pl-8 pr-6 py-2 text-xs border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#FF5200] focus:border-[#FF5200] appearance-none"
                     >
                       <option value="+1">+1 (US/CA)</option>
                       <option value="+7">+7 (RU/KZ)</option>
@@ -465,7 +465,7 @@ export default function BusinessSetup() {
                     placeholder="Enter Your Phone Number"
                     value={formData.phoneNumber}
                     onChange={(e) => handleInputChange("phoneNumber", e.target.value)}
-                    className="flex-1 px-3 py-2 text-xs border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="flex-1 px-3 py-2 text-xs border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#FF5200] focus:border-[#FF5200]"
                   />
                 </div>
               </div>
@@ -479,7 +479,7 @@ export default function BusinessSetup() {
                   placeholder="Enter Your Addresss"
                   value={formData.address}
                   onChange={(e) => handleInputChange("address", e.target.value)}
-                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#FF5200] focus:border-[#FF5200] resize-none"
                 />
               </div>
 
@@ -492,7 +492,7 @@ export default function BusinessSetup() {
                   placeholder="Enter Your State"
                   value={formData.state}
                   onChange={(e) => handleInputChange("state", e.target.value)}
-                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#FF5200] focus:border-[#FF5200]"
                 />
               </div>
 
@@ -505,7 +505,7 @@ export default function BusinessSetup() {
                   placeholder="Enter Your Pincode"
                   value={formData.pincode}
                   onChange={(e) => handleInputChange("pincode", e.target.value)}
-                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#FF5200] focus:border-[#FF5200]"
                 />
               </div>
             </div>
@@ -668,7 +668,7 @@ export default function BusinessSetup() {
                   type="button"
                   onClick={handleSave}
                   disabled={saving}
-                  className="px-4 py-2 text-xs font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  className="px-4 py-2 text-xs font-semibold rounded-lg bg-[#FF5200] text-white hover:bg-[#E64A00] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
                   {saving ? (
                     <>
@@ -695,7 +695,7 @@ function ToggleSwitch({ initial = false }) {
     <button
       type="button"
       onClick={() => setEnabled((prev) => !prev)}
-      className={`inline-flex items-center w-10 h-5 rounded-full border transition-all ${enabled ? "bg-blue-600 border-blue-600 justify-end" : "bg-slate-200 border-slate-300 justify-start"
+      className={`inline-flex items-center w-10 h-5 rounded-full border transition-all ${enabled ? "bg-[#FF5200] border-[#FF5200] justify-end" : "bg-slate-200 border-slate-300 justify-start"
         }`}
     >
       <span className="h-4 w-4 rounded-full bg-white shadow-sm" />

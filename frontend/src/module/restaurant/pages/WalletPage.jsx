@@ -4,10 +4,10 @@ import { useNavigate } from "react-router-dom"
 import Lenis from "lenis"
 import BottomNavbar from "../components/BottomNavbar"
 import MenuOverlay from "../components/MenuOverlay"
-import { 
-  Wallet, 
-  DollarSign, 
-  Hand, 
+import {
+  Wallet,
+  DollarSign,
+  Hand,
   SlidersHorizontal,
   Home,
   ShoppingBag,
@@ -22,9 +22,9 @@ import {
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { 
-  getWalletState, 
-  calculateBalances, 
+import {
+  getWalletState,
+  calculateBalances,
   createWithdrawRequest,
   setBalanceAdjusted,
   getBalanceAdjusted,
@@ -44,11 +44,11 @@ export default function WalletPage() {
   const [showPaymentDropdown, setShowPaymentDropdown] = useState(false)
   const [showFilterModal, setShowFilterModal] = useState(false)
   const [filterStatus, setFilterStatus] = useState("all")
-  
+
   // Get wallet state and calculate balances
   const [walletState, setWalletState] = useState(() => getWalletState())
   const balances = calculateBalances(walletState)
-  
+
   const paymentMethods = [
     "Bank Transfer",
     "PayPal",
@@ -56,21 +56,21 @@ export default function WalletPage() {
     "Credit Card",
     "Debit Card"
   ]
-  
+
   // Get transactions based on active tab and filters
   const getFilteredTransactions = () => {
-    let filtered = activeTab === "withdraw" 
+    let filtered = activeTab === "withdraw"
       ? getTransactionsByType("withdrawal")
       : getTransactionsByType("payment")
-    
+
     // Apply status filter
     if (filterStatus !== "all") {
       filtered = filtered.filter(t => t.status === filterStatus)
     }
-    
+
     return filtered
   }
-  
+
   const transactions = getFilteredTransactions()
 
   // Lenis smooth scrolling
@@ -159,15 +159,15 @@ export default function WalletPage() {
               </div>
             </div>
             <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-            <Button 
-              className="bg-white text-[#ff8100] hover:bg-white/90 font-semibold px-4 py-2 md:px-6 md:py-3 rounded-lg"
-              onClick={() => {
-                setWithdrawAmount(balances.withdrawalBalance.toString())
-                setShowWithdrawModal(true)
-              }}
-            >
-              Withdraw
-            </Button>
+              <Button
+                className="bg-white text-[#ff8100] hover:bg-white/90 font-semibold px-4 py-2 md:px-6 md:py-3 rounded-lg"
+                onClick={() => {
+                  setWithdrawAmount(balances.withdrawalBalance.toString())
+                  setShowWithdrawModal(true)
+                }}
+              >
+                Withdraw
+              </Button>
             </motion.div>
           </div>
         </motion.div>
@@ -191,13 +191,13 @@ export default function WalletPage() {
             </div>
             {!isBalanceAdjusted && (
               <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-            <Button 
-              variant="outline"
-              className="bg-[#ffebee] border-red-300 text-red-700 hover:bg-red-100 font-semibold px-4 py-2 md:px-6 md:py-3 rounded-lg"
+                <Button
+                  variant="outline"
+                  className="bg-[#ffebee] border-red-300 text-red-700 hover:bg-red-100 font-semibold px-4 py-2 md:px-6 md:py-3 rounded-lg"
                   onClick={() => setShowAdjustModal(true)}
-            >
-              Adjust
-            </Button>
+                >
+                  Adjust
+                </Button>
               </motion.div>
             )}
           </div>
@@ -305,11 +305,10 @@ export default function WalletPage() {
             <div className="flex gap-4 mb-4 border-b border-gray-200 ">
               <button
                 onClick={() => setActiveTab("withdraw")}
-                className={`pb-3 px-2 text-sm md:text-base font-medium transition-colors relative ${
-                  activeTab === "withdraw"
+                className={`pb-3 px-2 text-sm md:text-base font-medium transition-colors relative ${activeTab === "withdraw"
                     ? "text-[#ff8100]"
                     : "text-gray-600 hover:text-gray-900"
-                }`}
+                  }`}
               >
                 Withdraw Request
                 {activeTab === "withdraw" && (
@@ -321,11 +320,10 @@ export default function WalletPage() {
               </button>
               <button
                 onClick={() => setActiveTab("payment")}
-                className={`pb-3 px-2 text-sm md:text-base font-medium transition-colors relative ${
-                  activeTab === "payment"
+                className={`pb-3 px-2 text-sm md:text-base font-medium transition-colors relative ${activeTab === "payment"
                     ? "text-[#ff8100]"
                     : "text-gray-600 hover:text-gray-900"
-                }`}
+                  }`}
               >
                 Payment History
                 {activeTab === "payment" && (
@@ -341,16 +339,16 @@ export default function WalletPage() {
             <div className="flex items-center justify-between mb-4 relative">
               <h2 className="text-lg md:text-xl font-semibold text-gray-900">Transaction History</h2>
               <div className="relative filter-dropdown-container">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-gray-600 hover:text-gray-900"
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-gray-600 hover:text-gray-900"
                   onClick={() => setShowFilterModal(!showFilterModal)}
-              >
+                >
                   <SlidersHorizontal className="w-4 h-4 mr-2" />
-                Filter
-              </Button>
-                
+                  Filter
+                </Button>
+
                 {/* Filter Dropdown */}
                 <AnimatePresence>
                   {showFilterModal && (
@@ -375,14 +373,13 @@ export default function WalletPage() {
                               setFilterStatus(statusMap[option])
                               setShowFilterModal(false)
                             }}
-                            className={`w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 transition-colors ${
-                              (option === "All" && filterStatus === "all") ||
-                              (option === "Pending" && filterStatus === "Pending") ||
-                              (option === "Approved" && filterStatus === "Completed") ||
-                              (option === "Denied" && filterStatus === "Failed")
+                            className={`w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 transition-colors ${(option === "All" && filterStatus === "all") ||
+                                (option === "Pending" && filterStatus === "Pending") ||
+                                (option === "Approved" && filterStatus === "Completed") ||
+                                (option === "Denied" && filterStatus === "Failed")
                                 ? "text-[#ff8100] font-medium bg-[#ff8100]/5"
                                 : "text-gray-700"
-                            }`}
+                              }`}
                           >
                             {option}
                           </button>
@@ -413,13 +410,12 @@ export default function WalletPage() {
                     </p>
                   </div>
                   <div className="text-right">
-                    <span className={`inline-block text-xs md:text-sm font-medium px-3 py-1 rounded-full mb-2 ${
-                      transaction.status === "Pending" 
+                    <span className={`inline-block text-xs md:text-sm font-medium px-3 py-1 rounded-full mb-2 ${transaction.status === "Pending"
                         ? "bg-blue-100 text-blue-700"
                         : transaction.status === "Completed"
-                        ? "bg-green-100 text-green-700"
-                        : "bg-red-100 text-red-700"
-                    }`}>
+                          ? "bg-green-100 text-green-700"
+                          : "bg-red-100 text-red-700"
+                      }`}>
                       {transaction.status}
                     </span>
                     <p className="text-gray-500 text-xs md:text-sm">
@@ -467,7 +463,7 @@ export default function WalletPage() {
                   className="p-2 hover:bg-gray-100 rounded-full transition-colors"
                 >
                   <X className="w-5 h-5 text-gray-600" />
-          </button>
+                </button>
               </div>
 
               {/* Content */}
@@ -496,17 +492,17 @@ export default function WalletPage() {
                     Select Payment Method <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
-          <button 
+                    <button
                       type="button"
                       onClick={() => setShowPaymentDropdown(!showPaymentDropdown)}
                       className="w-full flex items-center justify-between px-3 py-2.5 border border-gray-300 rounded-lg bg-white text-left focus:outline-none focus:border-[#ff8100] focus:ring-1 focus:ring-[#ff8100]"
-          >
+                    >
                       <span className={selectedPaymentMethod ? "text-gray-900" : "text-gray-400"}>
                         {selectedPaymentMethod || "Select payment method"}
                       </span>
                       <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${showPaymentDropdown ? 'rotate-180' : ''}`} />
-          </button>
-                    
+                    </button>
+
                     {showPaymentDropdown && (
                       <motion.div
                         initial={{ opacity: 0, y: -10 }}
@@ -515,7 +511,7 @@ export default function WalletPage() {
                         className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto"
                       >
                         {paymentMethods.map((method) => (
-          <button 
+                          <button
                             key={method}
                             type="button"
                             onClick={() => {
@@ -605,7 +601,7 @@ export default function WalletPage() {
                 >
                   Ok
                 </Button>
-            </div>
+              </div>
             </motion.div>
           </motion.div>
         )}
@@ -615,7 +611,7 @@ export default function WalletPage() {
       {!showWithdrawModal && (
         <BottomNavbar onMenuClick={() => setShowMenu(true)} />
       )}
-      
+
       {/* Menu Overlay */}
       <MenuOverlay showMenu={showMenu} setShowMenu={setShowMenu} />
     </div>
