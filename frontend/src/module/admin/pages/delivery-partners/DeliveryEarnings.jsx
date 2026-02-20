@@ -11,9 +11,9 @@ const formatCurrency = (amount) => {
 const formatDate = (dateString) => {
   if (!dateString) return 'N/A'
   const date = new Date(dateString)
-  return date.toLocaleDateString('en-IN', { 
-    day: '2-digit', 
-    month: 'short', 
+  return date.toLocaleDateString('en-IN', {
+    day: '2-digit',
+    month: 'short',
     year: 'numeric',
     hour: '2-digit',
     minute: '2-digit'
@@ -56,7 +56,7 @@ export default function DeliveryEarnings() {
     try {
       setLoading(true)
       setError(null)
-      
+
       const params = {
         page: pagination.page,
         limit: pagination.limit,
@@ -68,7 +68,7 @@ export default function DeliveryEarnings() {
       }
 
       const response = await adminAPI.getDeliveryEarnings(params)
-      
+
       if (response.data?.success) {
         setEarnings(response.data.data.earnings || [])
         setSummary(response.data.data.summary || {})
@@ -174,7 +174,7 @@ export default function DeliveryEarnings() {
     return (
       <div className="p-4 lg:p-6 bg-slate-50 min-h-screen w-full max-w-full overflow-x-hidden flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
-          <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+          <Loader2 className="w-8 h-8 animate-spin text-[#FF5200]" />
           <p className="text-gray-600">Loading delivery earnings...</p>
         </div>
       </div>
@@ -207,8 +207,8 @@ export default function DeliveryEarnings() {
                 <p className="text-sm text-slate-600 mb-1">Total Delivery Boys</p>
                 <p className="text-2xl font-bold text-slate-900">{summary.totalDeliveryPartners || 0}</p>
               </div>
-              <div className="w-12 h-12 rounded-lg bg-blue-100 flex items-center justify-center">
-                <DollarSign className="w-6 h-6 text-blue-600" />
+              <div className="w-12 h-12 rounded-lg bg-orange-100 flex items-center justify-center">
+                <DollarSign className="w-6 h-6 text-[#FF5200]" />
               </div>
             </div>
           </div>
@@ -244,7 +244,7 @@ export default function DeliveryEarnings() {
               <select
                 value={filters.period}
                 onChange={(e) => handleFilterChange('period', e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF5200]"
               >
                 <option value="all">All Time</option>
                 <option value="today">Today</option>
@@ -257,7 +257,7 @@ export default function DeliveryEarnings() {
               <select
                 value={filters.deliveryPartnerId}
                 onChange={(e) => handleFilterChange('deliveryPartnerId', e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF5200]"
               >
                 <option value="">All Delivery Boys</option>
                 {deliveryPartners.map(dp => (
@@ -271,7 +271,7 @@ export default function DeliveryEarnings() {
                 type="date"
                 value={filters.fromDate}
                 onChange={(e) => handleFilterChange('fromDate', e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF5200]"
               />
             </div>
             <div>
@@ -280,7 +280,7 @@ export default function DeliveryEarnings() {
                 type="date"
                 value={filters.toDate}
                 onChange={(e) => handleFilterChange('toDate', e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF5200]"
               />
             </div>
           </div>
@@ -299,12 +299,12 @@ export default function DeliveryEarnings() {
                   setSearchQuery(e.target.value)
                   setPagination(prev => ({ ...prev, page: 1 }))
                 }}
-                className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF5200]"
               />
             </div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2">
+                <button className="px-4 py-2 bg-[#FF5200] text-white rounded-lg hover:bg-[#E64A00] flex items-center gap-2">
                   <Download className="w-4 h-4" />
                   <span>Export</span>
                   <ChevronDown className="w-4 h-4" />
@@ -375,7 +375,7 @@ export default function DeliveryEarnings() {
                       <td className="px-4 py-3 text-sm text-slate-700">
                         {earning.deliveryPartnerPhone || 'N/A'}
                       </td>
-                      <td className="px-4 py-3 text-sm text-blue-600 font-medium">
+                      <td className="px-4 py-3 text-sm text-[#FF5200] font-medium">
                         {earning.orderId || 'N/A'}
                       </td>
                       <td className="px-4 py-3 text-sm text-slate-700">
@@ -388,11 +388,10 @@ export default function DeliveryEarnings() {
                         {formatCurrency(earning.orderTotal)}
                       </td>
                       <td className="px-4 py-3 text-sm">
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                          earning.orderStatus === 'delivered' 
-                            ? 'bg-green-100 text-green-800' 
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${earning.orderStatus === 'delivered'
+                            ? 'bg-green-100 text-green-800'
                             : 'bg-yellow-100 text-yellow-800'
-                        }`}>
+                          }`}>
                           {earning.orderStatus || 'N/A'}
                         </span>
                       </td>
@@ -421,21 +420,20 @@ export default function DeliveryEarnings() {
                   Previous
                 </button>
                 {Array.from({ length: Math.min(5, pagination.pages) }).map((_, idx) => {
-                  const pageNum = pagination.page <= 3 
-                    ? idx + 1 
-                    : pagination.page >= pagination.pages - 2 
-                      ? pagination.pages - 4 + idx 
+                  const pageNum = pagination.page <= 3
+                    ? idx + 1
+                    : pagination.page >= pagination.pages - 2
+                      ? pagination.pages - 4 + idx
                       : pagination.page - 2 + idx
                   if (pageNum < 1 || pageNum > pagination.pages) return null
                   return (
                     <button
                       key={idx}
                       onClick={() => handlePageChange(pageNum)}
-                      className={`px-3 py-1 text-sm rounded border ${
-                        pagination.page === pageNum
-                          ? "bg-blue-600 border-blue-600 text-white"
+                      className={`px-3 py-1 text-sm rounded border ${pagination.page === pageNum
+                          ? "bg-[#FF5200] border-[#FF5200] text-white"
                           : "border-slate-300 text-slate-700 hover:bg-slate-50"
-                      }`}
+                        }`}
                     >
                       {pageNum}
                     </button>

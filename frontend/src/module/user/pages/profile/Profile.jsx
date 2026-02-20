@@ -261,14 +261,14 @@ export default function Profile() {
                 whileHover={{ scale: 1.1, rotate: 5 }}
                 transition={{ duration: 0.3, type: "spring", stiffness: 300 }}
               >
-                <Avatar className="h-16 w-16 bg-blue-300 border-0">
+                <Avatar className="h-16 w-16 bg-orange-600 border-0">
                   {userProfile?.profileImage && (
                     <AvatarImage
                       src={userProfile.profileImage && userProfile.profileImage.trim() ? userProfile.profileImage : undefined}
                       alt={displayName}
                     />
                   )}
-                  <AvatarFallback className="bg-blue-300 text-white text-2xl font-semibold">
+                  <AvatarFallback className="bg-orange-600 text-white text-2xl font-semibold">
                     {avatarInitial}
                   </AvatarFallback>
                 </Avatar>
@@ -313,7 +313,7 @@ export default function Profile() {
                   </motion.div>
                   <div className="flex-1 min-w-0 flex flex-col">
                     <span className="text-sm font-medium text-gray-900 dark:text-white whitespace-nowrap">{companyName} Money</span>
-                    <span className="text-base font-semibold text-green-600 dark:text-green-400">₹{userProfile?.wallet?.balance?.toFixed(0) || '0'}</span>
+                    <span className="text-base font-semibold text-orange-600 dark:text-orange-400">₹{userProfile?.wallet?.balance?.toFixed(0) || '0'}</span>
                   </div>
                 </CardContent>
               </Card>
@@ -496,7 +496,7 @@ export default function Profile() {
         {/* Collections Section */}
         <div className="mb-3">
           <div className="flex items-center gap-2 mb-2 px-1">
-            <div className="w-1 h-4 bg-green-600 rounded"></div>
+            <div className="w-1 h-4 bg-orange-600 rounded"></div>
             <h3 className="text-base font-semibold text-gray-900 dark:text-white">Collections</h3>
           </div>
           <Link to="/user/profile/favorites">
@@ -531,7 +531,7 @@ export default function Profile() {
         {/* Food Orders Section */}
         <div className="mb-3">
           <div className="flex items-center gap-2 mb-2 px-1">
-            <div className="w-1 h-4 bg-green-600 rounded"></div>
+            <div className="w-1 h-4 bg-orange-600 rounded"></div>
             <h3 className="text-base font-semibold text-gray-900 dark:text-white">Food Orders</h3>
           </div>
           <div className="space-y-2">
@@ -605,7 +605,7 @@ export default function Profile() {
         {/* Coupons Section */}
         <div className="mb-3">
           <div className="flex items-center gap-2 mb-2 px-1">
-            <div className="w-1 h-4 bg-green-600 rounded"></div>
+            <div className="w-1 h-4 bg-orange-600 rounded"></div>
             <h3 className="text-base font-semibold text-gray-900 dark:text-white">Coupons</h3>
           </div>
           <Link to="/user/profile/redeem-gold-coupon">
@@ -640,7 +640,7 @@ export default function Profile() {
         {/* More Section */}
         <div className="mb-6 pb-4">
           <div className="flex items-center gap-2 mb-2 px-1">
-            <div className="w-1 h-4 bg-green-600 rounded"></div>
+            <div className="w-1 h-4 bg-orange-600 rounded"></div>
             <h3 className="text-base font-semibold text-gray-900 dark:text-white">More</h3>
           </div>
           <div className="space-y-2">
@@ -806,12 +806,12 @@ export default function Profile() {
                 setVegModeOpen(false)
               }}
               className={`w-full p-3 rounded-xl border-2 transition-all flex items-center justify-between ${vegMode
-                ? 'border-green-600 bg-green-50'
+                ? 'border-orange-600 bg-orange-50'
                 : 'border-gray-200 bg-white hover:border-gray-300'
                 }`}
             >
               <div className="flex items-center gap-3">
-                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${vegMode ? 'border-green-600 bg-green-600' : 'border-gray-300'
+                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${vegMode ? 'border-orange-600 bg-orange-600' : 'border-gray-300'
                   }`}>
                   {vegMode && <Check className="h-3 w-3 text-white" />}
                 </div>
@@ -820,7 +820,7 @@ export default function Profile() {
                   <p className="text-xs text-gray-500">Show only vegetarian options</p>
                 </div>
               </div>
-              <Leaf className={`h-5 w-5 ${vegMode ? 'text-green-600' : 'text-gray-400'}`} />
+              <Leaf className={`h-5 w-5 ${vegMode ? 'text-orange-600' : 'text-gray-400'}`} />
             </button>
             <button
               onClick={() => {
@@ -863,11 +863,11 @@ export default function Profile() {
                 setAppearanceOpen(false)
               }}
               className={`w-full p-3 rounded-xl border-2 transition-all flex items-center gap-3 ${appearance === 'light'
-                ? 'border-blue-600 bg-blue-50 dark:border-blue-500 dark:bg-blue-900/20'
+                ? 'border-orange-600 bg-orange-50 dark:border-orange-500 dark:bg-orange-900/20'
                 : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-300 dark:hover:border-gray-600'
                 }`}
             >
-              <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${appearance === 'light' ? 'border-blue-600 bg-blue-600 dark:border-blue-500 dark:bg-blue-500' : 'border-gray-300 dark:border-gray-600'
+              <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${appearance === 'light' ? 'border-orange-600 bg-orange-600 dark:border-orange-500 dark:bg-orange-500' : 'border-gray-300 dark:border-gray-600'
                 }`}>
                 {appearance === 'light' && <Check className="h-3 w-3 text-white" />}
               </div>
@@ -883,11 +883,11 @@ export default function Profile() {
                 setAppearanceOpen(false)
               }}
               className={`w-full p-3 rounded-xl border-2 transition-all flex items-center gap-3 ${appearance === 'dark'
-                ? 'border-blue-600 dark:border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                ? 'border-orange-600 dark:border-orange-500 bg-orange-50 dark:bg-orange-900/20'
                 : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-300 dark:hover:border-gray-600'
                 }`}
             >
-              <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${appearance === 'dark' ? 'border-blue-600 bg-blue-600 dark:border-blue-500 dark:bg-blue-500' : 'border-gray-300 dark:border-gray-600'
+              <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${appearance === 'dark' ? 'border-orange-600 bg-orange-600 dark:border-orange-500 dark:bg-orange-500' : 'border-gray-300 dark:border-gray-600'
                 }`}>
                 {appearance === 'dark' && <Check className="h-3 w-3 text-white" />}
               </div>

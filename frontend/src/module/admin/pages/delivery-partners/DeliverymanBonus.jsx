@@ -12,22 +12,22 @@ const formatBonusAmount = (transaction) => {
   if (transaction.amount !== undefined && transaction.amount !== null) {
     return `₹${parseFloat(transaction.amount).toFixed(2)}`
   }
-  
+
   if (!transaction.bonus) return '₹0.00'
-  
+
   // Clean the bonus string - remove superscript characters
   let cleaned = transaction.bonus.toString()
     .replace(/¹/g, '') // Remove superscript 1
     .replace(/[\u2070-\u207F\u2080-\u208F]/g, '') // Remove all superscript characters
     .trim()
-  
+
   // Extract numeric value
   const numericMatch = cleaned.match(/[\d.]+/)
   if (numericMatch) {
     const amount = parseFloat(numericMatch[0])
     return `₹${amount.toFixed(2)}`
   }
-  
+
   return '₹0.00'
 }
 
@@ -106,7 +106,7 @@ export default function DeliverymanBonus() {
     if (!searchQuery.trim()) {
       return transactions
     }
-    
+
     const query = searchQuery.toLowerCase().trim()
     return transactions.filter(transaction =>
       transaction.deliveryman?.toLowerCase().includes(query) ||
@@ -137,27 +137,27 @@ export default function DeliverymanBonus() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!validateForm()) return
-    
+
     setSubmitting(true)
     setError("")
-    
+
     // Log request details
     console.log("Submitting bonus with data:", {
       deliveryPartnerId: formData.deliveryPartnerId,
       amount: formData.amount
     })
-    
+
     try {
       const response = await adminAPI.addDeliveryPartnerBonus(
         formData.deliveryPartnerId,
         formData.amount,
         '' // No reference
       )
-      
+
       console.log("Bonus response:", response)
       console.log("Response data:", response.data)
       console.log("Response status:", response.status)
-      
+
       if (response?.data?.success || response?.data?.data) {
         // Refresh transactions
         const transactionsResponse = await adminAPI.getDeliveryPartnerBonusTransactions({ limit: 1000 })
@@ -174,7 +174,7 @@ export default function DeliverymanBonus() {
           }))
           setTransactions(formatted)
         }
-        
+
         setFormData({ deliveryPartnerId: "", amount: "" })
         setShowSuccessDialog(true)
       } else {
@@ -193,10 +193,10 @@ export default function DeliverymanBonus() {
       console.error("Error request method:", error.config?.method)
       console.error("Error request data:", error.config?.data)
       console.error("==========================")
-      
+
       // Extract error message
       let errorMessage = "Failed to add bonus. Please try again."
-      
+
       if (error.response) {
         // Server responded with error status
         if (error.response.data?.message) {
@@ -221,7 +221,7 @@ export default function DeliverymanBonus() {
         // Error setting up the request
         errorMessage = error.message || "Failed to add bonus. Please try again."
       }
-      
+
       setError(errorMessage)
     } finally {
       setSubmitting(false)
@@ -278,7 +278,7 @@ export default function DeliverymanBonus() {
       <div className="max-w-7xl mx-auto">
         {/* Bonus Form */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6 relative">
-          <button 
+          <button
             onClick={() => setIsSettingsOpen(true)}
             className="absolute top-6 right-6 p-2 rounded-lg bg-slate-100 hover:bg-slate-200 transition-colors"
           >
@@ -286,7 +286,7 @@ export default function DeliverymanBonus() {
           </button>
 
           <div className="flex items-center gap-3 mb-6">
-            <Wallet className="w-5 h-5 text-blue-600" />
+            <Wallet className="w-5 h-5 text-[#FF5200]" />
             <h1 className="text-2xl font-bold text-slate-900">Bonus</h1>
           </div>
 
@@ -299,9 +299,8 @@ export default function DeliverymanBonus() {
                 <select
                   value={formData.deliveryPartnerId}
                   onChange={(e) => handleInputChange("deliveryPartnerId", e.target.value)}
-                  className={`w-full px-4 py-2.5 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
-                    formErrors.deliveryPartnerId ? "border-red-500" : "border-slate-300"
-                  }`}
+                  className={`w-full px-4 py-2.5 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#FF5200] text-sm ${formErrors.deliveryPartnerId ? "border-red-500" : "border-slate-300"
+                    }`}
                   disabled={submitting}
                 >
                   <option value="">Select Delivery Man</option>
@@ -324,9 +323,8 @@ export default function DeliverymanBonus() {
                   value={formData.amount}
                   onChange={(e) => handleInputChange("amount", e.target.value)}
                   placeholder="Enter amount"
-                  className={`w-full px-4 py-2.5 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
-                    formErrors.amount ? "border-red-500" : "border-slate-300"
-                  }`}
+                  className={`w-full px-4 py-2.5 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#FF5200] text-sm ${formErrors.amount ? "border-red-500" : "border-slate-300"
+                    }`}
                   disabled={submitting}
                 />
                 {formErrors.amount && <p className="text-xs text-red-500 mt-1">{formErrors.amount}</p>}
@@ -350,7 +348,7 @@ export default function DeliverymanBonus() {
               </button>
               <button
                 type="submit"
-                className="px-6 py-2.5 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="px-6 py-2.5 text-sm font-medium rounded-lg bg-[#FF5200] text-white hover:bg-[#E64A00] transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 disabled={submitting}
               >
                 {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
@@ -408,7 +406,7 @@ export default function DeliverymanBonus() {
           {/* Table */}
           {loading ? (
             <div className="flex flex-col items-center justify-center py-20">
-              <Loader2 className="w-12 h-12 text-blue-600 animate-spin mb-4" />
+              <Loader2 className="w-12 h-12 text-[#FF5200] animate-spin mb-4" />
               <p className="text-sm text-slate-600">Loading transactions...</p>
             </div>
           ) : filteredTransactions.length === 0 ? (

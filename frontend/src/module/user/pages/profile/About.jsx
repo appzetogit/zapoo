@@ -5,7 +5,7 @@ import { motion } from "framer-motion"
 import AnimatedPage from "../../components/AnimatedPage"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import zapooFoodLogo from "@/assets/zapoo-logo.png"
+import zapooFoodLogo from "@/assets/zapoo_logo.png"
 import api from "@/lib/api"
 import { API_ENDPOINTS } from "@/lib/api/config"
 import { useCompanyName } from "@/lib/hooks/useCompanyName"
@@ -84,7 +84,7 @@ export default function About() {
           transition={{ duration: 0.5 }}
         >
           <Card className="bg-white dark:bg-[#1a1a1a] rounded-2xl shadow-lg border-0 dark:border-gray-800 mb-6 overflow-hidden">
-            <div className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 p-8 md:p-10 text-center">
+            <div className="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/20 p-8 md:p-10 text-center">
               <motion.div
                 initial={{ scale: 0.8, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
@@ -92,10 +92,10 @@ export default function About() {
                 className="flex justify-center mb-6"
               >
                 <div className="relative">
-                  <div className="absolute inset-0 bg-green-400 rounded-full blur-2xl opacity-30 animate-pulse" />
+                  <div className="absolute inset-0 bg-orange-400 rounded-full blur-2xl opacity-30 animate-pulse" />
                   <div className="relative bg-white dark:bg-gray-800 rounded-full p-4 md:p-6 shadow-xl">
                     <img
-                      src={aboutData.logo && aboutData.logo.trim() ? aboutData.logo : appzetoFoodLogo}
+                      src={aboutData.logo && aboutData.logo.trim() ? aboutData.logo : zapooFoodLogo}
                       alt={`${aboutData.appName} Logo`}
                       className="h-16 w-16 md:h-20 md:w-20 object-contain rounded-full"
                     />
@@ -196,7 +196,7 @@ export default function About() {
                     <FileText className="h-5 w-5 text-gray-600 dark:text-gray-400" />
                   </div>
                   <div className="flex-1">
-                    <div className="text-base font-medium text-gray-900 dark:text-white group-hover:text-green-600 dark:group-hover:text-green-400 transition-colors">
+                    <div className="text-base font-medium text-gray-900 dark:text-white group-hover:text-orange-600 dark:group-hover:text-orange-400 transition-colors">
                       Terms and Conditions
                     </div>
                     <div className="text-sm text-gray-500 dark:text-gray-500">
@@ -214,7 +214,7 @@ export default function About() {
                     <Lock className="h-5 w-5 text-gray-600 dark:text-gray-400" />
                   </div>
                   <div className="flex-1">
-                    <div className="text-base font-medium text-gray-900 dark:text-white group-hover:text-green-600 dark:group-hover:text-green-400 transition-colors">
+                    <div className="text-base font-medium text-gray-900 dark:text-white group-hover:text-orange-600 dark:group-hover:text-orange-400 transition-colors">
                       Privacy Policy
                     </div>
                     <div className="text-sm text-gray-500 dark:text-gray-500">
@@ -232,7 +232,7 @@ export default function About() {
                     <Receipt className="h-5 w-5 text-gray-600 dark:text-gray-400" />
                   </div>
                   <div className="flex-1">
-                    <div className="text-base font-medium text-gray-900 dark:text-white group-hover:text-green-600 dark:group-hover:text-green-400 transition-colors">
+                    <div className="text-base font-medium text-gray-900 dark:text-white group-hover:text-orange-600 dark:group-hover:text-orange-400 transition-colors">
                       Refund Policy
                     </div>
                     <div className="text-sm text-gray-500 dark:text-gray-500">
@@ -250,7 +250,7 @@ export default function About() {
                     <Truck className="h-5 w-5 text-gray-600 dark:text-gray-400" />
                   </div>
                   <div className="flex-1">
-                    <div className="text-base font-medium text-gray-900 dark:text-white group-hover:text-green-600 dark:group-hover:text-green-400 transition-colors">
+                    <div className="text-base font-medium text-gray-900 dark:text-white group-hover:text-orange-600 dark:group-hover:text-orange-400 transition-colors">
                       Shipping Policy
                     </div>
                     <div className="text-sm text-gray-500 dark:text-gray-500">
@@ -268,7 +268,7 @@ export default function About() {
                     <XCircle className="h-5 w-5 text-gray-600 dark:text-gray-400" />
                   </div>
                   <div className="flex-1">
-                    <div className="text-base font-medium text-gray-900 dark:text-white group-hover:text-green-600 dark:group-hover:text-green-400 transition-colors">
+                    <div className="text-base font-medium text-gray-900 dark:text-white group-hover:text-orange-600 dark:group-hover:text-orange-400 transition-colors">
                       Cancellation Policy
                     </div>
                     <div className="text-sm text-gray-500 dark:text-gray-500">

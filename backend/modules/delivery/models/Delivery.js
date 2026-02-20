@@ -262,14 +262,14 @@ const deliverySchema = new mongoose.Schema(
 );
 
 // Indexes
-deliverySchema.index({ phone: 1 }, { unique: true });
-deliverySchema.index({ deliveryId: 1 }, { unique: true, sparse: true });
+// deliverySchema.index({ phone: 1 }, { unique: true }); // Removed duplicate index
+// deliverySchema.index({ deliveryId: 1 }, { unique: true, sparse: true }); // Removed duplicate index
 deliverySchema.index({ 'availability.currentLocation': '2dsphere' });
 deliverySchema.index({ status: 1 });
 deliverySchema.index({ isActive: 1 });
 
 // Hash password before saving
-deliverySchema.pre('save', async function(next) {
+deliverySchema.pre('save', async function (next) {
   if (!this.isModified('password')) {
     return next();
   }
@@ -281,7 +281,7 @@ deliverySchema.pre('save', async function(next) {
 });
 
 // Generate deliveryId before saving
-deliverySchema.pre('save', async function(next) {
+deliverySchema.pre('save', async function (next) {
   if (!this.deliveryId && this.isNew) {
     try {
       const DeliveryModel = mongoose.model('Delivery');
@@ -289,32 +289,33 @@ deliverySchema.pre('save', async function(next) {
       let isUnique = false;
       let attempts = 0;
       const maxAttempts = 100; // Prevent infinite loop
-      
+
       // Keep generating IDs until we find a unique one
       while (!isUnique && attempts < maxAttempts) {
         // Get the highest existing delivery ID number
         // Using aggregation for better performance and atomicity
         const result = await DeliveryModel.aggregate([
           { $match: { deliveryId: { $exists: true, $ne: null } } },
-          { $project: { 
-              number: { 
-                $toInt: { 
-                  $substr: ['$deliveryId', 3, 6] 
-                } 
-              } 
-            } 
+          {
+            $project: {
+              number: {
+                $toInt: {
+                  $substr: ['$deliveryId', 3, 6]
+                }
+              }
+            }
           },
           { $sort: { number: -1 } },
           { $limit: 1 }
         ]);
-        
+
         let nextNumber = 1;
         if (result.length > 0 && result[0].number) {
           nextNumber = result[0].number + 1;
         }
-        
+
         deliveryId = `DEL${String(nextNumber).padStart(6, '0')}`;
-        
+
         // Check if this ID already exists (handles race conditions)
         const exists = await DeliveryModel.findOne({ deliveryId }).select('_id');
         if (!exists) {
@@ -328,12 +329,12 @@ deliverySchema.pre('save', async function(next) {
           await new Promise(resolve => setTimeout(resolve, 5));
         }
       }
-      
+
       if (!isUnique) {
         // Fallback: use timestamp-based ID if we couldn't find a unique sequential one
         deliveryId = `DEL${Date.now().toString().slice(-6)}`;
       }
-      
+
       this.deliveryId = deliveryId;
     } catch (error) {
       // If model not registered yet or any other error, use timestamp-based ID
@@ -344,7 +345,7 @@ deliverySchema.pre('save', async function(next) {
 });
 
 // Method to compare password
-deliverySchema.methods.comparePassword = async function(candidatePassword) {
+deliverySchema.methods.comparePassword = async function (candidatePassword) {
   if (!this.password) {
     return false;
   }

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useNavigate } from "react-router-dom"
-import { 
+import {
   User,
   Utensils,
   Megaphone,
@@ -38,7 +38,7 @@ export default function MenuOverlay({ showMenu, setShowMenu }) {
 
     // Listen for storage changes
     window.addEventListener('storage', checkAuth)
-    
+
     // Custom event for same-tab updates
     window.addEventListener('restaurantAuthChanged', checkAuth)
 
@@ -95,15 +95,15 @@ export default function MenuOverlay({ showMenu, setShowMenu }) {
             onClick={() => setShowMenu(false)}
             className="fixed inset-0 bg-black/40 z-[100] backdrop-blur-sm"
           />
-          
+
           {/* Menu Sheet - Full bottom slide */}
           <motion.div
             initial={{ y: "100%", opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: "100%", opacity: 0 }}
-            transition={{ 
-              type: "spring", 
-              damping: 25, 
+            transition={{
+              type: "spring",
+              damping: 25,
               stiffness: 300,
               mass: 0.8
             }}
@@ -111,7 +111,7 @@ export default function MenuOverlay({ showMenu, setShowMenu }) {
             className="fixed bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-2xl z-[110] max-h-[90vh] overflow-hidden"
           >
             {/* Drag Handle */}
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.1, duration: 0.3 }}
@@ -122,7 +122,7 @@ export default function MenuOverlay({ showMenu, setShowMenu }) {
 
             {/* Menu Grid - Improved Layout */}
             <div className="px-4 pb-20 md:pb-6 pt-2 overflow-y-auto max-h-[calc(90vh-60px)] scrollbar-hide scroll-smooth">
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.15, duration: 0.3 }}
@@ -135,8 +135,8 @@ export default function MenuOverlay({ showMenu, setShowMenu }) {
                       key={option.id}
                       initial={{ opacity: 0, y: 20, scale: 0.9 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
-                      transition={{ 
-                        duration: 0.3, 
+                      transition={{
+                        duration: 0.3,
                         delay: 0.2 + (index * 0.02),
                         type: "spring",
                         stiffness: 200,
@@ -162,16 +162,15 @@ export default function MenuOverlay({ showMenu, setShowMenu }) {
                           navigate(option.route)
                         }
                       }}
-                      className={`flex flex-col items-center justify-center gap-2 p-3 md:p-4 rounded-xl transition-all shadow-md hover:shadow-lg ${
-                        option.isLogout
+                      className={`flex flex-col items-center justify-center gap-2 p-3 md:p-4 rounded-xl transition-all shadow-md hover:shadow-lg ${option.isLogout
                           ? "bg-red-500 hover:bg-red-600 text-white"
-                          : "bg-gradient-to-br from-[#ff8100] to-[#ff9500] hover:from-[#e67300] hover:to-[#e68500] text-white"
-                      }`}
+                          : "bg-gradient-to-br from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white"
+                        }`}
                     >
                       <motion.div
                         initial={{ scale: 0, rotate: -180 }}
                         animate={{ scale: 1, rotate: 0 }}
-                        transition={{ 
+                        transition={{
                           delay: 0.25 + (index * 0.02),
                           type: "spring",
                           stiffness: 200,
@@ -181,12 +180,12 @@ export default function MenuOverlay({ showMenu, setShowMenu }) {
                       >
                         <IconComponent className="w-5 h-5 md:w-6 md:h-6 text-white flex-shrink-0" />
                       </motion.div>
-                      <motion.span 
+                      <motion.span
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         transition={{ delay: 0.35 + (index * 0.02), duration: 0.2 }}
                         className="text-[10px] md:text-[11px] font-semibold text-white text-center leading-tight px-1"
-                        style={{ 
+                        style={{
                           display: '-webkit-box',
                           WebkitLineClamp: 2,
                           WebkitBoxOrient: 'vertical',

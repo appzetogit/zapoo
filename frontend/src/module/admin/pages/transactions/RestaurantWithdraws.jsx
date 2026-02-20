@@ -64,7 +64,7 @@ export default function RestaurantWithdraws() {
 
   const filteredWithdraws = useMemo(() => {
     let result = [...withdraws]
-    
+
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim()
       result = result.filter(w =>
@@ -73,7 +73,7 @@ export default function RestaurantWithdraws() {
         w.amount?.toString().includes(query)
       )
     }
-    
+
     return result
   }, [withdraws, searchQuery])
 
@@ -82,7 +82,7 @@ export default function RestaurantWithdraws() {
       return "bg-green-100 text-green-700"
     }
     if (status === "Pending") {
-      return "bg-blue-100 text-blue-700"
+      return "bg-orange-100 text-[#FF5200]"
     }
     if (status === "Rejected") {
       return "bg-red-100 text-red-700"
@@ -99,7 +99,7 @@ export default function RestaurantWithdraws() {
     if (!confirm('Are you sure you want to approve this withdrawal request?')) {
       return
     }
-    
+
     try {
       setProcessingAction(id)
       const response = await adminAPI.approveWithdrawalRequest(id)
@@ -122,7 +122,7 @@ export default function RestaurantWithdraws() {
       alert('Please provide a rejection reason')
       return
     }
-    
+
     try {
       setProcessingAction(id)
       const response = await adminAPI.rejectWithdrawalRequest(id, rejectionReason)
@@ -228,7 +228,7 @@ export default function RestaurantWithdraws() {
         {/* Header */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
           <div className="flex items-center gap-3">
-            <Building className="w-5 h-5 text-blue-600" />
+            <Building className="w-5 h-5 text-[#FF5200]" />
             <h1 className="text-2xl font-bold text-slate-900">Restaurant Withdraw Transaction</h1>
           </div>
         </div>
@@ -240,11 +240,10 @@ export default function RestaurantWithdraws() {
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
-                  activeTab === tab
-                    ? "border-blue-600 text-blue-600"
+                className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${activeTab === tab
+                    ? "border-[#FF5200] text-[#FF5200]"
                     : "border-transparent text-slate-600 hover:text-slate-900"
-                }`}
+                  }`}
               >
                 {tab}
               </button>
@@ -305,7 +304,7 @@ export default function RestaurantWithdraws() {
           {/* Table */}
           {loading ? (
             <div className="py-20 text-center">
-              <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-4" />
+              <Loader2 className="w-8 h-8 animate-spin text-[#FF5200] mx-auto mb-4" />
               <p className="text-slate-600">Loading withdrawal requests...</p>
             </div>
           ) : (
@@ -467,7 +466,7 @@ export default function RestaurantWithdraws() {
             <DialogFooter className="px-6 pb-6">
               <button
                 onClick={() => setIsViewOpen(false)}
-                className="px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-all shadow-md"
+                className="px-4 py-2 text-sm font-medium rounded-lg bg-[#FF5200] text-white hover:bg-[#E64A00] transition-all shadow-md"
               >
                 Close
               </button>
@@ -491,7 +490,7 @@ export default function RestaurantWithdraws() {
                   onChange={(e) => setRejectionReason(e.target.value)}
                   placeholder="Enter reason for rejection..."
                   rows={4}
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#FF5200] focus:border-[#FF5200] outline-none"
                 />
               </div>
             </div>
@@ -536,7 +535,7 @@ export default function RestaurantWithdraws() {
                         id={`toggle-${key}`}
                         checked={isVisible}
                         onChange={() => toggleColumn(key)}
-                        className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
+                        className="w-4 h-4 text-[#FF5200] border-slate-300 rounded focus:ring-[#FF5200]"
                       />
                       <label htmlFor={`toggle-${key}`} className="ml-2 text-sm text-slate-700 capitalize">
                         {key.replace(/([A-Z])/g, ' $1').trim()}

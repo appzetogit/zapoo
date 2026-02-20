@@ -85,7 +85,7 @@ export default function RestaurantSignupEmail() {
 
   const handleOtpChange = (index, value) => {
     if (!/^\d*$/.test(value)) return
-    
+
     const newOtp = [...otp]
     newOtp[index] = value.slice(-1)
     setOtp(newOtp)
@@ -122,7 +122,7 @@ export default function RestaurantSignupEmail() {
   const handleOtpSubmit = async (e) => {
     e.preventDefault()
     setError("")
-    
+
     const otpCode = otp.join("")
     if (otpCode.length !== 6) {
       setError("Please enter the complete OTP")
@@ -140,13 +140,13 @@ export default function RestaurantSignupEmail() {
       )
 
       const data = response?.data?.data || response?.data
-      
+
       if (data.accessToken && data.restaurant) {
         // Replace old token with new one (handles cross-module login)
         setAuthData("restaurant", data.accessToken, data.restaurant)
-        
+
         window.dispatchEvent(new Event("restaurantAuthChanged"))
-        
+
         navigate("/restaurant", { replace: true })
       } else {
         throw new Error("Registration failed. Please try again.")
@@ -167,7 +167,7 @@ export default function RestaurantSignupEmail() {
 
   const handleResendOtp = async () => {
     if (resendTimer > 0) return
-    
+
     setIsLoading(true)
     setError("")
     try {

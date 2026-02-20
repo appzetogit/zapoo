@@ -12,7 +12,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Mail, User, Lock, Eye, EyeOff, ArrowLeft, Shield } from "lucide-react"
-import zapooLogo from "@/assets/zapoo-logo.png"
+import zapooLogo from "@/assets/zapoo_logo.png"
 import { authAPI, adminAPI } from "@/lib/api"
 import { setAuthData } from "@/lib/utils/auth"
 import { loadBusinessSettings } from "@/lib/utils/businessSettings"
