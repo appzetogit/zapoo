@@ -800,6 +800,19 @@ export const marketingAPI = {
     );
   },
 
+  // Create Razorpay order for ad payment
+  createAdPaymentOrder: (adId) => {
+    return apiClient.post(
+      API_ENDPOINTS.MARKETING.PAYMENT_CREATE_ORDER.replace(":adId", adId)
+    );
+  },
+
+  // Verify ad payment
+  verifyAdPayment: (paymentData) => {
+    return apiClient.post(API_ENDPOINTS.MARKETING.PAYMENT_VERIFY, paymentData);
+  },
+
+
   // Get authenticated restaurant's ads
   getMyAds: () => {
     return apiClient.get(API_ENDPOINTS.MARKETING.MY_ADS);

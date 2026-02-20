@@ -11,7 +11,9 @@ import {
   Loader2,
   MapPin,
   Tag,
+  AlertCircle,
 } from "lucide-react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -26,6 +28,8 @@ export default function NewAdvertisementPage() {
   const [myZone, setMyZone] = useState(null)
   const [zoneLoading, setZoneLoading] = useState(true)
   const [zoneError, setZoneError] = useState(null)
+  const [dateError, setDateError] = useState("")
+  const [conflictError, setConflictError] = useState(null)
 
   const [formData, setFormData] = useState({
     title: "",
@@ -35,6 +39,63 @@ export default function NewAdvertisementPage() {
     redirectTarget: "menu",
     bannerImage: null,
   })
+
+  const tomorrowStr = () => {
+    const d = new Date()
+    d.setDate(d.getDate() + 1)
+    const yyyy = d.getFullYear()
+    const mm = String(d.getMonth() + 1).padStart(2, '0')
+    const dd = String(d.getDate()).padStart(2, '0')
+    return `${yyyy}-${mm}-${dd}`
+  }
+
+  const validateDates = (startDate, endDate) => {
+    const tomorrow = tomorrowStr()
+    if (startDate && startDate < tomorrow) return "Campaigns must be requested at least one day in advance."
+    if (endDate && endDate < tomorrow) return "End date cannot be in the past."
+    if (startDate && endDate && endDate < startDate) return "End date cannot be before start date."
+    return ""
+  }
+
+  const handleStartDateChange = (e) => {
+    const val = e.target.value
+    // Always store the value so the user can type through day/month/year freely
+    setFormData(f => ({ ...f, startDate: val }))
+
+    // Only validate once the year part is fully typed (4 digits, >= current year)
+    if (val && val.length === 10) {
+      const year = parseInt(val.split('-')[0], 10)
+      if (year >= new Date().getFullYear()) {
+        const err = validateDates(val, formData.endDate)
+        if (err) { toast.error(err); setDateError(err) }
+        else setDateError("")
+      } else {
+        setDateError("") // year still being typed, clear any old error
+      }
+    } else {
+      setDateError("")
+    }
+  }
+
+  const handleEndDateChange = (e) => {
+    const val = e.target.value
+    // Always store the value so the user can type through day/month/year freely
+    setFormData(f => ({ ...f, endDate: val }))
+
+    // Only validate once the year part is fully typed (4 digits, >= current year)
+    if (val && val.length === 10) {
+      const year = parseInt(val.split('-')[0], 10)
+      if (year >= new Date().getFullYear()) {
+        const err = validateDates(formData.startDate, val)
+        if (err) { toast.error(err); setDateError(err) }
+        else setDateError("")
+      } else {
+        setDateError("") // year still being typed, clear any old error
+      }
+    } else {
+      setDateError("")
+    }
+  }
 
   // Fetch the restaurant's own zone automatically
   useEffect(() => {
@@ -89,6 +150,17 @@ export default function NewAdvertisementPage() {
       return
     }
 
+    if (dateError) {
+      toast.error(dateError)
+      return
+    }
+
+    const days = calculateDays()
+    if (days <= 0) {
+      toast.error("Please select a valid date range (at least 1 day)")
+      return
+    }
+
     setLoading(true)
     try {
       const data = new FormData()
@@ -106,14 +178,18 @@ export default function NewAdvertisementPage() {
       toast.success("Ad request submitted for review!")
       navigate("/restaurant/advertisements")
     } catch (error) {
-      toast.error(error.response?.data?.message || "Something went wrong")
+      if (error.response?.status === 409) {
+        setConflictError(error.response.data.message)
+      } else {
+        toast.error(error.response?.data?.message || "Something went wrong")
+      }
     } finally {
       setLoading(false)
     }
   }
 
   const days = calculateDays()
-  const canSubmit = !loading && myZone && formData.title && formData.bannerImage && days > 0
+  const canSubmit = !loading && myZone && formData.title && formData.bannerImage && days > 0 && !dateError
 
   return (
     <div className="min-h-screen bg-[#fef9f5] pb-32">
@@ -247,8 +323,8 @@ export default function NewAdvertisementPage() {
                     <Input
                       type="date"
                       value={formData.startDate}
-                      onChange={e => setFormData(f => ({ ...f, startDate: e.target.value }))}
-                      min={new Date().toISOString().split('T')[0]}
+                      onChange={handleStartDateChange}
+                      min={tomorrowStr()}
                       className="pl-10"
                     />
                     <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -260,14 +336,22 @@ export default function NewAdvertisementPage() {
                     <Input
                       type="date"
                       value={formData.endDate}
-                      onChange={e => setFormData(f => ({ ...f, endDate: e.target.value }))}
-                      min={formData.startDate || new Date().toISOString().split('T')[0]}
+                      onChange={handleEndDateChange}
+                      min={formData.startDate || tomorrowStr()}
                       className="pl-10"
                     />
                     <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                   </div>
                 </div>
               </div>
+
+              {/* Date error alert */}
+              {dateError && (
+                <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
+                  <Info className="w-4 h-4 shrink-0 text-red-500" />
+                  <span>{dateError}</span>
+                </div>
+              )}
 
               {/* Duration summary */}
               {days > 0 && myZone && (
@@ -289,13 +373,7 @@ export default function NewAdvertisementPage() {
           </Card>
         </section>
 
-        {/* Info Box */}
-        <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex gap-3">
-          <Info className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />
-          <p className="text-xs text-blue-800 leading-relaxed">
-            Your ad will be reviewed by our team within 24 hours. Once approved, the campaign will automatically go live on the scheduled start date.
-          </p>
-        </div>
+
       </div>
 
       {/* Checkout Bar */}
@@ -309,7 +387,7 @@ export default function NewAdvertisementPage() {
             </div>
           </div>
           <Button
-            disabled={!canSubmit}
+            disabled={loading || !myZone}
             onClick={handleSubmit}
             className="bg-[#ff8100] hover:bg-[#e67300] text-white px-8 h-12 rounded-xl font-bold text-lg shadow-lg shadow-orange-100 transition-all flex-1 sm:flex-none disabled:opacity-50"
           >
@@ -319,6 +397,47 @@ export default function NewAdvertisementPage() {
       </div>
 
       <BottomNavbar />
+
+      <Dialog open={!!conflictError} onOpenChange={() => setConflictError(null)}>
+        <DialogContent className="w-[90%] sm:w-full sm:max-w-[340px] p-0 gap-0 overflow-hidden rounded-xl border-0 shadow-xl">
+          <div className="bg-red-50 p-4 flex flex-col items-center justify-center border-b border-red-100">
+            <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm mb-2">
+              <AlertCircle className="w-5 h-5 text-red-600" />
+            </div>
+            <DialogTitle className="text-base font-bold text-red-900">
+              Campaign Conflict
+            </DialogTitle>
+          </div>
+
+          <div className="p-4">
+            <DialogDescription className="text-center text-gray-600 text-sm mb-4 leading-relaxed">
+              {conflictError}
+            </DialogDescription>
+
+            <div className="bg-orange-50 border border-orange-100 rounded-lg p-3 flex gap-3 mb-4">
+              <Info className="w-4 h-4 text-orange-500 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <p className="text-xs text-orange-900 leading-relaxed">
+                  You can only have <span className="font-bold">one active campaign</span> per zone at a time.
+                </p>
+                <p className="text-[10px] text-orange-700 font-medium opacity-80">
+                  Please choose non-overlapping dates or wait for the current campaign to finish.
+                </p>
+              </div>
+            </div>
+
+            <DialogFooter className="sm:justify-center">
+              <Button
+                type="button"
+                className="w-full bg-gray-900 hover:bg-gray-800 text-white font-bold h-9 text-sm rounded-lg transition-all"
+                onClick={() => setConflictError(null)}
+              >
+                Understood, I'll fix it
+              </Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -1,5 +1,6 @@
 import AdRequest from '../models/AdRequest.js';
-import SlotConfiguration from '../models/SlotConfiguration.js';
+import { createOrder, verifyPayment } from '../../payment/services/razorpayService.js';
+import express from 'express';
 import Zone from '../../admin/models/Zone.js';
 import Tier from '../../admin/models/Tier.js';
 import Restaurant from '../../restaurant/models/Restaurant.js';
@@ -15,28 +16,30 @@ const AD_PRICING = {
 const DEFAULT_PRICING = 500;
 
 /**
- * Helper to check slot availability for a date range in specific zones
+ * Check banner slot availability using tier-based limits.
+ * Each tier defines maxBanners (max concurrent approved ads/day for zones in that tier).
+ * Minimum 1 banner always allowed regardless of tier config.
  */
 const checkAvailability = async (zones, startDate, endDate) => {
     const results = [];
 
     for (const zoneId of zones) {
-        const config = await SlotConfiguration.findOne({ zone: zoneId, isActive: true });
-        if (!config) {
-            results.push({ zoneId, available: false, reason: 'Zone not configured for ads' });
-            continue;
-        }
+        // Get zone with its tier
+        const zone = await Zone.findById(zoneId).populate('tierId');
+        const tier = zone?.tierId;
 
-        // Find overlapping approved/active campaigns
+        // Max banners from tier, minimum 1 always enforced
+        const maxBanners = Math.max(1, tier?.maxBanners ?? 5);
+
+        // Find overlapping approved/active campaigns for this zone
         const overlappingAds = await AdRequest.find({
             targetZones: zoneId,
             status: { $in: ['Approved', 'Scheduled', 'Active'] },
-            $or: [
-                { startDate: { $lte: endDate }, endDate: { $gte: startDate } }
-            ]
+            startDate: { $lte: endDate },
+            endDate: { $gte: startDate }
         });
 
-        // Check availability for each day in range
+        // Check each day in the requested range
         let isFull = false;
         let curr = new Date(startDate);
         const end = new Date(endDate);
@@ -46,7 +49,7 @@ const checkAvailability = async (zones, startDate, endDate) => {
                 ad.startDate <= curr && ad.endDate >= curr
             ).length;
 
-            if (countForDay >= config.maxSlots) {
+            if (countForDay >= maxBanners) {
                 isFull = true;
                 break;
             }
@@ -57,12 +60,14 @@ const checkAvailability = async (zones, startDate, endDate) => {
             zoneId,
             available: !isFull,
             slotsUsed: overlappingAds.length,
-            maxSlots: config.maxSlots
+            maxBanners,
+            tier: tier?.name || 'Unknown'
         });
     }
 
     return results;
 };
+
 
 import { uploadToCloudinary } from '../../../shared/utils/cloudinaryService.js';
 
@@ -71,14 +76,23 @@ import { uploadToCloudinary } from '../../../shared/utils/cloudinaryService.js';
  */
 export const createAdRequest = async (req, res) => {
     try {
+        // DEBUG: Log what we receive
+        console.log('📢 [createAdRequest] req.body:', JSON.stringify(req.body));
+        console.log('📢 [createAdRequest] req.file:', req.file ? `${req.file.originalname} (${req.file.size} bytes)` : 'MISSING');
+
         const {
-            targetZones,
+            targetZones: targetZonesRaw,
             startDate,
             endDate,
             title,
             description,
             redirectTarget
         } = req.body;
+
+        // Normalize targetZones — FormData sends it as 'targetZones[]' or 'targetZones'
+        let targetZones = req.body['targetZones[]'] || req.body['targetZones'] || [];
+        if (typeof targetZones === 'string') targetZones = [targetZones];
+        console.log('📢 [createAdRequest] targetZones parsed:', targetZones);
 
         const restaurantId = req.restaurant?._id || req.restaurant?.id;
 
@@ -90,8 +104,19 @@ export const createAdRequest = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Banner image is required' });
         }
 
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         const start = new Date(startDate);
+        const normalizedStart = new Date(start.getFullYear(), start.getMonth(), start.getDate());
         const end = new Date(endDate);
+
+        if (normalizedStart <= today) {
+            return res.status(400).json({
+                success: false,
+                message: 'Campaigns must be requested at least one day in advance.'
+            });
+        }
+
         const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
 
         if (days <= 0) {
@@ -104,7 +129,26 @@ export const createAdRequest = async (req, res) => {
             resource_type: 'image'
         });
 
-        // 2. Check availability
+        // Limit: Check if restaurant already has an active/approved/scheduled campaign in these zones for these dates
+        // concurrency check
+        const overlappingOwnAds = await AdRequest.find({
+            restaurant: restaurantId,
+            targetZones: { $in: targetZones },
+            status: { $in: ['Approved', 'Scheduled', 'Active'] },
+            $or: [
+                { startDate: { $lte: end }, endDate: { $gte: start } } // Dates overlap
+            ]
+        });
+
+        if (overlappingOwnAds.length > 0) {
+            return res.status(409).json({
+                success: false,
+                message: 'You already have an active campaign in this zone for these dates.',
+                conflictAd: overlappingOwnAds[0]
+            });
+        }
+
+        // 2. Check availability (Zone Capacity)
         const availability = await checkAvailability(targetZones, start, end);
         const unavailableZones = availability.filter(a => !a.available);
 
@@ -164,6 +208,21 @@ export const updateAdStatus = async (req, res) => {
         }
 
         if (status === 'Approved') {
+            // Check if approval window is still open (must be approved BEFORE start date)
+            const now = new Date();
+            const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            const adStartDate = new Date(ad.startDate);
+
+            if (adStartDate <= today) {
+                ad.status = 'Rejected';
+                ad.rejectionReason = 'Approval window expired (Campaign start date reached or passed)';
+                await ad.save();
+                return res.status(400).json({
+                    success: false,
+                    message: 'Approval window expired. This request has been automatically rejected.'
+                });
+            }
+
             // Re-verify availability at time of approval
             const availability = await checkAvailability(ad.targetZones, ad.startDate, ad.endDate);
             const unavailableZones = availability.filter(a => !a.available);
@@ -177,7 +236,8 @@ export const updateAdStatus = async (req, res) => {
             }
 
             ad.status = 'Approved';
-            ad.paymentStatus = 'Paid'; // Assuming payment is handled or confirmed
+            // Payment remains Pending until restaurant pays via Razorpay
+            // ad.paymentStatus = 'Paid'; // REMOVED: Auto-pay logic
             ad.approvedBy = req.user?._id;
             ad.approvalDate = new Date();
         } else if (status === 'Rejected') {
@@ -208,24 +268,153 @@ export const getActiveAdsByZone = async (req, res) => {
         const { zoneId } = req.params;
         const now = new Date();
 
-        // Fetch up to 5 active ads (as placeholder rotate)
+        // Fetch ALL active ads for this zone
         const ads = await AdRequest.find({
             targetZones: zoneId,
             status: 'Active',
             startDate: { $lte: now },
             endDate: { $gte: now }
         })
-            .limit(3) // per business rule: display only a limited number
-            .populate('restaurant', 'name logo');
+            .populate('restaurant', 'name logo address'); // Add address for location context
 
-        res.status(200).json({ success: true, data: ads });
+        // Logic: Return ONE random ad for fairness
+        let selectedAd = [];
+        if (ads.length > 0) {
+            const randomIndex = Math.floor(Math.random() * ads.length);
+            selectedAd = [ads[randomIndex]];
+        }
+
+        res.status(200).json({ success: true, data: selectedAd });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
 };
 
 /**
- * Tracking metrics
+ * Initiate Razorpay payment for an ad
+ */
+export const createAdPaymentOrder = async (req, res) => {
+    try {
+        const { adId } = req.params;
+        const restaurantId = req.restaurant?._id || req.restaurant?.id;
+
+        const ad = await AdRequest.findOne({ _id: adId, restaurant: restaurantId });
+        if (!ad) {
+            return res.status(404).json({ success: false, message: 'Ad request not found' });
+        }
+
+        if (ad.status !== 'Approved') {
+            return res.status(400).json({ success: false, message: 'Ad must be Approved before payment' });
+        }
+
+        if (ad.paymentStatus === 'Paid') {
+            return res.status(400).json({ success: false, message: 'Ad is already paid' });
+        }
+
+        // Amount in paise
+        const amountInPaise = Math.round(ad.totalCost * 100);
+
+        const order = await createOrder({
+            amount: amountInPaise,
+            currency: 'INR',
+            receipt: `ad_${ad._id}`,
+            notes: {
+                adId: ad._id.toString(),
+                restaurantId: restaurantId.toString(),
+                type: 'AD_CAMPAIGN'
+            }
+        });
+
+        ad.razorpayOrderId = order.id;
+        await ad.save();
+
+        res.status(200).json({
+            success: true,
+            data: {
+                orderId: order.id,
+                amount: order.amount,
+                currency: order.currency,
+                key: process.env.RAZORPAY_KEY_ID
+            }
+        });
+
+    } catch (error) {
+        console.error('Error creating ad payment order:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+/**
+ * Verify Razorpay payment and activate ad
+ */
+export const verifyAdPayment = async (req, res) => {
+    try {
+        const { adId, razorpayPaymentId, razorpaySignature } = req.body;
+        const restaurantId = req.restaurant?._id || req.restaurant?.id;
+
+        const ad = await AdRequest.findOne({ _id: adId, restaurant: restaurantId });
+        if (!ad) {
+            return res.status(404).json({ success: false, message: 'Ad request not found' });
+        }
+
+        if (!ad.razorpayOrderId) {
+            return res.status(400).json({ success: false, message: 'No payment order found for this ad' });
+        }
+
+        const isValid = await verifyPayment(ad.razorpayOrderId, razorpayPaymentId, razorpaySignature);
+
+        if (!isValid) {
+            return res.status(400).json({ success: false, message: 'Invalid payment signature' });
+        }
+
+        // Check availability again before activating
+        const availability = await checkAvailability(ad.targetZones, ad.startDate, ad.endDate);
+        const unavailableZones = availability.filter(a => !a.available);
+
+        if (unavailableZones.length > 0) {
+            // Edge case: Slots filled up between approval and payment
+            // In a real system, we might refund here automatically
+            return res.status(409).json({
+                success: false,
+                message: 'Slot no longer available. Please contact support for refund.',
+                unavailableZones
+            });
+        }
+
+        ad.paymentStatus = 'Paid';
+        ad.razorpayPaymentId = razorpayPaymentId;
+        ad.razorpaySignature = razorpaySignature;
+
+        // Determine status based on start date
+        const today = new Date();
+        const start = new Date(ad.startDate);
+
+        // Reset time parts for accurate date comparison
+        const todayZero = new Date(today.setHours(0, 0, 0, 0));
+        const startZero = new Date(start.setHours(0, 0, 0, 0));
+
+        if (startZero <= todayZero) {
+            ad.status = 'Active';
+        } else {
+            ad.status = 'Scheduled';
+        }
+
+        await ad.save();
+
+        res.status(200).json({
+            success: true,
+            message: 'Payment verified and ad activated!',
+            data: ad
+        });
+
+    } catch (error) {
+        console.error('Error verifying ad payment:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+/**
+ * Track metrics (existing)
  */
 export const trackAdMetric = async (req, res) => {
     try {
@@ -332,6 +521,21 @@ export const getMyZone = async (req, res) => {
  */
 export const getAllAdRequests = async (req, res) => {
     try {
+        // Auto-reject expired pending requests
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+        await AdRequest.updateMany(
+            {
+                status: 'Pending',
+                startDate: { $lte: today }
+            },
+            {
+                status: 'Rejected',
+                rejectionReason: 'Approval window expired'
+            }
+        );
+
         const ads = await AdRequest.find()
             .populate('restaurant', 'name')
             .populate('targetZones', 'name')
@@ -380,8 +584,11 @@ export const getAdRequestById = async (req, res) => {
         }
 
         // Check ownership if not admin
-        if (!isAdmin && ad.restaurant.toString() !== restaurantId?.toString()) {
-            return res.status(403).json({ success: false, message: 'Unauthorized access' });
+        if (!isAdmin) {
+            const adRestaurantId = ad.restaurant?._id || ad.restaurant;
+            if (adRestaurantId.toString() !== restaurantId?.toString()) {
+                return res.status(403).json({ success: false, message: 'Unauthorized access' });
+            }
         }
 
         res.status(200).json({ success: true, data: ad });
@@ -454,6 +661,24 @@ export const updateAdRequest = async (req, res) => {
         await ad.save();
 
         res.status(200).json({ success: true, message: 'Ad updated successfully', data: ad });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+/**
+ * Delete an ad request (Admin only)
+ */
+export const deleteAdRequest = async (req, res) => {
+    try {
+        const { adId } = req.params;
+        const ad = await AdRequest.findByIdAndDelete(adId);
+
+        if (!ad) {
+            return res.status(404).json({ success: false, message: 'Ad request not found' });
+        }
+
+        res.status(200).json({ success: true, message: 'Ad request deleted successfully' });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }

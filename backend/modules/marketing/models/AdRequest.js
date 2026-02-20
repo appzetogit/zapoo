@@ -48,6 +48,9 @@ const adRequestSchema = new mongoose.Schema(
             enum: ['Pending', 'Paid', 'Failed'],
             default: 'Pending'
         },
+        razorpayOrderId: { type: String },
+        razorpayPaymentId: { type: String },
+        razorpaySignature: { type: String },
         totalCost: {
             type: Number,
             required: true

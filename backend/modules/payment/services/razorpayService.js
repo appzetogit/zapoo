@@ -22,18 +22,8 @@ const initializeRazorpay = async () => {
     const keyId = credentials.keyId;
     const keySecret = credentials.keySecret;
 
-    logger.info('Razorpay credentials check:', {
-      hasKeyId: !!keyId,
-      hasKeySecret: !!keySecret,
-      keyIdLength: keyId?.length || 0,
-      keySecretLength: keySecret?.length || 0
-    });
-
     if (!keyId || !keySecret) {
-      logger.warn('Razorpay credentials not found. Payment gateway will not work.', {
-        keyId: keyId ? 'present' : 'missing',
-        keySecret: keySecret ? 'present' : 'missing'
-      });
+      logger.warn('Razorpay credentials not found.');
       return null;
     }
 
@@ -100,7 +90,7 @@ const createOrder = async (options) => {
 
     logger.info('Calling Razorpay API to create order...');
     const order = await razorpay.orders.create(orderOptions);
-    
+
     logger.info(`Razorpay order created successfully: ${order.id}`, {
       orderId: order.id,
       amount: order.amount,
@@ -122,7 +112,7 @@ const createOrder = async (options) => {
       },
       stack: error.stack
     });
-    
+
     // Return more descriptive error message
     let errorMessage = 'Failed to create payment order';
     if (error.error && error.error.description) {
@@ -130,7 +120,7 @@ const createOrder = async (options) => {
     } else if (error.message) {
       errorMessage = error.message;
     }
-    
+
     throw new Error(errorMessage);
   }
 };
@@ -145,7 +135,7 @@ const createOrder = async (options) => {
 const verifyPayment = async (razorpayOrderId, razorpayPaymentId, razorpaySignature) => {
   const credentials = await getRazorpayCredentials();
   const keySecret = credentials.keySecret;
-  
+
   if (!keySecret) {
     logger.error('Razorpay key secret not found');
     return false;
@@ -158,7 +148,7 @@ const verifyPayment = async (razorpayOrderId, razorpayPaymentId, razorpaySignatu
       .digest('hex');
 
     const isValid = generatedSignature === razorpaySignature;
-    
+
     if (!isValid) {
       logger.warn('Invalid Razorpay signature', {
         razorpayOrderId,

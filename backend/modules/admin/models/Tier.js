@@ -44,6 +44,12 @@ const tierSchema = new mongoose.Schema(
                 min: 0,
             },
         },
+        maxBanners: {
+            type: Number,
+            default: 5,
+            min: 1,
+            // Max number of concurrent approved ads per day for zones in this tier
+        },
     },
     {
         timestamps: true,

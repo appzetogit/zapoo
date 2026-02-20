@@ -42,7 +42,9 @@ import OptimizedImage from "@/components/OptimizedImage"
 import exploreOffers from "@/assets/explore more icons/offers.png"
 import exploreGourmet from "@/assets/explore more icons/gourmet.png"
 import exploreTop10 from "@/assets/explore more icons/top 10.png"
+
 import exploreCollection from "@/assets/explore more icons/collection.png"
+import ZoneAdBanner from "../components/ZoneAdBanner"
 
 // Banner images for hero carousel - will be fetched from API
 
@@ -1337,6 +1339,12 @@ export default function Home() {
         animate={{ opacity: 1 }}
         transition={{ duration: 0.6, delay: 0.4 }}
       >
+        {/* Zone Ad Banner - Single Promoted Slot */}
+        <div className="mb-4 sm:mb-6">
+          <ZoneAdBanner />
+        </div>
+
+        {/* Food Categories - Horizontal Scroll */}
         {/* Food Categories - Horizontal Scroll */}
         <motion.section
           className="space-y-1 sm:space-y-1.5 lg:space-y-2"
