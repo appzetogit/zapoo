@@ -1,5 +1,12 @@
 import { useState, useEffect } from 'react'
 import { Search, TrendingUp, TrendingDown, DollarSign, ShoppingCart, XCircle, Star, Calendar, BarChart3, Users, Award, Package } from 'lucide-react'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { adminAPI } from '@/lib/api'
 
 export default function PointOfSale() {
@@ -97,37 +104,37 @@ export default function PointOfSale() {
   const fetchRestaurantAnalytics = async (restaurantId) => {
     try {
       setLoading(true)
-      
+
       // Validate restaurantId
       if (!restaurantId) {
         console.error('Restaurant ID is required')
         return
       }
-      
+
       console.log('Fetching analytics for restaurant:', restaurantId)
-      
+
       // Fetch comprehensive restaurant analytics from backend
       const analyticsResponse = await adminAPI.getRestaurantAnalytics(restaurantId)
-      
+
       console.log('Analytics response:', analyticsResponse)
-      
+
       if (analyticsResponse?.data?.success && analyticsResponse.data.data) {
         const { restaurant, analytics } = analyticsResponse.data.data
-        
+
         console.log('Analytics data received:', analytics)
         console.log('Commission percentage from API:', analytics.commissionPercentage)
         console.log('Commission percentage type:', typeof analytics.commissionPercentage)
-        
+
         // Set restaurant data
         setRestaurantData(restaurant)
-        
+
         // Parse commission percentage - handle both number and string
         const commissionPercentage = analytics.commissionPercentage !== undefined && analytics.commissionPercentage !== null
           ? parseFloat(analytics.commissionPercentage) || 0
           : 0;
-        
+
         console.log('Parsed commission percentage:', commissionPercentage)
-        
+
         // Set analytics data - ensure all values are numbers, not null/undefined
         setAnalyticsData({
           totalOrders: Number(analytics.totalOrders) || 0,
@@ -188,7 +195,7 @@ export default function PointOfSale() {
         status: error?.response?.status,
         restaurantId: selectedRestaurant
       })
-      
+
       // Show user-friendly error message
       if (error?.response?.status === 404) {
         console.warn('Restaurant not found')
@@ -197,7 +204,7 @@ export default function PointOfSale() {
       } else {
         console.warn('Failed to fetch analytics. Please try again.')
       }
-      
+
       // Set empty data on error
       setAnalyticsData({
         totalOrders: 0,
@@ -253,7 +260,7 @@ export default function PointOfSale() {
     const value = e.target.value
     setSearchQuery(value)
     setShowSearchResults(value.trim().length > 0)
-    
+
     // If search is cleared, clear selection
     if (!value.trim()) {
       setSelectedRestaurant('')
@@ -277,25 +284,25 @@ export default function PointOfSale() {
   return (
     <div className="min-h-[calc(100vh-5rem)] bg-neutral-200 overflow-x-hidden w-full" style={{ maxWidth: '100vw', boxSizing: 'border-box' }}>
       <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-6 w-full overflow-hidden" style={{ maxWidth: '100%', boxSizing: 'border-box' }}>
-        
+
         {/* Header Section */}
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-[#334257] mb-2">Restaurant POS Analytics & Benefits</h1>
           <p className="text-sm text-[#8a94aa]">Track restaurant performance, profits, and commission details</p>
-                </div>
+        </div>
 
         {/* Restaurant Selection Card */}
         <div className="bg-white rounded-lg shadow-sm border border-[#e3e6ef] p-6 mb-6">
           <div className="flex flex-col gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-[#334257] mb-2">
+            <div>
+              <label className="block text-sm font-medium text-[#334257] mb-2">
                 Search Restaurant by Name or ID <span className="text-red-500">*</span>
-                  </label>
-                  <div className="relative">
+              </label>
+              <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 z-10" />
-                    <input
-                      type="text"
-                      value={searchQuery}
+                <input
+                  type="text"
+                  value={searchQuery}
                   onChange={handleSearchChange}
                   onFocus={() => {
                     if (searchQuery.trim()) {
@@ -307,9 +314,9 @@ export default function PointOfSale() {
                     setTimeout(() => setShowSearchResults(false), 200)
                   }}
                   placeholder="Type restaurant name or ID to search..."
-                  className="w-full h-11 pl-10 pr-3 rounded-md border border-[#e3e6ef] bg-white text-sm text-[#4a5671] focus:outline-none focus:ring-1 focus:ring-[#006fbd]"
+                  className="w-full h-11 pl-10 pr-3 rounded-md border border-[#e3e6ef] bg-white text-sm text-[#4a5671] focus:outline-none focus:ring-1 focus:ring-[#FF5200]"
                 />
-                
+
                 {/* Search Results Dropdown */}
                 {showSearchResults && filteredRestaurants.length > 0 && (
                   <div className="absolute z-50 w-full mt-1 bg-white border border-[#e3e6ef] rounded-md shadow-lg max-h-60 overflow-y-auto">
@@ -317,67 +324,71 @@ export default function PointOfSale() {
                       <div
                         key={restaurant._id}
                         onClick={() => handleRestaurantSelect(restaurant._id)}
-                        className="px-4 py-3 hover:bg-[#f9fafc] cursor-pointer border-b border-[#e3e6ef] last:border-b-0 transition-colors"
+                        className="px-4 py-3 hover:bg-orange-50 cursor-pointer border-b border-[#e3e6ef] last:border-b-0 transition-colors"
                       >
-                          <div className="flex items-center justify-between">
+                        <div className="flex items-center justify-between">
                           <div>
                             <p className="text-sm font-medium text-[#334257]">{restaurant.name}</p>
                             <p className="text-xs text-[#8a94aa]">ID: {restaurant.restaurantId || restaurant._id}</p>
                           </div>
                           {selectedRestaurant === restaurant._id && (
-                            <div className="w-2 h-2 bg-[#006fbd] rounded-full"></div>
+                            <div className="w-2 h-2 bg-[#FF5200] rounded-full"></div>
                           )}
                         </div>
                       </div>
                     ))}
                   </div>
                 )}
-                
+
                 {/* No Results Message */}
                 {showSearchResults && searchQuery.trim() && filteredRestaurants.length === 0 && (
                   <div className="absolute z-50 w-full mt-1 bg-white border border-[#e3e6ef] rounded-md shadow-lg p-4">
                     <p className="text-sm text-[#8a94aa] text-center">No restaurants found matching "{searchQuery}"</p>
                   </div>
                 )}
-                  </div>
+              </div>
               {selectedRestaurant && (
                 <p className="text-xs text-green-600 mt-2">
                   ✓ Selected: {getSelectedRestaurantName()}
                 </p>
               )}
-        </div>
+            </div>
 
             {/* Alternative: Dropdown Selector */}
             <div>
-                    <label className="block text-sm font-medium text-[#334257] mb-2">
+              <label className="block text-sm font-medium text-[#334257] mb-2">
                 Or Select from Dropdown
-                    </label>
-                    <div className="relative">
-                      <select 
+              </label>
+              <div className="relative">
+                <Select
                   value={selectedRestaurant}
-                  onChange={(e) => {
-                    setSelectedRestaurant(e.target.value)
-                    const selected = restaurants.find(r => r._id === e.target.value)
+                  onValueChange={(value) => {
+                    setSelectedRestaurant(value)
+                    const selected = restaurants.find(r => r._id === value)
                     if (selected) {
                       setSearchQuery(`${selected.name} (${selected.restaurantId || selected._id})`)
                     }
                   }}
-                        className="w-full h-11 rounded-md border border-[#e3e6ef] bg-white px-3 pr-10 text-sm text-[#4a5671] focus:outline-none focus:ring-1 focus:ring-[#006fbd]"
+                >
+                  <SelectTrigger className="w-full h-11 rounded-md border border-[#e3e6ef] bg-white px-3 text-sm text-[#4a5671] focus:ring-1 focus:ring-[#FF5200]">
+                    <SelectValue placeholder="Select Restaurant" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {restaurants.map(restaurant => (
+                      <SelectItem
+                        key={restaurant._id}
+                        value={restaurant._id}
+                        className="focus:bg-orange-50 focus:text-[#FF5200] cursor-pointer"
                       >
-                  <option value="">Select Restaurant</option>
-                  {restaurants.map(restaurant => (
-                    <option key={restaurant._id} value={restaurant._id}>
-                      {restaurant.name} ({restaurant.restaurantId || restaurant._id})
-                          </option>
-                        ))}
-                      </select>
-                      <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-gray-400 text-xs">
-                        ▼
-                      </span>
-                    </div>
-                  </div>
-                  </div>
-                </div>
+                        {restaurant.name} ({restaurant.restaurantId || restaurant._id})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+        </div>
 
         {/* Analytics Dashboard */}
         {selectedRestaurant && !loading ? (
@@ -391,11 +402,10 @@ export default function PointOfSale() {
                     Restaurant ID: {restaurants.find(r => r._id === selectedRestaurant)?.restaurantId || selectedRestaurant}
                   </p>
                 </div>
-                <div className={`px-4 py-2 rounded-full text-sm font-semibold ${
-                  analyticsData.status === 'active' 
-                    ? 'bg-green-100 text-green-700' 
-                    : 'bg-red-100 text-red-700'
-                }`}>
+                <div className={`px-4 py-2 rounded-full text-sm font-semibold ${analyticsData.status === 'active'
+                  ? 'bg-green-100 text-green-700'
+                  : 'bg-red-100 text-red-700'
+                  }`}>
                   {analyticsData.status === 'active' ? 'Active' : 'Inactive'}
                 </div>
               </div>
@@ -406,15 +416,15 @@ export default function PointOfSale() {
               {/* Total Orders */}
               <div className="bg-white rounded-lg shadow-sm border border-[#e3e6ef] p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <div className="p-3 bg-blue-100 rounded-lg">
-                    <ShoppingCart className="w-6 h-6 text-blue-600" />
+                  <div className="p-3 bg-orange-100 rounded-lg">
+                    <ShoppingCart className="w-6 h-6 text-[#FF5200]" />
                   </div>
                   <TrendingUp className="w-5 h-5 text-green-500" />
                 </div>
                 <h3 className="text-sm font-medium text-[#8a94aa] mb-1">Total Orders</h3>
                 <p className="text-2xl font-bold text-[#334257]">{formatNumber(analyticsData.totalOrders)}</p>
                 <p className="text-xs text-[#8a94aa] mt-2">Completed: {formatNumber(analyticsData.completedOrders)}</p>
-                </div>
+              </div>
 
               {/* Cancelled Orders */}
               <div className="bg-white rounded-lg shadow-sm border border-[#e3e6ef] p-6">
@@ -427,7 +437,7 @@ export default function PointOfSale() {
                 <h3 className="text-sm font-medium text-[#8a94aa] mb-1">Cancelled Orders</h3>
                 <p className="text-2xl font-bold text-[#334257]">{formatNumber(analyticsData.cancelledOrders)}</p>
                 <p className="text-xs text-[#8a94aa] mt-2">Cancellation Rate</p>
-                </div>
+              </div>
 
               {/* Average Rating */}
               <div className="bg-white rounded-lg shadow-sm border border-[#e3e6ef] p-6">
@@ -449,12 +459,12 @@ export default function PointOfSale() {
                     <Award className="w-6 h-6 text-purple-600" />
                   </div>
                   <span className="text-sm font-semibold text-purple-600">{analyticsData.commissionPercentage}%</span>
-                  </div>
+                </div>
                 <h3 className="text-sm font-medium text-[#8a94aa] mb-1">Commission Rate</h3>
                 <p className="text-2xl font-bold text-[#334257]">{analyticsData.commissionPercentage}%</p>
                 <p className="text-xs text-[#8a94aa] mt-2">Set Commission</p>
-                  </div>
-                  </div>
+              </div>
+            </div>
 
             {/* Profit & Revenue Section */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -464,11 +474,11 @@ export default function PointOfSale() {
                   <div className="flex items-center gap-3">
                     <div className="p-3 bg-green-100 rounded-lg">
                       <Calendar className="w-6 h-6 text-green-600" />
-                  </div>
+                    </div>
                     <div>
                       <h3 className="text-base font-semibold text-[#334257]">Monthly Profit</h3>
                       <p className="text-xs text-[#8a94aa]">Current Month</p>
-                  </div>
+                    </div>
                   </div>
                   <TrendingUp className="w-5 h-5 text-green-500" />
                 </div>
@@ -491,8 +501,8 @@ export default function PointOfSale() {
               <div className="bg-white rounded-lg shadow-sm border border-[#e3e6ef] p-6">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
-                    <div className="p-3 bg-blue-100 rounded-lg">
-                      <BarChart3 className="w-6 h-6 text-blue-600" />
+                    <div className="p-3 bg-orange-100 rounded-lg">
+                      <BarChart3 className="w-6 h-6 text-[#FF5200]" />
                     </div>
                     <div>
                       <h3 className="text-base font-semibold text-[#334257]">Yearly Profit</h3>
@@ -507,15 +517,15 @@ export default function PointOfSale() {
                     <div>
                       <span className="text-[#8a94aa]">Orders: </span>
                       <span className="font-semibold text-[#334257]">{formatNumber(analyticsData.yearlyOrders)}</span>
-              </div>
+                    </div>
                     <div>
                       <span className="text-[#8a94aa]">Avg/Year: </span>
                       <span className="font-semibold text-[#334257]">{formatCurrency(analyticsData.averageYearlyProfit)}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
-        </div>
-      </div>
 
             {/* Detailed Financial Breakdown */}
             <div className="bg-white rounded-lg shadow-sm border border-[#e3e6ef] p-6">
@@ -528,7 +538,7 @@ export default function PointOfSale() {
                   </div>
                   <div className="flex justify-between items-center py-3 border-b border-[#e3e6ef]">
                     <span className="text-sm text-[#8a94aa]">Total Commission (Admin)</span>
-                    <span className="text-base font-semibold text-[#006fbd]">{formatCurrency(analyticsData.totalCommission)}</span>
+                    <span className="text-base font-semibold text-[#FF5200]">{formatCurrency(analyticsData.totalCommission)}</span>
                   </div>
                   <div className="flex justify-between items-center py-3 border-b border-[#e3e6ef]">
                     <span className="text-sm text-[#8a94aa]">Restaurant Earning</span>
@@ -555,7 +565,7 @@ export default function PointOfSale() {
                 </div>
               </div>
             </div>
-            
+
             {/* Additional Details */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Customer Statistics */}
@@ -565,7 +575,7 @@ export default function PointOfSale() {
                     <Users className="w-5 h-5 text-indigo-600" />
                   </div>
                   <h3 className="text-base font-semibold text-[#334257]">Customer Statistics</h3>
-                  </div>
+                </div>
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-[#8a94aa]">Total Customers</span>
@@ -578,8 +588,8 @@ export default function PointOfSale() {
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-[#8a94aa]">Customer Retention</span>
                     <span className="text-sm font-semibold text-green-600">
-                      {analyticsData.totalCustomers > 0 
-                        ? ((analyticsData.repeatCustomers / analyticsData.totalCustomers) * 100).toFixed(1) 
+                      {analyticsData.totalCustomers > 0
+                        ? ((analyticsData.repeatCustomers / analyticsData.totalCustomers) * 100).toFixed(1)
                         : '0'}%
                     </span>
                   </div>
@@ -607,11 +617,10 @@ export default function PointOfSale() {
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-[#8a94aa]">Status</span>
-                    <span className={`text-sm font-semibold px-2 py-1 rounded ${
-                      analyticsData.status === 'active' 
-                        ? 'bg-green-100 text-green-700' 
-                        : 'bg-red-100 text-red-700'
-                    }`}>
+                    <span className={`text-sm font-semibold px-2 py-1 rounded ${analyticsData.status === 'active'
+                      ? 'bg-green-100 text-green-700'
+                      : 'bg-red-100 text-red-700'
+                      }`}>
                       {analyticsData.status === 'active' ? 'Active' : 'Inactive'}
                     </span>
                   </div>
@@ -619,16 +628,16 @@ export default function PointOfSale() {
                     <span className="text-sm text-[#8a94aa]">Total Reviews</span>
                     <span className="text-sm font-semibold text-[#334257]">{formatNumber(analyticsData.totalRatings)}</span>
                   </div>
-          </div>
+                </div>
               </div>
-              </div>
+            </div>
 
             {/* Order Statistics Summary */}
             <div className="bg-white rounded-lg shadow-sm border border-[#e3e6ef] p-6">
               <h3 className="text-lg font-semibold text-[#334257] mb-4">Order Statistics Summary</h3>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="text-center p-4 bg-blue-50 rounded-lg">
-                  <p className="text-2xl font-bold text-blue-600">{formatNumber(analyticsData.totalOrders)}</p>
+                <div className="text-center p-4 bg-orange-50 rounded-lg">
+                  <p className="text-2xl font-bold text-[#FF5200]">{formatNumber(analyticsData.totalOrders)}</p>
                   <p className="text-xs text-[#8a94aa] mt-1">Total Orders</p>
                 </div>
                 <div className="text-center p-4 bg-green-50 rounded-lg">
@@ -648,7 +657,7 @@ export default function PointOfSale() {
           </div>
         ) : selectedRestaurant && loading ? (
           <div className="bg-white rounded-lg shadow-sm border border-[#e3e6ef] p-12 text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#006fbd] mx-auto mb-4"></div>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FF5200] mx-auto mb-4"></div>
             <p className="text-sm text-[#8a94aa]">Loading restaurant analytics...</p>
           </div>
         ) : (

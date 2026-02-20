@@ -19,7 +19,7 @@ export default function CreateSupportTicket() {
 
   const validateForm = () => {
     const newErrors = {}
-    
+
     if (!formData.subject.trim()) {
       newErrors.subject = "Subject is required"
     } else if (formData.subject.trim().length < 3) {
@@ -52,13 +52,13 @@ export default function CreateSupportTicket() {
 
     try {
       setCreating(true)
-      
+
       // Prepare request data
       const requestData = {
         subject: formData.subject.trim(),
         description: formData.description.trim()
       }
-      
+
       // Only include category and priority if they have valid values
       if (formData.category && formData.category !== '') {
         requestData.category = formData.category
@@ -66,9 +66,9 @@ export default function CreateSupportTicket() {
       if (formData.priority && formData.priority !== '') {
         requestData.priority = formData.priority
       }
-      
+
       console.log('Sending ticket creation request:', requestData)
-      
+
       const response = await deliveryAPI.createSupportTicket(requestData)
 
       if (response?.data?.success) {
@@ -86,7 +86,7 @@ export default function CreateSupportTicket() {
         category: formData.category,
         priority: formData.priority
       })
-      
+
       // Show detailed error message
       let errorMessage = "Failed to create ticket"
       if (error?.response?.data?.message) {
@@ -96,12 +96,12 @@ export default function CreateSupportTicket() {
       } else if (error?.message) {
         errorMessage = error.message
       }
-      
+
       // If validation error, show field-specific errors
       if (error?.response?.data?.errors) {
         const validationErrors = error.response.data.errors
         const newErrors = {}
-        
+
         // Handle array format: [{ field: 'subject', message: '...' }]
         if (Array.isArray(validationErrors)) {
           validationErrors.forEach(err => {
@@ -120,13 +120,13 @@ export default function CreateSupportTicket() {
             newErrors.description = validationErrors.description
           }
         }
-        
+
         if (Object.keys(newErrors).length > 0) {
           setErrors(newErrors)
           errorMessage = "Please fix the validation errors"
         }
       }
-      
+
       toast.error(errorMessage)
     } finally {
       setCreating(false)
@@ -236,7 +236,7 @@ export default function CreateSupportTicket() {
             <button
               onClick={handleCreateTicket}
               disabled={creating || !formData.subject.trim() || formData.description.trim().length < 10}
-              className="w-full sm:w-auto px-6 py-3 bg-gray-900 text-white font-medium rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors"
+              className="w-full sm:w-auto px-6 py-3 bg-[#FD7675] text-white font-medium rounded-lg hover:bg-[#FD7675]/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors"
             >
               {creating ? (
                 <>

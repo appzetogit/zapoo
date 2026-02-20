@@ -45,21 +45,21 @@ export default function Favorites() {
                 <Button variant="ghost" size="icon" className="rounded-full h-8 w-8 sm:h-10 sm:w-10">
                   <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5" />
                 </Button>
-          </Link>
-          <h1 className="text-lg sm:text-xl md:text-2xl font-bold">My Favorites</h1>
-        </div>
-      </ScrollReveal>
-      <Card>
-          <CardContent className="py-12 text-center">
-            <Heart className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-            <p className="text-muted-foreground text-lg mb-4">You haven't added any favorites yet</p>
-            <Link to="/user">
-              <Button className="bg-gradient-to-r bg-primary-orange hover:opacity-90 text-white">
-                Explore Restaurants
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
+              </Link>
+              <h1 className="text-lg sm:text-xl md:text-2xl font-bold">My Favorites</h1>
+            </div>
+          </ScrollReveal>
+          <Card>
+            <CardContent className="py-12 text-center">
+              <Heart className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+              <p className="text-muted-foreground text-lg mb-4">You haven't added any favorites yet</p>
+              <Link to="/user">
+                <Button className="bg-[#FF5200] hover:opacity-90 text-white">
+                  Explore Restaurants
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
         </div>
       </AnimatedPage></>
     )
@@ -90,21 +90,19 @@ export default function Favorites() {
         <div className="flex gap-2 mb-6 border-b">
           <button
             onClick={() => setActiveTab("restaurants")}
-            className={`px-4 py-2 font-medium transition-colors ${
-              activeTab === "restaurants"
-                ? "border-b-2 border-primary-orange text-primary-orange"
+            className={`px-4 py-2 font-medium transition-colors ${activeTab === "restaurants"
+                ? "border-b-2 border-[#FF5200] text-[#FF5200]"
                 : "text-gray-500 hover:text-gray-700"
-            }`}
+              }`}
           >
             Restaurants ({restaurantFavorites.length})
           </button>
           <button
             onClick={() => setActiveTab("dishes")}
-            className={`px-4 py-2 font-medium transition-colors ${
-              activeTab === "dishes"
-                ? "border-b-2 border-primary-orange text-primary-orange"
+            className={`px-4 py-2 font-medium transition-colors ${activeTab === "dishes"
+                ? "border-b-2 border-[#FF5200] text-[#FF5200]"
                 : "text-gray-500 hover:text-gray-700"
-            }`}
+              }`}
           >
             Dishes ({dishFavorites.length})
           </button>
@@ -118,71 +116,71 @@ export default function Favorites() {
                 <Heart className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
                 <p className="text-muted-foreground text-lg mb-4">No restaurants saved yet</p>
                 <Link to="/user">
-                  <Button className="bg-gradient-to-r bg-primary-orange hover:opacity-90 text-white">
+                  <Button className="bg-[#FF5200] hover:opacity-90 text-white">
                     Explore Restaurants
                   </Button>
                 </Link>
               </div>
             ) : (
               restaurantFavorites.map((restaurant, index) => (
-            <ScrollReveal key={restaurant.slug} delay={index * 0.1}>
-              <Link to={`/user/restaurants/${restaurant.slug}`}>
-                <Card className="overflow-hidden h-full">
-                  <div className="h-32 w-full relative overflow-hidden">
-                    <img
-                      src={restaurant.image}
-                      alt={restaurant.name}
-                      className="w-full h-full object-cover"
-                      loading="lazy"
-                      onError={(e) => {
-                        e.target.src = `https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&h=600&fit=crop&q=80`
-                      }}
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-                    <div className="absolute top-2 right-2">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 rounded-full bg-white/90 backdrop-blur-sm hover:bg-white text-red-500"
-                        onClick={(e) => handleRemoveFavorite(e, restaurant.slug)}
-                      >
-                        <Heart className="h-4 w-4 fill-red-500" />
-                      </Button>
-                    </div>
-                    <div className="absolute bottom-2 left-2">
-                      <div className="flex items-center gap-1 bg-white/90 backdrop-blur-sm px-1.5 py-0.5 rounded-full">
-                        <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                        <span className="font-bold text-xs">{restaurant.rating}</span>
+                <ScrollReveal key={restaurant.slug} delay={index * 0.1}>
+                  <Link to={`/user/restaurants/${restaurant.slug}`}>
+                    <Card className="overflow-hidden h-full">
+                      <div className="h-32 w-full relative overflow-hidden">
+                        <img
+                          src={restaurant.image}
+                          alt={restaurant.name}
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                          onError={(e) => {
+                            e.target.src = `https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&h=600&fit=crop&q=80`
+                          }}
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+                        <div className="absolute top-2 right-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 rounded-full bg-white/90 backdrop-blur-sm hover:bg-white text-red-500"
+                            onClick={(e) => handleRemoveFavorite(e, restaurant.slug)}
+                          >
+                            <Heart className="h-4 w-4 fill-red-500" />
+                          </Button>
+                        </div>
+                        <div className="absolute bottom-2 left-2">
+                          <div className="flex items-center gap-1 bg-white/90 backdrop-blur-sm px-1.5 py-0.5 rounded-full">
+                            <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                            <span className="font-bold text-xs">{restaurant.rating}</span>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                  <CardContent className="p-3 space-y-2">
-                    <div>
-                      <CardTitle className="text-sm font-bold mb-0.5 line-clamp-1">
-                        {restaurant.name}
-                      </CardTitle>
-                      <p className="text-xs text-muted-foreground font-medium line-clamp-1">
-                        {restaurant.cuisine}
-                      </p>
-                    </div>
-                    <div className="flex items-center justify-between text-xs pt-2 border-t">
-                      <div className="flex items-center gap-1 text-muted-foreground">
-                        <Clock className="h-3 w-3" />
-                        <span className="font-medium">{restaurant.deliveryTime}</span>
-                      </div>
-                      <div className="flex items-center gap-1 text-muted-foreground">
-                        <MapPin className="h-3 w-3" />
-                        <span className="font-medium">{restaurant.distance}</span>
-                      </div>
-                    </div>
-                    <Button className="w-full bg-gradient-to-r bg-primary-orange hover:opacity-90 text-white text-xs py-1.5 h-8">
-                      View Restaurant
-                      <ArrowRight className="h-3 w-3 ml-1" />
-                    </Button>
-                  </CardContent>
-                </Card>
-              </Link>
-            </ScrollReveal>
+                      <CardContent className="p-3 space-y-2">
+                        <div>
+                          <CardTitle className="text-sm font-bold mb-0.5 line-clamp-1">
+                            {restaurant.name}
+                          </CardTitle>
+                          <p className="text-xs text-muted-foreground font-medium line-clamp-1">
+                            {restaurant.cuisine}
+                          </p>
+                        </div>
+                        <div className="flex items-center justify-between text-xs pt-2 border-t">
+                          <div className="flex items-center gap-1 text-muted-foreground">
+                            <Clock className="h-3 w-3" />
+                            <span className="font-medium">{restaurant.deliveryTime}</span>
+                          </div>
+                          <div className="flex items-center gap-1 text-muted-foreground">
+                            <MapPin className="h-3 w-3" />
+                            <span className="font-medium">{restaurant.distance}</span>
+                          </div>
+                        </div>
+                        <Button className="w-full bg-[#FF5200] hover:opacity-90 text-white text-xs py-1.5 h-8">
+                          View Restaurant
+                          <ArrowRight className="h-3 w-3 ml-1" />
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  </Link>
+                </ScrollReveal>
               ))
             )}
           </div>
@@ -196,7 +194,7 @@ export default function Favorites() {
                 <Bookmark className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
                 <p className="text-muted-foreground text-lg mb-4">No dishes saved yet</p>
                 <Link to="/user">
-                  <Button className="bg-gradient-to-r bg-primary-orange hover:opacity-90 text-white">
+                  <Button className="bg-[#FF5200] hover:opacity-90 text-white">
                     Explore Dishes
                   </Button>
                 </Link>
@@ -252,11 +250,11 @@ export default function Favorites() {
                               )}
                               <span className="text-muted-foreground font-medium text-xs">{dish.foodType || "N/A"}</span>
                             </div>
-                            <div className="text-sm font-bold text-primary-orange">
+                            <div className="text-sm font-bold text-[#FF5200]">
                               ₹{Math.round(dish.price || 0)}
                             </div>
                           </div>
-                          <Button className="w-full bg-gradient-to-r bg-primary-orange hover:opacity-90 text-white text-xs py-1.5 h-8">
+                          <Button className="w-full bg-[#FF5200] hover:opacity-90 text-white text-xs py-1.5 h-8">
                             View Dish
                             <ArrowRight className="h-3 w-3 ml-1" />
                           </Button>

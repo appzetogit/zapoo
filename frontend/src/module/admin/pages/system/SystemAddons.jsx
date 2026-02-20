@@ -6,18 +6,18 @@ import { toast } from "sonner"
 export default function SystemAddons() {
   const [isLoading, setIsLoading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
-  
+
   // Form state for all environment variables
   const [envData, setEnvData] = useState({
     // Razorpay
     RAZORPAY_API_KEY: "",
     RAZORPAY_SECRET_KEY: "",
-    
+
     // Cloudinary
     CLOUDINARY_CLOUD_NAME: "",
     CLOUDINARY_API_KEY: "",
     CLOUDINARY_API_SECRET: "",
-    
+
     // Firebase
     FIREBASE_API_KEY: "",
     FIREBASE_AUTH_DOMAIN: "",
@@ -28,17 +28,17 @@ export default function SystemAddons() {
     FIREBASE_PROJECT_ID: "",
     FIREBASE_CLIENT_EMAIL: "",
     FIREBASE_PRIVATE_KEY: "",
-    
+
     // SMTP
     SMTP_HOST: "",
     SMTP_PORT: "",
     SMTP_USER: "",
     SMTP_PASS: "",
-    
+
     // SMS Hub India
     SMSINDIAHUB_API_KEY: "",
     SMSINDIAHUB_SENDER_ID: "",
-    
+
     // Google Maps
     VITE_GOOGLE_MAPS_API_KEY: "",
   })
@@ -82,7 +82,7 @@ export default function SystemAddons() {
       const response = await adminAPI.saveEnvVariables(envData)
       if (response.data.success) {
         toast.success("Environment variables saved successfully")
-        
+
         // Clear Google Maps API key cache after saving
         try {
           const { clearGoogleMapsApiKeyCache } = await import('@/lib/utils/googleMapsApiKey.js');
@@ -111,7 +111,7 @@ export default function SystemAddons() {
             onChange={(e) => handleInputChange(fieldKey, e.target.value)}
             placeholder={placeholder || `Enter ${label}`}
             rows={4}
-            className="w-full px-3 py-2.5 border-2 border-slate-200 rounded-lg bg-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all text-sm resize-y"
+            className="w-full px-3 py-2.5 border-2 border-slate-200 rounded-lg bg-white focus:outline-none focus:border-[#FF5200] focus:ring-2 focus:ring-[#FF5200]/20 transition-all text-sm resize-y"
           />
         ) : (
           <input
@@ -119,7 +119,7 @@ export default function SystemAddons() {
             value={envData[fieldKey] || ""}
             onChange={(e) => handleInputChange(fieldKey, e.target.value)}
             placeholder={placeholder || `Enter ${label}`}
-            className="w-full px-3 py-2.5 border-2 border-slate-200 rounded-lg bg-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all text-sm"
+            className="w-full px-3 py-2.5 border-2 border-slate-200 rounded-lg bg-white focus:outline-none focus:border-[#FF5200] focus:ring-2 focus:ring-[#FF5200]/20 transition-all text-sm"
           />
         )}
       </div>
@@ -130,7 +130,7 @@ export default function SystemAddons() {
     return (
       <div className="p-4 lg:p-6 bg-slate-50 min-h-screen flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+          <Loader2 className="w-8 h-8 text-[#FF5200] animate-spin" />
           <p className="text-slate-600 font-medium">Loading environment variables...</p>
         </div>
       </div>
@@ -144,7 +144,7 @@ export default function SystemAddons() {
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#FF5200] via-purple-500 to-pink-500 flex items-center justify-center">
                 <Key className="w-5 h-5 text-white" />
               </div>
               <h1 className="text-2xl font-bold text-slate-900">ENV Setup</h1>
@@ -152,7 +152,7 @@ export default function SystemAddons() {
             <button
               onClick={handleSave}
               disabled={isSaving}
-              className="px-6 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors shadow-md flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-6 py-2.5 bg-[#FF5200] text-white rounded-lg font-medium hover:bg-[#E64A00] transition-colors shadow-md flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSaving ? (
                 <>
@@ -174,8 +174,8 @@ export default function SystemAddons() {
           {/* Razorpay Section */}
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
             <h2 className="text-xl font-bold text-slate-900 mb-4 flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
-                <Key className="w-4 h-4 text-blue-600" />
+              <div className="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center">
+                <Key className="w-4 h-4 text-[#FF5200]" />
               </div>
               Razorpay Configuration
             </h2>
@@ -218,9 +218,9 @@ export default function SystemAddons() {
               <InputField label="Firebase Project ID" fieldKey="FIREBASE_PROJECT_ID" />
               <InputField label="Firebase Client Email" fieldKey="FIREBASE_CLIENT_EMAIL" type="email" />
               <div className="md:col-span-2">
-                <InputField 
-                  label="Firebase Private Key" 
-                  fieldKey="FIREBASE_PRIVATE_KEY" 
+                <InputField
+                  label="Firebase Private Key"
+                  fieldKey="FIREBASE_PRIVATE_KEY"
                   type="textarea"
                   placeholder="Enter Firebase Private Key (can be multiline)"
                 />

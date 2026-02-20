@@ -32,7 +32,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import zapooLogo from "@/assets/zapoo-logo.png";
+import zapooLogo from "@/assets/zapoo_logo.png";
 import { adminAPI } from "@/lib/api";
 import { clearModuleAuth } from "@/lib/utils/auth";
 import { getCachedSettings, loadBusinessSettings } from "@/lib/utils/businessSettings";
@@ -198,7 +198,7 @@ export default function AdminNavbar({ onMenuClick }) {
 
   return (
     <>
-      <header className="sticky top-0 z-50 bg-[#FF5200] border-b border-orange-600 shadow-sm">
+      <header className="sticky top-0 z-50 bg-[#D66B3A] border-b border-[#C56235] shadow-sm">
         <div className="flex items-center justify-between px-6 py-3">
           {/* Left: Logo and Mobile Menu */}
           <div className="flex items-center gap-3">
@@ -211,11 +211,11 @@ export default function AdminNavbar({ onMenuClick }) {
             </button>
             {/* Logo */}
             <div className="flex items-center gap-2">
-              <div className="w-48 h-16 rounded-lg bg-white flex items-center justify-center overflow-hidden">
+              <div className="w-48 h-16 flex items-center justify-center overflow-hidden">
                 <img
-                  src="/zapoo-logo.jpg"
+                  src={zapooLogo}
                   alt="Zapoo"
-                  className="w-full h-full object-cover"
+                  className="h-full w-auto object-contain brightness-0 invert"
                 />
               </div>
             </div>
@@ -225,11 +225,11 @@ export default function AdminNavbar({ onMenuClick }) {
           <div className="flex-1 flex justify-center max-w-md mx-8">
             <button
               onClick={() => setSearchOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/20 text-white cursor-pointer hover:bg-white/30 transition-colors w-full border border-white/20"
+              className="flex items-center gap-2 px-4 py-2 rounded-full bg-white text-gray-500 cursor-pointer hover:bg-gray-50 transition-colors w-full border border-transparent"
             >
-              <Search className="w-4 h-4 text-white" />
-              <span className="text-sm flex-1 text-left text-white">Search</span>
-              <span className="text-xs px-2 py-0.5 rounded bg-white/20 text-white border border-white/10">
+              <Search className="w-4 h-4 text-gray-400" />
+              <span className="text-sm flex-1 text-left text-gray-400">Search</span>
+              <span className="text-xs px-2 py-0.5 rounded bg-orange-50 text-black border border-[#FF5200]">
                 Ctrl+K
               </span>
             </button>

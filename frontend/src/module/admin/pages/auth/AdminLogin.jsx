@@ -15,7 +15,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Eye, EyeOff } from "lucide-react"
-import zapooLogo from "@/assets/zapoo-logo.png"
+import zapooLogo from "@/assets/zapoo_logo.png"
 
 export default function AdminLogin() {
   const navigate = useNavigate()

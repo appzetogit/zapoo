@@ -125,26 +125,26 @@ const restaurantWalletSchema = new mongoose.Schema({
 });
 
 // Indexes
-restaurantWalletSchema.index({ restaurantId: 1 });
+// restaurantWalletSchema.index({ restaurantId: 1 }); // Removed duplicate index
 restaurantWalletSchema.index({ 'transactions.orderId': 1 });
 restaurantWalletSchema.index({ 'transactions.status': 1 });
 restaurantWalletSchema.index({ 'transactions.type': 1 });
 restaurantWalletSchema.index({ lastTransactionAt: -1 });
 
 // Virtual for pending balance (earned but not withdrawn)
-restaurantWalletSchema.virtual('pendingBalance').get(function() {
+restaurantWalletSchema.virtual('pendingBalance').get(function () {
   return this.totalEarned - this.totalWithdrawn;
 });
 
 // Method to add transaction and update balances
-restaurantWalletSchema.methods.addTransaction = function(transactionData) {
+restaurantWalletSchema.methods.addTransaction = function (transactionData) {
   const transaction = {
     ...transactionData,
     createdAt: new Date()
   };
-  
+
   this.transactions.push(transaction);
-  
+
   // Update balances based on transaction type and status
   if (transaction.status === 'Completed') {
     if (transaction.type === 'payment' || transaction.type === 'bonus' || transaction.type === 'refund') {
@@ -157,29 +157,29 @@ restaurantWalletSchema.methods.addTransaction = function(transactionData) {
       this.totalBalance -= transaction.amount;
     }
   }
-  
+
   this.lastTransactionAt = new Date();
-  
+
   return transaction;
 };
 
 // Method to update transaction status
-restaurantWalletSchema.methods.updateTransactionStatus = function(transactionId, status, failureReason = null) {
+restaurantWalletSchema.methods.updateTransactionStatus = function (transactionId, status, failureReason = null) {
   const transaction = this.transactions.id(transactionId);
   if (!transaction) {
     throw new Error('Transaction not found');
   }
-  
+
   const oldStatus = transaction.status;
   const oldAmount = transaction.amount;
-  
+
   transaction.status = status;
   transaction.processedAt = new Date();
-  
+
   if (status === 'Failed' && failureReason) {
     transaction.failureReason = failureReason;
   }
-  
+
   // If transaction status changed from Pending to Completed, update balances
   if (oldStatus === 'Pending' && status === 'Completed') {
     if (transaction.type === 'payment' || transaction.type === 'bonus' || transaction.type === 'refund') {
@@ -192,7 +192,7 @@ restaurantWalletSchema.methods.updateTransactionStatus = function(transactionId,
       this.totalBalance -= oldAmount;
     }
   }
-  
+
   // If transaction status changed from Completed to Failed/Cancelled, reverse balances
   if (oldStatus === 'Completed' && (status === 'Failed' || status === 'Cancelled')) {
     if (transaction.type === 'payment' || transaction.type === 'bonus' || transaction.type === 'refund') {
@@ -203,14 +203,14 @@ restaurantWalletSchema.methods.updateTransactionStatus = function(transactionId,
       this.totalWithdrawn = Math.max(0, this.totalWithdrawn - oldAmount);
     }
   }
-  
+
   return transaction;
 };
 
 // Static method to get wallet by restaurant ID or create if doesn't exist
-restaurantWalletSchema.statics.findOrCreateByRestaurantId = async function(restaurantId) {
+restaurantWalletSchema.statics.findOrCreateByRestaurantId = async function (restaurantId) {
   let wallet = await this.findOne({ restaurantId });
-  
+
   if (!wallet) {
     wallet = await this.create({
       restaurantId,
@@ -219,7 +219,7 @@ restaurantWalletSchema.statics.findOrCreateByRestaurantId = async function(resta
       totalEarned: 0
     });
   }
-  
+
   return wallet;
 };
 

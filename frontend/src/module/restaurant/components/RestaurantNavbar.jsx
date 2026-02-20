@@ -265,7 +265,7 @@ export default function RestaurantNavbar({
         {/* Close Button */}
         <button
           onClick={handleSearchClose}
-          className="w-6 h-6 bg-black rounded-full flex items-center justify-center shrink-0"
+          className="w-6 h-6 bg-[#FF5200] rounded-full flex items-center justify-center shrink-0"
           aria-label="Close search"
         >
           <X className="w-3 h-3 text-white" />

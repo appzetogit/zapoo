@@ -23,7 +23,7 @@ import {
   YAxis,
 } from "recharts"
 import { Activity, ArrowUpRight, ShoppingBag, CreditCard, Truck, Receipt, DollarSign, Store, UserCheck, Package, UserCircle, Clock, CheckCircle, Plus } from "lucide-react"
-import zapooLogo from "@/assets/zapoo-logo.png"
+import zapooLogo from "@/assets/zapoo_logo.png"
 import { adminAPI } from "@/lib/api"
 
 export default function AdminHome() {

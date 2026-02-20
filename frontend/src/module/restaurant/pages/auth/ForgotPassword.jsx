@@ -25,7 +25,7 @@ export default function RestaurantForgotPassword() {
   const handleEmailSubmit = async (e) => {
     e.preventDefault()
     setError("")
-    
+
     if (!email.trim()) {
       setError("Email is required")
       return
@@ -59,7 +59,7 @@ export default function RestaurantForgotPassword() {
 
   const handleOtpChange = (index, value) => {
     if (!/^\d*$/.test(value)) return
-    
+
     const newOtp = [...otp]
     newOtp[index] = value.slice(-1)
     setOtp(newOtp)
@@ -96,7 +96,7 @@ export default function RestaurantForgotPassword() {
   const handleOtpSubmit = async (e) => {
     e.preventDefault()
     setError("")
-    
+
     const otpCode = otp.join("")
     if (otpCode.length !== 6) {
       setError("Please enter the complete OTP")
@@ -123,7 +123,7 @@ export default function RestaurantForgotPassword() {
 
   const handleResendOtp = async () => {
     if (resendTimer > 0) return
-    
+
     setIsLoading(true)
     setError("")
     try {
@@ -153,7 +153,7 @@ export default function RestaurantForgotPassword() {
   const handlePasswordSubmit = async (e) => {
     e.preventDefault()
     setError("")
-    
+
     if (!newPassword || !confirmPassword) {
       setError("Please fill in all fields")
       return
