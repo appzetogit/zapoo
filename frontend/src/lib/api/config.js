@@ -236,6 +236,8 @@ export const API_ENDPOINTS = {
     ALL_REQUESTS: "/marketing/ads/all",
     SLOTS: "/marketing/slots",
     CONFIGURE_SLOTS: "/marketing/slots/configure",
+    PAYMENT_CREATE_ORDER: "/marketing/ads/payment/create-order/:adId",
+    PAYMENT_VERIFY: "/marketing/ads/payment/verify",
   },
   // Delivery endpoints
   DELIVERY: {

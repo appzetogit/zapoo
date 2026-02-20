@@ -39,7 +39,7 @@ export default function DeliveryWelcome() {
         const minutes = Math.floor(time / 60)
         const seconds = time % 60
         setAudioTime(`${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`)
-        
+
         // Stop after 10 seconds (simulating audio length)
         if (time >= 10) {
           setIsPlaying(false)
@@ -71,7 +71,7 @@ export default function DeliveryWelcome() {
           transition={{ duration: 0.5 }}
           className="text-center mb-20"
         >
-          
+
           <h1 className="text-lg font-semibold text-gray-900">
             Hi {userName},
           </h1>
@@ -108,7 +108,7 @@ export default function DeliveryWelcome() {
           transition={{ delay: 0.4, duration: 0.5 }}
           className="w-full max-w-sm bg-black rounded-3xl p-6 mb-8 relative overflow-hidden"
         >
-     
+
           {/* Money Illustration - Stack of Currency Notes */}
           <div className="flex justify-center mb-4">
             <div className="relative">
@@ -118,13 +118,13 @@ export default function DeliveryWelcome() {
                 <div className="relative z-10">
                   {/* Band/Tie around notes */}
                   {/* <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-3 bg-amber-300 rounded-full z-30"></div> */}
-                  
+
                   {/* Note 1 - Back (left) */}
                   <div className="w-10 h-14 bg-green-400 rounded-sm transform -rotate-12 absolute -left-2 top-1/2 -translate-y-1/2 z-0 shadow-md"></div>
-                  
+
                   {/* Note 2 - Middle */}
                   <div className="w-10 h-14 bg-green-300 rounded-sm transform rotate-0 relative z-10 shadow-lg"></div>
-                  
+
                   {/* Note 3 - Front (right) */}
                   <div className="w-10 h-14 bg-green-200 rounded-sm transform rotate-12 absolute -right-2 top-1/2 -translate-y-1/2 z-20 shadow-xl flex items-center justify-center">
                     <IndianRupee className="w-5 h-5 text-green-800" strokeWidth={3} />
@@ -148,13 +148,13 @@ export default function DeliveryWelcome() {
           </div>
 
           {/* Start Earning Button */}
-           <button
-             onClick={() => {
-               // Navigate directly to delivery home page (map with hotspots)
-               navigate("/delivery", { replace: true })
-             }}
-             className="w-full bg-[#00B761] hover:bg-[#00A055] text-white font-bold py-4 rounded-lg mt-4 flex items-center justify-center gap-2 transition-colors"
-           >
+          <button
+            onClick={() => {
+              // Navigate directly to delivery home page (map with hotspots)
+              navigate("/delivery", { replace: true })
+            }}
+            className="w-full bg-[#00B761] hover:bg-[#00A055] text-white font-bold py-4 rounded-lg mt-4 flex items-center justify-center gap-2 transition-colors"
+          >
             <span>Start earning</span>
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -176,7 +176,7 @@ export default function DeliveryWelcome() {
               <Play className="w-5 h-5 ml-0.5" />
             )}
           </button>
-          
+
           {/* Waveform */}
           <div className="flex-1 flex items-center gap-1 h-8">
             {[...Array(30)].map((_, i) => {
@@ -184,13 +184,13 @@ export default function DeliveryWelcome() {
               const seed = i * 0.1
               const baseHeight = 20
               const maxHeight = 80
-              
+
               // Create varying heights using sine waves with different frequencies
               const height1 = baseHeight + (Math.sin(seed) * 0.5 + 0.5) * (maxHeight - baseHeight)
               const height2 = baseHeight + (Math.sin(seed + 1) * 0.5 + 0.5) * (maxHeight - baseHeight)
               const height3 = baseHeight + (Math.sin(seed + 2) * 0.5 + 0.5) * (maxHeight - baseHeight)
               const height4 = baseHeight + (Math.sin(seed + 3) * 0.5 + 0.5) * (maxHeight - baseHeight)
-              
+
               return (
                 <motion.div
                   key={i}
@@ -280,7 +280,7 @@ export default function DeliveryWelcome() {
                 ease: "easeOut",
               }}
             />
-            
+
             {/* Main circle with checkmark */}
             <motion.div
               className="w-32 h-32 bg-gradient-to-br from-green-500 to-green-600 rounded-full flex items-center justify-center shadow-2xl relative overflow-hidden"
@@ -405,7 +405,7 @@ export default function DeliveryWelcome() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
               </svg>
             </div>
-            
+
             {/* Bag Info */}
             <div className="flex-1">
               <h3 className="font-semibold text-gray-900 mb-1">

@@ -65,7 +65,7 @@ export const updateTier = async (req, res) => {
     try {
         const { id } = req.params;
         console.log("updateTier body:", req.body);
-        const { name, minArea, maxArea, description, rank, isActive, baseFee, freeDeliveryThreshold } = req.body;
+        const { name, minArea, maxArea, description, rank, isActive, baseFee, freeDeliveryThreshold, maxBanners } = req.body;
 
         const tier = await Tier.findById(id);
         if (!tier) {
@@ -102,6 +102,11 @@ export const updateTier = async (req, res) => {
             }
             if (baseFee !== undefined) tier.deliveryPricing.baseFee = baseFee;
             if (freeDeliveryThreshold !== undefined) tier.deliveryPricing.freeDeliveryThreshold = freeDeliveryThreshold;
+        }
+
+        // Update tier-based banner limit
+        if (maxBanners !== undefined) {
+            tier.maxBanners = Math.max(1, parseInt(maxBanners) || 1);
         }
 
         await tier.save();

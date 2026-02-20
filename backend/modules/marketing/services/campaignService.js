@@ -11,7 +11,7 @@ export const syncCampaignStatuses = async () => {
         // 1. Scheduled -> Active (if start date reached and paid)
         const toActivate = await AdRequest.updateMany(
             {
-                status: 'Approved',
+                status: { $in: ['Approved', 'Scheduled'] },
                 startDate: { $lte: now },
                 endDate: { $gte: now },
                 paymentStatus: 'Paid'

@@ -1,4 +1,4 @@
-import { marketingAPI } from "@/lib/api"
+import { marketingAPI, restaurantAPI } from "@/lib/api"
 import { toast } from "sonner"
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
@@ -18,6 +18,8 @@ import {
 import { Card, CardContent } from "@/components/ui/card"
 import BottomNavbar from "../components/BottomNavbar"
 import MenuOverlay from "../components/MenuOverlay"
+import { initRazorpayPayment } from "@/lib/utils/razorpay"
+import { getCompanyNameAsync } from "@/lib/utils/businessSettings"
 
 export default function AdvertisementsPage() {
   const navigate = useNavigate()
@@ -25,23 +27,105 @@ export default function AdvertisementsPage() {
   const [openMenuId, setOpenMenuId] = useState(null)
   const [showMenu, setShowMenu] = useState(false)
   const [loading, setLoading] = useState(true)
+
   const [advertisements, setAdvertisements] = useState([])
+  const [processingPayment, setProcessingPayment] = useState(false)
+
+  const fetchAds = async () => {
+    try {
+      setLoading(true)
+      const res = await marketingAPI.getMyAds()
+      setAdvertisements(res.data.data || [])
+    } catch (error) {
+      toast.error("Failed to load advertisements")
+    } finally {
+      setLoading(false)
+    }
+  }
 
   // Fetch ads from real backend
   useEffect(() => {
-    const fetchAds = async () => {
-      try {
-        setLoading(true)
-        const res = await marketingAPI.getMyAds()
-        setAdvertisements(res.data.data || [])
-      } catch (error) {
-        toast.error("Failed to load advertisements")
-      } finally {
-        setLoading(false)
-      }
-    }
     fetchAds()
   }, [])
+
+
+  const handlePayNow = async (ad) => {
+    try {
+      setProcessingPayment(true)
+      toast.loading("Initializing payment...")
+
+      // 1. Create Order
+      const orderRes = await marketingAPI.createAdPaymentOrder(ad._id)
+      const { orderId, amount, currency, key } = orderRes.data.data
+
+      // 2. Get Restaurant & Company Info
+      // Use restaurantAPI because restaurant owners are authenticated via restaurant token
+      const restaurantRes = await restaurantAPI.getCurrentRestaurant()
+      const restaurant = restaurantRes.data.data?.restaurant || restaurantRes.data.restaurant || {}
+      const companyName = await getCompanyNameAsync()
+
+      toast.dismiss()
+
+      // 3. Open Razorpay
+      await initRazorpayPayment({
+        key,
+        amount,
+        currency,
+        order_id: orderId,
+        name: companyName,
+        description: `Ad Campaign: ${ad.title}`,
+        prefill: {
+          name: restaurant.name || restaurant.ownerName,
+          email: restaurant.email || restaurant.ownerEmail,
+          contact: restaurant.ownerPhone || restaurant.phone || restaurant.primaryContactNumber
+        },
+        notes: {
+          adId: ad._id,
+          type: 'AD_CAMPAIGN'
+        },
+        handler: async (response) => {
+          try {
+            toast.loading("Verifying payment...")
+
+            // 4. Verify Payment
+            await marketingAPI.verifyAdPayment({
+              adId: ad._id,
+              razorpayPaymentId: response.razorpay_payment_id,
+              razorpayOrderId: response.razorpay_order_id,
+              razorpaySignature: response.razorpay_signature
+            })
+
+            toast.dismiss()
+            toast.success("Payment successful! Your ad is now live.")
+
+            // Refresh list
+            fetchAds()
+
+          } catch (verifyErr) {
+            console.error(verifyErr)
+            toast.dismiss()
+            toast.error("Payment verification failed. Please contact support.")
+          } finally {
+            setProcessingPayment(false)
+          }
+        },
+        onError: (err) => {
+          console.error(err)
+          toast.error("Payment failed. Please try again.")
+          setProcessingPayment(false)
+        },
+        onClose: () => {
+          setProcessingPayment(false)
+        }
+      })
+
+    } catch (error) {
+      console.error(error)
+      toast.dismiss()
+      toast.error(error.response?.data?.message || "Failed to initiate payment")
+      setProcessingPayment(false)
+    }
+  }
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -182,8 +266,8 @@ export default function AdvertisementsPage() {
                             ID: {ad._id.slice(-8).toUpperCase()}
                           </h3>
                           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${ad.status === "Active" ? "bg-green-100 text-green-700" :
-                              ad.status === "Pending" ? "bg-orange-100 text-orange-700" :
-                                "bg-blue-100 text-blue-700"
+                            ad.status === "Pending" ? "bg-orange-100 text-orange-700" :
+                              "bg-blue-100 text-blue-700"
                             }`}>
                             {ad.status}
                           </span>
@@ -195,6 +279,22 @@ export default function AdvertisementsPage() {
                           <p>Placed: {new Date(ad.createdAt).toLocaleDateString()}</p>
                           <p>Dates: {new Date(ad.startDate).toLocaleDateString()} - {new Date(ad.endDate).toLocaleDateString()}</p>
                         </div>
+
+                        {/* Pay Now Button */}
+                        {ad.status === 'Approved' && ad.paymentStatus !== 'Paid' && (
+                          <motion.button
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handlePayNow(ad)
+                            }}
+                            disabled={processingPayment}
+                            className="mt-3 bg-green-600 hover:bg-green-700 text-white text-xs font-bold px-4 py-2 rounded-lg shadow-sm flex items-center gap-2"
+                          >
+                            <span>Pay ₹{ad.totalCost} to Activate</span>
+                          </motion.button>
+                        )}
                       </div>
 
                       {/* Right Icons */}

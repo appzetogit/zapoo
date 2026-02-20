@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
-import { 
+import {
   ArrowLeft,
   CreditCard,
   Lock,
@@ -9,16 +9,21 @@ import {
   Heart,
   ShoppingBag,
   Menu,
-  ChefHat
+  ChefHat,
+  MapPin,
+  Clock,
+  Check,
+  ChevronRight
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { motion, AnimatePresence } from "framer-motion"
 
 export default function PaymentPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const paymentMethod = searchParams.get("method") || "card"
-  
+
   const [cardNumber, setCardNumber] = useState("")
   const [cardName, setCardName] = useState("")
   const [expiryDate, setExpiryDate] = useState("")
@@ -129,19 +134,19 @@ export default function PaymentPage() {
     if (paymentMethod === "cash") {
       return // Already handled by useEffect
     }
-    
+
     if (!cardNumber || !cardName || !expiryDate || !cvv) {
       return
     }
-    
+
     setIsProcessing(true)
-    
+
     // Simulate payment processing
     setTimeout(() => {
       saveOrder()
       setIsProcessing(false)
       setIsSuccess(true)
-      
+
       // Navigate to success page after 2 seconds
       setTimeout(() => {
         navigate('/usermain/orders')
@@ -151,27 +156,132 @@ export default function PaymentPage() {
 
   if (isSuccess) {
     return (
-      <div className="min-h-screen bg-[#f6e9dc] flex items-center justify-center px-4">
-        <div className="bg-white rounded-2xl p-6 md:p-8 text-center max-w-md w-full shadow-lg">
-          <div className="bg-green-500 rounded-full p-3 md:p-4 w-16 h-16 md:w-20 md:h-20 mx-auto mb-3 md:mb-4 flex items-center justify-center">
-            <CheckCircle className="w-10 h-10 md:w-12 md:h-12 text-white" />
+      <AnimatePresence>
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="fixed inset-0 z-[100] bg-gradient-to-br from-indigo-100 via-white to-emerald-100 flex flex-col items-center justify-center h-screen w-screen overflow-hidden"
+        >
+          {/* Decorative Floating Elements */}
+          <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-200/30 rounded-full blur-[100px] animate-pulse" />
+          <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-emerald-200/30 rounded-full blur-[100px] animate-pulse" />
+
+          {/* Confetti Background */}
+          <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            {[...Array(20)].map((_, i) => (
+              <motion.div
+                key={i}
+                initial={{ y: -20, x: Math.random() * 100 + "%", rotate: 0 }}
+                animate={{
+                  y: "110vh",
+                  rotate: 360,
+                  x: (Math.random() * 100 - 10) + "%"
+                }}
+                transition={{
+                  duration: 2 + Math.random() * 2,
+                  repeat: Infinity,
+                  ease: "linear",
+                  delay: Math.random() * 3
+                }}
+                className="absolute w-2 h-4 rounded-sm"
+                style={{
+                  backgroundColor: ['#22c55e', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'][Math.floor(Math.random() * 6)],
+                }}
+              />
+            ))}
           </div>
-          <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-2">
-            {paymentMethod === "cash" ? "Order Placed!" : "Payment Successful!"}
-          </h2>
-          <p className="text-sm md:text-base text-gray-600 mb-4 md:mb-6">
-            {paymentMethod === "cash" 
-              ? "Your order has been placed. Pay cash on delivery." 
-              : "Your order has been placed successfully."}
-          </p>
-          <Button
-            className="w-full bg-[#ff8100] hover:bg-[#e67300] text-white font-semibold py-2.5 md:py-3 rounded-lg text-sm md:text-base"
-            onClick={() => navigate('/usermain/orders')}
+
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9, y: 30 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ type: "spring", damping: 20, stiffness: 100, delay: 0.1 }}
+            className="relative z-10 w-[92%] max-w-lg bg-white/70 backdrop-blur-3xl border border-white/50 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.1)] p-8 md:p-12 rounded-[2.5rem] md:rounded-[3.5rem] flex flex-col items-center text-center"
           >
-            View Orders
-          </Button>
-        </div>
-      </div>
+            {/* Success Tick Circle */}
+            <div className="relative mb-8 md:mb-10">
+              <motion.div
+                initial={{ scale: 0, rotate: -45 }}
+                animate={{ scale: 1, rotate: 0 }}
+                transition={{ type: "spring", damping: 12, stiffness: 200, delay: 0.3 }}
+                className="w-24 h-24 md:w-32 md:h-32 bg-gradient-to-tr from-emerald-500 to-green-400 rounded-full flex items-center justify-center shadow-[0_20px_40px_-10px_rgba(34,197,94,0.4)] relative z-10"
+              >
+                <Check className="w-12 h-12 md:w-16 md:h-16 text-white stroke-[3.5px]" />
+              </motion.div>
+
+              {/* Animated Rings */}
+              {[...Array(2)].map((_, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: [0, 0.4, 0], scale: [1, 1.6, 2.2] }}
+                  transition={{ duration: 2.5, repeat: Infinity, delay: 0.5 + (i * 1.2) }}
+                  className="absolute inset-0 border-2 border-green-400 rounded-full"
+                />
+              ))}
+            </div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5 }}
+            >
+              <h2 className="text-2xl md:text-4xl font-black text-gray-900 mb-3 tracking-tight">
+                {paymentMethod === "cash" ? "Order Placed!" : "Payment Successful!"}
+              </h2>
+              <p className="text-sm md:text-lg text-gray-600 font-medium mb-8 md:mb-10">
+                {paymentMethod === "cash"
+                  ? "Your order has been placed. Pay cash on delivery."
+                  : "Thank you! Your order has been placed successfully."}
+              </p>
+            </motion.div>
+
+            {/* Order Preview Card */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.6 }}
+              className="w-full bg-white/60 rounded-3xl p-5 mb-8 md:mb-10 border border-white/50 shadow-sm"
+            >
+              <div className="flex items-center gap-3 mb-4 last:mb-0">
+                <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <MapPin className="w-5 h-5 text-indigo-600" />
+                </div>
+                <div className="text-left">
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Delivering to</p>
+                  <p className="text-sm font-bold text-gray-800 truncate max-w-[200px] md:max-w-[280px]">
+                    {orderData.deliveryAddress || "Your Order Location"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <Clock className="w-5 h-5 text-emerald-600" />
+                </div>
+                <div className="text-left">
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Estimated Arrival</p>
+                  <p className="text-sm font-bold text-gray-800">
+                    {orderData.estimatedTime || "30-40 mins"}
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+
+            <motion.button
+              whileHover={{ scale: 1.02, backgroundColor: "rgba(17, 24, 39, 1)" }}
+              whileTap={{ scale: 0.98 }}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.7 }}
+              onClick={() => navigate('/usermain/orders')}
+              className="w-full h-14 md:h-16 bg-gray-900 text-white rounded-[1.2rem] md:rounded-[1.5rem] font-black text-base md:text-lg shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2 group"
+            >
+              View My Orders
+              <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+            </motion.button>
+          </motion.div>
+        </motion.div>
+      </AnimatePresence>
     )
   }
 
@@ -298,14 +408,14 @@ export default function PaymentPage() {
       {/* Bottom Navigation Bar - Mobile Only */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-50">
         <div className="flex items-center justify-around py-2 px-4">
-          <button 
+          <button
             onClick={() => navigate('/usermain')}
             className="flex flex-col items-center gap-1 p-2 text-gray-600 hover:text-[#ff8100] transition-colors"
           >
             <Home className="w-6 h-6" />
             <span className="text-xs text-gray-600 font-medium">Home</span>
           </button>
-          <button 
+          <button
             onClick={() => navigate('/usermain/wishlist')}
             className="flex flex-col items-center gap-1 p-2 text-gray-600 hover:text-[#ff8100] transition-colors"
           >

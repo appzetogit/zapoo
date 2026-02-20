@@ -4,6 +4,7 @@ import * as subscriptionController from "../controllers/subscriptionController.j
 // Assuming authMiddleware exists and verifies restaurant token/session
 // Adjust path to authMiddleware as needed. Likely in shared/middlewares or modules/auth
 import { authenticate, authorize, optionalAuthenticate } from "../../auth/middleware/auth.js";
+import { authenticate as authenticateRestaurant } from "../../restaurant/middleware/restaurantAuth.js";
 import { authenticateAdmin } from "../../admin/middleware/adminAuth.js";
 
 const router = express.Router();
@@ -13,9 +14,9 @@ const router = express.Router();
 router.get("/plans", optionalAuthenticate, subscriptionController.getPlans);
 
 // Restaurant routes
-router.post("/subscribe", authenticate, authorize("restaurant"), subscriptionController.subscribe);
-router.get("/my-subscription", authenticate, authorize("restaurant"), subscriptionController.getMySubscription);
-router.post("/cancel", authenticate, authorize("restaurant"), subscriptionController.cancelSubscription);
+router.post("/subscribe", authenticateRestaurant, subscriptionController.subscribe);
+router.get("/my-subscription", authenticateRestaurant, subscriptionController.getMySubscription);
+router.post("/cancel", authenticateRestaurant, subscriptionController.cancelSubscription);
 
 // Admin routes
 router.post("/plans", authenticateAdmin, subscriptionController.createPlan);
