@@ -23,7 +23,7 @@ export default function DeliveryEmergencyHelp() {
     try {
       setLoading(true)
       const response = await adminAPI.getEmergencyHelp()
-      
+
       if (response?.data?.success && response?.data?.data) {
         const data = response.data.data
         setFormData({
@@ -79,7 +79,7 @@ export default function DeliveryEmergencyHelp() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    
+
     if (!validateForm()) {
       toast.error("Please fix the errors in the form")
       return
@@ -170,13 +170,13 @@ export default function DeliveryEmergencyHelp() {
           </div>
 
           {/* Info Card */}
-          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="mb-6 p-4 bg-orange-50 border border-orange-200 rounded-lg">
             <div className="flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 shrink-0" />
-              <div className="text-sm text-blue-800">
+              <AlertCircle className="w-5 h-5 text-[#FF5200] mt-0.5 shrink-0" />
+              <div className="text-sm text-[#E64A00]">
                 <p className="font-semibold mb-1">Important Information</p>
                 <p>
-                  These phone numbers will be displayed to delivery partners in the emergency help section. 
+                  These phone numbers will be displayed to delivery partners in the emergency help section.
                   When a delivery partner clicks on any emergency option, it will automatically dial the corresponding number.
                 </p>
               </div>
@@ -198,11 +198,10 @@ export default function DeliveryEmergencyHelp() {
                     value={formData[field.id]}
                     onChange={(e) => handleInputChange(field.id, e.target.value)}
                     placeholder={field.placeholder}
-                    className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      formErrors[field.id]
+                    className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF5200] ${formErrors[field.id]
                         ? "border-red-300 focus:ring-red-500"
                         : "border-slate-300"
-                    }`}
+                      }`}
                   />
                   {formErrors[field.id] && (
                     <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
@@ -219,7 +218,7 @@ export default function DeliveryEmergencyHelp() {
               <button
                 type="submit"
                 disabled={saving}
-                className="w-full sm:w-auto px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="w-full sm:w-auto px-6 py-3 bg-[#FF5200] text-white rounded-lg font-semibold hover:bg-[#E64A00] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {saving ? (
                   <>

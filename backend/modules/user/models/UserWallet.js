@@ -102,7 +102,7 @@ const userWalletSchema = new mongoose.Schema({
 });
 
 // Indexes
-userWalletSchema.index({ userId: 1 }, { unique: true });
+// userWalletSchema.index({ userId: 1 }, { unique: true }); // Removed duplicate index
 userWalletSchema.index({ 'transactions.orderId': 1 });
 userWalletSchema.index({ 'transactions.status': 1 });
 userWalletSchema.index({ 'transactions.type': 1 });
@@ -110,19 +110,19 @@ userWalletSchema.index({ 'transactions.createdAt': -1 });
 userWalletSchema.index({ lastTransactionAt: -1 });
 
 // Method to add transaction and update balances
-userWalletSchema.methods.addTransaction = function(transactionData) {
+userWalletSchema.methods.addTransaction = function (transactionData) {
   const transaction = {
     ...transactionData,
     createdAt: new Date()
   };
-  
+
   this.transactions.push(transaction);
-  
+
   // Update balances based on transaction type and status
   if (transaction.status === 'Completed') {
     if (transaction.type === 'addition' || transaction.type === 'refund') {
       this.balance += transaction.amount;
-      
+
       if (transaction.type === 'addition') {
         this.totalAdded += transaction.amount;
       } else if (transaction.type === 'refund') {
@@ -137,34 +137,34 @@ userWalletSchema.methods.addTransaction = function(transactionData) {
       this.totalSpent += transaction.amount;
     }
   }
-  
+
   this.lastTransactionAt = new Date();
-  
+
   return transaction;
 };
 
 // Method to update transaction status
-userWalletSchema.methods.updateTransactionStatus = function(transactionId, status, failureReason = null) {
+userWalletSchema.methods.updateTransactionStatus = function (transactionId, status, failureReason = null) {
   const transaction = this.transactions.id(transactionId);
   if (!transaction) {
     throw new Error('Transaction not found');
   }
-  
+
   const oldStatus = transaction.status;
   const oldAmount = transaction.amount;
-  
+
   transaction.status = status;
   transaction.processedAt = new Date();
-  
+
   if (status === 'Failed' && failureReason) {
     transaction.failureReason = failureReason;
   }
-  
+
   // If transaction status changed from Pending to Completed, update balances
   if (oldStatus === 'Pending' && status === 'Completed') {
     if (transaction.type === 'addition' || transaction.type === 'refund') {
       this.balance += oldAmount;
-      
+
       if (transaction.type === 'addition') {
         this.totalAdded += oldAmount;
       } else if (transaction.type === 'refund') {
@@ -178,12 +178,12 @@ userWalletSchema.methods.updateTransactionStatus = function(transactionId, statu
       this.totalSpent += oldAmount;
     }
   }
-  
+
   // If transaction status changed from Completed to Failed/Cancelled, reverse balances
   if (oldStatus === 'Completed' && (status === 'Failed' || status === 'Cancelled')) {
     if (transaction.type === 'addition' || transaction.type === 'refund') {
       this.balance = Math.max(0, this.balance - oldAmount);
-      
+
       if (transaction.type === 'addition') {
         this.totalAdded = Math.max(0, this.totalAdded - oldAmount);
       } else if (transaction.type === 'refund') {
@@ -194,14 +194,14 @@ userWalletSchema.methods.updateTransactionStatus = function(transactionId, statu
       this.totalSpent = Math.max(0, this.totalSpent - oldAmount);
     }
   }
-  
+
   return transaction;
 };
 
 // Static method to get wallet by user ID or create if doesn't exist
-userWalletSchema.statics.findOrCreateByUserId = async function(userId) {
+userWalletSchema.statics.findOrCreateByUserId = async function (userId) {
   let wallet = await this.findOne({ userId });
-  
+
   if (!wallet) {
     wallet = await this.create({
       userId,
@@ -211,7 +211,7 @@ userWalletSchema.statics.findOrCreateByUserId = async function(userId) {
       totalRefunded: 0
     });
   }
-  
+
   return wallet;
 };
 

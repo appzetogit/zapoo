@@ -26,7 +26,7 @@ export default function PushNotification() {
     if (!searchQuery.trim()) {
       return notifications
     }
-    
+
     const query = searchQuery.toLowerCase().trim()
     return notifications.filter(notification =>
       notification.title.toLowerCase().includes(query) ||
@@ -71,7 +71,7 @@ export default function PushNotification() {
         {/* Create New Notification Section */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
           <div className="flex items-center gap-3 mb-6">
-            <Bell className="w-5 h-5 text-blue-600" />
+            <Bell className="w-5 h-5 text-[#FF5200]" />
             <h1 className="text-2xl font-bold text-slate-900">Notification</h1>
           </div>
 
@@ -86,7 +86,7 @@ export default function PushNotification() {
                   value={formData.title}
                   onChange={(e) => handleInputChange("title", e.target.value)}
                   placeholder="Ex: Notification Title"
-                  className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                  className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#FF5200] focus:border-[#FF5200] text-sm"
                 />
               </div>
 
@@ -97,7 +97,7 @@ export default function PushNotification() {
                 <select
                   value={formData.zone}
                   onChange={(e) => handleInputChange("zone", e.target.value)}
-                  className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                  className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#FF5200] focus:border-[#FF5200] text-sm"
                 >
                   <option value="All">All</option>
                   <option value="Asia">Asia</option>
@@ -112,7 +112,7 @@ export default function PushNotification() {
                 <select
                   value={formData.sendTo}
                   onChange={(e) => handleInputChange("sendTo", e.target.value)}
-                  className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                  className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#FF5200] focus:border-[#FF5200] text-sm"
                 >
                   <option value="Customer">Customer</option>
                   <option value="Delivery Man">Delivery Man</option>
@@ -126,9 +126,9 @@ export default function PushNotification() {
               <label className="block text-sm font-semibold text-slate-700 mb-3">
                 Notification banner
               </label>
-              <div className="border-2 border-dashed border-slate-300 rounded-lg p-12 text-center hover:border-blue-500 transition-colors cursor-pointer">
+              <div className="border-2 border-dashed border-slate-300 rounded-lg p-12 text-center hover:border-[#FF5200] transition-colors cursor-pointer">
                 <Upload className="w-12 h-12 text-slate-400 mx-auto mb-3" />
-                <p className="text-sm font-medium text-blue-600 mb-1">Upload Image</p>
+                <p className="text-sm font-medium text-[#FF5200] mb-1">Upload Image</p>
                 <p className="text-xs text-slate-500">Image format - jpg png jpeg gif webp Image Size -maximum size 2 MB Image Ratio - 3:1</p>
               </div>
             </div>
@@ -143,7 +143,7 @@ export default function PushNotification() {
                 onChange={(e) => handleInputChange("description", e.target.value)}
                 placeholder="Ex: Notification Descriptions"
                 rows={4}
-                className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm resize-none"
+                className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#FF5200] focus:border-[#FF5200] text-sm resize-none"
               />
             </div>
 
@@ -158,7 +158,7 @@ export default function PushNotification() {
               <div className="flex items-center gap-2">
                 <button
                   type="submit"
-                  className="px-6 py-2.5 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-all shadow-md"
+                  className="px-6 py-2.5 text-sm font-medium rounded-lg bg-[#FF5200] text-white hover:bg-[#E64A00] transition-all shadow-md"
                 >
                   Send Notification
                 </button>
@@ -257,14 +257,12 @@ export default function PushNotification() {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <button
                         onClick={() => handleToggleStatus(notification.sl)}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-                          notification.status ? "bg-blue-600" : "bg-slate-300"
-                        }`}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[#FF5200] focus:ring-offset-2 ${notification.status ? "bg-[#FF5200]" : "bg-slate-300"
+                          }`}
                       >
                         <span
-                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                            notification.status ? "translate-x-6" : "translate-x-1"
-                          }`}
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${notification.status ? "translate-x-6" : "translate-x-1"
+                            }`}
                         />
                       </button>
                     </td>

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { motion, AnimatePresence } from "framer-motion"
 import Lenis from "lenis"
-import { 
+import {
   ArrowLeft,
   Home,
   ShoppingBag,
@@ -133,7 +133,7 @@ export default function EditRestaurantPage() {
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    
+
     // Validate required fields
     if (!formData.restaurantName.english || !formData.address || !formData.phoneNumber) {
       alert("Please fill in all required fields (Restaurant Name, Address, Phone Number)")
@@ -156,7 +156,7 @@ export default function EditRestaurantPage() {
       {/* Header */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-4">
-          <button 
+          <button
             onClick={() => navigate("/restaurant/details")}
             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
           >
@@ -173,7 +173,7 @@ export default function EditRestaurantPage() {
           <Card className="bg-white shadow-sm border-0">
             <CardContent className="p-4 md:p-6">
               <h2 className="text-base md:text-lg font-semibold text-gray-900 mb-4">Restaurant Name</h2>
-              
+
               {/* Language Tabs */}
               <div className="flex gap-2 mb-4 overflow-x-auto scrollbar-hide">
                 {languages.map((lang) => (
@@ -181,11 +181,10 @@ export default function EditRestaurantPage() {
                     key={lang.id}
                     type="button"
                     onClick={() => setActiveLanguage(lang.id)}
-                    className={`flex-shrink-0 px-3 py-2 text-sm font-medium transition-colors border-b-2 ${
-                      activeLanguage === lang.id
-                        ? "text-[#ff8100] border-[#ff8100]"
+                    className={`flex-shrink-0 px-3 py-2 text-sm font-medium transition-colors border-b-2 ${activeLanguage === lang.id
+                        ? "text-blue-600 border-blue-600"
                         : "text-gray-600 border-transparent hover:text-gray-900"
-                    }`}
+                      }`}
                   >
                     {lang.label}
                   </button>
@@ -201,7 +200,7 @@ export default function EditRestaurantPage() {
                   type="text"
                   value={formData.restaurantName[activeLanguage]}
                   onChange={(e) => handleInputChange("restaurantName", e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#ff8100] focus:border-transparent outline-none"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none"
                   placeholder="Enter restaurant name"
                 />
               </div>
@@ -212,7 +211,7 @@ export default function EditRestaurantPage() {
           <Card className="bg-white shadow-sm border-0">
             <CardContent className="p-4 md:p-6">
               <h2 className="text-base md:text-lg font-semibold text-gray-900 mb-4">Contact</h2>
-              
+
               {/* Phone Number */}
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -227,7 +226,7 @@ export default function EditRestaurantPage() {
                     type="tel"
                     value={formData.phoneNumber}
                     onChange={(e) => handleInputChange("phoneNumber", e.target.value)}
-                    className="flex-1 px-4 py-2 border border-gray-300 rounded-r-lg focus:ring-2 focus:ring-[#ff8100] focus:border-transparent outline-none"
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-r-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none"
                     placeholder="01747410000"
                   />
                 </div>
@@ -242,7 +241,7 @@ export default function EditRestaurantPage() {
                   type="text"
                   value={formData.address}
                   onChange={(e) => handleInputChange("address", e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#ff8100] focus:border-transparent outline-none"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none"
                   placeholder="Enter address"
                 />
               </div>
@@ -261,9 +260,9 @@ export default function EditRestaurantPage() {
               <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 md:p-8 flex flex-col items-center justify-center min-h-[150px]">
                 {formData.logo ? (
                   <div className="relative w-32 h-32 rounded-lg overflow-hidden">
-                    <img 
-                      src={formData.logo} 
-                      alt="Restaurant Logo" 
+                    <img
+                      src={formData.logo}
+                      alt="Restaurant Logo"
                       className="w-full h-full object-cover"
                     />
                     <button
@@ -306,9 +305,9 @@ export default function EditRestaurantPage() {
               <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 md:p-8 flex flex-col items-center justify-center min-h-[200px]">
                 {formData.cover ? (
                   <div className="relative w-full rounded-lg overflow-hidden">
-                    <img 
-                      src={formData.cover} 
-                      alt="Restaurant Cover" 
+                    <img
+                      src={formData.cover}
+                      alt="Restaurant Cover"
                       className="w-full h-auto object-cover"
                     />
                     <button
@@ -341,7 +340,7 @@ export default function EditRestaurantPage() {
           <Card className="bg-white shadow-sm border-0">
             <CardContent className="p-4 md:p-6">
               <h2 className="text-base md:text-lg font-semibold text-gray-900 mb-4">Meta Data</h2>
-              
+
               {/* Title */}
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -351,7 +350,7 @@ export default function EditRestaurantPage() {
                   type="text"
                   value={formData.metaTitle}
                   onChange={(e) => handleInputChange("metaTitle", e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#ff8100] focus:border-transparent outline-none"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none"
                   placeholder="Enter meta title"
                 />
               </div>
@@ -365,7 +364,7 @@ export default function EditRestaurantPage() {
                   value={formData.metaDescription}
                   onChange={(e) => handleInputChange("metaDescription", e.target.value)}
                   rows={4}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#ff8100] focus:border-transparent outline-none resize-none"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none resize-none"
                   placeholder="Enter meta description"
                 />
               </div>
@@ -379,9 +378,9 @@ export default function EditRestaurantPage() {
               <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 md:p-8 flex flex-col items-center justify-center min-h-[150px]">
                 {formData.metaImage ? (
                   <div className="relative w-full rounded-lg overflow-hidden">
-                    <img 
-                      src={formData.metaImage} 
-                      alt="Meta Image" 
+                    <img
+                      src={formData.metaImage}
+                      alt="Meta Image"
                       className="w-full h-auto object-cover"
                     />
                     <button
@@ -414,7 +413,7 @@ export default function EditRestaurantPage() {
           <div className="sticky bottom-0 bg-white border-t border-gray-200 p-4 -mx-4 md:mx-0 md:border-0 md:p-0 md:mt-6">
             <Button
               type="submit"
-              className="w-full bg-[#ff8100] hover:bg-[#e67300] text-white font-semibold py-3 rounded-lg text-base md:text-lg"
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg text-base md:text-lg"
             >
               Update
             </Button>
@@ -424,7 +423,7 @@ export default function EditRestaurantPage() {
 
       {/* Bottom Navigation Bar - Mobile Only */}
       <BottomNavbar onMenuClick={() => setShowMenu(true)} />
-      
+
       {/* Menu Overlay */}
       <MenuOverlay showMenu={showMenu} setShowMenu={setShowMenu} />
     </div>
