@@ -259,8 +259,8 @@ const deliverySchema = new mongoose.Schema(
 );
 
 // Indexes
-deliverySchema.index({ phone: 1 }, { unique: true });
-deliverySchema.index({ deliveryId: 1 }, { unique: true, sparse: true });
+// deliverySchema.index({ phone: 1 }, { unique: true }); // Removed duplicate index
+// deliverySchema.index({ deliveryId: 1 }, { unique: true, sparse: true }); // Removed duplicate index
 deliverySchema.index({ 'availability.currentLocation': '2dsphere' });
 deliverySchema.index({ status: 1 });
 deliverySchema.index({ isActive: 1 });

@@ -79,7 +79,7 @@ export default function ZoneSetup() {
             </button>
             <button
               onClick={() => navigate("/admin/zone-setup/add")}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-[#FF5200] text-white rounded-lg hover:bg-[#E64A00] transition-colors"
             >
               <Plus className="w-5 h-5" />
               <span>Add Zone</span>
@@ -96,7 +96,7 @@ export default function ZoneSetup() {
               placeholder="Search zones by name or location..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#FF5200] focus:border-[#FF5200]"
             />
           </div>
         </div>
@@ -104,7 +104,7 @@ export default function ZoneSetup() {
         {/* Zones List */}
         {loading ? (
           <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-8 text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#FF5200] mx-auto mb-4"></div>
             <p className="text-slate-600">Loading zones...</p>
           </div>
         ) : filteredZones.length === 0 ? (
@@ -117,7 +117,7 @@ export default function ZoneSetup() {
             {!searchQuery && (
               <button
                 onClick={() => navigate("/admin/zone-setup/add")}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-[#FF5200] text-white rounded-lg hover:bg-[#E64A00] transition-colors"
               >
                 <Plus className="w-5 h-5" />
                 <span>Add Zone</span>
@@ -139,7 +139,7 @@ export default function ZoneSetup() {
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => navigate(`/admin/zone-setup/view/${zone._id || zone.id}`)}
-                      className="p-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                      className="p-2 text-slate-600 hover:text-[#FF5200] hover:bg-orange-50 rounded-lg transition-colors"
                       title="View"
                     >
                       <Eye className="w-4 h-4" />

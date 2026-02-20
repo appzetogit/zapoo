@@ -7,7 +7,7 @@ import { useCart } from "../context/CartContext"
 import { useLocationSelector } from "./UserLayout"
 import { FaLocationDot } from "react-icons/fa6"
 import { getCachedSettings, loadBusinessSettings } from "@/lib/utils/businessSettings"
-import zapooFoodLogo from "@/assets/zapoo-logo.png"
+import zapooFoodLogo from "@/assets/zapoo_logo.png"
 
 export default function PageNavbar({
   textColor = "white",

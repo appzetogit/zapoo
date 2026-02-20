@@ -12,7 +12,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Mail, ArrowLeft, Shield } from "lucide-react"
-import zapooLogo from "@/assets/zapoo-logo.png"
+import zapooLogo from "@/assets/zapoo_logo.png"
 import { authAPI } from "@/lib/api"
 import apiClient from "@/lib/api/axios"
 import { useCompanyName } from "@/lib/hooks/useCompanyName"

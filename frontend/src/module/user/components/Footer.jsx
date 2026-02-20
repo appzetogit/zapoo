@@ -3,7 +3,7 @@ import { Facebook, Twitter, Instagram, Mail, Phone, MapPin, Heart } from "lucide
 import { useState, useEffect } from "react"
 import { getCachedSettings, loadBusinessSettings } from "@/lib/utils/businessSettings"
 import { useCompanyName } from "@/lib/hooks/useCompanyName"
-import zapooFoodLogo from "@/assets/zapoo-logo.png"
+import zapooFoodLogo from "@/assets/zapoo_logo.png"
 
 export default function Footer() {
   const companyName = useCompanyName()

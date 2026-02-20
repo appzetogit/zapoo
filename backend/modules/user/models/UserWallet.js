@@ -98,7 +98,7 @@ const userWalletSchema = new mongoose.Schema({
 });
 
 // Indexes
-userWalletSchema.index({ userId: 1 }, { unique: true });
+// userWalletSchema.index({ userId: 1 }, { unique: true }); // Removed duplicate index
 userWalletSchema.index({ 'transactions.orderId': 1 });
 userWalletSchema.index({ 'transactions.status': 1 });
 userWalletSchema.index({ 'transactions.type': 1 });

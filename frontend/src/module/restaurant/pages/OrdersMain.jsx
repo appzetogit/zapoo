@@ -110,7 +110,7 @@ function CompletedOrders({ onSelectOrder }) {
     return (
       <div className="pt-4 pb-6">
         <div className="flex items-baseline justify-between mb-3">
-          <h2 className="text-base font-semibold text-black">Completed orders</h2>
+          <h2 className="text-base font-semibold text-[#FF5200]">Completed orders</h2>
           <Loader2 className="w-4 h-4 animate-spin text-gray-500" />
         </div>
         <div className="text-center py-8 text-gray-500 text-sm">Loading...</div>
@@ -121,7 +121,7 @@ function CompletedOrders({ onSelectOrder }) {
   return (
     <div className="pt-4 pb-6">
       <div className="flex items-baseline justify-between mb-3">
-        <h2 className="text-base font-semibold text-black">
+        <h2 className="text-base font-semibold text-[#FF5200]">
           Completed orders
         </h2>
         <span className="text-xs text-gray-500">{orders.length} total</span>
@@ -315,7 +315,7 @@ function CancelledOrders({ onSelectOrder }) {
     return (
       <div className="pt-4 pb-6">
         <div className="flex items-baseline justify-between mb-3">
-          <h2 className="text-base font-semibold text-black">Cancelled orders</h2>
+          <h2 className="text-base font-semibold text-[#FF5200]">Cancelled orders</h2>
           <Loader2 className="w-4 h-4 animate-spin text-gray-500" />
         </div>
         <div className="text-center py-8 text-gray-500 text-sm">Loading...</div>
@@ -326,7 +326,7 @@ function CancelledOrders({ onSelectOrder }) {
   return (
     <div className="pt-4 pb-6">
       <div className="flex items-baseline justify-between mb-3">
-        <h2 className="text-base font-semibold text-black">
+        <h2 className="text-base font-semibold text-[#FF5200]">
           Cancelled orders
         </h2>
         <span className="text-xs text-gray-500">{orders.length} total</span>
@@ -488,7 +488,7 @@ function TableBookings() {
   return (
     <div className="pt-4 pb-6 px-1">
       <div className="flex items-baseline justify-between mb-4 px-1">
-        <h2 className="text-base font-semibold text-black">Table Bookings</h2>
+        <h2 className="text-base font-semibold text-[#FF5200]">Table Bookings</h2>
         <span className="text-xs text-gray-500">{bookings.length} total</span>
       </div>
 
@@ -1291,7 +1291,7 @@ export default function OrdersMain() {
                 {isActive && (
                   <motion.div
                     layoutId="activeFilterBackground"
-                    className="absolute inset-0 bg-black rounded-full -z-10"
+                    className="absolute inset-0 bg-[#FF5200] rounded-full -z-10"
                     initial={false}
                     transition={{
                       type: "spring",
@@ -1648,11 +1648,11 @@ export default function OrdersMain() {
                     <div className="relative">
                       <button
                         onClick={handleAcceptOrder}
-                        className="w-full bg-black text-white py-3.5 rounded-lg font-semibold text-sm hover:bg-gray-800 transition-colors relative overflow-hidden"
+                        className="w-full bg-[#FF5200] text-white py-3.5 rounded-lg font-semibold text-sm hover:bg-orange-600 transition-colors relative overflow-hidden"
                       >
                         {/* Loading background */}
                         <motion.div
-                          className="absolute inset-0 bg-blue-600"
+                          className="absolute inset-0 bg-orange-700"
                           initial={{ width: "100%" }}
                           animate={{ width: `${(countdown / 240) * 100}%` }}
                           transition={{ duration: 1, ease: "linear" }}
@@ -1718,17 +1718,17 @@ export default function OrdersMain() {
                         key={reason}
                         onClick={() => setRejectReason(reason)}
                         className={`w-full text-left p-4 rounded-lg border-2 transition-all ${rejectReason === reason
-                          ? "border-black bg-black/5"
+                          ? "border-[#FF5200] bg-orange-50"
                           : "border-gray-200 bg-white hover:border-gray-300"
                           }`}
                       >
                         <div className="flex items-center justify-between">
-                          <span className={`text-sm font-medium ${rejectReason === reason ? "text-black" : "text-gray-900"
+                          <span className={`text-sm font-medium ${rejectReason === reason ? "text-[#FF5200]" : "text-gray-900"
                             }`}>
                             {reason}
                           </span>
                           {rejectReason === reason && (
-                            <div className="w-5 h-5 rounded-full bg-black flex items-center justify-center">
+                            <div className="w-5 h-5 rounded-full bg-[#FF5200] flex items-center justify-center">
                               <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                               </svg>
@@ -1752,7 +1752,7 @@ export default function OrdersMain() {
                     onClick={handleRejectConfirm}
                     disabled={!rejectReason}
                     className={`flex-1 py-3 rounded-lg font-semibold text-sm transition-colors ${rejectReason
-                      ? "!bg-black !text-white"
+                      ? "!bg-[#FF5200] !text-white"
                       : "bg-gray-200 text-gray-400 cursor-not-allowed"
                       }`}
                   >
@@ -1932,7 +1932,7 @@ export default function OrdersMain() {
               </div>
 
               <button
-                className="w-full bg-black text-white py-2.5 rounded-xl text-sm font-medium"
+                className="w-full bg-[#FF5200] text-white py-2.5 rounded-xl text-sm font-medium"
                 onClick={() => setIsSheetOpen(false)}
               >
                 Close
@@ -2329,7 +2329,7 @@ function PreparingOrders({ onSelectOrder, onCancel }) {
     return (
       <div className="pt-4 pb-6">
         <div className="flex items-baseline justify-between mb-3">
-          <h2 className="text-base font-semibold text-black">Preparing orders</h2>
+          <h2 className="text-base font-semibold text-[#FF5200]">Preparing orders</h2>
           <Loader2 className="w-4 h-4 animate-spin text-gray-500" />
         </div>
         <div className="text-center py-8 text-gray-500 text-sm">Loading...</div>
@@ -2340,7 +2340,7 @@ function PreparingOrders({ onSelectOrder, onCancel }) {
   return (
     <div className="pt-4 pb-6">
       <div className="flex items-baseline justify-between mb-3">
-        <h2 className="text-base font-semibold text-black">
+        <h2 className="text-base font-semibold text-[#FF5200]">
           Preparing orders
         </h2>
         <span className="text-xs text-gray-500">{orders.length} active</span>
@@ -2478,7 +2478,7 @@ function ReadyOrders({ onSelectOrder }) {
     return (
       <div className="pt-4 pb-6">
         <div className="flex items-baseline justify-between mb-3">
-          <h2 className="text-base font-semibold text-black">Ready for pickup</h2>
+          <h2 className="text-base font-semibold text-[#FF5200]">Ready for pickup</h2>
           <Loader2 className="w-4 h-4 animate-spin text-gray-500" />
         </div>
         <div className="text-center py-8 text-gray-500 text-sm">Loading...</div>
@@ -2489,7 +2489,7 @@ function ReadyOrders({ onSelectOrder }) {
   return (
     <div className="pt-4 pb-6">
       <div className="flex items-baseline justify-between mb-3">
-        <h2 className="text-base font-semibold text-black">
+        <h2 className="text-base font-semibold text-[#FF5200]">
           Ready for pickup
         </h2>
         <span className="text-xs text-gray-500">{orders.length} active</span>
@@ -2595,7 +2595,7 @@ const OutForDeliveryOrders = ({ onSelectOrder }) => {
     return (
       <div className="pt-4 pb-6">
         <div className="flex items-baseline justify-between mb-3">
-          <h2 className="text-base font-semibold text-black">Out for delivery</h2>
+          <h2 className="text-base font-semibold text-[#FF5200]">Out for delivery</h2>
           <Loader2 className="w-4 h-4 animate-spin text-gray-500" />
         </div>
         <div className="text-center py-8 text-gray-500 text-sm">Loading...</div>
@@ -2606,7 +2606,7 @@ const OutForDeliveryOrders = ({ onSelectOrder }) => {
   return (
     <div className="pt-4 pb-6">
       <div className="flex items-baseline justify-between mb-3">
-        <h2 className="text-base font-semibold text-black">
+        <h2 className="text-base font-semibold text-[#FF5200]">
           Out for delivery
         </h2>
         <span className="text-xs text-gray-500">{orders.length} active</span>
@@ -2665,7 +2665,7 @@ function EmptyState({ message = "Temporarily closed" }) {
       </h2>
 
       {/* View Status Button */}
-      <button className="bg-black text-white px-6 py-3 rounded-lg font-medium hover:bg-gray-800 transition-colors">
+      <button className="bg-[#FF5200] text-white px-6 py-3 rounded-lg font-medium hover:bg-orange-600 transition-colors">
         View status
       </button>
     </div>

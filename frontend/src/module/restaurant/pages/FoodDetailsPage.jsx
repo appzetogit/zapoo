@@ -2,7 +2,7 @@ import { useState, useEffect } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import { motion, AnimatePresence } from "framer-motion"
 import Lenis from "lenis"
-import { 
+import {
   ArrowLeft,
   Home,
   ShoppingBag,
@@ -29,7 +29,7 @@ export default function FoodDetailsPage() {
     mainStock: 0,
     variations: []
   })
-  
+
   // Load food data dynamically
   const loadFoodData = (foodId) => {
     const food = getFoodById(foodId)
@@ -243,7 +243,7 @@ export default function FoodDetailsPage() {
       {/* Header */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="px-4 py-3 flex items-center gap-4">
-          <button 
+          <button
             onClick={() => navigate("/restaurant/details")}
             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
           >
@@ -258,11 +258,10 @@ export default function FoodDetailsPage() {
         <div className="flex">
           <button
             onClick={() => setActiveTab("overview")}
-            className={`flex-1 py-3 px-4 text-sm md:text-base font-medium transition-colors relative ${
-              activeTab === "overview"
+            className={`flex-1 py-3 px-4 text-sm md:text-base font-medium transition-colors relative ${activeTab === "overview"
                 ? "text-[#ff8100]"
                 : "text-gray-600"
-            }`}
+              }`}
           >
             Product Overview
             {activeTab === "overview" && (
@@ -274,11 +273,10 @@ export default function FoodDetailsPage() {
           </button>
           <button
             onClick={() => setActiveTab("reviews")}
-            className={`flex-1 py-3 px-4 text-sm md:text-base font-medium transition-colors relative ${
-              activeTab === "reviews"
+            className={`flex-1 py-3 px-4 text-sm md:text-base font-medium transition-colors relative ${activeTab === "reviews"
                 ? "text-[#ff8100]"
                 : "text-gray-600"
-            }`}
+              }`}
           >
             Reviews
             {activeTab === "reviews" && (
@@ -303,45 +301,45 @@ export default function FoodDetailsPage() {
                 transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
                 whileHover={{ y: -4, scale: 1.01 }}
               >
-              <Card className="bg-white shadow-sm border-0">
-                <CardContent className="p-4 md:p-6">
-                  <div className="flex gap-4">
-                    {/* Food Image */}
-                    <div className="relative flex-shrink-0">
-                      <img 
-                        src={foodData.image}
-                        alt={foodData.name}
-                        className="w-24 h-24 md:w-32 md:h-32 rounded-lg object-cover"
-                      />
-                      {foodData.discount > 0 && (
-                        <div className="absolute top-0 left-0 bg-green-500 text-white text-xs font-bold px-2 py-1 rounded-tl-lg rounded-br-lg">
-                          {foodData.discount}% OFF
-                        </div>
-                      )}
-                    </div>
+                <Card className="bg-white shadow-sm border-0">
+                  <CardContent className="p-4 md:p-6">
+                    <div className="flex gap-4">
+                      {/* Food Image */}
+                      <div className="relative flex-shrink-0">
+                        <img
+                          src={foodData.image}
+                          alt={foodData.name}
+                          className="w-24 h-24 md:w-32 md:h-32 rounded-lg object-cover"
+                        />
+                        {foodData.discount > 0 && (
+                          <div className="absolute top-0 left-0 bg-green-500 text-white text-xs font-bold px-2 py-1 rounded-tl-lg rounded-br-lg">
+                            {foodData.discount}% OFF
+                          </div>
+                        )}
+                      </div>
 
-                    {/* Food Info */}
-                    <div className="flex-1 min-w-0">
-                      <h2 className="text-lg md:text-xl font-bold text-gray-900 mb-2">
-                        {foodData.nameArabic}
-                      </h2>
-                      <p className="text-[#ff8100] font-bold text-lg md:text-xl mb-2">
-                        {formatCurrency(foodData.price)}
-                      </p>
-                      <div className="flex items-center gap-2 mb-2">
-                        <Star className={`w-4 h-4 ${foodData.rating > 0 ? 'text-yellow-500 fill-yellow-500' : 'text-gray-300'}`} />
-                        <span className="text-gray-600 text-sm">
-                          {foodData.rating.toFixed(1)} ({foodData.reviews} Review{foodData.reviews !== 1 ? 's' : ''})
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1 text-gray-600 text-sm">
-                        <Clock className="w-4 h-4" />
-                        <span>{foodData.availabilityTime}</span>
+                      {/* Food Info */}
+                      <div className="flex-1 min-w-0">
+                        <h2 className="text-lg md:text-xl font-bold text-gray-900 mb-2">
+                          {foodData.nameArabic}
+                        </h2>
+                        <p className="text-[#ff8100] font-bold text-lg md:text-xl mb-2">
+                          {formatCurrency(foodData.price)}
+                        </p>
+                        <div className="flex items-center gap-2 mb-2">
+                          <Star className={`w-4 h-4 ${foodData.rating > 0 ? 'text-yellow-500 fill-yellow-500' : 'text-gray-300'}`} />
+                          <span className="text-gray-600 text-sm">
+                            {foodData.rating.toFixed(1)} ({foodData.reviews} Review{foodData.reviews !== 1 ? 's' : ''})
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1 text-gray-600 text-sm">
+                          <Clock className="w-4 h-4" />
+                          <span>{foodData.availabilityTime}</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
               </motion.div>
 
               {/* Availability Toggles */}
@@ -353,14 +351,12 @@ export default function FoodDetailsPage() {
                       <button
                         type="button"
                         onClick={() => setIsAvailable(!isAvailable)}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                          isAvailable ? 'bg-[#ff8100]' : 'bg-gray-300'
-                        }`}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${isAvailable ? 'bg-[#ff8100]' : 'bg-gray-300'
+                          }`}
                       >
                         <span
-                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                            isAvailable ? 'translate-x-6' : 'translate-x-1'
-                          }`}
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isAvailable ? 'translate-x-6' : 'translate-x-1'
+                            }`}
                         />
                       </button>
                     </div>
@@ -369,14 +365,12 @@ export default function FoodDetailsPage() {
                       <button
                         type="button"
                         onClick={() => setIsRecommended(!isRecommended)}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                          isRecommended ? 'bg-[#ff8100]' : 'bg-gray-300'
-                        }`}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${isRecommended ? 'bg-[#ff8100]' : 'bg-gray-300'
+                          }`}
                       >
                         <span
-                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                            isRecommended ? 'translate-x-6' : 'translate-x-1'
-                          }`}
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isRecommended ? 'translate-x-6' : 'translate-x-1'
+                            }`}
                         />
                       </button>
                     </div>
@@ -544,11 +538,10 @@ export default function FoodDetailsPage() {
                             {[...Array(5)].map((_, i) => (
                               <Star
                                 key={i}
-                                className={`w-4 h-4 ${
-                                  i < review.rating
+                                className={`w-4 h-4 ${i < review.rating
                                     ? "text-yellow-500 fill-yellow-500"
                                     : "text-gray-300"
-                                }`}
+                                  }`}
                               />
                             ))}
                           </div>
@@ -597,7 +590,7 @@ export default function FoodDetailsPage() {
 
       {/* Bottom Navigation Bar - Mobile Only */}
       <BottomNavbar onMenuClick={() => setShowMenu(true)} />
-      
+
       {/* Menu Overlay */}
       <MenuOverlay showMenu={showMenu} setShowMenu={setShowMenu} />
 
@@ -663,7 +656,7 @@ export default function FoodDetailsPage() {
                       <h3 className="text-sm font-semibold text-gray-700">Variation</h3>
                       <h3 className="text-sm font-semibold text-gray-700">Stock</h3>
                     </div>
-                    
+
                     <div className="mb-2">
                       <p className="text-xs text-gray-600 mb-2">Capacity</p>
                     </div>

@@ -1225,7 +1225,7 @@ export default function Cart() {
           <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-1">Your cart is empty</h2>
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-4 text-center">Add items from a restaurant to start a new order</p>
           <Link>
-            <Button className="bg-primary-orange hover:opacity-90 text-white">Browse Restaurants</Button>
+            <Button className="bg-[#FF5200] hover:opacity-90 text-white">Browse Restaurants</Button>
           </Link>
         </div>
       </AnimatedPage>
@@ -1295,18 +1295,18 @@ export default function Cart() {
 
                       <div className="flex items-center gap-3 md:gap-4">
                         {/* Quantity controls */}
-                        <div className="flex items-center border border-red-600 dark:border-red-500 rounded">
+                        <div className="flex items-center border border-[#FF5200] dark:border-[#FF5200] rounded">
                           <button
-                            className="px-2 md:px-3 py-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+                            className="px-2 md:px-3 py-1 text-[#FF5200] dark:text-[#FF5200] hover:bg-[#FF5200]/10 dark:hover:bg-[#FF5200]/20"
                             onClick={() => updateQuantity(item.id, item.quantity - 1)}
                           >
                             <Minus className="h-3 w-3 md:h-4 md:w-4" />
                           </button>
-                          <span className="px-2 md:px-3 text-sm md:text-base font-semibold text-red-600 dark:text-red-400 min-w-[20px] md:min-w-[24px] text-center">
+                          <span className="px-2 md:px-3 text-sm md:text-base font-semibold text-[#FF5200] dark:text-[#FF5200] min-w-[20px] md:min-w-[24px] text-center">
                             {item.quantity}
                           </span>
                           <button
-                            className="px-2 md:px-3 py-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+                            className="px-2 md:px-3 py-1 text-[#FF5200] dark:text-[#FF5200] hover:bg-[#FF5200]/10 dark:hover:bg-[#FF5200]/20"
                             onClick={() => updateQuantity(item.id, item.quantity + 1)}
                           >
                             <Plus className="h-3 w-3 md:h-4 md:w-4" />
@@ -1324,7 +1324,7 @@ export default function Cart() {
                 {/* Add more items */}
                 <button
                   onClick={() => navigate(-1)}
-                  className="flex items-center gap-2 mt-4 md:mt-6 text-red-600 dark:text-red-400"
+                  className="flex items-center gap-2 mt-4 md:mt-6 text-[#FF5200] dark:text-[#FF5200]"
                 >
                   <Plus className="h-4 w-4 md:h-5 md:w-5" />
                   <span className="text-sm md:text-base font-medium">Add more items</span>
@@ -1343,7 +1343,7 @@ export default function Cart() {
                 </button>
                 <button
                   onClick={() => setSendCutlery(!sendCutlery)}
-                  className={`flex items-center gap-2 px-3 md:px-4 py-2 md:py-3 border rounded-lg md:rounded-xl text-sm md:text-base ${sendCutlery ? 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300' : 'border-red-600 dark:border-red-500 text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20'}`}
+                  className={`flex items-center gap-2 px-3 md:px-4 py-2 md:py-3 border rounded-lg md:rounded-xl text-sm md:text-base ${sendCutlery ? 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300' : 'border-[#FF5200] dark:border-[#FF5200] text-[#FF5200] dark:text-[#FF5200] bg-[#FF5200]/10 dark:bg-[#FF5200]/20'}`}
                 >
                   <Utensils className="h-4 w-4 md:h-5 md:w-5" />
                   <span className="whitespace-nowrap">{sendCutlery ? "Don't send cutlery" : "No cutlery"}</span>
@@ -1357,7 +1357,7 @@ export default function Cart() {
                     value={note}
                     onChange={(e) => setNote(e.target.value)}
                     placeholder="Add cooking instructions, allergies, etc."
-                    className="w-full border border-gray-200 dark:border-gray-700 rounded-lg md:rounded-xl p-3 md:p-4 text-sm md:text-base resize-none h-20 md:h-24 focus:outline-none focus:border-red-600 dark:focus:border-red-500 bg-white dark:bg-[#0a0a0a] text-gray-900 dark:text-gray-100"
+                    className="w-full border border-gray-200 dark:border-gray-700 rounded-lg md:rounded-xl p-3 md:p-4 text-sm md:text-base resize-none h-20 md:h-24 focus:outline-none focus:border-[#FF5200] dark:focus:border-[#FF5200] bg-white dark:bg-[#0a0a0a] text-gray-900 dark:text-gray-100"
                   />
                 </div>
               )}
@@ -1449,12 +1449,12 @@ export default function Cart() {
               {/* Coupon Section */}
               <div className="bg-white dark:bg-[#1a1a1a] px-4 md:px-6 py-3 md:py-4 rounded-lg md:rounded-xl">
                 {appliedCoupon ? (
-                  <div className="flex items-center justify-between bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg md:rounded-xl p-3 md:p-4">
+                  <div className="flex items-center justify-between bg-[#FF5200]/10 dark:bg-[#FF5200]/20 border border-[#FF5200]/30 dark:border-[#FF5200]/30 rounded-lg md:rounded-xl p-3 md:p-4">
                     <div className="flex items-center gap-2 md:gap-3">
-                      <Tag className="h-4 w-4 md:h-5 md:w-5 text-red-600 dark:text-red-400" />
+                      <Tag className="h-4 w-4 md:h-5 md:w-5 text-[#FF5200] dark:text-[#FF5200]" />
                       <div>
-                        <p className="text-sm md:text-base font-medium text-red-700 dark:text-red-300">'{appliedCoupon.code}' applied</p>
-                        <p className="text-xs md:text-sm text-red-600 dark:text-red-400">You saved ₹{discount}</p>
+                        <p className="text-sm md:text-base font-medium text-[#FF5200] dark:text-[#FF5200]">'{appliedCoupon.code}' applied</p>
+                        <p className="text-xs md:text-sm text-[#FF5200] dark:text-[#FF5200]">You saved ₹{discount}</p>
                       </div>
                     </div>
                     <button onClick={handleRemoveCoupon} className="text-gray-500 dark:text-gray-400 text-xs md:text-sm font-medium">Remove</button>
@@ -1483,7 +1483,7 @@ export default function Cart() {
                       <Button
                         size="sm"
                         variant="outline"
-                        className="h-7 md:h-8 text-xs md:text-sm border-red-600 dark:border-red-500 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+                        className="h-7 md:h-8 text-xs md:text-sm border-[#FF5200] dark:border-[#FF5200] text-[#FF5200] dark:text-[#FF5200] hover:bg-[#FF5200]/10 dark:hover:bg-[#FF5200]/20"
                         onClick={() => handleApplyCoupon(availableCoupons[0])}
                         disabled={subtotal < availableCoupons[0].minOrder}
                       >
@@ -1510,7 +1510,7 @@ export default function Cart() {
                         <Button
                           size="sm"
                           variant="outline"
-                          className="h-6 md:h-7 text-xs md:text-sm border-red-600 dark:border-red-500 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+                          className="h-6 md:h-7 text-xs md:text-sm border-[#FF5200] dark:border-[#FF5200] text-[#FF5200] dark:text-[#FF5200] hover:bg-[#FF5200]/10 dark:hover:bg-[#FF5200]/20"
                           onClick={() => handleApplyCoupon(coupon)}
                           disabled={subtotal < coupon.minOrder}
                         >
@@ -1549,7 +1549,7 @@ export default function Cart() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 mt-3 md:mt-4">
                     <button
                       onClick={() => setDeliveryFleet("standard")}
-                      className={`p-3 md:p-4 rounded-lg md:rounded-xl border-2 text-left transition-colors ${deliveryFleet === "standard" ? "border-red-600 dark:border-red-500 bg-red-50 dark:bg-red-900/20" : "border-gray-200 dark:border-gray-700"}`}
+                      className={`p-3 md:p-4 rounded-lg md:rounded-xl border-2 text-left transition-colors ${deliveryFleet === "standard" ? "border-[#FF5200] dark:border-[#FF5200] bg-[#FF5200]/10 dark:bg-[#FF5200]/20" : "border-gray-200 dark:border-gray-700"}`}
                     >
                       <div className="flex items-center justify-between mb-1 md:mb-2">
                         <span className="text-sm md:text-base font-semibold text-gray-800 dark:text-gray-200">Standard Fleet</span>
@@ -1561,7 +1561,7 @@ export default function Cart() {
                     </button>
                     <button
                       onClick={() => setDeliveryFleet("veg")}
-                      className={`p-3 md:p-4 rounded-lg md:rounded-xl border-2 text-left transition-colors ${deliveryFleet === "veg" ? "border-red-600 dark:border-red-500 bg-red-50 dark:bg-red-900/20" : "border-gray-200 dark:border-gray-700"}`}
+                      className={`p-3 md:p-4 rounded-lg md:rounded-xl border-2 text-left transition-colors ${deliveryFleet === "veg" ? "border-[#FF5200] dark:border-[#FF5200] bg-[#FF5200]/10 dark:bg-[#FF5200]/20" : "border-gray-200 dark:border-gray-700"}`}
                     >
                       <div className="flex items-center justify-between mb-1 md:mb-2">
                         <span className="text-sm md:text-base font-semibold text-gray-800 dark:text-gray-200">Special Veg-only Fleet</span>
@@ -1601,8 +1601,8 @@ export default function Cart() {
                               }}
                               disabled={!addressExists}
                               className={`text-xs md:text-sm px-2 md:px-3 py-1 md:py-1.5 rounded-md border transition-colors ${addressExists
-                                  ? 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 bg-white dark:bg-[#1a1a1a]'
-                                  : 'border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-50'
+                                ? 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 bg-white dark:bg-[#1a1a1a]'
+                                : 'border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-50'
                                 }`}
                             >
                               {label}
@@ -1902,7 +1902,7 @@ export default function Cart() {
 
             {/* Confetti Background */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none">
-              {[...Array(30)].map((_, i) => (
+              {[...Array(50)].map((_, i) => (
                 <motion.div
                   key={i}
                   initial={{ y: -20, x: Math.random() * 100 + "%", rotate: 0 }}
@@ -1966,14 +1966,17 @@ export default function Cart() {
                 ))}
               </div>
 
-              <motion.div
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.5 }}
-              >
-                <h2 className="text-3xl md:text-5xl font-black text-gray-900 mb-3 tracking-tight">Order Placed!</h2>
+              {/* Order Placed Message (Merged) */}
+              <div className="text-center mb-2">
+                <h2 className="text-3xl md:text-5xl font-black text-[#FF5200] mb-3 tracking-tight">Order Placed!</h2>
+                <div className="flex items-center justify-center gap-2 mb-6">
+                  <MapPin className="w-5 h-5 text-red-500" />
+                  <h3 className="text-xl md:text-2xl font-bold text-gray-900">
+                    {defaultAddress?.city || "Your Location"}
+                  </h3>
+                </div>
                 <p className="text-base md:text-xl text-gray-600 font-medium mb-8 md:mb-10">Your delicious food is being prepared with care</p>
-              </motion.div>
+              </div>
 
               {/* Order Details Preview Card */}
               <motion.div

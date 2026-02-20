@@ -18,7 +18,7 @@ export default function SupportTickets() {
     try {
       setLoading(true)
       const response = await deliveryAPI.getSupportTickets()
-      
+
       if (response?.data?.success && response?.data?.data?.tickets) {
         setTickets(response.data.data.tickets)
       } else {
@@ -73,9 +73,9 @@ export default function SupportTickets() {
   const formatDateTime = (dateString) => {
     if (!dateString) return "N/A"
     const date = new Date(dateString)
-    return date.toLocaleString('en-GB', { 
-      day: '2-digit', 
-      month: 'short', 
+    return date.toLocaleString('en-GB', {
+      day: '2-digit',
+      month: 'short',
       year: 'numeric',
       hour: '2-digit',
       minute: '2-digit'
@@ -132,7 +132,7 @@ export default function SupportTickets() {
         {/* Create New Ticket Button */}
         <button
           onClick={() => navigate("/delivery/help/create-ticket")}
-          className="w-full bg-black text-white font-semibold py-4 rounded-lg hover:bg-gray-800 transition-colors flex items-center justify-center gap-2"
+          className="w-full bg-[#FD7675] text-white font-semibold py-4 rounded-lg hover:bg-[#FD7675]/90 transition-colors flex items-center justify-center gap-2"
         >
           <Plus className="w-5 h-5" />
           Create new ticket

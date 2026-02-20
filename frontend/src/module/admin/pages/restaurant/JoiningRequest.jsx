@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react"
-import { 
+import {
   Search, Filter, Eye, Check, X, UtensilsCrossed, ArrowUpDown, Loader2,
   FileText, Image as ImageIcon, ExternalLink, CreditCard, Calendar, Star, Building2, User, Phone, Mail, MapPin, Clock
 } from "lucide-react"
@@ -150,10 +150,10 @@ export default function JoiningRequest() {
       try {
         setProcessing(true)
         await adminAPI.approveRestaurant(request._id)
-        
+
         // Refresh the list
         await fetchRequests()
-        
+
         alert(`Successfully approved ${request.restaurantName}'s join request!`)
       } catch (err) {
         console.error("Error approving request:", err)
@@ -179,14 +179,14 @@ export default function JoiningRequest() {
     try {
       setProcessing(true)
       await adminAPI.rejectRestaurant(selectedRequest._id, rejectionReason)
-      
+
       // Refresh the list
       await fetchRequests()
-      
+
       setShowRejectDialog(false)
       setSelectedRequest(null)
       setRejectionReason("")
-      
+
       alert(`Successfully rejected ${selectedRequest.restaurantName}'s join request!`)
     } catch (err) {
       console.error("Error rejecting request:", err)
@@ -207,7 +207,7 @@ export default function JoiningRequest() {
     setShowDetailsModal(true)
     setLoadingDetails(true)
     setRestaurantDetails(null)
-    
+
     try {
       // First, use fullData if available (has all details from API)
       if (request.fullData) {
@@ -216,11 +216,11 @@ export default function JoiningRequest() {
         setLoadingDetails(false)
         return
       }
-      
+
       // Try to fetch full restaurant details from API
       const restaurantId = request._id || request.id
       let response = null
-      
+
       if (restaurantId) {
         try {
           // Try admin API first
@@ -230,7 +230,7 @@ export default function JoiningRequest() {
         } catch (err) {
           console.log("Admin API failed, trying restaurant API:", err)
         }
-        
+
         // Fallback to regular restaurant API
         if (!response || !response?.data?.success) {
           try {
@@ -240,7 +240,7 @@ export default function JoiningRequest() {
           }
         }
       }
-      
+
       // Check response structure
       if (response?.data?.success) {
         const data = response.data.data
@@ -275,7 +275,7 @@ export default function JoiningRequest() {
       <div className="max-w-7xl mx-auto">
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
           <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-lg bg-[#FF5200] flex items-center justify-center">
               <UtensilsCrossed className="w-5 h-5 text-white" />
             </div>
             <h1 className="text-2xl font-bold text-slate-900">New Restaurant Join Request</h1>
@@ -285,21 +285,19 @@ export default function JoiningRequest() {
           <div className="flex items-center gap-2 border-b border-slate-200 mb-6">
             <button
               onClick={() => setActiveTab("pending")}
-              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === "pending"
-                  ? "border-blue-600 text-blue-600"
-                  : "border-transparent text-slate-600 hover:text-slate-900"
-              }`}
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === "pending"
+                ? "border-[#FF5200] text-[#FF5200]"
+                : "border-transparent text-slate-600 hover:text-slate-900"
+                }`}
             >
               Pending Requests
             </button>
             <button
               onClick={() => setActiveTab("rejected")}
-              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === "rejected"
-                  ? "border-blue-600 text-blue-600"
-                  : "border-transparent text-slate-600 hover:text-slate-900"
-              }`}
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === "rejected"
+                ? "border-[#FF5200] text-[#FF5200]"
+                : "border-transparent text-slate-600 hover:text-slate-900"
+                }`}
             >
               Rejected Request
             </button>
@@ -313,25 +311,24 @@ export default function JoiningRequest() {
                   placeholder="Ex: Search by restaurant na"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 pr-4 py-2.5 w-full text-sm rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="pl-10 pr-4 py-2.5 w-full text-sm rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-[#FF5200] focus:border-[#FF5200]"
                 />
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               </div>
             </div>
 
             <div className="flex items-center gap-2">
-              <button 
+              <button
                 onClick={() => setShowFilterDialog(true)}
-                className={`px-4 py-2.5 text-sm font-medium rounded-lg border transition-all flex items-center gap-2 ${
-                  hasActiveFilters 
-                    ? "border-blue-500 bg-blue-50 text-blue-700 hover:bg-blue-100" 
-                    : "border-slate-300 bg-white hover:bg-slate-50 text-slate-700"
-                }`}
+                className={`px-4 py-2.5 text-sm font-medium rounded-lg border transition-all flex items-center gap-2 ${hasActiveFilters
+                  ? "border-[#FF5200] bg-orange-50 text-[#FF5200] hover:bg-orange-100"
+                  : "border-slate-300 bg-white hover:bg-slate-50 text-slate-700"
+                  }`}
               >
                 <Filter className="w-4 h-4" />
                 Filter
                 {hasActiveFilters && (
-                  <span className="ml-1 px-1.5 py-0.5 bg-blue-600 text-white text-xs rounded-full">
+                  <span className="ml-1 px-1.5 py-0.5 bg-[#FF5200] text-white text-xs rounded-full">
                     {[filters.zone, filters.businessModel, filters.dateFrom, filters.dateTo].filter(Boolean).length}
                   </span>
                 )}
@@ -387,7 +384,7 @@ export default function JoiningRequest() {
                 {loading ? (
                   <tr>
                     <td colSpan={7} className="px-6 py-20 text-center">
-                      <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-3" />
+                      <Loader2 className="w-8 h-8 animate-spin text-[#FF5200] mx-auto mb-3" />
                       <p className="text-lg font-semibold text-slate-700">Loading restaurant requests...</p>
                     </td>
                   </tr>
@@ -441,11 +438,10 @@ export default function JoiningRequest() {
                         <span className="text-sm text-slate-700">{request.businessModel}</span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                          request.status === "Pending"
-                            ? "bg-blue-100 text-blue-700"
-                            : "bg-red-100 text-red-700"
-                        }`}>
+                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${request.status === "Pending"
+                          ? "bg-orange-100 text-[#FF5200]"
+                          : "bg-red-100 text-red-700"
+                          }`}>
                           {request.status}
                         </span>
                       </td>
@@ -453,7 +449,7 @@ export default function JoiningRequest() {
                         <div className="flex items-center justify-center gap-2">
                           <button
                             onClick={() => handleViewDetails(request)}
-                            className="p-1.5 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
+                            className="p-1.5 rounded-full bg-orange-50 text-[#FF5200] hover:bg-orange-100 transition-colors"
                             title="View Details"
                           >
                             <Eye className="w-4 h-4" />
@@ -496,8 +492,8 @@ export default function JoiningRequest() {
             <div className="p-6">
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
-                    <Filter className="w-5 h-5 text-blue-600" />
+                  <div className="w-10 h-10 rounded-lg bg-orange-100 flex items-center justify-center">
+                    <Filter className="w-5 h-5 text-[#FF5200]" />
                   </div>
                   <div>
                     <h3 className="text-lg font-bold text-slate-900">Filter Requests</h3>
@@ -522,7 +518,7 @@ export default function JoiningRequest() {
                     <select
                       value={filters.zone}
                       onChange={(e) => setFilters({ ...filters, zone: e.target.value })}
-                      className="w-full px-4 py-2.5 text-sm rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-4 py-2.5 text-sm rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-[#FF5200] focus:border-[#FF5200]"
                     >
                       <option value="">All Zones</option>
                       {filterOptions.zones.map((zone) => (
@@ -541,7 +537,7 @@ export default function JoiningRequest() {
                     <select
                       value={filters.businessModel}
                       onChange={(e) => setFilters({ ...filters, businessModel: e.target.value })}
-                      className="w-full px-4 py-2.5 text-sm rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-4 py-2.5 text-sm rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-[#FF5200] focus:border-[#FF5200]"
                     >
                       <option value="">All Business Models</option>
                       {filterOptions.businessModels.map((model) => (
@@ -561,7 +557,7 @@ export default function JoiningRequest() {
                       type="date"
                       value={filters.dateFrom}
                       onChange={(e) => setFilters({ ...filters, dateFrom: e.target.value })}
-                      className="w-full px-4 py-2.5 text-sm rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-4 py-2.5 text-sm rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-[#FF5200] focus:border-[#FF5200]"
                     />
                   </div>
                   <div>
@@ -573,7 +569,7 @@ export default function JoiningRequest() {
                       value={filters.dateTo}
                       onChange={(e) => setFilters({ ...filters, dateTo: e.target.value })}
                       min={filters.dateFrom}
-                      className="w-full px-4 py-2.5 text-sm rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-4 py-2.5 text-sm rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-[#FF5200] focus:border-[#FF5200]"
                     />
                   </div>
                 </div>
@@ -589,7 +585,7 @@ export default function JoiningRequest() {
                 </button>
                 <button
                   onClick={() => setShowFilterDialog(false)}
-                  className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors"
+                  className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg bg-[#FF5200] hover:bg-[#E64A00] text-white transition-colors"
                 >
                   Apply Filters
                 </button>
@@ -613,7 +609,7 @@ export default function JoiningRequest() {
                   <p className="text-sm text-slate-600">{selectedRequest.restaurantName}</p>
                 </div>
               </div>
-              
+
               <p className="text-sm text-slate-700 mb-4">
                 Are you sure you want to reject this restaurant request? Please provide a reason for rejection.
               </p>
@@ -682,7 +678,7 @@ export default function JoiningRequest() {
             <div className="p-6">
               {loadingDetails && (
                 <div className="flex items-center justify-center py-20">
-                  <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+                  <Loader2 className="w-8 h-8 animate-spin text-[#FF5200]" />
                   <span className="ml-3 text-slate-600">Loading details...</span>
                 </div>
               )}
@@ -717,9 +713,8 @@ export default function JoiningRequest() {
                           <Building2 className="w-4 h-4" />
                           <span className="text-sm">{restaurantDetails?.restaurantId || restaurantDetails?._id || selectedRequest?._id || "N/A"}</span>
                         </div>
-                        <div className={`px-3 py-1 rounded-full text-xs font-medium ${
-                          restaurantDetails?.isActive !== false ? "bg-green-100 text-green-700" : "bg-blue-100 text-blue-700"
-                        }`}>
+                        <div className={`px-3 py-1 rounded-full text-xs font-medium ${restaurantDetails?.isActive !== false ? "bg-green-100 text-green-700" : "bg-orange-100 text-[#FF5200]"
+                          }`}>
                           {restaurantDetails?.isActive !== false ? "Active" : "Pending Approval"}
                         </div>
                       </div>
@@ -805,7 +800,7 @@ export default function JoiningRequest() {
                           <div className="flex flex-wrap gap-2">
                             {restaurantDetails?.cuisines && Array.isArray(restaurantDetails.cuisines) && restaurantDetails.cuisines.length > 0 ? (
                               restaurantDetails.cuisines.map((cuisine, idx) => (
-                                <span key={idx} className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">
+                                <span key={idx} className="px-3 py-1 bg-orange-100 text-[#FF5200] rounded-full text-sm font-medium">
                                   {cuisine}
                                 </span>
                               ))
@@ -866,9 +861,8 @@ export default function JoiningRequest() {
                         )}
                         <div>
                           <p className="text-xs text-slate-500 mb-1">Status</p>
-                          <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                            restaurantDetails?.isActive !== false ? "bg-green-100 text-green-700" : "bg-blue-100 text-blue-700"
-                          }`}>
+                          <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${restaurantDetails?.isActive !== false ? "bg-green-100 text-green-700" : "bg-orange-100 text-[#FF5200]"
+                            }`}>
                             {restaurantDetails?.isActive !== false ? "Active" : "Pending Approval"}
                           </span>
                         </div>
@@ -908,7 +902,7 @@ export default function JoiningRequest() {
                                     href={restaurantDetails.onboarding.step3.pan.image.url}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700"
+                                    className="inline-flex items-center gap-2 text-[#FF5200] hover:text-[#E64A00]"
                                   >
                                     <ImageIcon className="w-4 h-4" />
                                     <span>View PAN Document</span>
@@ -959,7 +953,7 @@ export default function JoiningRequest() {
                                     href={restaurantDetails.onboarding.step3.gst.image.url}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700"
+                                    className="inline-flex items-center gap-2 text-[#FF5200] hover:text-[#E64A00]"
                                   >
                                     <ImageIcon className="w-4 h-4" />
                                     <span>View GST Document</span>
@@ -1004,7 +998,7 @@ export default function JoiningRequest() {
                                     href={restaurantDetails.onboarding.step3.fssai.image.url}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700"
+                                    className="inline-flex items-center gap-2 text-[#FF5200] hover:text-[#E64A00]"
                                   >
                                     <ImageIcon className="w-4 h-4" />
                                     <span>View FSSAI Document</span>
@@ -1070,7 +1064,7 @@ export default function JoiningRequest() {
                               href={imgUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="rounded-lg overflow-hidden border border-slate-200 hover:border-blue-500 transition-colors"
+                              className="rounded-lg overflow-hidden border border-slate-200 hover:border-[#FF5200] transition-colors"
                             >
                               <img
                                 src={imgUrl}

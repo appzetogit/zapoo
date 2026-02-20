@@ -285,8 +285,8 @@ export default function AdminSidebar({ isOpen = false, onClose, onCollapseChange
             "flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all duration-300 ease-out menu-item-animate text-left",
             isInSection ? "text-sm font-semibold" : "text-sm",
             isActive(item.path)
-              ? "bg-orange-600 text-white font-semibold shadow-md shadow-orange-900/20"
-              : "text-neutral-400 hover:bg-neutral-900 hover:text-orange-500",
+              ? "bg-white text-[#FF5200] font-semibold shadow-md shadow-black/10"
+              : "text-white/90 hover:bg-white/10 hover:text-white",
             isCollapsed && "justify-center px-2"
           )}
           style={{ animationDelay: `${index * 0.05}s` }}
@@ -295,7 +295,7 @@ export default function AdminSidebar({ isOpen = false, onClose, onCollapseChange
           <Icon className={cn(
             "shrink-0 transition-all duration-300 text-left",
             isInSection ? "w-4 h-4" : "w-4 h-4",
-            isActive(item.path) ? "text-white scale-110" : "text-neutral-500 group-hover:text-orange-500"
+            isActive(item.path) ? "text-[#FF5200] scale-110" : "text-white/80 group-hover:text-white"
           )} />
           {!isCollapsed && (
             <span className={cn("text-left whitespace-nowrap", isInSection ? "font-semibold" : "font-medium")}>{item.label}</span>
@@ -316,7 +316,7 @@ export default function AdminSidebar({ isOpen = false, onClose, onCollapseChange
               onClick={() => toggleSection(sectionKey)}
               className={cn(
                 "w-full flex items-center justify-center px-2 py-2 rounded-lg transition-all duration-300 ease-out text-sm font-medium",
-                "text-neutral-400 hover:bg-neutral-900 hover:text-orange-500"
+                "text-white/90 hover:bg-white/10 hover:text-white"
               )}
               title={item.label}
             >
@@ -332,19 +332,19 @@ export default function AdminSidebar({ isOpen = false, onClose, onCollapseChange
             onClick={() => toggleSection(sectionKey)}
             className={cn(
               "w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg transition-all duration-300 ease-out text-sm font-medium text-left group",
-              "text-neutral-400 hover:bg-neutral-900 hover:text-orange-500"
+              "text-white/90 hover:bg-white/10 hover:text-white"
             )}
           >
             <div className="flex items-center gap-2.5 text-left">
-              <Icon className="w-4 h-4 shrink-0 text-neutral-500 transition-transform duration-300 group-hover:text-orange-500" />
+              <Icon className="w-4 h-4 shrink-0 text-white/80 transition-transform duration-300 group-hover:text-white" />
               <span className="font-medium text-left">{item.label}</span>
             </div>
             <div className="transition-transform duration-300" style={{ transform: isExpanded ? 'rotate(0deg)' : 'rotate(-90deg)' }}>
-              <ChevronDown className="w-4 h-4 shrink-0 text-neutral-500 group-hover:text-orange-500" />
+              <ChevronDown className="w-4 h-4 shrink-0 text-white/80 group-hover:text-white" />
             </div>
           </button>
           {isExpanded && item.subItems && (
-            <div className="ml-5 mt-1 space-y-1 border-l border-neutral-800 pl-3 submenu-animate overflow-hidden">
+            <div className="ml-5 mt-1 space-y-1 border-l border-white/20 pl-3 submenu-animate overflow-hidden">
               {item.subItems.map((subItem, subIndex) => {
                 const allSubPaths = item.subItems.map(si => si.path)
                 return (
@@ -359,14 +359,14 @@ export default function AdminSidebar({ isOpen = false, onClose, onCollapseChange
                     className={cn(
                       "flex items-center gap-2 px-3 py-1.5 rounded-md transition-all duration-300 ease-out text-sm font-normal text-left",
                       isActive(subItem.path, allSubPaths)
-                        ? "text-orange-500 font-semibold bg-orange-500/10"
-                        : "text-neutral-400 hover:text-orange-500"
+                        ? "text-[#FF5200] font-bold bg-white"
+                        : "text-white/70 hover:text-white hover:bg-white/5"
                     )}
                     style={{ animationDelay: `${subIndex * 0.03}s` }}
                   >
                     <span className={cn(
                       "w-1.5 h-1.5 rounded-full shrink-0 transition-all duration-300",
-                      isActive(subItem.path, allSubPaths) ? "bg-orange-500 scale-125" : "bg-neutral-600 group-hover:bg-orange-500"
+                      isActive(subItem.path, allSubPaths) ? "bg-[#FF5200] scale-125" : "bg-white/40 group-hover:bg-white"
                     )}></span>
                     <span className="text-left">{subItem.label}</span>
                   </Link>
@@ -450,10 +450,18 @@ export default function AdminSidebar({ isOpen = false, onClose, onCollapseChange
           scrollbar-width: thin;
           scrollbar-color: rgba(255, 255, 255, 0.25) rgba(17, 24, 39, 0.4);
         }
+
+        .admin-sidebar-gradient {
+          // background: linear-gradient(0deg,rgba(242, 116, 58, 1) 0%, rgba(240, 128, 77, 1) 55%, rgba(250, 170, 127, 1) 100%);
+          // background: linear-gradient(0deg,rgba(242, 116, 58, 1) 0%, rgba(214, 107, 58, 1) 70%);
+          // background: linear-gradient(0deg,rgba(227, 103, 45, 1) 0%, rgba(204, 101, 53, 1) 99%);
+           background: linear-gradient(0deg,rgba(227, 103, 45, 1) 0%, rgba(204, 101, 53, 1) 51%);
+         // background: linear-gradient(0deg,rgba(227, 103, 45, 1) 0%, rgba(237, 109, 50, 1) 51%);
+        }
       `}</style>
       <div
         className={cn(
-          "admin-sidebar-scroll bg-neutral-950 border-r border-neutral-800/60 h-screen fixed left-0 top-0 overflow-y-auto z-50",
+          "admin-sidebar-scroll admin-sidebar-gradient border-r border-neutral-800/60 h-screen fixed left-0 top-0 overflow-y-auto z-50",
           "transform transition-all duration-300 ease-in-out",
           "lg:translate-x-0",
           isOpen ? "translate-x-0" : "-translate-x-full",
@@ -461,14 +469,14 @@ export default function AdminSidebar({ isOpen = false, onClose, onCollapseChange
         )}
       >
         {/* Header with Logo and Brand */}
-        <div className="px-3 py-3 border-b border-neutral-800/60 bg-neutral-900 animate-[fadeIn_0.4s_ease-out]">
+        <div className="px-3 py-3 border-b border-white/10 bg-transparent animate-[fadeIn_0.4s_ease-out]">
           <div className="flex items-center justify-between mb-3">
 
 
             <div className="flex items-center gap-2">
               <button
                 onClick={toggleCollapse}
-                className="text-neutral-300 hover:text-white transition-all duration-200 hover:scale-110 p-1.5 rounded-lg hover:bg-white/5"
+                className="text-white/80 hover:text-white transition-all duration-200 hover:scale-110 p-1.5 rounded-lg hover:bg-white/10"
                 title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
               >
                 {isCollapsed ? (
@@ -479,7 +487,7 @@ export default function AdminSidebar({ isOpen = false, onClose, onCollapseChange
               </button>
               <button
                 onClick={onClose}
-                className="lg:hidden text-neutral-300 hover:text-white transition-all duration-200 hover:scale-110"
+                className="lg:hidden text-white/80 hover:text-white transition-all duration-200 hover:scale-110"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -489,7 +497,7 @@ export default function AdminSidebar({ isOpen = false, onClose, onCollapseChange
           {/* Admin Panel Label */}
           {!isCollapsed && (
             <div className="mb-3 animate-[slideIn_0.4s_ease-out_0.1s_both]">
-              <h2 className="text-sm font-semibold text-neutral-300 uppercase tracking-wider text-left">
+              <h2 className="text-sm font-semibold text-white/90 uppercase tracking-wider text-left">
                 Admin Panel
               </h2>
             </div>
@@ -498,21 +506,21 @@ export default function AdminSidebar({ isOpen = false, onClose, onCollapseChange
           {/* Search Bar */}
           {!isCollapsed && (
             <div className="relative animate-[slideIn_0.4s_ease-out_0.2s_both]">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-neutral-400 w-4 h-4 z-10 transition-colors duration-200" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/60 w-4 h-4 z-10 transition-colors duration-200" />
               <Input
                 type="text"
                 placeholder="Search Menu..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className={cn(
-                  "w-full pl-9 py-2 bg-neutral-900 border border-neutral-800 rounded-lg text-sm text-white placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-white/40 transition-all duration-200 text-left",
+                  "w-full pl-9 py-2 bg-white/20 border border-white/10 rounded-lg text-sm text-white placeholder:text-white/60 focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-white/40 transition-all duration-200 text-left",
                   searchQuery ? "pr-9" : "pr-3"
                 )}
               />
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery("")}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-neutral-400 hover:text-white transition-all duration-200 hover:scale-110 z-10"
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-white/60 hover:text-white transition-all duration-200 hover:scale-110 z-10"
                   aria-label="Clear search"
                 >
                   <X className="w-4 h-4" />
@@ -526,8 +534,8 @@ export default function AdminSidebar({ isOpen = false, onClose, onCollapseChange
         <nav className="px-3 py-3 space-y-2">
           {filteredMenuData.length === 0 && searchQuery.trim() ? (
             <div className="px-3 py-12 text-left animate-[fadeIn_0.4s_ease-out]">
-              <p className="text-neutral-300 text-sm font-medium text-left">No menu items found</p>
-              <p className="text-neutral-500 text-sm mt-2 text-left">Try a different search term</p>
+              <p className="text-white text-sm font-medium text-left">No menu items found</p>
+              <p className="text-white/70 text-sm mt-2 text-left">Try a different search term</p>
             </div>
           ) : (
             filteredMenuData.map((item, index) => {
@@ -540,14 +548,14 @@ export default function AdminSidebar({ isOpen = false, onClose, onCollapseChange
                   <div
                     key={index}
                     className={cn(
-                      index > 0 ? "mt-4 pt-4 border-t border-neutral-800/60" : "",
+                      index > 0 ? "mt-4 pt-4 border-t border-white/10" : "",
                       "animate-[fadeIn_0.4s_ease-out]"
                     )}
                     style={{ animationDelay: `${index * 0.1}s` }}
                   >
                     {!isCollapsed && (
                       <div className="px-3 py-2 mb-2">
-                        <span className="text-neutral-400 font-bold text-sm uppercase tracking-wider text-left">
+                        <span className="text-white/70 font-bold text-sm uppercase tracking-wider text-left">
                           {item.label}
                         </span>
                       </div>

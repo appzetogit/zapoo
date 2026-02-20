@@ -64,12 +64,12 @@ export default function TransactionReport() {
     const fetchTransactionReport = async () => {
       try {
         setLoading(true)
-        
+
         // Build date range based on time filter
         let fromDate = null
         let toDate = null
         const now = new Date()
-        
+
         if (filters.time === "Today") {
           fromDate = new Date(now.getFullYear(), now.getMonth(), now.getDate())
           toDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59)
@@ -167,7 +167,7 @@ export default function TransactionReport() {
     return (
       <div className="p-2 lg:p-3 bg-slate-50 min-h-screen flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
-          <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+          <Loader2 className="w-8 h-8 text-[#FF5200] animate-spin" />
           <p className="text-gray-600">Loading transaction report...</p>
         </div>
       </div>
@@ -180,7 +180,7 @@ export default function TransactionReport() {
         {/* Page Header */}
         <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-3 mb-3">
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center">
+            <div className="w-7 h-7 rounded-lg bg-[#FF5200] flex items-center justify-center">
               <BarChart3 className="w-3.5 h-3.5 text-white" />
             </div>
             <h1 className="text-lg font-bold text-slate-900">Transaction Report</h1>
@@ -194,7 +194,7 @@ export default function TransactionReport() {
               <select
                 value={filters.zone}
                 onChange={(e) => setFilters(prev => ({ ...prev, zone: e.target.value }))}
-                className="w-full px-2.5 py-1.5 pr-5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs appearance-none cursor-pointer"
+                className="w-full px-2.5 py-1.5 pr-5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#FF5200] text-xs appearance-none cursor-pointer"
               >
                 <option value="All Zones">All Zones</option>
                 {zones.map(zone => (
@@ -208,7 +208,7 @@ export default function TransactionReport() {
               <select
                 value={filters.restaurant}
                 onChange={(e) => setFilters(prev => ({ ...prev, restaurant: e.target.value }))}
-                className="w-full px-2.5 py-1.5 pr-5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs appearance-none cursor-pointer"
+                className="w-full px-2.5 py-1.5 pr-5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#FF5200] text-xs appearance-none cursor-pointer"
               >
                 <option value="All restaurants">All restaurants</option>
                 {restaurants.map(restaurant => (
@@ -222,7 +222,7 @@ export default function TransactionReport() {
               <select
                 value={filters.time}
                 onChange={(e) => setFilters(prev => ({ ...prev, time: e.target.value }))}
-                className="w-full px-2.5 py-1.5 pr-5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs appearance-none cursor-pointer"
+                className="w-full px-2.5 py-1.5 pr-5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#FF5200] text-xs appearance-none cursor-pointer"
               >
                 <option value="All Time">All Time</option>
                 <option value="Today">Today</option>
@@ -232,11 +232,10 @@ export default function TransactionReport() {
               <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-500 pointer-events-none" />
             </div>
 
-            <button 
+            <button
               onClick={handleFilterApply}
-              className={`px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-all whitespace-nowrap relative ${
-                activeFiltersCount > 0 ? "ring-2 ring-blue-300" : ""
-              }`}
+              className={`px-3 py-1.5 text-xs font-medium rounded-lg bg-[#FF5200] text-white hover:bg-[#E64A00] transition-all whitespace-nowrap relative ${activeFiltersCount > 0 ? "ring-2 ring-orange-300" : ""
+                }`}
             >
               Filter
               {activeFiltersCount > 0 && (
@@ -245,7 +244,7 @@ export default function TransactionReport() {
                 </span>
               )}
             </button>
-            <button 
+            <button
               onClick={handleResetFilters}
               className="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition-all whitespace-nowrap"
             >
@@ -315,12 +314,12 @@ export default function TransactionReport() {
             <div className="rounded-lg shadow-sm border border-slate-200 p-3" style={{ backgroundColor: '#f1f5f9' }}>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-lg bg-orange-100 flex items-center justify-center">
                     <img src={restaurantEarningIcon} alt="Restaurant Earning" className="w-6 h-6" />
                   </div>
                   <div className="flex items-center gap-2">
                     <p className="text-sm font-semibold text-slate-900">Restaurant Earning</p>
-                    <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center">
+                    <div className="w-5 h-5 rounded-full bg-[#FF5200] flex items-center justify-center">
                       <Info className="w-3 h-3 text-white" />
                     </div>
                   </div>
@@ -361,14 +360,14 @@ export default function TransactionReport() {
                   placeholder="Search by Order ID"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-7 pr-2 py-1.5 w-full text-[11px] rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="pl-7 pr-2 py-1.5 w-full text-[11px] rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-[#FF5200] focus:border-[#FF5200]"
                 />
                 <img src={searchIcon} alt="Search" className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3" />
               </div>
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className="px-2.5 py-1.5 text-[11px] font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 flex items-center gap-1 transition-all">
+                  <button className="px-2.5 py-1.5 text-[11px] font-medium rounded-lg bg-[#FF5200] text-white hover:bg-[#E64A00] flex items-center gap-1 transition-all">
                     <img src={exportIcon} alt="Export" className="w-3 h-3" />
                     <span>Export</span>
                     <ChevronDown className="w-2.5 h-2.5" />
@@ -395,7 +394,7 @@ export default function TransactionReport() {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-              <button 
+              <button
                 onClick={() => setIsSettingsOpen(true)}
                 className="p-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 transition-all"
               >
@@ -449,11 +448,10 @@ export default function TransactionReport() {
                         <span className="text-[10px] text-slate-700 truncate block">{transaction.restaurant}</span>
                       </td>
                       <td className="px-1.5 py-1">
-                        <span className={`text-[10px] truncate block ${
-                          transaction.customerName === "Invalid Customer Data" 
-                            ? "text-red-600 font-semibold" 
+                        <span className={`text-[10px] truncate block ${transaction.customerName === "Invalid Customer Data"
+                            ? "text-red-600 font-semibold"
                             : "text-slate-700"
-                        }`}>
+                          }`}>
                           {transaction.customerName}
                         </span>
                       </td>
@@ -471,7 +469,7 @@ export default function TransactionReport() {
                       </td>
                       <td className="px-1.5 py-1">
                         <span className="text-[10px] text-slate-700">
-                          {transaction.discountedAmount >= 1000 
+                          {transaction.discountedAmount >= 1000
                             ? formatCurrency(transaction.discountedAmount)
                             : formatFullCurrency(transaction.discountedAmount)
                           }

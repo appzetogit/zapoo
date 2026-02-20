@@ -131,13 +131,13 @@ export default function DesktopNavbar() {
               <Link
                 to="/user"
                 className={`px-6 py-2.5 text-sm font-medium transition-all duration-200 relative ${isDelivery
-                  ? "text-green-600 dark:text-green-500"
-                  : "text-gray-600 dark:text-gray-400 hover:text-green-600 dark:hover:text-green-500"
+                  ? "text-[#FD7675]"
+                  : "text-gray-600 dark:text-gray-400 hover:text-[#FD7675]"
                   }`}
               >
                 <span className="relative z-10">Delivery</span>
                 {isDelivery && (
-                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-green-600 dark:bg-green-500 rounded-t-full" />
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#FD7675] rounded-t-full" />
                 )}
               </Link>
 
@@ -148,13 +148,13 @@ export default function DesktopNavbar() {
               <Link
                 to="/user/under-250"
                 className={`px-6 py-2.5 text-sm font-medium transition-all duration-200 relative ${isUnder250
-                  ? "text-green-600 dark:text-green-500"
-                  : "text-gray-600 dark:text-gray-400 hover:text-green-600 dark:hover:text-green-500"
+                  ? "text-[#FD7675]"
+                  : "text-gray-600 dark:text-gray-400 hover:text-[#FD7675]"
                   }`}
               >
                 <span className="relative z-10">Under 250</span>
                 {isUnder250 && (
-                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-green-600 dark:bg-green-500 rounded-t-full" />
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#FD7675] rounded-t-full" />
                 )}
               </Link>
 
@@ -165,13 +165,13 @@ export default function DesktopNavbar() {
               <Link
                 to="/user/dining"
                 className={`px-6 py-2.5 text-sm font-medium transition-all duration-200 relative ${isDining
-                  ? "text-green-600 dark:text-green-500"
-                  : "text-gray-600 dark:text-gray-400 hover:text-green-600 dark:hover:text-green-500"
+                  ? "text-[#FD7675]"
+                  : "text-gray-600 dark:text-gray-400 hover:text-[#FD7675]"
                   }`}
               >
                 <span className="relative z-10">Dining</span>
                 {isDining && (
-                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-green-600 dark:bg-green-500 rounded-t-full" />
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#FD7675] rounded-t-full" />
                 )}
               </Link>
 
@@ -182,13 +182,13 @@ export default function DesktopNavbar() {
               <Link
                 to="/user/profile"
                 className={`px-6 py-2.5 text-sm font-medium transition-all duration-200 relative ${isProfile
-                  ? "text-green-600 dark:text-green-500"
-                  : "text-gray-600 dark:text-gray-400 hover:text-green-600 dark:hover:text-green-500"
+                  ? "text-[#FD7675]"
+                  : "text-gray-600 dark:text-gray-400 hover:text-[#FD7675]"
                   }`}
               >
                 <span className="relative z-10">Profile</span>
                 {isProfile && (
-                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-green-600 dark:bg-green-500 rounded-t-full" />
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#FD7675] rounded-t-full" />
                 )}
               </Link>
             </div>
