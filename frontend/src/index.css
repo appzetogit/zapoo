@@ -145,10 +145,10 @@
 }
 
 .theme-red {
-  --primary: oklch(0.6 0.2 20);
-  /* Red */
-  --primary-foreground: oklch(1 0 0);
-  --ring: oklch(0.6 0.2 20);
+  --primary: #FD7675;
+  /* Salmon */
+  --primary-foreground: #ffffff;
+  --ring: #FD7675;
 }
 
 .theme-blue {

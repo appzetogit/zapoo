@@ -1,5 +1,9 @@
 import mongoose from 'mongoose';
 import winston from 'winston';
+import dns from 'dns';
+
+// Fix DNS resolution for MongoDB Atlas
+dns.setServers(['8.8.8.8', '8.8.4.4']);
 
 const logger = winston.createLogger({
   level: 'info',
@@ -14,11 +18,11 @@ const logger = winston.createLogger({
 export const connectDB = async () => {
   try {
     const conn = await mongoose.connect(process.env.MONGODB_URI, {
-      // Mongoose 8.x options
+      family: 4 // Force IPv4
     });
 
     logger.info(`MongoDB Connected: ${conn.connection.host}`);
-    
+
     // Handle connection events
     mongoose.connection.on('error', (err) => {
       logger.error(`MongoDB connection error: ${err}`);

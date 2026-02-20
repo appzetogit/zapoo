@@ -20,7 +20,7 @@ export default function ViewSupportTicket() {
     try {
       setLoading(true)
       const response = await deliveryAPI.getSupportTicketById(id)
-      
+
       if (response?.data?.success && response?.data?.data) {
         setTicket(response.data.data)
       } else {
@@ -95,9 +95,9 @@ export default function ViewSupportTicket() {
   const formatDateTime = (dateString) => {
     if (!dateString) return "N/A"
     const date = new Date(dateString)
-    return date.toLocaleString('en-GB', { 
-      day: '2-digit', 
-      month: 'short', 
+    return date.toLocaleString('en-GB', {
+      day: '2-digit',
+      month: 'short',
       year: 'numeric',
       hour: '2-digit',
       minute: '2-digit'
@@ -244,7 +244,7 @@ export default function ViewSupportTicket() {
             <div className="pt-4 border-t border-gray-200">
               <button
                 onClick={() => navigate(-1)}
-                className="w-full px-6 py-3 bg-gray-900 text-white font-medium rounded-lg hover:bg-gray-800 transition-colors"
+                className="w-full px-6 py-3 bg-[#FD7675] text-white font-medium rounded-lg hover:bg-[#FD7675]/90 transition-colors"
               >
                 Close
               </button>

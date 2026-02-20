@@ -32,11 +32,11 @@ export default function BottomNavigation() {
 
   const TabIcon = (active, Outline, Solid) => {
     const Icon = active ? Solid : Outline
-    return <Icon className={iconClass} />
+    return <Icon className={`${iconClass} ${active ? "text-[#FD7675]" : "text-gray-500"}`} />
   }
 
   const TabLabel = (active, label) => (
-    <span className={`text-[10px] font-medium ${active ? "text-black" : "text-gray-500"}`}>
+    <span className={`text-[10px] font-medium ${active ? "text-[#FD7675]" : "text-gray-500"}`}>
       {label}
     </span>
   )
@@ -56,10 +56,10 @@ export default function BottomNavigation() {
         }
       } catch (error) {
         // Skip logging network and timeout errors (handled by axios interceptor)
-        if (error.code !== 'ECONNABORTED' && 
-            error.code !== 'ERR_NETWORK' && 
-            error.message !== 'Network Error' &&
-            !error.message?.includes('timeout')) {
+        if (error.code !== 'ECONNABORTED' &&
+          error.code !== 'ERR_NETWORK' &&
+          error.message !== 'Network Error' &&
+          !error.message?.includes('timeout')) {
           console.error("Error fetching profile image for navigation:", error)
         }
       }
@@ -73,7 +73,7 @@ export default function BottomNavigation() {
     }
 
     window.addEventListener('deliveryProfileRefresh', handleProfileRefresh)
-    
+
     return () => {
       window.removeEventListener('deliveryProfileRefresh', handleProfileRefresh)
     }
@@ -119,17 +119,15 @@ export default function BottomNavigation() {
             <img
               src={profileImage}
               alt="Profile"
-              className={`w-7 h-7 rounded-full border-2 object-cover ${
-                isActive("/delivery/profile") ? "border-black" : "border-gray-300"
-              }`}
+              className={`w-7 h-7 rounded-full border-2 object-cover ${isActive("/delivery/profile") ? "border-[#FD7675]" : "border-gray-300"
+                }`}
               onError={() => {
                 setImageError(true)
               }}
             />
           ) : (
-            <div className={`w-7 h-7 rounded-full border-2 flex items-center justify-center bg-gray-200 ${
-              isActive("/delivery/profile") ? "border-black" : "border-gray-300"
-            }`}>
+            <div className={`w-7 h-7 rounded-full border-2 flex items-center justify-center bg-gray-200 ${isActive("/delivery/profile") ? "border-[#FD7675]" : "border-gray-300"
+              }`}>
               <User className="w-4 h-4 text-gray-500" />
             </div>
           )}
