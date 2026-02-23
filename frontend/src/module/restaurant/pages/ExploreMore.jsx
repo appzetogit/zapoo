@@ -30,6 +30,7 @@ import {
   Calendar,
   MapPin,
   Zap,
+  Utensils,
 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { DateRangeCalendar } from "@/components/ui/date-range-calendar"
@@ -675,6 +676,7 @@ export default function ExploreMore() {
     { id: 1, label: "Outlet info", icon: Info, route: "/restaurant/outlet-info" },
     { id: 2, label: "Outlet timings", icon: Clock, route: "/restaurant/outlet-timings" },
     { id: 3, label: "Dining Reservations", icon: Calendar, route: "/restaurant/reservations" },
+    { id: 50, label: "Manage Tables", icon: Utensils, route: "/restaurant/tables" },
     { id: 4, label: "Manage staff", icon: Users, route: "/restaurant/contact-details" },
   ]
 

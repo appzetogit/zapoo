@@ -24,7 +24,7 @@ export default function About() {
   const companyName = useCompanyName()
   const [loading, setLoading] = useState(true)
   const [aboutData, setAboutData] = useState({
-    appName: 'Appzeto Food',
+    appName: 'Zapoo',
     version: '1.0.0',
     description: 'Your trusted food delivery partner, bringing delicious meals right to your doorstep. Experience the convenience of ordering from your favorite restaurants with fast, reliable delivery.',
     logo: '',

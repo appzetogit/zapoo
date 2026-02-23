@@ -17,7 +17,7 @@ export default function CreateOffers() {
   const [dateFormat, setDateFormat] = useState("weekly")
   const [dateRange, setDateRange] = useState("Weekly (15 - 17 Dec)")
   const [comparisonDate, setComparisonDate] = useState("previous week (8 - 10 Dec)")
-  
+
   // Restaurant data state
   const [restaurant, setRestaurant] = useState(null)
   const [loadingRestaurant, setLoadingRestaurant] = useState(true)
@@ -76,27 +76,27 @@ export default function CreateOffers() {
               <p className="text-xs text-gray-500 mt-0.5">
                 {(() => {
                   if (loadingRestaurant) return "Loading..."
-                  
+
                   if (!restaurant?.location) return "Location not available"
-                  
+
                   const loc = restaurant.location
-                  
+
                   // Priority 1: Use formattedAddress if available
-                  if (loc.formattedAddress && 
-                      loc.formattedAddress.trim() !== "" && 
-                      loc.formattedAddress !== "Select location") {
+                  if (loc.formattedAddress &&
+                    loc.formattedAddress.trim() !== "" &&
+                    loc.formattedAddress !== "Select location") {
                     // Check if it's just coordinates (latitude, longitude format)
                     const isCoordinates = /^-?\d+\.\d+,\s*-?\d+\.\d+$/.test(loc.formattedAddress.trim())
                     if (!isCoordinates) {
                       return loc.formattedAddress.trim()
                     }
                   }
-                  
+
                   // Priority 2: Use address field if available
                   if (loc.address && loc.address.trim() !== "") {
                     return loc.address.trim()
                   }
-                  
+
                   // Priority 3: Build from individual components
                   const addressParts = [
                     loc.addressLine1,
@@ -106,11 +106,11 @@ export default function CreateOffers() {
                     loc.state,
                     loc.zipCode || loc.pincode || loc.postalCode
                   ].filter(Boolean)
-                  
+
                   if (addressParts.length > 0) {
                     return addressParts.join(", ")
                   }
-                  
+
                   return "Location not available"
                 })()}
               </p>
@@ -122,11 +122,10 @@ export default function CreateOffers() {
         <div className="flex border-t border-white">
           <button
             onClick={() => setActiveTab("create-offers")}
-            className={`flex-1 py-3 text-sm font-medium relative ${
-              activeTab === "create-offers"
+            className={`flex-1 py-3 text-sm font-medium relative ${activeTab === "create-offers"
                 ? "text-blue-600"
                 : "text-gray-500"
-            }`}
+              }`}
           >
             Create offers
             {activeTab === "create-offers" && (
@@ -139,11 +138,10 @@ export default function CreateOffers() {
           </button>
           <button
             onClick={() => setActiveTab("track-offers")}
-            className={`flex-1 py-3 text-sm font-medium relative ${
-              activeTab === "track-offers"
+            className={`flex-1 py-3 text-sm font-medium relative ${activeTab === "track-offers"
                 ? "text-blue-600"
                 : "text-gray-500"
-            }`}
+              }`}
           >
             Track offers
             {activeTab === "track-offers" && (
@@ -222,7 +220,7 @@ export default function CreateOffers() {
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-2">
                   <h3 className="text-lg font-bold text-gray-900">Overall performance</h3>
-                  <button 
+                  <button
                     onClick={() => setIsPerformanceInfoOpen(true)}
                     className="p-1 rounded-full hover:bg-gray-100"
                   >
@@ -230,11 +228,11 @@ export default function CreateOffers() {
                   </button>
                 </div>
               </div>
-              
+
               <div className="mb-3">
                 <div className="flex items-center justify-between mb-1">
                   <p className="text-sm font-bold text-gray-900">{dateRange}</p>
-                  <button 
+                  <button
                     onClick={() => setIsFilterOpen(true)}
                     className="flex items-center gap-1 text-sm text-blue-600 font-medium"
                   >
@@ -301,11 +299,10 @@ export default function CreateOffers() {
                   <button
                     key={tab.id}
                     onClick={() => setOfferStatus(tab.id)}
-                    className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-semibold transition-colors ${
-                      offerStatus === tab.id
+                    className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-semibold transition-colors ${offerStatus === tab.id
                         ? "bg-black text-white"
                         : "bg-white text-gray-900 border border-gray-200"
-                    }`}
+                      }`}
                   >
                     {tab.label}
                   </button>
@@ -344,7 +341,7 @@ export default function CreateOffers() {
               onClick={() => setIsFilterOpen(false)}
               className="fixed inset-0 bg-black/50 z-[9999]"
             />
-            
+
             {/* Filter Bottom Sheet */}
             <motion.div
               initial={{ y: "100%" }}
@@ -449,7 +446,7 @@ export default function CreateOffers() {
               onClick={() => setIsPerformanceInfoOpen(false)}
               className="fixed inset-0 bg-black/50 z-[9999]"
             />
-            
+
             {/* Bottom Popup */}
             <motion.div
               initial={{ y: "100%" }}

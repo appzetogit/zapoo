@@ -8,6 +8,8 @@ import DiningStory from "../models/DiningStory.js";
 import TableBooking from "../models/TableBooking.js";
 import DiningReview from "../models/DiningReview.js";
 import Restaurant from "../../restaurant/models/Restaurant.js";
+import DiningTable from "../../tableReservation/models/DiningTable.js";
+import Reservation from "../../tableReservation/models/Reservation.js";
 import emailService from "../../auth/services/emailService.js";
 
 // Get all dining restaurants (with filtering)
@@ -43,7 +45,7 @@ export const getRestaurantBySlug = async (req, res) => {
       slug: req.params.slug,
     });
 
-    // If not found in GamingRestaurant, check regular Restaurant
+    // If not found in DiningRestaurant, check regular Restaurant
     let actualRestaurant = restaurant;
     if (!actualRestaurant) {
       actualRestaurant = await Restaurant.findOne({ slug: req.params.slug });
@@ -56,9 +58,18 @@ export const getRestaurantBySlug = async (req, res) => {
       });
     }
 
+    // Fetch unique table capacities for this restaurant
+    const tables = await DiningTable.find({
+      restaurantId: actualRestaurant._id,
+      isActive: true
+    }).distinct('capacity');
+
+    const restaurantData = actualRestaurant.toObject ? actualRestaurant.toObject() : actualRestaurant;
+    restaurantData.tableCapacities = tables.sort((a, b) => a - b);
+
     res.status(200).json({
       success: true,
-      data: actualRestaurant,
+      data: restaurantData,
     });
   } catch (error) {
     res.status(500).json({
@@ -250,8 +261,12 @@ export const getUserBookings = async (req, res) => {
       .populate("restaurant", "name location image")
       .sort({ createdAt: -1 });
 
-    // Manually handle population if the restaurant wasn't found in "Restaurant" collection
-    // (it might be in "DiningRestaurant" collection)
+    // Also fetch from the new Reservation model
+    const newReservations = await Reservation.find({ userId: req.user._id })
+      .populate("restaurantId", "name location image")
+      .sort({ createdAt: -1 });
+
+    // Combine results
     const processedBookings = await Promise.all(
       bookings.map(async (booking) => {
         const bookingObj = booking.toObject();
@@ -272,10 +287,40 @@ export const getUserBookings = async (req, res) => {
       }),
     );
 
+    // Map new reservations to match TableBooking structure
+    const mappedNewReservations = newReservations.map(resv => {
+      // Convert 24h to 12h for display
+      let timeDisplay = resv.startTime;
+      try {
+        if (timeDisplay && timeDisplay.includes(':')) {
+          let [h, m] = timeDisplay.split(':').map(Number);
+          const ampm = h >= 12 ? 'PM' : 'AM';
+          h = h % 12 || 12;
+          timeDisplay = `${h}:${m.toString().padStart(2, '0')} ${ampm}`;
+        }
+      } catch (e) {
+        console.error("Time format error:", e);
+      }
+
+      return {
+        _id: resv._id,
+        restaurant: resv.restaurantId,
+        guests: resv.guestCount,
+        date: resv.bookingDate,
+        timeSlot: timeDisplay,
+        status: resv.status,
+        specialRequest: resv.specialRequest,
+        createdAt: resv.createdAt,
+        isNewSystem: true
+      };
+    });
+
+    const finalBookings = [...processedBookings, ...mappedNewReservations].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
     res.status(200).json({
       success: true,
-      count: processedBookings.length,
-      data: processedBookings,
+      count: finalBookings.length,
+      data: finalBookings,
     });
   } catch (error) {
     res.status(500).json({

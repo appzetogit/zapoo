@@ -5,6 +5,9 @@ import Restaurant from '../../restaurant/models/Restaurant.js';
 import { successResponse, errorResponse } from '../../../shared/utils/response.js';
 import { uploadToCloudinary } from '../../../shared/utils/cloudinaryService.js';
 import { cloudinary } from '../../../config/cloudinary.js';
+import DiningTable from '../../tableReservation/models/DiningTable.js';
+import Reservation from '../../tableReservation/models/Reservation.js';
+import TableBooking from '../models/TableBooking.js';
 
 // ==================== DINING CATEGORIES ====================
 
@@ -172,9 +175,10 @@ export const updateDiningOfferBanner = async (req, res) => {
 
 export const getActiveRestaurants = async (req, res) => {
     try {
-        // Fetch restaurants that are active (assuming isServiceable or similar flag, or just all)
-        // For now fetching all with just name and id
-        const restaurants = await Restaurant.find().select('name _id').lean();
+        // Fetch all restaurants that are approved/active
+        const restaurants = await Restaurant.find({ isActive: true })
+            .select('name _id diningSettings')
+            .lean();
         return successResponse(res, 200, 'Restaurants retrieved successfully', { restaurants });
     } catch (error) {
         console.error('Error fetching restaurants:', error);
@@ -272,5 +276,85 @@ export const updateDiningStory = async (req, res) => {
     } catch (error) {
         console.error('Error updating story:', error);
         return errorResponse(res, 500, 'Failed to update story');
+    }
+};
+
+// ==================== RESTAURANT DINING SETTINGS (Admin) ====================
+
+/**
+ * Toggle dining feature for a restaurant
+ */
+export const toggleDiningStatus = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { isEnabled } = req.body;
+
+        const restaurant = await Restaurant.findById(id);
+        if (!restaurant) return errorResponse(res, 404, 'Restaurant not found');
+
+        if (!restaurant.diningSettings) {
+            restaurant.diningSettings = { isEnabled: false };
+        }
+
+        restaurant.diningSettings.isEnabled = isEnabled;
+        await restaurant.save();
+
+        return successResponse(res, 200, `Dining ${isEnabled ? 'enabled' : 'disabled'} for ${restaurant.name}`);
+    } catch (error) {
+        console.error('Error toggling dining status:', error);
+        return errorResponse(res, 500, 'Failed to toggle dining status');
+    }
+};
+
+// ==================== RESERVATION MANAGEMENT (Admin) ====================
+
+export const getAdminReservations = async (req, res) => {
+    try {
+        const { restaurantId, date, status } = req.query;
+        const filter = {};
+
+        // TableBooking uses 'restaurant' field (not 'restaurantId')
+        if (restaurantId) filter.restaurant = restaurantId;
+
+        // TableBooking uses 'date' field (Date type) and 'status'
+        if (date) {
+            // Match bookings on the given date (YYYY-MM-DD)
+            const startOfDay = new Date(date);
+            startOfDay.setHours(0, 0, 0, 0);
+            const endOfDay = new Date(date);
+            endOfDay.setHours(23, 59, 59, 999);
+            filter.date = { $gte: startOfDay, $lte: endOfDay };
+        }
+        if (status) filter.status = status;
+
+        const reservations = await TableBooking.find(filter)
+            .populate('user', 'name email phone')
+            .populate('restaurant', 'name location')
+            .sort({ createdAt: -1 })
+            .lean();
+
+        return successResponse(res, 200, 'Reservations retrieved successfully', { reservations });
+    } catch (error) {
+        console.error('Error fetching reservations:', error);
+        return errorResponse(res, 500, 'Failed to fetch reservations');
+    }
+};
+
+export const updateAdminReservationStatus = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { status } = req.body;
+        const allowed = ['pending', 'confirmed', 'completed', 'cancelled', 'no-show'];
+        if (!allowed.includes(status)) {
+            return errorResponse(res, 400, `Status must be one of: ${allowed.join(', ')}`);
+        }
+        const reservation = await Reservation.findByIdAndUpdate(id, { status }, { new: true })
+            .populate('userId', 'name phone')
+            .populate('tableId', 'tableNumber');
+        if (!reservation) return errorResponse(res, 404, 'Reservation not found');
+        return successResponse(res, 200, 'Reservation status updated', { reservation });
+    } catch (error) {
+        console.error('Error updating reservation:', error);
+        return errorResponse(res, 500, 'Failed to update reservation status');
     }
 };

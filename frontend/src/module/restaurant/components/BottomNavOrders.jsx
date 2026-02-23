@@ -259,22 +259,22 @@ export default function BottomNavOrders() {
         </>
       )}
 
-      <div className="sticky bottom-0 z-40 pb-3">
-        <div className="flex items-center gap-2 w-full">
+      <div className="fixed bottom-0 left-0 right-0 z-50 pb-4 px-2 sm:px-4 md:pb-6 md:px-8">
+        <div className="flex items-center gap-3 w-full max-w-2xl mx-auto md:max-w-none">
 
           {/* Left toggle (Hub → Orders) */}
           {isHubMode && (
             <button
               onClick={handleToggleMode}
-              className="flex flex-col items-center gap-1 bg-[#FF5200] text-white/90 pr-3 py-3 rounded-r-full rounded-l-[12px] shadow-md border border-[#FF5200] active:scale-95"
+              className="flex flex-col items-center gap-1 bg-[#3B82F6] text-white/90 px-4 py-3 rounded-full shadow-lg border border-[#3B82F6] active:scale-95 transition-all"
             >
-              <ArrowRightLeft className="w-4 h-4" />
-              <span className="text-[11px]">To Orders</span>
+              <ArrowRightLeft className="w-5 h-5" />
+              <span className="text-[11px] font-medium">To Orders</span>
             </button>
           )}
 
           <div className="flex-1">
-            <div className={`bg-[#FF5200] rounded-full py-1.5 px-1 shadow-lg relative ${isHubMode ? "mr-1" : "ml-1"}`}>
+            <div className="bg-[#3B82F6] rounded-full py-1.5 px-2 shadow-xl relative transition-all">
               <div className="flex items-center justify-around relative">
                 {tabs.map(tab => {
                   const Icon = tab.icon
@@ -285,13 +285,13 @@ export default function BottomNavOrders() {
                       key={tab.id}
                       onClick={() => handleTabClick(tab)}
                       aria-current={isActive ? "page" : undefined}
-                      className="relative flex flex-col items-center gap-1 px-4 py-2 rounded-full overflow-hidden z-10"
+                      className="relative flex flex-col items-center gap-1 px-4 py-2 rounded-full overflow-hidden z-10 min-w-[80px]"
                       whileTap={{ scale: 0.95 }}
                     >
                       {isActive && (
                         <motion.div
                           layoutId="bottomNavActive"
-                          className="absolute inset-0 bg-orange-700 rounded-full -z-10"
+                          className="absolute inset-0 bg-blue-700 rounded-full -z-10"
                           initial={false}
                           transition={{
                             type: "spring",
@@ -300,8 +300,8 @@ export default function BottomNavOrders() {
                           }}
                         />
                       )}
-                      <Icon className={`w-5 h-4 relative z-10 transition-colors duration-300 ease-in-out ${isActive ? "text-white" : "text-white/80"}`} />
-                      <span className={`text-[11px] relative z-10 transition-colors duration-300 ease-in-out ${isActive ? "text-white" : "text-white/80"}`}>
+                      <Icon className={`w-5 h-5 relative z-10 transition-colors duration-300 ease-in-out ${isActive ? "text-white" : "text-white/80"}`} />
+                      <span className={`text-[11px] relative z-10 transition-colors duration-300 ease-in-out ${isActive ? "text-white font-bold" : "text-white/80"}`}>
                         {tab.label}
                       </span>
                     </motion.button>
@@ -315,10 +315,10 @@ export default function BottomNavOrders() {
           {!isHubMode && (
             <button
               onClick={handleToggleMode}
-              className="flex flex-col items-center gap-1 bg-[#FF5200] text-white/90 pl-3 py-3 rounded-l-full rounded-r-[12px] shadow-md border border-[#FF5200] active:scale-95"
+              className="flex flex-col items-center gap-1 bg-[#3B82F6] text-white/90 px-4 py-3 rounded-full shadow-lg border border-[#3B82F6] active:scale-95 transition-all"
             >
-              <ArrowRightLeft className="w-4 h-4" />
-              <span className="text-[11px]">To Hub</span>
+              <ArrowRightLeft className="w-5 h-5" />
+              <span className="text-[11px] font-medium">To Hub</span>
             </button>
           )}
         </div>

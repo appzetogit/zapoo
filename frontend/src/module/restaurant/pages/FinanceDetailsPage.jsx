@@ -7,7 +7,7 @@ export default function FinanceDetailsPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const financeData = location.state?.financeData || {}
-  
+
   const [activeTab, setActiveTab] = useState("summary")
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [showDownloadPopup, setShowDownloadPopup] = useState(false)
@@ -100,7 +100,7 @@ export default function FinanceDetailsPage() {
   }
 
   // Calculate estimated payout: A + B - C - D - E
-  const estimatedPayout = 
+  const estimatedPayout =
     (settlementData.netOrderValue?.total || 0) +
     (settlementData.additions?.total || 0) -
     (settlementData.orderLevelDeductions?.total || 0) -
@@ -164,9 +164,8 @@ export default function FinanceDetailsPage() {
                     setTimeout(() => setIsTransitioning(false), 300)
                   }
                 }}
-                className={`shrink-0 px-6 py-3.5 rounded-full font-medium text-sm whitespace-nowrap relative overflow-hidden ${
-                  isActive ? 'text-white' : 'bg-white text-black'
-                }`}
+                className={`shrink-0 px-6 py-3.5 rounded-full font-medium text-sm whitespace-nowrap relative overflow-hidden ${isActive ? 'text-white' : 'bg-white text-black'
+                  }`}
                 animate={{
                   scale: isActive ? 1.05 : 1,
                   opacity: isActive ? 1 : 0.7,
