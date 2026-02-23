@@ -597,7 +597,21 @@ export default function Inventory() {
   const [selectedFilter, setSelectedFilter] = useState(null)
   const [isLoading, setIsLoading] = useState(false)
   const [loadingInventory, setLoadingInventory] = useState(false)
-  const [categories, setCategories] = useState([])
+  const [categories, setCategories] = useState(() => {
+    try {
+      if (typeof window === "undefined") return mockCategories
+      const saved = localStorage.getItem(INVENTORY_STORAGE_KEY)
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        if (Array.isArray(parsed)) {
+          return parsed
+        }
+      }
+    } catch (error) {
+      console.error("Error loading inventory from storage:", error)
+    }
+    return mockCategories
+  })
   const [expandedCategories, setExpandedCategories] = useState(() =>
     mockCategories.map(c => c.id)
   )
@@ -854,8 +868,15 @@ export default function Inventory() {
     isSwiping.current = false
   }
 
-  // No longer persisting categories to localStorage to avoid stale data issues
-  // The menu API is now the source of truth
+  // Persist categories to localStorage whenever they change
+  useEffect(() => {
+    try {
+      if (typeof window === "undefined") return
+      localStorage.setItem(INVENTORY_STORAGE_KEY, JSON.stringify(categories))
+    } catch (error) {
+      console.error("Error saving inventory to storage:", error)
+    }
+  }, [categories])
 
   // Calculate total items
   const totalItems = useMemo(
