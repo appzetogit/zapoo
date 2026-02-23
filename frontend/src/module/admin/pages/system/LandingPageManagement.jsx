@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react"
-import { Upload, Trash2, Image as ImageIcon, Loader2, AlertCircle, CheckCircle2, ArrowUp, ArrowDown, Layout, Tag, UtensilsCrossed, Trophy, ChefHat, Megaphone, Search } from "lucide-react"
+import { Upload, Trash2, Image as ImageIcon, Loader2, AlertCircle, CheckCircle2, ArrowUp, ArrowDown, Layout, Tag, UtensilsCrossed, Trophy, ChefHat, Megaphone, Search, X } from "lucide-react"
 import api from "@/lib/api"
 import { adminAPI } from "@/lib/api"
 import { getModuleToken } from "@/lib/utils/auth"
@@ -1746,50 +1746,83 @@ export default function LandingPageManagement() {
                       <p>No restaurants added to Top 10 yet.</p>
                     </div>
                   ) : (
-                    <div className="space-y-4">
+                    <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                       {top10Restaurants
                         .sort((a, b) => a.rank - b.rank)
-                        .map((item, index) => (
-                          <div key={item._id} className="border border-slate-200 rounded-lg p-4 flex items-center justify-between">
-                            <div className="flex items-center gap-4 flex-1">
-                              <div className="w-12 h-12 rounded-lg bg-orange-500 text-white flex items-center justify-center font-bold text-lg">
-                                {item.rank}
+                        .map((item, index) => {
+                          const restaurant = item.restaurant || {}
+                          const profileImage = restaurant.profileImage?.url || restaurant.profileImage || null
+
+                          return (
+                            <div key={item._id} className="min-w-[280px] border border-slate-200 rounded-xl p-3 flex flex-col gap-3 bg-white shadow-sm hover:shadow-md transition-shadow">
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-orange-600 text-white flex items-center justify-center font-bold text-base flex-shrink-0">
+                                  {item.rank}
+                                </div>
+                                <div className="w-12 h-12 rounded-lg bg-slate-100 overflow-hidden flex-shrink-0">
+                                  {profileImage ? (
+                                    <img src={profileImage} alt={restaurant.name} className="w-full h-full object-cover" />
+                                  ) : (
+                                    <div className="w-full h-full flex items-center justify-center text-slate-400 text-xs">IMG</div>
+                                  )}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <h3 className="font-bold text-slate-900 truncate text-sm">{restaurant.name || 'N/A'}</h3>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs font-semibold text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded">
+                                      {restaurant.rating || 0}★
+                                    </span>
+                                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${item.isActive ? 'bg-green-50 text-green-600' : 'bg-slate-100 text-slate-500'}`}>
+                                      {item.isActive ? 'Active' : 'Hidden'}
+                                    </span>
+                                  </div>
+                                </div>
                               </div>
-                              <div className="flex-1">
-                                <h3 className="font-semibold text-slate-900">{item.restaurant?.name || 'N/A'}</h3>
-                                <p className="text-xs text-slate-500">Rating: {item.restaurant?.rating || 0}★</p>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <Label className="text-xs">Rank:</Label>
-                                <select
-                                  value={item.rank}
-                                  onChange={(e) => handleTop10RankChange(item._id, e.target.value)}
-                                  className="px-2 py-1 border border-slate-300 rounded text-sm"
-                                >
-                                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(r => (
-                                    <option key={r} value={r}>{r}</option>
-                                  ))}
-                                </select>
+
+                              <div className="flex items-center justify-between border-t border-slate-100 pt-3">
+                                <div className="flex items-center gap-2">
+                                  <Label className="text-[10px] text-slate-500 uppercase font-bold">Rank</Label>
+                                  <select
+                                    value={item.rank}
+                                    onChange={(e) => handleTop10RankChange(item._id, e.target.value)}
+                                    className="px-2 py-1 border border-slate-200 rounded text-xs focus:ring-1 focus:ring-orange-500 outline-none"
+                                  >
+                                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(r => (
+                                      <option key={r} value={r}>{r}</option>
+                                    ))}
+                                  </select>
+                                </div>
+
+                                <div className="flex items-center gap-1">
+                                  <div className="flex gap-1 border-r border-slate-100 pr-2 mr-2">
+                                    <button onClick={() => handleTop10OrderChange(item._id, 'up')} disabled={index === 0} className="p-1 rounded hover:bg-slate-100 disabled:opacity-30 text-slate-600">
+                                      <ArrowUp className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button onClick={() => handleTop10OrderChange(item._id, 'down')} disabled={index === top10Restaurants.length - 1} className="p-1 rounded hover:bg-slate-100 disabled:opacity-30 text-slate-600">
+                                      <ArrowDown className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                  <div className="flex gap-1">
+                                    <button
+                                      onClick={() => handleToggleTop10Status(item._id, item.isActive)}
+                                      className={`p-1.5 rounded transition-colors ${item.isActive ? 'hover:bg-yellow-50 text-yellow-600' : 'hover:bg-green-50 text-green-600'}`}
+                                      title={item.isActive ? 'Deactivate' : 'Activate'}
+                                    >
+                                      {item.isActive ? <X className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteTop10Restaurant(item._id)}
+                                      disabled={top10Deleting === item._id}
+                                      className="p-1.5 rounded hover:bg-red-50 text-red-500 disabled:opacity-30 transition-colors"
+                                    >
+                                      {top10Deleting === item._id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                                    </button>
+                                  </div>
+                                </div>
                               </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                              <div className="flex items-center gap-1">
-                                <button onClick={() => handleTop10OrderChange(item._id, 'up')} disabled={index === 0} className="p-1.5 rounded hover:bg-slate-100 disabled:opacity-50">
-                                  <ArrowUp className="w-4 h-4 text-slate-600" />
-                                </button>
-                                <button onClick={() => handleTop10OrderChange(item._id, 'down')} disabled={index === top10Restaurants.length - 1} className="p-1.5 rounded hover:bg-slate-100 disabled:opacity-50">
-                                  <ArrowDown className="w-4 h-4 text-slate-600" />
-                                </button>
-                              </div>
-                              <button onClick={() => handleToggleTop10Status(item._id, item.isActive)} className={`px-3 py-1.5 rounded text-sm font-medium ${item.isActive ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'}`}>
-                                {item.isActive ? 'Deactivate' : 'Activate'}
-                              </button>
-                              <button onClick={() => handleDeleteTop10Restaurant(item._id)} disabled={top10Deleting === item._id} className="p-1.5 rounded hover:bg-red-100 text-red-600 disabled:opacity-50">
-                                {top10Deleting === item._id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                              </button>
-                            </div>
-                          </div>
-                        ))}
+                          )
+                        })}
                     </div>
                   )}
                 </div>

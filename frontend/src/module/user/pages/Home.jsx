@@ -2,7 +2,7 @@ import { useSearchParams, Link, useNavigate } from "react-router-dom"
 import React, { useRef, useEffect, useState, useMemo, useCallback } from "react"
 import { createPortal } from "react-dom"
 import Lenis from "lenis"
-import { Star, Clock, MapPin, Heart, Search, Tag, Flame, ShoppingBag, ShoppingCart, Mic, SlidersHorizontal, CheckCircle2, Bookmark, BadgePercent, X, ArrowDownUp, Timer, CalendarClock, ShieldCheck, IndianRupee, UtensilsCrossed, Leaf, AlertCircle, Loader2, Plus, Check, Share2 } from "lucide-react"
+import { Star, Clock, MapPin, Heart, Search, Tag, Flame, ShoppingBag, ShoppingCart, Mic, SlidersHorizontal, CheckCircle2, Bookmark, BadgePercent, X, ArrowDownUp, Timer, CalendarClock, ShieldCheck, IndianRupee, UtensilsCrossed, Leaf, AlertCircle, Loader2, Plus, Check, Share2, Zap } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import Footer from "../components/Footer"
 import AddToCartButton from "../components/AddToCartButton"
@@ -205,6 +205,8 @@ export default function Home() {
   const [realCategories, setRealCategories] = useState([])
   const [loadingRealCategories, setLoadingRealCategories] = useState(true)
   const [showAllCategoriesModal, setShowAllCategoriesModal] = useState(false)
+  const [top10Restaurants, setTop10Restaurants] = useState([])
+  const [loadingTop10, setLoadingTop10] = useState(true)
   const isHandlingSwitchOff = useRef(false)
 
   // Swipe functionality for hero banner carousel
@@ -365,6 +367,26 @@ export default function Home() {
     }
 
     fetchLandingConfig()
+  }, [])
+
+  // Fetch Top 10 restaurants
+  useEffect(() => {
+    const fetchTop10 = async () => {
+      try {
+        setLoadingTop10(true)
+        const response = await api.get('/hero-banners/top-10/public')
+        if (response.data.success && response.data.data) {
+          setTop10Restaurants(response.data.data.restaurants || [])
+        }
+      } catch (error) {
+        console.error('Error fetching Top 10 restaurants:', error)
+        setTop10Restaurants([])
+      } finally {
+        setLoadingTop10(false)
+      }
+    }
+
+    fetchTop10()
   }, [])
 
   // Auto-cycle hero banner images
@@ -1700,6 +1722,107 @@ export default function Home() {
         {/* Featured Foods - Horizontal Scroll */}
 
         {/* Restaurants - Enhanced with Animations */}
+        {/* Top 10 Horizontal Scroll Section */}
+        {!loadingTop10 && top10Restaurants.length > 0 && (
+          <div className="mb-8 lg:mb-12">
+            <div className="px-1 mb-4 flex items-center justify-between">
+              <div className="flex flex-col gap-0.5">
+                <h2 className="text-xs sm:text-sm lg:text-base font-semibold text-gray-400 tracking-widest uppercase">
+                  Handpicked for you
+                </h2>
+                <span className="text-base sm:text-lg lg:text-2xl text-gray-900 dark:text-white font-bold">Top 10</span>
+              </div>
+              <Link to="/user/top-10" className="text-orange-600 font-semibold text-sm hover:underline">
+                See All
+              </Link>
+            </div>
+
+            <div
+              className="flex gap-4 sm:gap-6 overflow-x-auto pb-6 scrollbar-hide px-1"
+              style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+            >
+              {top10Restaurants.map((item, index) => {
+                const restaurant = item.restaurant || item;
+                const restaurantSlug = restaurant.slug || restaurant.name?.toLowerCase().replace(/\s+/g, "-");
+
+                return (
+                  <Link
+                    key={restaurant._id || index}
+                    to={`/user/restaurants/${restaurantSlug}`}
+                    className="flex-shrink-0 w-[240px] sm:w-[280px] group"
+                  >
+                    <div className="relative aspect-[4/3] rounded-2xl overflow-hidden mb-3 shadow-sm group-hover:shadow-md transition-shadow">
+                      {/* Restaurant Image */}
+                      <OptimizedImage
+                        src={restaurant.profileImage?.url || "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&h=600&fit=crop"}
+                        alt={restaurant.name}
+                        className="w-full h-full transform transition-transform duration-500 group-hover:scale-110"
+                        objectFit="cover"
+                      />
+
+                      {/* Gradient Overlay */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-60" />
+
+                      {/* Offer Badge - Top Left */}
+                      {restaurant.offer && (
+                        <div className="absolute top-2 left-2 sm:top-3 sm:left-3">
+                          <div className="bg-white/95 backdrop-blur-sm px-2 py-1 sm:px-3 sm:py-1.5 rounded-xl shadow-lg border border-orange-100 flex flex-col items-center">
+                            <span className="text-[10px] sm:text-xs font-black text-orange-600 uppercase tracking-tighter leading-none">
+                              {restaurant.offer.split(' ')[0]} {restaurant.offer.split(' ')[1]}
+                            </span>
+                            <span className="text-[8px] sm:text-[10px] font-bold text-gray-500 uppercase tracking-tighter leading-none mt-0.5">
+                              {restaurant.offer.split(' ').slice(2).join(' ')}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Favorite Button - Top Right */}
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleToggleFavorite(e);
+                        }}
+                        className="absolute top-2 right-2 sm:top-3 sm:right-3 p-2 rounded-full bg-white/20 backdrop-blur-md text-white hover:bg-white hover:text-red-500 transition-all shadow-sm"
+                      >
+                        <Heart className={`w-4 h-4 sm:w-5 sm:h-5 ${isFavorite(restaurantSlug) ? 'fill-current text-red-500' : ''}`} />
+                      </button>
+
+                      {/* Rating Badge - Bottom Left */}
+                      <div className="absolute bottom-2 left-2 sm:bottom-3 sm:left-3">
+                        <div className="flex items-center gap-1 bg-[#1A9F4F] text-white px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-bold shadow-lg">
+                          <span>{restaurant.rating || "4.1"}</span>
+                          <Star className="w-2.5 h-2.5 sm:w-3 sm:h-3 fill-current" />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Restaurant Info */}
+                    <div className="px-1">
+                      <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white truncate mb-0.5">
+                        {restaurant.name}
+                      </h3>
+                      <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+                        <div className="flex items-center gap-1">
+                          <Zap className="w-3.5 h-3.5 text-[#1A9F4F] fill-current" />
+                          <span className="text-xs sm:text-sm font-semibold text-[#1A9F4F]">
+                            {restaurant.estimatedDeliveryTime || '20-25'} mins
+                          </span>
+                        </div>
+                        <span className="w-1 h-1 rounded-full bg-gray-300" />
+                        <span className="text-xs sm:text-sm font-medium truncate">
+                          {restaurant.cuisine?.join(', ') || 'Continental, Italian'}
+                        </span>
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         <motion.section
           className="space-y-0 pt-3 sm:pt-4 lg:pt-6 pb-20 md:pb-24"
           initial={{ opacity: 0 }}
