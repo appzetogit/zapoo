@@ -1,8 +1,8 @@
 import { useState, useMemo, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { 
-  Search, 
-  Image as ImageIcon, 
+import {
+  Search,
+  Image as ImageIcon,
   Grid3x3,
   ChevronDown,
   ChevronUp,
@@ -59,7 +59,7 @@ export default function HubMenu() {
   const [isAddAddonModalOpen, setIsAddAddonModalOpen] = useState(false)
   const [addons, setAddons] = useState([])
   const [loadingAddons, setLoadingAddons] = useState(false)
-  
+
   // Add-on form state
   const [addonName, setAddonName] = useState("")
   const [addonDescription, setAddonDescription] = useState("")
@@ -72,8 +72,8 @@ export default function HubMenu() {
 
   // Restaurant info - fetch from backend
   const restaurantName = restaurantData?.name || ""
-  const restaurantExpertise = restaurantData?.cuisines?.length > 0 
-    ? restaurantData.cuisines.join(", ") 
+  const restaurantExpertise = restaurantData?.cuisines?.length > 0
+    ? restaurantData.cuisines.join(", ")
     : ""
 
   // Handle scroll to change title
@@ -166,12 +166,12 @@ export default function HubMenu() {
       } catch (error) {
         // Only log error if it's not a network/timeout error (backend might be down/slow)
         if (error.code !== 'ERR_NETWORK' && error.code !== 'ECONNABORTED' && !error.message?.includes('timeout')) {
-        console.error('Error fetching restaurant data:', error)
+          console.error('Error fetching restaurant data:', error)
         }
         // Continue with default values if fetch fails
       }
     }
-    
+
     fetchRestaurantData()
   }, [])
 
@@ -182,11 +182,11 @@ export default function HubMenu() {
         setLoadingMenu(true)
       }
       const response = await restaurantAPI.getMenu()
-      
+
       if (response.data && response.data.success && response.data.data && response.data.data.menu) {
         const menuSections = response.data.data.menu.sections || []
         setMenuData(menuSections)
-        
+
         // Menu data is now directly from backend, no need to transform
       } else {
         // Empty menu - start fresh
@@ -195,7 +195,7 @@ export default function HubMenu() {
     } catch (error) {
       // Only log and show toast if it's not a network/timeout error
       if (error.code !== 'ERR_NETWORK' && error.code !== 'ECONNABORTED' && !error.message?.includes('timeout')) {
-      console.error('Error fetching menu:', error)
+        console.error('Error fetching menu:', error)
         toast.error('Failed to load menu')
       } else if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
         // Silently handle network errors - backend is not running
@@ -338,7 +338,7 @@ export default function HubMenu() {
             isEnabled: section.isEnabled !== undefined ? section.isEnabled : true,
             order: section.order !== undefined ? section.order : index,
           }))
-          
+
           await restaurantAPI.updateMenu({ sections: normalizedSections })
           console.log('✅ Menu saved successfully with', normalizedSections.length, 'sections')
         } catch (error) {
@@ -353,7 +353,7 @@ export default function HubMenu() {
           }
         }
       }, 1000) // Debounce: save 1 second after last change
-      
+
       return () => clearTimeout(timeoutId)
     }
   }, [menuData, loadingMenu])
@@ -385,7 +385,7 @@ export default function HubMenu() {
   // Handle add-on image add
   const handleAddonImageAdd = (e) => {
     const files = Array.from(e.target.files)
-    
+
     const allowedTypes = ["image/png", "image/jpeg", "image/jpg", "image/webp"]
     const validFiles = files.filter(file => {
       if (!allowedTypes.includes(file.type)) {
@@ -404,16 +404,16 @@ export default function HubMenu() {
 
     const newImagePreviews = []
     const newImageFilesMap = new Map(addonImageFiles)
-    
+
     validFiles.forEach(file => {
       const previewUrl = URL.createObjectURL(file)
       newImagePreviews.push(previewUrl)
       newImageFilesMap.set(previewUrl, file)
     })
-    
+
     setAddonImages([...addonImages, ...newImagePreviews])
     setAddonImageFiles(newImageFilesMap)
-    
+
     if (addonFileInputRef.current) {
       addonFileInputRef.current.value = ""
     }
@@ -422,22 +422,22 @@ export default function HubMenu() {
   // Handle add-on image delete
   const handleAddonImageDelete = (index) => {
     if (index < 0 || index >= addonImages.length) return
-    
+
     if (!window.confirm('Are you sure you want to delete this image?')) {
       return
     }
-    
+
     const imageToDelete = addonImages[index]
     const newImages = addonImages.filter((_, i) => i !== index)
     setAddonImages(newImages)
-    
+
     // Revoke blob URL if it's a preview
     if (imageToDelete.startsWith('blob:')) {
       URL.revokeObjectURL(imageToDelete)
       addonImageFiles.delete(imageToDelete)
       setAddonImageFiles(new Map(addonImageFiles))
     }
-    
+
     toast.success('Image removed')
   }
 
@@ -457,15 +457,15 @@ export default function HubMenu() {
 
       // Upload new images to Cloudinary
       const uploadedImageUrls = []
-      
-      const existingImageUrls = addonImages.filter(img => 
-        typeof img === 'string' && 
-        (img.startsWith('http://') || img.startsWith('https://')) && 
+
+      const existingImageUrls = addonImages.filter(img =>
+        typeof img === 'string' &&
+        (img.startsWith('http://') || img.startsWith('https://')) &&
         !img.startsWith('blob:')
       )
-      
+
       const filesToUpload = Array.from(addonImageFiles.values())
-      
+
       if (filesToUpload.length > 0) {
         toast.info(`Uploading ${filesToUpload.length} image(s)...`)
         for (let i = 0; i < filesToUpload.length; i++) {
@@ -490,10 +490,10 @@ export default function HubMenu() {
       const allImageUrls = [
         ...existingImageUrls,
         ...uploadedImageUrls
-      ].filter((url, index, self) => 
-        url && 
-        typeof url === 'string' && 
-        url.trim() !== '' && 
+      ].filter((url, index, self) =>
+        url &&
+        typeof url === 'string' &&
+        url.trim() !== '' &&
         self.indexOf(url) === index
       )
 
@@ -514,7 +514,7 @@ export default function HubMenu() {
         await restaurantAPI.addAddon(addonData)
         toast.success('Add-on added successfully! Pending admin approval.')
       }
-      
+
       // Reset form
       setAddonName("")
       setAddonDescription("")
@@ -523,7 +523,7 @@ export default function HubMenu() {
       setAddonImageFiles(new Map())
       setEditingAddon(null)
       setIsAddAddonModalOpen(false)
-      
+
       // Refresh add-ons list
       fetchAddons(true)
     } catch (error) {
@@ -597,8 +597,8 @@ export default function HubMenu() {
 
   // Prevent body scroll when popups are open
   useEffect(() => {
-    if (isFilterOpen || isAddPopupOpen || isMenuOpen || isAvailabilityPopupOpen || 
-        isCategoryOptionsOpen || isEditCategoryOpen || isAddSubCategoryOpen || isAddCategoryPopupOpen || isSearchOpen || isAddAddonModalOpen) {
+    if (isFilterOpen || isAddPopupOpen || isMenuOpen || isAvailabilityPopupOpen ||
+      isCategoryOptionsOpen || isEditCategoryOpen || isAddSubCategoryOpen || isAddCategoryPopupOpen || isSearchOpen || isAddAddonModalOpen) {
       document.body.style.overflow = 'hidden'
     } else {
       document.body.style.overflow = 'unset'
@@ -606,8 +606,8 @@ export default function HubMenu() {
     return () => {
       document.body.style.overflow = 'unset'
     }
-  }, [isFilterOpen, isAddPopupOpen, isMenuOpen, isAvailabilityPopupOpen, 
-      isCategoryOptionsOpen, isEditCategoryOpen, isAddSubCategoryOpen, isAddCategoryPopupOpen, isSearchOpen, isAddAddonModalOpen])
+  }, [isFilterOpen, isAddPopupOpen, isMenuOpen, isAvailabilityPopupOpen,
+    isCategoryOptionsOpen, isEditCategoryOpen, isAddSubCategoryOpen, isAddCategoryPopupOpen, isSearchOpen, isAddAddonModalOpen])
 
   // Filter menu based on active filter and search query
   const filteredMenuGroups = useMemo(() => {
@@ -642,8 +642,8 @@ export default function HubMenu() {
       filtered = filtered.map(group => {
         const filteredItems = group.items.filter(item => {
           return item.name.toLowerCase().includes(query) ||
-                 item.category.toLowerCase().includes(query) ||
-                 (item.description && item.description.toLowerCase().includes(query))
+            item.category.toLowerCase().includes(query) ||
+            (item.description && item.description.toLowerCase().includes(query))
         })
         return { ...group, items: filteredItems }
       }).filter(group => group.items.length > 0)
@@ -678,7 +678,7 @@ export default function HubMenu() {
       // Directly turn on (no popup needed)
       setMenuData(prev => prev.map(g => ({
         ...g,
-        items: g.items.map(i => 
+        items: g.items.map(i =>
           i.id === itemId ? { ...i, isAvailable: true } : i
         )
       })))
@@ -718,12 +718,12 @@ export default function HubMenu() {
             // Fallback: update locally
             setMenuData(prev => prev.map(g => ({
               ...g,
-              items: g.items.map(i => 
+              items: g.items.map(i =>
                 i.id === switchingOffTarget.id ? { ...i, isAvailable: false } : i
               ),
               subsections: g.subsections?.map(sub => ({
                 ...sub,
-                items: sub.items.map(i => 
+                items: sub.items.map(i =>
                   i.id === switchingOffTarget.id ? { ...i, isAvailable: false } : i
                 )
               }))
@@ -740,7 +740,7 @@ export default function HubMenu() {
         }
       } else if (switchingOffTarget.type === 'group') {
         // For groups, just update locally (no API support yet)
-        setMenuData(prev => prev.map(g => 
+        setMenuData(prev => prev.map(g =>
           g.id === switchingOffTarget.id ? { ...g, isEnabled: false } : g
         ))
         toast.success('Category availability updated')
@@ -780,7 +780,7 @@ export default function HubMenu() {
 
   const handleSaveCategoryName = () => {
     if (!editCategoryName.trim() || !selectedCategory) return
-    
+
     const newCategoryName = editCategoryName.trim()
     if (newCategoryName === selectedCategory.name) {
       setIsEditCategoryOpen(false)
@@ -822,7 +822,7 @@ export default function HubMenu() {
 
   const handleContinueSubCategory = () => {
     if (!subCategoryName.trim() || !selectedGroupForSubCategory) return
-    
+
     // Navigate to new item page with sub-category info
     navigate('/restaurant/hub-menu/item/new', {
       state: {
@@ -831,7 +831,7 @@ export default function HubMenu() {
         subCategory: subCategoryName.trim()
       }
     })
-    
+
     // Close popup and reset
     setIsAddSubCategoryOpen(false)
     setSubCategoryName("")
@@ -850,20 +850,20 @@ export default function HubMenu() {
       toast.error('Please enter a category name')
       return
     }
-    
+
     try {
       // Add category to backend
       const response = await restaurantAPI.addSection(newCategoryName.trim())
-      
+
       if (response.data && response.data.success) {
         // Refresh menu data
         const menuResponse = await restaurantAPI.getMenu()
         if (menuResponse.data && menuResponse.data.success && menuResponse.data.data && menuResponse.data.data.menu) {
           setMenuData(menuResponse.data.data.menu.sections || [])
         }
-        
+
         toast.success('Category added successfully!')
-        
+
         // Navigate to new item page with new category
         navigate('/restaurant/hub-menu/item/new', {
           state: {
@@ -879,7 +879,7 @@ export default function HubMenu() {
       console.error('Error adding category:', error)
       toast.error(error.response?.data?.message || 'Failed to add category')
     }
-    
+
     // Close popup and reset
     setIsAddCategoryPopupOpen(false)
     setNewCategoryName("")
@@ -887,7 +887,7 @@ export default function HubMenu() {
 
   const handleDeleteCategory = async () => {
     if (!selectedCategory) return
-    
+
     if (!window.confirm(`Are you sure you want to delete the category "${selectedCategory.name}"? This will delete all items in this category.`)) {
       return
     }
@@ -895,9 +895,9 @@ export default function HubMenu() {
     try {
       // Remove section from menuData and update backend
       const updatedSections = menuData.filter(section => section.id !== selectedCategory.id)
-      
+
       await restaurantAPI.updateMenu({ sections: updatedSections })
-      
+
       // Update local state
       setMenuData(updatedSections)
       toast.success('Category deleted successfully')
@@ -955,7 +955,7 @@ export default function HubMenu() {
               </AnimatePresence>
             </div>
             <div className="flex items-center gap-3 shrink-0">
-              <button 
+              <button
                 onClick={() => {
                   fetchMenu(true)
                   toast.success('Menu refreshed')
@@ -965,18 +965,18 @@ export default function HubMenu() {
               >
                 <RefreshCw className="w-5 h-5 text-gray-700" />
               </button>
-              <button 
+              <button
                 onClick={() => setIsSearchOpen(true)}
                 className="p-2 rounded-full hover:bg-gray-100 transition-colors"
               >
                 <Search className="w-5 h-5 text-gray-700" />
               </button>
               <button
-              className="p-2 ml-1 hover:bg-gray-100 rounded-full transition-colors"
-              onClick={() => navigate("/restaurant/explore")}
-            >
-              <Menu className="w-5 h-5 text-gray-700" />
-            </button>
+                className="p-2 ml-1 hover:bg-gray-100 rounded-full transition-colors"
+                onClick={() => navigate("/restaurant/explore")}
+              >
+                <Menu className="w-5 h-5 text-gray-700" />
+              </button>
             </div>
           </div>
 
@@ -1019,11 +1019,10 @@ export default function HubMenu() {
               <button
                 key={filter.id}
                 onClick={() => handleFilterSelect(filter.id)}
-                className={`flex items-center gap-2 px-2 py-1 text-semibold border-2 rounded-md text-sm font-medium whitespace-nowrap shrink-0 ${
-                  activeFilter === filter.id
-                    ? "bg-gray-900 text-white border-gray-900"
-                    : "bg-white border-gray-200 text-gray-900"
-                }`}
+                className={`flex items-center gap-2 px-2 py-1 text-semibold border-2 rounded-md text-sm font-medium whitespace-nowrap shrink-0 ${activeFilter === filter.id
+                  ? "bg-[#3B82F6] text-white border-[#3B82F6]"
+                  : "bg-white border-gray-200 text-gray-900"
+                  }`}
               >
                 <span>{filter.label}</span>
                 <span className="bg-red-100 border-2 border-red-400 text-red-400 text-xs  font-bold p-0.5 py-0.25 rounded-sm">
@@ -1034,7 +1033,7 @@ export default function HubMenu() {
             ))}
             <button
               onClick={() => setIsFilterOpen(true)}
-              className="sticky right-0 z-10 bg-black p-2 text-white border-2 border-black flex items-center gap-2 px-2 py-1 text-semibold rounded-l-lg text-sm font-medium whitespace-nowrap"
+              className="sticky right-0 z-10 bg-[#3B82F6] p-2 text-white border-2 border-[#3B82F6] flex items-center gap-2 px-2 py-1 text-semibold rounded-l-lg text-sm font-medium whitespace-nowrap"
             >
               <SlidersHorizontal className="w-4 h-4" />
               <span>Filter</span>
@@ -1045,28 +1044,26 @@ export default function HubMenu() {
         {/* Tabs */}
       </div>
 
-        <div className="flex items-center gap-2 p-0.5 mt-2 w-auto mx-4 bg-gray-200 rounded-md">
-          <button
-            onClick={() => setActiveTab("all")}
-            className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-              activeTab === "all"
-                ? "bg-white text-black"
-                : " text-gray-600"
+      <div className="flex items-center gap-2 p-0.5 mt-2 w-auto mx-4 bg-gray-200 rounded-md">
+        <button
+          onClick={() => setActiveTab("all")}
+          className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${activeTab === "all"
+            ? "bg-[#3B82F6] text-white"
+            : " text-gray-600"
             }`}
-          >
-            All items
-          </button>
-          <button
-            onClick={() => setActiveTab("add-ons")}
-            className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-              activeTab === "add-ons"
-                ? "bg-white text-black"
-                : " text-gray-600"
+        >
+          All items
+        </button>
+        <button
+          onClick={() => setActiveTab("add-ons")}
+          className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${activeTab === "add-ons"
+            ? "bg-[#3B82F6] text-white"
+            : " text-gray-600"
             }`}
-          >
-            Add-ons
-          </button>
-        </div>
+        >
+          Add-ons
+        </button>
+      </div>
       {/* Content */}
       <div className="flex-1 space-y-4 pt-8 pb-24 overflow-y-auto">
         {activeTab === "add-ons" ? (
@@ -1075,7 +1072,7 @@ export default function HubMenu() {
             <div className="mb-6">
               <button
                 onClick={() => setIsAddAddonModalOpen(true)}
-                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors"
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-[#3B82F6] hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
               >
                 <Plus className="h-5 w-5" />
                 <span>Add Add-on</span>
@@ -1164,135 +1161,132 @@ export default function HubMenu() {
               const itemCount = group.items.length
               const enabledItems = group.items.filter(item => item.isAvailable).length
 
-            return (
-              <div
-                key={group.id}
-                id={`group-${group.id}`}
-                className="bg-white rounded-lg overflow-hidden"
-              >
-              {/* Group Header */}
-              <div className="py-3 flex items-center justify-between px-4">
-                <div className="flex items-center gap-3 flex-1">
-                  <div className="w-1 h-6 bg-red-500 rounded-r-full" />
-                  <h3 className="text-base font-bold text-gray-900">
-                    {group.name} ({enabledItems})
-                  </h3>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault()
-                      e.stopPropagation()
-                      toggleGroup(group.id)
-                    }}
-                    className="p-1 rounded-full hover:bg-gray-100 transition-colors z-10 relative"
-                    aria-label={isExpanded ? "Collapse section" : "Expand section"}
-                  >
-                    {isExpanded ? (
-                      <ChevronUp className="w-5 h-5 text-gray-600" />
-                    ) : (
-                      <ChevronDown className="w-5 h-5 text-gray-600" />
-                    )}
-                  </button>
-                  <button 
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault()
-                      e.stopPropagation()
-                      handleOpenCategoryOptions(group)
-                    }}
-                    className="p-1 rounded-full hover:bg-gray-100 transition-colors z-10 relative"
-                    aria-label="Category options"
-                  >
-                    <MoreVertical className="w-5 h-5 text-gray-600" />
-                  </button>
-                </div>
-              </div>
-
-              {isExpanded && (
-                <div className="p-4 space-y-2">
-                  {/* Items */}
-                  <div className="space-y-4">
-                    {group.items.map((item) => (
-                      <div key={item.id} className="border-b border-gray-100 pb-4 last:border-0 last:pb-0">
-                        <div className="flex items-start gap-3">
-                          {/* Left: Veg/Non-veg icon, name, price */}
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-2">
-                              <div
-                                className={`w-4 h-4 rounded-sm border-2 shrink-0 flex items-center justify-center ${
-                                  item.foodType === "Veg"
-                                    ? "bg-green-50 border-green-600"
-                                    : "bg-red-50 border-red-600"
-                                }`}
-                              >
-                                <div className={`w-2 h-2 rounded-full ${
-                                  item.foodType === "Veg"
-                                    ? "bg-green-600"
-                                    : "bg-red-600"
-                                }`} />
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2 mb-1">
-                              <h5 className="text-base font-bold text-gray-900">{item.name}</h5>
-                              {/* Approval Status Tag */}
-                              {item.approvalStatus && (
-                                <span
-                                  className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                                    item.approvalStatus === 'approved'
-                                      ? 'bg-green-100 text-green-700 border border-green-300'
-                                      : item.approvalStatus === 'rejected'
-                                      ? 'bg-red-100 text-red-700 border border-red-300'
-                                      : 'bg-yellow-100 text-yellow-700 border border-yellow-300'
-                                  }`}
-                                >
-                                  {item.approvalStatus === 'approved'
-                                    ? 'Approved'
-                                    : item.approvalStatus === 'rejected'
-                                    ? 'Rejected'
-                                    : 'Pending'}
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-sm font-medium text-gray-700 mb-3">₹{item.price}</p>
-                          </div>
-
-                          {/* Right: Image */}
-                          <div className="relative">
-                            <img
-                              src={item.image}
-                              alt={item.name}
-                              className="w-20 h-20 rounded-lg object-cover"
-                            />
-                            <div className="absolute bottom-1 right-1 bg-black/60 rounded-full p-1">
-                              <div className="flex items-center gap-1">
-                                <Camera className="w-3 h-3 text-white" />
-                                <span className="text-white text-xs font-semibold">{item.photoCount}</span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Action buttons - below image */}
-                        <div className="flex items-center justify-center gap-3 mt-4">
-                          <button 
-                            onClick={() => navigate(`/restaurant/hub-menu/item/${item.id}`, { state: { item, groupId: group.id } })}
-                            className="flex items-center gap-1.5 bg-transparent text-gray-700 text-sm font-medium"
-                          >
-                            <Edit className="w-3.5 h-3.5" />
-                            <span>Edit</span>
-                          </button>
-                        </div>
-                      </div>
-                    ))}
+              return (
+                <div
+                  key={group.id}
+                  id={`group-${group.id}`}
+                  className="bg-white rounded-lg overflow-hidden"
+                >
+                  {/* Group Header */}
+                  <div className="py-3 flex items-center justify-between px-4">
+                    <div className="flex items-center gap-3 flex-1">
+                      <div className="w-1 h-6 bg-red-500 rounded-r-full" />
+                      <h3 className="text-base font-bold text-gray-900">
+                        {group.name} ({enabledItems})
+                      </h3>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          toggleGroup(group.id)
+                        }}
+                        className="p-1 rounded-full hover:bg-gray-100 transition-colors z-10 relative"
+                        aria-label={isExpanded ? "Collapse section" : "Expand section"}
+                      >
+                        {isExpanded ? (
+                          <ChevronUp className="w-5 h-5 text-gray-600" />
+                        ) : (
+                          <ChevronDown className="w-5 h-5 text-gray-600" />
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          handleOpenCategoryOptions(group)
+                        }}
+                        className="p-1 rounded-full hover:bg-gray-100 transition-colors z-10 relative"
+                        aria-label="Category options"
+                      >
+                        <MoreVertical className="w-5 h-5 text-gray-600" />
+                      </button>
+                    </div>
                   </div>
 
+                  {isExpanded && (
+                    <div className="p-4 space-y-2">
+                      {/* Items */}
+                      <div className="space-y-4">
+                        {group.items.map((item) => (
+                          <div key={item.id} className="border-b border-gray-100 pb-4 last:border-0 last:pb-0">
+                            <div className="flex items-start gap-3">
+                              {/* Left: Veg/Non-veg icon, name, price */}
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <div
+                                    className={`w-4 h-4 rounded-sm border-2 shrink-0 flex items-center justify-center ${item.foodType === "Veg"
+                                      ? "bg-green-50 border-green-600"
+                                      : "bg-red-50 border-red-600"
+                                      }`}
+                                  >
+                                    <div className={`w-2 h-2 rounded-full ${item.foodType === "Veg"
+                                      ? "bg-green-600"
+                                      : "bg-red-600"
+                                      }`} />
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2 mb-1">
+                                  <h5 className="text-base font-bold text-gray-900">{item.name}</h5>
+                                  {/* Approval Status Tag */}
+                                  {item.approvalStatus && (
+                                    <span
+                                      className={`px-2 py-0.5 rounded-full text-xs font-medium ${item.approvalStatus === 'approved'
+                                        ? 'bg-green-100 text-green-700 border border-green-300'
+                                        : item.approvalStatus === 'rejected'
+                                          ? 'bg-red-100 text-red-700 border border-red-300'
+                                          : 'bg-yellow-100 text-yellow-700 border border-yellow-300'
+                                        }`}
+                                    >
+                                      {item.approvalStatus === 'approved'
+                                        ? 'Approved'
+                                        : item.approvalStatus === 'rejected'
+                                          ? 'Rejected'
+                                          : 'Pending'}
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-sm font-medium text-gray-700 mb-3">₹{item.price}</p>
+                              </div>
+
+                              {/* Right: Image */}
+                              <div className="relative">
+                                <img
+                                  src={item.image}
+                                  alt={item.name}
+                                  className="w-20 h-20 rounded-lg object-cover"
+                                />
+                                <div className="absolute bottom-1 right-1 bg-black/60 rounded-full p-1">
+                                  <div className="flex items-center gap-1">
+                                    <Camera className="w-3 h-3 text-white" />
+                                    <span className="text-white text-xs font-semibold">{item.photoCount}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Action buttons - below image */}
+                            <div className="flex items-center justify-center gap-3 mt-4">
+                              <button
+                                onClick={() => navigate(`/restaurant/hub-menu/item/${item.id}`, { state: { item, groupId: group.id } })}
+                                className="flex items-center gap-1.5 bg-transparent text-gray-700 text-sm font-medium"
+                              >
+                                <Edit className="w-3.5 h-3.5" />
+                                <span>Edit</span>
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                    </div>
+                  )}
                 </div>
-              )}
-              </div>
-            )
-          })}
+              )
+            })}
           </div>
         )}
       </div>
@@ -1341,8 +1335,8 @@ export default function HubMenu() {
                         value={filter.id}
                         checked={activeFilter === filter.id}
                         onChange={() => handleFilterSelect(filter.id)}
-                        className="w-5 h-5 text-black border-gray-400 focus:ring-black"
-                        style={{ accentColor: "#000000" }}
+                        className="w-5 h-5 text-[#3B82F6] border-gray-400 focus:ring-[#3B82F6]"
+                        style={{ accentColor: "#3B82F6" }}
                       />
                     </label>
                   ))}
@@ -1363,7 +1357,7 @@ export default function HubMenu() {
                 )}
                 <button
                   onClick={() => setIsFilterOpen(false)}
-                  className="w-full py-3 rounded-lg font-semibold text-sm bg-gray-900 text-white hover:bg-gray-800 transition-colors"
+                  className="w-full py-3 rounded-lg font-semibold text-sm bg-[#3B82F6] text-white hover:bg-blue-700 transition-colors"
                 >
                   Confirm
                 </button>
@@ -1414,10 +1408,10 @@ export default function HubMenu() {
       <div>
         {isAvailabilityPopupOpen && (
           <>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
               className="fixed inset-0 bg-white z-[9999]"
             >
               {/* Header */}
@@ -1458,8 +1452,8 @@ export default function HubMenu() {
                             value={option.id}
                             checked={availabilityReason === option.id}
                             onChange={() => setAvailabilityReason(option.id)}
-                            className="w-5 h-5 text-black border-gray-400 focus:ring-black"
-                            style={{ accentColor: "#000000" }}
+                            className="w-5 h-5 text-[#3B82F6] border-gray-400 focus:ring-[#3B82F6]"
+                            style={{ accentColor: "#3B82F6" }}
                           />
                           <span className="text-sm font-medium text-gray-900">{option.label}</span>
                         </label>
@@ -1471,7 +1465,7 @@ export default function HubMenu() {
                               onChange={(e) => setCustomDateTime(e.target.value)}
                               min={new Date().toISOString().slice(0, 16)}
                               max={new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16)}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-black"
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3B82F6] focus:border-[#3B82F6]"
                               required
                             />
                           </div>
@@ -1495,8 +1489,8 @@ export default function HubMenu() {
                         value="manual"
                         checked={availabilityReason === "manual"}
                         onChange={() => setAvailabilityReason("manual")}
-                        className="w-5 h-5 text-black border-gray-400 focus:ring-black"
-                        style={{ accentColor: "#000000" }}
+                        className="w-5 h-5 text-[#3B82F6] border-gray-400 focus:ring-[#3B82F6]"
+                        style={{ accentColor: "#3B82F6" }}
                       />
                       <span className="text-sm font-medium text-gray-900">I will turn it on myself</span>
                     </label>
@@ -1512,11 +1506,10 @@ export default function HubMenu() {
                 <button
                   onClick={handleAvailabilityConfirm}
                   disabled={!availabilityReason || isScheduling || (availabilityReason === 'custom' && !customDateTime)}
-                  className={`w-full py-3 rounded-lg font-semibold text-sm transition-colors ${
-                    availabilityReason && !isScheduling && (availabilityReason !== 'custom' || customDateTime)
-                      ? "bg-gray-900 text-white hover:bg-gray-800"
-                      : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                  }`}
+                  className={`w-full py-3 rounded-lg font-semibold text-sm transition-colors ${availabilityReason && !isScheduling && (availabilityReason !== 'custom' || customDateTime)
+                    ? "bg-[#3B82F6] text-white hover:bg-blue-700"
+                    : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                    }`}
                 >
                   {isScheduling ? 'Scheduling...' : 'Confirm'}
                 </button>
@@ -1532,12 +1525,12 @@ export default function HubMenu() {
 
         {activeTab !== "add-ons" && (
           <motion.button
-          whileTap={{ scale: 0.96 }}
-          onClick={() => setIsAddPopupOpen(true)}
-          className="px-4 py-2 border bg-black text-white border-gray-800 rounded-lg text-sm font-bold"
-        >
-          + ADD
-        </motion.button>)}
+            whileTap={{ scale: 0.96 }}
+            onClick={() => setIsAddPopupOpen(true)}
+            className="px-4 py-2 border bg-[#3B82F6] text-white border-[#3B82F6] rounded-lg text-sm font-bold"
+          >
+            + ADD
+          </motion.button>)}
 
         {/* Menu Button */}
         {activeTab !== "add-ons" && (
@@ -1610,8 +1603,8 @@ export default function HubMenu() {
                           )
                         })}
                       </div>
-        </div>
-      </motion.div>
+                    </div>
+                  </motion.div>
                 </>
               )}
             </AnimatePresence>
@@ -1735,11 +1728,10 @@ export default function HubMenu() {
                     <button
                       onClick={handleSaveCategoryName}
                       disabled={!editCategoryName.trim()}
-                      className={`flex-1 py-3 px-4 rounded-lg text-sm font-semibold transition-colors ${
-                        editCategoryName.trim()
-                          ? "bg-black text-white hover:bg-gray-800"
-                          : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                      }`}
+                      className={`flex-1 py-3 px-4 rounded-lg text-sm font-semibold transition-colors ${editCategoryName.trim()
+                        ? "bg-[#3B82F6] text-white hover:bg-blue-700"
+                        : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                        }`}
                     >
                       Save
                     </button>
@@ -1815,11 +1807,10 @@ export default function HubMenu() {
                   <button
                     onClick={handleContinueSubCategory}
                     disabled={!subCategoryName.trim()}
-                    className={`w-full py-3 px-4 rounded-lg text-sm font-semibold transition-colors ${
-                      subCategoryName.trim()
-                        ? "bg-black text-white hover:bg-gray-800"
-                        : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                    }`}
+                    className={`w-full py-3 px-4 rounded-lg text-sm font-semibold transition-colors ${subCategoryName.trim()
+                      ? "bg-[#3B82F6] text-white hover:bg-blue-700"
+                      : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                      }`}
                   >
                     Continue
                   </button>
@@ -1887,11 +1878,10 @@ export default function HubMenu() {
                   <button
                     onClick={handleContinueAddCategory}
                     disabled={!newCategoryName.trim()}
-                    className={`w-full py-3 px-4 rounded-lg text-sm font-semibold transition-colors ${
-                      newCategoryName.trim()
-                        ? "bg-black text-white hover:bg-gray-800"
-                        : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                    }`}
+                    className={`w-full py-3 px-4 rounded-lg text-sm font-semibold transition-colors ${newCategoryName.trim()
+                      ? "bg-[#3B82F6] text-white hover:bg-blue-700"
+                      : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                      }`}
                   >
                     Continue
                   </button>
@@ -1972,8 +1962,8 @@ export default function HubMenu() {
                                 key={item.id}
                                 onClick={() => {
                                   setIsSearchOpen(false)
-                                  navigate(`/restaurant/hub-menu/item/${item.id}`, { 
-                                    state: { item, groupId: group.id } 
+                                  navigate(`/restaurant/hub-menu/item/${item.id}`, {
+                                    state: { item, groupId: group.id }
                                   })
                                 }}
                                 className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer transition-colors"
@@ -1986,17 +1976,15 @@ export default function HubMenu() {
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center gap-2 mb-1">
                                     <div
-                                      className={`w-4 h-4 rounded-sm border-2 shrink-0 flex items-center justify-center ${
-                                        item.foodType === "Veg"
-                                          ? "bg-green-50 border-green-600"
-                                          : "bg-red-50 border-red-600"
-                                      }`}
+                                      className={`w-4 h-4 rounded-sm border-2 shrink-0 flex items-center justify-center ${item.foodType === "Veg"
+                                        ? "bg-green-50 border-green-600"
+                                        : "bg-red-50 border-red-600"
+                                        }`}
                                     >
-                                      <div className={`w-2 h-2 rounded-full ${
-                                        item.foodType === "Veg"
-                                          ? "bg-green-600"
-                                          : "bg-red-600"
-                                      }`} />
+                                      <div className={`w-2 h-2 rounded-full ${item.foodType === "Veg"
+                                        ? "bg-green-600"
+                                        : "bg-red-600"
+                                        }`} />
                                     </div>
                                     <h4 className="text-sm font-bold text-gray-900 truncate">
                                       {item.name}
@@ -2039,7 +2027,7 @@ export default function HubMenu() {
                 <div className="px-4 py-3 border-t border-gray-200">
                   <button
                     onClick={() => setIsSearchOpen(false)}
-                    className="w-full py-3 rounded-lg font-semibold text-sm bg-gray-900 text-white hover:bg-gray-800 transition-colors"
+                    className="w-full py-3 rounded-lg font-semibold text-sm bg-[#3B82F6] text-white hover:bg-blue-700 transition-colors"
                   >
                     View Results ({filteredMenuGroups.reduce((acc, group) => acc + group.items.length, 0)} items)
                   </button>
@@ -2092,7 +2080,7 @@ export default function HubMenu() {
                     value={addonName}
                     onChange={(e) => setAddonName(e.target.value)}
                     placeholder="e.g., Coke, Chips, Sauce"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3B82F6] focus:border-transparent"
                   />
                 </div>
 
@@ -2106,7 +2094,7 @@ export default function HubMenu() {
                     onChange={(e) => setAddonDescription(e.target.value)}
                     placeholder="Describe the add-on..."
                     rows={3}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3B82F6] focus:border-transparent resize-none"
                   />
                 </div>
 
@@ -2122,7 +2110,7 @@ export default function HubMenu() {
                     placeholder="0.00"
                     min="0"
                     step="0.01"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3B82F6] focus:border-transparent"
                   />
                 </div>
 
@@ -2131,7 +2119,7 @@ export default function HubMenu() {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Images
                   </label>
-                  
+
                   {/* Image Preview Grid */}
                   {addonImages.length > 0 && (
                     <div className="grid grid-cols-3 gap-3 mb-3">
@@ -2170,7 +2158,7 @@ export default function HubMenu() {
                   />
                   <label
                     htmlFor="addon-image-upload"
-                    className="flex items-center justify-center gap-2 px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-green-500 hover:bg-green-50 transition-colors"
+                    className="flex items-center justify-center gap-2 px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-[#3B82F6] hover:bg-blue-50 transition-colors"
                   >
                     <Camera className="h-5 w-5 text-gray-500" />
                     <span className="text-sm font-medium text-gray-700">Add Images</span>
@@ -2190,7 +2178,7 @@ export default function HubMenu() {
                 <button
                   onClick={handleSaveAddon}
                   disabled={!addonName.trim() || !addonPrice || uploadingAddonImages}
-                  className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors font-medium flex items-center justify-center gap-2"
+                  className="flex-1 px-4 py-2 bg-[#3B82F6] text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors font-medium flex items-center justify-center gap-2"
                 >
                   {uploadingAddonImages ? (
                     <>

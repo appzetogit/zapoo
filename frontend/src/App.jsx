@@ -104,6 +104,7 @@ const ManageOutlets = lazy(() => import("@/module/restaurant/pages/ManageOutlets
 const UpdateBankDetails = lazy(() => import("@/module/restaurant/pages/UpdateBankDetails"))
 const ZoneSetup = lazy(() => import("@/module/restaurant/pages/ZoneSetup"))
 const DiningReservations = lazy(() => import("@/module/restaurant/pages/DiningReservations"))
+const DiningTableManagement = lazy(() => import("@/module/restaurant/pages/DiningTableManagement"))
 const SubscriptionPlans = lazy(() => import("@/module/restaurant/pages/SubscriptionPlans"))
 
 // Admin Module
@@ -779,6 +780,14 @@ export default function App() {
           element={
             <ProtectedRoute requiredRole="restaurant" loginPath="/restaurant/login">
               <DiningReservations />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/restaurant/tables"
+          element={
+            <ProtectedRoute requiredRole="restaurant" loginPath="/restaurant/login">
+              <DiningTableManagement />
             </ProtectedRoute>
           }
         />

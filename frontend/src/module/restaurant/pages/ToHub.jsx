@@ -43,7 +43,6 @@ export default function ToHub() {
   const topTabs = [
     { id: "my-feed", label: "My feed" },
     { id: "sales", label: "Sales" },
-    { id: "growth", label: "Growth" },
   ]
   const [activeTopTab, setActiveTopTab] = useState("my-feed")
   const [isTransitioning, setIsTransitioning] = useState(false)
@@ -1292,8 +1291,8 @@ export default function ToHub() {
               <AreaChart data={chartData} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
                 <defs>
                   <linearGradient id="ordersGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#111827" stopOpacity={0.6} />
-                    <stop offset="95%" stopColor="#111827" stopOpacity={0.05} />
+                    <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.6} />
+                    <stop offset="95%" stopColor="#3B82F6" stopOpacity={0.05} />
                   </linearGradient>
                   <linearGradient id="salesGradient" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#10b981" stopOpacity={0.6} />
@@ -1305,7 +1304,7 @@ export default function ToHub() {
                 <YAxis tick={{ fontSize: 11, fill: "#6b7280" }} />
                 <Tooltip />
                 <Legend />
-                <Area type="monotone" dataKey="orders" stroke="#111827" fill="url(#ordersGradient)" />
+                <Area type="monotone" dataKey="orders" stroke="#3B82F6" fill="url(#ordersGradient)" />
                 <Area type="monotone" dataKey="sales" stroke="#10b981" fill="url(#salesGradient)" />
               </AreaChart>
             </ResponsiveContainer>
@@ -1331,7 +1330,7 @@ export default function ToHub() {
                   className="flex flex-col items-center gap-2 hover:opacity-80 transition-opacity"
                 >
                   <div className="w-16 h-16 bg-white rounded-xl flex items-center justify-center shadow-sm hover:shadow-md transition-shadow">
-                    <Icon className="w-5 h-5 text-black" />
+                    <Icon className="w-5 h-5 text-[#3B82F6]" />
                   </div>
                   <span className="text-[12px] text-center text-gray-800 leading-tight">
                     {link.label}
@@ -1421,12 +1420,12 @@ export default function ToHub() {
 
             <div className="pt-2">
               <div className="flex items-center justify-center gap-4 text-xs text-gray-600">
-                <span className="flex items-center gap-2"><span className="w-3 h-0.5 bg-gray-900 inline-block"></span>Yesterday</span>
+                <span className="flex items-center gap-2"><span className="w-3 h-0.5 bg-[#3B82F6] inline-block"></span>Yesterday</span>
                 <span className="flex items-center gap-2"><span className="w-3 h-0.5 bg-gray-400 inline-block"></span>Day before yesterday</span>
               </div>
               <button
                 onClick={() => setActiveTopTab("sales")}
-                className="w-full mt-3 bg-black text-white py-3 rounded-md text-sm font-semibold hover:bg-gray-800 transition-colors"
+                className="w-full mt-3 bg-[#3B82F6] text-white py-3 rounded-md text-sm font-semibold hover:bg-blue-700 transition-colors"
               >
                 Get deeper insights
               </button>
@@ -1489,7 +1488,7 @@ export default function ToHub() {
 
             <button
               onClick={() => setActiveTopTab("customers")}
-              className="w-full bg-black text-white py-3 rounded-md text-sm font-semibold hover:bg-gray-800 transition-colors"
+              className="w-full bg-[#3B82F6] text-white py-3 rounded-md text-sm font-semibold hover:bg-blue-700 transition-colors"
             >
               Get deeper insights
             </button>
@@ -1618,7 +1617,7 @@ export default function ToHub() {
 
             <button
               onClick={() => setActiveTopTab("offers")}
-              className="w-full bg-black text-white py-3 rounded-md text-sm font-semibold hover:bg-gray-800 transition-colors"
+              className="w-full bg-[#3B82F6] text-white py-3 rounded-md text-sm font-semibold hover:bg-blue-700 transition-colors"
             >
               Get deeper insights
             </button>
@@ -1829,10 +1828,10 @@ export default function ToHub() {
                       yAxisId="left"
                       type="monotone"
                       dataKey="sales"
-                      stroke="#111827"
+                      stroke="#3B82F6"
                       strokeWidth={2}
-                      fill="rgba(17,24,39,0.12)"
-                      dot={{ r: 3, fill: "#111827" }}
+                      fill="rgba(59, 130, 246, 0.12)"
+                      dot={{ r: 3, fill: "#3B82F6" }}
                       activeDot={{ r: 4 }}
                     />
                     <Line
@@ -1850,7 +1849,7 @@ export default function ToHub() {
 
               <div className="flex items-center justify-center gap-6 text-xs text-gray-600">
                 <span className="flex items-center gap-2">
-                  <span className="w-3 h-3 bg-gray-900 inline-block rounded-[2px]" />
+                  <span className="w-3 h-3 bg-[#3B82F6] inline-block rounded-[2px]" />
                   Net sales
                 </span>
                 <span className="flex items-center gap-2">
@@ -1945,10 +1944,10 @@ export default function ToHub() {
                   <Area
                     type="monotone"
                     dataKey="aov"
-                    stroke="#111827"
+                    stroke="#3B82F6"
                     strokeWidth={2}
-                    fill="rgba(17,24,39,0.08)"
-                    dot={{ r: 3, fill: "#111827" }}
+                    fill="rgba(59, 130, 246, 0.08)"
+                    dot={{ r: 3, fill: "#3B82F6" }}
                     activeDot={{ r: 4 }}
                   />
                 </AreaChart>
@@ -2108,7 +2107,7 @@ export default function ToHub() {
                       setTimeout(() => setIsTransitioning(false), 300)
                     }
                   }}
-                  className={`shrink-0 px-6 py-3.5 rounded-full font-medium text-sm whitespace-nowrap relative overflow-hidden ${isActive ? 'text-white' : 'bg-white text-black'}`}
+                  className={`shrink-0 px-6 py-3.5 rounded-full font-medium text-sm whitespace-nowrap relative overflow-hidden ${isActive ? 'text-white' : 'bg-white text-gray-700'}`}
                   animate={{ scale: isActive ? 1.05 : 1, opacity: isActive ? 1 : 0.7 }}
                   transition={{ duration: 0.3, ease: [0.25, 0.1, 0.25, 1] }}
                   whileTap={{ scale: 0.95 }}
@@ -2116,7 +2115,7 @@ export default function ToHub() {
                   {isActive && (
                     <motion.div
                       layoutId="hubTopTabActive"
-                      className="absolute inset-0 bg-black rounded-full -z-10"
+                      className="absolute inset-0 bg-[#3B82F6] rounded-full -z-10"
                       initial={false}
                       transition={{
                         type: "spring",

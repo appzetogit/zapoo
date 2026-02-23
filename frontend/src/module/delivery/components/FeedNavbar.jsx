@@ -400,13 +400,7 @@ export default function FeedNavbar({ className = "" }) {
 
         {/* Right Icons */}
         <div className="flex items-center gap-3">
-          <Link to="/delivery/feed">
-            <img
-              src="/zapoo-delivery-logo.jpg"
-              alt="Zapoo Delivery"
-              className="h-8 w-auto"
-            />
-          </Link>
+
           {/* Emergency */}
           <button
             onClick={() => setShowEmergencyPopup(true)}

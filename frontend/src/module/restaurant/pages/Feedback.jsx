@@ -89,7 +89,7 @@ export default function Feedback() {
   const [activeTab, setActiveTab] = useState(tabFromUrl === "complaints" ? "complaints" : "reviews")
   const navigate = useNavigate()
   const [isTransitioning, setIsTransitioning] = useState(false)
-  
+
   // Update active tab when URL param changes
   useEffect(() => {
     if (tabFromUrl === "complaints") {
@@ -99,13 +99,13 @@ export default function Feedback() {
       setActiveTab("reviews")
     }
   }, [tabFromUrl])
-  
+
   // Swipe gesture refs
   const touchStartX = useRef(0)
   const touchEndX = useRef(0)
   const touchStartY = useRef(0)
   const isSwiping = useRef(false)
-  
+
   const feedbackTabs = ["complaints", "reviews"]
   const [reviews, setReviews] = useState([])
   const [selectedReview, setSelectedReview] = useState(null)
@@ -120,7 +120,7 @@ export default function Feedback() {
   })
   const [isFilterLoading, setIsFilterLoading] = useState(false)
   const [displayedReviews, setDisplayedReviews] = useState([])
-  
+
   // Complaints filter state
   const [isComplaintsFilterOpen, setIsComplaintsFilterOpen] = useState(false)
   const [selectedComplaintsFilterCategory, setSelectedComplaintsFilterCategory] = useState("issueType")
@@ -129,7 +129,7 @@ export default function Feedback() {
     reasons: []
   })
   const [complaintsSearchQuery, setComplaintsSearchQuery] = useState("")
-  
+
   // Date selector state
   const [isDateSelectorOpen, setIsDateSelectorOpen] = useState(false)
   const [selectedDateRange, setSelectedDateRange] = useState("last5days") // "today", "yesterday", "thisWeek", "lastWeek", "thisMonth", "lastMonth", "last5days", "custom"
@@ -170,7 +170,7 @@ export default function Feedback() {
   useEffect(() => {
     const fetchComplaints = async () => {
       if (activeTab !== 'complaints') return
-      
+
       try {
         setIsComplaintsLoading(true)
         const dateRanges = getDateRanges()
@@ -254,16 +254,16 @@ export default function Feedback() {
 
         while (hasMore && page <= maxPages) {
           try {
-            const response = await restaurantAPI.getOrders({ 
-              page, 
+            const response = await restaurantAPI.getOrders({
+              page,
               limit,
               status: 'delivered'
             })
-            
+
             if (response.data?.success && response.data.data?.orders) {
               const orders = response.data.data.orders
               allOrders = [...allOrders, ...orders]
-              
+
               const totalPages = response.data.data.pagination?.totalPages || response.data.data.totalPages || 1
               if (orders.length < limit || (totalPages > 0 && page >= totalPages)) {
                 hasMore = false
@@ -297,31 +297,31 @@ export default function Feedback() {
             const formattedDate = `${day} ${month}, ${year} ${displayHours}:${displayMinutes} ${ampm}`
 
             // Extract user info
-            const userName = order.userId?.name || 
-                            (typeof order.userId === 'object' && order.userId?.name) ||
-                            'Customer'
-            const userImage = order.userId?.profileImage || 
-                             (typeof order.userId === 'object' && order.userId?.profileImage) ||
-                             `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=random`
+            const userName = order.userId?.name ||
+              (typeof order.userId === 'object' && order.userId?.name) ||
+              'Customer'
+            const userImage = order.userId?.profileImage ||
+              (typeof order.userId === 'object' && order.userId?.profileImage) ||
+              `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=random`
 
             // Get outlet/restaurant name
-            const outlet = order.restaurantName || 
-                          (restaurantData?.name) ||
-                          'Restaurant'
+            const outlet = order.restaurantName ||
+              (restaurantData?.name) ||
+              'Restaurant'
 
             // Get rating if available (from order.review or order.rating)
-            const rating = order.review?.rating || 
-                          order.rating || 
-                          order.feedback?.rating ||
-                          null
+            const rating = order.review?.rating ||
+              order.rating ||
+              order.feedback?.rating ||
+              null
             const reviewText = order.review?.comment ||
-                             order.review?.text ||
-                             order.feedback?.comment ||
-                             order.feedback?.text ||
-                             (rating ? `${rating}★ rating` : 'No review text')
+              order.review?.text ||
+              order.feedback?.comment ||
+              order.feedback?.text ||
+              (rating ? `${rating}★ rating` : 'No review text')
 
             // Count user's orders with this restaurant
-            const userOrdersCount = allOrders.filter(o => 
+            const userOrdersCount = allOrders.filter(o =>
               (o.userId?._id || o.userId) === (order.userId?._id || order.userId)
             ).length
 
@@ -346,7 +346,7 @@ export default function Feedback() {
 
         // Calculate rating summary
         const ratings = transformedReviews.map(r => r.rating).filter(r => r !== null)
-        const averageRating = ratings.length > 0 
+        const averageRating = ratings.length > 0
           ? (ratings.reduce((sum, r) => sum + r, 0) / ratings.length).toFixed(1)
           : 0
         const totalRatings = ratings.length
@@ -359,15 +359,15 @@ export default function Feedback() {
         })
 
         setReviews(transformedReviews)
-        
+
         // Save to localStorage for offline access
         try {
           if (typeof window !== "undefined") {
             localStorage.setItem(REVIEWS_STORAGE_KEY, JSON.stringify(transformedReviews))
           }
-    } catch (error) {
-      console.error("Error saving reviews to storage:", error)
-    }
+        } catch (error) {
+          console.error("Error saving reviews to storage:", error)
+        }
       } catch (error) {
         console.error("Error fetching reviews:", error)
         // Keep existing reviews on error
@@ -392,7 +392,7 @@ export default function Feedback() {
       const now = new Date()
       const daysAgo = filterValues.duration === "7days" ? 7 : filterValues.duration === "30days" ? 30 : 90
       const cutoffDate = new Date(now.getTime() - daysAgo * 24 * 60 * 60 * 1000)
-      
+
       filtered = filtered.filter(review => {
         // Parse date from review.date string (format: "30 Dec, 2023 2:05 PM")
         const reviewDate = new Date(review.date)
@@ -411,7 +411,7 @@ export default function Feedback() {
       filtered.sort((a, b) => {
         const dateA = new Date(a.date)
         const dateB = new Date(b.date)
-        
+
         switch (filterValues.sortBy) {
           case "newest":
             return dateB - dateA
@@ -444,18 +444,18 @@ export default function Feedback() {
     try {
       // TODO: Implement API call to save reply to backend
       // For now, update local state
-    setReviews(prev =>
-      prev.map(review =>
-        review.id === selectedReview.id
-          ? { ...review, reply: replyText.trim() }
-          : review
+      setReviews(prev =>
+        prev.map(review =>
+          review.id === selectedReview.id
+            ? { ...review, reply: replyText.trim() }
+            : review
+        )
       )
-    )
 
-    setSelectedReview(prev => prev ? { ...prev, reply: replyText.trim() } : null)
-    setReplyText("")
-    setIsReviewModalOpen(false)
-      
+      setSelectedReview(prev => prev ? { ...prev, reply: replyText.trim() } : null)
+      setReplyText("")
+      setIsReviewModalOpen(false)
+
       // Save to localStorage
       try {
         if (typeof window !== "undefined") {
@@ -498,7 +498,7 @@ export default function Feedback() {
   const handleFilterApply = () => {
     setIsFilterLoading(true)
     setIsFilterOpen(false)
-    
+
     // Show loading animation for 200ms
     setTimeout(() => {
       setIsFilterLoading(false)
@@ -525,33 +525,33 @@ export default function Feedback() {
   const getDateRanges = () => {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
-    
+
     const yesterday = new Date(today)
     yesterday.setDate(yesterday.getDate() - 1)
-    
+
     // This week so far (Monday to today)
     const thisWeekStart = new Date(today)
     const dayOfWeek = today.getDay()
     const diff = dayOfWeek === 0 ? 6 : dayOfWeek - 1 // Monday is 0
     thisWeekStart.setDate(today.getDate() - diff)
-    
+
     // Last week (Monday to Sunday)
     const lastWeekStart = new Date(thisWeekStart)
     lastWeekStart.setDate(lastWeekStart.getDate() - 7)
     const lastWeekEnd = new Date(thisWeekStart)
     lastWeekEnd.setDate(lastWeekEnd.getDate() - 1)
-    
+
     // This month so far
     const thisMonthStart = new Date(today.getFullYear(), today.getMonth(), 1)
-    
+
     // Last month
     const lastMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1)
     const lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0)
-    
+
     // Last 5 days
     const last5DaysStart = new Date(today)
     last5DaysStart.setDate(last5DaysStart.getDate() - 4) // Including today
-    
+
     return {
       today,
       yesterday,
@@ -572,7 +572,7 @@ export default function Feedback() {
   const handleComplaintsFilterApply = () => {
     setIsComplaintsLoading(true)
     setIsComplaintsFilterOpen(false)
-    
+
     setTimeout(() => {
       setIsComplaintsLoading(false)
     }, 200)
@@ -627,13 +627,13 @@ export default function Feedback() {
     if (!isSwiping.current) {
       const deltaX = Math.abs(e.touches[0].clientX - touchStartX.current)
       const deltaY = Math.abs(e.touches[0].clientY - touchStartY.current)
-      
+
       // Determine if this is a horizontal swipe
       if (deltaX > deltaY && deltaX > 10) {
         isSwiping.current = true
       }
     }
-    
+
     if (isSwiping.current) {
       touchEndX.current = e.touches[0].clientX
     }
@@ -653,7 +653,7 @@ export default function Feedback() {
     if (swipeVelocity > minSwipeDistance && !isTransitioning) {
       const currentIndex = feedbackTabs.findIndex(tab => tab === activeTab)
       let newIndex = currentIndex
-      
+
       if (swipeDistance > 0 && currentIndex < feedbackTabs.length - 1) {
         // Swipe left - go to next tab
         newIndex = currentIndex + 1
@@ -664,11 +664,11 @@ export default function Feedback() {
 
       if (newIndex !== currentIndex) {
         setIsTransitioning(true)
-        
+
         // Smooth transition with animation
         setTimeout(() => {
           setActiveTab(feedbackTabs[newIndex])
-          
+
           // Reset transition state after animation
           setTimeout(() => {
             setIsTransitioning(false)
@@ -676,7 +676,7 @@ export default function Feedback() {
         }, 50)
       }
     }
-    
+
     // Reset touch positions
     touchStartX.current = 0
     touchEndX.current = 0
@@ -705,13 +705,13 @@ export default function Feedback() {
             >
               <Bell className="w-5 h-5 text-gray-700" />
             </button>
-            <button 
+            <button
               className="p-2 ml-1 hover:bg-gray-100 rounded-full transition-colors"
               onClick={() => navigate("/restaurant/help-centre")}
             >
               <HelpCircle className="w-5 h-5 text-gray-700" />
             </button>
-            <button 
+            <button
               className="p-2 ml-1 hover:bg-gray-100 rounded-full transition-colors"
               onClick={() => navigate("/restaurant/explore")}
             >
@@ -729,9 +729,8 @@ export default function Feedback() {
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
-                className={`px-6 py-3.5 rounded-full text-sm font-medium whitespace-nowrap relative overflow-hidden ${
-                  isActive ? "text-white" : "bg-white text-gray-800 border border-gray-200"
-                }`}
+                className={`px-6 py-3.5 rounded-full text-sm font-medium whitespace-nowrap relative overflow-hidden ${isActive ? "text-white" : "bg-white text-gray-800 border border-gray-200"
+                  }`}
                 animate={{
                   scale: isActive ? 1.02 : 1,
                 }}
@@ -741,7 +740,7 @@ export default function Feedback() {
                 {isActive && (
                   <motion.div
                     layoutId="feedbackTabActive"
-                    className="absolute inset-0 bg-black rounded-full -z-10"
+                    className="absolute inset-0 bg-[#3B82F6] rounded-full -z-10"
                     initial={false}
                     transition={{
                       type: "spring",
@@ -759,43 +758,43 @@ export default function Feedback() {
         {/* Date range row only for Complaints tab */}
         {activeTab === "complaints" && (
           <div className="flex items-center gap-2 px-4">
-            <button 
+            <button
               className="flex-1 bg-white flex items-center justify-between rounded-md px-3 py-2.5 border border-gray-200 hover:bg-gray-50 transition-colors"
               onClick={() => setIsDateSelectorOpen(true)}
             >
               <div className="flex flex-col items-start">
                 <span className="text-sm font-medium text-gray-900">
-                  {selectedDateRange === "last5days" ? "Last 5 days" : 
-                   selectedDateRange === "today" ? "Today so far" :
-                   selectedDateRange === "yesterday" ? "Yesterday" :
-                   selectedDateRange === "thisWeek" ? "This week so far" :
-                   selectedDateRange === "lastWeek" ? "Last week" :
-                   selectedDateRange === "thisMonth" ? "This month so far" :
-                   selectedDateRange === "lastMonth" ? "Last month" :
-                   selectedDateRange === "custom" && customDateRange.start && customDateRange.end ?
-                   `${formatDateShort(customDateRange.start)} - ${formatDateShort(customDateRange.end)}` :
-                   "Last 5 days"}
+                  {selectedDateRange === "last5days" ? "Last 5 days" :
+                    selectedDateRange === "today" ? "Today so far" :
+                      selectedDateRange === "yesterday" ? "Yesterday" :
+                        selectedDateRange === "thisWeek" ? "This week so far" :
+                          selectedDateRange === "lastWeek" ? "Last week" :
+                            selectedDateRange === "thisMonth" ? "This month so far" :
+                              selectedDateRange === "lastMonth" ? "Last month" :
+                                selectedDateRange === "custom" && customDateRange.start && customDateRange.end ?
+                                  `${formatDateShort(customDateRange.start)} - ${formatDateShort(customDateRange.end)}` :
+                                  "Last 5 days"}
                 </span>
                 <span className="text-[11px] text-gray-500">
                   Select your own date range
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-gray-800" />
+                <Calendar className="w-4 h-4 text-[#3B82F6]" />
               </div>
             </button>
-            <button 
+            <button
               className="w-14 self-stretch rounded-md bg-white border border-gray-200 flex items-center justify-center hover:bg-gray-50 transition-colors"
               onClick={() => setIsComplaintsFilterOpen(true)}
             >
-              <SlidersHorizontal className="w-4 h-4 text-gray-800" />
+              <SlidersHorizontal className="w-4 h-4 text-[#3B82F6]" />
             </button>
           </div>
         )}
       </div>
 
       {/* Content */}
-      <div 
+      <div
         className="flex-1 px-4"
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
@@ -869,7 +868,7 @@ export default function Feedback() {
                       className="flex-1 text-sm text-gray-900 placeholder-gray-400 bg-transparent focus:outline-none"
                     />
                   </div>
-                  <button 
+                  <button
                     className="w-14 self-stretch rounded-md bg-white border border-gray-200 flex items-center justify-center hover:bg-gray-50 transition-colors"
                     onClick={() => setIsFilterOpen(true)}
                   >
@@ -910,82 +909,82 @@ export default function Feedback() {
                     </div>
                   ) : (
                     displayedReviews.map((review) => (
-                  <div 
-                    key={review.id} 
-                    className="rounded-2xl bg-white p-3 space-y-3  cursor-pointer"
-                    onClick={() => handleReviewClick(review)}
-                  >
-                    {/* Order & outlet */}
-                    <div className="text-[11px] text-gray-500 flex items-center justify-between gap-2">
-                      <span className="truncate">
-                        Order #{review.orderNumber} · {review.outlet}
-                      </span>
-                    </div>
-
-                    {/* User row */}
-                    <div className="flex items-center gap-3">
-                      <img
-                        src={review.userImage}
-                        alt={review.userName}
-                        className="h-8 w-8 rounded-full object-cover"
-                      />
-                      <div>
-                        <p className="text-sm font-semibold text-gray-900">
-                          {review.userName}
-                        </p>
-                        <p className="text-[11px] text-gray-500">
-                          {review.ordersCount} order{review.ordersCount !== 1 ? 's' : ''} with you
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Rating + text card */}
-                    <div className="mt-1 rounded-xl bg-gray-100 px-3 py-2 relative">
-                      {/* Speech bubble tail */}
-                      <div className="absolute -top-2 left-4 w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-b-[8px] border-b-gray-100"></div>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-700 text-white text-[11px] font-semibold">
-                          {review.rating}★
-                        </span>
-                        <span className="text-[11px] text-gray-500">
-                          {review.date}
-                        </span>
-                      </div>
-                      <p className="text-sm text-gray-800">
-                        {review.reviewText}
-                      </p>
-                    </div>
-
-                    {/* Reply section - show if reply exists */}
-                    {review.reply && (
-                      <div className="mt-2 rounded-xl bg-blue-50 px-3 py-2 relative">
-                        {/* Speech bubble tail for reply */}
-                        <div className="absolute -top-2 right-4 w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-b-[8px] border-b-blue-50"></div>
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-[11px] text-gray-600 font-medium">
-                            Your reply
+                      <div
+                        key={review.id}
+                        className="rounded-2xl bg-white p-3 space-y-3  cursor-pointer"
+                        onClick={() => handleReviewClick(review)}
+                      >
+                        {/* Order & outlet */}
+                        <div className="text-[11px] text-gray-500 flex items-center justify-between gap-2">
+                          <span className="truncate">
+                            Order #{review.orderNumber} · {review.outlet}
                           </span>
                         </div>
-                        <p className="text-sm text-gray-800">
-                          {review.reply}
-                        </p>
-                      </div>
-                    )}
 
-                    {/* Reply link */}
-                    <div className="flex justify-end">
-                      <button 
-                        className="text-xs font-medium text-blue-700 flex items-center gap-1"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleReviewClick(review)
-                        }}
-                      >
-                        <Reply className="w-3.5 h-3.5" />
-                        <span>{review.reply ? "Edit Reply" : "Reply"}</span>
-                      </button>
-                    </div>
-                  </div>
+                        {/* User row */}
+                        <div className="flex items-center gap-3">
+                          <img
+                            src={review.userImage}
+                            alt={review.userName}
+                            className="h-8 w-8 rounded-full object-cover"
+                          />
+                          <div>
+                            <p className="text-sm font-semibold text-gray-900">
+                              {review.userName}
+                            </p>
+                            <p className="text-[11px] text-gray-500">
+                              {review.ordersCount} order{review.ordersCount !== 1 ? 's' : ''} with you
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Rating + text card */}
+                        <div className="mt-1 rounded-xl bg-gray-100 px-3 py-2 relative">
+                          {/* Speech bubble tail */}
+                          <div className="absolute -top-2 left-4 w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-b-[8px] border-b-gray-100"></div>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-700 text-white text-[11px] font-semibold">
+                              {review.rating}★
+                            </span>
+                            <span className="text-[11px] text-gray-500">
+                              {review.date}
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-800">
+                            {review.reviewText}
+                          </p>
+                        </div>
+
+                        {/* Reply section - show if reply exists */}
+                        {review.reply && (
+                          <div className="mt-2 rounded-xl bg-blue-50 px-3 py-2 relative">
+                            {/* Speech bubble tail for reply */}
+                            <div className="absolute -top-2 right-4 w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-b-[8px] border-b-blue-50"></div>
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-[11px] text-gray-600 font-medium">
+                                Your reply
+                              </span>
+                            </div>
+                            <p className="text-sm text-gray-800">
+                              {review.reply}
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Reply link */}
+                        <div className="flex justify-end">
+                          <button
+                            className="text-xs font-medium text-blue-700 flex items-center gap-1"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleReviewClick(review)
+                            }}
+                          >
+                            <Reply className="w-3.5 h-3.5" />
+                            <span>{review.reply ? "Edit Reply" : "Reply"}</span>
+                          </button>
+                        </div>
+                      </div>
                     ))
                   )}
                 </div>
@@ -1007,7 +1006,7 @@ export default function Feedback() {
               className="fixed inset-0 bg-black/50 z-[9999]"
               onClick={handleCloseModal}
             />
-            
+
             {/* Modal */}
             <motion.div
               initial={{ y: "100%" }}
@@ -1078,7 +1077,7 @@ export default function Feedback() {
                     value={replyText}
                     onChange={(e) => setReplyText(e.target.value)}
                     placeholder="Type your reply"
-                    className="flex-1 px-4 py-2.5 rounded-lg border border-gray-300 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-400"
+                    className="flex-1 px-4 py-2.5 rounded-lg border border-gray-300 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400"
                     onKeyPress={(e) => {
                       if (e.key === "Enter" && replyText.trim()) {
                         handleSendReply()
@@ -1088,11 +1087,10 @@ export default function Feedback() {
                   <button
                     onClick={handleSendReply}
                     disabled={!replyText.trim()}
-                    className={`w-11 h-11 rounded-lg flex items-center justify-center transition-colors ${
-                      replyText.trim()
-                        ? "bg-gray-900 text-white hover:bg-gray-800"
-                        : "bg-gray-200 text-gray-400 cursor-not-allowed"
-                    }`}
+                    className={`w-11 h-11 rounded-lg flex items-center justify-center transition-colors ${replyText.trim()
+                      ? "bg-[#3B82F6] text-white hover:bg-blue-700"
+                      : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                      }`}
                   >
                     <Send className="w-5 h-5" />
                   </button>
@@ -1115,7 +1113,7 @@ export default function Feedback() {
               className="fixed inset-0 bg-black/50 z-[9999]"
               onClick={() => setIsFilterOpen(false)}
             />
-            
+
             {/* Filter Modal */}
             <motion.div
               initial={{ y: "100%" }}
@@ -1131,7 +1129,7 @@ export default function Feedback() {
                 <h2 className="text-lg font-bold text-gray-900">Filters</h2>
                 <button
                   onClick={() => setIsFilterOpen(false)}
-                  className="w-10 h-10 bg-black rounded-full flex items-center justify-center hover:bg-gray-800 transition-colors"
+                  className="w-10 h-10 bg-[#3B82F6] rounded-full flex items-center justify-center hover:bg-blue-700 transition-colors"
                 >
                   <X className="w-5 h-5 text-white" />
                 </button>
@@ -1143,31 +1141,28 @@ export default function Feedback() {
                 <div className="w-32 bg-gray-50 border-r border-gray-200 flex flex-col">
                   <button
                     onClick={() => setSelectedFilterCategory("duration")}
-                    className={`p-4 text-left text-sm font-medium transition-colors ${
-                      selectedFilterCategory === "duration"
-                        ? "bg-white text-gray-900 border-l-2 border-black"
-                        : "text-gray-700 hover:bg-gray-100"
-                    }`}
+                    className={`p-4 text-left text-sm font-medium transition-colors ${selectedFilterCategory === "duration"
+                      ? "bg-white text-gray-900 border-l-2 border-[#3B82F6]"
+                      : "text-gray-700 hover:bg-gray-100"
+                      }`}
                   >
                     Duration
                   </button>
                   <button
                     onClick={() => setSelectedFilterCategory("sortBy")}
-                    className={`p-4 text-left text-sm font-medium transition-colors ${
-                      selectedFilterCategory === "sortBy"
-                        ? "bg-white text-gray-900 border-l-2 border-black"
-                        : "text-gray-700 hover:bg-gray-100"
-                    }`}
+                    className={`p-4 text-left text-sm font-medium transition-colors ${selectedFilterCategory === "sortBy"
+                      ? "bg-white text-gray-900 border-l-2 border-[#3B82F6]"
+                      : "text-gray-700 hover:bg-gray-100"
+                      }`}
                   >
                     Sort by
                   </button>
                   <button
                     onClick={() => setSelectedFilterCategory("reviewType")}
-                    className={`p-4 text-left text-sm font-medium transition-colors ${
-                      selectedFilterCategory === "reviewType"
-                        ? "bg-white text-gray-900 border-l-2 border-black"
-                        : "text-gray-700 hover:bg-gray-100"
-                    }`}
+                    className={`p-4 text-left text-sm font-medium transition-colors ${selectedFilterCategory === "reviewType"
+                      ? "bg-white text-gray-900 border-l-2 border-[#3B82F6]"
+                      : "text-gray-700 hover:bg-gray-100"
+                      }`}
                   >
                     Review type
                   </button>
@@ -1183,7 +1178,7 @@ export default function Feedback() {
                           name="duration"
                           checked={filterValues.duration === "7days"}
                           onChange={() => setFilterValues(prev => ({ ...prev, duration: "7days" }))}
-                          className="w-5 h-5 text-black border-gray-300 focus:ring-black"
+                          className="w-5 h-5 text-[#3B82F6] border-gray-300 focus:ring-[#3B82F6]"
                         />
                         <span className="text-sm text-gray-900 font-medium">Last 7 days</span>
                       </label>
@@ -1193,7 +1188,7 @@ export default function Feedback() {
                           name="duration"
                           checked={filterValues.duration === "30days"}
                           onChange={() => setFilterValues(prev => ({ ...prev, duration: "30days" }))}
-                          className="w-5 h-5 text-black border-gray-300 focus:ring-black"
+                          className="w-5 h-5 text-[#3B82F6] border-gray-300 focus:ring-[#3B82F6]"
                         />
                         <span className="text-sm text-gray-900 font-medium">Last 30 days</span>
                       </label>
@@ -1203,7 +1198,7 @@ export default function Feedback() {
                           name="duration"
                           checked={filterValues.duration === "90days"}
                           onChange={() => setFilterValues(prev => ({ ...prev, duration: "90days" }))}
-                          className="w-5 h-5 text-black border-gray-300 focus:ring-black"
+                          className="w-5 h-5 text-[#3B82F6] border-gray-300 focus:ring-[#3B82F6]"
                         />
                         <span className="text-sm text-gray-900 font-medium">Last 90 days</span>
                       </label>
@@ -1218,7 +1213,7 @@ export default function Feedback() {
                           name="sortBy"
                           checked={filterValues.sortBy === "newest"}
                           onChange={() => setFilterValues(prev => ({ ...prev, sortBy: "newest" }))}
-                          className="w-5 h-5 text-black border-gray-300 focus:ring-black"
+                          className="w-5 h-5 text-[#3B82F6] border-gray-300 focus:ring-[#3B82F6]"
                         />
                         <span className="text-sm text-gray-900 font-medium">Newest first</span>
                       </label>
@@ -1228,7 +1223,7 @@ export default function Feedback() {
                           name="sortBy"
                           checked={filterValues.sortBy === "oldest"}
                           onChange={() => setFilterValues(prev => ({ ...prev, sortBy: "oldest" }))}
-                          className="w-5 h-5 text-black border-gray-300 focus:ring-black"
+                          className="w-5 h-5 text-[#3B82F6] border-gray-300 focus:ring-[#3B82F6]"
                         />
                         <span className="text-sm text-gray-900 font-medium">Oldest first</span>
                       </label>
@@ -1238,7 +1233,7 @@ export default function Feedback() {
                           name="sortBy"
                           checked={filterValues.sortBy === "bestRated"}
                           onChange={() => setFilterValues(prev => ({ ...prev, sortBy: "bestRated" }))}
-                          className="w-5 h-5 text-black border-gray-300 focus:ring-black"
+                          className="w-5 h-5 text-[#3B82F6] border-gray-300 focus:ring-[#3B82F6]"
                         />
                         <span className="text-sm text-gray-900 font-medium">Best rated first</span>
                       </label>
@@ -1248,7 +1243,7 @@ export default function Feedback() {
                           name="sortBy"
                           checked={filterValues.sortBy === "worstRated"}
                           onChange={() => setFilterValues(prev => ({ ...prev, sortBy: "worstRated" }))}
-                          className="w-5 h-5 text-black border-gray-300 focus:ring-black"
+                          className="w-5 h-5 text-[#3B82F6] border-gray-300 focus:ring-[#3B82F6]"
                         />
                         <span className="text-sm text-gray-900 font-medium">Worst rated first</span>
                       </label>
@@ -1335,7 +1330,7 @@ export default function Feedback() {
                 </button>
                 <button
                   onClick={handleFilterApply}
-                  className="flex-1 bg-black text-white py-3 rounded-lg font-medium hover:bg-gray-800 transition-colors"
+                  className="flex-1 bg-[#3B82F6] text-white py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors"
                 >
                   Apply
                 </button>
@@ -1396,7 +1391,7 @@ export default function Feedback() {
                             name="dateRange"
                             checked={selectedDateRange === option.id}
                             onChange={() => handleDateRangeSelect(option.id)}
-                            className="w-5 h-5 text-black border-gray-300 focus:ring-black"
+                            className="w-5 h-5 text-[#3B82F6] border-gray-300 focus:ring-[#3B82F6]"
                           />
                         </label>
                       ))}
@@ -1429,7 +1424,7 @@ export default function Feedback() {
                       setIsComplaintsLoading(false)
                     }, 200)
                   }}
-                  className="flex-1 bg-black text-white py-3 rounded-lg font-medium hover:bg-gray-800 transition-colors"
+                  className="flex-1 bg-[#3B82F6] text-white py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors"
                 >
                   Apply
                 </button>
@@ -1500,7 +1495,7 @@ export default function Feedback() {
                 </button>
                 <button
                   onClick={handleCustomDateApply}
-                  className="flex-1 bg-black text-white py-3 rounded-lg font-medium hover:bg-gray-800 transition-colors"
+                  className="flex-1 bg-[#3B82F6] text-white py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors"
                 >
                   Apply
                 </button>
@@ -1537,21 +1532,19 @@ export default function Feedback() {
                 <div className="w-32 bg-gray-50 border-r border-gray-200 flex flex-col">
                   <button
                     onClick={() => setSelectedComplaintsFilterCategory("issueType")}
-                    className={`p-4 text-left text-sm font-medium transition-colors ${
-                      selectedComplaintsFilterCategory === "issueType"
-                        ? "bg-white text-gray-900 border-l-2 border-black"
-                        : "text-gray-700 hover:bg-gray-100"
-                    }`}
+                    className={`p-4 text-left text-sm font-medium transition-colors ${selectedComplaintsFilterCategory === "issueType"
+                      ? "bg-white text-gray-900 border-l-2 border-black"
+                      : "text-gray-700 hover:bg-gray-100"
+                      }`}
                   >
                     Issue type
                   </button>
                   <button
                     onClick={() => setSelectedComplaintsFilterCategory("reasons")}
-                    className={`p-4 text-left text-sm font-medium transition-colors ${
-                      selectedComplaintsFilterCategory === "reasons"
-                        ? "bg-white text-gray-900 border-l-2 border-black"
-                        : "text-gray-700 hover:bg-gray-100"
-                    }`}
+                    className={`p-4 text-left text-sm font-medium transition-colors ${selectedComplaintsFilterCategory === "reasons"
+                      ? "bg-white text-gray-900 border-l-2 border-black"
+                      : "text-gray-700 hover:bg-gray-100"
+                      }`}
                   >
                     Reasons
                   </button>
@@ -1594,7 +1587,7 @@ export default function Feedback() {
                                   }))
                                 }
                               }}
-                              className="w-5 h-5 text-black border-gray-300 focus:ring-black rounded"
+                              className="w-5 h-5 text-[#3B82F6] border-gray-300 focus:ring-[#3B82F6] rounded"
                             />
                             <span className="text-sm text-gray-900 font-medium">{option}</span>
                           </label>
@@ -1613,7 +1606,7 @@ export default function Feedback() {
                             value={complaintsSearchQuery}
                             onChange={(e) => setComplaintsSearchQuery(e.target.value)}
                             placeholder="Search"
-                            className="w-full pl-10 pr-4 py-2 text-sm text-gray-900 placeholder-gray-400 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-400"
+                            className="w-full pl-10 pr-4 py-2 text-sm text-gray-900 placeholder-gray-400 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
                           />
                         </div>
                       </div>
@@ -1645,7 +1638,7 @@ export default function Feedback() {
                                   }))
                                 }
                               }}
-                              className="w-5 h-5 text-black border-gray-300 focus:ring-black rounded"
+                              className="w-5 h-5 text-[#3B82F6] border-gray-300 focus:ring-[#3B82F6] rounded"
                             />
                             <span className="text-sm text-gray-900 font-medium">{option}</span>
                           </label>
@@ -1666,7 +1659,7 @@ export default function Feedback() {
                 </button>
                 <button
                   onClick={handleComplaintsFilterApply}
-                  className="flex-1 bg-black text-white py-3 rounded-lg font-medium hover:bg-gray-800 transition-colors"
+                  className="flex-1 bg-[#3B82F6] text-white py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors"
                 >
                   Apply
                 </button>

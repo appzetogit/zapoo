@@ -369,7 +369,7 @@ export default function LandingPageManagement() {
     if (!restaurantSearchQuery.trim()) return true
     const query = restaurantSearchQuery.toLowerCase()
     return restaurant.name?.toLowerCase().includes(query) ||
-           restaurant.restaurantId?.toLowerCase().includes(query)
+      restaurant.restaurantId?.toLowerCase().includes(query)
   })
 
   // ==================== CATEGORIES ====================
@@ -1236,7 +1236,7 @@ export default function LandingPageManagement() {
         {/* Page Title */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-blue-500 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-lg bg-orange-500 flex items-center justify-center">
               <Layout className="w-5 h-5 text-white" />
             </div>
             <div>
@@ -1256,7 +1256,7 @@ export default function LandingPageManagement() {
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
                   className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors whitespace-nowrap ${activeTab === tab.id
-                    ? 'bg-blue-500 text-white'
+                    ? 'bg-orange-500 text-white'
                     : 'text-slate-600 hover:bg-slate-100'
                     }`}
                 >
@@ -1290,7 +1290,7 @@ export default function LandingPageManagement() {
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
               <h2 className="text-lg font-bold text-slate-900 mb-4">Upload New Banner(s)</h2>
               <div
-                className="border-2 border-dashed border-blue-300 rounded-lg p-8 text-center bg-blue-50/30 cursor-pointer transition-colors hover:border-blue-400 hover:bg-blue-50/50"
+                className="border-2 border-dashed border-orange-300 rounded-lg p-8 text-center bg-orange-50/30 cursor-pointer transition-colors hover:border-orange-400 hover:bg-orange-50/50"
                 onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
                 onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); }}
                 onDrop={(e) => {
@@ -1312,15 +1312,15 @@ export default function LandingPageManagement() {
                 />
                 {bannersUploading ? (
                   <div className="flex flex-col items-center gap-3">
-                    <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
-                    <p className="text-blue-600 font-medium">
+                    <Loader2 className="w-8 h-8 text-orange-600 animate-spin" />
+                    <p className="text-orange-600 font-medium">
                       Uploading image {bannersUploadProgress.current} of {bannersUploadProgress.total}...
                     </p>
                     {bannersUploadProgress.total > 0 && (
                       <div className="w-full max-w-xs">
-                        <div className="w-full bg-blue-200 rounded-full h-2">
+                        <div className="w-full bg-orange-200 rounded-full h-2">
                           <div
-                            className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                            className="bg-orange-600 h-2 rounded-full transition-all duration-300"
                             style={{ width: `${(bannersUploadProgress.current / bannersUploadProgress.total) * 100}%` }}
                           />
                         </div>
@@ -1329,12 +1329,12 @@ export default function LandingPageManagement() {
                   </div>
                 ) : (
                   <div className="flex flex-col items-center gap-3">
-                    <Upload className="w-8 h-8 text-blue-600" />
+                    <Upload className="w-8 h-8 text-orange-600" />
                     <div>
                       <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); bannersFileInputRef.current?.click(); }}
-                        className="text-blue-600 font-medium hover:text-blue-700 underline"
+                        className="text-orange-600 font-medium hover:text-orange-700 underline"
                       >
                         Click to upload
                       </button>
@@ -1351,7 +1351,7 @@ export default function LandingPageManagement() {
               <h2 className="text-lg font-bold text-slate-900 mb-4">Banner List ({banners.length})</h2>
               {bannersLoading ? (
                 <div className="flex items-center justify-center py-12">
-                  <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+                  <Loader2 className="w-8 h-8 text-orange-600 animate-spin" />
                 </div>
               ) : banners.length === 0 ? (
                 <div className="text-center py-12 text-slate-500">
@@ -1370,7 +1370,7 @@ export default function LandingPageManagement() {
                           </span>
                         </div>
                         <div className="absolute top-2 left-2">
-                          <span className="px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800">Order: {banner.order}</span>
+                          <span className="px-2 py-1 rounded text-xs font-medium bg-orange-100 text-orange-800">Order: {banner.order}</span>
                         </div>
                       </div>
                       <div className="p-4 bg-white">
@@ -1384,13 +1384,13 @@ export default function LandingPageManagement() {
                             </button>
                           </div>
                           <div className="flex items-center gap-2 flex-wrap">
-                            <button 
+                            <button
                               onClick={() => {
                                 setSelectedBannerId(banner._id)
                                 setSelectedRestaurantIds(banner.linkedRestaurants?.map(r => r._id || r) || [])
                                 setShowRestaurantModal(true)
                               }}
-                              className="px-3 py-1.5 rounded text-sm font-medium bg-blue-100 text-blue-800 hover:bg-blue-200 flex items-center gap-1"
+                              className="px-3 py-1.5 rounded text-sm font-medium bg-orange-100 text-orange-800 hover:bg-orange-200 flex items-center gap-1"
                             >
                               <Megaphone className="w-4 h-4" />
                               Advertise
@@ -1408,7 +1408,7 @@ export default function LandingPageManagement() {
                             <p className="text-xs text-slate-600 mb-1">Linked Restaurants ({banner.linkedRestaurants.length}):</p>
                             <div className="flex flex-wrap gap-1">
                               {banner.linkedRestaurants.slice(0, 3).map((restaurant) => (
-                                <span key={restaurant._id || restaurant} className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-xs">
+                                <span key={restaurant._id || restaurant} className="px-2 py-0.5 bg-orange-50 text-orange-700 rounded text-xs">
                                   {restaurant.name || 'Restaurant'}
                                 </span>
                               ))}
@@ -1436,7 +1436,7 @@ export default function LandingPageManagement() {
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
               <h2 className="text-lg font-bold text-slate-900 mb-4">Upload New Banner(s)</h2>
               <div
-                className="border-2 border-dashed border-blue-300 rounded-lg p-8 text-center bg-blue-50/30 cursor-pointer transition-colors hover:border-blue-400 hover:bg-blue-50/50"
+                className="border-2 border-dashed border-orange-300 rounded-lg p-8 text-center bg-orange-50/30 cursor-pointer transition-colors hover:border-orange-400 hover:bg-orange-50/50"
                 onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
                 onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); }}
                 onDrop={(e) => {
@@ -1458,15 +1458,15 @@ export default function LandingPageManagement() {
                 />
                 {under250BannersUploading ? (
                   <div className="flex flex-col items-center gap-3">
-                    <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
-                    <p className="text-blue-600 font-medium">
+                    <Loader2 className="w-8 h-8 text-orange-600 animate-spin" />
+                    <p className="text-orange-600 font-medium">
                       Uploading image {under250BannersUploadProgress.current} of {under250BannersUploadProgress.total}...
                     </p>
                     {under250BannersUploadProgress.total > 0 && (
                       <div className="w-full max-w-xs">
-                        <div className="w-full bg-blue-200 rounded-full h-2">
+                        <div className="w-full bg-orange-200 rounded-full h-2">
                           <div
-                            className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                            className="bg-orange-600 h-2 rounded-full transition-all duration-300"
                             style={{ width: `${(under250BannersUploadProgress.current / under250BannersUploadProgress.total) * 100}%` }}
                           />
                         </div>
@@ -1475,12 +1475,12 @@ export default function LandingPageManagement() {
                   </div>
                 ) : (
                   <div className="flex flex-col items-center gap-3">
-                    <Upload className="w-8 h-8 text-blue-600" />
+                    <Upload className="w-8 h-8 text-orange-600" />
                     <div>
                       <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); under250BannersFileInputRef.current?.click(); }}
-                        className="text-blue-600 font-medium hover:text-blue-700 underline"
+                        className="text-orange-600 font-medium hover:text-orange-700 underline"
                       >
                         Click to upload
                       </button>
@@ -1497,7 +1497,7 @@ export default function LandingPageManagement() {
               <h2 className="text-lg font-bold text-slate-900 mb-4">Banner List ({under250Banners.length})</h2>
               {under250BannersLoading ? (
                 <div className="flex items-center justify-center py-12">
-                  <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+                  <Loader2 className="w-8 h-8 text-orange-600 animate-spin" />
                 </div>
               ) : under250Banners.length === 0 ? (
                 <div className="text-center py-12 text-slate-500">
@@ -1516,7 +1516,7 @@ export default function LandingPageManagement() {
                           </span>
                         </div>
                         <div className="absolute top-2 left-2">
-                          <span className="px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800">Order: {banner.order}</span>
+                          <span className="px-2 py-1 rounded text-xs font-medium bg-orange-100 text-orange-800">Order: {banner.order}</span>
                         </div>
                       </div>
                       <div className="p-4 bg-white">
@@ -1552,7 +1552,7 @@ export default function LandingPageManagement() {
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
               <h2 className="text-lg font-bold text-slate-900 mb-4">Upload New Dining Banner(s)</h2>
               <div
-                className="border-2 border-dashed border-blue-300 rounded-lg p-8 text-center bg-blue-50/30 cursor-pointer transition-colors hover:border-blue-400 hover:bg-blue-50/50"
+                className="border-2 border-dashed border-orange-300 rounded-lg p-8 text-center bg-orange-50/30 cursor-pointer transition-colors hover:border-orange-400 hover:bg-orange-50/50"
                 onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
                 onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); }}
                 onDrop={(e) => {
@@ -1574,15 +1574,15 @@ export default function LandingPageManagement() {
                 />
                 {diningBannersUploading ? (
                   <div className="flex flex-col items-center gap-3">
-                    <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
-                    <p className="text-blue-600 font-medium">
+                    <Loader2 className="w-8 h-8 text-orange-600 animate-spin" />
+                    <p className="text-orange-600 font-medium">
                       Uploading image {diningBannersUploadProgress.current} of {diningBannersUploadProgress.total}...
                     </p>
                     {diningBannersUploadProgress.total > 0 && (
                       <div className="w-full max-w-xs">
-                        <div className="w-full bg-blue-200 rounded-full h-2">
+                        <div className="w-full bg-orange-200 rounded-full h-2">
                           <div
-                            className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                            className="bg-orange-600 h-2 rounded-full transition-all duration-300"
                             style={{ width: `${(diningBannersUploadProgress.current / diningBannersUploadProgress.total) * 100}%` }}
                           />
                         </div>
@@ -1591,12 +1591,12 @@ export default function LandingPageManagement() {
                   </div>
                 ) : (
                   <div className="flex flex-col items-center gap-3">
-                    <Upload className="w-8 h-8 text-blue-600" />
+                    <Upload className="w-8 h-8 text-orange-600" />
                     <div>
                       <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); diningBannersFileInputRef.current?.click(); }}
-                        className="text-blue-600 font-medium hover:text-blue-700 underline"
+                        className="text-orange-600 font-medium hover:text-orange-700 underline"
                       >
                         Click to upload
                       </button>
@@ -1613,7 +1613,7 @@ export default function LandingPageManagement() {
               <h2 className="text-lg font-bold text-slate-900 mb-4">Banner List ({diningBanners.length})</h2>
               {diningBannersLoading ? (
                 <div className="flex items-center justify-center py-12">
-                  <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+                  <Loader2 className="w-8 h-8 text-orange-600 animate-spin" />
                 </div>
               ) : diningBanners.length === 0 ? (
                 <div className="text-center py-12 text-slate-500">
@@ -1632,7 +1632,7 @@ export default function LandingPageManagement() {
                           </span>
                         </div>
                         <div className="absolute top-2 left-2">
-                          <span className="px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800">Order: {banner.order}</span>
+                          <span className="px-2 py-1 rounded text-xs font-medium bg-orange-100 text-orange-800">Order: {banner.order}</span>
                         </div>
                       </div>
                       <div className="p-4 bg-white">
@@ -1674,11 +1674,10 @@ export default function LandingPageManagement() {
                     <button
                       key={tab.id}
                       onClick={() => setExploreMoreSubTab(tab.id)}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors whitespace-nowrap ${
-                        exploreMoreSubTab === tab.id
-                          ? 'bg-blue-500 text-white'
+                      className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors whitespace-nowrap ${exploreMoreSubTab === tab.id
+                          ? 'bg-orange-500 text-white'
                           : 'text-slate-600 hover:bg-slate-100'
-                      }`}
+                        }`}
                     >
                       <Icon className="w-4 h-4" />
                       {tab.label}
@@ -1700,7 +1699,7 @@ export default function LandingPageManagement() {
                         id="restaurant-top10"
                         value={selectedRestaurantTop10}
                         onChange={(e) => setSelectedRestaurantTop10(e.target.value)}
-                        className="mt-1 w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="mt-1 w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                         disabled={restaurantsLoading}
                       >
                         <option value="">Select a restaurant...</option>
@@ -1725,10 +1724,10 @@ export default function LandingPageManagement() {
                         className="mt-1"
                       />
                     </div>
-                    <Button 
-                      onClick={handleAddTop10Restaurant} 
+                    <Button
+                      onClick={handleAddTop10Restaurant}
                       disabled={!selectedRestaurantTop10 || !selectedRank}
-                      className="bg-blue-500 hover:bg-blue-600 text-white"
+                      className="bg-orange-500 hover:bg-orange-600 text-white"
                     >
                       Add to Top 10
                     </Button>
@@ -1739,7 +1738,7 @@ export default function LandingPageManagement() {
                   <h2 className="text-lg font-bold text-slate-900 mb-4">Top 10 Restaurants ({top10Restaurants.length})</h2>
                   {top10Loading ? (
                     <div className="flex items-center justify-center py-12">
-                      <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+                      <Loader2 className="w-8 h-8 text-orange-600 animate-spin" />
                     </div>
                   ) : top10Restaurants.length === 0 ? (
                     <div className="text-center py-12 text-slate-500">
@@ -1809,7 +1808,7 @@ export default function LandingPageManagement() {
                         id="restaurant-gourmet"
                         value={selectedRestaurantGourmet}
                         onChange={(e) => setSelectedRestaurantGourmet(e.target.value)}
-                        className="mt-1 w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="mt-1 w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                         disabled={restaurantsLoading}
                       >
                         <option value="">Select a restaurant...</option>
@@ -1822,10 +1821,10 @@ export default function LandingPageManagement() {
                           ))}
                       </select>
                     </div>
-                    <Button 
-                      onClick={handleAddGourmetRestaurant} 
+                    <Button
+                      onClick={handleAddGourmetRestaurant}
                       disabled={!selectedRestaurantGourmet}
-                      className="bg-blue-500 hover:bg-blue-600 text-white"
+                      className="bg-orange-500 hover:bg-orange-600 text-white"
                     >
                       Add to Gourmet
                     </Button>
@@ -1836,7 +1835,7 @@ export default function LandingPageManagement() {
                   <h2 className="text-lg font-bold text-slate-900 mb-4">Gourmet Restaurants ({gourmetRestaurants.length})</h2>
                   {gourmetLoading ? (
                     <div className="flex items-center justify-center py-12">
-                      <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+                      <Loader2 className="w-8 h-8 text-orange-600 animate-spin" />
                     </div>
                   ) : gourmetRestaurants.length === 0 ? (
                     <div className="text-center py-12 text-slate-500">
@@ -1852,16 +1851,16 @@ export default function LandingPageManagement() {
                           const coverImages = item.restaurant?.coverImages && item.restaurant.coverImages.length > 0
                             ? item.restaurant.coverImages.map(img => img.url || img).filter(Boolean)
                             : []
-                          
+
                           const menuImages = item.restaurant?.menuImages && item.restaurant.menuImages.length > 0
                             ? item.restaurant.menuImages.map(img => img.url || img).filter(Boolean)
                             : []
-                          
+
                           const restaurantImage = coverImages.length > 0
                             ? coverImages[0]
                             : (menuImages.length > 0
-                                ? menuImages[0]
-                                : (item.restaurant?.profileImage?.url || "https://via.placeholder.com/400"))
+                              ? menuImages[0]
+                              : (item.restaurant?.profileImage?.url || "https://via.placeholder.com/400"))
 
                           return (
                             <div key={item._id} className="border border-slate-200 rounded-lg overflow-hidden">
@@ -1913,7 +1912,7 @@ export default function LandingPageManagement() {
                 Select restaurants that will be linked to this banner. When users click on this banner, they will be redirected to the selected restaurants.
               </DialogDescription>
             </DialogHeader>
-            
+
             <div className="flex-1 overflow-hidden flex flex-col">
               {/* Search Bar and Selected Count */}
               <div className="px-6 pt-4 pb-3 space-y-3 bg-slate-50 border-b border-slate-200">
@@ -1924,12 +1923,12 @@ export default function LandingPageManagement() {
                     placeholder="Search restaurants by name or ID..."
                     value={restaurantSearchQuery}
                     onChange={(e) => setRestaurantSearchQuery(e.target.value)}
-                    className="pl-10 h-11 bg-white border-slate-300 focus:border-blue-500 focus:ring-blue-500"
+                    className="pl-10 h-11 bg-white border-slate-300 focus:border-orange-500 focus:ring-orange-500"
                   />
                 </div>
                 {selectedRestaurantIds.length > 0 && (
                   <div className="flex items-center gap-2">
-                    <div className="px-3 py-1.5 bg-blue-100 text-blue-700 rounded-lg text-sm font-medium">
+                    <div className="px-3 py-1.5 bg-orange-100 text-orange-700 rounded-lg text-sm font-medium">
                       {selectedRestaurantIds.length} restaurant{selectedRestaurantIds.length > 1 ? 's' : ''} selected
                     </div>
                     <Button
@@ -1948,7 +1947,7 @@ export default function LandingPageManagement() {
               <div className="flex-1 overflow-y-auto bg-white">
                 {restaurantsLoading ? (
                   <div className="flex flex-col items-center justify-center py-16">
-                    <Loader2 className="w-10 h-10 text-blue-600 animate-spin mb-3" />
+                    <Loader2 className="w-10 h-10 text-orange-600 animate-spin mb-3" />
                     <p className="text-slate-500">Loading restaurants...</p>
                   </div>
                 ) : filteredRestaurantsForModal.length === 0 ? (
@@ -1964,15 +1963,14 @@ export default function LandingPageManagement() {
                     {filteredRestaurantsForModal.map((restaurant) => {
                       const isSelected = selectedRestaurantIds.includes(restaurant._id)
                       const profileImageUrl = restaurant.profileImage?.url || restaurant.profileImage || null
-                      
+
                       return (
                         <div
                           key={restaurant._id}
-                          className={`px-6 py-4 transition-all cursor-pointer ${
-                            isSelected 
-                              ? 'bg-blue-50 border-l-4 border-l-blue-500' 
+                          className={`px-6 py-4 transition-all cursor-pointer ${isSelected
+                              ? 'bg-orange-50 border-l-4 border-l-orange-500'
                               : 'hover:bg-slate-50'
-                          }`}
+                            }`}
                           onClick={() => toggleRestaurantSelection(restaurant._id)}
                         >
                           <div className="flex items-center gap-4">
@@ -1984,7 +1982,7 @@ export default function LandingPageManagement() {
                                 className="w-5 h-5"
                               />
                             </div>
-                            
+
                             {/* Restaurant Image */}
                             <div className="flex-shrink-0">
                               {profileImageUrl ? (
@@ -1998,20 +1996,18 @@ export default function LandingPageManagement() {
                                   }}
                                 />
                               ) : null}
-                              <div 
-                                className={`w-16 h-16 rounded-xl bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-bold text-lg ${
-                                  profileImageUrl ? 'hidden' : 'flex'
-                                }`}
+                              <div
+                                className={`w-16 h-16 rounded-xl bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white font-bold text-lg ${profileImageUrl ? 'hidden' : 'flex'
+                                  }`}
                               >
                                 {restaurant.name?.charAt(0)?.toUpperCase() || 'R'}
                               </div>
                             </div>
-                            
+
                             {/* Restaurant Info */}
                             <div className="flex-1 min-w-0">
-                              <h3 className={`font-semibold text-base mb-1 ${
-                                isSelected ? 'text-blue-900' : 'text-slate-900'
-                              }`}>
+                              <h3 className={`font-semibold text-base mb-1 ${isSelected ? 'text-orange-900' : 'text-slate-900'
+                                }`}>
                                 {restaurant.name || 'Unnamed Restaurant'}
                               </h3>
                               <p className="text-sm text-slate-500 truncate">
@@ -2024,11 +2020,11 @@ export default function LandingPageManagement() {
                                 </div>
                               )}
                             </div>
-                            
+
                             {/* Selected Indicator */}
                             {isSelected && (
                               <div className="flex-shrink-0">
-                                <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center">
+                                <div className="w-8 h-8 rounded-full bg-orange-500 flex items-center justify-center">
                                   <CheckCircle2 className="w-5 h-5 text-white" />
                                 </div>
                               </div>
@@ -2062,7 +2058,7 @@ export default function LandingPageManagement() {
                   <Button
                     onClick={handleLinkRestaurants}
                     disabled={linkingRestaurants || selectedRestaurantIds.length === 0}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-6 min-w-[140px]"
+                    className="bg-orange-600 hover:bg-orange-700 text-white px-6 min-w-[140px]"
                   >
                     {linkingRestaurants ? (
                       <>

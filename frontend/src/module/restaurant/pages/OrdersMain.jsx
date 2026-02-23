@@ -110,7 +110,7 @@ function CompletedOrders({ onSelectOrder }) {
     return (
       <div className="pt-4 pb-6">
         <div className="flex items-baseline justify-between mb-3">
-          <h2 className="text-base font-semibold text-[#FF5200]">Completed orders</h2>
+          <h2 className="text-base font-semibold text-[#3B82F6]">Completed orders</h2>
           <Loader2 className="w-4 h-4 animate-spin text-gray-500" />
         </div>
         <div className="text-center py-8 text-gray-500 text-sm">Loading...</div>
@@ -121,7 +121,7 @@ function CompletedOrders({ onSelectOrder }) {
   return (
     <div className="pt-4 pb-6">
       <div className="flex items-baseline justify-between mb-3">
-        <h2 className="text-base font-semibold text-[#FF5200]">
+        <h2 className="text-base font-semibold text-[#3B82F6]">
           Completed orders
         </h2>
         <span className="text-xs text-gray-500">{orders.length} total</span>
@@ -315,7 +315,7 @@ function CancelledOrders({ onSelectOrder }) {
     return (
       <div className="pt-4 pb-6">
         <div className="flex items-baseline justify-between mb-3">
-          <h2 className="text-base font-semibold text-[#FF5200]">Cancelled orders</h2>
+          <h2 className="text-base font-semibold text-[#3B82F6]">Cancelled orders</h2>
           <Loader2 className="w-4 h-4 animate-spin text-gray-500" />
         </div>
         <div className="text-center py-8 text-gray-500 text-sm">Loading...</div>
@@ -326,7 +326,7 @@ function CancelledOrders({ onSelectOrder }) {
   return (
     <div className="pt-4 pb-6">
       <div className="flex items-baseline justify-between mb-3">
-        <h2 className="text-base font-semibold text-[#FF5200]">
+        <h2 className="text-base font-semibold text-[#3B82F6]">
           Cancelled orders
         </h2>
         <span className="text-xs text-gray-500">{orders.length} total</span>
@@ -400,10 +400,10 @@ function CancelledOrders({ onSelectOrder }) {
 
                       <div className="flex flex-col items-end gap-1">
                         <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium border ${order.cancelledBy === 'user'
-                          ? 'border-orange-500 text-orange-600'
+                          ? 'border-blue-500 text-blue-600'
                           : 'border-red-500 text-red-600'
                           }`}>
-                          <span className={`h-1.5 w-1.5 rounded-full ${order.cancelledBy === 'user' ? 'bg-orange-500' : 'bg-red-500'
+                          <span className={`h-1.5 w-1.5 rounded-full ${order.cancelledBy === 'user' ? 'bg-blue-500' : 'bg-red-500'
                             }`} />
                           {cancelledByText}
                         </span>
@@ -488,7 +488,7 @@ function TableBookings() {
   return (
     <div className="pt-4 pb-6 px-1">
       <div className="flex items-baseline justify-between mb-4 px-1">
-        <h2 className="text-base font-semibold text-[#FF5200]">Table Bookings</h2>
+        <h2 className="text-base font-semibold text-[#3B82F6]">Table Bookings</h2>
         <span className="text-xs text-gray-500">{bookings.length} total</span>
       </div>
 
@@ -506,7 +506,7 @@ function TableBookings() {
                   <p className="text-[11px] text-gray-500">{booking.user?.phone || 'No phone'}</p>
                 </div>
                 <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase ${booking.status === 'confirmed' ? 'bg-green-100 text-green-700' :
-                  booking.status === 'checked-in' ? 'bg-orange-100 text-orange-700' :
+                  booking.status === 'checked-in' ? 'bg-blue-100 text-blue-700' :
                     booking.status === 'completed' ? 'bg-blue-100 text-blue-700' :
                       'bg-gray-100 text-gray-600'
                   }`}>
@@ -1291,7 +1291,7 @@ export default function OrdersMain() {
                 {isActive && (
                   <motion.div
                     layoutId="activeFilterBackground"
-                    className="absolute inset-0 bg-[#FF5200] rounded-full -z-10"
+                    className="absolute inset-0 bg-[#3B82F6] rounded-full -z-10"
                     initial={false}
                     transition={{
                       type: "spring",
@@ -1644,15 +1644,14 @@ export default function OrdersMain() {
 
                   {/* Accept and Reject buttons */}
                   <div className="space-y-3">
-                    {/* Accept button with countdown */}
                     <div className="relative">
                       <button
                         onClick={handleAcceptOrder}
-                        className="w-full bg-[#FF5200] text-white py-3.5 rounded-lg font-semibold text-sm hover:bg-orange-600 transition-colors relative overflow-hidden"
+                        className="w-full bg-[#3B82F6] text-white py-3.5 rounded-lg font-semibold text-sm hover:bg-blue-600 transition-colors relative overflow-hidden"
                       >
                         {/* Loading background */}
                         <motion.div
-                          className="absolute inset-0 bg-orange-700"
+                          className="absolute inset-0 bg-blue-700"
                           initial={{ width: "100%" }}
                           animate={{ width: `${(countdown / 240) * 100}%` }}
                           transition={{ duration: 1, ease: "linear" }}
@@ -1718,17 +1717,17 @@ export default function OrdersMain() {
                         key={reason}
                         onClick={() => setRejectReason(reason)}
                         className={`w-full text-left p-4 rounded-lg border-2 transition-all ${rejectReason === reason
-                          ? "border-[#FF5200] bg-orange-50"
+                          ? "border-[#3B82F6] bg-blue-50"
                           : "border-gray-200 bg-white hover:border-gray-300"
                           }`}
                       >
                         <div className="flex items-center justify-between">
-                          <span className={`text-sm font-medium ${rejectReason === reason ? "text-[#FF5200]" : "text-gray-900"
+                          <span className={`text-sm font-medium ${rejectReason === reason ? "text-[#3B82F6]" : "text-gray-900"
                             }`}>
                             {reason}
                           </span>
                           {rejectReason === reason && (
-                            <div className="w-5 h-5 rounded-full bg-[#FF5200] flex items-center justify-center">
+                            <div className="w-5 h-5 rounded-full bg-[#3B82F6] flex items-center justify-center">
                               <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                               </svg>
@@ -1752,7 +1751,7 @@ export default function OrdersMain() {
                     onClick={handleRejectConfirm}
                     disabled={!rejectReason}
                     className={`flex-1 py-3 rounded-lg font-semibold text-sm transition-colors ${rejectReason
-                      ? "!bg-[#FF5200] !text-white"
+                      ? "!bg-[#3B82F6] !text-white"
                       : "bg-gray-200 text-gray-400 cursor-not-allowed"
                       }`}
                   >
@@ -1932,7 +1931,7 @@ export default function OrdersMain() {
               </div>
 
               <button
-                className="w-full bg-[#FF5200] text-white py-2.5 rounded-xl text-sm font-medium"
+                className="w-full bg-[#3B82F6] text-white py-2.5 rounded-xl text-sm font-medium"
                 onClick={() => setIsSheetOpen(false)}
               >
                 Close
@@ -1944,7 +1943,7 @@ export default function OrdersMain() {
 
       {/* Bottom Navigation - Sticky */}
       <BottomNavOrders />
-    </div>
+    </div >
   )
 }
 
@@ -2122,9 +2121,9 @@ function OrderCard({
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${deliveryPartnerId
                     ? 'bg-green-100 text-green-700 border border-green-300'
-                    : 'bg-orange-100 text-orange-700 border border-orange-300'
+                    : 'bg-blue-100 text-blue-700 border border-blue-300'
                     }`}>
-                    <span className={`h-1.5 w-1.5 rounded-full ${deliveryPartnerId ? 'bg-green-500' : 'bg-orange-500'
+                    <span className={`h-1.5 w-1.5 rounded-full ${deliveryPartnerId ? 'bg-green-500' : 'bg-blue-500'
                       }`} />
                     {deliveryPartnerId ? 'Assigned' : 'Not Assigned'}
                   </span>
@@ -2329,7 +2328,7 @@ function PreparingOrders({ onSelectOrder, onCancel }) {
     return (
       <div className="pt-4 pb-6">
         <div className="flex items-baseline justify-between mb-3">
-          <h2 className="text-base font-semibold text-[#FF5200]">Preparing orders</h2>
+          <h2 className="text-base font-semibold text-[#3B82F6]">Preparing orders</h2>
           <Loader2 className="w-4 h-4 animate-spin text-gray-500" />
         </div>
         <div className="text-center py-8 text-gray-500 text-sm">Loading...</div>
@@ -2340,7 +2339,7 @@ function PreparingOrders({ onSelectOrder, onCancel }) {
   return (
     <div className="pt-4 pb-6">
       <div className="flex items-baseline justify-between mb-3">
-        <h2 className="text-base font-semibold text-[#FF5200]">
+        <h2 className="text-base font-semibold text-[#3B82F6]">
           Preparing orders
         </h2>
         <span className="text-xs text-gray-500">{orders.length} active</span>
@@ -2478,7 +2477,7 @@ function ReadyOrders({ onSelectOrder }) {
     return (
       <div className="pt-4 pb-6">
         <div className="flex items-baseline justify-between mb-3">
-          <h2 className="text-base font-semibold text-[#FF5200]">Ready for pickup</h2>
+          <h2 className="text-base font-semibold text-[#3B82F6]">Ready for pickup</h2>
           <Loader2 className="w-4 h-4 animate-spin text-gray-500" />
         </div>
         <div className="text-center py-8 text-gray-500 text-sm">Loading...</div>
@@ -2489,7 +2488,7 @@ function ReadyOrders({ onSelectOrder }) {
   return (
     <div className="pt-4 pb-6">
       <div className="flex items-baseline justify-between mb-3">
-        <h2 className="text-base font-semibold text-[#FF5200]">
+        <h2 className="text-base font-semibold text-[#3B82F6]">
           Ready for pickup
         </h2>
         <span className="text-xs text-gray-500">{orders.length} active</span>
@@ -2595,7 +2594,7 @@ const OutForDeliveryOrders = ({ onSelectOrder }) => {
     return (
       <div className="pt-4 pb-6">
         <div className="flex items-baseline justify-between mb-3">
-          <h2 className="text-base font-semibold text-[#FF5200]">Out for delivery</h2>
+          <h2 className="text-base font-semibold text-[#3B82F6]">Out for delivery</h2>
           <Loader2 className="w-4 h-4 animate-spin text-gray-500" />
         </div>
         <div className="text-center py-8 text-gray-500 text-sm">Loading...</div>
@@ -2606,7 +2605,7 @@ const OutForDeliveryOrders = ({ onSelectOrder }) => {
   return (
     <div className="pt-4 pb-6">
       <div className="flex items-baseline justify-between mb-3">
-        <h2 className="text-base font-semibold text-[#FF5200]">
+        <h2 className="text-base font-semibold text-[#3B82F6]">
           Out for delivery
         </h2>
         <span className="text-xs text-gray-500">{orders.length} active</span>
@@ -2665,7 +2664,7 @@ function EmptyState({ message = "Temporarily closed" }) {
       </h2>
 
       {/* View Status Button */}
-      <button className="bg-[#FF5200] text-white px-6 py-3 rounded-lg font-medium hover:bg-orange-600 transition-colors">
+      <button className="bg-[#3B82F6] text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-600 transition-colors">
         View status
       </button>
     </div>
