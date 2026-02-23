@@ -1,24 +1,26 @@
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
-import { Search, Download, ChevronDown, Plus, MoreVertical, Building2, Settings, Filter, FileDown, FileSpreadsheet, FileText, Code, Eye, Edit, Trash2 } from "lucide-react"
-import { adsListDummy } from "../../data/adsListDummy"
+import { Search, Download, ChevronDown, Plus, MoreVertical, Building2, Settings, Filter, FileDown, FileSpreadsheet, FileText, Code, Eye, Edit, Trash2, Loader2 } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import SettingsDialog from "../../components/orders/SettingsDialog"
 import { exportAdvertisementsToCSV, exportAdvertisementsToExcel, exportAdvertisementsToPDF, exportAdvertisementsToJSON } from "../../components/advertisements/advertisementsExportUtils"
+import apiClient from "@/lib/api/axios"
+import { toast } from "sonner"
 
 export default function AdsList() {
   const navigate = useNavigate()
   const [searchQuery, setSearchQuery] = useState("")
   const [adsType, setAdsType] = useState("all")
-  const [ads, setAds] = useState(adsListDummy)
+  const [ads, setAds] = useState([])
+  const [loading, setLoading] = useState(true)
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [isViewOpen, setIsViewOpen] = useState(false)
   const [isDeleteOpen, setIsDeleteOpen] = useState(false)
   const [selectedAd, setSelectedAd] = useState(null)
   const [filters, setFilters] = useState({
-    status: "",
+    status: "Active", // Default to Active for "Active Campaigns" page
     restaurant: "",
     priority: "",
   })
@@ -34,6 +36,39 @@ export default function AdsList() {
     actions: true,
   })
 
+  // Map DB fields to table-friendly shape
+  const mapAd = (ad, idx) => ({
+    sl: idx + 1,
+    _id: ad._id,
+    adsId: String(ad._id).slice(-8).toUpperCase(),
+    adsTitle: ad.title || "Untitled",
+    restaurantName: ad.restaurant?.name || "Unknown",
+    restaurantEmail: "", // Could populate if backend returns it
+    adsType: ad.targetZones?.map(z => z.name || z).join(", ") || "Banner",
+    duration: `${new Date(ad.startDate).toLocaleDateString("en-IN")} – ${new Date(ad.endDate).toLocaleDateString("en-IN")}`,
+    status: ad.status,
+    priority: ad.priority || null,
+    raw: ad,
+  })
+
+  const fetchAds = async () => {
+    try {
+      setLoading(true)
+      const res = await apiClient.get("/marketing/ads/all")
+      const data = res.data.data || []
+      setAds(data.map(mapAd))
+    } catch (err) {
+      console.error("Failed to fetch ads:", err)
+      toast.error("Failed to load advertisements")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchAds()
+  }, [])
+
   const columnsConfig = {
     si: "Serial Number",
     adsId: "Ads ID",
@@ -48,7 +83,7 @@ export default function AdsList() {
 
   const filteredAds = useMemo(() => {
     let result = [...ads]
-    
+
     if (adsType !== "all") {
       result = result.filter(ad => ad.adsType === adsType)
     }
@@ -99,10 +134,14 @@ export default function AdsList() {
     }
   }
 
-  const handlePriorityChange = (sl, newPriority) => {
-    setAds(ads.map(ad =>
-      ad.sl === sl ? { ...ad, priority: newPriority } : ad
-    ))
+  const handlePriorityChange = async (adId, newPriority) => {
+    try {
+      await apiClient.put(`/marketing/ads/${adId}/status`, { priority: newPriority })
+      toast.success("Priority updated")
+      fetchAds()
+    } catch (err) {
+      toast.error("Failed to update priority")
+    }
   }
 
   const handleViewAd = (ad) => {
@@ -111,7 +150,7 @@ export default function AdsList() {
   }
 
   const handleEditAd = (ad) => {
-    navigate("/admin/new-advertisement", { state: { editAd: ad } })
+    navigate("/admin/advertisement/new", { state: { editAd: ad.raw } })
   }
 
   const handleDeleteClick = (ad) => {
@@ -119,11 +158,17 @@ export default function AdsList() {
     setIsDeleteOpen(true)
   }
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (selectedAd) {
-      setAds(ads.filter(ad => ad.sl !== selectedAd.sl))
-      setIsDeleteOpen(false)
-      setSelectedAd(null)
+      try {
+        await apiClient.delete(`/marketing/ads/${selectedAd._id}`)
+        toast.success("Ad deleted")
+        setIsDeleteOpen(false)
+        setSelectedAd(null)
+        fetchAds()
+      } catch (err) {
+        toast.error("Failed to delete ad")
+      }
     }
   }
 
@@ -151,14 +196,14 @@ export default function AdsList() {
 
   const handleResetFilters = () => {
     setFilters({
-      status: "",
+      status: "Active",
       restaurant: "",
       priority: "",
     })
   }
 
   const restaurants = [...new Set(ads.map(ad => ad.restaurantName))].filter(Boolean)
-  const statuses = [...new Set(ads.map(ad => ad.status))].filter(Boolean)
+  const statuses = ["Pending", "Approved", "Active", "Scheduled", "Rejected"]
 
   return (
     <div className="p-4 lg:p-6 bg-slate-50 min-h-screen">
@@ -177,7 +222,7 @@ export default function AdsList() {
             </div>
           </div>
 
-          <button 
+          <button
             onClick={() => navigate("/admin/new-advertisement")}
             className="px-4 py-2.5 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 flex items-center gap-2 transition-all shadow-md"
           >
@@ -238,11 +283,10 @@ export default function AdsList() {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <button 
+          <button
             onClick={() => setIsFilterOpen(true)}
-            className={`px-4 py-2.5 text-sm font-medium rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 flex items-center gap-2 transition-all relative ${
-              activeFiltersCount > 0 ? "border-emerald-500 bg-emerald-50" : ""
-            }`}
+            className={`px-4 py-2.5 text-sm font-medium rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 flex items-center gap-2 transition-all relative ${activeFiltersCount > 0 ? "border-emerald-500 bg-emerald-50" : ""
+              }`}
           >
             <Filter className="w-4 h-4" />
             <span className="text-black font-bold">Filters</span>
@@ -253,7 +297,7 @@ export default function AdsList() {
             )}
           </button>
 
-          <button 
+          <button
             onClick={() => setIsSettingsOpen(true)}
             className="p-2.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 transition-all"
           >
@@ -280,7 +324,14 @@ export default function AdsList() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-slate-100">
-              {filteredAds.length === 0 ? (
+              {loading ? (
+                <tr>
+                  <td colSpan={Object.values(visibleColumns).filter(v => v).length} className="px-6 py-20 text-center">
+                    <Loader2 className="w-8 h-8 animate-spin text-orange-500 mx-auto mb-2" />
+                    <p className="text-sm text-slate-500">Loading active campaigns...</p>
+                  </td>
+                </tr>
+              ) : filteredAds.length === 0 ? (
                 <tr>
                   <td colSpan={Object.values(visibleColumns).filter(v => v).length} className="px-6 py-20 text-center">
                     <p className="text-lg font-semibold text-slate-700 mb-1">No Data Found</p>
@@ -300,7 +351,7 @@ export default function AdsList() {
                     )}
                     {visibleColumns.adsId && (
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <button 
+                        <button
                           onClick={() => handleViewAd(ad)}
                           className="text-sm font-medium text-blue-600 hover:text-blue-700"
                         >
@@ -347,7 +398,7 @@ export default function AdsList() {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <select
                           value={ad.priority || ""}
-                          onChange={(e) => handlePriorityChange(ad.sl, e.target.value)}
+                          onChange={(e) => handlePriorityChange(ad._id, e.target.value)}
                           className="px-2 py-1 text-xs border border-slate-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-slate-400"
                         >
                           <option value="">N/A</option>
@@ -366,14 +417,14 @@ export default function AdsList() {
                             </button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-48 bg-white border border-slate-200 rounded-lg shadow-lg z-50">
-                            <DropdownMenuItem 
+                            <DropdownMenuItem
                               onClick={() => handleViewAd(ad)}
                               className="cursor-pointer"
                             >
                               <Eye className="w-4 h-4 mr-2" />
                               View Details
                             </DropdownMenuItem>
-                            <DropdownMenuItem 
+                            <DropdownMenuItem
                               onClick={() => handleEditAd(ad)}
                               className="cursor-pointer"
                             >
@@ -381,7 +432,7 @@ export default function AdsList() {
                               Edit
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem 
+                            <DropdownMenuItem
                               onClick={() => handleDeleteClick(ad)}
                               className="cursor-pointer text-red-600"
                             >

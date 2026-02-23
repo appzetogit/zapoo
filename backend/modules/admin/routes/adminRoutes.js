@@ -1,4 +1,4 @@
-import express from "express";
+import express from "express"; // Refreshed for recommendation feature
 import {
   getAllWithdrawalRequests,
   approveWithdrawalRequest,
@@ -129,6 +129,8 @@ import {
   getPendingFoodApprovals,
   approveFoodItem,
   rejectFoodItem,
+  approveSpecialRecommendation,
+  rejectSpecialRecommendation,
 } from "../controllers/foodApprovalController.js";
 import {
   getAllComplaints,
@@ -399,6 +401,8 @@ router.put("/restaurant-complaints/:id/notes", updateInternalNotes);
 router.get("/food-approvals", getPendingFoodApprovals);
 router.post("/food-approvals/:id/approve", approveFoodItem);
 router.post("/food-approvals/:id/reject", rejectFoodItem);
+router.post("/food-approvals/:id/approve-special", approveSpecialRecommendation);
+router.post("/food-approvals/:id/reject-special", rejectSpecialRecommendation);
 
 // Offers Management
 router.get("/offers", getAllOffers);

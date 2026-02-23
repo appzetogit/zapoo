@@ -23,6 +23,7 @@ const getFeeSettings = async () => {
       freeDeliveryThreshold: 149,
       platformFee: 5,
       gstRate: 5,
+      recommendedItemFee: 0,
     };
   } catch (error) {
     console.error('Error fetching fee settings:', error);
@@ -285,6 +286,19 @@ export const calculateOrderPricing = async ({
     // Calculate GST on subtotal after discount
     const gst = await calculateGST(subtotal, discount, restaurant);
 
+    // Calculate internal recommended fee (not shown to user)
+    const feeSettings = await getFeeSettings();
+    const recommendedFeePerItem = feeSettings.recommendedItemFee || 0;
+    let internalRecommendedFee = 0;
+
+    if (recommendedFeePerItem > 0) {
+      items.forEach(item => {
+        if (item.isRecommended) {
+          internalRecommendedFee += recommendedFeePerItem * (item.quantity || 1);
+        }
+      });
+    }
+
     // Calculate total
     const total = subtotal - discount + finalDeliveryFee + platformFee + gst;
 
@@ -299,6 +313,7 @@ export const calculateOrderPricing = async ({
       tax: gst, // Already rounded in calculateGST
       total: Math.round(total),
       savings: Math.round(savings),
+      internalRecommendedFee: Math.round(internalRecommendedFee),
       appliedCoupon: appliedCoupon ? {
         code: appliedCoupon.code,
         discount: discount,

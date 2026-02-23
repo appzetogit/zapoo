@@ -51,6 +51,12 @@ const feeSettingsSchema = new mongoose.Schema(
       max: 100,
       comment: 'GST rate in percentage (e.g., 5 for 5%)'
     },
+    recommendedItemFee: {
+      type: Number,
+      default: 0,
+      min: 0,
+      comment: 'Internal fee charged to restaurant for recommended items'
+    },
     isActive: {
       type: Boolean,
       default: true,

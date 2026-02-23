@@ -292,17 +292,41 @@ export const createOrder = async (req, res) => {
       pricing.couponCode = pricing.appliedCoupon.code;
     }
 
-    // Create order in database with pending status
-    const order = new Order({
-      orderId: generatedOrderId,
-      userId,
-      restaurantId: assignedRestaurantId,
-      restaurantName: assignedRestaurantName,
+    // Calculate pricing including potential internal recommendation fees
+    const pricingData = await calculateOrderPricing({
       items,
+      restaurantId: assignedRestaurantId,
+      deliveryAddress: address,
+      couponCode: pricing.couponCode,
+      deliveryFleet: deliveryFleet || 'standard'
+    });
+
+    // Create the order
+    const order = new Order({
+      orderId: generatedOrderId, // Re-added orderId generation
+      userId,
+      restaurant: assignedRestaurantId,
+      restaurantName: assignedRestaurantName,
+      items: items.map(item => ({
+        itemId: item.itemId,
+        name: item.name,
+        price: item.price,
+        quantity: item.quantity,
+        image: item.image,
+        description: item.description,
+        isVeg: item.isVeg,
+        isRecommended: item.isRecommended || false
+      })),
       address,
       pricing: {
-        ...pricing,
-        couponCode: pricing.couponCode || null
+        subtotal: pricingData.subtotal,
+        discount: pricingData.discount,
+        deliveryFee: pricingData.deliveryFee,
+        platformFee: pricingData.platformFee,
+        tax: pricingData.tax,
+        total: pricingData.total,
+        internalRecommendedFee: pricingData.internalRecommendedFee, // Track internal fee
+        couponCode: pricing.couponCode
       },
       deliveryFleet: deliveryFleet || 'standard',
       note: note || '',

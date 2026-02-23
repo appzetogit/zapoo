@@ -100,9 +100,7 @@ export default function SubscriptionPlans() {
 
                 {/* Header Section */}
                 <div className="text-center space-y-4 max-w-3xl mx-auto">
-                    <Badge className="bg-orange-100 text-orange-600 hover:bg-orange-100 px-4 py-1.5 text-sm font-medium rounded-full mb-2">
-                        Generic Subscription Logic
-                    </Badge>
+
                     <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-gray-900">
                         Supercharge Your <span className="text-orange-500">Restaurant</span>
                     </h1>
@@ -160,8 +158,8 @@ export default function SubscriptionPlans() {
                             <Card
                                 key={plan._id}
                                 className={`relative overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 ${isCurrent
-                                        ? 'border-2 border-orange-500 shadow-lg shadow-orange-100 ring-4 ring-orange-50'
-                                        : 'border-gray-200 hover:border-orange-200'
+                                    ? 'border-2 border-orange-500 shadow-lg shadow-orange-100 ring-4 ring-orange-50'
+                                    : 'border-gray-200 hover:border-orange-200'
                                     }`}
                             >
                                 {/* Popular Tag (Mock logic: if price is middle range or specifically marked) */}
@@ -193,7 +191,7 @@ export default function SubscriptionPlans() {
 
                                 <CardContent className="px-8 pb-8">
                                     <div className="flex items-baseline mb-8">
-                                        <span className="text-5xl font-extrabold text-gray-900 tracking-tight">₹{plan.price.toLocaleString()}</span>
+                                        <span className="text-5xl font-extrabold text-gray-900 tracking-tight">₹{plan.price?.toLocaleString() || '0'}</span>
                                         <span className="text-gray-400 font-medium ml-2">/total</span>
                                     </div>
 
@@ -213,8 +211,8 @@ export default function SubscriptionPlans() {
                                 <CardFooter className="px-8 pb-8 pt-0">
                                     <Button
                                         className={`w-full h-12 text-base font-semibold rounded-xl transition-all duration-200 ${isCurrent
-                                                ? 'bg-green-50 text-green-700 hover:bg-green-100 border border-green-200'
-                                                : 'bg-gray-900 text-white hover:bg-orange-500 hover:shadow-orange-200 hover:shadow-lg'
+                                            ? 'bg-green-50 text-green-700 hover:bg-green-100 border border-green-200'
+                                            : 'bg-gray-900 text-white hover:bg-orange-500 hover:shadow-orange-200 hover:shadow-lg'
                                             }`}
                                         onClick={() => !isCurrent && handleSubscribe(plan)}
                                         disabled={isCurrent || (processingId === plan._id)}

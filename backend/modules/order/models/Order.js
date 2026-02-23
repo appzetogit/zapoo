@@ -27,6 +27,10 @@ const orderItemSchema = new mongoose.Schema({
   isVeg: {
     type: Boolean,
     default: true
+  },
+  isRecommended: {
+    type: Boolean,
+    default: false
   }
 }, { _id: true });
 
@@ -113,6 +117,12 @@ const orderSchema = new mongoose.Schema({
       type: Number,
       required: true,
       min: 0
+    },
+    internalRecommendedFee: {
+      type: Number,
+      default: 0,
+      min: 0,
+      comment: 'Internal fee for recommended items (not visible to user)'
     },
     couponCode: {
       type: String

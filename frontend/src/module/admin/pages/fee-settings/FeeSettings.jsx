@@ -30,6 +30,7 @@ export default function FeeSettings() {
           freeDeliveryThreshold: response.data.data.feeSettings.freeDeliveryThreshold || 149,
           platformFee: response.data.data.feeSettings.platformFee || 5,
           gstRate: response.data.data.feeSettings.gstRate || 5,
+          recommendedItemFee: response.data.data.feeSettings.recommendedItemFee || 0,
         })
       }
     } catch (error) {
@@ -55,6 +56,7 @@ export default function FeeSettings() {
         freeDeliveryThreshold: Number(feeSettings.freeDeliveryThreshold),
         platformFee: Number(feeSettings.platformFee),
         gstRate: Number(feeSettings.gstRate),
+        recommendedItemFee: Number(feeSettings.recommendedItemFee || 0),
         isActive: true,
       })
 
@@ -402,8 +404,28 @@ export default function FeeSettings() {
                     GST percentage applied on order subtotal
                   </p>
                 </div>
+
+                {/* Recommended Item Fee (Internal) */}
+                <div className="space-y-2">
+                  <label className="block text-sm font-semibold text-slate-700 flex items-center gap-1.5">
+                    Recommended Item Fee (₹)
+                    <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-600 uppercase tracking-tight">Internal</span>
+                  </label>
+                  <input
+                    type="number"
+                    value={feeSettings.recommendedItemFee || 0}
+                    onChange={(e) => setFeeSettings({ ...feeSettings, recommendedItemFee: e.target.value })}
+                    min="0"
+                    step="1"
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    placeholder="20"
+                  />
+                  <p className="text-xs text-slate-500">
+                    Calculated internally for orders containing recommended items (not shown to customers)
+                  </p>
+                </div>
               </div>
-          </>
+            </>
           )}
         </div>
       </div>

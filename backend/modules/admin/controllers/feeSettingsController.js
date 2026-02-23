@@ -31,6 +31,7 @@ export const getFeeSettings = asyncHandler(async (req, res) => {
         freeDeliveryThreshold: 149,
         platformFee: 5,
         gstRate: 5,
+        recommendedItemFee: 0,
         isActive: true,
         createdBy: req.admin?._id || null,
       });
@@ -54,7 +55,7 @@ export const getFeeSettings = asyncHandler(async (req, res) => {
  */
 export const createOrUpdateFeeSettings = asyncHandler(async (req, res) => {
   try {
-    const { deliveryFee, deliveryFeeRanges, freeDeliveryThreshold, platformFee, gstRate, isActive } = req.body;
+    const { deliveryFee, deliveryFeeRanges, freeDeliveryThreshold, platformFee, gstRate, recommendedItemFee, isActive } = req.body;
 
     // Validate platform fee
     if (platformFee === undefined || platformFee < 0) {
@@ -97,6 +98,7 @@ export const createOrUpdateFeeSettings = asyncHandler(async (req, res) => {
       freeDeliveryThreshold: freeDeliveryThreshold ? Number(freeDeliveryThreshold) : 149,
       platformFee: Number(platformFee),
       gstRate: Number(gstRate),
+      recommendedItemFee: recommendedItemFee !== undefined ? Number(recommendedItemFee) : 0,
       isActive: isActive !== false,
       createdBy: req.admin?._id || null,
       updatedBy: req.admin?._id || null,
@@ -131,7 +133,7 @@ export const createOrUpdateFeeSettings = asyncHandler(async (req, res) => {
 export const updateFeeSettings = asyncHandler(async (req, res) => {
   try {
     const { id } = req.params;
-    const { deliveryFee, deliveryFeeRanges, freeDeliveryThreshold, platformFee, gstRate, isActive } = req.body;
+    const { deliveryFee, deliveryFeeRanges, freeDeliveryThreshold, platformFee, gstRate, recommendedItemFee, isActive } = req.body;
 
     const feeSettings = await FeeSettings.findById(id);
 
@@ -194,6 +196,10 @@ export const updateFeeSettings = asyncHandler(async (req, res) => {
         return errorResponse(res, 400, 'GST rate must be between 0 and 100');
       }
       feeSettings.gstRate = Number(gstRate);
+    }
+
+    if (recommendedItemFee !== undefined) {
+      feeSettings.recommendedItemFee = Number(recommendedItemFee);
     }
 
     if (isActive !== undefined) {
