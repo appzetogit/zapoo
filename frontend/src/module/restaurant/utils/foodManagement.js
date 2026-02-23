@@ -27,6 +27,8 @@ const DEFAULT_FOODS = [
     discountAmount: 0.0,
     isAvailable: true,
     isRecommended: false,
+    isRecommendationRequest: false,
+    recommendationStatus: "none",
     variations: [
       { id: 1, name: "Capacity - 1 Person", price: 0.00, stock: 10 },
       { id: 2, name: "Capacity - 2 Person", price: 70.00, stock: 30 },
@@ -56,6 +58,8 @@ const DEFAULT_FOODS = [
     discountAmount: 0.0,
     isAvailable: true,
     isRecommended: false,
+    isRecommendationRequest: false,
+    recommendationStatus: "none",
     variations: [],
     tags: [],
     nutrition: [],
@@ -81,6 +85,8 @@ const DEFAULT_FOODS = [
     discountAmount: 30.0,
     isAvailable: true,
     isRecommended: true,
+    isRecommendationRequest: true,
+    recommendationStatus: "approved",
     variations: [],
     tags: ["pizza", "meat"],
     nutrition: ["Calories", "Protein", "Carbs"],
@@ -106,6 +112,8 @@ const DEFAULT_FOODS = [
     discountAmount: 7.0,
     isAvailable: true,
     isRecommended: false,
+    isRecommendationRequest: false,
+    recommendationStatus: "none",
     variations: [],
     tags: ["pizza", "cheese"],
     nutrition: [],
@@ -131,6 +139,8 @@ const DEFAULT_FOODS = [
     discountAmount: 0.0,
     isAvailable: true,
     isRecommended: false,
+    isRecommendationRequest: false,
+    recommendationStatus: "none",
     variations: [],
     tags: ["rice", "thai"],
     nutrition: [],
@@ -179,7 +189,7 @@ const setAllFoods = (foods) => {
  */
 export const getFoodById = (id) => {
   if (!id) return null
-  
+
   try {
     const foods = getAllFoods()
     const food = foods.find(f => f.id === parseInt(id) || f.id === id)
@@ -222,11 +232,11 @@ const getNextFoodId = () => {
  */
 export const saveFood = (foodData) => {
   if (!foodData) return null
-  
+
   try {
     const foods = getAllFoods()
     const isNewFood = !foodData.id || !foods.find(f => f.id === foodData.id)
-    
+
     let savedFood
     if (isNewFood) {
       // New food - assign ID
@@ -242,7 +252,9 @@ export const saveFood = (foodData) => {
         nutrition: foodData.nutrition || [],
         allergies: foodData.allergies || [],
         isAvailable: foodData.isAvailable !== undefined ? foodData.isAvailable : true,
-        isRecommended: foodData.isRecommended || false
+        isRecommended: foodData.isRecommended || false,
+        isRecommendationRequest: foodData.isRecommendationRequest || false,
+        recommendationStatus: foodData.recommendationStatus || "none"
       }
       foods.push(savedFood)
       // Dispatch event for new food
@@ -267,13 +279,13 @@ export const saveFood = (foodData) => {
         window.dispatchEvent(new CustomEvent('foodAdded', { detail: { food: savedFood } }))
       }
     }
-    
+
     setAllFoods(foods)
     // Dispatch general food change event
     window.dispatchEvent(new CustomEvent('foodsChanged'))
     // Trigger storage event for cross-tab updates
     window.dispatchEvent(new Event('storage'))
-    
+
     return savedFood
   } catch (error) {
     console.error('Error saving food:', error)
@@ -288,11 +300,11 @@ export const saveFood = (foodData) => {
  */
 export const deleteFood = (id) => {
   if (!id) return false
-  
+
   try {
     const foods = getAllFoods()
     const index = foods.findIndex(f => f.id === parseInt(id) || f.id === id)
-    
+
     if (index !== -1) {
       const deletedFood = foods[index]
       foods.splice(index, 1)
@@ -303,7 +315,7 @@ export const deleteFood = (id) => {
       window.dispatchEvent(new Event('storage'))
       return true
     }
-    
+
     return false
   } catch (error) {
     console.error('Error deleting food:', error)
@@ -319,7 +331,7 @@ export const deleteFood = (id) => {
  */
 export const updateFoodStock = (id, stock) => {
   if (!id) return false
-  
+
   try {
     const food = getFoodById(id)
     if (food) {

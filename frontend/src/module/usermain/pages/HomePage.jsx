@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react"
+import axios from "axios"
 import { useNavigate } from "react-router-dom"
 import { motion, AnimatePresence } from "framer-motion"
 import Lenis from "lenis"
@@ -35,9 +36,6 @@ export default function HomePage() {
     return saved ? JSON.parse(saved) : []
   })
   const [toast, setToast] = useState({ show: false, message: '' })
-  const [activeAds, setActiveAds] = useState([])
-  const [adsLoading, setAdsLoading] = useState(false)
-  const [currentZone, setCurrentZone] = useState(null)
 
   // Function to extract location parts for display
   // Main location: First 2 parts only (e.g., "Mama Loca, G-2")
@@ -304,56 +302,6 @@ export default function HomePage() {
     "Hungry? We've got you!",
   ]
 
-  // Detect Zone and Fetch Ads
-  useEffect(() => {
-    const detectAndFetch = async () => {
-      if (currentLocation?.latitude && currentLocation?.longitude) {
-        try {
-          const zoneRes = await axios.get(`/api/admin/zones/detect`, {
-            params: { lat: currentLocation.latitude, lng: currentLocation.longitude }
-          });
-
-          const zoneId = zoneRes.data.data?.zoneId;
-          if (zoneId) {
-            setCurrentZone(zoneId);
-            const adsRes = await axios.get(`/api/marketing/ads/active/${zoneId}`);
-            setActiveAds(adsRes.data.data || []);
-          }
-        } catch (error) {
-          console.error("Ad detection error:", error);
-        }
-      }
-    };
-    detectAndFetch();
-  }, [currentLocation]);
-
-  // Track impressions when slide changes
-  useEffect(() => {
-    if (activeAds.length > 0 && activeAds[currentSlide]) {
-      const adId = activeAds[currentSlide]._id;
-      axios.post(`/api/marketing/ads/${adId}/track`, { type: 'impression' })
-        .catch(err => console.error("Impression track error:", err));
-    }
-  }, [currentSlide, activeAds]);
-
-  // Carousel slides data - Use activeAds if available, fallback to static
-  const carouselSlides = activeAds.length > 0
-    ? activeAds.map(ad => ({
-      id: ad._id,
-      title: ad.title,
-      image: ad.bannerImage,
-      discount: ad.description || "Featured",
-      rating: ad.restaurant?.rating || "4.5/5",
-      restaurantId: ad.restaurant?._id
-    }))
-    : [
-      { id: 1, title: "Biryani That Will Change Your Mind", image: "https://images.unsplash.com/photo-1589302168068-964664d93dc0?w=1200&h=600&fit=crop", discount: "14% OFF", rating: "5/5" },
-      { id: 2, title: "Delicious Pizza", image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=1200&h=600&fit=crop", discount: "20% OFF", rating: "4.8/5" },
-      { id: 3, title: "Fresh Burgers", image: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=1200&h=600&fit=crop", discount: "15% OFF", rating: "4.9/5" },
-      { id: 4, title: "Tasty Pasta", image: "https://images.unsplash.com/photo-1551183053-bf91a1d81141?w=1200&h=600&fit=crop", discount: "10% OFF", rating: "4.7/5" },
-      { id: 5, title: "Sushi Delight", image: "https://images.unsplash.com/photo-1579584425555-c3ce17fd4351?w=1200&h=600&fit=crop", discount: "12% OFF", rating: "4.6/5" },
-    ]
-
   // Auto-slide effect
   useEffect(() => {
     const lenis = new Lenis({
@@ -369,16 +317,15 @@ export default function HomePage() {
 
     requestAnimationFrame(raf)
 
-    // Auto-slide carousel
-    const interval = setInterval(() => {
-      setCurrentSlide((prev) => (prev + 1) % carouselSlides.length)
-    }, 4000) // Change slide every 4 seconds
+    const timer = setInterval(() => {
+      setCurrentSlide((prev) => (prev + 1) % 3)
+    }, 4000)
 
     return () => {
-      clearInterval(interval)
+      clearInterval(timer)
       lenis.destroy()
     }
-  }, [carouselSlides.length])
+  }, [])
 
   // Rotate placeholder text
   useEffect(() => {
@@ -563,103 +510,39 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* Promotional Banner Carousel - Full Image Background */}
+      {/* Featured Slider */}
       <div className="px-4 mb-6">
-        <div
-          className="relative rounded-xl overflow-hidden h-36 md:h-48 cursor-pointer"
-          onClick={() => {
-            const currentAd = activeAds[currentSlide];
-            if (currentAd) {
-              // Track Click
-              axios.post(`/api/marketing/ads/${currentAd._id}/track`, { type: 'click' });
-
-              // Navigate to redirect target
-              if (currentAd.redirectTarget === 'menu') {
-                navigate(`/usermain/restaurant/${currentAd.restaurant?._id}/menu`);
-              } else {
-                navigate(`/usermain/restaurant/${currentAd.restaurant?._id}`);
-              }
-            } else {
-              // Fallback for static slides
-              navigate(`/usermain/food/${carouselSlides[currentSlide].id}`);
-            }
-          }}
-        >
+        <div className="relative rounded-2xl overflow-hidden h-40 md:h-52 shadow-lg">
           <AnimatePresence mode="wait">
             <motion.div
               key={currentSlide}
-              initial={{ opacity: 0, x: 300 }}
+              initial={{ opacity: 0, x: 100 }}
               animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -300 }}
-              transition={{
-                duration: 0.6,
-                ease: [0.4, 0, 0.2, 1]
-              }}
+              exit={{ opacity: 0, x: -100 }}
+              transition={{ duration: 0.5 }}
               className="absolute inset-0"
             >
-              {/* Full Banner Image */}
               <img
-                src={carouselSlides[currentSlide].image}
-                alt={carouselSlides[currentSlide].title}
+                src={restaurantCarouselData[currentSlide].image}
                 className="w-full h-full object-cover"
-                onError={(e) => {
-                  e.target.src = `https://images.unsplash.com/photo-1589302168068-964664d93dc0?w=1200&h=600&fit=crop`
-                }}
+                alt="Special Offer"
               />
-
-              {/* Gradient Overlay for better text readability */}
-              <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-transparent" />
-
-              {/* Content Overlay */}
-              <div className="absolute inset-0 flex items-center px-4 py-3">
-                <div className="flex-1 z-10">
-                  <motion.h2
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.2, duration: 0.5 }}
-                    className="text-white text-base md:text-xl font-bold mb-2 md:mb-3"
-                  >
-                    {carouselSlides[currentSlide].title}
-                  </motion.h2>
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.3, duration: 0.5 }}
-                    className="flex items-center gap-2 md:gap-3 mb-2 md:mb-3"
-                  >
-                    <Button
-                      className="bg-transparent border-2 border-[#ff8100] text-white hover:bg-[#ff8100] rounded-full px-3 md:px-5 py-1.5 md:py-2 text-xs md:text-sm font-semibold transition-colors"
-                    >
-                      Order Now
-                    </Button>
-                    {carouselSlides[currentSlide].rating && (
-                      <span className="text-white text-xs md:text-sm font-semibold bg-white/20 backdrop-blur-sm px-2 md:px-3 py-1 md:py-1.5 rounded-full">
-                        {carouselSlides[currentSlide].rating}
-                      </span>
-                    )}
-                  </motion.div>
+              <div className="absolute inset-0 bg-black/20" />
+              <div className="absolute top-4 left-4 z-10">
+                <h2 className="text-white text-xl font-bold leading-tight max-w-[200px]">
+                  {restaurantCarouselData[currentSlide].title}
+                </h2>
+                <div className="mt-2 bg-[#ff8100] text-white px-3 py-1 rounded-full text-xs font-bold inline-block">
+                  {restaurantCarouselData[currentSlide].discount}
                 </div>
               </div>
-
-              {/* Discount Tag */}
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ delay: 0.4, type: "spring", stiffness: 200 }}
-                className="absolute bottom-2 md:bottom-4 right-2 md:right-4 bg-[#ff8100] text-white rounded-full px-2 md:px-3 py-1 md:py-1.5 text-[10px] md:text-xs font-bold shadow-lg"
-              >
-                {carouselSlides[currentSlide].discount}
-              </motion.div>
             </motion.div>
           </AnimatePresence>
-
-          {/* Carousel Indicators */}
-          <div className="absolute bottom-2 md:bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-2 z-20">
-            {carouselSlides.map((_, index) => (
-              <button
-                key={index}
-                onClick={() => setCurrentSlide(index)}
-                className={`h-1.5 md:h-2 rounded-full transition-all duration-300 ${index === currentSlide ? 'bg-[#ff8100] w-5 md:w-6' : 'bg-white/50 w-1.5 md:w-2 hover:bg-white/70'
+          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
+            {restaurantCarouselData.map((_, i) => (
+              <div
+                key={i}
+                className={`w-1.5 h-1.5 rounded-full transition-all ${i === currentSlide ? 'bg-white w-4' : 'bg-white/50'
                   }`}
               />
             ))}

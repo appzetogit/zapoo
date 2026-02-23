@@ -15,6 +15,7 @@ router.get("/plans", optionalAuthenticate, subscriptionController.getPlans);
 
 // Restaurant routes
 router.post("/subscribe", authenticateRestaurant, subscriptionController.subscribe);
+router.post("/verify-payment", authenticateRestaurant, subscriptionController.verifySubscriptionPayment);
 router.get("/my-subscription", authenticateRestaurant, subscriptionController.getMySubscription);
 router.post("/cancel", authenticateRestaurant, subscriptionController.cancelSubscription);
 
