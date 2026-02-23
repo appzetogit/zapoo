@@ -597,21 +597,7 @@ export default function Inventory() {
   const [selectedFilter, setSelectedFilter] = useState(null)
   const [isLoading, setIsLoading] = useState(false)
   const [loadingInventory, setLoadingInventory] = useState(false)
-  const [categories, setCategories] = useState(() => {
-    try {
-      if (typeof window === "undefined") return mockCategories
-      const saved = localStorage.getItem(INVENTORY_STORAGE_KEY)
-      if (saved) {
-        const parsed = JSON.parse(saved)
-        if (Array.isArray(parsed)) {
-          return parsed
-        }
-      }
-    } catch (error) {
-      console.error("Error loading inventory from storage:", error)
-    }
-    return mockCategories
-  })
+  const [categories, setCategories] = useState([])
   const [expandedCategories, setExpandedCategories] = useState(() =>
     mockCategories.map(c => c.id)
   )
@@ -868,15 +854,8 @@ export default function Inventory() {
     isSwiping.current = false
   }
 
-  // Persist categories to localStorage whenever they change
-  useEffect(() => {
-    try {
-      if (typeof window === "undefined") return
-      localStorage.setItem(INVENTORY_STORAGE_KEY, JSON.stringify(categories))
-    } catch (error) {
-      console.error("Error saving inventory to storage:", error)
-    }
-  }, [categories])
+  // No longer persisting categories to localStorage to avoid stale data issues
+  // The menu API is now the source of truth
 
   // Calculate total items
   const totalItems = useMemo(
@@ -1641,7 +1620,7 @@ export default function Inventory() {
       </div>
 
       {/* Filter Popup */}
-      <AnimatePresence>
+      < AnimatePresence >
         {filterOpen && (
           <>
             <motion.div
@@ -1706,10 +1685,10 @@ export default function Inventory() {
             </motion.div>
           </>
         )}
-      </AnimatePresence>
+      </AnimatePresence >
 
       {/* Toggle Popup */}
-      <AnimatePresence>
+      < AnimatePresence >
         {togglePopupOpen && toggleTarget && (
           <>
             <motion.div
@@ -1877,10 +1856,10 @@ export default function Inventory() {
             </motion.div>
           </>
         )}
-      </AnimatePresence>
+      </AnimatePresence >
 
       {/* Calendar Popup */}
-      <SimpleCalendar
+      < SimpleCalendar
         selectedDate={selectedDate}
         onDateSelect={setSelectedDate}
         isOpen={showCalendar}
@@ -1898,90 +1877,92 @@ export default function Inventory() {
       />
 
       {/* Floating Menu Button & Popup (hidden on Add-ons tab) */}
-      {activeTab !== "add-ons" && (
-        <div className="fixed right-4 bottom-24 z-30">
-          <motion.button
-            type="button"
-            whileTap={{ scale: 0.96 }}
-            onClick={() => setIsMenuOpen((prev) => !prev)}
-            className="flex items-center gap-2 px-4 py-2 rounded-full border border-gray-800 bg-white text-sm font-medium shadow-sm"
-          >
-            <span className="w-5 h-5 flex items-center justify-center">
-              {isMenuOpen ? (
-                <X className="w-4 h-4 text-gray-900" />
-              ) : (
-                <Utensils className="w-4 h-4 text-gray-900" />
+      {
+        activeTab !== "add-ons" && (
+          <div className="fixed right-4 bottom-24 z-30">
+            <motion.button
+              type="button"
+              whileTap={{ scale: 0.96 }}
+              onClick={() => setIsMenuOpen((prev) => !prev)}
+              className="flex items-center gap-2 px-4 py-2 rounded-full border border-gray-800 bg-white text-sm font-medium shadow-sm"
+            >
+              <span className="w-5 h-5 flex items-center justify-center">
+                {isMenuOpen ? (
+                  <X className="w-4 h-4 text-gray-900" />
+                ) : (
+                  <Utensils className="w-4 h-4 text-gray-900" />
+                )}
+              </span>
+              <span>{isMenuOpen ? "Close" : "Menu"}</span>
+            </motion.button>
+
+            <AnimatePresence>
+              {isMenuOpen && (
+                <>
+                  {/* Backdrop */}
+                  <motion.div
+                    className="fixed inset-0 bg-black/40 z-30"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    onClick={() => setIsMenuOpen(false)}
+                  />
+
+                  {/* Menu Popup */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 20 }}
+                    transition={{ duration: 0.2 }}
+                    className="fixed right-4 bottom-36 z-30 w-[60vw] max-w-sm h-[45vh] bg-white rounded-3xl shadow-lg overflow-hidden"
+                  >
+                    <div className="h-full flex flex-col">
+                      <div className="px-4 pt-4 pb-2">
+                        <p className="text-sm font-semibold text-gray-900">Menu</p>
+                      </div>
+                      <div className="h-px bg-gray-200 mx-4" />
+                      <div className="flex-1 overflow-y-auto px-4 py-2 space-y-1">
+                        {categories.map((category, index) => {
+                          const itemCount =
+                            category.itemCount || (category.items?.length || 0)
+                          const isLast = index === categories.length - 1
+
+                          return (
+                            <button
+                              key={category.id}
+                              type="button"
+                              onClick={() => {
+                                setIsMenuOpen(false)
+                                setTimeout(() => scrollToCategory(category.id), 200)
+                              }}
+                              className="w-full text-left py-3 focus:outline-none"
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm font-medium text-gray-900">
+                                  {category.name}
+                                </span>
+                                <span className="min-w-[28px] h-7 rounded-full border border-gray-300 flex items-center justify-center text-xs text-gray-800">
+                                  {itemCount}
+                                </span>
+                              </div>
+                              {!isLast && (
+                                <div className="mt-3 border-t border-dashed border-gray-200" />
+                              )}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  </motion.div>
+                </>
               )}
-            </span>
-            <span>{isMenuOpen ? "Close" : "Menu"}</span>
-          </motion.button>
-
-          <AnimatePresence>
-            {isMenuOpen && (
-              <>
-                {/* Backdrop */}
-                <motion.div
-                  className="fixed inset-0 bg-black/40 z-30"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  onClick={() => setIsMenuOpen(false)}
-                />
-
-                {/* Menu Popup */}
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 20 }}
-                  transition={{ duration: 0.2 }}
-                  className="fixed right-4 bottom-36 z-30 w-[60vw] max-w-sm h-[45vh] bg-white rounded-3xl shadow-lg overflow-hidden"
-                >
-                  <div className="h-full flex flex-col">
-                    <div className="px-4 pt-4 pb-2">
-                      <p className="text-sm font-semibold text-gray-900">Menu</p>
-                    </div>
-                    <div className="h-px bg-gray-200 mx-4" />
-                    <div className="flex-1 overflow-y-auto px-4 py-2 space-y-1">
-                      {categories.map((category, index) => {
-                        const itemCount =
-                          category.itemCount || (category.items?.length || 0)
-                        const isLast = index === categories.length - 1
-
-                        return (
-                          <button
-                            key={category.id}
-                            type="button"
-                            onClick={() => {
-                              setIsMenuOpen(false)
-                              setTimeout(() => scrollToCategory(category.id), 200)
-                            }}
-                            className="w-full text-left py-3 focus:outline-none"
-                          >
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm font-medium text-gray-900">
-                                {category.name}
-                              </span>
-                              <span className="min-w-[28px] h-7 rounded-full border border-gray-300 flex items-center justify-center text-xs text-gray-800">
-                                {itemCount}
-                              </span>
-                            </div>
-                            {!isLast && (
-                              <div className="mt-3 border-t border-dashed border-gray-200" />
-                            )}
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </div>
-                </motion.div>
-              </>
-            )}
-          </AnimatePresence>
-        </div>
-      )}
+            </AnimatePresence>
+          </div>
+        )
+      }
 
       {/* Bottom Navigation */}
       <BottomNavOrders />
-    </div>
+    </div >
   )
 }

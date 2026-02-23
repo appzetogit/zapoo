@@ -456,6 +456,9 @@ export const restaurantAPI = {
       item,
     });
   },
+  deleteMenuItem: (itemId) => {
+    return apiClient.delete(`${API_ENDPOINTS.RESTAURANT.MENU}/item/${itemId}`);
+  },
   getMenuByRestaurantId: (restaurantId) => {
     return apiClient.get(
       API_ENDPOINTS.RESTAURANT.MENU_BY_RESTAURANT_ID.replace(
@@ -1874,6 +1877,19 @@ export const adminAPI = {
   rejectFoodItem: (id, reason) => {
     return apiClient.post(
       API_ENDPOINTS.ADMIN.FOOD_APPROVAL_REJECT.replace(":id", id),
+      { reason },
+    );
+  },
+
+  approveSpecialRecommendation: (id) => {
+    return apiClient.post(
+      API_ENDPOINTS.ADMIN.FOOD_APPROVAL_SPECIAL_APPROVE.replace(":id", id),
+    );
+  },
+
+  rejectSpecialRecommendation: (id, reason) => {
+    return apiClient.post(
+      API_ENDPOINTS.ADMIN.FOOD_APPROVAL_SPECIAL_REJECT.replace(":id", id),
       { reason },
     );
   },
