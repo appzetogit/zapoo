@@ -305,7 +305,7 @@ export const createOrder = async (req, res) => {
     const order = new Order({
       orderId: generatedOrderId, // Re-added orderId generation
       userId,
-      restaurant: assignedRestaurantId,
+      restaurantId: assignedRestaurantId,
       restaurantName: assignedRestaurantName,
       items: items.map(item => ({
         itemId: item.itemId,

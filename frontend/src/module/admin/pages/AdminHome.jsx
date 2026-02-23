@@ -115,8 +115,9 @@ export default function AdminHome() {
   const platformFeeTotal = dashboardData?.platformFee?.total || 0
   const deliveryFeeTotal = dashboardData?.deliveryFee?.total || 0
   const gstTotal = dashboardData?.gst?.total || 0
-  // Total revenue = Commission + Platform Fee + Delivery Fee + GST
-  const totalAdminEarnings = commissionTotal + platformFeeTotal + deliveryFeeTotal + gstTotal
+  const recommendedItemFeeTotal = dashboardData?.recommendedItemFee?.total || 0
+  // Total revenue = Commission + Platform Fee + Delivery Fee + GST + Recommended Item Fee
+  const totalAdminEarnings = commissionTotal + platformFeeTotal + deliveryFeeTotal + gstTotal + recommendedItemFeeTotal
 
   // Additional stats
   const totalRestaurants = dashboardData?.restaurants?.total || 0
@@ -230,9 +231,16 @@ export default function AdminHome() {
               accent="bg-orange-200/40"
             />
             <MetricCard
+              title="Recommended Item fees"
+              value={`₹${recommendedItemFeeTotal.toLocaleString("en-IN")}`}
+              helper="Total recommended fees"
+              icon={<Plus className="h-5 w-5 text-pink-600" />}
+              accent="bg-pink-200/40"
+            />
+            <MetricCard
               title="Total revenue"
               value={`₹${totalAdminEarnings.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-              helper={`Commission ₹${commissionTotal.toFixed(2)} + Platform ₹${platformFeeTotal.toFixed(2)} + Delivery ₹${deliveryFeeTotal.toFixed(2)} + GST ₹${gstTotal.toFixed(2)}`}
+              helper={`Commission ₹${commissionTotal.toFixed(2)} + Platform ₹${platformFeeTotal.toFixed(2)} + Delivery ₹${deliveryFeeTotal.toFixed(2)} + GST ₹${gstTotal.toFixed(2)} + Rec ₹${recommendedItemFeeTotal.toFixed(2)}`}
               icon={<DollarSign className="h-5 w-5 text-green-600" />}
               accent="bg-green-200/40"
             />

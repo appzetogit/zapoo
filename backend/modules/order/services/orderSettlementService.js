@@ -76,11 +76,16 @@ export const calculateOrderSettlement = async (orderId) => {
     // Else: Subscription Base -> 0 commission (already set)
 
     const commissionAmount = Math.round(restaurantCommissionData.commission * 100) / 100;
-    const restaurantNetEarning = Math.round((foodPrice - commissionAmount) * 100) / 100;
+
+    // Internal Recommended Fee (Deducted from restaurant, earned by admin)
+    const recommendedItemFee = order.pricing.internalRecommendedFee || 0;
+
+    const restaurantNetEarning = Math.round((foodPrice - commissionAmount - recommendedItemFee) * 100) / 100;
 
     const restaurantEarning = {
       foodPrice: foodPrice, // Full order value (₹200)
       commission: commissionAmount, // Commission deducted (₹30 for 15% or 0 for SaaS)
+      recommendedItemFee: recommendedItemFee, // Internal fee for recommended items
       commissionPercentage: restaurantCommissionData.type === 'percentage'
         ? restaurantCommissionData.value
         : (foodPrice > 0 ? (commissionAmount / foodPrice) * 100 : 0),
@@ -130,13 +135,15 @@ export const calculateOrderSettlement = async (orderId) => {
     const adminPlatformFee = Math.round(userPayment.platformFee * 100) / 100;
     const adminDeliveryFee = Math.round(userPayment.deliveryFee * 100) / 100;
     const adminGST = Math.round(userPayment.gst * 100) / 100;
-    const adminTotal = Math.round((adminCommission + adminPlatformFee + adminDeliveryFee + adminGST) * 100) / 100;
+    const adminRecommendedFee = Math.round(restaurantEarning.recommendedItemFee * 100) / 100;
+    const adminTotal = Math.round((adminCommission + adminPlatformFee + adminDeliveryFee + adminGST + adminRecommendedFee) * 100) / 100;
 
     const adminEarning = {
       commission: adminCommission, // Restaurant commission (₹30)
       platformFee: adminPlatformFee, // Platform fee (₹6)
       deliveryFee: adminDeliveryFee, // Delivery fee (₹0 if free, but still tracked)
       gst: adminGST, // GST (₹10)
+      recommendedItemFee: adminRecommendedFee, // Recommended item fee (₹5)
       deliveryMargin: Math.max(0, Math.round(deliveryMargin * 100) / 100), // Delivery fee - delivery partner earning
       totalEarning: adminTotal, // Total admin earnings
       status: 'pending'

@@ -785,7 +785,8 @@ export default function RestaurantDetails() {
       restaurantId: validRestaurantId, // Use validated restaurantId
       description: item.description,
       originalPrice: item.originalPrice,
-      isVeg: item.isVeg !== false // Add isVeg property
+      isVeg: item.isVeg !== false,
+      isRecommended: item.isRecommended === true
     }
 
     // Get source position for animation from event target

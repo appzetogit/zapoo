@@ -66,6 +66,17 @@ const zoneSchema = new mongoose.Schema(
         default: Date.now
       }
     },
+    recommendedItemFee: {
+      type: Number,
+      default: 0,
+      min: 0,
+      comment: 'Fee for recommended items in this zone (if overridden)'
+    },
+    isRecommendedFeeOverridden: {
+      type: Boolean,
+      default: false,
+      comment: 'If true, use the zone-level recommendedItemFee instead of tier-level'
+    },
     area: {
       type: Number,
       default: 0,

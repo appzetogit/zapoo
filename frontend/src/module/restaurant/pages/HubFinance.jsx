@@ -680,6 +680,71 @@ export default function HubFinance() {
                     <p className="text-sm text-gray-600 mb-4">
                       {financeData?.currentCycle?.totalOrders || 0} {financeData?.currentCycle?.totalOrders === 1 ? 'order' : 'orders'}
                     </p>
+
+                    {/* Recommended Item Performance */}
+                    {financeData?.currentCycle?.recommendedItems && (
+                      <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-100">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="w-1.5 h-4 bg-blue-500 rounded-full"></div>
+                          <h3 className="text-xs font-bold text-gray-900 uppercase tracking-tight">Special Item Performance</h3>
+                        </div>
+
+                        {/* Top stats */}
+                        <div className="grid grid-cols-2 gap-2 mb-3">
+                          <div>
+                            <p className="text-[10px] text-gray-500 uppercase">Items Sold</p>
+                            <p className="text-sm font-bold text-gray-900">{financeData.currentCycle.recommendedItems.count || 0}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-gray-500 uppercase">Gross Revenue</p>
+                            <p className="text-sm font-bold text-gray-900">₹{financeData.currentCycle.recommendedItems.revenue?.toLocaleString('en-IN')}</p>
+                          </div>
+                        </div>
+
+                        {/* Earnings breakdown */}
+                        <div className="border-t border-blue-200/50 pt-2 space-y-1.5">
+                          <p className="text-[9px] text-gray-400 uppercase font-bold tracking-wider">Earnings Breakdown</p>
+
+                          <div className="flex items-center justify-between bg-red-50/80 border border-red-100/60 rounded px-2 py-1.5">
+                            <div className="flex items-center gap-1.5">
+                              <div className="w-1.5 h-1.5 rounded-full bg-red-400" />
+                              <p className="text-[11px] font-semibold text-gray-600">Admin Platform Fee</p>
+                            </div>
+                            <p className="text-xs font-bold text-red-600">- ₹{financeData.currentCycle.recommendedItems.fees?.toLocaleString('en-IN') ?? 0}</p>
+                          </div>
+
+                          <div className="flex items-center justify-between bg-green-50/80 border border-green-100/60 rounded px-2 py-1.5">
+                            <div className="flex items-center gap-1.5">
+                              <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                              <p className="text-[11px] font-semibold text-gray-600">Your Net Earnings</p>
+                            </div>
+                            <p className="text-xs font-bold text-green-700">₹{financeData.currentCycle.recommendedItems.netRevenue?.toLocaleString('en-IN')}</p>
+                          </div>
+                        </div>
+
+                        <div className="mt-2 pt-2 border-t border-blue-200/50 flex justify-between items-center">
+                          <p className="text-[10px] text-gray-500 uppercase">Contribution</p>
+                          <p className="text-xs font-bold text-blue-700">{financeData.currentCycle.recommendedItems.contributionPct}% of total sales</p>
+                        </div>
+
+                        {financeData.currentCycle.recommendedItems.topItems?.length > 0 && (
+                          <div className="mt-3">
+                            <p className="text-[10px] text-gray-500 uppercase mb-2 font-bold">Top Boosted Items</p>
+                            <div className="space-y-1.5">
+                              {financeData.currentCycle.recommendedItems.topItems.map((item, idx) => (
+                                <div key={idx} className="flex justify-between items-center text-[11px] bg-white/50 p-1.5 rounded">
+                                  <span className="text-gray-700 truncate max-w-[150px]">{item.name}</span>
+                                  <span className="font-bold text-gray-900">{item.count} sold</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        <p className="text-[9px] text-gray-400 mt-2 italic">* Admin platform fee is charged for boosting item visibility to more customers.</p>
+                      </div>
+                    )}
+
                     {(financeData?.currentCycle?.estimatedPayout || 0) > 0 && (
                       <button
                         onClick={() => setShowWithdrawalModal(true)}

@@ -1,6 +1,8 @@
 import Restaurant from '../../restaurant/models/Restaurant.js';
 import Offer from '../../restaurant/models/Offer.js';
 import FeeSettings from '../../admin/models/FeeSettings.js';
+import Zone from '../../admin/models/Zone.js';
+import Tier from '../../admin/models/Tier.js';
 import mongoose from 'mongoose';
 
 /**
@@ -288,7 +290,23 @@ export const calculateOrderPricing = async ({
 
     // Calculate internal recommended fee (not shown to user)
     const feeSettings = await getFeeSettings();
-    const recommendedFeePerItem = feeSettings.recommendedItemFee || 0;
+    let recommendedFeePerItem = feeSettings.recommendedItemFee || 0;
+
+    // Check for Zone or Tier based overrides
+    if (restaurant && restaurant.zoneId) {
+      const zone = await Zone.findById(restaurant.zoneId).lean();
+      if (zone) {
+        if (zone.isRecommendedFeeOverridden) {
+          recommendedFeePerItem = zone.recommendedItemFee || 0;
+        } else if (zone.tierId) {
+          const tier = await Tier.findById(zone.tierId).lean();
+          if (tier && tier.recommendedItemFee !== undefined) {
+            recommendedFeePerItem = tier.recommendedItemFee;
+          }
+        }
+      }
+    }
+
     let internalRecommendedFee = 0;
 
     if (recommendedFeePerItem > 0) {

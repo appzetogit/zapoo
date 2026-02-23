@@ -56,36 +56,36 @@ export const updateUserProfile = asyncHandler(async (req, res) => {
     if (name !== undefined && name !== null) {
       user.name = name.trim();
     }
-    
+
     if (email !== undefined && email !== null && email.trim() !== '') {
       // Check if email already exists for another user
-      const existingUser = await User.findOne({ 
+      const existingUser = await User.findOne({
         email: email.toLowerCase().trim(),
         _id: { $ne: user._id },
         role: 'user'
       });
-      
+
       if (existingUser) {
         return errorResponse(res, 400, 'Email already in use');
       }
-      
+
       user.email = email.toLowerCase().trim();
     }
-    
+
     if (phone !== undefined && phone !== null) {
       // Check if phone already exists for another user
       if (phone.trim() !== '') {
-        const existingUser = await User.findOne({ 
+        const existingUser = await User.findOne({
           phone: phone.trim(),
           _id: { $ne: user._id },
           role: 'user'
         });
-        
+
         if (existingUser) {
           return errorResponse(res, 400, 'Phone number already in use');
         }
       }
-      
+
       user.phone = phone ? phone.trim() : null;
     }
 
@@ -176,13 +176,13 @@ export const uploadProfileImage = asyncHandler(async (req, res) => {
  */
 export const updateUserLocation = asyncHandler(async (req, res) => {
   try {
-    const { 
-      latitude, 
-      longitude, 
-      address, 
-      city, 
-      state, 
-      area, 
+    const {
+      latitude,
+      longitude,
+      address,
+      city,
+      state,
+      area,
       formattedAddress,
       accuracy,
       postalCode,
@@ -215,6 +215,15 @@ export const updateUserLocation = asyncHandler(async (req, res) => {
 
     if (!user) {
       return errorResponse(res, 404, 'User not found');
+    }
+
+    // Throttling: Ignore updates if they occur within 5 seconds of the last update
+    const lastUpdate = user.currentLocation?.lastUpdated;
+    if (lastUpdate && (new Date() - new Date(lastUpdate)) < 5000) {
+      return successResponse(res, 200, 'Location update throttled', {
+        location: user.currentLocation,
+        message: 'Rate limit: Update skipped'
+      });
     }
 
     // Build complete location object with all available data

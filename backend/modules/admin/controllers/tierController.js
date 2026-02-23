@@ -8,7 +8,7 @@ import { errorResponse, successResponse } from "../../../shared/utils/response.j
  */
 export const createTier = async (req, res) => {
     try {
-        const { name, minArea, maxArea, description, rank } = req.body;
+        const { name, minArea, maxArea, description, rank, recommendedItemFee } = req.body;
 
         // Check if rank already exists
         const existingRank = await Tier.findOne({ rank });
@@ -32,7 +32,8 @@ export const createTier = async (req, res) => {
             deliveryPricing: {
                 baseFee: req.body.baseFee || 0,
                 freeDeliveryThreshold: req.body.freeDeliveryThreshold || 0
-            }
+            },
+            recommendedItemFee: recommendedItemFee || 0
         });
 
         return successResponse(res, 201, "Tier created successfully", tier);
@@ -65,7 +66,7 @@ export const updateTier = async (req, res) => {
     try {
         const { id } = req.params;
         console.log("updateTier body:", req.body);
-        const { name, minArea, maxArea, description, rank, isActive, baseFee, freeDeliveryThreshold, maxBanners } = req.body;
+        const { name, minArea, maxArea, description, rank, isActive, baseFee, freeDeliveryThreshold, maxBanners, recommendedItemFee } = req.body;
 
         const tier = await Tier.findById(id);
         if (!tier) {
@@ -107,6 +108,10 @@ export const updateTier = async (req, res) => {
         // Update tier-based banner limit
         if (maxBanners !== undefined) {
             tier.maxBanners = Math.max(1, parseInt(maxBanners) || 1);
+        }
+
+        if (recommendedItemFee !== undefined) {
+            tier.recommendedItemFee = Number(recommendedItemFee);
         }
 
         await tier.save();
