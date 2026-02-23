@@ -323,12 +323,10 @@ export default function ToHub() {
   const [totalOrders, setTotalOrders] = useState("0")
   const [lastUpdated, setLastUpdated] = useState(null)
   const [mealtimeMetrics, setMealtimeMetrics] = useState([
-    { title: "Breakfast", window: "7:00 am - 11:00 am", value: "0", change: "- 0%", color: "#111827" },
-    { title: "Lunch", window: "11:00 am - 4:00 pm", value: "0", change: "- 0%", color: "#ef4444" },
-    { title: "Evening snacks", window: "4:00 pm - 7:00 pm", value: "0", change: "- 0%", color: "#2563eb" },
     { title: "Dinner", window: "7:00 pm - 11:00 pm", value: "0", change: "- 0%", color: "#f59e0b" },
     { title: "Late night", window: "11:00 pm - 7:00 am", value: "0", change: "- 0%", color: "#10b981" },
   ])
+  const [recommendedStats, setRecommendedStats] = useState({ count: 0, revenue: 0, fees: 0, contribution: 0 })
   const [complaintsView, setComplaintsView] = useState("all")
   const [isKptVideoOpen, setIsKptVideoOpen] = useState(false)
   const [offersWeeklyData] = useState([
@@ -937,18 +935,36 @@ export default function ToHub() {
         // Calculate mealtime data
         const mealtimeData = calculateMealtimeData(allOrders, startDate, endDate)
 
-        console.log('📈 Chart data calculated:', {
-          totalSales: newTotalSales,
-          totalOrders: newTotalOrders,
-          chartDataPoints: newChartData.length,
-          mealtimeData,
-          filter: graphFilter
+        // Calculate recommended items data
+        let recCount = 0
+        let recRevenue = 0
+        let recFees = 0
+        const filteredOrdersForRec = allOrders.filter(order => {
+          const orderDate = new Date(order.createdAt)
+          return orderDate >= startDateISO && orderDate <= endDateISO
         })
+
+        filteredOrdersForRec.forEach(order => {
+          let hasRecItem = false
+            ; (order.items || []).forEach(item => {
+              if (item.isRecommended) {
+                recCount += (item.quantity || 1)
+                recRevenue += (item.price || 0) * (item.quantity || 1)
+                hasRecItem = true
+              }
+            })
+          if (hasRecItem) {
+            recFees += (order.pricing?.internalRecommendedFee || 0)
+          }
+        })
+
+        const contribution = newTotalSales > 0 ? (recRevenue / newTotalSales * 100).toFixed(1) : 0
 
         setChartData(newChartData)
         setTotalSales(`₹ ${newTotalSales.toLocaleString("en-IN")}`)
         setTotalOrders(newTotalOrders.toString())
         setMealtimeMetrics(mealtimeData)
+        setRecommendedStats({ count: recCount, revenue: recRevenue, fees: recFees, contribution })
         setLastUpdated(new Date())
       } else {
         // No orders found
@@ -964,6 +980,7 @@ export default function ToHub() {
         ])
         setTotalSales("₹ 0")
         setTotalOrders("0")
+        setRecommendedStats({ count: 0, revenue: 0, fees: 0, contribution: 0 })
         // Reset mealtime metrics to zero
         setMealtimeMetrics([
           { title: "Breakfast", window: "7:00 am - 11:00 am", value: "0", change: "- 0%", color: "#111827" },
@@ -1726,6 +1743,58 @@ export default function ToHub() {
                 </div>
               </div>
             ))}
+          </div>
+
+          {/* Recommended Items Performance card */}
+          <div className="px-4">
+            <div className="bg-white rounded-lg p-4 space-y-4 relative overflow-hidden">
+              <div className="absolute top-0 right-0 p-2">
+                <Wand2 className="w-8 h-8 text-blue-100/50" />
+              </div>
+              <div className="flex items-center justify-between relative z-10">
+                <div>
+                  <p className="text-base font-bold text-gray-900">Special Items Performance</p>
+                  <p className="text-xs text-gray-500">How your boosted items are performing</p>
+                </div>
+              </div>
+
+              {/* Top metrics row */}
+              <div className="grid grid-cols-2 gap-4 relative z-10">
+                <div className="bg-blue-50/50 p-3 rounded-lg border border-blue-100/50">
+                  <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-1">Items Sold</p>
+                  <p className="text-xl font-bold text-blue-600">{recommendedStats.count}</p>
+                  <p className="text-[10px] text-blue-400 mt-1">{recommendedStats.contribution}% of total sales</p>
+                </div>
+                <div className="bg-green-50/50 p-3 rounded-lg border border-green-100/50">
+                  <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-1">Gross Revenue</p>
+                  <p className="text-xl font-bold text-green-600">₹{recommendedStats.revenue?.toLocaleString('en-IN')}</p>
+                  <p className="text-[10px] text-green-400 mt-1">Before platform fees</p>
+                </div>
+              </div>
+
+              {/* Earnings breakdown */}
+              <div className="relative z-10 border-t border-gray-100 pt-3 space-y-2">
+                <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Earnings Breakdown</p>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-red-50/60 p-3 rounded-lg border border-red-100/60">
+                    <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-1">Platform Fee</p>
+                    <p className="text-xl font-bold text-red-500">- ₹{recommendedStats.fees?.toLocaleString('en-IN') ?? 0}</p>
+                    <p className="text-[10px] text-red-400 mt-1">Goes to admin</p>
+                  </div>
+                  <div className="bg-green-50/60 p-3 rounded-lg border border-green-100/60">
+                    <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-1">Your Earnings</p>
+                    <p className="text-xl font-bold text-green-600">₹{(recommendedStats.revenue - recommendedStats.fees).toLocaleString('en-IN')}</p>
+                    <p className="text-[10px] text-green-400 mt-1">After platform fee</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-2 text-[10px] text-gray-400 italic bg-gray-50/80 p-2 rounded relative z-10">
+                <span>💡</span>
+                <span>Platform fees are charged for featuring your items to more customers. These are separate from your regular earnings.</span>
+              </div>
+            </div>
           </div>
 
 

@@ -51,7 +51,7 @@ export const reverseGeocode = async (req, res) => {
         try {
           const requestId = Date.now().toString();
           const url = `https://api.olamaps.io/places/v1/reverse-geocode?latlng=${latNum},${lngNum}&api_key=${apiKey}`;
-          
+
           response = await axios.get(url, {
             headers: {
               'X-Request-Id': requestId, // Unique ID for tracking
@@ -60,7 +60,7 @@ export const reverseGeocode = async (req, res) => {
             },
             timeout: 10000 // 10 seconds timeout
           });
-          
+
           logger.info('OLA Maps reverse geocode successful (latlng format)', {
             lat: latNum,
             lng: lngNum,
@@ -68,7 +68,7 @@ export const reverseGeocode = async (req, res) => {
             hasResults: !!(response.data?.results),
             resultsLength: response.data?.results?.length || 0
           });
-          
+
           // Log first result for debugging
           if (response.data?.results?.[0]) {
             logger.info('OLA Maps first result:', {
@@ -84,14 +84,14 @@ export const reverseGeocode = async (req, res) => {
             data: err1a.response?.data
           });
           response = null;
-          
+
           // Try Method 1b: API Key as query parameter (separate lat/lng)
           try {
             response = await axios.get(
               'https://api.olamaps.io/places/v1/reverse-geocode',
               {
-                params: { 
-                  lat: latNum, 
+                params: {
+                  lat: latNum,
                   lng: lngNum,
                   key: apiKey,
                   // Add parameters for detailed response
@@ -116,7 +116,7 @@ export const reverseGeocode = async (req, res) => {
             response = null;
           }
         }
-        
+
         // Try Method 2: Bearer token with project headers
         if (!response) {
           try {
@@ -125,7 +125,7 @@ export const reverseGeocode = async (req, res) => {
               'Content-Type': 'application/json',
               'X-Request-Id': Date.now().toString()
             };
-            
+
             if (projectId) {
               headers['X-Project-ID'] = projectId;
             }
@@ -150,7 +150,7 @@ export const reverseGeocode = async (req, res) => {
             response = null;
           }
         }
-        
+
         // Try Method 3: API Key in X-API-Key header
         if (!response) {
           try {
@@ -179,234 +179,231 @@ export const reverseGeocode = async (req, res) => {
         // OLA Maps API key not configured, skip to fallback
         logger.warn('OLA_MAPS_API_KEY not configured, using fallback service');
       }
-      
+
       // All OLA Maps methods failed or not configured, use fallback
       if (!response) {
         try {
-          logger.warn('All OLA Maps authentication methods failed, using fallback service', {
-            error: lastError?.message || 'All methods failed',
-            status: lastError?.response?.status
-          });
-          
+          logger.warn('⚠️ All OLA Maps authentication methods failed or not configured. Using Fallback service (BigDataCloud) for reverse geocoding.');
+
           try {
-              // Try Google Maps Geocoding API first (better sublocality data)
-              let fallbackResponse = null;
-              // Get Google Maps API key from database (NO FALLBACK)
-              const { getGoogleMapsApiKey } = await import('../../../shared/utils/envService.js');
-              const googleApiKey = await getGoogleMapsApiKey();
-              
-              if (googleApiKey) {
-                try {
-                  fallbackResponse = await axios.get(
-                    `https://maps.googleapis.com/maps/api/geocode/json`,
-                    {
-                      params: {
-                        latlng: `${latNum},${lngNum}`,
-                        key: googleApiKey,
-                        language: 'en'
-                      },
-                      timeout: 5000
-                    }
-                  );
-                  
-                  // Transform Google Maps response
-                  if (fallbackResponse.data && fallbackResponse.data.results && fallbackResponse.data.results.length > 0) {
-                    const googleResult = fallbackResponse.data.results[0];
-                    const addressComponents = googleResult.address_components || [];
-                    
-                    // Extract components
-                    let city = "";
-                    let state = "";
-                    let country = "";
-                    let area = "";
-                    
-                    addressComponents.forEach(comp => {
-                      const types = comp.types || [];
-                      if (types.includes('locality')) city = comp.long_name;
-                      if (types.includes('administrative_area_level_1')) state = comp.long_name;
-                      if (types.includes('country')) country = comp.long_name;
-                      if (types.includes('sublocality') || types.includes('sublocality_level_1') || types.includes('neighborhood')) {
-                        area = comp.long_name;
-                      }
-                    });
-                    
-                    // If no sublocality, try all sublocality levels and neighborhood
-                    if (!area) {
-                      // Try sublocality_level_2, sublocality_level_3, neighborhood
-                      const sublocality = addressComponents.find(c => {
-                        const types = c.types || [];
-                        return types.includes('sublocality_level_2') || 
-                               types.includes('sublocality_level_3') ||
-                               types.includes('neighborhood') ||
-                               (types.includes('political') && 
-                                !types.includes('administrative_area_level_1') &&
-                                !types.includes('locality'));
-                      });
-                      if (sublocality && 
-                          sublocality.long_name !== city && 
-                          sublocality.long_name !== state &&
-                          !sublocality.long_name.toLowerCase().includes('district')) {
-                        area = sublocality.long_name;
-                      }
-                    }
-                    
-                    // If still no area, try Google Places Nearby Search for more specific location
-                    if (!area && googleApiKey) {
-                      try {
-                        const placesResponse = await axios.get(
-                          `https://maps.googleapis.com/maps/api/place/nearbysearch/json`,
-                          {
-                            params: {
-                              location: `${latNum},${lngNum}`,
-                              radius: 100, // 100 meters - very close
-                              type: 'neighborhood|sublocality',
-                              key: googleApiKey
-                            },
-                            timeout: 3000
-                          }
-                        );
-                        
-                        if (placesResponse.data && placesResponse.data.results && placesResponse.data.results.length > 0) {
-                          const place = placesResponse.data.results[0];
-                          if (place.name && 
-                              place.name !== city && 
-                              place.name !== state &&
-                              !place.name.toLowerCase().includes('district')) {
-                            area = place.name;
-                            logger.info('Found area from Google Places Nearby Search', { area });
-                          }
-                        }
-                      } catch (placesErr) {
-                        // Silently fail - this is optional enhancement
-                      }
-                    }
-                    
-                    const transformedData = {
-                      results: [{
-                        formatted_address: googleResult.formatted_address,
-                        address_components: {
-                          city: city,
-                          state: state,
-                          country: country,
-                          area: area
-                        },
-                        geometry: {
-                          location: {
-                            lat: latNum,
-                            lng: lngNum
-                          }
-                        }
-                      }]
-                    };
-                    
-                    return res.json({
-                      success: true,
-                      data: transformedData,
-                      source: 'google_maps'
-                    });
+            // Try Google Maps Geocoding API first (better sublocality data)
+            let fallbackResponse = null;
+            // Get Google Maps API key from database (NO FALLBACK)
+            const { getGoogleMapsApiKey } = await import('../../../shared/utils/envService.js');
+            const googleApiKey = await getGoogleMapsApiKey();
+
+            if (googleApiKey) {
+              try {
+                fallbackResponse = await axios.get(
+                  `https://maps.googleapis.com/maps/api/geocode/json`,
+                  {
+                    params: {
+                      latlng: `${latNum},${lngNum}`,
+                      key: googleApiKey,
+                      language: 'en'
+                    },
+                    timeout: 5000
                   }
-                } catch (googleErr) {
-                  logger.warn('Google Maps geocoding failed, using bigdatacloud fallback', {
-                    error: googleErr.message
+                );
+
+                // Transform Google Maps response
+                if (fallbackResponse.data && fallbackResponse.data.results && fallbackResponse.data.results.length > 0) {
+                  const googleResult = fallbackResponse.data.results[0];
+                  const addressComponents = googleResult.address_components || [];
+
+                  // Extract components
+                  let city = "";
+                  let state = "";
+                  let country = "";
+                  let area = "";
+
+                  addressComponents.forEach(comp => {
+                    const types = comp.types || [];
+                    if (types.includes('locality')) city = comp.long_name;
+                    if (types.includes('administrative_area_level_1')) state = comp.long_name;
+                    if (types.includes('country')) country = comp.long_name;
+                    if (types.includes('sublocality') || types.includes('sublocality_level_1') || types.includes('neighborhood')) {
+                      area = comp.long_name;
+                    }
+                  });
+
+                  // If no sublocality, try all sublocality levels and neighborhood
+                  if (!area) {
+                    // Try sublocality_level_2, sublocality_level_3, neighborhood
+                    const sublocality = addressComponents.find(c => {
+                      const types = c.types || [];
+                      return types.includes('sublocality_level_2') ||
+                        types.includes('sublocality_level_3') ||
+                        types.includes('neighborhood') ||
+                        (types.includes('political') &&
+                          !types.includes('administrative_area_level_1') &&
+                          !types.includes('locality'));
+                    });
+                    if (sublocality &&
+                      sublocality.long_name !== city &&
+                      sublocality.long_name !== state &&
+                      !sublocality.long_name.toLowerCase().includes('district')) {
+                      area = sublocality.long_name;
+                    }
+                  }
+
+                  // If still no area, try Google Places Nearby Search for more specific location
+                  if (!area && googleApiKey) {
+                    try {
+                      const placesResponse = await axios.get(
+                        `https://maps.googleapis.com/maps/api/place/nearbysearch/json`,
+                        {
+                          params: {
+                            location: `${latNum},${lngNum}`,
+                            radius: 100, // 100 meters - very close
+                            type: 'neighborhood|sublocality',
+                            key: googleApiKey
+                          },
+                          timeout: 3000
+                        }
+                      );
+
+                      if (placesResponse.data && placesResponse.data.results && placesResponse.data.results.length > 0) {
+                        const place = placesResponse.data.results[0];
+                        if (place.name &&
+                          place.name !== city &&
+                          place.name !== state &&
+                          !place.name.toLowerCase().includes('district')) {
+                          area = place.name;
+                          logger.info('Found area from Google Places Nearby Search', { area });
+                        }
+                      }
+                    } catch (placesErr) {
+                      // Silently fail - this is optional enhancement
+                    }
+                  }
+
+                  const transformedData = {
+                    results: [{
+                      formatted_address: googleResult.formatted_address,
+                      address_components: {
+                        city: city,
+                        state: state,
+                        country: country,
+                        area: area
+                      },
+                      geometry: {
+                        location: {
+                          lat: latNum,
+                          lng: lngNum
+                        }
+                      }
+                    }]
+                  };
+
+                  return res.json({
+                    success: true,
+                    data: transformedData,
+                    source: 'google_maps'
                   });
                 }
+              } catch (googleErr) {
+                logger.warn('Google Maps geocoding failed, using bigdatacloud fallback', {
+                  error: googleErr.message
+                });
               }
-              
-              // Fallback to bigdatacloud if Google Maps not available or failed
-              fallbackResponse = await axios.get(
-                `https://api.bigdatacloud.net/data/reverse-geocode-client`,
-                {
-                  params: {
-                    latitude: latNum,
-                    longitude: lngNum,
-                    localityLanguage: 'en'
-                  },
-                  timeout: 5000 // Reduced timeout to 5 seconds
-                }
-              );
+            }
 
-              // Transform fallback response to match expected format
-              const fallbackData = fallbackResponse.data;
-              
-              // Extract sublocality/area from bigdatacloud response
-              // bigdatacloud provides localityInfo.administrative array with different levels
-              let area = "";
-              if (fallbackData.localityInfo?.administrative) {
-                // Find sublocality (usually at index 2 or 3, not state which is at 1)
-                const adminLevels = fallbackData.localityInfo.administrative;
-                // Level 1 is usually state, level 2+ might be district/city, level 3+ is sublocality
-                for (let i = 2; i < adminLevels.length && i < 5; i++) {
-                  const level = adminLevels[i];
-                  if (level?.name && 
-                      level.name !== fallbackData.principalSubdivision && 
-                      level.name !== fallbackData.city &&
-                      level.name !== fallbackData.locality) {
-                    area = level.name;
-                    break;
-                  }
-                }
-                // If no area found, try subLocality field directly
-                if (!area && fallbackData.subLocality) {
-                  area = fallbackData.subLocality;
-                }
+            // Fallback to bigdatacloud if Google Maps not available or failed
+            fallbackResponse = await axios.get(
+              `https://api.bigdatacloud.net/data/reverse-geocode-client`,
+              {
+                params: {
+                  latitude: latNum,
+                  longitude: lngNum,
+                  localityLanguage: 'en'
+                },
+                timeout: 5000 // Reduced timeout to 5 seconds
               }
-              
-              // Build formatted address with area if available
-              let formattedAddress = fallbackData.formattedAddress;
-              if (!formattedAddress) {
-                const parts = [];
-                if (area) parts.push(area);
-                if (fallbackData.locality || fallbackData.city) parts.push(fallbackData.locality || fallbackData.city);
-                if (fallbackData.principalSubdivision) parts.push(fallbackData.principalSubdivision);
-                formattedAddress = parts.join(', ');
-              }
-              
-              const transformedData = {
-                results: [{
-                  formatted_address: formattedAddress,
-                  address_components: {
-                    city: fallbackData.city || fallbackData.locality,
-                    state: fallbackData.principalSubdivision || fallbackData.administrativeArea,
-                    country: fallbackData.countryName,
-                    area: area || "" // Use extracted area, not state!
-                  },
-                  geometry: {
-                    location: {
-                      lat: latNum,
-                      lng: lngNum
-                    }
-                  }
-                }]
-              };
+            );
 
-              return res.json({
-                success: true,
-                data: transformedData,
-                source: 'fallback'
-              });
-            } catch (fallbackError) {
-              // Even fallback failed, return minimal data
-              logger.error('Fallback geocoding also failed', {
-                error: fallbackError.message
-              });
-              
-              const minimalData = {
-                results: [{
-                  formatted_address: `${latNum.toFixed(6)}, ${lngNum.toFixed(6)}`,
-                  address_components: {
-                    city: 'Current Location',
-                    state: '',
-                    country: '',
-                    area: ''
-                  },
-                  geometry: {
-                    location: {
-                      lat: latNum,
-                      lng: lngNum
-                    }
+            // Transform fallback response to match expected format
+            const fallbackData = fallbackResponse.data;
+
+            // Extract sublocality/area from bigdatacloud response
+            // bigdatacloud provides localityInfo.administrative array with different levels
+            let area = "";
+            if (fallbackData.localityInfo?.administrative) {
+              // Find sublocality (usually at index 2 or 3, not state which is at 1)
+              const adminLevels = fallbackData.localityInfo.administrative;
+              // Level 1 is usually state, level 2+ might be district/city, level 3+ is sublocality
+              for (let i = 2; i < adminLevels.length && i < 5; i++) {
+                const level = adminLevels[i];
+                if (level?.name &&
+                  level.name !== fallbackData.principalSubdivision &&
+                  level.name !== fallbackData.city &&
+                  level.name !== fallbackData.locality) {
+                  area = level.name;
+                  break;
+                }
+              }
+              // If no area found, try subLocality field directly
+              if (!area && fallbackData.subLocality) {
+                area = fallbackData.subLocality;
+              }
+            }
+
+            // Build formatted address with area if available
+            let formattedAddress = fallbackData.formattedAddress;
+            if (!formattedAddress) {
+              const parts = [];
+              if (area) parts.push(area);
+              if (fallbackData.locality || fallbackData.city) parts.push(fallbackData.locality || fallbackData.city);
+              if (fallbackData.principalSubdivision) parts.push(fallbackData.principalSubdivision);
+              formattedAddress = parts.join(', ');
+            }
+
+            const transformedData = {
+              results: [{
+                formatted_address: formattedAddress,
+                address_components: {
+                  city: fallbackData.city || fallbackData.locality,
+                  state: fallbackData.principalSubdivision || fallbackData.administrativeArea,
+                  country: fallbackData.countryName,
+                  area: area || "" // Use extracted area, not state!
+                },
+                geometry: {
+                  location: {
+                    lat: latNum,
+                    lng: lngNum
                   }
-                }]
-              };
+                }
+              }]
+            };
+
+            return res.json({
+              success: true,
+              data: transformedData,
+              source: 'fallback'
+            });
+          } catch (fallbackError) {
+            // Even fallback failed, return minimal data
+            logger.error('Fallback geocoding also failed', {
+              error: fallbackError.message
+            });
+
+            const minimalData = {
+              results: [{
+                formatted_address: `${latNum.toFixed(6)}, ${lngNum.toFixed(6)}`,
+                address_components: {
+                  city: 'Current Location',
+                  state: '',
+                  country: '',
+                  area: ''
+                },
+                geometry: {
+                  location: {
+                    lat: latNum,
+                    lng: lngNum
+                  }
+                }
+              }]
+            };
 
             return res.json({
               success: true,
@@ -419,7 +416,7 @@ export const reverseGeocode = async (req, res) => {
           logger.error('Outer fallback error', {
             error: fallbackOuterError.message
           });
-          
+
           const minimalData = {
             results: [{
               formatted_address: `${latNum.toFixed(6)}, ${lngNum.toFixed(6)}`,
@@ -454,16 +451,16 @@ export const reverseGeocode = async (req, res) => {
           hasResult: !!response.data.result,
           keys: Object.keys(response.data)
         });
-        
+
         // OLA Maps API might return data in different structures
         // Process and normalize the response to extract sublocality/area
         let olaData = response.data;
         let processedData = olaData;
-        
+
         // If OLA Maps returns results array, process it
         if (olaData.results && Array.isArray(olaData.results) && olaData.results.length > 0) {
           const firstResult = olaData.results[0];
-          
+
           // Check if it has address_components array (Google Maps style)
           if (firstResult.address_components && Array.isArray(firstResult.address_components)) {
             let area = "";
@@ -471,7 +468,7 @@ export const reverseGeocode = async (req, res) => {
             let state = "";
             let country = "";
             let formattedAddress = firstResult.formatted_address || "";
-            
+
             // Extract from address_components array
             firstResult.address_components.forEach(comp => {
               const types = comp.types || [];
@@ -487,54 +484,54 @@ export const reverseGeocode = async (req, res) => {
                 country = comp.long_name || comp.short_name || "";
               }
             });
-            
+
             // If no sublocality found, try other levels
             if (!area) {
               const sublocality = firstResult.address_components.find(c => {
                 const types = c.types || [];
-                return types.includes('sublocality_level_2') || 
-                       types.includes('sublocality_level_3') ||
-                       (types.includes('political') && 
-                        !types.includes('administrative_area_level_1') &&
-                        !types.includes('locality') &&
-                        !types.includes('country'));
+                return types.includes('sublocality_level_2') ||
+                  types.includes('sublocality_level_3') ||
+                  (types.includes('political') &&
+                    !types.includes('administrative_area_level_1') &&
+                    !types.includes('locality') &&
+                    !types.includes('country'));
               });
               if (sublocality) {
                 area = sublocality.long_name || sublocality.short_name || "";
               }
             }
-            
+
             // Reject generic area names
             if (area && (
-                area.toLowerCase().includes('district') ||
-                area.toLowerCase() === (state || "").toLowerCase() ||
-                area.toLowerCase() === (city || "").toLowerCase()
-              )) {
+              area.toLowerCase().includes('district') ||
+              area.toLowerCase() === (state || "").toLowerCase() ||
+              area.toLowerCase() === (city || "").toLowerCase()
+            )) {
               area = "";
             }
-            
+
             // If still no area, try to extract from formatted_address
             // This is CRITICAL for Indian addresses where area is in formatted_address
             if (!area && formattedAddress) {
               const parts = formattedAddress.split(',').map(p => p.trim()).filter(p => p.length > 0);
               logger.info('Extracting area from formatted_address', { parts, city, state });
-              
+
               if (parts.length >= 3) {
                 // Format: "New Palasia, Indore, Madhya Pradesh"
                 const potentialArea = parts[0];
                 const cityPart = parts[1] || city;
                 const statePart = parts[2] || state;
-                
-                if (potentialArea && 
-                    potentialArea.toLowerCase() !== (cityPart || "").toLowerCase() &&
-                    potentialArea.toLowerCase() !== (statePart || "").toLowerCase() &&
-                    !potentialArea.toLowerCase().includes('district') &&
-                    !potentialArea.toLowerCase().includes('city') &&
-                    potentialArea.length > 2 &&
-                    potentialArea.length < 50) {
+
+                if (potentialArea &&
+                  potentialArea.toLowerCase() !== (cityPart || "").toLowerCase() &&
+                  potentialArea.toLowerCase() !== (statePart || "").toLowerCase() &&
+                  !potentialArea.toLowerCase().includes('district') &&
+                  !potentialArea.toLowerCase().includes('city') &&
+                  potentialArea.length > 2 &&
+                  potentialArea.length < 50) {
                   area = potentialArea;
                   logger.info('✅ Extracted area from formatted_address (3+ parts):', area);
-                  
+
                   // Update city and state from formatted_address if available
                   if (cityPart && (!city || cityPart.toLowerCase() !== city.toLowerCase())) {
                     city = cityPart;
@@ -548,19 +545,19 @@ export const reverseGeocode = async (req, res) => {
                 // Try first part as area if it doesn't match city
                 const firstPart = parts[0];
                 const secondPart = parts[1];
-                
+
                 // If we already have city, check if first part is different
                 if (city && firstPart.toLowerCase() !== city.toLowerCase() &&
-                    firstPart.toLowerCase() !== (state || "").toLowerCase() &&
-                    !firstPart.toLowerCase().includes('district') &&
-                    !firstPart.toLowerCase().includes('city') &&
-                    firstPart.length > 2 && firstPart.length < 50) {
+                  firstPart.toLowerCase() !== (state || "").toLowerCase() &&
+                  !firstPart.toLowerCase().includes('district') &&
+                  !firstPart.toLowerCase().includes('city') &&
+                  firstPart.length > 2 && firstPart.length < 50) {
                   area = firstPart;
                   logger.info('✅ Extracted area from formatted_address (2 parts):', area);
                 }
               }
             }
-            
+
             // Transform to our expected format
             processedData = {
               results: [{
@@ -579,7 +576,7 @@ export const reverseGeocode = async (req, res) => {
                 }
               }]
             };
-            
+
             logger.info('OLA Maps processed response:', {
               area,
               city,
@@ -588,14 +585,14 @@ export const reverseGeocode = async (req, res) => {
             });
           }
         }
-        
+
         return res.json({
           success: true,
           data: processedData,
           source: 'olamaps'
         });
       }
-      
+
       // If we reach here, all methods failed and fallback should have been used
       // But if fallback also failed, return coordinates-only response
       const minimalData = {
@@ -718,8 +715,8 @@ export const getNearbyLocations = async (req, res) => {
               id: place.place_id || `place_${index}`,
               name: place.name || '',
               address: place.vicinity || place.formatted_address || '',
-              distance: distance < 1000 
-                ? `${Math.round(distance)} m` 
+              distance: distance < 1000
+                ? `${Math.round(distance)} m`
                 : `${(distance / 1000).toFixed(2)} km`,
               distanceMeters: Math.round(distance),
               latitude: placeLat,
@@ -778,8 +775,8 @@ export const getNearbyLocations = async (req, res) => {
               id: place.place_id || place.id || `place_${index}`,
               name: place.name || '',
               address: place.vicinity || place.formatted_address || place.address || '',
-              distance: distance < 1000 
-                ? `${Math.round(distance)} m` 
+              distance: distance < 1000
+                ? `${Math.round(distance)} m`
                 : `${(distance / 1000).toFixed(2)} km`,
               distanceMeters: Math.round(distance),
               latitude: placeLat,
@@ -837,10 +834,10 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
   const Δφ = (lat2 - lat1) * Math.PI / 180;
   const Δλ = (lon2 - lon1) * Math.PI / 180;
 
-  const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
-            Math.cos(φ1) * Math.cos(φ2) *
-            Math.sin(Δλ/2) * Math.sin(Δλ/2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+    Math.cos(φ1) * Math.cos(φ2) *
+    Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
   return R * c; // Distance in meters
 }

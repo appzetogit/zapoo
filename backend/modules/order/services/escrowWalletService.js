@@ -151,13 +151,13 @@ const creditRestaurantWallet = async (restaurantId, orderId, netAmount, orderNum
   try {
     const RestaurantWallet = (await import('../../restaurant/models/RestaurantWallet.js')).default;
     const wallet = await RestaurantWallet.findOrCreateByRestaurantId(restaurantId);
-    
+
     // Create description with breakdown
     let description = `Payment for order ${orderNumber}`;
     if (foodPrice && commission) {
       description = `Payment for order ${orderNumber} (Order: ₹${foodPrice}, Commission: ₹${commission}, Net: ₹${netAmount})`;
     }
-    
+
     wallet.addTransaction({
       amount: netAmount, // Credit net amount (₹170)
       type: 'payment',
@@ -165,7 +165,7 @@ const creditRestaurantWallet = async (restaurantId, orderId, netAmount, orderNum
       description: description,
       orderId: orderId
     });
-    
+
     await wallet.save();
 
     // Create audit log
@@ -200,7 +200,7 @@ const creditDeliveryWallet = async (deliveryId, orderId, amount, orderNumber) =>
   try {
     const DeliveryWallet = (await import('../../delivery/models/DeliveryWallet.js')).default;
     const wallet = await DeliveryWallet.findOrCreateByDeliveryId(deliveryId);
-    
+
     wallet.addTransaction({
       amount: amount,
       type: 'payment',
@@ -209,7 +209,7 @@ const creditDeliveryWallet = async (deliveryId, orderId, amount, orderNumber) =>
       orderId: orderId,
       paymentCollected: false // Will be updated when COD is collected
     });
-    
+
     await wallet.save();
 
     // Create audit log
@@ -294,6 +294,18 @@ const creditAdminWallet = async (orderId, adminEarning, orderNumber, restaurantI
         status: 'Completed',
         description: `GST from order ${orderNumber}`,
         orderId: orderId
+      });
+    }
+
+    // Credit Recommended Item Fee
+    if (adminEarning.recommendedItemFee > 0) {
+      wallet.addTransaction({
+        amount: adminEarning.recommendedItemFee,
+        type: 'recommended_item_fee',
+        status: 'Completed',
+        description: `Fee for recommended items in order ${orderNumber}`,
+        orderId: orderId,
+        restaurantId: restaurantId
       });
     }
 

@@ -26,7 +26,8 @@ export default function TransactionReport() {
     refundedTransaction: 0,
     adminEarning: 0,
     restaurantEarning: 0,
-    deliverymanEarning: 0
+    deliverymanEarning: 0,
+    recommendedItemFee: 0
   })
   const [filters, setFilters] = useState({
     zone: "All Zones",
@@ -101,7 +102,8 @@ export default function TransactionReport() {
             refundedTransaction: 0,
             adminEarning: 0,
             restaurantEarning: 0,
-            deliverymanEarning: 0
+            deliverymanEarning: 0,
+            recommendedItemFee: 0
           })
         } else {
           setTransactions([])
@@ -345,6 +347,24 @@ export default function TransactionReport() {
                 <p className="text-base font-bold text-orange-600">{formatCurrency(summary.deliverymanEarning)}</p>
               </div>
             </div>
+
+            {/* Recommended Item Fee */}
+            <div className="rounded-lg shadow-sm border border-slate-200 p-3" style={{ backgroundColor: '#f1f5f9' }}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-pink-100 flex items-center justify-center">
+                    <img src={completedIcon} alt="Recommended Fee" className="w-6 h-6" style={{ filter: 'hue-rotate(280deg)' }} />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-semibold text-slate-900">Recommended Item fees</p>
+                    <div className="w-5 h-5 rounded-full bg-pink-500 flex items-center justify-center">
+                      <Info className="w-3 h-3 text-white" />
+                    </div>
+                  </div>
+                </div>
+                <p className="text-base font-bold text-pink-600">{formatCurrency(summary.recommendedItemFee)}</p>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -419,6 +439,7 @@ export default function TransactionReport() {
                   <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '8%' }}>Discounted Amount</th>
                   <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '7%' }}>Vat/Tax</th>
                   <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '8%' }}>Delivery Charge</th>
+                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '8%' }}>Recommended Fee</th>
                   <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '8%' }}>Order Amount</th>
                 </tr>
               </thead>
@@ -449,8 +470,8 @@ export default function TransactionReport() {
                       </td>
                       <td className="px-1.5 py-1">
                         <span className={`text-[10px] truncate block ${transaction.customerName === "Invalid Customer Data"
-                            ? "text-red-600 font-semibold"
-                            : "text-slate-700"
+                          ? "text-red-600 font-semibold"
+                          : "text-slate-700"
                           }`}>
                           {transaction.customerName}
                         </span>
@@ -480,6 +501,9 @@ export default function TransactionReport() {
                       </td>
                       <td className="px-1.5 py-1">
                         <span className="text-[10px] text-slate-700">{formatFullCurrency(transaction.deliveryCharge)}</span>
+                      </td>
+                      <td className="px-1.5 py-1">
+                        <span className="text-[10px] text-slate-700">{formatFullCurrency(transaction.recommendedItemFee || 0)}</span>
                       </td>
                       <td className="px-1.5 py-1">
                         <span className="text-[10px] font-medium text-slate-900">{formatFullCurrency(transaction.orderAmount)}</span>

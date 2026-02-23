@@ -98,23 +98,26 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
     let totalPlatformFee = 0;
     let totalDeliveryFee = 0;
     let totalGST = 0;
+    let totalRecommendedFee = 0;
 
     allSettlements.forEach((s, index) => {
       const commission = s.adminEarning?.commission || 0;
       const platformFee = s.adminEarning?.platformFee || 0;
       const deliveryFee = s.adminEarning?.deliveryFee || 0;
       const gst = s.adminEarning?.gst || 0;
+      const recommendedFee = s.adminEarning?.recommendedItemFee || 0;
 
       totalCommission += commission;
       totalPlatformFee += platformFee;
       totalDeliveryFee += deliveryFee;
       totalGST += gst;
+      totalRecommendedFee += recommendedFee;
 
       // Log each settlement for debugging
       if (index < 5) {
         // Log first 5 settlements
         console.log(
-          `📦 Settlement ${index + 1} (${s.orderNumber}): Commission: ₹${commission}, Platform: ₹${platformFee}, Delivery: ₹${deliveryFee}, GST: ₹${gst}`,
+          `📦 Settlement ${index + 1} (${s.orderNumber}): Commission: ₹${commission}, Platform: ₹${platformFee}, Delivery: ₹${deliveryFee}, GST: ₹${gst}, Recommended: ₹${recommendedFee}`,
         );
       }
     });
@@ -123,9 +126,10 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
     totalPlatformFee = Math.round(totalPlatformFee * 100) / 100;
     totalDeliveryFee = Math.round(totalDeliveryFee * 100) / 100;
     totalGST = Math.round(totalGST * 100) / 100;
+    totalRecommendedFee = Math.round(totalRecommendedFee * 100) / 100;
 
     console.log(
-      `💰 Final calculated totals - Commission: ₹${totalCommission}, Platform Fee: ₹${totalPlatformFee}, Delivery Fee: ₹${totalDeliveryFee}, GST: ₹${totalGST}`,
+      `💰 Final calculated totals - Commission: ₹${totalCommission}, Platform Fee: ₹${totalPlatformFee}, Delivery Fee: ₹${totalDeliveryFee}, GST: ₹${totalGST}, Recommended Fee: ₹${totalRecommendedFee}`,
     );
 
     // Get last 30 days data from OrderSettlement
@@ -146,6 +150,10 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
     );
     const last30DaysGST = last30DaysSettlements.reduce(
       (sum, s) => sum + (s.adminEarning?.gst || 0),
+      0,
+    );
+    const last30DaysRecommendedFee = last30DaysSettlements.reduce(
+      (sum, s) => sum + (s.adminEarning?.recommendedItemFee || 0),
       0,
     );
 
@@ -432,13 +440,19 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
         last30Days: last30DaysGST,
         currency: "INR",
       },
+      recommendedItemFee: {
+        total: totalRecommendedFee,
+        last30Days: last30DaysRecommendedFee,
+        currency: "INR",
+      },
       totalAdminEarnings: {
-        total: totalCommission + totalPlatformFee + totalDeliveryFee + totalGST,
+        total: totalCommission + totalPlatformFee + totalDeliveryFee + totalGST + totalRecommendedFee,
         last30Days:
           last30DaysCommission +
           last30DaysPlatformFee +
           last30DaysDeliveryFee +
-          last30DaysGST,
+          last30DaysGST +
+          last30DaysRecommendedFee,
         currency: "INR",
       },
       orders: {

@@ -38,7 +38,7 @@ export const getOrderSettlementDetails = asyncHandler(async (req, res) => {
 export const getRestaurantSettlements = asyncHandler(async (req, res) => {
   try {
     const { restaurantId, startDate, endDate } = req.query;
-    
+
     const settlements = await getPendingRestaurantSettlements(
       restaurantId || null,
       startDate || null,
@@ -75,7 +75,7 @@ export const getRestaurantSettlements = asyncHandler(async (req, res) => {
 export const getDeliverySettlements = asyncHandler(async (req, res) => {
   try {
     const { deliveryId, startDate, endDate } = req.query;
-    
+
     const settlements = await getPendingDeliverySettlements(
       deliveryId || null,
       startDate || null,
@@ -238,6 +238,7 @@ export const getAdminWalletSummary = asyncHandler(async (req, res) => {
         totalPlatformFee: wallet.totalPlatformFee,
         totalDeliveryFee: wallet.totalDeliveryFee,
         totalGST: wallet.totalGST,
+        totalRecommendedFee: wallet.totalRecommendedFee || 0,
         totalWithdrawn: wallet.totalWithdrawn,
         pendingBalance: wallet.totalBalance - wallet.totalWithdrawn
       },
@@ -257,7 +258,7 @@ export const getAdminWalletSummary = asyncHandler(async (req, res) => {
 export const getSettlementStatistics = asyncHandler(async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
-    
+
     const query = {
       settlementStatus: 'completed'
     };
@@ -280,7 +281,8 @@ export const getSettlementStatistics = asyncHandler(async (req, res) => {
       totalCommission: settlements.reduce((sum, s) => sum + s.restaurantEarning.commission, 0),
       totalPlatformFee: settlements.reduce((sum, s) => sum + s.userPayment.platformFee, 0),
       totalDeliveryFee: settlements.reduce((sum, s) => sum + s.userPayment.deliveryFee, 0),
-      totalGST: settlements.reduce((sum, s) => sum + s.userPayment.gst, 0)
+      totalGST: settlements.reduce((sum, s) => sum + s.userPayment.gst, 0),
+      totalRecommendedFee: settlements.reduce((sum, s) => sum + (s.adminEarning.recommendedItemFee || 0), 0)
     };
 
     return successResponse(res, 200, 'Settlement statistics retrieved', {
