@@ -327,10 +327,13 @@ export const sidebarMenuData = [
     label: "BANNER SETTINGS",
     items: [
       {
-        type: "link",
+        type: "expandable",
         label: "Landing Page Management",
-        path: "/admin/hero-banner-management",
         icon: "Image",
+        subItems: [
+          { label: "Admin Banners", path: "/admin/hero-banner-management" },
+          { label: "Restaurant Banners", path: "/admin/restaurant-banners" },
+        ],
       },
     ],
   },

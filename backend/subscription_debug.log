@@ -1,0 +1,12 @@
+2026-02-20T11:28:45.723Z - Razorpay order creation failed: receipt: the length must be no more than 40.
+Error: receipt: the length must be no more than 40.
+    at Module.createOrder (file:///C:/Users/hp/Desktop/Zapoo/backend/modules/payment/services/razorpayService.js:128:11)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async subscribe (file:///C:/Users/hp/Desktop/Zapoo/backend/modules/subscription/controllers/subscriptionController.js:165:35)
+
+2026-02-20T11:28:45.727Z - General subscription error: receipt: the length must be no more than 40.
+Error: receipt: the length must be no more than 40.
+    at Module.createOrder (file:///C:/Users/hp/Desktop/Zapoo/backend/modules/payment/services/razorpayService.js:128:11)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async subscribe (file:///C:/Users/hp/Desktop/Zapoo/backend/modules/subscription/controllers/subscriptionController.js:165:35)
+

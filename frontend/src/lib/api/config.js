@@ -402,6 +402,8 @@ export const API_ENDPOINTS = {
     FOOD_APPROVALS: "/admin/food-approvals",
     FOOD_APPROVAL_APPROVE: "/admin/food-approvals/:id/approve",
     FOOD_APPROVAL_REJECT: "/admin/food-approvals/:id/reject",
+    FOOD_APPROVAL_SPECIAL_APPROVE: "/admin/food-approvals/:id/approve-special",
+    FOOD_APPROVAL_SPECIAL_REJECT: "/admin/food-approvals/:id/reject-special",
     OFFERS: "/admin/offers",
     ZONES: "/admin/zones",
     ZONE_BY_ID: "/admin/zones/:id",

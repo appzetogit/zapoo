@@ -92,7 +92,8 @@ export default function AdDetailsPage() {
                     Ads ID #{adData?._id.slice(-8).toUpperCase()}
                   </h2>
                   <span className={`text-xs font-medium px-3 py-1 rounded-full ${adData?.status === 'Active' ? 'bg-green-100 text-green-700' :
-                      adData?.status === 'Pending' ? 'bg-orange-100 text-orange-700' :
+                    adData?.status === 'Pending' ? 'bg-orange-100 text-orange-700' :
+                      adData?.status === 'Banner Pending' ? 'bg-purple-100 text-purple-700' :
                         'bg-blue-100 text-blue-700'
                     }`}>
                     {adData?.status}
@@ -217,15 +218,23 @@ export default function AdDetailsPage() {
                 {/* Banner Image */}
                 <div>
                   <h3 className="text-sm font-bold text-gray-900 mb-2">Campaign Banner</h3>
-                  <div className="w-full aspect-video rounded-lg overflow-hidden border border-gray-200 bg-gray-50">
-                    <img
-                      src={adData?.bannerImage}
-                      alt="Banner"
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        e.target.src = `https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=800&h=400&fit=crop`
-                      }}
-                    />
+                  <div className="w-full aspect-video rounded-lg overflow-hidden border border-gray-200 bg-gray-50 flex items-center justify-center">
+                    {adData?.status === 'Banner Pending' ? (
+                      <div className="text-center p-6">
+                        <Megaphone className="w-10 h-10 text-purple-500 mx-auto mb-2 opacity-50" />
+                        <p className="text-sm font-bold text-gray-900">Banner Pending</p>
+                        <p className="text-xs text-gray-500 mt-1">Admin will upload your banner shortly</p>
+                      </div>
+                    ) : (
+                      <img
+                        src={adData?.bannerImage}
+                        alt="Banner"
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.target.src = `https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=800&h=400&fit=crop`
+                        }}
+                      />
+                    )}
                   </div>
                 </div>
 

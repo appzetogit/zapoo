@@ -292,8 +292,8 @@ function TimePickerWheel({
                   >
                     <span
                       className={`text-lg transition-all duration-200 ${selectedHour === hour
-                          ? 'font-bold text-gray-900 text-xl'
-                          : 'font-normal text-gray-400 text-base'
+                        ? 'font-bold text-gray-900 text-xl'
+                        : 'font-normal text-gray-400 text-base'
                         }`}
                     >
                       {hour}
@@ -350,8 +350,8 @@ function TimePickerWheel({
                   >
                     <span
                       className={`text-lg transition-all duration-200 ${selectedMinute === minute
-                          ? 'font-bold text-gray-900 text-xl'
-                          : 'font-normal text-gray-400 text-base'
+                        ? 'font-bold text-gray-900 text-xl'
+                        : 'font-normal text-gray-400 text-base'
                         }`}
                     >
                       {minute.toString().padStart(2, '0')}
@@ -404,8 +404,8 @@ function TimePickerWheel({
                   >
                     <span
                       className={`text-lg transition-all duration-200 ${selectedPeriod === period
-                          ? 'font-bold text-gray-900 text-xl'
-                          : 'font-normal text-gray-400 text-base'
+                        ? 'font-bold text-gray-900 text-xl'
+                        : 'font-normal text-gray-400 text-base'
                         }`}
                     >
                       {period}
@@ -569,12 +569,12 @@ function SimpleCalendar({ selectedDate, onDateSelect, isOpen, onClose }) {
                       onClose()
                     }}
                     className={`h-10 text-sm rounded transition-colors ${!isCurrent
-                        ? 'text-gray-300'
-                        : isSelectedDate
-                          ? 'bg-black text-white'
-                          : isTodayDate
-                            ? 'bg-gray-100 text-black font-semibold'
-                            : 'text-gray-700 hover:bg-gray-100'
+                      ? 'text-gray-300'
+                      : isSelectedDate
+                        ? 'bg-black text-white'
+                        : isTodayDate
+                          ? 'bg-gray-100 text-black font-semibold'
+                          : 'text-gray-700 hover:bg-gray-100'
                       }`}
                   >
                     {date.getDate()}
@@ -597,21 +597,7 @@ export default function Inventory() {
   const [selectedFilter, setSelectedFilter] = useState(null)
   const [isLoading, setIsLoading] = useState(false)
   const [loadingInventory, setLoadingInventory] = useState(false)
-  const [categories, setCategories] = useState(() => {
-    try {
-      if (typeof window === "undefined") return mockCategories
-      const saved = localStorage.getItem(INVENTORY_STORAGE_KEY)
-      if (saved) {
-        const parsed = JSON.parse(saved)
-        if (Array.isArray(parsed)) {
-          return parsed
-        }
-      }
-    } catch (error) {
-      console.error("Error loading inventory from storage:", error)
-    }
-    return mockCategories
-  })
+  const [categories, setCategories] = useState([])
   const [expandedCategories, setExpandedCategories] = useState(() =>
     mockCategories.map(c => c.id)
   )
@@ -655,22 +641,22 @@ export default function Inventory() {
     const fetchMenuData = async () => {
       try {
         setLoadingInventory(true)
-        
+
         // Fetch menu from API
         const menuResponse = await restaurantAPI.getMenu()
-        
+
         if (menuResponse.data && menuResponse.data.success && menuResponse.data.data && menuResponse.data.data.menu) {
           const menuSections = menuResponse.data.data.menu.sections || []
-          
+
           // Convert menu sections to inventory categories
           const convertedCategories = menuSections.map((section, sectionIndex) => {
             // Collect all items from section and subsections
             const allItems = []
-            
+
             // Add direct items from section
             if (Array.isArray(section.items)) {
               section.items.forEach(item => {
-                  allItems.push({
+                allItems.push({
                   id: String(item.id || Date.now() + Math.random()),
                   name: item.name || "Unnamed Item",
                   inStock: item.isAvailable !== undefined ? item.isAvailable : true,
@@ -683,33 +669,33 @@ export default function Inventory() {
                 })
               })
             }
-            
+
             // Add items from subsections
             if (Array.isArray(section.subsections)) {
               section.subsections.forEach(subsection => {
                 if (Array.isArray(subsection.items)) {
                   subsection.items.forEach(item => {
-                  allItems.push({
-                  id: String(item.id || Date.now() + Math.random()),
-                  name: item.name || "Unnamed Item",
-                  inStock: item.isAvailable !== undefined ? item.isAvailable : true,
-                  isVeg: item.foodType === "Veg",
-                  isRecommended: item.isRecommended !== undefined ? item.isRecommended : false,
-                  stockQuantity: item.stock || "Unlimited",
-                  unit: item.itemSizeUnit || "piece",
-                  expiryDate: null,
-                  lastRestocked: null,
-                })
+                    allItems.push({
+                      id: String(item.id || Date.now() + Math.random()),
+                      name: item.name || "Unnamed Item",
+                      inStock: item.isAvailable !== undefined ? item.isAvailable : true,
+                      isVeg: item.foodType === "Veg",
+                      isRecommended: item.isRecommended !== undefined ? item.isRecommended : false,
+                      stockQuantity: item.stock || "Unlimited",
+                      unit: item.itemSizeUnit || "piece",
+                      expiryDate: null,
+                      lastRestocked: null,
+                    })
                   })
                 }
               })
             }
-            
+
             // Use category's isEnabled from menu API, not calculated from items
             // Category toggle should be independent of item toggles
             const categoryInStock = section.isEnabled !== undefined ? section.isEnabled : true
             const itemCount = allItems.length
-            
+
             return {
               id: section.id || `category-${sectionIndex}`,
               name: section.name || "Unnamed Category",
@@ -720,7 +706,7 @@ export default function Inventory() {
               order: section.order !== undefined ? section.order : sectionIndex,
             }
           })
-          
+
           setCategories(convertedCategories)
           setExpandedCategories(convertedCategories.map(c => c.id))
         } else {
@@ -731,7 +717,7 @@ export default function Inventory() {
       } catch (error) {
         // Only log and show toast if it's not a network/timeout error
         if (error.code !== 'ERR_NETWORK' && error.code !== 'ECONNABORTED' && !error.message?.includes('timeout')) {
-        console.error('Error fetching menu data:', error)
+          console.error('Error fetching menu data:', error)
           toast.error('Failed to load menu data')
         } else if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
           // Silently handle network errors - backend is not running
@@ -743,7 +729,7 @@ export default function Inventory() {
         setLoadingInventory(false)
       }
     }
-    
+
     fetchMenuData()
   }, [])
 
@@ -784,7 +770,7 @@ export default function Inventory() {
       })
 
       // Update local state
-      setAddons(prev => prev.map(a => 
+      setAddons(prev => prev.map(a =>
         a.id === addonId ? { ...a, isAvailable } : a
       ))
 
@@ -868,15 +854,8 @@ export default function Inventory() {
     isSwiping.current = false
   }
 
-  // Persist categories to localStorage whenever they change
-  useEffect(() => {
-    try {
-      if (typeof window === "undefined") return
-      localStorage.setItem(INVENTORY_STORAGE_KEY, JSON.stringify(categories))
-    } catch (error) {
-      console.error("Error saving inventory to storage:", error)
-    }
-  }, [categories])
+  // No longer persisting categories to localStorage to avoid stale data issues
+  // The menu API is now the source of truth
 
   // Calculate total items
   const totalItems = useMemo(
@@ -994,7 +973,7 @@ export default function Inventory() {
           const updatedItems = section.items.map(item =>
             item.id === String(itemId) ? { ...item, isAvailable: isAvailable } : item
           )
-          
+
           // Update items in subsections too
           const updatedSubsections = section.subsections.map(subsection => ({
             ...subsection,
@@ -1155,76 +1134,6 @@ export default function Inventory() {
     )
   }
 
-  // Update menu API when recommendation toggle changes
-  const updateRecommendationAPI = async (categoryId, itemId, isRecommended) => {
-    try {
-      // Fetch current menu
-      const menuResponse = await restaurantAPI.getMenu()
-      if (!menuResponse.data || !menuResponse.data.success || !menuResponse.data.data || !menuResponse.data.data.menu) {
-        console.error('Failed to fetch menu for update')
-        return
-      }
-
-      const menu = menuResponse.data.data.menu
-      const sections = menu.sections || []
-
-      // Update menu sections
-      const updatedSections = sections.map(section => {
-        if (section.id !== categoryId) return section
-
-        // Update item in direct items
-        const updatedItems = section.items.map(item =>
-          item.id === String(itemId) ? { ...item, isRecommended: isRecommended } : item
-        )
-        
-        // Update item in subsections too
-        const updatedSubsections = section.subsections.map(subsection => ({
-          ...subsection,
-          items: subsection.items.map(item =>
-            item.id === String(itemId) ? { ...item, isRecommended: isRecommended } : item
-          )
-        }))
-
-        return {
-          ...section,
-          items: updatedItems,
-          subsections: updatedSubsections
-        }
-      })
-
-      // Save updated menu
-      await restaurantAPI.updateMenu({ sections: updatedSections })
-      console.log('Menu recommendation updated successfully')
-    } catch (error) {
-      console.error('Error updating menu recommendation:', error)
-      toast.error('Failed to update recommendation')
-    }
-  }
-
-  // Handle item recommendation toggle
-  const handleRecommendToggle = async (categoryId, itemId) => {
-    // Find current recommendation status
-    const category = categories.find(cat => cat.id === categoryId)
-    const item = category?.items.find(i => i.id === itemId)
-    const newRecommendationStatus = !item?.isRecommended
-
-    // Update local state
-    setCategories(prev =>
-      prev.map(category => {
-        if (category.id !== categoryId) return category
-        const updatedItems = category.items.map(item =>
-          item.id === itemId ? { ...item, isRecommended: newRecommendationStatus } : item
-        )
-        return {
-          ...category,
-          items: updatedItems,
-        }
-      })
-    )
-
-    // Update menu API
-    await updateRecommendationAPI(categoryId, itemId, newRecommendationStatus)
-  }
 
   const scrollToCategory = (categoryId) => {
     const el = categoryRefs.current[categoryId]
@@ -1252,8 +1161,8 @@ export default function Inventory() {
           <motion.button
             onClick={() => setActiveTab("all-items")}
             className={`px-6 py-3.5 rounded-full font-medium text-sm whitespace-nowrap relative overflow-hidden ${activeTab === "all-items"
-                ? 'text-white'
-                : 'bg-white text-black'
+              ? 'text-white'
+              : 'bg-white text-black'
               }`}
             animate={{
               scale: activeTab === "all-items" ? 1.05 : 1,
@@ -1285,8 +1194,8 @@ export default function Inventory() {
           <motion.button
             onClick={() => setActiveTab("add-ons")}
             className={`px-6 py-3.5 rounded-full font-medium text-sm whitespace-nowrap relative overflow-hidden ${activeTab === "add-ons"
-                ? 'text-white'
-                : 'bg-white text-black'
+              ? 'text-white'
+              : 'bg-white text-black'
               }`}
             animate={{
               scale: activeTab === "add-ons" ? 1.05 : 1,
@@ -1602,21 +1511,15 @@ export default function Inventory() {
                                 </div>
                               </div>
                               <div className="flex items-center gap-3">
-                                {/* Recommend Thumb Icon */}
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    handleRecommendToggle(category.id, item.id)
-                                  }}
-                                  className={`p-1.5 rounded-lg transition-colors ${
-                                    item.isRecommended
-                                      ? "bg-blue-100 text-blue-600"
-                                      : "bg-gray-100 text-gray-400 hover:bg-gray-200"
-                                  }`}
-                                  title={item.isRecommended ? "Recommended" : "Click to recommend"}
-                                >
-                                  <ThumbsUp className="w-4 h-4" />
-                                </button>
+                                {/* Recommend Thumb Icon (Read-only) */}
+                                {item.isRecommended && (
+                                  <div
+                                    className="p-1.5 rounded-lg bg-blue-100 text-blue-600"
+                                    title="Recommended Item"
+                                  >
+                                    <ThumbsUp className="w-4 h-4" />
+                                  </div>
+                                )}
                                 {/* Item Toggle Switch */}
                                 <div onClick={(e) => e.stopPropagation()}>
                                   <Switch
@@ -1755,7 +1658,7 @@ export default function Inventory() {
                   {/* Option 1: For specific time */}
                   <label className="flex items-center justify-between py-4 cursor-pointer border-b border-gray-200">
                     <div className="flex items-center gap-3 flex-1">
-                    
+
                       <span className="text-base text-gray-900">For specific time</span>
                       {selectedOption === "specific-time" && (
                         <div className="ml-auto py-3 flex items-center justify-center gap-4">
@@ -1776,7 +1679,7 @@ export default function Inventory() {
                           </button>
                         </div>
                       )}
-                        <input
+                      <input
                         type="radio"
                         name="outOfStockOption"
                         checked={selectedOption === "specific-time"}
@@ -1790,7 +1693,7 @@ export default function Inventory() {
                   {/* Option 2: Next business day */}
                   <label className="flex items-center justify-between py-4 cursor-pointer border-b border-gray-200">
                     <div className="flex items-center gap-3 flex-1">
-                   
+
                       <span className="text-base text-gray-900">Next business day - Opening time</span>
                       <input
                         type="radio"
@@ -1806,7 +1709,7 @@ export default function Inventory() {
                   {/* Option 3: Custom date & time */}
                   <label className="flex items-center justify-between py-4 cursor-pointer border-b border-gray-200">
                     <div className="flex items-center gap-3 flex-1">
-                    
+
                       <span className="text-base text-gray-900">Custom date & time</span>
                       <input
                         type="radio"
@@ -1841,7 +1744,7 @@ export default function Inventory() {
                   <label className="flex items-center justify-between py-4 cursor-pointer">
                     <div className="flex flex-col gap-1 flex-1">
                       <div className="flex items-center gap-3">
-                       
+
                         <span className="text-base text-gray-900">I will turn it on manually</span>
                         <input
                           type="radio"

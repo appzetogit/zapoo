@@ -123,18 +123,12 @@ export const createAdRequest = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Invalid date range' });
         }
 
-        // 1. Upload to Cloudinary
-        const uploadResult = await uploadToCloudinary(req.file.buffer, {
-            folder: 'marketing/banners',
-            resource_type: 'image'
-        });
-
         // Limit: Check if restaurant already has an active/approved/scheduled campaign in these zones for these dates
         // concurrency check
         const overlappingOwnAds = await AdRequest.find({
             restaurant: restaurantId,
             targetZones: { $in: targetZones },
-            status: { $in: ['Approved', 'Scheduled', 'Active'] },
+            status: { $in: ['Approved', 'Scheduled', 'Active', 'Banner Pending'] },
             $or: [
                 { startDate: { $lte: end }, endDate: { $gte: start } } // Dates overlap
             ]
@@ -143,7 +137,7 @@ export const createAdRequest = async (req, res) => {
         if (overlappingOwnAds.length > 0) {
             return res.status(409).json({
                 success: false,
-                message: 'You already have an active campaign in this zone for these dates.',
+                message: 'You already have a campaign in this zone for these dates.',
                 conflictAd: overlappingOwnAds[0]
             });
         }
@@ -171,7 +165,6 @@ export const createAdRequest = async (req, res) => {
 
         const adRequest = await AdRequest.create({
             restaurant: restaurantId,
-            bannerImage: uploadResult.secure_url,
             targetZones,
             startDate: start,
             endDate: end,
@@ -275,16 +268,17 @@ export const getActiveAdsByZone = async (req, res) => {
             startDate: { $lte: now },
             endDate: { $gte: now }
         })
-            .populate('restaurant', 'name logo address'); // Add address for location context
+            .populate('restaurant', 'name logo address') // Add address for location context
+            .limit(20); // Safety limit
 
-        // Logic: Return ONE random ad for fairness
-        let selectedAd = [];
-        if (ads.length > 0) {
-            const randomIndex = Math.floor(Math.random() * ads.length);
-            selectedAd = [ads[randomIndex]];
-        }
+        // Logic: Return ads according to Tier limits
+        const zone = await Zone.findById(zoneId).populate('tierId');
+        const maxBanners = zone?.tierId?.maxBanners || 5;
 
-        res.status(200).json({ success: true, data: selectedAd });
+        // Return up to maxBanners
+        const selectedAds = ads.slice(0, maxBanners);
+
+        res.status(200).json({ success: true, data: selectedAds });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
@@ -385,19 +379,7 @@ export const verifyAdPayment = async (req, res) => {
         ad.razorpayPaymentId = razorpayPaymentId;
         ad.razorpaySignature = razorpaySignature;
 
-        // Determine status based on start date
-        const today = new Date();
-        const start = new Date(ad.startDate);
-
-        // Reset time parts for accurate date comparison
-        const todayZero = new Date(today.setHours(0, 0, 0, 0));
-        const startZero = new Date(start.setHours(0, 0, 0, 0));
-
-        if (startZero <= todayZero) {
-            ad.status = 'Active';
-        } else {
-            ad.status = 'Scheduled';
-        }
+        ad.status = 'Banner Pending';
 
         await ad.save();
 
@@ -669,6 +651,59 @@ export const updateAdRequest = async (req, res) => {
 /**
  * Delete an ad request (Admin only)
  */
+/**
+ * Admin uploads a banner for a paid ad and activates it
+ */
+export const uploadAdminBanner = async (req, res) => {
+    try {
+        const { adId } = req.params;
+
+        if (!req.file) {
+            return res.status(400).json({ success: false, message: 'Banner image is required' });
+        }
+
+        const ad = await AdRequest.findById(adId);
+        if (!ad) {
+            return res.status(404).json({ success: false, message: 'Ad request not found' });
+        }
+
+        if (ad.paymentStatus !== 'Paid') {
+            return res.status(400).json({ success: false, message: 'Payment must be confirmed before uploading banner' });
+        }
+
+        // Upload to Cloudinary
+        const uploadResult = await uploadToCloudinary(req.file.buffer, {
+            folder: 'marketing/banners',
+            resource_type: 'image'
+        });
+
+        ad.bannerImage = uploadResult.secure_url;
+
+        // Determine status based on start date
+        const today = new Date();
+        const start = new Date(ad.startDate);
+        const todayZero = new Date(today.setHours(0, 0, 0, 0));
+        const startZero = new Date(start.setHours(0, 0, 0, 0));
+
+        if (startZero <= todayZero) {
+            ad.status = 'Active';
+        } else {
+            ad.status = 'Scheduled';
+        }
+
+        await ad.save();
+
+        res.status(200).json({
+            success: true,
+            message: 'Banner uploaded and ad activated!',
+            data: ad
+        });
+    } catch (error) {
+        console.error('Error in uploadAdminBanner:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
 export const deleteAdRequest = async (req, res) => {
     try {
         const { adId } = req.params;

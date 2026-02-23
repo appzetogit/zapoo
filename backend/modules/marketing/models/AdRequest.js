@@ -9,7 +9,7 @@ const adRequestSchema = new mongoose.Schema(
         },
         bannerImage: {
             type: String,
-            required: true
+            required: false
         },
         targetZones: [{
             type: mongoose.Schema.Types.ObjectId,
@@ -40,7 +40,7 @@ const adRequestSchema = new mongoose.Schema(
         },
         status: {
             type: String,
-            enum: ['Pending', 'Approved', 'Scheduled', 'Active', 'Completed', 'Rejected'],
+            enum: ['Pending', 'Approved', 'Scheduled', 'Active', 'Completed', 'Rejected', 'Banner Pending'],
             default: 'Pending'
         },
         paymentStatus: {

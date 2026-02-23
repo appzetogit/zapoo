@@ -510,8 +510,21 @@ export default function RestaurantDetails() {
                   })) || []
                 })))
 
+                // Deduplicate items: Remove recommended items from their original sections
+                // This ensures they only appear in the "Recommended for you" section at the top
+                const recommendedItemIds = new Set(recommendedItems.map(item => String(item.id)))
+
+                const deduplicatedMenuSections = menuSections.map(section => ({
+                  ...section,
+                  items: section.items?.filter(item => !recommendedItemIds.has(String(item.id))) || [],
+                  subsections: section.subsections?.map(subsection => ({
+                    ...subsection,
+                    items: subsection.items?.filter(item => !recommendedItemIds.has(String(item.id))) || []
+                  })) || []
+                }))
+
                 // Always create recommended section (even if empty) - will show "No dish Yet" if empty
-                const finalMenuSections = [{ name: "Recommended for you", items: recommendedItems, subsections: [] }, ...menuSections]
+                const finalMenuSections = [{ name: "Recommended for you", items: recommendedItems, subsections: [] }, ...deduplicatedMenuSections]
 
                 setRestaurant(prev => ({
                   ...prev,
@@ -1611,7 +1624,15 @@ export default function RestaurantDetails() {
                                 {item.isSpicy && <span className="text-red-500">🌶️</span>}
                               </div>
 
-                              <h3 className="font-bold text-gray-800 dark:text-white text-lg leading-tight">{item.name}</h3>
+                              <div className="flex items-center gap-2">
+                                <h3 className="font-bold text-gray-800 dark:text-white text-lg leading-tight">{item.name}</h3>
+                                {item.isRecommended && (
+                                  <Badge className="bg-orange-100 text-[#FF5200] border-none text-[10px] h-5 py-0 px-1.5 flex items-center gap-1 font-bold">
+                                    <Star className="w-3 h-3 fill-current" />
+                                    MUST TRY
+                                  </Badge>
+                                )}
+                              </div>
 
                               {/* Highly Reordered Progress Bar - Show if customisable */}
                               {item.customisable && (
@@ -1827,7 +1848,15 @@ export default function RestaurantDetails() {
                                           {item.isSpicy && <span className="text-red-500">🌶️</span>}
                                         </div>
 
-                                        <h3 className="font-bold text-gray-800 dark:text-white text-lg leading-tight">{item.name}</h3>
+                                        <div className="flex items-center gap-2">
+                                          <h3 className="font-bold text-gray-800 dark:text-white text-lg leading-tight">{item.name}</h3>
+                                          {item.isRecommended && (
+                                            <Badge className="bg-orange-100 text-[#FF5200] border-none text-[10px] h-5 py-0 px-1.5 flex items-center gap-1 font-bold">
+                                              <Star className="w-3 h-3 fill-current" />
+                                              MUST TRY
+                                            </Badge>
+                                          )}
+                                        </div>
 
                                         {/* Highly Reordered Progress Bar - Show if customisable */}
                                         {item.customisable && (

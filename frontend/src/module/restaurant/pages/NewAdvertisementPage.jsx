@@ -37,7 +37,6 @@ export default function NewAdvertisementPage() {
     startDate: "",
     endDate: "",
     redirectTarget: "menu",
-    bannerImage: null,
   })
 
   const tomorrowStr = () => {
@@ -129,19 +128,8 @@ export default function NewAdvertisementPage() {
     return myZone.pricePerDay * days
   }, [myZone, formData.startDate, formData.endDate])
 
-  const handleFileUpload = (e) => {
-    const file = e.target.files[0]
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        toast.error("Banner must be under 5MB")
-        return
-      }
-      setFormData(prev => ({ ...prev, bannerImage: file }))
-    }
-  }
-
   const handleSubmit = async () => {
-    if (!formData.title || !formData.bannerImage || !formData.startDate || !formData.endDate) {
+    if (!formData.title || !formData.startDate || !formData.endDate) {
       toast.error("Please fill all required fields")
       return
     }
@@ -163,17 +151,16 @@ export default function NewAdvertisementPage() {
 
     setLoading(true)
     try {
-      const data = new FormData()
-      data.append("title", formData.title)
-      data.append("description", formData.description)
-      data.append("startDate", formData.startDate)
-      data.append("endDate", formData.endDate)
-      data.append("redirectTarget", formData.redirectTarget)
-      data.append("bannerImage", formData.bannerImage)
-      // Auto-submit the restaurant's own zone
-      data.append("targetZones[]", myZone._id)
+      const payload = {
+        title: formData.title,
+        description: formData.description,
+        startDate: formData.startDate,
+        endDate: formData.endDate,
+        redirectTarget: formData.redirectTarget,
+        targetZones: [myZone._id] // Auto-submit the restaurant's own zone
+      }
 
-      await marketingAPI.submitAdRequest(data)
+      await marketingAPI.createAdRequest(payload)
 
       toast.success("Ad request submitted for review!")
       navigate("/restaurant/advertisements")
@@ -189,7 +176,7 @@ export default function NewAdvertisementPage() {
   }
 
   const days = calculateDays()
-  const canSubmit = !loading && myZone && formData.title && formData.bannerImage && days > 0 && !dateError
+  const canSubmit = !loading && myZone && formData.title && days > 0 && !dateError
 
   return (
     <div className="min-h-screen bg-[#fef9f5] pb-32">
@@ -203,52 +190,43 @@ export default function NewAdvertisementPage() {
 
       <div className="max-w-2xl mx-auto p-4 space-y-6">
 
-        {/* Step 1: Banner & Campaign Info */}
+        {/* Step 1: Campaign Info */}
         <section className="space-y-3">
           <div className="flex items-center gap-2 text-orange-600 font-bold px-1">
             <Layers className="w-5 h-5" />
-            <h2>Campaign Creatives</h2>
+            <h2>Campaign Details</h2>
           </div>
           <Card className="border-none shadow-sm overflow-hidden">
-            <CardContent className="p-0">
-              <div className="relative group">
-                <input type="file" id="banner" hidden onChange={handleFileUpload} accept="image/*" />
-                <label
-                  htmlFor="banner"
-                  className={`flex flex-col items-center justify-center p-8 border-2 border-dashed transition-all cursor-pointer min-h-[160px]
-                    ${formData.bannerImage ? 'border-orange-500 bg-orange-50' : 'border-gray-200 hover:border-orange-300 bg-white'}`}
-                >
-                  {formData.bannerImage ? (
-                    <div className="text-center space-y-2">
-                      <CheckCircle2 className="w-10 h-10 text-orange-500 mx-auto" />
-                      <p className="text-sm font-bold text-gray-900">{formData.bannerImage.name}</p>
-                      <span className="text-xs text-orange-600 underline">Change Image</span>
-                    </div>
-                  ) : (
-                    <div className="text-center space-y-3">
-                      <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center mx-auto">
-                        <Upload className="w-6 h-6 text-orange-600" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-bold text-gray-900">Upload Banner Image</p>
-                        <p className="text-xs text-gray-500 mt-1">Recommended: 1200×600px (Max 5MB)</p>
-                      </div>
-                    </div>
-                  )}
-                </label>
-              </div>
-              <div className="p-4 space-y-4">
+            <CardContent className="p-4 space-y-4">
+              <div>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="text-[10px] uppercase font-bold text-gray-500 ml-1">Campaign Title</label>
+                  <span className={`text-[10px] font-bold ${formData.title.length >= 50 ? 'text-red-500' : 'text-gray-400'}`}>
+                    {formData.title.length}/50
+                  </span>
+                </div>
                 <Input
-                  placeholder="Campaign Title (e.g. Weekend Feast Special)"
+                  placeholder="e.g. Weekend Feast Special"
                   value={formData.title}
+                  maxLength={50}
                   onChange={e => setFormData(f => ({ ...f, title: e.target.value }))}
-                  className="font-semibold text-lg border-none focus-visible:ring-0 px-0 h-auto placeholder:text-gray-300"
+                  className="font-semibold text-lg border-gray-100 focus:border-orange-200 focus:ring-orange-100 h-12"
                 />
+              </div>
+
+              <div>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="text-[10px] uppercase font-bold text-gray-500 ml-1">Short Description</label>
+                  <span className={`text-[10px] font-bold ${formData.description.length >= 200 ? 'text-red-500' : 'text-gray-400'}`}>
+                    {formData.description.length}/200
+                  </span>
+                </div>
                 <textarea
-                  placeholder="Short catchy description..."
+                  placeholder="Short catchy description to attract customers..."
                   value={formData.description}
+                  maxLength={200}
                   onChange={e => setFormData(f => ({ ...f, description: e.target.value }))}
-                  className="w-full text-sm text-gray-600 border-none focus:ring-0 resize-none px-0 bg-transparent min-h-[60px]"
+                  className="w-full text-sm text-gray-600 border border-gray-100 rounded-lg focus:border-orange-200 focus:ring-orange-100 resize-none p-3 bg-gray-50/30 min-h-[80px]"
                 />
               </div>
             </CardContent>

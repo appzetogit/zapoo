@@ -11,6 +11,7 @@ import {
     getAdRequestById,
     createAdPaymentOrder,
     verifyAdPayment,
+    uploadAdminBanner,
     deleteAdRequest
 } from '../controllers/adController.js';
 import { uploadMiddleware } from '../../../shared/utils/cloudinaryService.js';
@@ -50,8 +51,8 @@ const authenticateAny = async (req, res, next) => {
 };
 
 // Restaurant routes
-router.post('/request', restaurantAuth, uploadMiddleware.single('bannerImage'), createAdRequest);
-router.put('/request/:adId', restaurantAuth, uploadMiddleware.single('bannerImage'), updateAdRequest);
+router.post('/request', restaurantAuth, createAdRequest);
+router.put('/request/:adId', restaurantAuth, updateAdRequest);
 router.get('/my-zone', restaurantAuth, getMyZone);
 router.get('/my-ads', restaurantAuth, getMyAdRequests);
 router.post('/payment/create-order/:adId', restaurantAuth, createAdPaymentOrder);
@@ -60,6 +61,7 @@ router.post('/payment/verify', restaurantAuth, verifyAdPayment);
 // Admin routes
 router.get('/all', authenticateAdmin, getAllAdRequests);
 router.put('/:adId/status', authenticateAdmin, updateAdStatus);
+router.post('/:adId/banner', authenticateAdmin, uploadMiddleware.single('bannerImage'), uploadAdminBanner);
 router.delete('/:adId', authenticateAdmin, deleteAdRequest);
 
 // Shared Admin/Restaurant Detail route

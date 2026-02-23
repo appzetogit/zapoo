@@ -62,6 +62,8 @@ export default function EditFoodPage() {
     discount: 0,
     isAvailable: true,
     isRecommended: false,
+    isRecommendationRequest: false,
+    recommendationStatus: "none",
     variations: [],
     tags: [],
     nutrition: [],
@@ -453,19 +455,38 @@ export default function EditFoodPage() {
                   </button>
                 </div>
 
-                <div className="flex items-center justify-between">
-                  <span className="text-sm md:text-base font-medium text-gray-900">Recommended</span>
-                  <button
-                    type="button"
-                    onClick={() => handleInputChange("isRecommended", !formData.isRecommended)}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${formData.isRecommended ? 'bg-[#ff8100]' : 'bg-gray-300'
-                      }`}
-                  >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.isRecommended ? 'translate-x-6' : 'translate-x-1'
-                        }`}
-                    />
-                  </button>
+
+                {/* Special Item Request */}
+                <div className="pt-4 border-t border-gray-100">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm md:text-base font-medium text-gray-900">Special Item</span>
+                      {formData.recommendationStatus && formData.recommendationStatus !== 'none' && (
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${formData.recommendationStatus === 'approved' ? 'bg-green-100 text-green-700' :
+                          formData.recommendationStatus === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                            'bg-red-100 text-red-700'
+                          }`}>
+                          {formData.recommendationStatus}
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      disabled={formData.recommendationStatus === 'approved'}
+                      onClick={() => handleInputChange("isRecommendationRequest", !formData.isRecommendationRequest)}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${formData.isRecommendationRequest ? 'bg-[#ff8100]' : 'bg-gray-300'
+                        } ${formData.recommendationStatus === 'approved' ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.isRecommendationRequest ? 'translate-x-6' : 'translate-x-1'
+                          }`}
+                      />
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    Request to mark this as a "Special Item" to boost its visibility on the menu.
+                    {formData.recommendationStatus === 'approved' ? ' This item is currently a Special Item.' : ' This request requires admin approval.'}
+                  </p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
