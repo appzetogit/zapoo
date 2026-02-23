@@ -139,19 +139,7 @@ export default function RestaurantDetailsPage() {
         {/* Restaurant Info Card Overlay */}
         <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl p-4 md:p-6">
           <div className="flex items-start gap-4">
-            <div className="flex-shrink-0">
-              <div className="bg-primary-orange rounded-lg p-3">
-                {restaurantData.logo ? (
-                  <img
-                    src={restaurantData.logo}
-                    alt="Restaurant Logo"
-                    className="w-6 h-6 md:w-8 md:h-8 object-cover rounded"
-                  />
-                ) : (
-                  <Utensils className="w-6 h-6 md:w-8 md:h-8 text-white" />
-                )}
-              </div>
-            </div>
+
             <div className="flex-1 min-w-0">
               <div className="flex items-start justify-between mb-2">
                 <h2 className="text-xl md:text-2xl font-bold text-gray-900">
@@ -213,14 +201,14 @@ export default function RestaurantDetailsPage() {
                 whileTap={{ scale: 0.95 }}
                 onClick={() => setActiveCategory(category.id)}
                 className={`relative z-10 flex-shrink-0 px-4 py-2 rounded-full text-sm md:text-base font-medium transition-colors ${activeCategory === category.id
-                    ? "text-white"
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  ? "text-white"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                   }`}
               >
                 {activeCategory === category.id && (
                   <motion.div
                     layoutId="activeCategory"
-                    className="absolute inset-0 bg-primary-orange rounded-full z-0"
+                    className="absolute inset-0 bg-[#3B82F6] rounded-full z-0"
                     transition={{ type: "spring", stiffness: 500, damping: 30 }}
                   />
                 )}
@@ -291,7 +279,7 @@ export default function RestaurantDetailsPage() {
 
                         <div className="flex items-center justify-between mt-0.5">
                           <div className="flex items-center gap-2">
-                            <p className="text-[#ff8100] font-bold text-sm">
+                            <p className="text-[#3B82F6] font-bold text-sm">
                               ₹ {item.price.toFixed(2)}
                             </p>
                             <p className="text-gray-500 text-xs">

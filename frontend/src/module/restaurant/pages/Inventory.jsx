@@ -292,8 +292,8 @@ function TimePickerWheel({
                   >
                     <span
                       className={`text-lg transition-all duration-200 ${selectedHour === hour
-                          ? 'font-bold text-gray-900 text-xl'
-                          : 'font-normal text-gray-400 text-base'
+                        ? 'font-bold text-gray-900 text-xl'
+                        : 'font-normal text-gray-400 text-base'
                         }`}
                     >
                       {hour}
@@ -350,8 +350,8 @@ function TimePickerWheel({
                   >
                     <span
                       className={`text-lg transition-all duration-200 ${selectedMinute === minute
-                          ? 'font-bold text-gray-900 text-xl'
-                          : 'font-normal text-gray-400 text-base'
+                        ? 'font-bold text-gray-900 text-xl'
+                        : 'font-normal text-gray-400 text-base'
                         }`}
                     >
                       {minute.toString().padStart(2, '0')}
@@ -404,8 +404,8 @@ function TimePickerWheel({
                   >
                     <span
                       className={`text-lg transition-all duration-200 ${selectedPeriod === period
-                          ? 'font-bold text-gray-900 text-xl'
-                          : 'font-normal text-gray-400 text-base'
+                        ? 'font-bold text-gray-900 text-xl'
+                        : 'font-normal text-gray-400 text-base'
                         }`}
                     >
                       {period}
@@ -569,12 +569,12 @@ function SimpleCalendar({ selectedDate, onDateSelect, isOpen, onClose }) {
                       onClose()
                     }}
                     className={`h-10 text-sm rounded transition-colors ${!isCurrent
-                        ? 'text-gray-300'
-                        : isSelectedDate
-                          ? 'bg-black text-white'
-                          : isTodayDate
-                            ? 'bg-gray-100 text-black font-semibold'
-                            : 'text-gray-700 hover:bg-gray-100'
+                      ? 'text-gray-300'
+                      : isSelectedDate
+                        ? 'bg-[#3B82F6] text-white'
+                        : isTodayDate
+                          ? 'bg-blue-50 text-[#3B82F6] font-semibold'
+                          : 'text-gray-700 hover:bg-gray-100'
                       }`}
                   >
                     {date.getDate()}
@@ -655,22 +655,22 @@ export default function Inventory() {
     const fetchMenuData = async () => {
       try {
         setLoadingInventory(true)
-        
+
         // Fetch menu from API
         const menuResponse = await restaurantAPI.getMenu()
-        
+
         if (menuResponse.data && menuResponse.data.success && menuResponse.data.data && menuResponse.data.data.menu) {
           const menuSections = menuResponse.data.data.menu.sections || []
-          
+
           // Convert menu sections to inventory categories
           const convertedCategories = menuSections.map((section, sectionIndex) => {
             // Collect all items from section and subsections
             const allItems = []
-            
+
             // Add direct items from section
             if (Array.isArray(section.items)) {
               section.items.forEach(item => {
-                  allItems.push({
+                allItems.push({
                   id: String(item.id || Date.now() + Math.random()),
                   name: item.name || "Unnamed Item",
                   inStock: item.isAvailable !== undefined ? item.isAvailable : true,
@@ -683,33 +683,33 @@ export default function Inventory() {
                 })
               })
             }
-            
+
             // Add items from subsections
             if (Array.isArray(section.subsections)) {
               section.subsections.forEach(subsection => {
                 if (Array.isArray(subsection.items)) {
                   subsection.items.forEach(item => {
-                  allItems.push({
-                  id: String(item.id || Date.now() + Math.random()),
-                  name: item.name || "Unnamed Item",
-                  inStock: item.isAvailable !== undefined ? item.isAvailable : true,
-                  isVeg: item.foodType === "Veg",
-                  isRecommended: item.isRecommended !== undefined ? item.isRecommended : false,
-                  stockQuantity: item.stock || "Unlimited",
-                  unit: item.itemSizeUnit || "piece",
-                  expiryDate: null,
-                  lastRestocked: null,
-                })
+                    allItems.push({
+                      id: String(item.id || Date.now() + Math.random()),
+                      name: item.name || "Unnamed Item",
+                      inStock: item.isAvailable !== undefined ? item.isAvailable : true,
+                      isVeg: item.foodType === "Veg",
+                      isRecommended: item.isRecommended !== undefined ? item.isRecommended : false,
+                      stockQuantity: item.stock || "Unlimited",
+                      unit: item.itemSizeUnit || "piece",
+                      expiryDate: null,
+                      lastRestocked: null,
+                    })
                   })
                 }
               })
             }
-            
+
             // Use category's isEnabled from menu API, not calculated from items
             // Category toggle should be independent of item toggles
             const categoryInStock = section.isEnabled !== undefined ? section.isEnabled : true
             const itemCount = allItems.length
-            
+
             return {
               id: section.id || `category-${sectionIndex}`,
               name: section.name || "Unnamed Category",
@@ -720,7 +720,7 @@ export default function Inventory() {
               order: section.order !== undefined ? section.order : sectionIndex,
             }
           })
-          
+
           setCategories(convertedCategories)
           setExpandedCategories(convertedCategories.map(c => c.id))
         } else {
@@ -731,7 +731,7 @@ export default function Inventory() {
       } catch (error) {
         // Only log and show toast if it's not a network/timeout error
         if (error.code !== 'ERR_NETWORK' && error.code !== 'ECONNABORTED' && !error.message?.includes('timeout')) {
-        console.error('Error fetching menu data:', error)
+          console.error('Error fetching menu data:', error)
           toast.error('Failed to load menu data')
         } else if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
           // Silently handle network errors - backend is not running
@@ -743,7 +743,7 @@ export default function Inventory() {
         setLoadingInventory(false)
       }
     }
-    
+
     fetchMenuData()
   }, [])
 
@@ -784,7 +784,7 @@ export default function Inventory() {
       })
 
       // Update local state
-      setAddons(prev => prev.map(a => 
+      setAddons(prev => prev.map(a =>
         a.id === addonId ? { ...a, isAvailable } : a
       ))
 
@@ -994,7 +994,7 @@ export default function Inventory() {
           const updatedItems = section.items.map(item =>
             item.id === String(itemId) ? { ...item, isAvailable: isAvailable } : item
           )
-          
+
           // Update items in subsections too
           const updatedSubsections = section.subsections.map(subsection => ({
             ...subsection,
@@ -1176,7 +1176,7 @@ export default function Inventory() {
         const updatedItems = section.items.map(item =>
           item.id === String(itemId) ? { ...item, isRecommended: isRecommended } : item
         )
-        
+
         // Update item in subsections too
         const updatedSubsections = section.subsections.map(subsection => ({
           ...subsection,
@@ -1252,8 +1252,8 @@ export default function Inventory() {
           <motion.button
             onClick={() => setActiveTab("all-items")}
             className={`px-6 py-3.5 rounded-full font-medium text-sm whitespace-nowrap relative overflow-hidden ${activeTab === "all-items"
-                ? 'text-white'
-                : 'bg-white text-black'
+              ? 'text-white'
+              : 'bg-white text-black'
               }`}
             animate={{
               scale: activeTab === "all-items" ? 1.05 : 1,
@@ -1263,7 +1263,7 @@ export default function Inventory() {
             {activeTab === "all-items" && (
               <motion.div
                 layoutId="activeTabBackground"
-                className="absolute inset-0 bg-black rounded-full -z-10"
+                className="absolute inset-0 bg-[#3B82F6] rounded-full -z-10"
                 initial={false}
                 transition={{
                   type: "spring",
@@ -1285,8 +1285,8 @@ export default function Inventory() {
           <motion.button
             onClick={() => setActiveTab("add-ons")}
             className={`px-6 py-3.5 rounded-full font-medium text-sm whitespace-nowrap relative overflow-hidden ${activeTab === "add-ons"
-                ? 'text-white'
-                : 'bg-white text-black'
+              ? 'text-white'
+              : 'bg-white text-black'
               }`}
             animate={{
               scale: activeTab === "add-ons" ? 1.05 : 1,
@@ -1296,7 +1296,7 @@ export default function Inventory() {
             {activeTab === "add-ons" && (
               <motion.div
                 layoutId="activeTabBackground"
-                className="absolute inset-0 bg-black rounded-full -z-10"
+                className="absolute inset-0 bg-[#3B82F6] rounded-full -z-10"
                 initial={false}
                 transition={{
                   type: "spring",
@@ -1383,7 +1383,7 @@ export default function Inventory() {
           className="bg-blue-200/20 rounded-lg p-4 mt-4 mb-4 flex items-center justify-between"
         >
           <span className="text-sm font-light text-gray-900">Want to edit your menu?</span>
-          <button className="bg-blue-200/30 hover:bg-blue-300 text-black  px-4 py-2 rounded-full text-sm font-light transition-colors">
+          <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-full text-sm font-medium transition-colors">
             Edit now
           </button>
         </motion.div>
@@ -1608,11 +1608,10 @@ export default function Inventory() {
                                     e.stopPropagation()
                                     handleRecommendToggle(category.id, item.id)
                                   }}
-                                  className={`p-1.5 rounded-lg transition-colors ${
-                                    item.isRecommended
-                                      ? "bg-blue-100 text-blue-600"
-                                      : "bg-gray-100 text-gray-400 hover:bg-gray-200"
-                                  }`}
+                                  className={`p-1.5 rounded-lg transition-colors ${item.isRecommended
+                                    ? "bg-blue-100 text-blue-600"
+                                    : "bg-gray-100 text-gray-400 hover:bg-gray-200"
+                                    }`}
                                   title={item.isRecommended ? "Recommended" : "Click to recommend"}
                                 >
                                   <ThumbsUp className="w-4 h-4" />
@@ -1670,7 +1669,7 @@ export default function Inventory() {
                       name="filter"
                       checked={selectedFilter === "out-of-stock"}
                       onChange={() => setSelectedFilter("out-of-stock")}
-                      className="w-5 h-5 text-black border-gray-300 focus:ring-black"
+                      className="w-5 h-5 text-[#3B82F6] border-gray-300 focus:ring-[#3B82F6]"
                     />
                     <span className="text-base text-gray-900">Out of stock items only</span>
                   </label>
@@ -1681,7 +1680,7 @@ export default function Inventory() {
                       name="filter"
                       checked={selectedFilter === "in-stock"}
                       onChange={() => setSelectedFilter("in-stock")}
-                      className="w-5 h-5 text-black border-gray-300 focus:ring-black"
+                      className="w-5 h-5 text-[#3B82F6] border-gray-300 focus:ring-[#3B82F6]"
                     />
                     <span className="text-base text-gray-900">In stock items only</span>
                   </label>
@@ -1698,7 +1697,7 @@ export default function Inventory() {
                   )}
                   <button
                     onClick={handleFilterApply}
-                    className={`${selectedFilter ? 'flex-1' : 'w-full'} bg-black text-white py-3 rounded-lg font-medium hover:bg-gray-800 transition-colors`}
+                    className={`${selectedFilter ? 'flex-1' : 'w-full'} bg-[#3B82F6] text-white py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors`}
                   >
                     Apply
                   </button>
@@ -1755,7 +1754,7 @@ export default function Inventory() {
                   {/* Option 1: For specific time */}
                   <label className="flex items-center justify-between py-4 cursor-pointer border-b border-gray-200">
                     <div className="flex items-center gap-3 flex-1">
-                    
+
                       <span className="text-base text-gray-900">For specific time</span>
                       {selectedOption === "specific-time" && (
                         <div className="ml-auto py-3 flex items-center justify-center gap-4">
@@ -1776,13 +1775,13 @@ export default function Inventory() {
                           </button>
                         </div>
                       )}
-                        <input
+                      <input
                         type="radio"
                         name="outOfStockOption"
                         checked={selectedOption === "specific-time"}
                         onChange={() => setSelectedOption("specific-time")}
-                        style={{ accentColor: "#000000" }}
-                        className="ml-auto w-5 h-5 !text-black !border-gray-300 !bg-black !focus:ring-black"
+                        style={{ accentColor: "#3B82F6" }}
+                        className="ml-auto w-5 h-5 !text-[#3B82F6] !border-gray-300 !bg-[#3B82F6] !focus:ring-[#3B82F6]"
                       />
                     </div>
                   </label>
@@ -1790,15 +1789,15 @@ export default function Inventory() {
                   {/* Option 2: Next business day */}
                   <label className="flex items-center justify-between py-4 cursor-pointer border-b border-gray-200">
                     <div className="flex items-center gap-3 flex-1">
-                   
+
                       <span className="text-base text-gray-900">Next business day - Opening time</span>
                       <input
                         type="radio"
                         name="outOfStockOption"
                         checked={selectedOption === "next-business-day"}
                         onChange={() => setSelectedOption("next-business-day")}
-                        style={{ accentColor: "#000000" }}
-                        className="ml-auto w-5 h-5 !text-black !border-gray-300 !bg-black !focus:ring-black"
+                        style={{ accentColor: "#3B82F6" }}
+                        className="ml-auto w-5 h-5 !text-[#3B82F6] !border-gray-300 !bg-[#3B82F6] !focus:ring-[#3B82F6]"
                       />
                     </div>
                   </label>
@@ -1806,15 +1805,15 @@ export default function Inventory() {
                   {/* Option 3: Custom date & time */}
                   <label className="flex items-center justify-between py-4 cursor-pointer border-b border-gray-200">
                     <div className="flex items-center gap-3 flex-1">
-                    
+
                       <span className="text-base text-gray-900">Custom date & time</span>
                       <input
                         type="radio"
                         name="outOfStockOption"
                         checked={selectedOption === "custom-date-time"}
                         onChange={() => setSelectedOption("custom-date-time")}
-                        style={{ accentColor: "#000000" }}
-                        className="ml-auto w-5 h-5 text-black border-gray-300 focus:ring-black"
+                        style={{ accentColor: "#3B82F6" }}
+                        className="ml-auto w-5 h-5 text-[#3B82F6] border-gray-300 focus:ring-[#3B82F6]"
                       />
                     </div>
                   </label>
@@ -1841,15 +1840,15 @@ export default function Inventory() {
                   <label className="flex items-center justify-between py-4 cursor-pointer">
                     <div className="flex flex-col gap-1 flex-1">
                       <div className="flex items-center gap-3">
-                       
+
                         <span className="text-base text-gray-900">I will turn it on manually</span>
                         <input
                           type="radio"
                           name="outOfStockOption"
                           checked={selectedOption === "manual"}
                           onChange={() => setSelectedOption("manual")}
-                          style={{ accentColor: "#000000" }}
-                          className="ml-auto w-5 h-5 !text-black !border-gray-300 !bg-black !focus:ring-black"
+                          style={{ accentColor: "#3B82F6" }}
+                          className="ml-auto w-5 h-5 !text-[#3B82F6] !border-gray-300 !bg-[#3B82F6] !focus:ring-[#3B82F6]"
                         />
                       </div>
                       <p className="text-sm text-gray-500">
@@ -1869,7 +1868,7 @@ export default function Inventory() {
                   </button>
                   <button
                     onClick={handleToggleConfirm}
-                    className="flex-1 bg-black text-white py-3 rounded-lg font-medium hover:bg-gray-800 transition-colors"
+                    className="flex-1 bg-[#3B82F6] text-white py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors"
                   >
                     Confirm
                   </button>

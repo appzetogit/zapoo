@@ -416,83 +416,8 @@ export default function AdminHome() {
             </Card>
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-3">
-            <Card className="border-neutral-200 bg-white">
-              <CardHeader className="flex items-center justify-between border-b border-neutral-200 pb-4">
-                <CardTitle className="text-lg text-neutral-900">Momentum snapshot</CardTitle>
-                <span className="text-xs text-neutral-500">No data available</span>
-              </CardHeader>
-              <CardContent className="pt-4">
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={monthlyData.slice(-6)}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                      <XAxis dataKey="month" stroke="#6b7280" />
-                      <YAxis stroke="#6b7280" />
-                      <Tooltip
-                        contentStyle={{ background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 12 }}
-                        labelStyle={{ color: "#111827" }}
-                        itemStyle={{ color: "#111827" }}
-                      />
-                      <Legend />
-                      <Bar dataKey="orders" fill="#0ea5e9" radius={[8, 8, 0, 0]} name="Orders" />
-                      <Bar dataKey="commission" fill="#a855f7" radius={[8, 8, 0, 0]} name="Commission" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
 
-            <Card className="border-neutral-200 bg-white">
-              <CardHeader className="border-b border-neutral-200 pb-4">
-                <CardTitle className="text-lg text-neutral-900">Live signals</CardTitle>
-                <p className="text-sm text-neutral-500">Ops notes and service health</p>
-              </CardHeader>
-              <CardContent className="space-y-3 pt-4">
-                {activityFeed.map((item, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-start justify-between rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-3"
-                  >
-                    <div>
-                      <p className="text-sm font-semibold text-neutral-900">{item.title}</p>
-                      <p className="text-xs text-neutral-600">{item.detail}</p>
-                    </div>
-                    <span className="text-xs text-neutral-500">{item.time}</span>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
 
-            <Card className="border-neutral-200 bg-white">
-              <CardHeader className="border-b border-neutral-200 pb-4">
-                <CardTitle className="text-lg text-neutral-900">Order states</CardTitle>
-                <p className="text-sm text-neutral-500">Quick glance by status</p>
-              </CardHeader>
-              <CardContent className="grid gap-3 pt-4">
-                {orderStats.map((item) => (
-                  <div
-                    key={item.label}
-                    className="flex items-center justify-between rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-3"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span
-                        className="flex h-9 w-9 items-center justify-center rounded-lg text-sm font-semibold text-neutral-900"
-                        style={{ background: `${item.color}1A`, color: item.color }}
-                      >
-                        {item.label.slice(0, 2).toUpperCase()}
-                      </span>
-                      <div>
-                        <p className="text-sm text-neutral-900">{item.label}</p>
-                        <p className="text-xs text-neutral-500">Tracked in {selectedPeriod}</p>
-                      </div>
-                    </div>
-                    <p className="text-sm font-semibold text-neutral-900">{item.value}</p>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
         </div>
       </div>
     </div>

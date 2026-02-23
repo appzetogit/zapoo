@@ -95,7 +95,7 @@ export default function TableBooking() {
 
     const handleProceed = () => {
         if (!selectedSlot) return
-        navigate("/dining/book-confirmation", {
+        navigate("/dining/book-table-select", {
             state: {
                 restaurant,
                 guests: selectedGuests,

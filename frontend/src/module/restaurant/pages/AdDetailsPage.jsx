@@ -92,8 +92,8 @@ export default function AdDetailsPage() {
                     Ads ID #{adData?._id.slice(-8).toUpperCase()}
                   </h2>
                   <span className={`text-xs font-medium px-3 py-1 rounded-full ${adData?.status === 'Active' ? 'bg-green-100 text-green-700' :
-                      adData?.status === 'Pending' ? 'bg-orange-100 text-orange-700' :
-                        'bg-blue-100 text-blue-700'
+                    adData?.status === 'Pending' ? 'bg-orange-100 text-orange-700' :
+                      'bg-blue-100 text-blue-700'
                     }`}>
                     {adData?.status}
                   </span>
@@ -117,7 +117,7 @@ export default function AdDetailsPage() {
                 {/* Ads Created */}
                 <div className="flex items-start gap-3">
                   <div className="flex-shrink-0 mt-0.5">
-                    <Calendar className="w-5 h-5 text-[#ff8100]" />
+                    <Calendar className="w-5 h-5 text-[#3B82F6]" />
                   </div>
                   <div className="flex-1">
                     <p className="text-xs text-gray-500 mb-0.5">Ads Created</p>
@@ -130,7 +130,7 @@ export default function AdDetailsPage() {
                 {/* Duration */}
                 <div className="flex items-start gap-3">
                   <div className="flex-shrink-0 mt-0.5">
-                    <Calendar className="w-5 h-5 text-[#ff8100]" />
+                    <Calendar className="w-5 h-5 text-[#3B82F6]" />
                   </div>
                   <div className="flex-1">
                     <p className="text-xs text-gray-500 mb-0.5">Duration</p>
@@ -143,7 +143,7 @@ export default function AdDetailsPage() {
                 {/* Ads Details */}
                 <div className="flex items-start gap-3">
                   <div className="flex-shrink-0 mt-0.5">
-                    <Megaphone className="w-5 h-5 text-[#ff8100]" />
+                    <Megaphone className="w-5 h-5 text-[#3B82F6]" />
                   </div>
                   <div className="flex-1">
                     <p className="text-xs text-gray-500 mb-0.5">Target Zones</p>
@@ -156,7 +156,7 @@ export default function AdDetailsPage() {
                 {/* Redirect Target */}
                 <div className="flex items-start gap-3">
                   <div className="flex-shrink-0 mt-0.5">
-                    <Megaphone className="w-5 h-5 text-[#ff8100]" />
+                    <Megaphone className="w-5 h-5 text-[#3B82F6]" />
                   </div>
                   <div className="flex-1">
                     <p className="text-xs text-gray-500 mb-0.5">Redirecting To</p>
@@ -242,7 +242,7 @@ export default function AdDetailsPage() {
                     </div>
                     <div className="text-center">
                       <p className="text-[10px] uppercase text-gray-500">CTR</p>
-                      <p className="font-bold text-orange-600">
+                      <p className="font-bold text-[#3B82F6]">
                         {adData.metrics?.impressions > 0
                           ? ((adData.metrics.clicks / adData.metrics.impressions) * 100).toFixed(1)
                           : 0}%
@@ -257,13 +257,13 @@ export default function AdDetailsPage() {
       </div>
 
       {/* Edit Ads Button - Fixed at Bottom */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-4 z-50 md:relative md:border-t-0 md:px-4 md:py-4 md:mt-6">
+      <div className="fixed bottom-16 md:bottom-0 left-0 right-0 bg-white border-t border-gray-100 p-4 pb-6 z-50">
         <Button
           disabled={loading || adData?.status === 'Active'}
           onClick={() => {
             navigate(`/restaurant/advertisements/${adData?._id}/edit`)
           }}
-          className="w-full bg-[#ff8100] hover:bg-[#e67300] text-white font-semibold py-3 rounded-lg flex items-center justify-center gap-2"
+          className="w-full bg-[#3B82F6] hover:bg-blue-700 text-white font-semibold py-3 rounded-lg flex items-center justify-center gap-2"
         >
           {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
             <>

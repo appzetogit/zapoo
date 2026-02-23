@@ -239,7 +239,7 @@ export default function FoodDetailsPage() {
   ]
 
   return (
-    <div className="min-h-screen bg-[#f6e9dc] overflow-x-hidden flex flex-col">
+    <div className="min-h-screen bg-[#F3F4F6] overflow-x-hidden flex flex-col">
       {/* Header */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="px-4 py-3 flex items-center gap-4">
@@ -259,7 +259,7 @@ export default function FoodDetailsPage() {
           <button
             onClick={() => setActiveTab("overview")}
             className={`flex-1 py-3 px-4 text-sm md:text-base font-medium transition-colors relative ${activeTab === "overview"
-                ? "text-[#ff8100]"
+                ? "text-[#3B82F6]"
                 : "text-gray-600"
               }`}
           >
@@ -267,14 +267,14 @@ export default function FoodDetailsPage() {
             {activeTab === "overview" && (
               <motion.div
                 layoutId="activeTab"
-                className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#ff8100]"
+                className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#3B82F6]"
               />
             )}
           </button>
           <button
             onClick={() => setActiveTab("reviews")}
             className={`flex-1 py-3 px-4 text-sm md:text-base font-medium transition-colors relative ${activeTab === "reviews"
-                ? "text-[#ff8100]"
+                ? "text-[#3B82F6]"
                 : "text-gray-600"
               }`}
           >
@@ -282,7 +282,7 @@ export default function FoodDetailsPage() {
             {activeTab === "reviews" && (
               <motion.div
                 layoutId="activeTab"
-                className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#ff8100]"
+                className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#3B82F6]"
               />
             )}
           </button>
@@ -323,7 +323,7 @@ export default function FoodDetailsPage() {
                         <h2 className="text-lg md:text-xl font-bold text-gray-900 mb-2">
                           {foodData.nameArabic}
                         </h2>
-                        <p className="text-[#ff8100] font-bold text-lg md:text-xl mb-2">
+                        <p className="text-[#3B82F6] font-bold text-lg md:text-xl mb-2">
                           {formatCurrency(foodData.price)}
                         </p>
                         <div className="flex items-center gap-2 mb-2">
@@ -351,7 +351,7 @@ export default function FoodDetailsPage() {
                       <button
                         type="button"
                         onClick={() => setIsAvailable(!isAvailable)}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${isAvailable ? 'bg-[#ff8100]' : 'bg-gray-300'
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${isAvailable ? 'bg-[#3B82F6]' : 'bg-gray-300'
                           }`}
                       >
                         <span
@@ -365,7 +365,7 @@ export default function FoodDetailsPage() {
                       <button
                         type="button"
                         onClick={() => setIsRecommended(!isRecommended)}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${isRecommended ? 'bg-[#ff8100]' : 'bg-gray-300'
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${isRecommended ? 'bg-[#3B82F6]' : 'bg-gray-300'
                           }`}
                       >
                         <span
@@ -574,14 +574,14 @@ export default function FoodDetailsPage() {
             type="button"
             variant="outline"
             onClick={handleOpenStockModal}
-            className="flex-1 border-[#ff8100] text-[#ff8100] hover:bg-[#ff8100] hover:text-white font-semibold py-3"
+            className="flex-1 border-[#3B82F6] text-[#3B82F6] hover:bg-[#3B82F6] hover:text-white font-semibold py-3"
           >
             Update Stock
           </Button>
           <Button
             type="button"
             onClick={() => navigate(`/restaurant/food/${id}/edit`)}
-            className="flex-1 bg-[#ff8100] hover:bg-[#e67300] text-white font-semibold py-3"
+            className="flex-1 bg-[#3B82F6] hover:bg-[#1D4ED8] text-white font-semibold py-3"
           >
             Edit
           </Button>
@@ -644,7 +644,7 @@ export default function FoodDetailsPage() {
                         handleStockChange('main', value)
                       }
                     }}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#ff8100] focus:border-transparent outline-none"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3B82F6] focus:border-transparent outline-none"
                     placeholder="Enter stock or 'Unlimited'"
                   />
                 </div>
@@ -672,7 +672,7 @@ export default function FoodDetailsPage() {
                               type="number"
                               value={variation.stock}
                               onChange={(e) => handleStockChange('variation', e.target.value, variation.id)}
-                              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#ff8100] focus:border-transparent outline-none"
+                              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3B82F6] focus:border-transparent outline-none"
                               placeholder="0"
                               min="0"
                             />
@@ -704,7 +704,7 @@ export default function FoodDetailsPage() {
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={handleUpdateStock}
-                  className="flex-1 bg-[#ff8100] hover:bg-[#e67300] text-white font-semibold py-3 rounded-lg transition-colors"
+                  className="flex-1 bg-[#3B82F6] hover:bg-[#1D4ED8] text-white font-semibold py-3 rounded-lg transition-colors"
                 >
                   Update
                 </motion.button>
@@ -716,4 +716,5 @@ export default function FoodDetailsPage() {
     </div>
   )
 }
+
 

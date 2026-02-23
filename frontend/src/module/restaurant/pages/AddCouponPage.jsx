@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react"
 import { motion } from "framer-motion"
 import { useNavigate } from "react-router-dom"
 import Lenis from "lenis"
-import { 
+import {
   ArrowLeft,
   Calendar,
   ChevronDown,
@@ -122,7 +122,7 @@ export default function AddCouponPage(props) {
     <div className="min-h-screen bg-[#f6e9dc] overflow-x-hidden pb-24 md:pb-6">
       {/* Header */}
       <div className="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-50 flex items-center gap-3">
-        <button 
+        <button
           onClick={() => navigate(-1)}
           className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
         >
@@ -172,7 +172,7 @@ export default function AddCouponPage(props) {
                   />
                   <button
                     onClick={generateCouponCode}
-                    className="p-2.5 bg-[#ff8100] hover:bg-[#e67300] rounded-lg transition-colors flex items-center justify-center"
+                    className="p-2.5 bg-[#3B82F6] hover:bg-blue-700 rounded-lg transition-colors flex items-center justify-center"
                   >
                     <Wand2 className="w-5 h-5 text-white" />
                   </button>
@@ -291,13 +291,13 @@ export default function AddCouponPage(props) {
                   <div className="flex flex-col">
                     <button
                       onClick={incrementLimit}
-                      className="p-1 bg-[#ff8100] hover:bg-[#e67300] rounded-t transition-colors"
+                      className="p-1 bg-[#3B82F6] hover:bg-blue-700 rounded-t transition-colors"
                     >
                       <ChevronUp className="w-3 h-3 text-white" />
                     </button>
                     <button
                       onClick={decrementLimit}
-                      className="p-1 bg-[#ff8100] hover:bg-[#e67300] rounded-b transition-colors"
+                      className="p-1 bg-[#3B82F6] hover:bg-blue-700 rounded-b transition-colors"
                     >
                       <ChevronDownIcon className="w-3 h-3 text-white" />
                     </button>
@@ -406,7 +406,7 @@ export default function AddCouponPage(props) {
                     onClick={() => setShowStartDatePicker(!showStartDatePicker)}
                     className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5"
                   >
-                    <Calendar className="w-5 h-5 text-[#ff8100]" />
+                    <Calendar className="w-5 h-5 text-[#3B82F6]" />
                   </button>
                 </div>
                 {showStartDatePicker && (
@@ -422,7 +422,7 @@ export default function AddCouponPage(props) {
                         handleInputChange("startDate", e.target.value)
                         setShowStartDatePicker(false)
                       }}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#ff8100]"
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3B82F6]"
                     />
                   </motion.div>
                 )}
@@ -447,7 +447,7 @@ export default function AddCouponPage(props) {
                     onClick={() => setShowEndDatePicker(!showEndDatePicker)}
                     className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5"
                   >
-                    <Calendar className="w-5 h-5 text-[#ff8100]" />
+                    <Calendar className="w-5 h-5 text-[#3B82F6]" />
                   </button>
                 </div>
                 {showEndDatePicker && (
@@ -463,7 +463,7 @@ export default function AddCouponPage(props) {
                         handleInputChange("endDate", e.target.value)
                         setShowEndDatePicker(false)
                       }}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#ff8100]"
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3B82F6]"
                     />
                   </motion.div>
                 )}
@@ -474,7 +474,7 @@ export default function AddCouponPage(props) {
       </div>
 
       {/* Add Button */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-4 z-50 md:relative md:border-t-0 md:px-4 md:py-4 md:mt-6">
+      <div className="fixed bottom-16 md:bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-4 z-50 md:relative md:border-t-0 md:px-4 md:py-4 md:mt-6">
         <Button
           onClick={() => {
             if (isEditMode) {
@@ -485,7 +485,7 @@ export default function AddCouponPage(props) {
             // Navigate to coupon list after save
             navigate("/restaurant/coupon")
           }}
-          className="w-full bg-[#ff8100] hover:bg-[#e67300] text-white font-semibold py-3 rounded-lg"
+          className="w-full bg-[#3B82F6] hover:bg-blue-700 text-white font-semibold py-3 rounded-lg"
         >
           {isEditMode ? "Update" : "Add"}
         </Button>
