@@ -46,9 +46,9 @@ export default function TableBookingSuccess() {
             <motion.div
                 initial={{ scale: 0.5, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
-                className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mb-6"
+                className="w-20 h-20 bg-orange-100 rounded-full flex items-center justify-center mb-6"
             >
-                <CheckCircle2 className="w-12 h-12 text-green-500" />
+                <CheckCircle2 className="w-12 h-12 text-orange-500" />
             </motion.div>
 
             <motion.div
@@ -123,7 +123,7 @@ export default function TableBookingSuccess() {
                         </div>
                         <div className="space-y-1">
                             <p className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Status</p>
-                            <div className="bg-green-500 text-white px-2 py-0.5 rounded-lg text-xs font-bold w-fit">
+                            <div className="bg-orange-500 text-white px-2 py-0.5 rounded-lg text-xs font-bold w-fit">
                                 CONFIRMED
                             </div>
                         </div>

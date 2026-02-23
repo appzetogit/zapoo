@@ -65,8 +65,8 @@ export default function ConversationListPage() {
   ]
 
   // Get conversations based on active tab
-  const currentConversations = activeTab === "Customer" 
-    ? customerConversations 
+  const currentConversations = activeTab === "Customer"
+    ? customerConversations
     : deliveryManConversations
 
   const filteredConversations = currentConversations.filter((conv) =>
@@ -113,11 +113,10 @@ export default function ConversationListPage() {
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={() => setActiveTab("Customer")}
-            className={`pb-3 px-1 text-sm font-medium transition-colors relative ${
-              activeTab === "Customer"
+            className={`pb-3 px-1 text-sm font-medium transition-colors relative ${activeTab === "Customer"
                 ? "text-gray-900"
                 : "text-gray-400"
-            }`}
+              }`}
           >
             Customer
             {activeTab === "Customer" && (
@@ -133,11 +132,10 @@ export default function ConversationListPage() {
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={() => setActiveTab("Delivery Man")}
-            className={`pb-3 px-1 text-sm font-medium transition-colors relative ${
-              activeTab === "Delivery Man"
+            className={`pb-3 px-1 text-sm font-medium transition-colors relative ${activeTab === "Delivery Man"
                 ? "text-gray-900"
                 : "text-gray-400"
-            }`}
+              }`}
           >
             Delivery Man
             {activeTab === "Delivery Man" && (

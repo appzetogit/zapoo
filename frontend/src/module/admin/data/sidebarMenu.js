@@ -353,6 +353,12 @@ export const sidebarMenuData = [
         path: "/admin/dining-list",
         icon: "FileText",
       },
+      {
+        type: "link",
+        label: "Table Management",
+        path: "/admin/dining-table-management",
+        icon: "LayoutGrid",
+      },
     ],
   },
   {

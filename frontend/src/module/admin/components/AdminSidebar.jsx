@@ -42,6 +42,10 @@ import {
   Zap,
   Phone,
   IndianRupee,
+  AlertTriangle,
+  Layers,
+  CheckCircle2,
+  LayoutGrid,
   PiggyBank,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -87,6 +91,10 @@ const iconMap = {
   Phone,
   IndianRupee,
   PiggyBank,
+  AlertTriangle,
+  Layers,
+  CheckCircle2,
+  LayoutGrid,
 }
 
 export default function AdminSidebar({ isOpen = false, onClose, onCollapseChange }) {

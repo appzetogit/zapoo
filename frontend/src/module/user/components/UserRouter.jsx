@@ -23,6 +23,7 @@ const DiningRestaurantDetails = lazy(() => import("../pages/dining/DiningRestaur
 const TableBooking = lazy(() => import("../pages/dining/TableBooking"))
 const TableBookingConfirmation = lazy(() => import("../pages/dining/TableBookingConfirmation"))
 const TableBookingSuccess = lazy(() => import("../pages/dining/TableBookingSuccess"))
+const TableSelectPage = lazy(() => import("../pages/dining/TableSelectPage"))
 const MyBookings = lazy(() => import("../pages/dining/MyBookings"))
 const SearchResults = lazy(() => import("../pages/SearchResults"))
 const ProductDetail = lazy(() => import("../pages/ProductDetail"))
@@ -121,6 +122,14 @@ export default function UserRouter() {
             element={
               <ProtectedRoute requiredRole="user" loginPath="/user/auth/sign-in">
                 <TableBookingSuccess />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/dining/book-table-select"
+            element={
+              <ProtectedRoute requiredRole="user" loginPath="/user/auth/sign-in">
+                <TableSelectPage />
               </ProtectedRoute>
             }
           />

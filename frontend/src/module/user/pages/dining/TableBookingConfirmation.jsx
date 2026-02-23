@@ -3,15 +3,35 @@ import { useLocation, useNavigate } from "react-router-dom"
 import { ArrowLeft, Calendar, Users, MapPin, Ticket, ChevronRight, Edit2, ShieldCheck, Info } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import AnimatedPage from "../../components/AnimatedPage"
-import { diningAPI, authAPI } from "@/lib/api"
+import { diningAPI, authAPI, api } from "@/lib/api"
 import { useEffect } from "react"
 import { toast } from "sonner"
 import Loader from "@/components/Loader"
 
+// Convert "12:30 PM" → "12:30" (24-hour HH:mm)
+function to24Hour(timeStr) {
+    if (!timeStr) return "12:00"
+    const [time, modifier] = timeStr.split(" ")
+    let [hours, minutes] = time.split(":").map(Number)
+    if (modifier === "PM" && hours !== 12) hours += 12
+    if (modifier === "AM" && hours === 12) hours = 0
+    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`
+}
+
+// Format date object to YYYY-MM-DD
+function toYMD(date) {
+    if (!date) return ""
+    const d = new Date(date)
+    const year = d.getFullYear()
+    const month = String(d.getMonth() + 1).padStart(2, "0")
+    const day = String(d.getDate()).padStart(2, "0")
+    return `${year}-${month}-${day}`
+}
+
 export default function TableBookingConfirmation() {
     const location = useLocation()
     const navigate = useNavigate()
-    const { restaurant, guests, date, timeSlot, discount } = location.state || {}
+    const { restaurant, guests, date, timeSlot, discount, tableId, tableNumber } = location.state || {}
 
     const [specialRequest, setSpecialRequest] = useState("")
     const [user, setUser] = useState(null)
@@ -32,7 +52,6 @@ export default function TableBookingConfirmation() {
                 }
             } catch (error) {
                 console.error("Error fetching user:", error)
-                // If not logged in, navigate to sign-in but the ProtectedRoute should handle this
             } finally {
                 setLoading(false)
             }
@@ -41,20 +60,30 @@ export default function TableBookingConfirmation() {
     }, [restaurant, navigate])
 
     const handleBooking = async () => {
+        if (!tableId) {
+            toast.error("Please select a table first")
+            navigate(-1)
+            return
+        }
+
         try {
             setBookingInProgress(true)
-            const response = await diningAPI.createBooking({
-                restaurant: restaurant._id,
-                guests,
-                date,
-                timeSlot,
+            const response = await api.post("/book-table", {
+                tableId,
+                date: toYMD(date),
+                startTime: to24Hour(timeSlot),
+                guestCount: guests,
                 specialRequest
             })
 
             if (response.data.success) {
                 toast.success("Table booked successfully!")
-                // Navigate to success page with booking details
-                navigate("/dining/book-success", { state: { booking: response.data.data } })
+                // Map back to expected structure for success page
+                const bookingData = {
+                    ...response.data.data,
+                    restaurant: restaurant // Success page expects restaurant object
+                }
+                navigate("/dining/book-success", { state: { booking: bookingData } })
             }
         } catch (error) {
             console.error("Booking error:", error)
@@ -92,7 +121,7 @@ export default function TableBookingConfirmation() {
                                 <p className="font-bold text-gray-900">{formattedDate} at {timeSlot}</p>
                                 <div className="flex items-center gap-2 text-gray-500 text-sm mt-0.5">
                                     <Users className="w-4 h-4" />
-                                    <span>{guests} guests</span>
+                                    <span>{guests} guests {tableNumber && `· Table ${tableNumber}`}</span>
                                 </div>
                             </div>
                         </div>
@@ -140,7 +169,7 @@ export default function TableBookingConfirmation() {
                     <div className="space-y-2">
                         <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 flex items-center justify-between">
                             <div className="flex items-start gap-3">
-                                <div className="text-green-500 mt-1">
+                                <div className="text-orange-500 mt-1">
                                     <Edit2 className="w-5 h-5" />
                                 </div>
                                 <div>

@@ -115,17 +115,15 @@ export default function ChatDetailPage() {
             className={`flex ${msg.sender === "me" ? "justify-end" : "justify-start"}`}
           >
             <div
-              className={`max-w-[75%] md:max-w-[60%] rounded-2xl px-4 py-2.5 ${
-                msg.sender === "me"
+              className={`max-w-[75%] md:max-w-[60%] rounded-2xl px-4 py-2.5 ${msg.sender === "me"
                   ? "bg-[#ff8100] text-white rounded-br-sm"
                   : "bg-white text-gray-900 rounded-bl-sm shadow-sm"
-              }`}
+                }`}
             >
               <p className="text-sm md:text-base break-words">{msg.text}</p>
               <p
-                className={`text-xs mt-1 ${
-                  msg.sender === "me" ? "text-white/70" : "text-gray-500"
-                }`}
+                className={`text-xs mt-1 ${msg.sender === "me" ? "text-white/70" : "text-gray-500"
+                  }`}
               >
                 {msg.time}
               </p>

@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react"
-import { Calendar, Clock, Users, Search, Filter, MessageSquare, ChevronRight, CheckCircle2, XCircle, Clock4 } from "lucide-react"
+import { useNavigate } from "react-router-dom"
+import { Calendar, Clock, Users, Search, Filter, MessageSquare, ChevronRight, CheckCircle2, XCircle, Clock4, Utensils } from "lucide-react"
 import { diningAPI, restaurantAPI } from "@/lib/api"
 import Loader from "@/components/Loader"
 import { Badge } from "@/components/ui/badge"
 
 export default function DiningReservations() {
+    const navigate = useNavigate()
     const [bookings, setBookings] = useState([])
     const [loading, setLoading] = useState(true)
     const [restaurant, setRestaurant] = useState(null)
@@ -66,9 +68,17 @@ export default function DiningReservations() {
             {/* Header */}
             <div className="bg-white p-6 border-b sticky top-0 z-30">
                 <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div>
-                        <h1 className="text-2xl font-bold text-slate-900">Table Reservations</h1>
-                        <p className="text-slate-500 text-sm mt-1">Manage your upcoming guest bookings</p>
+                    <div className="flex flex-col md:flex-row md:items-center gap-4">
+                        <div>
+                            <h1 className="text-2xl font-bold text-slate-900">Table Reservations</h1>
+                            <p className="text-slate-500 text-sm mt-1">Manage your upcoming guest bookings</p>
+                        </div>
+                        <button
+                            onClick={() => navigate("/restaurant/tables")}
+                            className="bg-orange-50 border border-orange-200 text-orange-600 px-4 py-2 rounded-xl text-sm font-bold hover:bg-orange-100 transition-colors flex items-center gap-2"
+                        >
+                            <Utensils className="w-4 h-4" /> Manage Tables
+                        </button>
                     </div>
 
                     <div className="flex items-center gap-3">

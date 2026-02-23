@@ -18,7 +18,8 @@ import {
   CheckSquare,
   LogOut,
   LogIn,
-  UserPlus
+  UserPlus,
+  Calendar
 } from "lucide-react"
 
 export default function MenuOverlay({ showMenu, setShowMenu }) {
@@ -52,6 +53,8 @@ export default function MenuOverlay({ showMenu, setShowMenu }) {
   const getMenuOptions = () => {
     const baseOptions = [
       { id: 4, name: "All Food", icon: Utensils, route: "/restaurant/food/all" },
+      { id: 25, name: "Dining Reservations", icon: Calendar, route: "/restaurant/reservations" },
+      { id: 26, name: "Manage Tables", icon: Utensils, route: "/restaurant/tables" },
       { id: 6, name: "Restaurant Config", icon: Settings, route: "/restaurant/config" },
       { id: 7, name: "Advertisements", icon: Monitor, route: "/restaurant/advertisements" },
       { id: 9, name: "Categories", icon: Grid3x3, route: "/restaurant/categories" },
@@ -163,8 +166,8 @@ export default function MenuOverlay({ showMenu, setShowMenu }) {
                         }
                       }}
                       className={`flex flex-col items-center justify-center gap-2 p-3 md:p-4 rounded-xl transition-all shadow-md hover:shadow-lg ${option.isLogout
-                          ? "bg-red-500 hover:bg-red-600 text-white"
-                          : "bg-gradient-to-br from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white"
+                        ? "bg-red-500 hover:bg-red-600 text-white"
+                        : "bg-gradient-to-br from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white"
                         }`}
                     >
                       <motion.div

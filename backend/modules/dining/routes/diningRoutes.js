@@ -16,6 +16,7 @@ import {
 } from "../controllers/diningController.js";
 import { authenticate as authenticateUser } from "../../auth/middleware/auth.js";
 import { authenticate as authenticateRestaurant } from "../../restaurant/middleware/restaurantAuth.js";
+import { authenticateAdmin } from "../../admin/middleware/adminAuth.js";
 
 const router = express.Router();
 
@@ -36,6 +37,7 @@ router.get(
   authenticateRestaurant,
   getRestaurantBookings,
 );
+// User or restaurant can update status
 router.patch(
   "/bookings/:bookingId/status",
   authenticateUser,
@@ -44,6 +46,12 @@ router.patch(
 router.patch(
   "/bookings/:bookingId/status/restaurant",
   authenticateRestaurant,
+  updateBookingStatus,
+);
+// Admin can also update booking status
+router.patch(
+  "/bookings/:bookingId/status/admin",
+  authenticateAdmin,
   updateBookingStatus,
 );
 router.post("/reviews", authenticateUser, createDiningReview);

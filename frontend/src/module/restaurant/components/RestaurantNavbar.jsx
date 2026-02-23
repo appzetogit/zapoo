@@ -265,7 +265,7 @@ export default function RestaurantNavbar({
         {/* Close Button */}
         <button
           onClick={handleSearchClose}
-          className="w-6 h-6 bg-[#FF5200] rounded-full flex items-center justify-center shrink-0"
+          className="w-6 h-6 bg-[#3B82F6] rounded-full flex items-center justify-center shrink-0"
           aria-label="Close search"
         >
           <X className="w-3 h-3 text-white" />
@@ -284,16 +284,7 @@ export default function RestaurantNavbar({
         </h1>
 
         {/* Location */}
-        {!loading && location && location.trim() !== "" && (
-          <div className="flex items-center gap-3">
-            <Link to="/restaurant/dashboard">
-              <img
-                src="/zapoo-rest-logo.jpg"
-                alt="Zapoo Restaurant"
-                className="h-8 w-auto"
-              />
-            </Link>
-          </div>)}
+
       </div>
 
       {/* Right Side - Interactive Elements */}

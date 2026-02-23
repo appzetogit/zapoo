@@ -571,9 +571,9 @@ function SimpleCalendar({ selectedDate, onDateSelect, isOpen, onClose }) {
                     className={`h-10 text-sm rounded transition-colors ${!isCurrent
                       ? 'text-gray-300'
                       : isSelectedDate
-                        ? 'bg-black text-white'
+                        ? 'bg-[#3B82F6] text-white'
                         : isTodayDate
-                          ? 'bg-gray-100 text-black font-semibold'
+                          ? 'bg-blue-50 text-[#3B82F6] font-semibold'
                           : 'text-gray-700 hover:bg-gray-100'
                       }`}
                   >
@@ -1134,6 +1134,76 @@ export default function Inventory() {
     )
   }
 
+  // Update menu API when recommendation toggle changes
+  const updateRecommendationAPI = async (categoryId, itemId, isRecommended) => {
+    try {
+      // Fetch current menu
+      const menuResponse = await restaurantAPI.getMenu()
+      if (!menuResponse.data || !menuResponse.data.success || !menuResponse.data.data || !menuResponse.data.data.menu) {
+        console.error('Failed to fetch menu for update')
+        return
+      }
+
+      const menu = menuResponse.data.data.menu
+      const sections = menu.sections || []
+
+      // Update menu sections
+      const updatedSections = sections.map(section => {
+        if (section.id !== categoryId) return section
+
+        // Update item in direct items
+        const updatedItems = section.items.map(item =>
+          item.id === String(itemId) ? { ...item, isRecommended: isRecommended } : item
+        )
+
+        // Update item in subsections too
+        const updatedSubsections = section.subsections.map(subsection => ({
+          ...subsection,
+          items: subsection.items.map(item =>
+            item.id === String(itemId) ? { ...item, isRecommended: isRecommended } : item
+          )
+        }))
+
+        return {
+          ...section,
+          items: updatedItems,
+          subsections: updatedSubsections
+        }
+      })
+
+      // Save updated menu
+      await restaurantAPI.updateMenu({ sections: updatedSections })
+      console.log('Menu recommendation updated successfully')
+    } catch (error) {
+      console.error('Error updating menu recommendation:', error)
+      toast.error('Failed to update recommendation')
+    }
+  }
+
+  // Handle item recommendation toggle
+  const handleRecommendToggle = async (categoryId, itemId) => {
+    // Find current recommendation status
+    const category = categories.find(cat => cat.id === categoryId)
+    const item = category?.items.find(i => i.id === itemId)
+    const newRecommendationStatus = !item?.isRecommended
+
+    // Update local state
+    setCategories(prev =>
+      prev.map(category => {
+        if (category.id !== categoryId) return category
+        const updatedItems = category.items.map(item =>
+          item.id === itemId ? { ...item, isRecommended: newRecommendationStatus } : item
+        )
+        return {
+          ...category,
+          items: updatedItems,
+        }
+      })
+    )
+
+    // Update menu API
+    await updateRecommendationAPI(categoryId, itemId, newRecommendationStatus)
+  }
 
   const scrollToCategory = (categoryId) => {
     const el = categoryRefs.current[categoryId]
@@ -1172,7 +1242,7 @@ export default function Inventory() {
             {activeTab === "all-items" && (
               <motion.div
                 layoutId="activeTabBackground"
-                className="absolute inset-0 bg-black rounded-full -z-10"
+                className="absolute inset-0 bg-[#3B82F6] rounded-full -z-10"
                 initial={false}
                 transition={{
                   type: "spring",
@@ -1205,7 +1275,7 @@ export default function Inventory() {
             {activeTab === "add-ons" && (
               <motion.div
                 layoutId="activeTabBackground"
-                className="absolute inset-0 bg-black rounded-full -z-10"
+                className="absolute inset-0 bg-[#3B82F6] rounded-full -z-10"
                 initial={false}
                 transition={{
                   type: "spring",
@@ -1292,7 +1362,7 @@ export default function Inventory() {
           className="bg-blue-200/20 rounded-lg p-4 mt-4 mb-4 flex items-center justify-between"
         >
           <span className="text-sm font-light text-gray-900">Want to edit your menu?</span>
-          <button className="bg-blue-200/30 hover:bg-blue-300 text-black  px-4 py-2 rounded-full text-sm font-light transition-colors">
+          <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-full text-sm font-medium transition-colors">
             Edit now
           </button>
         </motion.div>
@@ -1511,15 +1581,20 @@ export default function Inventory() {
                                 </div>
                               </div>
                               <div className="flex items-center gap-3">
-                                {/* Recommend Thumb Icon (Read-only) */}
-                                {item.isRecommended && (
-                                  <div
-                                    className="p-1.5 rounded-lg bg-blue-100 text-blue-600"
-                                    title="Recommended Item"
-                                  >
-                                    <ThumbsUp className="w-4 h-4" />
-                                  </div>
-                                )}
+                                {/* Recommend Thumb Icon */}
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleRecommendToggle(category.id, item.id)
+                                  }}
+                                  className={`p-1.5 rounded-lg transition-colors ${item.isRecommended
+                                    ? "bg-blue-100 text-blue-600"
+                                    : "bg-gray-100 text-gray-400 hover:bg-gray-200"
+                                    }`}
+                                  title={item.isRecommended ? "Recommended" : "Click to recommend"}
+                                >
+                                  <ThumbsUp className="w-4 h-4" />
+                                </button>
                                 {/* Item Toggle Switch */}
                                 <div onClick={(e) => e.stopPropagation()}>
                                   <Switch
@@ -1545,7 +1620,7 @@ export default function Inventory() {
       </div>
 
       {/* Filter Popup */}
-      <AnimatePresence>
+      < AnimatePresence >
         {filterOpen && (
           <>
             <motion.div
@@ -1573,7 +1648,7 @@ export default function Inventory() {
                       name="filter"
                       checked={selectedFilter === "out-of-stock"}
                       onChange={() => setSelectedFilter("out-of-stock")}
-                      className="w-5 h-5 text-black border-gray-300 focus:ring-black"
+                      className="w-5 h-5 text-[#3B82F6] border-gray-300 focus:ring-[#3B82F6]"
                     />
                     <span className="text-base text-gray-900">Out of stock items only</span>
                   </label>
@@ -1584,7 +1659,7 @@ export default function Inventory() {
                       name="filter"
                       checked={selectedFilter === "in-stock"}
                       onChange={() => setSelectedFilter("in-stock")}
-                      className="w-5 h-5 text-black border-gray-300 focus:ring-black"
+                      className="w-5 h-5 text-[#3B82F6] border-gray-300 focus:ring-[#3B82F6]"
                     />
                     <span className="text-base text-gray-900">In stock items only</span>
                   </label>
@@ -1601,7 +1676,7 @@ export default function Inventory() {
                   )}
                   <button
                     onClick={handleFilterApply}
-                    className={`${selectedFilter ? 'flex-1' : 'w-full'} bg-black text-white py-3 rounded-lg font-medium hover:bg-gray-800 transition-colors`}
+                    className={`${selectedFilter ? 'flex-1' : 'w-full'} bg-[#3B82F6] text-white py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors`}
                   >
                     Apply
                   </button>
@@ -1610,10 +1685,10 @@ export default function Inventory() {
             </motion.div>
           </>
         )}
-      </AnimatePresence>
+      </AnimatePresence >
 
       {/* Toggle Popup */}
-      <AnimatePresence>
+      < AnimatePresence >
         {togglePopupOpen && toggleTarget && (
           <>
             <motion.div
@@ -1684,8 +1759,8 @@ export default function Inventory() {
                         name="outOfStockOption"
                         checked={selectedOption === "specific-time"}
                         onChange={() => setSelectedOption("specific-time")}
-                        style={{ accentColor: "#000000" }}
-                        className="ml-auto w-5 h-5 !text-black !border-gray-300 !bg-black !focus:ring-black"
+                        style={{ accentColor: "#3B82F6" }}
+                        className="ml-auto w-5 h-5 !text-[#3B82F6] !border-gray-300 !bg-[#3B82F6] !focus:ring-[#3B82F6]"
                       />
                     </div>
                   </label>
@@ -1700,8 +1775,8 @@ export default function Inventory() {
                         name="outOfStockOption"
                         checked={selectedOption === "next-business-day"}
                         onChange={() => setSelectedOption("next-business-day")}
-                        style={{ accentColor: "#000000" }}
-                        className="ml-auto w-5 h-5 !text-black !border-gray-300 !bg-black !focus:ring-black"
+                        style={{ accentColor: "#3B82F6" }}
+                        className="ml-auto w-5 h-5 !text-[#3B82F6] !border-gray-300 !bg-[#3B82F6] !focus:ring-[#3B82F6]"
                       />
                     </div>
                   </label>
@@ -1716,8 +1791,8 @@ export default function Inventory() {
                         name="outOfStockOption"
                         checked={selectedOption === "custom-date-time"}
                         onChange={() => setSelectedOption("custom-date-time")}
-                        style={{ accentColor: "#000000" }}
-                        className="ml-auto w-5 h-5 text-black border-gray-300 focus:ring-black"
+                        style={{ accentColor: "#3B82F6" }}
+                        className="ml-auto w-5 h-5 text-[#3B82F6] border-gray-300 focus:ring-[#3B82F6]"
                       />
                     </div>
                   </label>
@@ -1751,8 +1826,8 @@ export default function Inventory() {
                           name="outOfStockOption"
                           checked={selectedOption === "manual"}
                           onChange={() => setSelectedOption("manual")}
-                          style={{ accentColor: "#000000" }}
-                          className="ml-auto w-5 h-5 !text-black !border-gray-300 !bg-black !focus:ring-black"
+                          style={{ accentColor: "#3B82F6" }}
+                          className="ml-auto w-5 h-5 !text-[#3B82F6] !border-gray-300 !bg-[#3B82F6] !focus:ring-[#3B82F6]"
                         />
                       </div>
                       <p className="text-sm text-gray-500">
@@ -1772,7 +1847,7 @@ export default function Inventory() {
                   </button>
                   <button
                     onClick={handleToggleConfirm}
-                    className="flex-1 bg-black text-white py-3 rounded-lg font-medium hover:bg-gray-800 transition-colors"
+                    className="flex-1 bg-[#3B82F6] text-white py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors"
                   >
                     Confirm
                   </button>
@@ -1781,10 +1856,10 @@ export default function Inventory() {
             </motion.div>
           </>
         )}
-      </AnimatePresence>
+      </AnimatePresence >
 
       {/* Calendar Popup */}
-      <SimpleCalendar
+      < SimpleCalendar
         selectedDate={selectedDate}
         onDateSelect={setSelectedDate}
         isOpen={showCalendar}
@@ -1802,90 +1877,92 @@ export default function Inventory() {
       />
 
       {/* Floating Menu Button & Popup (hidden on Add-ons tab) */}
-      {activeTab !== "add-ons" && (
-        <div className="fixed right-4 bottom-24 z-30">
-          <motion.button
-            type="button"
-            whileTap={{ scale: 0.96 }}
-            onClick={() => setIsMenuOpen((prev) => !prev)}
-            className="flex items-center gap-2 px-4 py-2 rounded-full border border-gray-800 bg-white text-sm font-medium shadow-sm"
-          >
-            <span className="w-5 h-5 flex items-center justify-center">
-              {isMenuOpen ? (
-                <X className="w-4 h-4 text-gray-900" />
-              ) : (
-                <Utensils className="w-4 h-4 text-gray-900" />
+      {
+        activeTab !== "add-ons" && (
+          <div className="fixed right-4 bottom-24 z-30">
+            <motion.button
+              type="button"
+              whileTap={{ scale: 0.96 }}
+              onClick={() => setIsMenuOpen((prev) => !prev)}
+              className="flex items-center gap-2 px-4 py-2 rounded-full border border-gray-800 bg-white text-sm font-medium shadow-sm"
+            >
+              <span className="w-5 h-5 flex items-center justify-center">
+                {isMenuOpen ? (
+                  <X className="w-4 h-4 text-gray-900" />
+                ) : (
+                  <Utensils className="w-4 h-4 text-gray-900" />
+                )}
+              </span>
+              <span>{isMenuOpen ? "Close" : "Menu"}</span>
+            </motion.button>
+
+            <AnimatePresence>
+              {isMenuOpen && (
+                <>
+                  {/* Backdrop */}
+                  <motion.div
+                    className="fixed inset-0 bg-black/40 z-30"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    onClick={() => setIsMenuOpen(false)}
+                  />
+
+                  {/* Menu Popup */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 20 }}
+                    transition={{ duration: 0.2 }}
+                    className="fixed right-4 bottom-36 z-30 w-[60vw] max-w-sm h-[45vh] bg-white rounded-3xl shadow-lg overflow-hidden"
+                  >
+                    <div className="h-full flex flex-col">
+                      <div className="px-4 pt-4 pb-2">
+                        <p className="text-sm font-semibold text-gray-900">Menu</p>
+                      </div>
+                      <div className="h-px bg-gray-200 mx-4" />
+                      <div className="flex-1 overflow-y-auto px-4 py-2 space-y-1">
+                        {categories.map((category, index) => {
+                          const itemCount =
+                            category.itemCount || (category.items?.length || 0)
+                          const isLast = index === categories.length - 1
+
+                          return (
+                            <button
+                              key={category.id}
+                              type="button"
+                              onClick={() => {
+                                setIsMenuOpen(false)
+                                setTimeout(() => scrollToCategory(category.id), 200)
+                              }}
+                              className="w-full text-left py-3 focus:outline-none"
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm font-medium text-gray-900">
+                                  {category.name}
+                                </span>
+                                <span className="min-w-[28px] h-7 rounded-full border border-gray-300 flex items-center justify-center text-xs text-gray-800">
+                                  {itemCount}
+                                </span>
+                              </div>
+                              {!isLast && (
+                                <div className="mt-3 border-t border-dashed border-gray-200" />
+                              )}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  </motion.div>
+                </>
               )}
-            </span>
-            <span>{isMenuOpen ? "Close" : "Menu"}</span>
-          </motion.button>
-
-          <AnimatePresence>
-            {isMenuOpen && (
-              <>
-                {/* Backdrop */}
-                <motion.div
-                  className="fixed inset-0 bg-black/40 z-30"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  onClick={() => setIsMenuOpen(false)}
-                />
-
-                {/* Menu Popup */}
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 20 }}
-                  transition={{ duration: 0.2 }}
-                  className="fixed right-4 bottom-36 z-30 w-[60vw] max-w-sm h-[45vh] bg-white rounded-3xl shadow-lg overflow-hidden"
-                >
-                  <div className="h-full flex flex-col">
-                    <div className="px-4 pt-4 pb-2">
-                      <p className="text-sm font-semibold text-gray-900">Menu</p>
-                    </div>
-                    <div className="h-px bg-gray-200 mx-4" />
-                    <div className="flex-1 overflow-y-auto px-4 py-2 space-y-1">
-                      {categories.map((category, index) => {
-                        const itemCount =
-                          category.itemCount || (category.items?.length || 0)
-                        const isLast = index === categories.length - 1
-
-                        return (
-                          <button
-                            key={category.id}
-                            type="button"
-                            onClick={() => {
-                              setIsMenuOpen(false)
-                              setTimeout(() => scrollToCategory(category.id), 200)
-                            }}
-                            className="w-full text-left py-3 focus:outline-none"
-                          >
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm font-medium text-gray-900">
-                                {category.name}
-                              </span>
-                              <span className="min-w-[28px] h-7 rounded-full border border-gray-300 flex items-center justify-center text-xs text-gray-800">
-                                {itemCount}
-                              </span>
-                            </div>
-                            {!isLast && (
-                              <div className="mt-3 border-t border-dashed border-gray-200" />
-                            )}
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </div>
-                </motion.div>
-              </>
-            )}
-          </AnimatePresence>
-        </div>
-      )}
+            </AnimatePresence>
+          </div>
+        )
+      }
 
       {/* Bottom Navigation */}
       <BottomNavOrders />
-    </div>
+    </div >
   )
 }

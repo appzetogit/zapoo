@@ -11,14 +11,17 @@ import {
     Bookmark,
     CheckCircle2,
     Clock,
-    UtensilsCrossed
+    UtensilsCrossed,
+    Users
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Loader2 } from "lucide-react"
+import { useProfile } from "../../context/ProfileContext"
 
 export default function DiningRestaurantDetails() {
     const { diningType, slug } = useParams() // Get params from URL
     const navigate = useNavigate()
+    const { addFavorite, removeFavorite, isFavorite } = useProfile()
 
     const [restaurant, setRestaurant] = useState(null)
     const [loading, setLoading] = useState(true)
@@ -82,7 +85,7 @@ export default function DiningRestaurantDetails() {
     if (loading) {
         return (
             <div className="flex items-center justify-center min-h-screen bg-slate-50">
-                <Loader2 className="w-8 h-8 animate-spin text-red-500" />
+                <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
             </div>
         )
     }
@@ -101,6 +104,29 @@ export default function DiningRestaurantDetails() {
     const formattedDistance = "2.4 km away" // Placeholder or calc
     const rating = restaurant.rating || restaurant.avgRating || 4.5
     const isOpen = restaurant.isAcceptingOrders !== false // simplified check
+
+    const restaurantSlug = restaurant?.slug || slug || restaurant?.name?.toLowerCase().replace(/\s+/g, "-") || ""
+    const favorite = isFavorite(restaurantSlug)
+
+    const handleToggleFavorite = (e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        if (!restaurant) return
+
+        if (favorite) {
+            removeFavorite(restaurantSlug)
+        } else {
+            addFavorite({
+                slug: restaurantSlug,
+                name: restaurant.name,
+                cuisine: Array.isArray(restaurant.cuisines) ? restaurant.cuisines[0] : (restaurant.cuisine || "Multi-cuisine"),
+                rating: rating,
+                deliveryTime: restaurant.deliveryTime || "30-40 mins",
+                distance: formattedDistance,
+                image: coverImage
+            })
+        }
+    }
 
     if (restaurant.diningSettings && restaurant.diningSettings.isEnabled === false) {
         return (
@@ -127,8 +153,11 @@ export default function DiningRestaurantDetails() {
                 </button>
 
                 <div className="flex gap-3 pointer-events-auto">
-                    <button className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md flex items-center justify-center text-white hover:bg-black/60 transition-colors">
-                        <Bookmark className="w-5 h-5" />
+                    <button
+                        onClick={handleToggleFavorite}
+                        className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md flex items-center justify-center text-white hover:bg-black/60 transition-colors"
+                    >
+                        <Bookmark className={`w-5 h-5 ${favorite ? "fill-white text-white" : "text-white"}`} />
                     </button>
                     <button className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md flex items-center justify-center text-white hover:bg-black/60 transition-colors">
                         <Share2 className="w-5 h-5" />
@@ -163,16 +192,16 @@ export default function DiningRestaurantDetails() {
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                             {isOpen ? (
-                                <div className="flex items-center gap-1.5 text-green-400 text-xs font-semibold uppercase tracking-wide">
+                                <div className="flex items-center gap-1.5 text-orange-400 text-xs font-semibold uppercase tracking-wide">
                                     <CheckCircle2 className="w-4 h-4" />
                                     <span>Open now | 12:00 PM to 11:59 PM</span>
                                 </div>
                             ) : (
-                                <div className="text-red-400 text-xs font-semibold">Closed</div>
+                                <div className="text-orange-400 text-xs font-semibold">Closed</div>
                             )}
                         </div>
 
-                        <div className="flex flex-col items-center bg-green-700/90 backdrop-blur-sm rounded-lg px-2 py-1">
+                        <div className="flex flex-col items-center bg-orange-700/90 backdrop-blur-sm rounded-lg px-2 py-1">
                             <div className="flex items-center gap-1 text-white font-bold text-lg leading-none">
                                 {rating} <Star className="w-3 h-3 fill-current" />
                             </div>
@@ -185,20 +214,48 @@ export default function DiningRestaurantDetails() {
             {/* Action Buttons Bar */}
             <div className="flex items-center justify-between px-4 py-4 border-b border-gray-100 gap-3">
                 <Button
+                    onClick={() => setIsBookingOpen(true)}
                     variant="outline"
-                    className="flex-1 border-gray-200 h-10 text-red-500 hover:text-red-600 hover:bg-red-50 font-medium rounded-full"
+                    className="flex-1 border-gray-200 h-10 text-orange-500 hover:text-orange-600 hover:bg-orange-50 font-medium rounded-full"
                 >
                     <UtensilsCrossed className="w-4 h-4 mr-2" />
                     Book a table
                 </Button>
 
                 <div className="flex gap-3">
-                    <button className="w-10 h-10 rounded-full border border-gray-200 flex items-center justify-center text-red-500 hover:bg-red-50">
+                    <button className="w-10 h-10 rounded-full border border-gray-200 flex items-center justify-center text-orange-500 hover:bg-orange-50">
                         <Navigation className="w-5 h-5" />
                     </button>
-                    <button className="w-10 h-10 rounded-full border border-gray-200 flex items-center justify-center text-red-500 hover:bg-red-50">
+                    <button className="w-10 h-10 rounded-full border border-gray-200 flex items-center justify-center text-orange-500 hover:bg-orange-50" onClick={() => window.location.href = `tel:${restaurant.ownerPhone || restaurant.primaryContactNumber}`}>
                         <Phone className="w-5 h-5" />
                     </button>
+                </div>
+            </div>
+
+            {/* Seating Overview Section */}
+            <div className="px-4 py-5 border-b border-gray-50">
+                <h3 className="text-sm font-bold text-gray-800 mb-3 uppercase tracking-wider">Seating Options</h3>
+                <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1">
+                    {/* Unique capacities from tables only */}
+                    {(restaurant.tableCapacities || []).map(size => (
+                        <div key={size} className="flex-shrink-0 bg-orange-50 border border-orange-100 rounded-xl p-3 min-w-[100px] flex flex-col items-center">
+                            <Users className="w-5 h-5 text-orange-500 mb-1" />
+                            <span className="text-xs font-bold text-gray-700">Table for {size}</span>
+                            <span className="text-[10px] text-gray-400 mt-0.5">Available</span>
+                        </div>
+                    ))}
+                    {restaurant.tableCapacities?.length === 0 && (
+                        <div className="flex-1 text-center py-4">
+                            <p className="text-gray-400 text-xs italic">No specific seating options configured</p>
+                        </div>
+                    )}
+                    {restaurant.diningSettings?.maxGuests > (restaurant.tableCapacities?.[restaurant.tableCapacities.length - 1] || 8) && (
+                        <div className="flex-shrink-0 bg-orange-50 border border-orange-100 rounded-xl p-3 min-w-[100px] flex flex-col items-center">
+                            <Users className="w-5 h-5 text-orange-500 mb-1" />
+                            <span className="text-xs font-bold text-gray-700">Large Groups</span>
+                            <span className="text-[10px] text-gray-400 mt-0.5">Upto {restaurant.diningSettings.maxGuests}</span>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -212,7 +269,7 @@ export default function DiningRestaurantDetails() {
 
                     {/* Decorative Elements mimicking the screenshot */}
                     <div className="absolute top-0 left-0 w-8 h-8 bg-purple-500/20 -rotate-45 transform -translate-x-4 -translate-y-4"></div>
-                    <div className="absolute bottom-0 right-0 w-8 h-8 bg-green-500/20 rotate-45 transform translate-x-4 translate-y-4"></div>
+                    <div className="absolute bottom-0 right-0 w-8 h-8 bg-orange-500/20 rotate-45 transform translate-x-4 translate-y-4"></div>
                 </div>
             </div>
 
@@ -223,12 +280,12 @@ export default function DiningRestaurantDetails() {
                         <button
                             key={tab}
                             onClick={() => setActiveTab(tab)}
-                            className={`whitespace-nowrap py-3 text-sm font-medium transition-colors relative ${activeTab === tab ? "text-red-500" : "text-gray-500 hover:text-gray-800"
+                            className={`whitespace-nowrap py-3 text-sm font-medium transition-colors relative ${activeTab === tab ? "text-orange-500" : "text-gray-500 hover:text-gray-800"
                                 }`}
                         >
                             {tab}
                             {activeTab === tab && (
-                                <div className="absolute bottom-0 left-0 w-full h-[2px] bg-red-500 rounded-t-full" />
+                                <div className="absolute bottom-0 left-0 w-full h-[2px] bg-orange-500 rounded-t-full" />
                             )}
                         </button>
                     ))}
@@ -254,12 +311,12 @@ export default function DiningRestaurantDetails() {
                     <Button
                         variant="outline"
                         onClick={() => setIsBookingOpen(true)}
-                        className="flex-1 h-12 rounded-xl text-red-500 border-red-500 hover:bg-red-50 font-bold"
+                        className="flex-1 h-12 rounded-xl text-orange-500 border-orange-500 hover:bg-orange-50 font-bold"
                     >
                         Book a table
                     </Button>
                     <Button
-                        className="flex-1 h-12 rounded-xl bg-red-500 hover:bg-red-600 text-white font-bold flex flex-col items-center justify-center leading-tight py-1"
+                        className="flex-1 h-12 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold flex flex-col items-center justify-center leading-tight py-1"
                     >
                         <span className="text-sm">Pay bill</span>
                         <span className="text-[10px] font-normal opacity-90">Tap to view offers</span>
@@ -306,7 +363,7 @@ export default function DiningRestaurantDetails() {
                                         onBlur={(e) => {
                                             if (!selectedGuests || selectedGuests < 1) setSelectedGuests(1)
                                         }}
-                                        className="w-full p-3 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all text-lg font-semibold text-center"
+                                        className="w-full p-3 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition-all text-lg font-semibold text-center"
                                     />
                                     <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-medium pointer-events-none">
                                         Guests
@@ -320,8 +377,8 @@ export default function DiningRestaurantDetails() {
                                             key={num}
                                             onClick={() => setSelectedGuests(num)}
                                             className={`min-w-[40px] h-10 rounded-full flex items-center justify-center text-sm font-medium transition-all flex-shrink-0 ${selectedGuests === num
-                                                ? "bg-red-500 text-white shadow-md transform scale-105"
-                                                : "bg-white border border-gray-200 text-gray-600 hover:border-red-200 hover:bg-red-50"
+                                                ? "bg-orange-500 text-white shadow-md transform scale-105"
+                                                : "bg-white border border-gray-200 text-gray-600 hover:border-orange-200 hover:bg-orange-50"
                                                 }`}
                                         >
                                             {num}
@@ -335,7 +392,7 @@ export default function DiningRestaurantDetails() {
                                     setIsBookingOpen(false)
                                     navigate(`/dining/book/${slug}`, { state: { guestCount: selectedGuests } })
                                 }}
-                                className="w-full bg-red-500 hover:bg-red-600 text-white font-bold h-12 rounded-xl"
+                                className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold h-12 rounded-xl"
                             >
                                 Confirm Booking
                             </Button>

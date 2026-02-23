@@ -212,7 +212,7 @@ export default function EditAdvertisementPage() {
   if (fetchLoading) {
     return (
       <div className="min-h-screen bg-[#fef9f5] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+        <Loader2 className="w-8 h-8 animate-spin text-[#3B82F6]" />
       </div>
     )
   }
@@ -221,7 +221,7 @@ export default function EditAdvertisementPage() {
     <div className="min-h-screen bg-[#fef9f5] pb-32">
       {/* Header */}
       <div className="bg-white border-b border-gray-100 px-4 py-4 sticky top-0 z-50 flex items-center gap-4">
-        <button onClick={() => navigate(-1)} className="p-2 hover:bg-orange-50 rounded-full transition-colors">
+        <button onClick={() => navigate(-1)} className="p-2 hover:bg-blue-50 rounded-full transition-colors">
           <ArrowLeft className="w-5 h-5 text-gray-700" />
         </button>
         <h1 className="text-xl font-bold text-gray-900">Edit Promoted Listing</h1>
@@ -231,7 +231,7 @@ export default function EditAdvertisementPage() {
 
         {/* Step 1: Banner & Campaign Info */}
         <section className="space-y-3">
-          <div className="flex items-center gap-2 text-orange-600 font-bold px-1">
+          <div className="flex items-center gap-2 text-[#3B82F6] font-bold px-1">
             <Layers className="w-5 h-5" />
             <h2>Campaign Creatives</h2>
           </div>
@@ -242,13 +242,13 @@ export default function EditAdvertisementPage() {
                 <label
                   htmlFor="banner"
                   className={`flex flex-col items-center justify-center p-8 border-2 border-dashed transition-all cursor-pointer min-h-[160px]
-                    ${hasBanner ? 'border-orange-500 bg-orange-50' : 'border-gray-200 hover:border-orange-300 bg-white'}`}
+                    ${hasBanner ? 'border-[#3B82F6] bg-blue-50' : 'border-gray-200 hover:border-blue-300 bg-white'}`}
                 >
                   {formData.bannerImage ? (
                     <div className="text-center space-y-2">
-                      <CheckCircle2 className="w-10 h-10 text-orange-500 mx-auto" />
+                      <CheckCircle2 className="w-10 h-10 text-[#3B82F6] mx-auto" />
                       <p className="text-sm font-bold text-gray-900">{formData.bannerImage.name}</p>
-                      <span className="text-xs text-orange-600 underline">Change Image</span>
+                      <span className="text-xs text-[#3B82F6] underline">Change Image</span>
                     </div>
                   ) : formData.existingBannerUrl ? (
                     <div className="text-center space-y-2">
@@ -257,12 +257,12 @@ export default function EditAdvertisementPage() {
                         alt="Current banner"
                         className="w-full max-h-32 object-cover rounded-lg mb-2"
                       />
-                      <span className="text-xs text-orange-600 underline">Click to change banner</span>
+                      <span className="text-xs text-[#3B82F6] underline">Click to change banner</span>
                     </div>
                   ) : (
                     <div className="text-center space-y-3">
-                      <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center mx-auto">
-                        <Upload className="w-6 h-6 text-orange-600" />
+                      <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto">
+                        <Upload className="w-6 h-6 text-[#3B82F6]" />
                       </div>
                       <div>
                         <p className="text-sm font-bold text-gray-900">Upload Banner Image</p>
@@ -292,7 +292,7 @@ export default function EditAdvertisementPage() {
 
         {/* Step 2: Your Zone (auto-selected, read-only) */}
         <section className="space-y-3">
-          <div className="flex items-center gap-2 text-orange-600 font-bold px-1">
+          <div className="flex items-center gap-2 text-[#3B82F6] font-bold px-1">
             <MapPin className="w-5 h-5" />
             <h2>Ad Placement Zone</h2>
           </div>
@@ -300,21 +300,25 @@ export default function EditAdvertisementPage() {
           {zoneLoading ? (
             <div className="h-20 bg-gray-100 animate-pulse rounded-xl" />
           ) : zoneError ? (
-            <div className="bg-red-50 border border-red-100 rounded-xl p-4 flex gap-3">
-              <Info className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
-              <div>
-                <p className="text-sm font-bold text-red-800">Zone Not Assigned</p>
-                <p className="text-xs text-red-600 mt-1">{zoneError}</p>
+            <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 flex gap-3 mb-4">
+              <Info className="w-4 h-4 text-[#3B82F6] shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <p className="text-xs text-blue-900 leading-relaxed">
+                  You can only have <span className="font-bold">one active campaign</span> per zone at a time.
+                </p>
+                <p className="text-[10px] text-blue-700 font-medium opacity-80">
+                  Please choose non-overlapping dates or wait for the current campaign to finish.
+                </p>
               </div>
             </div>
           ) : myZone ? (
             <motion.div
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              className="bg-white rounded-xl border-2 border-orange-400 p-4 flex items-center gap-4 shadow-sm"
+              className="bg-white rounded-xl border-2 border-blue-400 p-4 flex items-center gap-4 shadow-sm"
             >
-              <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center shrink-0">
-                <MapPin className="w-6 h-6 text-orange-600" />
+              <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center shrink-0">
+                <MapPin className="w-6 h-6 text-[#3B82F6]" />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
@@ -322,7 +326,7 @@ export default function EditAdvertisementPage() {
                   <CheckCircle2 className="w-4 h-4 text-orange-500 shrink-0" />
                 </div>
                 <div className="flex items-center gap-2 mt-1">
-                  <span className="text-[10px] font-bold uppercase text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full">
+                  <span className="text-[10px] font-bold uppercase text-[#3B82F6] bg-blue-50 px-2 py-0.5 rounded-full">
                     {myZone.tier}
                   </span>
                   <span className="text-xs text-gray-500 flex items-center gap-1">
@@ -345,7 +349,7 @@ export default function EditAdvertisementPage() {
 
         {/* Step 3: Campaign Duration */}
         <section className="space-y-3">
-          <div className="flex items-center gap-2 text-orange-600 font-bold px-1">
+          <div className="flex items-center gap-2 text-[#3B82F6] font-bold px-1">
             <Calendar className="w-5 h-5" />
             <h2>Campaign Duration</h2>
           </div>
@@ -397,10 +401,10 @@ export default function EditAdvertisementPage() {
                 <motion.div
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: "auto" }}
-                  className="bg-orange-50 rounded-lg p-3 flex items-center justify-between"
+                  className="bg-blue-50 rounded-lg p-3 flex items-center justify-between"
                 >
                   <div className="text-sm text-gray-700">
-                    <span className="font-bold text-orange-700">{days} day{days > 1 ? 's' : ''}</span>
+                    <span className="font-bold text-blue-700">{days} day{days > 1 ? 's' : ''}</span>
                     <span className="text-gray-500"> × ₹{myZone.pricePerDay}/day</span>
                   </div>
                   <div className="text-base font-black text-gray-900">
@@ -422,7 +426,7 @@ export default function EditAdvertisementPage() {
       </div>
 
       {/* Checkout Bar */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 p-4 pb-8 z-50">
+      <div className="fixed bottom-16 md:bottom-0 left-0 right-0 bg-white border-t border-gray-100 p-4 pb-6 z-50">
         <div className="max-w-2xl mx-auto flex items-center justify-between gap-4">
           <div className="flex flex-col">
             <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Estimated Total</span>
@@ -434,7 +438,7 @@ export default function EditAdvertisementPage() {
           <Button
             disabled={!canSubmit}
             onClick={handleSubmit}
-            className="bg-[#ff8100] hover:bg-[#e67300] text-white px-8 h-12 rounded-xl font-bold text-lg shadow-lg shadow-orange-100 transition-all flex-1 sm:flex-none disabled:opacity-50"
+            className="bg-[#3B82F6] hover:bg-blue-700 text-white px-8 h-12 rounded-xl font-bold text-lg shadow-lg shadow-blue-100 transition-all flex-1 sm:flex-none disabled:opacity-50"
           >
             {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Save Changes'}
           </Button>

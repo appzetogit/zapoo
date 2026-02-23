@@ -13,7 +13,10 @@ import {
     createDiningStory,
     deleteDiningStory,
     updateDiningStory,
-    getActiveRestaurants
+    getActiveRestaurants,
+    toggleDiningStatus,
+    getAdminReservations,
+    updateAdminReservationStatus
 } from '../controllers/diningAdminController.js';
 
 const router = express.Router();
@@ -37,5 +40,12 @@ router.get('/stories', authenticateAdmin, getAdminDiningStories);
 router.post('/stories', authenticateAdmin, uploadMiddleware.single('image'), createDiningStory);
 router.put('/stories/:id', authenticateAdmin, uploadMiddleware.single('image'), updateDiningStory);
 router.delete('/stories/:id', authenticateAdmin, deleteDiningStory);
+
+// ===================== RESTAURANT DINING SETTINGS =====================
+router.patch('/restaurants/:id/toggle-dining', authenticateAdmin, toggleDiningStatus);
+
+// ===================== RESERVATION MANAGEMENT =====================
+router.get('/reservations', authenticateAdmin, getAdminReservations);
+router.patch('/reservations/:id/status', authenticateAdmin, updateAdminReservationStatus);
 
 export default router;
