@@ -456,9 +456,6 @@ export const restaurantAPI = {
       item,
     });
   },
-  deleteMenuItem: (itemId) => {
-    return apiClient.delete(`${API_ENDPOINTS.RESTAURANT.MENU}/item/${itemId}`);
-  },
   getMenuByRestaurantId: (restaurantId) => {
     return apiClient.get(
       API_ENDPOINTS.RESTAURANT.MENU_BY_RESTAURANT_ID.replace(

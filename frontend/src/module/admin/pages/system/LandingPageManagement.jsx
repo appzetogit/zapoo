@@ -1675,8 +1675,8 @@ export default function LandingPageManagement() {
                       key={tab.id}
                       onClick={() => setExploreMoreSubTab(tab.id)}
                       className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors whitespace-nowrap ${exploreMoreSubTab === tab.id
-                          ? 'bg-orange-500 text-white'
-                          : 'text-slate-600 hover:bg-slate-100'
+                        ? 'bg-orange-500 text-white'
+                        : 'text-slate-600 hover:bg-slate-100'
                         }`}
                     >
                       <Icon className="w-4 h-4" />
@@ -1968,8 +1968,8 @@ export default function LandingPageManagement() {
                         <div
                           key={restaurant._id}
                           className={`px-6 py-4 transition-all cursor-pointer ${isSelected
-                              ? 'bg-orange-50 border-l-4 border-l-orange-500'
-                              : 'hover:bg-slate-50'
+                            ? 'bg-orange-50 border-l-4 border-l-orange-500'
+                            : 'hover:bg-slate-50'
                             }`}
                           onClick={() => toggleRestaurantSelection(restaurant._id)}
                         >
