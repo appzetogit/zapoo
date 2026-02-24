@@ -11,6 +11,32 @@ const heroBannerSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
+  // Dynamic text fields for left side content
+  title: {
+    type: String,
+    trim: true,
+    default: ''
+  },
+  subtitle: {
+    type: String,
+    trim: true,
+    default: ''
+  },
+  description: {
+    type: String,
+    trim: true,
+    default: ''
+  },
+  ctaText: {
+    type: String,
+    trim: true,
+    default: 'Order Now'
+  },
+  ctaLink: {
+    type: String,
+    trim: true,
+    default: '/user'
+  },
   order: {
     type: Number,
     default: 0

@@ -137,10 +137,13 @@ export default function UserLayout() {
           <OrdersProvider>
             <SearchOverlayProvider>
               <LocationSelectorProvider>
-                {/* <Navbar /> */}
-                {showBottomNav && <DesktopNavbar />}
-                <LocationPrompt />
-                <main>
+                {!location.pathname.startsWith("/auth/") && (
+                  <>
+                    <DesktopNavbar />
+                    <LocationPrompt />
+                  </>
+                )}
+                <main className={!location.pathname.startsWith("/auth/") ? "md:pt-16" : ""}>
                   <Outlet />
                 </main>
                 {showBottomNav && <BottomNavigation />}

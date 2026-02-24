@@ -20,6 +20,7 @@ import { Switch } from "@/components/ui/switch"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useSearchOverlay, useLocationSelector } from "../components/UserLayout"
 import PageNavbar from "../components/PageNavbar"
+import { toast } from "sonner"
 
 // Import shared food images - prevents duplication
 import { foodImages } from "@/constants/images"
@@ -1026,6 +1027,49 @@ export default function Home() {
     openSearch()
   }, [heroSearch, openSearch, setSearchValue])
 
+  const handleVoiceSearch = useCallback(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      toast.error("Speech Recognition is not supported in this browser.");
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = "en-IN";
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onstart = () => {
+      toast("Listening...", {
+        icon: <Mic className="w-4 h-4 text-orange-500 animate-pulse" />,
+      });
+    };
+
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      setHeroSearch(transcript);
+      if (transcript.trim()) {
+        toast.success(`Searching for "${transcript}"`);
+        // Small delay to let user see transcript before auto-searching
+        setTimeout(() => {
+          navigate(`/user/search?q=${encodeURIComponent(transcript.trim())}`);
+          closeSearch();
+        }, 1500);
+      }
+    };
+
+    recognition.onerror = (event) => {
+      console.error("Speech recognition error", event.error);
+      if (event.error === 'not-allowed') {
+        toast.error("Microphone access denied. Please enable it in browser settings.");
+      } else {
+        toast.error("Could not hear you. Please try again.");
+      }
+    };
+
+    recognition.start();
+  }, [handleSearchFocus]);
+
   const handleSearchClose = useCallback(() => {
     closeSearch()
     setHeroSearch("")
@@ -1176,9 +1220,9 @@ export default function Home() {
         `}</style>
       </div>
 
-      {/* 1. Sticky Navbar Section - Light Orange Background */}
+      {/* 1. Sticky Navbar Section - Light Orange Background - Mobile only */}
       <motion.div
-        className="sticky top-0 z-50 bg-orange-50 border-b border-orange-100 shadow-sm"
+        className="md:hidden sticky top-0 z-50 bg-white"
         initial={{ y: -100 }}
         animate={{ y: 0 }}
         transition={{ duration: 0.5, ease: "easeOut" }}
@@ -1195,9 +1239,9 @@ export default function Home() {
             whileHover={{ scale: 1.01 }}
             transition={{ type: "spring", stiffness: 300, damping: 20 }}
           >
-            <div className="relative bg-gray-50 dark:bg-neutral-900 rounded-xl border border-gray-200 dark:border-neutral-800 p-1 lg:p-1.5 transition-all">
+            <div className="relative bg-gray-50 dark:bg-neutral-900 rounded-full border border-gray-200 dark:border-neutral-800 p-0.5 lg:p-1 transition-all">
               <div className="flex items-center gap-2 sm:gap-3">
-                <Search className="h-4 w-4 lg:h-5 lg:w-5 text-gray-400 flex-shrink-0 ml-2 sm:ml-3" strokeWidth={2.5} />
+                <Search className="h-4 w-4 lg:h-5 lg:w-5 text-gray-400 flex-shrink-0 ml-3 sm:ml-4" strokeWidth={2.5} />
                 <div className="flex-1 relative">
                   <Input
                     value={heroSearch}
@@ -1211,7 +1255,7 @@ export default function Home() {
                       }
                     }}
                     placeholder=""
-                    className="pl-0 pr-2 h-8 sm:h-9 lg:h-10 w-full bg-transparent border-0 text-sm sm:text-base lg:text-lg font-medium text-gray-700 dark:text-white focus-visible:ring-0 focus-visible:ring-offset-0 rounded-full"
+                    className="pl-0 pr-2 h-9 sm:h-10 lg:h-11 w-full bg-transparent border-0 text-sm sm:text-base lg:text-lg font-medium text-gray-700 dark:text-white focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none"
                   />
                   {!heroSearch && (
                     <div className="absolute left-0 top-1/2 -translate-y-1/2 pointer-events-none h-5 overflow-hidden">
@@ -1230,13 +1274,23 @@ export default function Home() {
                     </div>
                   )}
                 </div>
-                <button
-                  type="button"
-                  onClick={handleSearchFocus}
-                  className="mr-1 p-1.5 hover:bg-gray-200 dark:hover:bg-neutral-800 rounded-full transition-colors"
-                >
-                  <Mic className="h-4 w-4 lg:h-5 lg:w-5 text-gray-400" strokeWidth={2.5} />
-                </button>
+                {heroSearch ? (
+                  <button
+                    type="button"
+                    onClick={() => setHeroSearch("")}
+                    className="mr-1 p-1.5 hover:bg-gray-200 dark:hover:bg-neutral-800 rounded-full transition-colors"
+                  >
+                    <X className="h-4 w-4 lg:h-5 lg:w-5 text-gray-400" strokeWidth={2.5} />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleVoiceSearch}
+                    className="mr-1 p-1.5 hover:bg-gray-200 dark:hover:bg-neutral-800 rounded-full transition-colors"
+                  >
+                    <Mic className="h-4 w-4 lg:h-5 lg:w-5 text-gray-400" strokeWidth={2.5} />
+                  </button>
+                )}
               </div>
             </div>
           </motion.div>
@@ -1256,76 +1310,243 @@ export default function Home() {
         </div>
       </div>
 
-      {/* 3. Hero Banner Section - Distinct Rounded Container */}
+      {/* 3. Hero Banner Section */}
       <div className="relative w-full bg-white pt-3 sm:pt-4 pb-1 sm:pb-2">
         <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
-          <div className="relative w-full aspect-[16/8] sm:aspect-[16/7] lg:aspect-[21/7] rounded-2xl overflow-hidden shadow-sm border border-gray-100">
-            {loadingBanners ? (
-              <div className="absolute inset-0 bg-gray-100 flex items-center justify-center">
-                <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
-              </div>
-            ) : heroBannerImages.length > 0 ? (
-              <div
-                className="w-full h-full cursor-grab active:cursor-grabbing"
-                onTouchStart={handleTouchStart}
-                onTouchMove={handleTouchMove}
-                onTouchEnd={handleTouchEnd}
-                onMouseDown={handleMouseDown}
-                onMouseMove={handleMouseMove}
-                onMouseUp={handleMouseUp}
-              >
-                <motion.div
-                  className="flex h-full"
-                  animate={{ x: `-${currentBannerIndex * 100}%` }}
-                  transition={{ duration: 0.6, ease: "easeInOut" }}
-                  style={{ width: `${heroBannerImages.length * 100}%` }}
-                >
-                  {heroBannerImages.map((image, index) => {
-                    const bannerData = heroBannersData[index]
-                    const linkedRestaurants = bannerData?.linkedRestaurants || []
-                    const hasLinkedRestaurants = linkedRestaurants.length > 0
-                    return (
-                      <div
-                        key={index}
-                        className="w-full h-full flex-shrink-0"
-                        style={{ cursor: hasLinkedRestaurants ? 'pointer' : 'default' }}
-                        onClick={() => {
-                          if (hasLinkedRestaurants) {
-                            const firstRestaurant = linkedRestaurants[0]
-                            const restaurantSlug = firstRestaurant.slug || firstRestaurant.restaurantId || firstRestaurant._id
-                            navigate(`/restaurants/${restaurantSlug}`)
-                          }
-                        }}
-                      >
-                        <OptimizedImage
-                          src={image}
-                          alt={`Banner ${index + 1}`}
-                          className="w-full h-full"
-                          objectFit="cover"
-                          priority={index === 0}
-                        />
-                      </div>
-                    )
-                  })}
-                </motion.div>
+          {loadingBanners ? (
+            <div className="w-full rounded-2xl bg-gray-100 flex items-center justify-center" style={{ minHeight: '320px' }}>
+              <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+            </div>
+          ) : heroBannersData.length > 0 ? (
+            (() => {
+              const currentBanner = heroBannersData[currentBannerIndex] || heroBannersData[0]
+              const hasText = currentBanner?.title || currentBanner?.subtitle || currentBanner?.description
+              const linkedRestaurants = currentBanner?.linkedRestaurants || []
+              const hasLinkedRestaurants = linkedRestaurants.length > 0
 
-                {/* Banner Indicators */}
-                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
-                  {heroBannerImages.map((_, idx) => (
+              return (
+                <>
+                  {/* MOBILE: Vertical card layout (hidden on sm+) */}
+                  <div
+                    className="sm:hidden relative w-full rounded-2xl overflow-hidden shadow-md border-t border-gray-200 bg-white cursor-pointer"
+                    style={{ minHeight: '270px' }}
+                    onTouchStart={handleTouchStart}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={handleTouchEnd}
+                    onClick={() => {
+                      if (hasLinkedRestaurants) {
+                        const firstRestaurant = linkedRestaurants[0]
+                        const restaurantSlug = firstRestaurant.slug || firstRestaurant.restaurantId || firstRestaurant._id
+                        navigate(`/restaurants/${restaurantSlug}`)
+                      }
+                    }}
+                  >
+                    {/* Top: Text with Animation */}
+                    <div className="px-5 pt-5 pb-3 bg-white relative z-10 min-h-[110px]">
+                      <AnimatePresence mode="wait">
+                        <motion.div
+                          key={currentBannerIndex}
+                          initial={{ opacity: 0, x: 20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          exit={{ opacity: 0, x: -20 }}
+                          transition={{ duration: 0.4, ease: "easeOut" }}
+                        >
+                          {currentBanner?.subtitle && (
+                            <span className="font-semibold text-xs text-orange-500 tracking-wide uppercase block mb-0.5">
+                              {currentBanner.subtitle}
+                            </span>
+                          )}
+                          {currentBanner?.title && (
+                            <h2 className="text-2xl font-extrabold text-gray-900 leading-tight mb-1">
+                              {currentBanner.title}
+                            </h2>
+                          )}
+                          {currentBanner?.description && (
+                            <p className="text-gray-500 text-xs mb-2 line-clamp-2">{currentBanner.description}</p>
+                          )}
+                        </motion.div>
+                      </AnimatePresence>
+                    </div>
+
+                    {/* CTA Badge overlapping with Animation */}
+                    <AnimatePresence mode="wait">
+                      {currentBanner?.ctaText && (
+                        <motion.div
+                          key={currentBannerIndex}
+                          initial={{ opacity: 0, scale: 0.8 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.8 }}
+                          transition={{ duration: 0.3 }}
+                          className="absolute left-5 z-20"
+                          style={{ top: hasText ? '105px' : '12px' }}
+                        >
+                          <a
+                            href={currentBanner?.ctaLink || '/user'}
+                            onClick={e => e.stopPropagation()}
+                            className="flex flex-col items-center justify-center bg-orange-500 text-white font-bold text-[10px] leading-tight rounded-full shadow-lg px-3 py-3 text-center uppercase"
+                            style={{ width: '72px', height: '72px' }}
+                          >
+                            {currentBanner.ctaText}
+                          </a>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+
+                    {/* Bottom: Image with curved top */}
                     <div
-                      key={idx}
-                      className={`h-1.5 rounded-full transition-all duration-300 ${idx === currentBannerIndex ? "w-6 bg-white shadow-sm" : "w-1.5 bg-white/50"}`}
-                    />
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div className="absolute inset-0 bg-gradient-to-r from-orange-400 to-rose-400" />
-            )}
-          </div>
+                      className="relative w-full overflow-hidden bg-white"
+                      style={{ aspectRatio: '16/7', marginTop: '-2px' }}
+                      onTouchStart={handleTouchStart}
+                      onTouchMove={handleTouchMove}
+                      onTouchEnd={handleTouchEnd}
+                    >
+                      {/* Swipeable image strip */}
+                      <motion.div
+                        className="flex"
+                        animate={{ x: `-${(currentBannerIndex * 100) / (heroBannerImages.length || 1)}%` }}
+                        transition={{ duration: 0.6, ease: [0.32, 0.72, 0, 1] }}
+                        style={{ width: `${heroBannerImages.length * 100}%`, height: '100%' }}
+                      >
+                        {heroBannerImages.map((image, index) => (
+                          <div key={index} className="flex-shrink-0" style={{ width: `${100 / heroBannerImages.length}%`, height: '100%' }}>
+                            <img
+                              src={image}
+                              alt={`Banner ${index + 1}`}
+                              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                              loading={index === 0 ? 'eager' : 'lazy'}
+                            />
+                          </div>
+                        ))}
+                      </motion.div>
+
+                      {/* Curved white overlay at top */}
+                      <div
+                        className="absolute inset-x-0 top-0 z-10 bg-white pointer-events-none"
+                        style={{
+                          height: '36px',
+                          borderRadius: '0 0 50% 50% / 0 0 100% 100%',
+                        }}
+                      />
+
+                      {/* Indicators */}
+                      {heroBannerImages.length > 1 && (
+                        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5 z-20">
+                          {heroBannerImages.map((_, idx) => (
+                            <div
+                              key={idx}
+                              className={`h-1.5 rounded-full transition-all duration-300 ${idx === currentBannerIndex ? 'w-6 bg-white shadow-sm' : 'w-1.5 bg-white/60'}`}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* DESKTOP: Horizontal split layout (hidden on mobile) */}
+                  <div
+                    className="hidden sm:flex w-full rounded-2xl overflow-hidden shadow-sm border border-gray-100 bg-white"
+                    style={{ minHeight: '220px' }}
+                    onMouseDown={handleMouseDown}
+                    onMouseMove={handleMouseMove}
+                    onMouseUp={handleMouseUp}
+                  >
+                    {/* Left: Text with Animation */}
+                    <div className="flex flex-col justify-center px-8 py-6 w-2/5 bg-white z-10 min-h-[220px]">
+                      <AnimatePresence mode="wait">
+                        <motion.div
+                          key={currentBannerIndex}
+                          initial={{ opacity: 0, x: -25 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          exit={{ opacity: 0, x: 25 }}
+                          transition={{ duration: 0.5, ease: "easeOut" }}
+                        >
+                          {currentBanner?.subtitle && (
+                            <span className="text-orange-500 font-semibold text-sm uppercase tracking-wider mb-1">
+                              {currentBanner.subtitle}
+                            </span>
+                          )}
+                          {currentBanner?.title && (
+                            <h2 className="text-3xl lg:text-4xl font-extrabold text-gray-900 leading-tight mb-2">
+                              {currentBanner.title}
+                            </h2>
+                          )}
+                          {currentBanner?.description && (
+                            <p className="text-gray-500 text-sm mb-4 line-clamp-3">{currentBanner.description}</p>
+                          )}
+                          <a
+                            href={currentBanner?.ctaLink || '/user'}
+                            className="inline-flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold px-5 py-2 rounded-full w-fit transition-colors shadow"
+                          >
+                            {currentBanner?.ctaText || 'Order Now'}
+                          </a>
+                        </motion.div>
+                      </AnimatePresence>
+                    </div>
+
+                    {/* Right: Image */}
+                    <div
+                      className={`relative overflow-hidden ${hasText ? 'w-3/5' : 'w-full'}`}
+                      style={{ minHeight: '220px' }}
+                    >
+                      <motion.div
+                        className="flex h-full"
+                        animate={{ x: `-${(currentBannerIndex * 100) / (heroBannerImages.length || 1)}%` }}
+                        transition={{ duration: 0.7, ease: [0.32, 0.72, 0, 1] }}
+                        style={{ width: `${heroBannerImages.length * 100}%` }}
+                      >
+                        {heroBannerImages.map((image, index) => {
+                          const bd = heroBannersData[index]
+                          const lr = bd?.linkedRestaurants || []
+                          return (
+                            <div
+                              key={index}
+                              className="w-full h-full flex-shrink-0"
+                              style={{ cursor: lr.length > 0 ? 'pointer' : 'default' }}
+                              onClick={() => {
+                                if (lr.length > 0) {
+                                  const slug = lr[0].slug || lr[0].restaurantId || lr[0]._id
+                                  navigate(`/restaurants/${slug}`)
+                                }
+                              }}
+                            >
+                              <OptimizedImage
+                                src={image}
+                                alt={`Banner ${index + 1}`}
+                                className="w-full h-full"
+                                objectFit="cover"
+                                priority={index === 0}
+                              />
+                            </div>
+                          )
+                        })}
+                      </motion.div>
+                      {heroBannerImages.length > 1 && (
+                        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
+                          {heroBannerImages.map((_, idx) => (
+                            <div
+                              key={idx}
+                              className={`h-1.5 rounded-full transition-all duration-300 ${idx === currentBannerIndex ? 'w-6 bg-white shadow-sm' : 'w-1.5 bg-white/50'}`}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )
+            })()
+          ) : (
+            <div className="w-full rounded-2xl bg-gradient-to-r from-orange-400 to-rose-400" style={{ minHeight: '220px' }} />
+          )}
         </div>
       </div>
 
+      {/* Zone Ad Banner - same width container as hero banner */}
+      <div className="relative w-full bg-white pt-4 sm:pt-4 pb-1 sm:pb-2">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+          <ZoneAdBanner />
+        </div>
+      </div>
 
       {/* Rest of Content - Container Width with Unified Background */}
       <motion.div
@@ -1334,10 +1555,7 @@ export default function Home() {
         animate={{ opacity: 1 }}
         transition={{ duration: 0.6, delay: 0.4 }}
       >
-        {/* Zone Ad Banner - Single Promoted Slot */}
-        <div className="mb-4 sm:mb-6">
-          <ZoneAdBanner />
-        </div>
+        {/* Zone Ad Banner - same width as hero banner */}
 
         {/* Food Categories - Horizontal Scroll */}
         {/* Food Categories - Horizontal Scroll */}

@@ -20,6 +20,15 @@ export default function LandingPageManagement() {
   const [bannersUploadProgress, setBannersUploadProgress] = useState({ current: 0, total: 0 })
   const [bannersDeleting, setBannersDeleting] = useState(null)
   const bannersFileInputRef = useRef(null)
+  // Banner text fields for single-banner upload
+  const [bannerTitle, setBannerTitle] = useState('')
+  const [bannerSubtitle, setBannerSubtitle] = useState('')
+  const [bannerDescription, setBannerDescription] = useState('')
+  const [bannerCtaText, setBannerCtaText] = useState('Order Now')
+  const [bannerCtaLink, setBannerCtaLink] = useState('/user')
+  const [bannerFile, setBannerFile] = useState(null)
+  const [bannerPreview, setBannerPreview] = useState(null)
+  const [singleBannerUploading, setSingleBannerUploading] = useState(false)
 
   // Categories
   const [categories, setCategories] = useState([])
@@ -192,6 +201,52 @@ export default function LandingPageManagement() {
       return
     }
     uploadBanners(files)
+  }
+
+  // Single banner upload with text fields
+  const handleSingleBannerFileChange = (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setBannerFile(file)
+    setBannerPreview(URL.createObjectURL(file))
+  }
+
+  const handleSingleBannerUpload = async () => {
+    if (!bannerFile) {
+      setError('Please select an image')
+      return
+    }
+    try {
+      setSingleBannerUploading(true)
+      setError(null)
+      setSuccess(null)
+      const formData = new FormData()
+      formData.append('image', bannerFile)
+      if (bannerTitle.trim()) formData.append('title', bannerTitle.trim())
+      if (bannerSubtitle.trim()) formData.append('subtitle', bannerSubtitle.trim())
+      if (bannerDescription.trim()) formData.append('description', bannerDescription.trim())
+      formData.append('ctaText', bannerCtaText.trim() || 'Order Now')
+      formData.append('ctaLink', bannerCtaLink.trim() || '/user')
+      const config = getAuthConfig()
+      const response = await api.post('/hero-banners', formData, config)
+      if (response.data.success) {
+        setSuccess('Banner uploaded successfully!')
+        setBannerTitle('')
+        setBannerSubtitle('')
+        setBannerDescription('')
+        setBannerCtaText('Order Now')
+        setBannerCtaLink('/user')
+        setBannerFile(null)
+        if (bannerPreview) URL.revokeObjectURL(bannerPreview)
+        setBannerPreview(null)
+        await fetchBanners()
+        setTimeout(() => setSuccess(null), 4000)
+      }
+    } catch (err) {
+      setErrorSafely(err.response?.data?.message || 'Failed to upload banner')
+    } finally {
+      setSingleBannerUploading(false)
+    }
   }
 
   const uploadBanners = async (files) => {
@@ -1286,65 +1341,104 @@ export default function LandingPageManagement() {
         {/* Hero Banners Tab */}
         {activeTab === 'banners' && (
           <>
-            {/* Upload Section */}
+            {/* Upload Section with Text Fields */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
-              <h2 className="text-lg font-bold text-slate-900 mb-4">Upload New Banner(s)</h2>
-              <div
-                className="border-2 border-dashed border-orange-300 rounded-lg p-8 text-center bg-orange-50/30 cursor-pointer transition-colors hover:border-orange-400 hover:bg-orange-50/50"
-                onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                onDrop={(e) => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  const files = Array.from(e.dataTransfer.files)
-                  if (files.length > 0) handleBannerFileSelect({ files })
-                }}
-                onClick={() => bannersFileInputRef.current?.click()}
-              >
-                <input
-                  ref={bannersFileInputRef}
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={handleBannerFileSelect}
-                  className="hidden"
-                  disabled={bannersUploading}
-                />
-                {bannersUploading ? (
-                  <div className="flex flex-col items-center gap-3">
-                    <Loader2 className="w-8 h-8 text-orange-600 animate-spin" />
-                    <p className="text-orange-600 font-medium">
-                      Uploading image {bannersUploadProgress.current} of {bannersUploadProgress.total}...
-                    </p>
-                    {bannersUploadProgress.total > 0 && (
-                      <div className="w-full max-w-xs">
-                        <div className="w-full bg-orange-200 rounded-full h-2">
-                          <div
-                            className="bg-orange-600 h-2 rounded-full transition-all duration-300"
-                            style={{ width: `${(bannersUploadProgress.current / bannersUploadProgress.total) * 100}%` }}
-                          />
-                        </div>
-                      </div>
-                    )}
+              <h2 className="text-lg font-bold text-slate-900 mb-1">Add New Banner</h2>
+              <p className="text-sm text-slate-500 mb-5">Upload banner image + optional left-side text for split layout</p>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Left: Text Fields */}
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1">Title <span className="text-slate-400 font-normal">(optional)</span></label>
+                    <input
+                      type="text"
+                      value={bannerTitle}
+                      onChange={e => setBannerTitle(e.target.value)}
+                      placeholder="e.g. HOME FOR SALE"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                    />
                   </div>
-                ) : (
-                  <div className="flex flex-col items-center gap-3">
-                    <Upload className="w-8 h-8 text-orange-600" />
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1">Subtitle <span className="text-slate-400 font-normal">(optional)</span></label>
+                    <input
+                      type="text"
+                      value={bannerSubtitle}
+                      onChange={e => setBannerSubtitle(e.target.value)}
+                      placeholder="e.g. Modern"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1">Description <span className="text-slate-400 font-normal">(optional)</span></label>
+                    <textarea
+                      value={bannerDescription}
+                      onChange={e => setBannerDescription(e.target.value)}
+                      placeholder="Short description shown under the title..."
+                      rows={3}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 resize-none"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); bannersFileInputRef.current?.click(); }}
-                        className="text-orange-600 font-medium hover:text-orange-700 underline"
-                      >
-                        Click to upload
-                      </button>
-                      <span className="text-slate-600"> or drag and drop</span>
+                      <label className="block text-sm font-semibold text-slate-700 mb-1">CTA Button Text</label>
+                      <input
+                        type="text"
+                        value={bannerCtaText}
+                        onChange={e => setBannerCtaText(e.target.value)}
+                        placeholder="Order Now"
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                      />
                     </div>
-                    <p className="text-xs text-slate-500">PNG, JPG, WEBP up to 5MB each (Max 5 images at once)</p>
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-1">CTA Link</label>
+                      <input
+                        type="text"
+                        value={bannerCtaLink}
+                        onChange={e => setBannerCtaLink(e.target.value)}
+                        placeholder="/user"
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                      />
+                    </div>
                   </div>
-                )}
+                </div>
+
+                {/* Right: Image Upload */}
+                <div className="flex flex-col gap-3">
+                  <label className="block text-sm font-semibold text-slate-700">Banner Image <span className="text-red-500">*</span></label>
+                  <label
+                    htmlFor="single-banner-input"
+                    className="border-2 border-dashed border-orange-300 rounded-lg p-6 text-center bg-orange-50/30 cursor-pointer hover:border-orange-400 transition-colors flex-1 flex flex-col items-center justify-center gap-2"
+                  >
+                    <input
+                      id="single-banner-input"
+                      type="file"
+                      accept="image/*"
+                      onChange={handleSingleBannerFileChange}
+                      className="hidden"
+                    />
+                    {bannerPreview ? (
+                      <img src={bannerPreview} alt="Preview" className="w-full max-h-40 object-contain rounded-lg" />
+                    ) : (
+                      <>
+                        <Upload className="w-8 h-8 text-orange-500" />
+                        <p className="text-sm text-orange-600 font-medium">Click to select image</p>
+                        <p className="text-xs text-slate-500">PNG, JPG, WEBP — max 5MB</p>
+                      </>
+                    )}
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleSingleBannerUpload}
+                    disabled={singleBannerUploading || !bannerFile}
+                    className="w-full py-2.5 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white font-semibold rounded-lg text-sm transition-colors flex items-center justify-center gap-2"
+                  >
+                    {singleBannerUploading ? <><Loader2 className="w-4 h-4 animate-spin" /> Uploading...</> : <><Upload className="w-4 h-4" /> Upload Banner</>}
+                  </button>
+                </div>
               </div>
             </div>
+
 
             {/* Banners List */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">

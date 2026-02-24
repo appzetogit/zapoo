@@ -55,7 +55,7 @@ export default function OTP() {
       } else {
         setContactInfo(data.phone || "")
       }
-      
+
       // OTP auto-fill removed - user must manually enter OTP
     }
 
@@ -165,7 +165,7 @@ export default function OTP() {
     }
 
     const code = otpValue || otp.join("")
-    
+
     if (code.length !== 6) {
       return
     }
@@ -340,51 +340,72 @@ export default function OTP() {
   }
 
   return (
-    <AnimatedPage className="min-h-screen bg-white dark:bg-[#0a0a0a] flex flex-col">
-      {/* Header */}
-      <div className="relative flex items-center justify-center py-4 px-4 md:py-6 md:px-6 lg:px-8 border-b border-gray-200 dark:border-gray-800">
+    <AnimatedPage className="min-h-screen bg-[#CB202D] flex flex-col">
+      {/* Top Header Section (Zomato Red) */}
+      <div className="relative pt-12 pb-16 px-6 text-center">
+        {/* Back Button */}
         <button
           onClick={() => navigate("/user/auth/sign-in")}
-          className="absolute left-4 md:left-6 lg:left-8 top-1/2 -translate-y-1/2 hover:opacity-70 transition-opacity"
-          aria-label="Go back"
+          className="absolute left-6 top-6 p-2 hover:bg-white/10 rounded-full transition-colors"
+          disabled={isLoading}
         >
-          <ArrowLeft className="h-5 w-5 md:h-6 md:w-6 text-black dark:text-white" />
+          <ArrowLeft className="h-6 w-6 text-white" />
         </button>
-        <h1 className="text-lg md:text-xl lg:text-2xl font-bold text-black dark:text-white">OTP Verification</h1>
-      </div> 
 
-      {/* Main Content */}
-      <div className="flex flex-col justify-center px-6 sm:px-8 md:px-12 lg:px-16 xl:px-20 pt-8 sm:pt-12 md:pt-16 lg:pt-20 pb-12 sm:pb-16 md:pb-20">
-        <div className="max-w-md md:max-w-lg lg:max-w-xl xl:max-w-2xl mx-auto w-full space-y-8 md:space-y-10 lg:space-y-12">
-          {/* Message */}
-          <div className="text-center space-y-2 md:space-y-3">
-            <p className="text-base md:text-lg lg:text-xl text-black dark:text-white">
-              {showNameInput
-                ? "You're almost done! Please tell us your name to complete registration."
-                : contactType === "email"
-                ? "We have sent a verification code to"
-                : "We have sent a verification code to"}
-            </p>
-            {!showNameInput && (
-              <p className="text-base md:text-lg lg:text-xl text-black dark:text-white font-medium">
-                {contactInfo}
-              </p>
-            )}
+        {/* Icon Area */}
+        <div className="flex justify-center mb-8">
+          <div className="w-24 h-24 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center p-6 border border-white/30">
+            <div className="relative">
+              <div className="w-12 h-16 border-2 border-white rounded-md flex flex-col items-center justify-center gap-1.5 p-1.5 shadow-xl">
+                <div className="w-full h-0.5 bg-white/50 rounded-full" />
+                <div className="flex gap-0.5">
+                  {[1, 2, 3].map(i => <div key={i} className="w-1.5 h-1.5 bg-white rounded-full" />)}
+                </div>
+                <div className="w-full h-0.5 bg-white/50 rounded-full" />
+              </div>
+            </div>
           </div>
+        </div>
 
+        {/* Title & Instructions */}
+        <div className="space-y-2">
+          <h1 className="text-3xl font-bold text-white tracking-tight">
+            {showNameInput ? "One last thing" : "OTP Verification"}
+          </h1>
+          <p className="text-white/80 text-sm max-w-[280px] mx-auto leading-relaxed">
+            {showNameInput
+              ? "Please tell us your name to complete your profile"
+              : `Please enter the OTP sent to your ${contactType === "email" ? "email" : "mobile number"}`}
+          </p>
+        </div>
+      </div>
+
+      {/* Main Content White Card */}
+      <div className="flex-1 bg-white dark:bg-[#0a0a0a] rounded-t-[40px] shadow-2xl mt-[-20px] px-6 sm:px-8 md:px-12 pt-10 pb-12 flex flex-col">
+        <div className="max-w-md mx-auto w-full flex-1 flex flex-col">
           {/* Error message */}
           {error && (
-            <p className="text-sm text-red-500 text-center">
-              {error}
-            </p>
+            <div className="mb-6 p-3 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 rounded-xl">
+              <p className="text-sm text-red-600 dark:text-red-400 text-center font-medium">
+                {error}
+              </p>
+            </div>
+          )}
+
+          {/* Contact Info Display */}
+          {!showNameInput && (
+            <div className="text-center mb-10">
+              <p className="text-gray-500 dark:text-gray-400 text-sm mb-1 uppercase tracking-wider font-semibold">Sent to</p>
+              <p className="text-xl font-bold text-gray-800 dark:text-white">{contactInfo}</p>
+            </div>
           )}
 
           {/* OTP Input Fields */}
           {!showNameInput && (
-            <>
-              <div className="flex justify-center gap-2 sm:gap-3 md:gap-4 lg:gap-5">
+            <div className="space-y-12">
+              <div className="flex justify-between gap-2 max-w-sm mx-auto">
                 {otp.map((digit, index) => (
-                  <Input
+                  <input
                     key={index}
                     ref={(el) => (inputRefs.current[index] = el)}
                     type="text"
@@ -395,89 +416,98 @@ export default function OTP() {
                     onKeyDown={(e) => handleKeyDown(index, e)}
                     onPaste={index === 0 ? handlePaste : undefined}
                     disabled={isLoading}
-                    className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 lg:w-18 lg:h-18 text-center text-lg sm:text-xl md:text-2xl lg:text-3xl font-semibold p-0 border-2 border-black dark:border-gray-600 rounded-lg focus-visible:ring-2 focus-visible:ring-[#E23744] focus-visible:border-[#E23744] dark:focus-visible:border-[#E23744] bg-white dark:bg-[#1a1a1a] text-black dark:text-white transition-all"
+                    className="w-12 h-12 md:w-14 md:h-14 text-center text-2xl font-bold bg-white dark:bg-gray-800 border-2 border-red-200 ring-4 ring-red-50 rounded-xl outline-none transition-all text-gray-800 dark:text-white py-0 shadow-sm focus:border-[#CB202D] focus:ring-[#CB202D]/10 focus:scale-105"
                   />
                 ))}
               </div>
 
               {/* Resend Section */}
-              <div className="text-center space-y-1 md:space-y-2">
-                <p className="text-sm md:text-base text-black dark:text-white">
-                  Didn't get the {contactType === "email" ? "email" : "SMS"}?
+              <div className="text-center">
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
+                  Didn't receive code?
                 </p>
                 {resendTimer > 0 ? (
-                  <p className="text-sm md:text-base text-gray-500 dark:text-gray-400">
-                    Resend {contactType === "email" ? "email" : "SMS"} in {resendTimer}s
-                  </p>
+                  <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-gray-50 dark:bg-gray-800 rounded-full border border-gray-100 dark:border-gray-700">
+                    <span className="text-xs font-bold text-[#CB202D]">{resendTimer}s</span>
+                    <span className="text-xs text-gray-400 font-medium">remaining</span>
+                  </div>
                 ) : (
                   <button
                     type="button"
                     onClick={handleResend}
                     disabled={isLoading}
-                    className="text-sm md:text-base text-[#E23744] hover:text-[#d32f3d] dark:text-[#E23744] dark:hover:text-[#d32f3d] disabled:opacity-50 transition-colors font-medium"
+                    className="text-[#CB202D] hover:text-[#b51c1c] font-bold text-sm underline active:scale-95 transition-transform"
                   >
-                    Resend {contactType === "email" ? "email" : "SMS"}
+                    Resend OTP
                   </button>
                 )}
               </div>
-            </>
-          )}
-
-          {/* Name Input (shown only after OTP verified and user is new) */}
-          {showNameInput && (
-            <div className="space-y-4 md:space-y-5">
-              <div className="space-y-2">
-                <label className="block text-sm md:text-base font-medium text-black dark:text-white text-left">
-                  Full name
-                </label>
-                <Input
-                  type="text"
-                  value={name}
-                  onChange={(e) => {
-                    setName(e.target.value)
-                    if (nameError) setNameError("")
-                  }}
-                  disabled={isLoading}
-                  placeholder="Enter your name"
-                  className={`h-11 md:h-14 text-base md:text-lg border-2 ${
-                    nameError ? "border-red-500" : "border-gray-300 dark:border-gray-700"
-                  } bg-white dark:bg-[#1a1a1a] text-black dark:text-white rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-[#E23744]`}
-                />
-                {nameError && (
-                  <p className="text-xs md:text-sm text-red-500 text-left">
-                    {nameError}
-                  </p>
-                )}
-              </div>
-
-              <Button
-                onClick={handleSubmitName}
-                disabled={isLoading}
-                className="w-full h-11 md:h-14 bg-[#E23744] hover:bg-[#d32f3d] text-white font-semibold text-base md:text-lg rounded-lg transition-all hover:shadow-lg active:scale-[0.98]"
-              >
-                {isLoading ? "Continuing..." : "Continue"}
-              </Button>
             </div>
           )}
 
-          {/* Loading Spinner */}
-          {isLoading && !showNameInput && (
-            <div className="flex justify-center pt-4">
-              <Loader2 className="h-6 w-6 text-[#E23744] animate-spin" />
+          {/* Name Input Step */}
+          {showNameInput && (
+            <div className="space-y-8 flex-1">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-gray-500 uppercase tracking-wider ml-1">
+                    Your Full Name
+                  </label>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => {
+                      setName(e.target.value)
+                      if (nameError) setNameError("")
+                    }}
+                    disabled={isLoading}
+                    placeholder="e.g. Rahul Sharma"
+                    className={`w-full h-14 px-5 text-lg bg-gray-50 dark:bg-gray-800 border-2 ${nameError ? "border-red-500" : "border-gray-100 dark:border-gray-700"
+                      } rounded-xl focus:border-[#CB202D] focus:ring-4 focus:ring-[#CB202D]/10 outline-none transition-all text-gray-800 dark:text-white`}
+                  />
+                  {nameError && (
+                    <p className="text-xs text-red-500 font-medium ml-1">
+                      {nameError}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="mt-auto">
+                <Button
+                  onClick={handleSubmitName}
+                  disabled={isLoading}
+                  className="w-full h-14 bg-[#CB202D] hover:bg-[#b51c1c] text-white font-bold text-lg rounded-xl shadow-lg shadow-red-200 dark:shadow-none transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+                >
+                  {isLoading ? (
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  ) : (
+                    "Complete Registration"
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {!showNameInput && (
+            <div className="mt-8 pt-4 text-center space-y-6">
+              <Button
+                onClick={() => handleVerify()}
+                disabled={isLoading || otp.join("").length !== 6}
+                className="w-full h-14 bg-[#CB202D] hover:bg-[#b51c1c] text-white font-bold text-lg rounded-xl shadow-lg shadow-red-200 dark:shadow-none transition-all active:scale-[0.98] disabled:bg-gray-100 disabled:text-gray-400 disabled:shadow-none uppercase tracking-wide"
+              >
+                {isLoading ? <Loader2 className="h-6 w-6 animate-spin" /> : "Submit"}
+              </Button>
+
+              <button
+                onClick={() => navigate("/user/auth/sign-in")}
+                className="block w-full text-sm text-gray-400 font-semibold hover:text-[#CB202D] transition-colors py-2"
+              >
+                Change Mobile Number
+              </button>
             </div>
           )}
         </div>
-      </div>
-
-      {/* Go back to login methods */}
-      <div className="pt-4 md:pt-6 mt-auto px-6 md:px-8 lg:px-12 text-center pb-8 md:pb-12">
-        <button
-          type="button"
-          onClick={() => navigate("/user/auth/sign-in")}
-          className="text-sm md:text-base text-[#E23744] hover:text-[#d32f3d] hover:underline transition-colors font-medium"
-        >
-          Go back to login methods
-        </button>
       </div>
     </AnimatedPage>
   )
