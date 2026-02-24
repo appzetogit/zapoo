@@ -128,7 +128,7 @@ export default function ZoneAdBanner() {
 
     if (zoneLoading || loading) {
         return (
-            <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            <div className="w-full py-3">
                 <Skeleton className="w-full aspect-[3/1] md:aspect-[4/1] lg:aspect-[5/1] rounded-2xl" />
             </div>
         )
@@ -149,7 +149,7 @@ export default function ZoneAdBanner() {
     const currentAd = ads[currentSlide]
 
     return (
-        <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="w-full py-3">
             <div
                 className="relative w-full aspect-[3/1] md:aspect-[4/1] lg:aspect-[5/1] overflow-hidden rounded-2xl cursor-pointer group shadow-sm hover:shadow-md transition-all bg-gray-100"
                 onMouseEnter={() => setIsPaused(true)}

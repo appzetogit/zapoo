@@ -4,7 +4,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { exportCustomersToCSV, exportCustomersToExcel, exportCustomersToPDF } from "../components/customers/customersExportUtils"
 import { adminAPI } from "@/lib/api"
 import { toast } from "sonner"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 
 export default function Customers() {
   const [searchQuery, setSearchQuery] = useState("")
@@ -450,178 +450,276 @@ export default function Customers() {
         </div>
       </div>
 
-      {/* User Details Modal */}
+      {/* User Details Modal - Enhanced UI */}
       <Dialog open={showUserDetails} onOpenChange={setShowUserDetails}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto mx-auto">
-          <DialogHeader>
-            <DialogTitle className="text-xl font-bold text-slate-900">User Details</DialogTitle>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-0 border-none shadow-2xl rounded-2xl overflow-hidden bg-white">
+          <DialogHeader className="sr-only">
+            <DialogTitle>User Detail Insights</DialogTitle>
+            <DialogDescription>
+              Detailed view of customer profile, statistics, addresses, and recent order history.
+            </DialogDescription>
           </DialogHeader>
+          <div className="bg-gradient-to-r from-orange-500 to-rose-500 h-24 w-full relative">
+            <button
+              onClick={() => setShowUserDetails(false)}
+              className="absolute right-4 top-4 p-2 bg-white/20 hover:bg-white/30 backdrop-blur-md rounded-full text-white transition-all z-20"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
 
-          {loadingDetails ? (
-            <div className="py-8 text-center">
-              <div className="text-sm text-slate-500">Loading user details...</div>
-            </div>
-          ) : userDetails ? (
-            <div className="space-y-4">
-              {/* Profile Section */}
-              <div className="bg-slate-50 rounded-lg p-4">
-                <div className="flex items-start gap-4">
-                  <div className="w-16 h-16 rounded-full bg-slate-200 flex items-center justify-center flex-shrink-0">
-                    {userDetails.profileImage ? (
-                      <img src={userDetails.profileImage} alt={userDetails.name} className="w-full h-full rounded-full object-cover" />
-                    ) : (
-                      <User className="w-8 h-8 text-slate-400" />
-                    )}
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <h3 className="text-lg font-bold text-slate-900">{userDetails.name}</h3>
-                      {userDetails.isActive ? (
-                        <span className="px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700 flex items-center gap-1">
-                          <CheckCircle className="w-3 h-3" />
-                          Active
-                        </span>
+          <div className="px-6 pb-8 -mt-12 relative z-10">
+            {loadingDetails ? (
+              <div className="py-20 flex flex-col items-center justify-center space-y-4 bg-white rounded-t-3xl">
+                <div className="w-12 h-12 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
+                <div className="text-slate-500 font-medium animate-pulse">Fetching premium insights...</div>
+              </div>
+            ) : userDetails ? (
+              <div className="space-y-6">
+                {/* Profile Header Card */}
+                <div className="bg-white rounded-2xl shadow-xl shadow-slate-200/50 p-6 border border-slate-100">
+                  <div className="flex flex-col md:flex-row items-center md:items-start gap-6 text-center md:text-left">
+                    <div className="w-24 h-24 rounded-2xl bg-gradient-to-tr from-slate-100 to-slate-50 border-4 border-white shadow-lg flex items-center justify-center flex-shrink-0 -mt-16 bg-white overflow-hidden">
+                      {userDetails.profileImage ? (
+                        <img src={userDetails.profileImage} alt={userDetails.name} className="w-full h-full object-cover" />
                       ) : (
-                        <span className="px-2 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700 flex items-center gap-1">
-                          <XCircle className="w-3 h-3" />
-                          Inactive
-                        </span>
+                        <div className="flex flex-col items-center justify-center gap-1">
+                          <User className="w-10 h-10 text-slate-300" />
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Member</span>
+                        </div>
                       )}
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
-                      <div className="flex items-center gap-2 text-sm text-slate-600">
-                        <Mail className="w-4 h-4" />
-                        <span>{userDetails.email}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-slate-600">
-                        <Phone className="w-4 h-4" />
-                        <span>{userDetails.phone}</span>
-                        {userDetails.phoneVerified && (
-                          <CheckCircle className="w-3 h-3 text-green-600" />
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-slate-600">
-                        <CalendarIcon className="w-4 h-4" />
-                        <span>Joined: {userDetails.joiningDate}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-slate-600">
-                        <User className="w-4 h-4" />
-                        <span>Signup: {userDetails.signupMethod || 'N/A'}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
 
-              {/* Statistics Section */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div className="bg-orange-50 rounded-lg p-3">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Package className="w-4 h-4 text-[#FF5200]" />
-                    <span className="text-xs font-semibold text-slate-700">Total Orders</span>
-                  </div>
-                  <p className="text-xl font-bold text-[#FF5200]">{userDetails.totalOrders || 0}</p>
-                </div>
-                <div className="bg-green-50 rounded-lg p-3">
-                  <div className="flex items-center gap-2 mb-1">
-                    <DollarSign className="w-4 h-4 text-green-600" />
-                    <span className="text-xs font-semibold text-slate-700">Total Spent</span>
-                  </div>
-                  <p className="text-xl font-bold text-green-600">
-                    ${(userDetails.totalOrderAmount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </p>
-                </div>
-                <div className="bg-purple-50 rounded-lg p-3">
-                  <div className="flex items-center gap-2 mb-1">
-                    <CalendarIcon className="w-4 h-4 text-purple-600" />
-                    <span className="text-xs font-semibold text-slate-700">Member Since</span>
-                  </div>
-                  <p className="text-base font-bold text-purple-600">{userDetails.joiningDate}</p>
-                </div>
-              </div>
-
-              {/* Addresses Section */}
-              {userDetails.addresses && userDetails.addresses.length > 0 && (
-                <div>
-                  <h4 className="text-base font-bold text-slate-900 mb-2 flex items-center gap-2">
-                    <MapPin className="w-4 h-4" />
-                    Addresses
-                  </h4>
-                  <div className="space-y-2">
-                    {userDetails.addresses.map((address, index) => (
-                      <div key={index} className="bg-slate-50 rounded-lg p-3 border border-slate-200">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-sm font-semibold text-slate-700">{address.label || 'Address'}</span>
-                          {address.isDefault && (
-                            <span className="px-2 py-1 rounded-full text-xs font-semibold bg-orange-100 text-[#FF5200]">
-                              Default
+                    <div className="flex-1 w-full pt-2">
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div>
+                          <h3 className="text-2xl font-extrabold text-slate-900 tracking-tight">{userDetails.name}</h3>
+                          <div className="flex items-center justify-center md:justify-start gap-1.5 mt-1">
+                            <span className="text-xs font-medium text-slate-500">ID: {userDetails.id?.slice(-8).toUpperCase() || "N/A"}</span>
+                            <span className="w-1 h-1 rounded-full bg-slate-300"></span>
+                            <span className="text-xs font-semibold text-orange-600">Premium User</span>
+                          </div>
+                        </div>
+                        <div>
+                          {userDetails.isActive ? (
+                            <span className="px-4 py-1.5 rounded-full text-xs font-bold bg-green-500 text-white shadow-lg shadow-green-200 inline-flex items-center gap-1.5">
+                              <CheckCircle className="w-3.5 h-3.5" />
+                              ACTIVE ACCOUNT
+                            </span>
+                          ) : (
+                            <span className="px-4 py-1.5 rounded-full text-xs font-bold bg-slate-400 text-white shadow-lg shadow-slate-200 inline-flex items-center gap-1.5">
+                              <XCircle className="w-3.5 h-3.5" />
+                              SUSPENDED
                             </span>
                           )}
                         </div>
-                        <p className="text-sm text-slate-600">
-                          {address.street}
-                          {address.additionalDetails && `, ${address.additionalDetails}`}
-                          {address.city && `, ${address.city}`}
-                          {address.state && `, ${address.state}`}
-                          {address.zipCode && ` - ${address.zipCode}`}
-                        </p>
                       </div>
-                    ))}
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6">
+                        <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50/50 hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100">
+                          <div className="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center text-orange-600">
+                            <Mail className="w-4 h-4" />
+                          </div>
+                          <div className="overflow-hidden">
+                            <p className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Email Address</p>
+                            <p className="text-sm font-semibold text-slate-700 truncate">{userDetails.email || "Not Provided"}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50/50 hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100">
+                          <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600">
+                            <Phone className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <p className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Phone Number</p>
+                            <div className="flex items-center gap-1">
+                              <p className="text-sm font-semibold text-slate-700">{userDetails.phone || "No Phone"}</p>
+                              {userDetails.phoneVerified && <CheckCircle className="w-3 h-3 text-green-500" />}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50/50 hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100">
+                          <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center text-purple-600">
+                            <CalendarIcon className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <p className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Join Date</p>
+                            <p className="text-sm font-semibold text-slate-700">{userDetails.joiningDate}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50/50 hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100">
+                          <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-600">
+                            <CheckCircle className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <p className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Signup Mode</p>
+                            <p className="text-sm font-semibold text-slate-700 capitalize">{userDetails.signupMethod || 'Web Portal'}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              )}
 
-              {/* Recent Orders Section */}
-              {userDetails.orders && userDetails.orders.length > 0 && (
-                <div>
-                  <h4 className="text-base font-bold text-slate-900 mb-2 flex items-center gap-2">
-                    <Package className="w-4 h-4" />
-                    Recent Orders
-                  </h4>
-                  <div className="space-y-2">
-                    {userDetails.orders.slice(0, 5).map((order, index) => (
-                      <div key={index} className="bg-slate-50 rounded-lg p-3 border border-slate-200 flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-semibold text-slate-900">{order.orderId}</p>
-                          <p className="text-xs text-slate-600">{order.restaurantName}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-sm font-semibold text-slate-900">${(order.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                          <p className="text-xs text-slate-600 capitalize">{order.status}</p>
-                        </div>
-                      </div>
-                    ))}
+                {/* Engagement Statistics */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="relative group overflow-hidden bg-gradient-to-br from-[#FF5200] to-orange-400 rounded-2xl p-5 shadow-xl shadow-orange-100">
+                    <div className="absolute top-0 right-0 p-3 opacity-20 transform group-hover:scale-110 transition-transform">
+                      <Package className="w-16 h-16 text-white" />
+                    </div>
+                    <p className="text-xs font-bold text-white/80 uppercase tracking-widest mb-1">Total Orders</p>
+                    <div className="flex items-baseline gap-1">
+                      <h4 className="text-3xl font-black text-white">{userDetails.totalOrders || 0}</h4>
+                      <span className="text-[10px] font-bold text-white/60">delivered</span>
+                    </div>
+                  </div>
+
+                  <div className="relative group overflow-hidden bg-white border border-slate-100 rounded-2xl p-5 shadow-lg shadow-slate-100 hover:border-green-100 transition-colors">
+                    <div className="absolute top-0 right-0 p-3 opacity-10 text-green-600 transform group-hover:scale-110 transition-transform">
+                      <DollarSign className="w-16 h-16" />
+                    </div>
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Wallet Spent</p>
+                    <h4 className="text-3xl font-black text-slate-900">
+                      <span className="text-xl text-green-500 mr-0.5">$</span>
+                      {Math.floor(userDetails.totalOrderAmount || 0)}
+                      <span className="text-lg text-slate-400">.{(userDetails.totalOrderAmount || 0).toFixed(2).split('.')[1]}</span>
+                    </h4>
+                  </div>
+
+                  <div className="relative group overflow-hidden bg-white border border-slate-100 rounded-2xl p-5 shadow-lg shadow-slate-100 hover:border-purple-100 transition-colors">
+                    <div className="absolute top-0 right-0 p-3 opacity-10 text-purple-600 transform group-hover:scale-110 transition-transform">
+                      <Calendar className="w-16 h-16" />
+                    </div>
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Member Age</p>
+                    <h4 className="text-xl font-black text-slate-900 mt-2">
+                      {userDetails.joiningDate.split(' ')[2] || 'Just'}{' Join'}
+                    </h4>
+                    <p className="text-[10px] font-medium text-slate-400 mt-0.5">Established Entity</p>
                   </div>
                 </div>
-              )}
 
-              {/* Additional Info */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {userDetails.gender && (
-                  <div className="bg-slate-50 rounded-lg p-3">
-                    <p className="text-xs font-semibold text-slate-700 mb-1">Gender</p>
-                    <p className="text-sm text-slate-600 capitalize">{userDetails.gender}</p>
+                {/* Dynamic Content Grid */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Addresses Column */}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between pb-1">
+                      <h4 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
+                        <MapPin className="w-4 h-4 text-orange-500" />
+                        Saved Addresses
+                      </h4>
+                      <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+                        {userDetails.addresses?.length || 0} LOCATION{userDetails.addresses?.length !== 1 ? 'S' : ''}
+                      </span>
+                    </div>
+
+                    <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                      {userDetails.addresses && userDetails.addresses.length > 0 ? (
+                        userDetails.addresses.map((address, index) => (
+                          <div key={index} className={`relative p-4 rounded-xl border transition-all ${address.isDefault ? 'border-orange-200 bg-orange-50/30' : 'border-slate-100 bg-white hover:border-slate-200 shadow-sm'}`}>
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-2">
+                                <span className={`w-2 h-2 rounded-full ${address.isDefault ? 'bg-orange-500' : 'bg-slate-300'}`}></span>
+                                <h5 className="text-xs font-bold text-slate-700 uppercase tracking-tight">{address.label || 'Other'}</h5>
+                              </div>
+                              {address.isDefault && (
+                                <span className="text-[8px] font-black uppercase text-white bg-orange-500 px-1.5 py-0.5 rounded shadow-sm">Default</span>
+                              )}
+                            </div>
+                            <p className="text-sm text-slate-600 leading-relaxed font-normal">
+                              {address.street}{address.additionalDetails && `, ${address.additionalDetails}`}
+                              <span className="block mt-1 font-semibold text-slate-500 text-xs">
+                                {address.city && `${address.city}, `}{address.state && `${address.state}`}{address.zipCode && ` - ${address.zipCode}`}
+                              </span>
+                            </p>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-center py-8 border-2 border-dashed border-slate-100 rounded-2xl">
+                          <MapPin className="w-8 h-8 text-slate-100 mx-auto mb-2" />
+                          <p className="text-xs font-bold text-slate-300 uppercase">No address data linked</p>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                )}
-                {userDetails.dateOfBirth && (
-                  <div className="bg-slate-50 rounded-lg p-3">
-                    <p className="text-xs font-semibold text-slate-700 mb-1">Date of Birth</p>
-                    <p className="text-sm text-slate-600">
-                      {new Date(userDetails.dateOfBirth).toLocaleDateString('en-GB', {
-                        day: 'numeric',
-                        month: 'short',
-                        year: 'numeric'
-                      })}
-                    </p>
+
+                  {/* Orders Column */}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between pb-1">
+                      <h4 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
+                        <Package className="w-4 h-4 text-blue-500" />
+                        Recent activity
+                      </h4>
+                      <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">LATEST 5</span>
+                    </div>
+
+                    <div className="space-y-3">
+                      {userDetails.orders && userDetails.orders.length > 0 ? (
+                        userDetails.orders.slice(0, 5).map((order, index) => (
+                          <div key={index} className="flex items-center justify-between p-3 rounded-xl bg-white border border-slate-100 hover:border-blue-100 hover:shadow-md hover:shadow-blue-50/50 transition-all cursor-pointer group">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600 transition-colors group-hover:bg-blue-500 group-hover:text-white">
+                                <Package className="w-5 h-5" />
+                              </div>
+                              <div>
+                                <p className="text-xs font-bold text-slate-900 group-hover:text-blue-600 transition-colors">{order.orderId}</p>
+                                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">{order.restaurantName}</p>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-sm font-black text-slate-900">${(order.total || 0).toLocaleString()}</p>
+                              <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full tracking-[1px] ${order.status === 'delivered' ? 'bg-green-100 text-green-600' :
+                                order.status === 'cancelled' ? 'bg-red-100 text-red-600' :
+                                  'bg-orange-100 text-orange-600'
+                                }`}>
+                                {order.status}
+                              </span>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-center py-8 border-2 border-dashed border-slate-100 rounded-2xl">
+                          <Package className="w-8 h-8 text-slate-100 mx-auto mb-2" />
+                          <p className="text-xs font-bold text-slate-300 uppercase">No order transactions</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Additional Metadata Footer */}
+                {(userDetails.gender || userDetails.dateOfBirth) && (
+                  <div className="flex flex-wrap gap-4 pt-4 border-t border-slate-100">
+                    {userDetails.gender && (
+                      <div className="flex items-center gap-2 bg-slate-50 px-4 py-2 rounded-xl">
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">GENDER</span>
+                        <span className="text-xs font-bold text-slate-700 capitalize">{userDetails.gender}</span>
+                      </div>
+                    )}
+                    {userDetails.dateOfBirth && (
+                      <div className="flex items-center gap-2 bg-slate-50 px-4 py-2 rounded-xl">
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">BIRTHDAY</span>
+                        <span className="text-xs font-bold text-slate-700">
+                          {new Date(userDetails.dateOfBirth).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' })}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
-            </div>
-          ) : (
-            <div className="py-8 text-center">
-              <div className="text-sm text-slate-500">No user details available</div>
-            </div>
-          )}
+            ) : (
+              <div className="py-20 text-center flex flex-col items-center justify-center space-y-3">
+                <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center">
+                  <User className="w-8 h-8 text-slate-200" />
+                </div>
+                <p className="text-sm font-bold text-slate-400 uppercase tracking-wider">Missing detailed user context</p>
+                <button
+                  onClick={() => setShowUserDetails(false)}
+                  className="text-xs font-bold text-orange-500 hover:text-orange-600 underline"
+                >
+                  Return to directory
+                </button>
+              </div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>

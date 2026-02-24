@@ -141,16 +141,16 @@ export default function NewAdvertisement() {
 
     try {
       await new Promise(resolve => setTimeout(resolve, 1000))
-      
+
       // Here you would typically send the data to your API
       console.log("Form submitted:", {
         ...formData,
         profileImage,
         coverImage
       })
-      
+
       setShowSuccessDialog(true)
-      
+
       setTimeout(() => {
         handleReset()
         setShowSuccessDialog(false)
@@ -202,11 +202,10 @@ export default function NewAdvertisement() {
                   <button
                     key={tab.key}
                     onClick={() => setActiveLanguage(tab.key)}
-                    className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                      activeLanguage === tab.key
+                    className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeLanguage === tab.key
                         ? "border-blue-600 text-blue-600"
                         : "border-transparent text-slate-600 hover:text-slate-900"
-                    }`}
+                      }`}
                   >
                     {tab.label}
                   </button>
@@ -224,9 +223,8 @@ export default function NewAdvertisement() {
                       value={formData.title}
                       onChange={(e) => handleInputChange("title", e.target.value)}
                       placeholder="Exclusive Offer"
-                      className={`w-full px-4 py-2.5 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm ${
-                        formErrors.title ? "border-red-500" : "border-slate-300"
-                      }`}
+                      className={`w-full px-4 py-2.5 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm ${formErrors.title ? "border-red-500" : "border-slate-300"
+                        }`}
                     />
                     {formErrors.title && (
                       <p className="text-xs text-red-500 mt-1">{formErrors.title}</p>
@@ -254,9 +252,8 @@ export default function NewAdvertisement() {
                       <select
                         value={formData.restaurant}
                         onChange={(e) => handleInputChange("restaurant", e.target.value)}
-                        className={`w-full px-4 py-2.5 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm ${
-                          formErrors.restaurant ? "border-red-500" : "border-slate-300"
-                        }`}
+                        className={`w-full px-4 py-2.5 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm ${formErrors.restaurant ? "border-red-500" : "border-slate-300"
+                          }`}
                       >
                         <option value="">Select Restaurant</option>
                         <option value="cafe-monarch">Café Monarch</option>
@@ -307,9 +304,8 @@ export default function NewAdvertisement() {
                         type="date"
                         value={formData.validity}
                         onChange={(e) => handleInputChange("validity", e.target.value)}
-                        className={`w-full px-4 py-2.5 pr-10 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm ${
-                          formErrors.validity ? "border-red-500" : "border-slate-300"
-                        }`}
+                        className={`w-full px-4 py-2.5 pr-10 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm ${formErrors.validity ? "border-red-500" : "border-slate-300"
+                          }`}
                       />
                       <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                     </div>
@@ -383,9 +379,8 @@ export default function NewAdvertisement() {
                         ) : (
                           <div
                             onClick={() => profileInputRef.current?.click()}
-                            className={`border-2 border-dashed rounded-lg p-6 text-center hover:border-blue-500 transition-colors cursor-pointer ${
-                              formErrors.profileImage ? "border-red-500" : "border-slate-300"
-                            }`}
+                            className={`border-2 border-dashed rounded-lg p-6 text-center hover:border-blue-500 transition-colors cursor-pointer ${formErrors.profileImage ? "border-red-500" : "border-slate-300"
+                              }`}
                           >
                             <Upload className="w-8 h-8 text-slate-400 mx-auto mb-2" />
                             <p className="text-sm font-medium text-blue-600 mb-1">Click to Upload Profile Image</p>
@@ -430,9 +425,8 @@ export default function NewAdvertisement() {
                         ) : (
                           <div
                             onClick={() => coverInputRef.current?.click()}
-                            className={`border-2 border-dashed rounded-lg p-6 text-center hover:border-blue-500 transition-colors cursor-pointer ${
-                              formErrors.coverImage ? "border-red-500" : "border-slate-300"
-                            }`}
+                            className={`border-2 border-dashed rounded-lg p-6 text-center hover:border-blue-500 transition-colors cursor-pointer ${formErrors.coverImage ? "border-red-500" : "border-slate-300"
+                              }`}
                           >
                             <Upload className="w-8 h-8 text-slate-400 mx-auto mb-2" />
                             <p className="text-sm font-medium text-blue-600 mb-1">Click to Upload Cover Image</p>
@@ -506,7 +500,7 @@ export default function NewAdvertisement() {
                       />
                     )}
                   </div>
-                  
+
                   {/* Content Overlay */}
                   <div className="absolute inset-0 p-4 flex flex-col justify-between">
                     <div className="flex items-start justify-between">
@@ -532,7 +526,7 @@ export default function NewAdvertisement() {
                         <Heart className="w-4 h-4 text-red-500" />
                       </button>
                     </div>
-                    
+
                     <div className="bg-white/90 backdrop-blur-sm rounded-lg p-3">
                       <h3 className="text-sm font-semibold text-slate-900 mb-1">
                         {formData.title || "Title"}
@@ -557,24 +551,32 @@ export default function NewAdvertisement() {
 
       {/* Success Dialog */}
       <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
-        <DialogContent className="max-w-md bg-white p-0 opacity-0 data-[state=open]:opacity-100 data-[state=closed]:opacity-0 transition-opacity duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=open]:scale-100 data-[state=closed]:scale-100">
-          <div className="p-8 text-center">
-            <div className="flex justify-center mb-4">
+        <DialogContent className="max-w-md bg-white p-0 overflow-hidden shadow-2xl border-none rounded-2xl">
+          <div className="p-8 text-center bg-white">
+            <div className="flex justify-center mb-6">
               <div className="relative">
-                <div className="absolute inset-0 bg-emerald-100 rounded-full animate-ping opacity-75"></div>
-                <div className="relative bg-emerald-500 rounded-full p-4">
-                  <CheckCircle2 className="w-12 h-12 text-white" />
+                <div className="absolute inset-0 bg-emerald-100 rounded-full animate-ping opacity-25"></div>
+                <div className="relative bg-emerald-500 rounded-full p-5 shadow-lg shadow-emerald-200">
+                  <CheckCircle2 className="w-10 h-10 text-white" />
                 </div>
               </div>
             </div>
-            <DialogHeader>
-              <DialogTitle className="text-2xl font-bold text-slate-900 mb-2">
-                Advertisement Created Successfully!
+            <DialogHeader className="text-center">
+              <DialogTitle className="text-2xl font-black text-slate-900 mb-2">
+                SUCCESSFUL!
               </DialogTitle>
-              <DialogDescription className="text-sm text-slate-600">
-                The advertisement has been successfully created and is now active in the system.
+              <DialogDescription className="text-sm font-medium text-slate-500 leading-relaxed">
+                Your advertisement has been created and synced with the system successfully.
               </DialogDescription>
             </DialogHeader>
+            <div className="mt-8">
+              <button
+                onClick={() => setShowSuccessDialog(false)}
+                className="w-full py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-all shadow-lg shadow-slate-200"
+              >
+                GOT IT
+              </button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
