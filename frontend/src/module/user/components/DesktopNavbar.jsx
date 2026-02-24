@@ -84,7 +84,7 @@ export default function DesktopNavbar() {
         }`}
     >
       {/* Background */}
-      <div className="absolute inset-0 bg-white/98 dark:bg-[#1a1a1a]/98 border-b border-gray-200/50 dark:border-gray-800/50 shadow-sm" />
+      <div className="absolute inset-0 bg-white/98 dark:bg-[#1a1a1a]/98 shadow-sm" />
 
       {/* Content */}
       <div className="relative">

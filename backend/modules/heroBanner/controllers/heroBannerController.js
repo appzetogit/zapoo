@@ -20,12 +20,17 @@ export const getHeroBanners = async (req, res) => {
     const banners = await HeroBanner.find({ isActive: true })
       .populate('linkedRestaurants', 'name slug restaurantId profileImage')
       .sort({ order: 1, createdAt: -1 })
-      .select('imageUrl order linkedRestaurants')
+      .select('imageUrl order linkedRestaurants title subtitle description ctaText ctaLink')
       .lean();
 
     return successResponse(res, 200, 'Hero banners retrieved successfully', {
       banners: banners.map(b => ({
         imageUrl: b.imageUrl,
+        title: b.title || '',
+        subtitle: b.subtitle || '',
+        description: b.description || '',
+        ctaText: b.ctaText || 'Order Now',
+        ctaLink: b.ctaLink || '/user',
         linkedRestaurants: b.linkedRestaurants || []
       }))
     });
@@ -78,12 +83,20 @@ export const createHeroBanner = async (req, res) => {
 
     const newOrder = lastBanner ? lastBanner.order + 1 : 0;
 
+    // Get text fields from request body
+    const { title, subtitle, description, ctaText, ctaLink } = req.body;
+
     // Create banner record
     const banner = new HeroBanner({
       imageUrl: result.secure_url,
       cloudinaryPublicId: result.public_id,
       order: newOrder,
-      isActive: true
+      isActive: true,
+      title: title || '',
+      subtitle: subtitle || '',
+      description: description || '',
+      ctaText: ctaText || 'Order Now',
+      ctaLink: ctaLink || '/user'
     });
 
     await banner.save();
@@ -92,6 +105,11 @@ export const createHeroBanner = async (req, res) => {
       banner: {
         _id: banner._id,
         imageUrl: banner.imageUrl,
+        title: banner.title,
+        subtitle: banner.subtitle,
+        description: banner.description,
+        ctaText: banner.ctaText,
+        ctaLink: banner.ctaLink,
         order: banner.order,
         isActive: banner.isActive,
         createdAt: banner.createdAt

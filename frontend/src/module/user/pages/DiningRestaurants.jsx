@@ -11,6 +11,7 @@ import { useLocation as useLocationHook } from "../hooks/useLocation"
 import { useProfile } from "../context/ProfileContext"
 import { FaLocationDot } from "react-icons/fa6"
 import zapooFoodLogo from "@/assets/zapoo_logo.png"
+import { toast } from "sonner"
 // Using placeholder for dining restaurant banner
 const diningBanner = "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=1200&h=400&fit=crop"
 
@@ -193,6 +194,49 @@ export default function DiningRestaurants() {
     openSearch()
   }, [heroSearch, openSearch, setSearchValue])
 
+  const handleVoiceSearch = useCallback(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      toast.error("Speech Recognition is not supported in this browser.");
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = "en-IN";
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onstart = () => {
+      toast("Listening...", {
+        icon: <Mic className="w-4 h-4 text-orange-500 animate-pulse" />,
+      });
+    };
+
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      setHeroSearch(transcript);
+      if (transcript.trim()) {
+        toast.success(`Searching for "${transcript}"`);
+        // Auto-navigate to show related items/restaurants
+        setTimeout(() => {
+          navigate(`/user/search?q=${encodeURIComponent(transcript.trim())}`);
+          closeSearch();
+        }, 1500);
+      }
+    };
+
+    recognition.onerror = (event) => {
+      console.error("Speech recognition error", event.error);
+      if (event.error === 'not-allowed') {
+        toast.error("Microphone access denied. Please enable it in browser settings.");
+      } else {
+        toast.error("Could not hear you. Please try again.");
+      }
+    };
+
+    recognition.start();
+  }, [handleSearchFocus]);
+
   const handleOpenMap = () => {
     const lat = location?.latitude || 22.7196
     const lng = location?.longitude || 75.8577
@@ -269,11 +313,13 @@ export default function DiningRestaurants() {
                 variant="ghost"
                 size="icon"
                 className="absolute right-2 sm:right-3 md:right-4 top-1/2 -translate-y-1/2 h-8 w-8 sm:h-9 sm:w-9 md:h-10 md:w-10 rounded-full hover:bg-gray-100"
-                onClick={() => {
-                  // Voice search functionality
-                }}
+                onClick={heroSearch ? () => setHeroSearch("") : handleVoiceSearch}
               >
-                <Mic className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 text-gray-500" />
+                {heroSearch ? (
+                  <X className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 text-gray-500" />
+                ) : (
+                  <Mic className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 text-gray-500" />
+                )}
               </Button>
             </div>
           </div>
