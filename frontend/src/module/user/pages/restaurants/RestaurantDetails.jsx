@@ -510,21 +510,8 @@ export default function RestaurantDetails() {
                   })) || []
                 })))
 
-                // Deduplicate items: Remove recommended items from their original sections
-                // This ensures they only appear in the "Recommended for you" section at the top
-                const recommendedItemIds = new Set(recommendedItems.map(item => String(item.id)))
-
-                const deduplicatedMenuSections = menuSections.map(section => ({
-                  ...section,
-                  items: section.items?.filter(item => !recommendedItemIds.has(String(item.id))) || [],
-                  subsections: section.subsections?.map(subsection => ({
-                    ...subsection,
-                    items: subsection.items?.filter(item => !recommendedItemIds.has(String(item.id))) || []
-                  })) || []
-                }))
-
                 // Always create recommended section (even if empty) - will show "No dish Yet" if empty
-                const finalMenuSections = [{ name: "Recommended for you", items: recommendedItems, subsections: [] }, ...deduplicatedMenuSections]
+                const finalMenuSections = [{ name: "Recommended for you", items: recommendedItems, subsections: [] }, ...menuSections]
 
                 setRestaurant(prev => ({
                   ...prev,
@@ -798,7 +785,8 @@ export default function RestaurantDetails() {
       restaurantId: validRestaurantId, // Use validated restaurantId
       description: item.description,
       originalPrice: item.originalPrice,
-      isVeg: item.isVeg !== false // Add isVeg property
+      isVeg: item.isVeg !== false,
+      isRecommended: item.isRecommended === true
     }
 
     // Get source position for animation from event target

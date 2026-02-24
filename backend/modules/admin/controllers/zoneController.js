@@ -122,7 +122,9 @@ export const createZone = asyncHandler(async (req, res) => {
       peakZoneDuration,
       peakZoneSurgePercentage,
       isActive,
-      deliveryPricing
+      deliveryPricing,
+      recommendedItemFee,
+      isRecommendedFeeOverridden
     } = req.body;
 
     // Validation - For customer zones, country and zoneName are required instead of restaurantId
@@ -178,6 +180,8 @@ export const createZone = asyncHandler(async (req, res) => {
       peakZoneSurgePercentage: peakZoneSurgePercentage || 0,
       isActive: isActive !== undefined ? isActive : true,
       deliveryPricing,
+      recommendedItemFee: recommendedItemFee || 0,
+      isRecommendedFeeOverridden: isRecommendedFeeOverridden || false,
       createdBy: req.admin?._id || null
     };
 
@@ -234,6 +238,10 @@ export const updateZone = asyncHandler(async (req, res) => {
 
     // Update zone
     Object.assign(zone, updateData);
+
+    // Explicitly handle coordinates if passed as empty array (Object.assign might not be enough depending on how it was being handled before, but here it should be fine)
+    // The main thing is ensures recommendedItemFee and isRecommendedFeeOverridden are included which Object.assign does.
+
     await zone.save();
 
     // Populate before returning (only if restaurantId exists)

@@ -255,7 +255,7 @@ export const getPublicFeeSettings = asyncHandler(async (req, res) => {
   try {
     const feeSettings = await FeeSettings.findOne({ isActive: true })
       .sort({ createdAt: -1 })
-      .select('deliveryFee freeDeliveryThreshold platformFee gstRate')
+      .select('deliveryFee freeDeliveryThreshold platformFee gstRate recommendedItemFee')
       .lean();
 
     // If no active settings, return default values
@@ -266,6 +266,7 @@ export const getPublicFeeSettings = asyncHandler(async (req, res) => {
           freeDeliveryThreshold: 149,
           platformFee: 5,
           gstRate: 5,
+          recommendedItemFee: 0,
         },
       });
     }
