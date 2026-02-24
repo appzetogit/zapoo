@@ -751,31 +751,10 @@ export default function ItemDetailsPage() {
     }
   }
 
-  const handleDelete = async () => {
-    if (!id || isNewItem) {
-      navigate(-1)
-      return
-    }
-
-    if (!window.confirm("Are you sure you want to delete this item?")) {
-      return
-    }
-
-    try {
-      setLoadingItem(true)
-      const response = await restaurantAPI.deleteMenuItem(id)
-      if (response.data && response.data.success) {
-        toast.success("Item deleted successfully")
-        navigate(-1)
-      } else {
-        toast.error(response.data?.message || "Failed to delete item")
-      }
-    } catch (error) {
-      console.error("Error deleting item:", error)
-      toast.error("An error occurred while deleting the item")
-    } finally {
-      setLoadingItem(false)
-    }
+  const handleDelete = () => {
+    // Delete logic here
+    console.log("Deleting item:", id)
+    navigate(-1)
   }
 
   return (

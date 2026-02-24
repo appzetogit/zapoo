@@ -50,6 +50,12 @@ const tierSchema = new mongoose.Schema(
             min: 1,
             // Max number of concurrent approved ads per day for zones in this tier
         },
+        recommendedItemFee: {
+            type: Number,
+            default: 0,
+            min: 0,
+            comment: 'Default fee for recommended items in this tier'
+        },
     },
     {
         timestamps: true,

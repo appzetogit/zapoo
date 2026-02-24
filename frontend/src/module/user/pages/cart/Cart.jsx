@@ -2021,14 +2021,6 @@ export default function Cart() {
                 <ChevronRight className="w-6 h-6 group-hover:translate-x-1.5 transition-transform" />
               </motion.button>
 
-              <motion.p
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 1.2 }}
-                className="mt-6 text-xs font-bold text-gray-400 uppercase tracking-widest"
-              >
-                Order ID: #{placedOrderId?.slice(-6).toUpperCase() || "CONFIRMED"}
-              </motion.p>
             </motion.div>
           </motion.div>
         )}

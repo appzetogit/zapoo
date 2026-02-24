@@ -130,8 +130,8 @@ export function useLocation() {
       const GOOGLE_MAPS_API_KEY = await getGoogleMapsApiKey();
 
       if (!GOOGLE_MAPS_API_KEY) {
-        console.warn("⚠️ Google Maps API key not found, using fallback");
-        console.warn("⚠️ Please set Google Maps API Key in ENV Setup");
+        console.warn("⚠️ Google Maps API key not found in database. Using fallback geocoding service (BigDataCloud).");
+        console.warn("💡 Please set VITE_GOOGLE_MAPS_API_KEY in Admin → System → Environment Variables for higher precision.");
         return reverseGeocodeDirect(latitude, longitude);
       }
 

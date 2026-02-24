@@ -1,15 +1,15 @@
 import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 
-// Firebase configuration - fallback to hardcoded values if env vars are not available
+// Firebase configuration - strictly use environment variables
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyC_TqpDR7LNHxFEPd8cGjl_ka_Rj0ebECA",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "zomato-607fa.firebaseapp.com",
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "zomato-607fa",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:1065631021082:web:7424afd0ad2054ed6879a3",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "1065631021082",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "zomato-607fa.firebasestorage.app",
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-7JJV7JYVRX"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
 // Validate Firebase configuration
