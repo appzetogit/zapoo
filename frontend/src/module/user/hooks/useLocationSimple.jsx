@@ -122,7 +122,6 @@ export function useLocationSimple() {
    */
   const reverseGeocode = async (latitude, longitude) => {
     try {
-      console.log("🔍 Reverse geocoding via Backend API (Fallback: BigDataCloud/OlaMaps)...");
       const response = await locationAPI.reverseGeocode(latitude, longitude)
 
       // Check if API call was successful

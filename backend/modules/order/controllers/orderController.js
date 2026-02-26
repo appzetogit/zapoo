@@ -524,11 +524,11 @@ export const createOrder = async (req, res) => {
         // Mark order as confirmed and payment as completed
         order.payment.method = 'wallet';
         order.payment.status = 'completed';
-        order.status = 'confirmed';
-        order.tracking.confirmed = {
-          status: true,
-          timestamp: new Date()
-        };
+        order.status = 'pending'; // Keep as pending instead of auto-confirmed
+        // order.tracking.confirmed = {
+        //   status: true,
+        //   timestamp: new Date()
+        // };
         await order.save();
 
         // Notify restaurant about new wallet payment order
@@ -601,14 +601,14 @@ export const createOrder = async (req, res) => {
         });
       }
 
-      // Mark order as confirmed so restaurant can prepare it (ensure payment.method is cash for notification)
+      // Mark order as pending so restaurant must accept it
       order.payment.method = 'cash';
       order.payment.status = 'pending';
-      order.status = 'confirmed';
-      order.tracking.confirmed = {
-        status: true,
-        timestamp: new Date()
-      };
+      order.status = 'pending';
+      // order.tracking.confirmed = {
+      //   status: true,
+      //   timestamp: new Date()
+      // };
       await order.save();
 
       // Notify restaurant about new COD order via Socket.IO (non-blocking)
@@ -815,13 +815,13 @@ export const verifyOrderPayment = async (req, res) => {
 
     await payment.save();
 
-    // Update order status
+    // Update order status - Keep as pending for restaurant to accept
     order.payment.status = 'completed';
     order.payment.razorpayPaymentId = razorpayPaymentId;
     order.payment.razorpaySignature = razorpaySignature;
     order.payment.transactionId = razorpayPaymentId;
-    order.status = 'confirmed';
-    order.tracking.confirmed = { status: true, timestamp: new Date() };
+    order.status = 'pending'; // Keep as pending instead of confirmed
+    // order.tracking.confirmed = { status: true, timestamp: new Date() };
     await order.save();
 
     // Calculate order settlement and hold escrow

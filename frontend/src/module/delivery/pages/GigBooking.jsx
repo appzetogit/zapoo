@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom"
 import { motion, AnimatePresence } from "framer-motion"
 import { gsap } from "gsap"
 import Lenis from "lenis"
-import { 
+import {
   X,
   Calendar,
   Clock,
@@ -49,17 +49,17 @@ export default function GigBooking() {
   const navigate = useNavigate()
   const location = useLocation()
   const [animationKey, setAnimationKey] = useState(0)
-  
+
   // Get tab from URL parameter, default to "book"
   const searchParams = new URLSearchParams(location.search)
   const urlTab = searchParams.get("tab")
   const [activeTab, setActiveTab] = useState(urlTab === "history" ? "history" : "book")
-  
+
   const [selectedDate, setSelectedDate] = useState(null)
   const [dateChangeKey, setDateChangeKey] = useState(0)
   const summaryRef = useRef(null)
   const slotsRef = useRef(null)
-  
+
   // Update activeTab when URL parameter changes
   useEffect(() => {
     const params = new URLSearchParams(location.search)
@@ -70,13 +70,13 @@ export default function GigBooking() {
       setActiveTab("book")
     }
   }, [location.search])
-  
+
   // Track date changes to reset animations
   const handleDateChange = (date) => {
     setSelectedDate(date)
     setDateChangeKey(prev => prev + 1) // Reset animations
   }
-  
+
   const {
     selectedSlots,
     bookedGigs,
@@ -94,7 +94,7 @@ export default function GigBooking() {
 
   // Generate available dates
   const availableDates = generateAvailableDates(userLevel)
-  
+
   // Set first date as selected by default
   useEffect(() => {
     if (!selectedDate && availableDates.length > 0) {
@@ -178,12 +178,12 @@ export default function GigBooking() {
 
     const wasEmpty = selectedSlots.length === 0
     toggleSlot(slot)
-    
+
     // Smooth scroll to summary after a short delay if this is the first selection
     if (wasEmpty && summaryRef.current) {
       setTimeout(() => {
-        summaryRef.current?.scrollIntoView({ 
-          behavior: 'smooth', 
+        summaryRef.current?.scrollIntoView({
+          behavior: 'smooth',
           block: 'start',
           inline: 'nearest'
         })
@@ -279,9 +279,9 @@ export default function GigBooking() {
 
   // Check if slot is selected
   const isSlotSelected = (slot) => {
-    return selectedSlots.some(s => 
-      s.date === slot.date && 
-      s.startTime === slot.startTime && 
+    return selectedSlots.some(s =>
+      s.date === slot.date &&
+      s.startTime === slot.startTime &&
       s.endTime === slot.endTime
     )
   }
@@ -303,8 +303,8 @@ export default function GigBooking() {
             goOnline()
           }
         }}
-        onEmergencyClick={() => {}}
-        onHelpClick={() => {}}
+        onEmergencyClick={() => { }}
+        onHelpClick={() => { }}
         className=""
       />
 
@@ -312,7 +312,7 @@ export default function GigBooking() {
       <div className="px-4 pt-4 pb-4">
         <Button
           onClick={() => navigate("/delivery/offers")}
-          className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-semibold py-3 rounded-lg shadow-md flex items-center justify-center gap-2"
+          className="w-full bg-[#DC2626] hover:bg-[#B91C1C] text-white font-semibold py-3 rounded-lg shadow-md flex items-center justify-center gap-2"
         >
           <Gift className="w-5 h-5" />
           <span>View All Offers</span>
@@ -328,16 +328,15 @@ export default function GigBooking() {
               setActiveTab("book")
               navigate("/delivery/gig?tab=book", { replace: true })
             }}
-            className={`relative flex-1 py-3 px-4 rounded-lg font-medium transition-colors ${
-              activeTab === "book"
+            className={`relative flex-1 py-3 px-4 rounded-lg font-medium transition-colors ${activeTab === "book"
                 ? "text-white"
-                : "bg-white text-gray-900 hover:bg-orange-50"
-            }`}
+                : "bg-white text-gray-900 hover:bg-red-50"
+              }`}
           >
             {activeTab === "book" && (
               <motion.div
                 layoutId="activeGigTab"
-                className="absolute inset-0 bg-[#ff8100] rounded-lg z-0"
+                className="absolute inset-0 bg-[#DC2626] rounded-lg z-0"
                 transition={{ type: "spring", stiffness: 500, damping: 30 }}
               />
             )}
@@ -348,16 +347,15 @@ export default function GigBooking() {
               setActiveTab("history")
               navigate("/delivery/gig?tab=history", { replace: true })
             }}
-            className={`relative flex-1 py-3 px-4 rounded-lg font-medium transition-colors ${
-              activeTab === "history"
+            className={`relative flex-1 py-3 px-4 rounded-lg font-medium transition-colors ${activeTab === "history"
                 ? "text-white"
-                : "bg-white text-gray-900 hover:bg-orange-50"
-            }`}
+                : "bg-white text-gray-900 hover:bg-red-50"
+              }`}
           >
             {activeTab === "history" && (
               <motion.div
                 layoutId="activeGigTab"
-                className="absolute inset-0 bg-[#ff8100] rounded-lg z-0"
+                className="absolute inset-0 bg-[#DC2626] rounded-lg z-0"
                 transition={{ type: "spring", stiffness: 500, damping: 30 }}
               />
             )}
@@ -389,17 +387,16 @@ export default function GigBooking() {
                         initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
                         transition={{ delay: index * 0.05, duration: 0.2 }}
-                        className={`relative shrink-0 px-4 py-3 rounded-lg font-medium transition-all ${
-                          isSelected
+                        className={`relative shrink-0 px-4 py-3 rounded-lg font-medium transition-all ${isSelected
                             ? "text-white shadow-lg"
                             : "bg-white text-gray-700 hover:bg-gray-50 shadow-sm"
-                        }`}
+                          }`}
                         whileTap={{ scale: 0.95 }}
                       >
                         {isSelected && (
                           <motion.div
                             layoutId="selectedDate"
-                            className="absolute inset-0 bg-[#ff8100] rounded-lg z-0"
+                            className="absolute inset-0 bg-[#DC2626] rounded-lg z-0"
                             transition={{ type: "spring", stiffness: 500, damping: 30 }}
                           />
                         )}
@@ -408,8 +405,8 @@ export default function GigBooking() {
                             {dateObj.isToday ? "Today" : dateObj.isTomorrow ? "Tomorrow" : dateObj.displayDate.split(" - ")[0]}
                           </div>
                           <div className="text-sm font-bold">
-                            {dateObj.isToday || dateObj.isTomorrow 
-                              ? dateObj.displayDate 
+                            {dateObj.isToday || dateObj.isTomorrow
+                              ? dateObj.displayDate
                               : dateObj.displayDate.split(" - ")[1]}
                           </div>
                         </div>
@@ -442,7 +439,7 @@ export default function GigBooking() {
                         {categorizedSlots.map((category, catIndex) => {
                           const categoryTimeRange = getCategoryTimeRange(category)
                           const gigCount = category.slots.length
-                          
+
                           // Get icon based on category
                           const getCategoryIcon = () => {
                             if (category.name.includes('Breakfast')) return <Sunrise className="w-5 h-5 text-yellow-400" />
@@ -456,7 +453,7 @@ export default function GigBooking() {
                               initial={{ opacity: 0, y: 10 }}
                               animate={{ opacity: 1, y: 0 }}
                               exit={{ opacity: 0, y: -10 }}
-                              transition={{ 
+                              transition={{
                                 delay: catIndex * 0.05, // Minimal delay
                                 duration: 0.2,
                                 type: "spring",
@@ -490,7 +487,7 @@ export default function GigBooking() {
                                         initial={{ opacity: 0, x: -5 }}
                                         animate={{ opacity: 1, x: 0 }}
                                         exit={{ opacity: 0, x: 5 }}
-                                        transition={{ 
+                                        transition={{
                                           delay: catIndex * 0.05 + slotIndex * 0.02, // Very minimal delay
                                           duration: 0.15, // Very fast animation
                                           type: "spring",
@@ -498,34 +495,31 @@ export default function GigBooking() {
                                         }}
                                         onClick={() => !isBooked && handleSlotToggle(slot)}
                                         disabled={isBooked}
-                                        className={`w-full rounded-lg px-4 py-3 shadow-sm border transition-all ${
-                                          isBooked
+                                        className={`w-full rounded-lg px-4 py-3 shadow-sm border transition-all ${isBooked
                                             ? "opacity-60 cursor-not-allowed border-gray-200 bg-gray-50"
                                             : isSelected
-                                            ? "border-[#10b981] bg-[#10b981] shadow-md"
-                                            : "border-gray-200 bg-white hover:border-[#ff8100] hover:shadow-md"
-                                        }`}
+                                              ? "border-[#DC2626] bg-[#DC2626] shadow-md"
+                                              : "border-gray-200 bg-white hover:border-[#DC2626] hover:shadow-md"
+                                          }`}
                                         whileHover={!isBooked ? { scale: 1.01, y: -1 } : {}}
                                         whileTap={!isBooked ? { scale: 0.99 } : {}}
                                       >
                                         <div className="flex items-start justify-between">
                                           <div className="flex-1">
-                                            <div className={`font-bold text-base mb-1 ${
-                                              isSelected 
-                                                ? "text-white" 
-                                                : isBooked 
-                                                  ? "text-gray-400" 
+                                            <div className={`font-bold text-base mb-1 ${isSelected
+                                                ? "text-white"
+                                                : isBooked
+                                                  ? "text-gray-400"
                                                   : "text-gray-900"
-                                            }`}>
+                                              }`}>
                                               {formatTimeDisplay(slot.startTime)} - {formatTimeDisplay(slot.endTime)}
                                             </div>
-                                            <div className={`text-sm mb-2 ${
-                                              isSelected 
-                                                ? "text-white/90" 
-                                                : isBooked 
-                                                  ? "text-gray-400" 
+                                            <div className={`text-sm mb-2 ${isSelected
+                                                ? "text-white/90"
+                                                : isBooked
+                                                  ? "text-gray-400"
                                                   : "text-gray-600"
-                                            }`}>
+                                              }`}>
                                               ₹{slot.payRate.min} - ₹{slot.payRate.max} per hour
                                             </div>
                                             {isBooked && (
@@ -575,21 +569,21 @@ export default function GigBooking() {
                     initial={{ opacity: 0, y: 30, scale: 0.95 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: -20, scale: 0.95 }}
-                    transition={{ 
+                    transition={{
                       type: "spring",
                       stiffness: 300,
                       damping: 25
                     }}
-                    className="bg-white rounded-xl p-4 border-2 border-[#ff8100] shadow-lg"
+                    className="bg-white rounded-xl p-4 border-2 border-[#DC2626] shadow-lg"
                   >
                     <div className="flex items-center gap-2 mb-3">
-                      <div className="bg-[#ff8100] rounded-full p-2">
+                      <div className="bg-[#DC2626] rounded-full p-2">
                         <Calendar className="w-4 h-4 text-white" />
                       </div>
                       <h3 className="text-lg font-bold text-gray-800">Booking Summary</h3>
                     </div>
                     <div className="space-y-2 text-sm">
-                      <motion.div 
+                      <motion.div
                         initial={{ opacity: 0, x: -10 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: 0.1 }}
@@ -602,7 +596,7 @@ export default function GigBooking() {
                         <span className="font-bold text-gray-900 text-base">{totalHours} hours</span>
                       </motion.div>
                       {timeRange && (
-                        <motion.div 
+                        <motion.div
                           initial={{ opacity: 0, x: -10 }}
                           animate={{ opacity: 1, x: 0 }}
                           transition={{ delay: 0.15 }}
@@ -612,14 +606,14 @@ export default function GigBooking() {
                           <span className="font-semibold text-gray-900">{timeRange}</span>
                         </motion.div>
                       )}
-                      <motion.div 
+                      <motion.div
                         initial={{ opacity: 0, x: -10 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: 0.2 }}
                         className="flex justify-between items-center py-2"
                       >
                         <span className="text-gray-600">Slots Selected:</span>
-                        <span className="font-semibold text-[#ff8100] text-base">{selectedSlots.length} slot{selectedSlots.length > 1 ? 's' : ''}</span>
+                        <span className="font-semibold text-[#DC2626] text-base">{selectedSlots.length} slot{selectedSlots.length > 1 ? 's' : ''}</span>
                       </motion.div>
                     </div>
                   </motion.div>
@@ -638,11 +632,10 @@ export default function GigBooking() {
                   disabled={!canBook}
                   whileHover={canBook ? { scale: 1.02, y: -2 } : {}}
                   whileTap={canBook ? { scale: 0.98 } : {}}
-                  className={`w-full py-4 text-lg font-semibold rounded-lg shadow-lg transition-all ${
-                    canBook
-                      ? "bg-[#ff8100] hover:bg-[#e67300] text-white"
+                  className={`w-full py-4 text-lg font-semibold rounded-lg shadow-lg transition-all ${canBook
+                      ? "bg-[#DC2626] hover:bg-[#B91C1C] text-white"
                       : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                  }`}
+                    }`}
                 >
                   Book Gig
                 </motion.button>
@@ -662,7 +655,7 @@ export default function GigBooking() {
                       onClick={handleGoOnline}
                       whileHover={{ scale: 1.02, y: -2 }}
                       whileTap={{ scale: 0.98 }}
-                      className="w-full py-4 text-lg font-semibold rounded-lg bg-green-600 hover:bg-green-700 text-white shadow-lg transition-all"
+                      className="w-full py-4 text-lg font-semibold rounded-lg bg-[#DC2626] hover:bg-[#B91C1C] text-white shadow-lg transition-all"
                     >
                       Go Online
                     </motion.button>
@@ -684,7 +677,7 @@ export default function GigBooking() {
                       onClick={handleGoOffline}
                       whileHover={{ scale: 1.02, y: -2 }}
                       whileTap={{ scale: 0.98 }}
-                      className="w-full py-4 text-lg font-semibold rounded-lg bg-red-600 hover:bg-red-700 text-white shadow-lg transition-all"
+                      className="w-full py-4 text-lg font-semibold rounded-lg bg-[#991B1B] hover:bg-[#7F1D1D] text-white shadow-lg transition-all"
                     >
                       Go Offline
                     </motion.button>
@@ -731,7 +724,7 @@ export default function GigBooking() {
                     key={gig.id}
                     initial={{ opacity: 0, y: 30, scale: 0.95 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
-                    transition={{ 
+                    transition={{
                       delay: index * 0.1,
                       duration: 0.3,
                       type: "spring",
@@ -745,8 +738,8 @@ export default function GigBooking() {
                         <div className="flex items-start justify-between mb-3">
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-2">
-                              <div className="bg-[#ff8100]/10 rounded-lg p-1.5">
-                                <Calendar className="w-4 h-4 text-[#ff8100]" />
+                              <div className="bg-[#DC2626]/10 rounded-lg p-1.5">
+                                <Calendar className="w-4 h-4 text-[#DC2626]" />
                               </div>
                               <span className="font-bold text-gray-900 text-base">
                                 {new Date(gig.date).toLocaleDateString('en-US', {
@@ -764,7 +757,7 @@ export default function GigBooking() {
                               </span>
                             </div>
                           </div>
-                          <motion.span 
+                          <motion.span
                             initial={{ scale: 0 }}
                             animate={{ scale: 1 }}
                             transition={{ delay: index * 0.1 + 0.2, type: "spring" }}
@@ -783,12 +776,12 @@ export default function GigBooking() {
                             <span className="text-gray-600">{gig.slots.length} slot{gig.slots.length > 1 ? 's' : ''}</span>
                           </div>
                           {gig.status === 'active' && (
-                            <motion.div 
+                            <motion.div
                               initial={{ opacity: 0 }}
                               animate={{ opacity: 1 }}
                               className="flex items-center gap-2 text-green-600 text-sm font-semibold"
                             >
-                              <motion.div 
+                              <motion.div
                                 className="w-2.5 h-2.5 bg-green-600 rounded-full"
                                 animate={{ scale: [1, 1.3, 1] }}
                                 transition={{ duration: 1.5, repeat: Infinity }}

@@ -246,7 +246,7 @@ export default function AdvertisementsPage() {
           <AnimatePresence mode="wait">
             {filteredAds.map((ad, index) => (
               <motion.div
-                key={ad.id}
+                key={ad._id}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
@@ -304,31 +304,31 @@ export default function AdvertisementsPage() {
                           whileTap={{ scale: 0.9 }}
                           onClick={(e) => {
                             e.stopPropagation()
-                            setOpenMenuId(openMenuId === ad.id ? null : ad.id)
+                            setOpenMenuId(openMenuId === ad._id ? null : ad._id)
                           }}
                           className="p-2 hover:bg-gray-100 rounded-lg transition-colors relative"
-                          data-menu-id={ad.id}
+                          data-menu-id={ad._id}
                         >
                           <MoreVertical className="w-5 h-5 text-gray-600" />
                         </motion.button>
 
                         {/* Context Menu */}
                         <AnimatePresence>
-                          {openMenuId === ad.id && (
+                          {openMenuId === ad._id && (
                             <motion.div
                               initial={{ opacity: 0, scale: 0.95, y: -10 }}
                               animate={{ opacity: 1, scale: 1, y: 0 }}
                               exit={{ opacity: 0, scale: 0.95, y: -10 }}
                               transition={{ duration: 0.2, ease: "easeOut" }}
                               className="absolute top-full right-0 mt-2 bg-white rounded-xl shadow-2xl border border-gray-200 py-2 z-50 min-w-[180px]"
-                              data-menu-id={ad.id}
+                              data-menu-id={ad._id}
                             >
                               {[
-                                { icon: Eye, label: "View Ads", action: () => navigate(`/restaurant/advertisements/${ad.id}`) },
-                                { icon: Edit, label: "Edit Ads", action: () => navigate(`/restaurant/advertisements/${ad.id}/edit`) },
-                                { icon: Pause, label: "Pause Ads", action: () => console.log("Pause:", ad.id) },
-                                { icon: Copy, label: "Copy Ads", action: () => console.log("Copy:", ad.id) },
-                                { icon: Trash2, label: "Delete Ads", action: () => console.log("Delete:", ad.id), isDanger: true }
+                                { icon: Eye, label: "View Ads", action: () => navigate(`/restaurant/advertisements/${ad._id}`) },
+                                { icon: Edit, label: "Edit Ads", action: () => navigate(`/restaurant/advertisements/${ad._id}/edit`) },
+                                { icon: Pause, label: "Pause Ads", action: () => console.log("Pause:", ad._id) },
+                                { icon: Copy, label: "Copy Ads", action: () => console.log("Copy:", ad._id) },
+                                { icon: Trash2, label: "Delete Ads", action: () => console.log("Delete:", ad._id), isDanger: true }
                               ].map((option, idx) => {
                                 const IconComponent = option.icon
                                 return (
@@ -362,7 +362,7 @@ export default function AdvertisementsPage() {
                           whileHover={{ scale: 1.1 }}
                           whileTap={{ scale: 0.9 }}
                           onClick={() => {
-                            navigate(`/restaurant/advertisements/${ad.id}`)
+                            navigate(`/restaurant/advertisements/${ad._id}`)
                           }}
                           className="p-2 bg-[#3B82F6] hover:bg-blue-700 rounded-lg transition-colors"
                         >

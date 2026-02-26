@@ -26,7 +26,7 @@ export default function DeliveryOTP() {
     // Only redirect if token exists and is valid - don't redirect during OTP flow
     const token = localStorage.getItem("delivery_accessToken")
     const authenticated = localStorage.getItem("delivery_authenticated") === "true"
-    
+
     // Only redirect if both token and authenticated flag exist (user is fully logged in)
     if (token && authenticated) {
       // Check if token is not expired
@@ -158,7 +158,7 @@ export default function DeliveryOTP() {
     if (!showNameInput && digits.length === 6) {
       handleVerify(newOtp.join(""))
       return
-    } 
+    }
     inputRefs.current[digits.length]?.focus()
   }
 
@@ -169,7 +169,7 @@ export default function DeliveryOTP() {
     }
 
     const code = otpValue || otp.join("")
-    
+
     if (code.length !== 6) {
       return
     }
@@ -258,9 +258,9 @@ export default function DeliveryOTP() {
       const verifyAndNavigate = () => {
         const storedToken = localStorage.getItem("delivery_accessToken")
         const storedAuth = localStorage.getItem("delivery_authenticated")
-        
+
         console.log("Verifying token storage:", { hasToken: !!storedToken, authenticated: storedAuth, retryCount })
-        
+
         if (storedToken && storedAuth === "true") {
           // Token is stored, navigate to delivery home
           console.log("Token verified, navigating to /delivery")
@@ -353,9 +353,9 @@ export default function DeliveryOTP() {
       const verifyAndNavigate = () => {
         const storedToken = localStorage.getItem("delivery_accessToken")
         const storedAuth = localStorage.getItem("delivery_authenticated")
-        
+
         console.log("Verifying token storage (with name):", { hasToken: !!storedToken, authenticated: storedAuth, retryCount })
-        
+
         if (storedToken && storedAuth === "true") {
           // Token is stored, navigate to delivery home
           console.log("Token verified, navigating to /delivery")
@@ -465,7 +465,7 @@ export default function DeliveryOTP() {
           <ArrowLeft className="h-5 w-5 text-black" />
         </button>
         <h1 className="text-lg font-bold text-black">OTP Verification</h1>
-      </div> 
+      </div>
 
       {/* Main Content */}
       <div className="flex flex-col justify-center px-6 pt-8 pb-12">
@@ -509,7 +509,7 @@ export default function DeliveryOTP() {
                     disabled={isLoading}
                     autoComplete="off"
                     autoFocus={false}
-                    className="w-12 h-12 text-center text-lg font-semibold p-0 border border-black rounded-md focus-visible:ring-0 focus-visible:border-black bg-white"
+                    className="w-12 h-12 text-center text-lg font-semibold p-0 border border-[#DC2626] rounded-md focus-visible:ring-0 focus-visible:border-[#DC2626] bg-white"
                   />
                 ))}
               </div>
@@ -553,9 +553,8 @@ export default function DeliveryOTP() {
                   }}
                   disabled={isLoading}
                   placeholder="Enter your name"
-                  className={`h-11 border ${
-                    nameError ? "border-red-500" : "border-gray-300"
-                  }`}
+                  className={`h-11 border ${nameError ? "border-red-500" : "border-gray-300"
+                    }`}
                 />
                 {nameError && (
                   <p className="text-xs text-red-500 text-left">
@@ -567,7 +566,7 @@ export default function DeliveryOTP() {
               <Button
                 onClick={handleSubmitName}
                 disabled={isLoading}
-                className="w-full h-11 bg-[#00B761] hover:bg-[#00A055] text-white font-semibold"
+                className="w-full h-11 bg-[#DC2626] hover:bg-[#C52222] text-white font-semibold"
               >
                 {isLoading ? "Continuing..." : "Continue"}
               </Button>
@@ -577,7 +576,7 @@ export default function DeliveryOTP() {
           {/* Loading Spinner */}
           {isLoading && !showNameInput && (
             <div className="flex justify-center pt-4">
-              <Loader2 className="h-6 w-6 text-green-500 animate-spin" />
+              <Loader2 className="h-6 w-6 text-[#DC2626] animate-spin" />
             </div>
           )}
         </div>
@@ -588,7 +587,7 @@ export default function DeliveryOTP() {
         <button
           type="button"
           onClick={() => navigate("/delivery/sign-in")}
-          className="text-sm text-[#E23744] hover:underline"
+          className="text-sm text-[#DC2626] hover:underline"
         >
           Go back to login methods
         </button>

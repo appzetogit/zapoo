@@ -59,12 +59,12 @@ export default function SignupStep2() {
 
       if (response?.data?.success && response?.data?.data) {
         const { url, publicId } = response.data.data
-        
+
         setDocuments(prev => ({
           ...prev,
           [docType]: file
         }))
-        
+
         setUploadedDocs(prev => ({
           ...prev,
           [docType]: { url, publicId }
@@ -136,7 +136,7 @@ export default function SignupStep2() {
         <label className="block text-sm font-medium text-gray-700 mb-2">
           {label} {required && <span className="text-red-500">*</span>}
         </label>
-        
+
         {uploaded ? (
           <div className="relative">
             <img
@@ -157,11 +157,11 @@ export default function SignupStep2() {
             </div>
           </div>
         ) : (
-          <label className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-green-500 transition-colors">
+          <label className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-[#DC2626] transition-colors">
             <div className="flex flex-col items-center justify-center pt-5 pb-6">
               {isUploading ? (
                 <>
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500 mb-2"></div>
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#DC2626] mb-2"></div>
                   <p className="text-sm text-gray-500">Uploading...</p>
                 </>
               ) : (
@@ -220,11 +220,10 @@ export default function SignupStep2() {
           <button
             type="submit"
             disabled={isSubmitting || !uploadedDocs.profilePhoto || !uploadedDocs.aadharPhoto || !uploadedDocs.panPhoto || !uploadedDocs.drivingLicensePhoto}
-            className={`w-full py-4 rounded-lg font-bold text-white text-base transition-colors mt-6 ${
-              isSubmitting || !uploadedDocs.profilePhoto || !uploadedDocs.aadharPhoto || !uploadedDocs.panPhoto || !uploadedDocs.drivingLicensePhoto
+            className={`w-full py-4 rounded-lg font-bold text-white text-base transition-colors mt-6 ${isSubmitting || !uploadedDocs.profilePhoto || !uploadedDocs.aadharPhoto || !uploadedDocs.panPhoto || !uploadedDocs.drivingLicensePhoto
                 ? "bg-gray-400 cursor-not-allowed"
-                : "bg-[#00B761] hover:bg-[#00A055]"
-            }`}
+                : "bg-[#DC2626] hover:bg-[#C52222]"
+              }`}
           >
             {isSubmitting ? "Submitting..." : "Complete Signup"}
           </button>

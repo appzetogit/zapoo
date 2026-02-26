@@ -17,7 +17,7 @@ export default function ShowIdCard() {
       try {
         setLoading(true)
         const response = await deliveryAPI.getProfile()
-        
+
         if (response?.data?.success && response?.data?.data?.profile) {
           setProfileData(response.data.data.profile)
         } else {
@@ -72,7 +72,7 @@ export default function ShowIdCard() {
     }
     // Fallback to avatar generator with name
     const name = profileData?.name || "Delivery Partner"
-    return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=ff8100&color=fff&size=128`
+    return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=DC2626&color=fff&size=128`
   }
 
   // Get vehicle display text
@@ -103,7 +103,7 @@ export default function ShowIdCard() {
           <p className="text-gray-600 mb-4">Failed to load ID card data</p>
           <button
             onClick={() => navigate(-1)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg"
+            className="px-4 py-2 bg-[#DC2626] text-white rounded-lg"
           >
             Go Back
           </button>
@@ -130,11 +130,11 @@ export default function ShowIdCard() {
         onClick={() => navigate(-1)}
         className="absolute top-4 right-4 p-2 hover:bg-gray-100 rounded-full transition-colors z-20"
       >
-        <X className="w-6 h-6 text-black" />
+        <X className="w-6 h-6 text-white" />
       </button>
 
       {/* Top Grey Background Section */}
-      <div className="bg-gray-200 h-32 relative">
+      <div className="bg-[#DC2626] h-32 relative">
         {/* Profile Picture - Positioned on gray area, overlapping into white */}
         <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 z-10">
           <img
@@ -143,7 +143,7 @@ export default function ShowIdCard() {
             className="w-32 h-32 rounded-full object-cover border-4 border-white shadow-lg"
             onError={(e) => {
               const name = idCardData.name || "Delivery Partner"
-              e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=ff8100&color=fff&size=128`
+              e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=DC2626&color=fff&size=128`
             }}
           />
         </div>

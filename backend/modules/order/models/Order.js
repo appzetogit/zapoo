@@ -274,7 +274,17 @@ const orderSchema = new mongoose.Schema({
     zoneId: String,
     zoneName: String,
     deliveryPartnerId: String,
-    assignedAt: Date
+    assignedAt: Date,
+    // Notification tracking for priority assignment
+    priorityNotifiedAt: Date,
+    priorityDeliveryPartnerIds: [String],
+    expandedNotifiedAt: Date,
+    expandedDeliveryPartnerIds: [String],
+    notificationPhase: {
+      type: String,
+      enum: ['none', 'priority', 'expanded', 'immediate'],
+      default: 'none'
+    }
   },
   deliveryState: {
     status: {

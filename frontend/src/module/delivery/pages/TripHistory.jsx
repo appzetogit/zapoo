@@ -173,7 +173,7 @@ export default function TripHistory() {
         >
           <Gift className="w-5 h-5 text-black" />
           {bonusTransactions.length > 0 && !hasViewedBonus && (
-            <span className="absolute -top-1 -right-1 w-5 h-5 bg-[#FD7675] text-white text-xs rounded-full flex items-center justify-center">
+            <span className="absolute -top-1 -right-1 w-5 h-5 bg-[#DC2626] text-white text-xs rounded-full flex items-center justify-center">
               {bonusTransactions.length}
             </span>
           )}
@@ -190,12 +190,12 @@ export default function TripHistory() {
             }}
             className="relative"
           >
-            <span className={`text-base font-medium transition-colors ${activeTab === "daily" ? "text-[#FD7675]" : "text-gray-500"
+            <span className={`text-base font-medium transition-colors ${activeTab === "daily" ? "text-[#DC2626]" : "text-gray-500"
               }`}>
               Daily
             </span>
             {activeTab === "daily" && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#FD7675] mt-2"></div>
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#DC2626] mt-2"></div>
             )}
           </button>
           <button
@@ -205,12 +205,12 @@ export default function TripHistory() {
             }}
             className="relative"
           >
-            <span className={`text-base font-medium transition-colors ${activeTab === "weekly" ? "text-[#FD7675]" : "text-gray-500"
+            <span className={`text-base font-medium transition-colors ${activeTab === "weekly" ? "text-[#DC2626]" : "text-gray-500"
               }`}>
               Weekly
             </span>
             {activeTab === "weekly" && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#FD7675] mt-2"></div>
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#DC2626] mt-2"></div>
             )}
           </button>
           <button
@@ -220,12 +220,12 @@ export default function TripHistory() {
             }}
             className="relative"
           >
-            <span className={`text-base font-medium transition-colors ${activeTab === "monthly" ? "text-[#FD7675]" : "text-gray-500"
+            <span className={`text-base font-medium transition-colors ${activeTab === "monthly" ? "text-[#DC2626]" : "text-gray-500"
               }`}>
               Monthly
             </span>
             {activeTab === "monthly" && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#FD7675] mt-2"></div>
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#DC2626] mt-2"></div>
             )}
           </button>
         </div>
@@ -306,7 +306,7 @@ export default function TripHistory() {
       <div className="flex-1 overflow-y-auto px-4 py-6 pb-20">
         {loading ? (
           <div className="flex flex-col items-center justify-center py-12">
-            <Loader2 className="w-12 h-12 text-[#FD7675] animate-spin mb-4" />
+            <Loader2 className="w-12 h-12 text-[#DC2626] animate-spin mb-4" />
             <p className="text-gray-500 text-base">Loading trips...</p>
           </div>
         ) : error ? (
@@ -314,7 +314,7 @@ export default function TripHistory() {
             <p className="text-red-600 text-base mb-2">{error}</p>
             <button
               onClick={() => window.location.reload()}
-              className="text-[#FD7675] text-sm underline"
+              className="text-[#DC2626] text-sm underline"
             >
               Retry
             </button>
@@ -347,8 +347,8 @@ export default function TripHistory() {
                     })()}
                   </div>
                   <span className={`text-sm font-medium ${trip.status === 'Completed' ? 'text-green-600' :
-                      trip.status === 'Cancelled' ? 'text-red-600' :
-                        'text-yellow-600'
+                    trip.status === 'Cancelled' ? 'text-red-600' :
+                      'text-yellow-600'
                     }`}>
                     {trip.status}
                   </span>
@@ -445,10 +445,10 @@ export default function TripHistory() {
                             )}
                           </div>
                           <span className={`text-xs font-medium px-3 py-1 rounded-full ${transaction.status === 'Completed'
-                              ? 'bg-green-100 text-green-700'
-                              : transaction.status === 'Pending'
-                                ? 'bg-yellow-100 text-yellow-700'
-                                : 'bg-red-100 text-red-700'
+                            ? 'bg-green-100 text-green-700'
+                            : transaction.status === 'Pending'
+                              ? 'bg-yellow-100 text-yellow-700'
+                              : 'bg-red-100 text-red-700'
                             }`}>
                             {transaction.status || 'Pending'}
                           </span>

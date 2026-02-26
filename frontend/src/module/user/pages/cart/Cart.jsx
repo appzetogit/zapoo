@@ -12,6 +12,7 @@ import { useOrders } from "../../context/OrdersContext"
 import { useLocation as useUserLocation } from "../../hooks/useLocation"
 import { useZone } from "../../hooks/useZone"
 import { orderAPI, restaurantAPI, adminAPI, userAPI, API_ENDPOINTS } from "@/lib/api"
+import { useLocationSelector } from "../../components/UserLayout"
 import { API_BASE_URL } from "@/lib/api/config"
 import { initRazorpayPayment } from "@/lib/utils/razorpay"
 import { toast } from "sonner"
@@ -105,6 +106,8 @@ export default function Cart() {
   const [orderProgress, setOrderProgress] = useState(0)
   const [showOrderSuccess, setShowOrderSuccess] = useState(false)
   const [placedOrderId, setPlacedOrderId] = useState(null)
+
+  const { openLocationSelector } = useLocationSelector()
 
   // Restaurant and pricing state
   const [restaurantData, setRestaurantData] = useState(null)
@@ -629,7 +632,8 @@ export default function Cart() {
       const address = addresses.find(addr => addr.label === label)
 
       if (!address) {
-        toast.error(`No ${label} address found. Please add an address first.`)
+        // Instead of error, open selector with this label
+        openLocationSelector(label)
         return
       }
 
@@ -1575,9 +1579,11 @@ export default function Cart() {
                 )}
               </div>
 
-              {/* Delivery Address */}
               <div className="bg-white dark:bg-[#1a1a1a] px-4 md:px-6 py-3 md:py-4 rounded-lg md:rounded-xl">
-                <Link className="flex items-center justify-between">
+                <button
+                  onClick={() => openLocationSelector()}
+                  className="flex items-center justify-between w-full text-left"
+                >
                   <div className="flex items-center gap-3 md:gap-4">
                     <MapPin className="h-4 w-4 md:h-5 md:w-5 text-gray-500 dark:text-gray-400" />
                     <div className="flex-1">
@@ -1599,10 +1605,9 @@ export default function Cart() {
                                 e.stopPropagation()
                                 handleSelectAddressByLabel(label)
                               }}
-                              disabled={!addressExists}
                               className={`text-xs md:text-sm px-2 md:px-3 py-1 md:py-1.5 rounded-md border transition-colors ${addressExists
-                                ? 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 bg-white dark:bg-[#1a1a1a]'
-                                : 'border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-50'
+                                ? 'border-[#FF5200] bg-orange-50 dark:bg-orange-900/20 text-[#FF5200] font-medium'
+                                : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600'
                                 }`}
                             >
                               {label}
@@ -1613,7 +1618,7 @@ export default function Cart() {
                     </div>
                   </div>
                   <ChevronRight className="h-4 w-4 md:h-5 md:w-5 text-gray-400" />
-                </Link>
+                </button>
               </div>
 
               {/* Contact */}

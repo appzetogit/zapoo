@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import AdRequest from '../models/AdRequest.js';
 import { createOrder, verifyPayment } from '../../payment/services/razorpayService.js';
 import express from 'express';
@@ -77,11 +78,11 @@ import { uploadToCloudinary } from '../../../shared/utils/cloudinaryService.js';
 export const createAdRequest = async (req, res) => {
     try {
         // DEBUG: Log what we receive
-        console.log('📢 [createAdRequest] req.body:', JSON.stringify(req.body));
-        console.log('📢 [createAdRequest] req.file:', req.file ? `${req.file.originalname} (${req.file.size} bytes)` : 'MISSING');
+        console.log('📢 [createAdRequest] Payload:', JSON.stringify(req.body, null, 2));
+        console.log('📢 [createAdRequest] Restaurant:', req.restaurant ? req.restaurant._id : 'MISSING');
+        console.log('📢 [createAdRequest] User:', req.user ? req.user._id : 'MISSING');
 
         const {
-            targetZones: targetZonesRaw,
             startDate,
             endDate,
             title,
@@ -90,25 +91,46 @@ export const createAdRequest = async (req, res) => {
         } = req.body;
 
         // Normalize targetZones — FormData sends it as 'targetZones[]' or 'targetZones'
-        let targetZones = req.body['targetZones[]'] || req.body['targetZones'] || [];
-        if (typeof targetZones === 'string') targetZones = [targetZones];
+        let targetZones = req.body.targetZones || req.body['targetZones[]'] || [];
+        if (typeof targetZones === 'string') {
+            try {
+                // Try parsing if it's a stringified array
+                if (targetZones.startsWith('[')) {
+                    targetZones = JSON.parse(targetZones);
+                } else {
+                    targetZones = [targetZones];
+                }
+            } catch (e) {
+                targetZones = [targetZones];
+            }
+        }
+
         console.log('📢 [createAdRequest] targetZones parsed:', targetZones);
+
+        if (!Array.isArray(targetZones) || targetZones.length === 0) {
+            return res.status(400).json({ success: false, message: 'At least one target zone must be selected' });
+        }
 
         const restaurantId = req.restaurant?._id || req.restaurant?.id;
 
         if (!restaurantId) {
+            console.error('❌ [createAdRequest] Missing restaurantId');
             return res.status(401).json({ success: false, message: 'Restaurant authentication required' });
         }
 
-        if (!req.file) {
-            return res.status(400).json({ success: false, message: 'Banner image is required' });
+        // Convert targetZones to ObjectIds for reliable querying
+        const targetZoneIds = targetZones.map(id => new mongoose.Types.ObjectId(id));
+
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+
+        if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+            return res.status(400).json({ success: false, message: 'Invalid start or end date' });
         }
 
         const now = new Date();
         const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        const start = new Date(startDate);
         const normalizedStart = new Date(start.getFullYear(), start.getMonth(), start.getDate());
-        const end = new Date(endDate);
 
         if (normalizedStart <= today) {
             return res.status(400).json({
@@ -119,7 +141,7 @@ export const createAdRequest = async (req, res) => {
 
         const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
 
-        if (days <= 0) {
+        if (isNaN(days) || days <= 0) {
             return res.status(400).json({ success: false, message: 'Invalid date range' });
         }
 
@@ -127,7 +149,7 @@ export const createAdRequest = async (req, res) => {
         // concurrency check
         const overlappingOwnAds = await AdRequest.find({
             restaurant: restaurantId,
-            targetZones: { $in: targetZones },
+            targetZones: { $in: targetZoneIds },
             status: { $in: ['Approved', 'Scheduled', 'Active', 'Banner Pending'] },
             $or: [
                 { startDate: { $lte: end }, endDate: { $gte: start } } // Dates overlap
@@ -143,7 +165,7 @@ export const createAdRequest = async (req, res) => {
         }
 
         // 2. Check availability (Zone Capacity)
-        const availability = await checkAvailability(targetZones, start, end);
+        const availability = await checkAvailability(targetZoneIds, start, end);
         const unavailableZones = availability.filter(a => !a.available);
 
         if (unavailableZones.length > 0) {
@@ -156,16 +178,25 @@ export const createAdRequest = async (req, res) => {
 
         // 3. Calculate total cost based on Tier
         let totalCost = 0;
-        for (const zoneId of targetZones) {
+        for (const zoneId of targetZoneIds) {
+            if (!mongoose.Types.ObjectId.isValid(zoneId)) {
+                return res.status(400).json({ success: false, message: `Invalid zone ID: ${zoneId}` });
+            }
             const zone = await Zone.findById(zoneId).populate('tierId');
+            if (!zone) {
+                return res.status(404).json({ success: false, message: `Zone not found: ${zoneId}` });
+            }
             const tierRank = zone?.tierId?.rank || 2;
             const pricePerDay = AD_PRICING[tierRank] || DEFAULT_PRICING;
             totalCost += pricePerDay * days;
         }
 
+        console.log('📢 [createAdRequest] Days:', days);
+        console.log('📢 [createAdRequest] Total Cost:', totalCost);
+
         const adRequest = await AdRequest.create({
             restaurant: restaurantId,
-            targetZones,
+            targetZones: targetZoneIds,
             startDate: start,
             endDate: end,
             title,
@@ -182,8 +213,12 @@ export const createAdRequest = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error in createAdRequest:', error);
-        res.status(500).json({ success: false, message: error.message });
+        console.error('❌ [createAdRequest] CRITICAL ERROR:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message || 'Internal server error in createAdRequest',
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
     }
 };
 
@@ -194,6 +229,10 @@ export const updateAdStatus = async (req, res) => {
     try {
         const { adId } = req.params;
         const { status, rejectionReason } = req.body;
+
+        if (!mongoose.Types.ObjectId.isValid(adId)) {
+            return res.status(400).json({ success: false, message: 'Invalid advertisement ID format' });
+        }
 
         const ad = await AdRequest.findById(adId);
         if (!ad) {
@@ -292,6 +331,10 @@ export const createAdPaymentOrder = async (req, res) => {
         const { adId } = req.params;
         const restaurantId = req.restaurant?._id || req.restaurant?.id;
 
+        if (!mongoose.Types.ObjectId.isValid(adId)) {
+            return res.status(400).json({ success: false, message: 'Invalid advertisement ID format' });
+        }
+
         const ad = await AdRequest.findOne({ _id: adId, restaurant: restaurantId });
         if (!ad) {
             return res.status(404).json({ success: false, message: 'Ad request not found' });
@@ -345,6 +388,10 @@ export const verifyAdPayment = async (req, res) => {
     try {
         const { adId, razorpayPaymentId, razorpaySignature } = req.body;
         const restaurantId = req.restaurant?._id || req.restaurant?.id;
+
+        if (!mongoose.Types.ObjectId.isValid(adId)) {
+            return res.status(400).json({ success: false, message: 'Invalid advertisement ID format' });
+        }
 
         const ad = await AdRequest.findOne({ _id: adId, restaurant: restaurantId });
         if (!ad) {
@@ -402,6 +449,10 @@ export const trackAdMetric = async (req, res) => {
     try {
         const { adId } = req.params;
         const { type } = req.body; // 'impression', 'click', 'order'
+
+        if (!mongoose.Types.ObjectId.isValid(adId)) {
+            return res.status(400).json({ success: false, message: 'Invalid advertisement ID format' });
+        }
 
         const updateMap = {
             'impression': 'metrics.impressions',
@@ -557,6 +608,10 @@ export const getAdRequestById = async (req, res) => {
         const restaurantId = req.restaurant?._id || req.restaurant?.id;
         const isAdmin = !!req.admin;
 
+        if (!mongoose.Types.ObjectId.isValid(adId)) {
+            return res.status(400).json({ success: false, message: 'Invalid advertisement ID format' });
+        }
+
         const ad = await AdRequest.findById(adId)
             .populate('restaurant', 'name logo')
             .populate('targetZones', 'name');
@@ -586,6 +641,10 @@ export const updateAdRequest = async (req, res) => {
     try {
         const { adId } = req.params;
         const restaurantId = req.restaurant?._id || req.restaurant?.id;
+
+        if (!mongoose.Types.ObjectId.isValid(adId)) {
+            return res.status(400).json({ success: false, message: 'Invalid advertisement ID format' });
+        }
 
         const ad = await AdRequest.findById(adId);
         if (!ad) {
@@ -658,6 +717,10 @@ export const uploadAdminBanner = async (req, res) => {
     try {
         const { adId } = req.params;
 
+        if (!mongoose.Types.ObjectId.isValid(adId)) {
+            return res.status(400).json({ success: false, message: 'Invalid advertisement ID format' });
+        }
+
         if (!req.file) {
             return res.status(400).json({ success: false, message: 'Banner image is required' });
         }
@@ -707,6 +770,10 @@ export const uploadAdminBanner = async (req, res) => {
 export const deleteAdRequest = async (req, res) => {
     try {
         const { adId } = req.params;
+
+        if (!mongoose.Types.ObjectId.isValid(adId)) {
+            return res.status(400).json({ success: false, message: 'Invalid advertisement ID format' });
+        }
         const ad = await AdRequest.findByIdAndDelete(adId);
 
         if (!ad) {

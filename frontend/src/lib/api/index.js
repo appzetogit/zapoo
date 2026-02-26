@@ -779,16 +779,16 @@ export const marketingAPI = {
   },
 
   // Submit new ad request
-  submitAdRequest: (formData) => {
-    return apiClient.post(API_ENDPOINTS.MARKETING.REQUEST, formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-    });
+  createAdRequest: (payload) => {
+    return apiClient.post(API_ENDPOINTS.MARKETING.REQUEST, payload);
   },
 
   // Update an existing (pending) ad request
   updateAdRequest: (adId, formData) => {
+    if (!adId || adId === "undefined") {
+      console.error("marketingAPI.updateAdRequest called with invalid adId:", adId);
+      return Promise.reject(new Error("Invalid Advertisement ID"));
+    }
     return apiClient.put(
       API_ENDPOINTS.MARKETING.UPDATE_REQUEST.replace(":adId", adId),
       formData,
@@ -802,6 +802,10 @@ export const marketingAPI = {
 
   // Create Razorpay order for ad payment
   createAdPaymentOrder: (adId) => {
+    if (!adId || adId === "undefined") {
+      console.error("marketingAPI.createAdPaymentOrder called with invalid adId:", adId);
+      return Promise.reject(new Error("Invalid Advertisement ID"));
+    }
     return apiClient.post(
       API_ENDPOINTS.MARKETING.PAYMENT_CREATE_ORDER.replace(":adId", adId)
     );
@@ -820,11 +824,19 @@ export const marketingAPI = {
 
   // Get ad details by ID
   getAdDetails: (adId) => {
+    if (!adId || adId === "undefined") {
+      console.error("marketingAPI.getAdDetails called with invalid adId:", adId);
+      return Promise.reject(new Error("Invalid Advertisement ID"));
+    }
     return apiClient.get(API_ENDPOINTS.MARKETING.AD_DETAILS.replace(":adId", adId));
   },
 
   // Track ad metric (impression/click/order)
   trackMetric: (adId, type) => {
+    if (!adId || adId === "undefined") {
+      console.error("marketingAPI.trackMetric called with invalid adId:", adId);
+      return Promise.reject(new Error("Invalid Advertisement ID"));
+    }
     return apiClient.post(API_ENDPOINTS.MARKETING.TRACK.replace(":adId", adId), { type });
   },
 
@@ -840,6 +852,10 @@ export const marketingAPI = {
 
   // Admin: Update ad status
   updateStatus: (adId, status, notes = "") => {
+    if (!adId || adId === "undefined") {
+      console.error("marketingAPI.updateStatus called with invalid adId:", adId);
+      return Promise.reject(new Error("Invalid Advertisement ID"));
+    }
     return apiClient.put(API_ENDPOINTS.MARKETING.UPDATE_STATUS.replace(":adId", adId), { status, notes });
   },
 

@@ -160,6 +160,8 @@ export default function NewAdvertisementPage() {
         targetZones: [myZone._id] // Auto-submit the restaurant's own zone
       }
 
+      console.log('🚀 [NewAdvertisement] Submitting payload:', payload);
+
       await marketingAPI.createAdRequest(payload)
 
       toast.success("Ad request submitted for review!")

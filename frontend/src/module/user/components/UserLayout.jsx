@@ -62,7 +62,8 @@ function SearchOverlayProvider({ children }) {
 // Create LocationSelector context with default value
 const LocationSelectorContext = createContext({
   isLocationSelectorOpen: false,
-  openLocationSelector: () => {
+  locationSelectorLabel: null,
+  openLocationSelector: (label = null) => {
     console.warn("LocationSelectorProvider not available")
   },
   closeLocationSelector: () => { }
@@ -78,17 +79,21 @@ export function useLocationSelector() {
 
 function LocationSelectorProvider({ children }) {
   const [isLocationSelectorOpen, setIsLocationSelectorOpen] = useState(false)
+  const [locationSelectorLabel, setLocationSelectorLabel] = useState(null)
 
-  const openLocationSelector = () => {
+  const openLocationSelector = (label = null) => {
+    setLocationSelectorLabel(label)
     setIsLocationSelectorOpen(true)
   }
 
   const closeLocationSelector = () => {
     setIsLocationSelectorOpen(false)
+    setLocationSelectorLabel(null)
   }
 
   const value = {
     isLocationSelectorOpen,
+    locationSelectorLabel,
     openLocationSelector,
     closeLocationSelector
   }
@@ -101,6 +106,7 @@ function LocationSelectorProvider({ children }) {
           <LocationSelectorOverlay
             isOpen={isLocationSelectorOpen}
             onClose={closeLocationSelector}
+            initialLabel={locationSelectorLabel}
           />
         )}
       </Suspense>

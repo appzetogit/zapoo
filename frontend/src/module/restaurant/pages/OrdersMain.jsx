@@ -750,36 +750,36 @@ export default function OrdersMain() {
       try {
         const response = await restaurantAPI.getOrders()
         if (response.data?.success && response.data.data?.orders) {
-          // Find confirmed orders that haven't been shown yet
-          const confirmedOrders = response.data.data.orders.filter(
-            order => order.status === 'confirmed' &&
+          // Find pending orders that haven't been shown yet
+          const pendingOrders = response.data.data.orders.filter(
+            order => order.status === 'pending' &&
               !shownOrdersRef.current.has(order.orderId || order._id)
           )
 
-          // Show the most recent confirmed order in popup (double-check state)
-          if (confirmedOrders.length > 0 && !showNewOrderPopupRef.current && !newOrderRef.current) {
-            const latestConfirmedOrder = confirmedOrders[0]
-            const orderId = latestConfirmedOrder.orderId || latestConfirmedOrder._id
+          // Show the most recent pending order in popup (double-check state)
+          if (pendingOrders.length > 0 && !showNewOrderPopupRef.current && !newOrderRef.current) {
+            const latestPendingOrder = pendingOrders[0]
+            const orderId = latestPendingOrder.orderId || latestPendingOrder._id
 
             // Transform order to match newOrder format (include payment so COD shows correctly)
             const orderForPopup = {
-              orderId: latestConfirmedOrder.orderId,
-              orderMongoId: latestConfirmedOrder._id,
-              restaurantId: latestConfirmedOrder.restaurantId,
-              restaurantName: latestConfirmedOrder.restaurantName,
-              items: latestConfirmedOrder.items || [],
-              total: latestConfirmedOrder.pricing?.total || 0,
-              customerAddress: latestConfirmedOrder.address,
-              status: latestConfirmedOrder.status,
-              createdAt: latestConfirmedOrder.createdAt,
-              estimatedDeliveryTime: latestConfirmedOrder.estimatedDeliveryTime || 30,
-              note: latestConfirmedOrder.note || '',
-              sendCutlery: latestConfirmedOrder.sendCutlery,
-              paymentMethod: latestConfirmedOrder.paymentMethod ?? latestConfirmedOrder.payment?.method,
-              payment: latestConfirmedOrder.payment
+              orderId: latestPendingOrder.orderId,
+              orderMongoId: latestPendingOrder._id,
+              restaurantId: latestPendingOrder.restaurantId,
+              restaurantName: latestPendingOrder.restaurantName,
+              items: latestPendingOrder.items || [],
+              total: latestPendingOrder.pricing?.total || 0,
+              customerAddress: latestPendingOrder.address,
+              status: latestPendingOrder.status,
+              createdAt: latestPendingOrder.createdAt,
+              estimatedDeliveryTime: latestPendingOrder.estimatedDeliveryTime || 30,
+              note: latestPendingOrder.note || '',
+              sendCutlery: latestPendingOrder.sendCutlery,
+              paymentMethod: latestPendingOrder.paymentMethod ?? latestPendingOrder.payment?.method,
+              payment: latestPendingOrder.payment
             }
 
-            console.log('📦 Found confirmed order (fallback):', orderForPopup)
+            console.log('📦 Found pending order (fallback):', orderForPopup)
             shownOrdersRef.current.add(orderId)
             setPopupOrder(orderForPopup)
             setShowNewOrderPopup(true)
@@ -1370,12 +1370,21 @@ export default function OrdersMain() {
         }}
       >
         <style>{`
-          .content-scroll {
-            scrollbar-width: none;
-            -ms-overflow-style: none;
-          }
           .content-scroll::-webkit-scrollbar {
             display: none;
+          }
+          .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+          }
+          .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f1f1;
+          }
+          .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #ccc;
+            border-radius: 10px;
+          }
+          .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #999;
           }
         `}</style>
 
@@ -1480,71 +1489,67 @@ export default function OrdersMain() {
                 onClick={(e) => e.stopPropagation()}
               >
                 {/* Header */}
-                <div className="px-4 py-3 bg-white border-b border-gray-200 flex items-center justify-between">
-                  <div className="flex-1">
-                    <h3 className="text-base font-bold text-gray-900">
+                <div className="px-6 py-5 bg-white border-b border-gray-100 flex items-center justify-between">
+                  <div>
+                    <h3 className="text-xl font-extrabold text-gray-900 tracking-tight">
                       {(popupOrder || newOrder)?.orderId || '#Order'}
                     </h3>
-                    <p className="text-xs text-gray-500 mt-0.5">
+                    <p className="text-[13px] text-gray-500 font-semibold mt-0.5">
                       {(popupOrder || newOrder)?.restaurantName || 'Restaurant'}
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-4">
                     <button
                       onClick={handlePrint}
-                      className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                      className="p-1.5 hover:bg-gray-50 rounded-lg transition-colors group"
                       aria-label="Print"
                     >
-                      <Printer className="w-5 h-5 text-gray-700" />
+                      <Printer className="w-[20px] h-[20px] text-gray-700 group-hover:text-black" />
                     </button>
                     <button
                       onClick={toggleMute}
-                      className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                      className="p-1.5 hover:bg-gray-50 rounded-lg transition-colors group"
                       aria-label={isMuted ? "Unmute" : "Mute"}
                     >
                       {isMuted ? (
-                        <VolumeX className="w-5 h-5 text-gray-700" />
+                        <VolumeX className="w-[20px] h-[20px] text-gray-700 group-hover:text-black" />
                       ) : (
-                        <Volume2 className="w-5 h-5 text-gray-700" />
+                        <Volume2 className="w-[20px] h-[20px] text-gray-700 group-hover:text-black" />
                       )}
                     </button>
                   </div>
                 </div>
 
                 {/* Content */}
-                <div className="px-4 py-4 max-h-[60vh] overflow-y-auto">
-                  {/* Customer info */}
-                  <div className="mb-4">
-                    <h4 className="text-sm font-semibold text-gray-900">
+                <div className="px-6 py-5 max-h-[70vh] overflow-y-auto custom-scrollbar">
+                  {/* Item Summary and Date */}
+                  <div className="mb-6">
+                    <h4 className="text-[16px] font-extrabold text-gray-900 tracking-tight">
                       {(popupOrder || newOrder)?.items?.[0]?.name || 'New Order'}
                     </h4>
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="text-[13px] text-gray-500 font-medium mt-1">
                       {(popupOrder || newOrder)?.createdAt
-                        ? new Date((popupOrder || newOrder).createdAt).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+                        ? new Date((popupOrder || newOrder).createdAt).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).replace(',', '')
                         : 'Just now'}
                     </p>
                   </div>
 
                   {/* Details Accordion */}
-                  <div className="mb-4">
+                  <div className="mb-2">
                     <button
                       onClick={() => setIsDetailsExpanded(!isDetailsExpanded)}
-                      className="w-full flex items-center justify-between py-2 border-b border-gray-200"
+                      className="w-full flex items-center justify-between py-3.5 group"
                     >
-                      <div className="flex items-center gap-2">
-                        <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      <div className="flex items-center gap-3">
+                        <svg className="w-5 h-5 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
-                        <span className="text-sm font-semibold text-gray-900">Details</span>
-                        <span className="text-xs text-gray-500">
+                        <span className="text-sm font-bold text-gray-900">Details</span>
+                        <span className="text-[13px] font-medium text-gray-500">
                           {(popupOrder || newOrder)?.items?.length || 0} item{(popupOrder || newOrder)?.items?.length !== 1 ? 's' : ''}
                         </span>
                       </div>
-                      {isDetailsExpanded ? (
-                        <ChevronUp className="w-4 h-4 text-gray-600" />
-                      ) : (
-                        <ChevronDown className="w-4 h-4 text-gray-600" />
-                      )}
+                      <ChevronDown className={`w-4 h-4 text-gray-400 group-hover:text-gray-600 transition-transform duration-300 ${isDetailsExpanded ? 'rotate-180' : ''}`} />
                     </button>
 
                     <AnimatePresence>
@@ -1553,23 +1558,21 @@ export default function OrdersMain() {
                           initial={{ height: 0, opacity: 0 }}
                           animate={{ height: "auto", opacity: 1 }}
                           exit={{ height: 0, opacity: 0 }}
-                          transition={{ duration: 0.2 }}
+                          transition={{ duration: 0.25, ease: "easeInOut" }}
                           className="overflow-hidden"
                         >
-                          <div className="py-3 space-y-3">
+                          <div className="pb-5 space-y-4 pt-1">
                             {(popupOrder || newOrder)?.items?.map((item, index) => (
-                              <div key={index} className="flex items-start gap-3">
-                                <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${item.isVeg ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                                <div className="flex-1">
-                                  <div className="flex items-start justify-between">
-                                    <p className="text-sm font-medium text-gray-900">
-                                      {item.quantity} x {item.name}
-                                    </p>
-                                    <p className="text-xs text-gray-600 ml-2">
-                                      ₹{item.price * item.quantity}
-                                    </p>
-                                  </div>
+                              <div key={index} className="flex items-center justify-between px-1">
+                                <div className="flex items-center gap-3">
+                                  <div className={`w-2 h-2 rounded-full shrink-0 ${item.isVeg !== false ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                                  <p className="text-[14px] font-bold text-gray-900">
+                                    {item.quantity} x {item.name}
+                                  </p>
                                 </div>
+                                <p className="text-[14px] font-bold text-gray-900">
+                                  ₹{item.price * item.quantity}
+                                </p>
                               </div>
                             )) || (
                                 <p className="text-sm text-gray-500">No items</p>
@@ -1581,100 +1584,97 @@ export default function OrdersMain() {
                   </div>
 
                   {/* Send cutlery */}
-                  {(popupOrder || newOrder)?.sendCutlery && (
-                    <div className="mb-4 flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
-                      <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-                      </svg>
-                      <span className="text-sm text-gray-700">Send cutlery</span>
-                    </div>
-                  )}
+                  <div className="mb-6 p-4 bg-gray-50/70 rounded-xl border border-gray-100 flex items-center gap-3 mt-2">
+                    <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                    <span className="text-[14px] font-bold text-gray-600">Send cutlery</span>
+                  </div>
 
                   {/* Total bill */}
-                  <div className="mb-4 flex items-center justify-between py-3 border-y border-gray-200">
-                    <div className="flex items-center gap-2">
-                      <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" />
+                  <div className="mb-6 flex items-center justify-between py-5 border-y border-gray-100">
+                    <div className="flex items-center gap-3">
+                      <svg className="w-5 h-5 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" />
                       </svg>
-                      <span className="text-sm font-semibold text-gray-900">Total bill</span>
+                      <span className="text-[15px] font-extrabold text-gray-900">Total bill</span>
                     </div>
-                    <span className="text-base font-bold text-gray-900">
+                    <span className="text-[18px] font-extrabold text-gray-950">
                       ₹{(popupOrder || newOrder)?.total || 0}
                     </span>
                   </div>
 
-                  {/* Payment method: treat cash/cod (any case) as COD */}
-                  {(() => {
-                    const raw = (popupOrder || newOrder)?.paymentMethod ?? (popupOrder || newOrder)?.payment?.method;
-                    const m = raw != null ? String(raw).toLowerCase().trim() : '';
-                    const isCod = m === 'cash' || m === 'cod';
-                    return (
-                      <div className="mb-4 flex items-center justify-between py-2">
-                        <span className="text-sm font-medium text-gray-700">Payment</span>
-                        <span className={`text-sm font-semibold ${isCod ? 'text-amber-600' : 'text-green-600'}`}>
+                  {/* Payment method */}
+                  <div className="mb-6 flex items-center justify-between px-1">
+                    <span className="text-[14px] font-semibold text-gray-500">Payment</span>
+                    {(() => {
+                      const raw = (popupOrder || newOrder)?.paymentMethod ?? (popupOrder || newOrder)?.payment?.method;
+                      const m = raw != null ? String(raw).toLowerCase().trim() : '';
+                      const isCod = m === 'cash' || m === 'cod' || m === 'cash on delivery';
+                      return (
+                        <span className={`text-[14px] font-extrabold ${isCod ? 'text-amber-600' : 'text-green-600'}`}>
                           {isCod ? 'Cash on Delivery' : 'Online'}
                         </span>
-                      </div>
-                    );
-                  })()}
+                      );
+                    })()}
+                  </div>
 
                   {/* Preparation time */}
-                  <div className="mb-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-sm font-medium text-gray-700">Preparation time</span>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => setPrepTime(Math.max(1, prepTime - 1))}
-                          className="p-1.5 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors"
-                        >
-                          <Minus className="w-4 h-4 text-gray-700" />
-                        </button>
-                        <span className="text-base font-semibold text-gray-900 min-w-[60px] text-center">
-                          {prepTime} mins
-                        </span>
-                        <button
-                          onClick={() => setPrepTime(prepTime + 1)}
-                          className="p-1.5 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors"
-                        >
-                          <Plus className="w-4 h-4 text-gray-700" />
-                        </button>
-                      </div>
+                  <div className="mb-7 flex items-center justify-between px-1">
+                    <span className="text-[14px] font-semibold text-gray-500">Preparation time</span>
+                    <div className="flex items-center gap-4">
+                      <button
+                        onClick={() => setPrepTime(Math.max(1, prepTime - 1))}
+                        className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-full transition-all"
+                      >
+                        <Minus className="w-4 h-4 text-gray-700" />
+                      </button>
+                      <span className="text-[15px] font-extrabold text-gray-950 min-w-[65px] text-center">
+                        {prepTime} mins
+                      </span>
+                      <button
+                        onClick={() => setPrepTime(prepTime + 1)}
+                        className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-full transition-all"
+                      >
+                        <Plus className="w-4 h-4 text-gray-700" />
+                      </button>
                     </div>
                   </div>
 
                   {/* Accept and Reject buttons */}
-                  <div className="space-y-3">
-                    <div className="relative">
+                  <div className="space-y-4 px-1">
+                    <div className="relative rounded-xl overflow-hidden shadow-lg shadow-blue-100">
                       <button
                         onClick={handleAcceptOrder}
-                        className="w-full bg-[#3B82F6] text-white py-3.5 rounded-lg font-semibold text-sm hover:bg-blue-600 transition-colors relative overflow-hidden"
+                        className="w-full bg-[#1A68FF] text-white py-4 font-extrabold text-[15px] hover:bg-blue-600 transition-colors flex items-center justify-center gap-2 relative z-10"
                       >
-                        {/* Loading background */}
+                        Accept ({formatTime(countdown)})
+                      </button>
+                      {/* Accept Loading Bar at bottom (matching screenshot style) */}
+                      <div className="absolute bottom-0 left-0 h-1.5 bg-black/20 w-full z-20">
                         <motion.div
-                          className="absolute inset-0 bg-blue-700"
+                          className="h-full bg-black/40"
                           initial={{ width: "100%" }}
                           animate={{ width: `${(countdown / 240) * 100}%` }}
                           transition={{ duration: 1, ease: "linear" }}
                         />
-                        <span className="relative z-10">Accept ({formatTime(countdown)})</span>
-                      </button>
+                      </div>
                     </div>
 
-                    {/* Reject button */}
                     <button
                       onClick={handleRejectClick}
-                      className="w-full bg-white border-2 border-red-500 text-red-600 py-3 rounded-lg font-semibold text-sm hover:bg-red-50 transition-colors"
+                      className="w-full bg-white border border-red-500 text-red-600 py-3.5 rounded-xl font-extrabold text-[15px] hover:bg-red-50 transition-colors"
                     >
                       Reject Order
                     </button>
                   </div>
-                </div>
 
-                {/* Footer */}
-                <div className="px-4 py-3 bg-gray-50 border-t border-gray-200">
-                  <button className="text-sm text-gray-600 hover:text-gray-900 transition-colors underline mx-auto block">
-                    Need help with this order?
-                  </button>
+                  {/* Need Help Link */}
+                  <div className="mt-8 pb-2">
+                    <button className="text-[14px] font-bold text-gray-600 hover:text-gray-900 transition-colors underline underline-offset-4 mx-auto block decoration-gray-300 hover:decoration-gray-900">
+                      Need help with this order?
+                    </button>
+                  </div>
                 </div>
               </motion.div>
             </motion.div>
@@ -2168,11 +2168,11 @@ function PreparingOrders({ onSelectOrder, onCancel }) {
         if (!isMounted) return
 
         if (response.data?.success && response.data.data?.orders) {
-          // Filter orders with 'preparing' status only
-          // 'confirmed' orders should only appear in popup notification, not in preparing list
-          // After accepting, order status changes to 'preparing' and then appears here
+          // Filter orders with 'preparing' or 'confirmed' (Accepted) status
+          // 'confirmed' orders should appear in preparing list after acceptance
+          // 'pending' orders should only appear in popup notification
           const preparingOrders = response.data.data.orders.filter(
-            order => order.status === 'preparing'
+            order => ['preparing', 'confirmed'].includes(order.status)
           )
 
           const transformedOrders = preparingOrders.map(order => {

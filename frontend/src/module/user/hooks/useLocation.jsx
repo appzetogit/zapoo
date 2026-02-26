@@ -130,17 +130,10 @@ export function useLocation() {
       const GOOGLE_MAPS_API_KEY = await getGoogleMapsApiKey();
 
       if (!GOOGLE_MAPS_API_KEY) {
-        console.warn("⚠️ Google Maps API key not found in database. Using fallback geocoding service (BigDataCloud).");
-        console.warn("💡 Please set VITE_GOOGLE_MAPS_API_KEY in Admin → System → Environment Variables for higher precision.");
         return reverseGeocodeDirect(latitude, longitude);
       }
 
-      console.log("🔍 Fetching address from Google Maps for:", latitude, longitude);
-      console.log("🔍 Using Google Maps API Key:", GOOGLE_MAPS_API_KEY.substring(0, 10) + "...");
-      console.log("🔍 Coordinates precision:", {
-        lat: latitude.toFixed(8),
-        lng: longitude.toFixed(8)
-      });
+      // Fetching address...
 
       // Validate coordinates are in India range BEFORE fetching
       // India: Latitude 6.5° to 37.1° N, Longitude 68.7° to 97.4° E
@@ -192,12 +185,7 @@ export function useLocation() {
       }
 
       // Log full response for debugging
-      console.log("📦📦📦 Google Maps API Full Response:", {
-        status: data.status,
-        error_message: data.error_message,
-        results_count: data.results?.length || 0,
-        has_results: !!data.results && data.results.length > 0
-      });
+      // Response received
 
       // Check for API errors
       if (data.status === "REQUEST_DENIED") {
@@ -302,18 +290,7 @@ export function useLocation() {
       }
 
       // Log detailed information about the selected result
-      console.log(`📦 Using results[${bestResultIndex}] (Most Precise - Zomato Style):`, {
-        index: bestResultIndex,
-        formattedAddress,
-        formattedAddressParts: formattedAddress.split(',').length,
-        hasPOI: addressComponents.some(c => c.types.includes("point_of_interest")),
-        hasPremise: addressComponents.some(c => c.types.includes("premise")),
-        hasSublocality: addressComponents.some(c => c.types.includes("sublocality_level_1")),
-        allComponents: addressComponents.map(c => ({
-          name: c.long_name,
-          types: c.types
-        }))
-      });
+      // Precise result selected
 
       // If formattedAddress is incomplete (only 2 parts = city, state), log warning
       const addressPartsCount = formattedAddress.split(',').map(p => p.trim()).filter(p => p.length > 0).length;
@@ -327,30 +304,9 @@ export function useLocation() {
       }
 
       // Log ALL results to see what Google is returning
-      console.log("📦 Google Maps API Response - All Results:", {
-        totalResults: data.results.length,
-        results: data.results.map((r, i) => ({
-          index: i,
-          formatted_address: r.formatted_address,
-          types: r.types,
-          hasPOI: r.address_components?.some(c => c.types.includes("point_of_interest")),
-          hasPremise: r.address_components?.some(c => c.types.includes("premise")),
-          hasSublocality: r.address_components?.some(c => c.types.includes("sublocality_level_1"))
-        }))
-      });
+      // Log results list silently
 
-      console.log("📦 Using results[0] (Most Precise - Zomato Style):", {
-        status: data.status,
-        formattedAddress,
-        addressComponentsCount: addressComponents.length,
-        hasPremise: addressComponents.some(c => c.types.includes("premise")),
-        hasPOI: addressComponents.some(c => c.types.includes("point_of_interest")),
-        hasSublocality: addressComponents.some(c => c.types.includes("sublocality_level_1")),
-        allComponentTypes: addressComponents.map(c => ({
-          name: c.long_name,
-          types: c.types
-        }))
-      });
+      // Selection finalized
 
       // Extract address components with priority order (Zomato style - EXACT LOCATION)
       let city = "";
@@ -808,33 +764,11 @@ export function useLocation() {
         }
       }
 
-      console.log("✅✅✅ Google Maps Reverse Geocode + Places API - Complete Address:", {
-        mainTitle, // ZOMATO-STYLE: Building/Cafe name
-        mainLocation, // ZOMATO-STYLE: Main location for display
-        placeName: placeName || "Not found", // From Places API
-        pointOfInterest,
-        premise,
-        streetNumber,
-        floor,
-        sublocalityLevel1,
-        city,
-        state,
-        postalCode,
-        completeFormattedAddress,
-        displayAddress,
-        area,
-        formattedAddressFromGoogle: formattedAddress, // Original from Google
-        // Places API Details
-        hasPlaceDetails: !!placeDetails,
-        phone: placePhone || "Not available",
-        website: placeWebsite || "Not available",
-        rating: placeRating || "Not rated",
-        photosCount: placePhotos.length
-      });
+      // Address extracted
 
       // Final validation: Ensure mainTitle/mainLocation is used properly
       if (mainTitle && mainTitle !== "Location Found") {
-        console.log("✅✅✅ ZOMATO-STYLE SUCCESS: Exact building/cafe name extracted:", mainTitle);
+        // Exact building extracted
       } else {
         console.warn("⚠️⚠️⚠️ ZOMATO-STYLE WARNING: Could not extract exact building/cafe name");
         console.warn("⚠️ This might be due to:");
@@ -873,22 +807,7 @@ export function useLocation() {
         placeTypes: placeDetails?.types || []
       };
 
-      console.log("✅✅✅ FINAL Location Result (ZOMATO-STYLE + Google Places API):", {
-        mainTitle: locationResult.mainTitle,
-        placeName: locationResult.placeName,
-        address: locationResult.address,
-        formattedAddress: locationResult.formattedAddress,
-        area: locationResult.area,
-        city: locationResult.city,
-        state: locationResult.state,
-        phone: locationResult.phone,
-        website: locationResult.website,
-        rating: locationResult.rating,
-        photosCount: locationResult.photos?.length || 0,
-        hasPlaceDetails: locationResult.hasPlaceDetails,
-        hasCompleteAddress: locationResult.formattedAddress &&
-          locationResult.formattedAddress.split(',').length >= 4
-      });
+      // Final location calculated
 
       return locationResult;
     } catch (error) {

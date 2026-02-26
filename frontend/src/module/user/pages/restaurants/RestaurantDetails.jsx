@@ -472,7 +472,7 @@ export default function RestaurantDetails() {
                     section.items.forEach(item => {
                       // Strict check: isRecommended must be exactly boolean true
                       // This will exclude: false, undefined, null, 0, "", and any other falsy values
-                      if (item.isRecommended === true && typeof item.isRecommended === 'boolean' && item.isAvailable !== false) {
+                      if (item.isRecommended && item.isAvailable !== false) {
                         recommendedItems.push(item)
                       }
                     })
@@ -484,7 +484,7 @@ export default function RestaurantDetails() {
                         subsection.items.forEach(item => {
                           // Strict check: isRecommended must be exactly boolean true
                           // This will exclude: false, undefined, null, 0, "", and any other falsy values
-                          if (item.isRecommended === true && typeof item.isRecommended === 'boolean' && item.isAvailable !== false) {
+                          if (item.isRecommended && item.isAvailable !== false) {
                             recommendedItems.push(item)
                           }
                         })
@@ -1682,9 +1682,9 @@ export default function RestaurantDetails() {
 
                             {/* Right Side - Image and Add Button */}
                             <div className="relative w-32 h-32 flex-shrink-0">
-                              {item.image ? (
+                              {(item.image || (item.images && item.images.length > 0)) ? (
                                 <img
-                                  src={item.image}
+                                  src={item.image || item.images[0]}
                                   alt={item.name}
                                   className="w-full h-full object-cover rounded-2xl shadow-sm"
                                 />
@@ -1902,9 +1902,9 @@ export default function RestaurantDetails() {
 
                                       {/* Right Side - Image and Add Button */}
                                       <div className="relative w-32 h-32 flex-shrink-0">
-                                        {item.image ? (
+                                        {(item.image || (item.images && item.images.length > 0)) ? (
                                           <img
-                                            src={item.image}
+                                            src={item.image || item.images[0]}
                                             alt={item.name}
                                             className="w-full h-full object-cover rounded-2xl shadow-sm"
                                           />

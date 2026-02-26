@@ -112,22 +112,22 @@ export default function DeliveryWelcome() {
           {/* Money Illustration - Stack of Currency Notes */}
           <div className="flex justify-center mb-4">
             <div className="relative">
-              <div className="w-24 h-24 bg-green-600 rounded-lg flex items-center justify-center relative overflow-visible">
-                <div className="absolute inset-0 bg-gradient-to-br from-green-500 to-green-700 rounded-lg"></div>
+              <div className="w-24 h-24 bg-[#DC2626] rounded-lg flex items-center justify-center relative overflow-visible">
+                <div className="absolute inset-0 bg-gradient-to-br from-[#DC2626] to-[#B91C1C] rounded-lg"></div>
                 {/* Stack of money notes with band */}
                 <div className="relative z-10">
                   {/* Band/Tie around notes */}
                   {/* <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-3 bg-amber-300 rounded-full z-30"></div> */}
 
                   {/* Note 1 - Back (left) */}
-                  <div className="w-10 h-14 bg-green-400 rounded-sm transform -rotate-12 absolute -left-2 top-1/2 -translate-y-1/2 z-0 shadow-md"></div>
+                  <div className="w-10 h-14 bg-[#EF4444] rounded-sm transform -rotate-12 absolute -left-2 top-1/2 -translate-y-1/2 z-0 shadow-md"></div>
 
                   {/* Note 2 - Middle */}
-                  <div className="w-10 h-14 bg-green-300 rounded-sm transform rotate-0 relative z-10 shadow-lg"></div>
+                  <div className="w-10 h-14 bg-[#F87171] rounded-sm transform rotate-0 relative z-10 shadow-lg"></div>
 
                   {/* Note 3 - Front (right) */}
-                  <div className="w-10 h-14 bg-green-200 rounded-sm transform rotate-12 absolute -right-2 top-1/2 -translate-y-1/2 z-20 shadow-xl flex items-center justify-center">
-                    <IndianRupee className="w-5 h-5 text-green-800" strokeWidth={3} />
+                  <div className="w-10 h-14 bg-[#FCA5A5] rounded-sm transform rotate-12 absolute -right-2 top-1/2 -translate-y-1/2 z-20 shadow-xl flex items-center justify-center">
+                    <IndianRupee className="w-5 h-5 text-red-800" strokeWidth={3} />
                   </div>
                 </div>
               </div>
@@ -153,7 +153,7 @@ export default function DeliveryWelcome() {
               // Navigate directly to delivery home page (map with hotspots)
               navigate("/delivery", { replace: true })
             }}
-            className="w-full bg-[#00B761] hover:bg-[#00A055] text-white font-bold py-4 rounded-lg mt-4 flex items-center justify-center gap-2 transition-colors"
+            className="w-full bg-[#DC2626] hover:bg-[#C52222] text-white font-bold py-4 rounded-lg mt-4 flex items-center justify-center gap-2 transition-colors"
           >
             <span>Start earning</span>
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -271,7 +271,7 @@ export default function DeliveryWelcome() {
           <div className="relative mb-6 z-10">
             {/* Outer ring animation */}
             <motion.div
-              className="absolute inset-0 w-32 h-32 rounded-full border-4 border-green-500"
+              className="absolute inset-0 w-32 h-32 rounded-full border-4 border-[#DC2626]"
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1.2, opacity: 0 }}
               transition={{
@@ -283,7 +283,7 @@ export default function DeliveryWelcome() {
 
             {/* Main circle with checkmark */}
             <motion.div
-              className="w-32 h-32 bg-gradient-to-br from-green-500 to-green-600 rounded-full flex items-center justify-center shadow-2xl relative overflow-hidden"
+              className="w-32 h-32 bg-gradient-to-br from-[#DC2626] to-[#B91C1C] rounded-full flex items-center justify-center shadow-2xl relative overflow-hidden"
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
               transition={{

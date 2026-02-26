@@ -183,7 +183,7 @@ export const reverseGeocode = async (req, res) => {
       // All OLA Maps methods failed or not configured, use fallback
       if (!response) {
         try {
-          logger.warn('⚠️ All OLA Maps authentication methods failed or not configured. Using Fallback service (BigDataCloud) for reverse geocoding.');
+          logger.info('Using fallback geocoding service');
 
           try {
             // Try Google Maps Geocoding API first (better sublocality data)

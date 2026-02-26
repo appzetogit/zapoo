@@ -244,7 +244,7 @@ export default function ViewSupportTicket() {
             <div className="pt-4 border-t border-gray-200">
               <button
                 onClick={() => navigate(-1)}
-                className="w-full px-6 py-3 bg-[#FD7675] text-white font-medium rounded-lg hover:bg-[#FD7675]/90 transition-colors"
+                className="w-full px-6 py-3 bg-[#DC2626] text-white font-medium rounded-lg hover:bg-[#DC2626]/90 transition-colors"
               >
                 Close
               </button>

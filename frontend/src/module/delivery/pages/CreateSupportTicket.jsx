@@ -204,7 +204,7 @@ export default function CreateSupportTicket() {
               <select
                 value={formData.category}
                 onChange={(e) => handleInputChange("category", e.target.value)}
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white appearance-none cursor-pointer"
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#DC2626] focus:border-[#DC2626] bg-white appearance-none cursor-pointer"
               >
                 <option value="other">Other</option>
                 <option value="payment">Payment</option>
@@ -221,7 +221,7 @@ export default function CreateSupportTicket() {
               <select
                 value={formData.priority}
                 onChange={(e) => handleInputChange("priority", e.target.value)}
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white appearance-none cursor-pointer"
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#DC2626] focus:border-[#DC2626] bg-white appearance-none cursor-pointer"
               >
                 <option value="low">Low</option>
                 <option value="medium">Medium</option>
@@ -236,7 +236,7 @@ export default function CreateSupportTicket() {
             <button
               onClick={handleCreateTicket}
               disabled={creating || !formData.subject.trim() || formData.description.trim().length < 10}
-              className="w-full sm:w-auto px-6 py-3 bg-[#FD7675] text-white font-medium rounded-lg hover:bg-[#FD7675]/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors"
+              className="w-full sm:w-auto px-6 py-3 bg-[#DC2626] text-white font-medium rounded-lg hover:bg-[#DC2626]/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors"
             >
               {creating ? (
                 <>

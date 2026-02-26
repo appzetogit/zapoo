@@ -59,6 +59,7 @@ export default function ItemDetailsPage() {
   const [images, setImages] = useState([])
   const [imageFiles, setImageFiles] = useState(new Map()) // Track File objects by preview URL
   const [uploadingImages, setUploadingImages] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const [touchStart, setTouchStart] = useState(null)
   const [touchEnd, setTouchEnd] = useState(null)
@@ -751,10 +752,101 @@ export default function ItemDetailsPage() {
     }
   }
 
-  const handleDelete = () => {
-    // Delete logic here
-    console.log("Deleting item:", id)
-    navigate(-1)
+  const handleDelete = async () => {
+    if (isNewItem) {
+      navigate(-1)
+      return
+    }
+
+    if (!window.confirm("Are you sure you want to delete this item?")) return
+
+    try {
+      setIsDeleting(true)
+
+      // Get current menu
+      const menuResponse = await restaurantAPI.getMenu()
+      if (!menuResponse.data?.success) {
+        throw new Error(menuResponse.data?.message || "Failed to fetch menu")
+      }
+
+      let sections = menuResponse.data?.data?.menu?.sections || []
+
+      // Identify the item ID
+      const itemId = itemData?.id || id
+      if (!itemId) {
+        toast.error("Could not identify item to delete")
+        return
+      }
+
+      const searchId = String(itemId).trim()
+      const urlId = String(id || "").trim()
+      let itemRemoved = false
+
+      // Loop through sections to find and remove the item
+      for (let sectionIndex = 0; sectionIndex < sections.length; sectionIndex++) {
+        const section = sections[sectionIndex]
+
+        // Check items in section
+        if (section.items && Array.isArray(section.items)) {
+          const itemIndex = section.items.findIndex((item) => {
+            const itemIdStr = String(item.id || item._id || "").trim()
+            return itemIdStr === searchId || itemIdStr === urlId
+          })
+
+          if (itemIndex !== -1) {
+            section.items.splice(itemIndex, 1)
+            itemRemoved = true
+            console.log(`Deleted item from section: ${section.name}`)
+            break
+          }
+        }
+
+        // Check items in subsections
+        if (!itemRemoved && section.subsections && Array.isArray(section.subsections)) {
+          for (let subIndex = 0; subIndex < section.subsections.length; subIndex++) {
+            const subsection = section.subsections[subIndex]
+            if (subsection.items && Array.isArray(subsection.items)) {
+              const subItemIndex = subsection.items.findIndex((item) => {
+                const itemIdStr = String(item.id || item._id || "").trim()
+                return itemIdStr === searchId || itemIdStr === urlId
+              })
+
+              if (subItemIndex !== -1) {
+                subsection.items.splice(subItemIndex, 1)
+                itemRemoved = true
+                console.log(`Deleted item from subsection: ${subsection.name} in section: ${section.name}`)
+                break
+              }
+            }
+          }
+          if (itemRemoved) break
+        }
+      }
+
+      if (itemRemoved) {
+        // Update menu with the item removed
+        const updateResponse = await restaurantAPI.updateMenu({ sections })
+
+        if (updateResponse.data?.success) {
+          toast.success("Item deleted successfully")
+          // Small delay to ensure backend has processed the update
+          await new Promise((resolve) => setTimeout(resolve, 300))
+          // Trigger refresh and navigate back
+          window.dispatchEvent(new CustomEvent("foodsChanged"))
+          navigate("/restaurant/hub-menu", { replace: true })
+        } else {
+          toast.error(updateResponse.data?.message || "Failed to delete item")
+        }
+      } else {
+        toast.warning("Item already removed or not found")
+        navigate("/restaurant/hub-menu", { replace: true })
+      }
+    } catch (error) {
+      console.error("Error deleting item:", error)
+      toast.error(error.response?.data?.message || error.message || "Failed to delete item. Please try again.")
+    } finally {
+      setIsDeleting(false)
+    }
   }
 
   return (
@@ -1264,15 +1356,16 @@ export default function ItemDetailsPage() {
           {!isNewItem && (
             <button
               onClick={handleDelete}
-              className="flex-1 py-3 px-4 border border-black rounded-lg text-sm font-semibold text-black bg-white hover:bg-gray-50 transition-colors"
+              disabled={isDeleting || uploadingImages}
+              className="flex-1 py-3 px-4 border border-black rounded-lg text-sm font-semibold text-black bg-white hover:bg-gray-50 transition-colors flex items-center justify-center disabled:opacity-50"
             >
-              Delete
+              {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : "Delete"}
             </button>
           )}
           <button
             onClick={handleSave}
-            disabled={uploadingImages}
-            className={`${isNewItem ? 'w-full' : 'flex-1'} py-3 px-4 rounded-lg text-sm font-semibold transition-colors flex items-center justify-center gap-2 ${!uploadingImages
+            disabled={uploadingImages || isDeleting}
+            className={`${isNewItem ? 'w-full' : 'flex-1'} py-3 px-4 rounded-lg text-sm font-semibold transition-colors flex items-center justify-center gap-2 ${!uploadingImages && !isDeleting
               ? "bg-black text-white hover:bg-black"
               : "bg-gray-300 text-gray-500 cursor-not-allowed"
               }`}
@@ -1280,7 +1373,7 @@ export default function ItemDetailsPage() {
             {uploadingImages ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Uploading...</span>
+                <span>Saving...</span>
               </>
             ) : (
               "Save"

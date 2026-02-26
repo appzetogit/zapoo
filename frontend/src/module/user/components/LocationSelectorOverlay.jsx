@@ -40,7 +40,7 @@ const getAddressIcon = (address) => {
   return Home
 }
 
-export default function LocationSelectorOverlay({ isOpen, onClose }) {
+export default function LocationSelectorOverlay({ isOpen, onClose, initialLabel = null }) {
   const navigate = useNavigate()
   const inputRef = useRef(null)
   const [searchValue, setSearchValue] = useState("")
@@ -79,6 +79,26 @@ export default function LocationSelectorOverlay({ isOpen, onClose }) {
       })
     })
   }, [])
+
+  // Handle initialLabel
+  useEffect(() => {
+    if (isOpen && initialLabel) {
+      const existing = addresses.find(addr => addr.label === initialLabel)
+      if (existing) {
+        // If address exists, we can either select it or edit it.
+        // For now, let's just select it and show it on map
+        handleSelectSavedAddress(existing)
+      } else {
+        // If it doesn't exist, open add form with this label
+        setShowAddressForm(true)
+        setAddressFormData(prev => ({
+          ...prev,
+          label: initialLabel,
+          phone: userProfile?.phone || ""
+        }))
+      }
+    }
+  }, [isOpen, initialLabel, addresses.length])
   const reverseGeocodeTimeoutRef = useRef(null) // Debounce timeout for reverse geocoding
   const lastReverseGeocodeCoordsRef = useRef(null) // Track last coordinates to avoid duplicate calls
 
@@ -2002,23 +2022,37 @@ export default function LocationSelectorOverlay({ isOpen, onClose }) {
         longitude: mapPosition[1], // longitude from mapPosition[1]
       }
 
-      // Check if an address with the same label already exists
-      const existingAddressWithSameLabel = addresses.find(addr => addr.label === normalizedLabel)
+      // Logic for saving:
+      // 1. If we have addressFormData.id, it means we are editing a specific address.
+      // 2. If no id, check if an address with normalizedLabel already exists.
+      // 3. If exists, update that one (overwrite).
+      // 4. If not, create new.
 
-      if (existingAddressWithSameLabel) {
-        // Update existing address instead of creating a new one
-        console.log("🔄 Updating existing address with label:", normalizedLabel)
-        await updateAddress(existingAddressWithSameLabel.id, addressToSave)
-        toast.success(`Address updated for ${normalizedLabel}!`)
+      if (addressFormData.id) {
+        // Update specific address by ID
+        console.log("🔄 Updating specific address by ID:", addressFormData.id)
+        await updateAddress(addressFormData.id, addressToSave)
+        toast.success(`Address updated!`)
       } else {
-        // Create new address
-        console.log("💾 Saving new address:", addressToSave)
-        await addAddress(addressToSave)
-        toast.success(`Address saved as ${normalizedLabel}!`)
+        // Check if an address with the same label already exists to decide between add or update
+        const existingAddressWithSameLabel = addresses.find(addr => addr.label === normalizedLabel)
+
+        if (existingAddressWithSameLabel) {
+          // Update existing address instead of creating a new one (overwrite by label)
+          console.log("🔄 Updating existing address with label:", normalizedLabel)
+          await updateAddress(existingAddressWithSameLabel.id, addressToSave)
+          toast.success(`${normalizedLabel} address updated!`)
+        } else {
+          // Create new address
+          console.log("💾 Saving new address:", addressToSave)
+          await addAddress(addressToSave)
+          toast.success(`Address saved as ${normalizedLabel}!`)
+        }
       }
 
       // Reset form
       setAddressFormData({
+        id: null,
         street: "",
         city: "",
         state: "",
@@ -2032,7 +2066,13 @@ export default function LocationSelectorOverlay({ isOpen, onClose }) {
 
       // Close overlay and redirect to home page
       onClose()
-      navigate("/")
+      // Use window.location.reload() or similar if needed to refresh the page state
+      // navigate("/") // Redirecting to home might be disruptive if on checkout
+      if (window.location.pathname.includes('/cart') || window.location.pathname.includes('/checkout')) {
+        // Just let the context update handle it
+      } else {
+        navigate("/")
+      }
     } catch (error) {
       console.error("❌ Error saving address:", error)
       console.error("❌ Error details:", {
@@ -2107,8 +2147,9 @@ export default function LocationSelectorOverlay({ isOpen, onClose }) {
       // Update map position to show selected address
       setMapPosition([latitude, longitude])
 
-      // Update address form data with selected address
+      // Update address form data with selected address (to keep in sync if form opens)
       setAddressFormData({
+        id: address.id, // Store ID for potential update
         street: address.street || "",
         city: address.city || "",
         state: address.state || "",
@@ -2155,6 +2196,40 @@ export default function LocationSelectorOverlay({ isOpen, onClose }) {
     }
   }
 
+  const handleEditSavedAddress = (address) => {
+    const coordinates = address.location?.coordinates || []
+    const longitude = coordinates[0]
+    const latitude = coordinates[1]
+
+    if (latitude && longitude) {
+      setMapPosition([latitude, longitude])
+    }
+
+    setAddressFormData({
+      id: address.id,
+      label: address.label || "Home",
+      street: address.street || "",
+      additionalDetails: address.additionalDetails || "",
+      city: address.city || "",
+      state: address.state || "",
+      zipCode: address.zipCode || "",
+      phone: address.phone || userProfile?.phone || "",
+    })
+
+    setShowAddressForm(true)
+
+    // Update map if it's initialized
+    if (googleMapRef.current && window.google && window.google.maps && latitude && longitude) {
+      setTimeout(() => {
+        googleMapRef.current.panTo({ lat: latitude, lng: longitude })
+        googleMapRef.current.setZoom(17)
+        if (greenMarkerRef.current) {
+          greenMarkerRef.current.setPosition({ lat: latitude, lng: longitude })
+        }
+      }, 500)
+    }
+  }
+
   // Calculate distance for saved addresses
   const getAddressDistance = (address) => {
     if (!location?.latitude || !location?.longitude) return "0 m"
@@ -2173,11 +2248,6 @@ export default function LocationSelectorOverlay({ isOpen, onClose }) {
     )
 
     return distance < 1000 ? `${Math.round(distance)} m` : `${(distance / 1000).toFixed(2)} km`
-  }
-
-  const handleEditAddress = (addressId) => {
-    // Edit address functionality removed - user can delete and add new address instead
-    toast.info("To edit address, please delete and add a new one")
   }
 
   if (!isOpen) return null
@@ -2287,10 +2357,26 @@ export default function LocationSelectorOverlay({ isOpen, onClose }) {
               </div>
             </div>
 
+            {/* Manual Address Field */}
+            <div>
+              <Label htmlFor="street" className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 block">
+                Address (Area / Street)*
+              </Label>
+              <Input
+                id="street"
+                name="street"
+                placeholder="E.g. Colony name, Street name"
+                value={addressFormData.street}
+                onChange={handleAddressFormChange}
+                className="bg-white dark:bg-[#1a1a1a] border-gray-200 dark:border-gray-700"
+                required
+              />
+            </div>
+
             {/* Address Details */}
             <div>
               <Label htmlFor="additionalDetails" className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 block">
-                Address details*
+                Additional address details*
               </Label>
               <Input
                 id="additionalDetails"
@@ -2343,12 +2429,6 @@ export default function LocationSelectorOverlay({ isOpen, onClose }) {
 
             {/* Hidden required fields for form validation */}
             <div className="hidden">
-              <Input
-                name="street"
-                value={addressFormData.street}
-                onChange={handleAddressFormChange}
-                required
-              />
               <Input
                 name="city"
                 value={addressFormData.city}
@@ -2510,9 +2590,21 @@ export default function LocationSelectorOverlay({ isOpen, onClose }) {
                               </div>
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className="font-semibold text-gray-900 dark:text-white">
-                                {address.label || address.additionalDetails || "Home"}
-                              </p>
+                              <div className="flex items-center justify-between">
+                                <p className="font-semibold text-gray-900 dark:text-white">
+                                  {address.label || address.additionalDetails || "Home"}
+                                </p>
+                                <button
+                                  onClick={(e) => {
+                                    e.preventDefault()
+                                    e.stopPropagation()
+                                    handleEditSavedAddress(address)
+                                  }}
+                                  className="text-xs font-semibold text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300 px-2 py-1 rounded hover:bg-green-50 dark:hover:bg-green-900/10"
+                                >
+                                  Edit
+                                </button>
+                              </div>
                               <p className="text-sm text-gray-500 dark:text-gray-400">
                                 {[
                                   address.additionalDetails,

@@ -28,6 +28,10 @@ import {
 import { formatCurrency } from "../../restaurant/utils/currency"
 import { useGigStore } from "../store/gigStore"
 import { useProgressStore } from "../store/progressStore"
+import {
+  HelpCircle as HelpIcon
+
+} from "lucide-react"
 import { getAllDeliveryOrders } from "../utils/deliveryOrderStatus"
 import { deliveryAPI } from "@/lib/api"
 import { API_BASE_URL } from "@/lib/api/config"
@@ -124,7 +128,7 @@ export default function PocketPage() {
       subtitle: "PAN & bank details required for payouts",
       icon: "bank",
       buttonText: "Submit",
-      bgColor: "bg-[#FD7675]"
+      bgColor: "bg-[#DC2626]"
     }]
     , [bankDetailsFilled])
 
@@ -687,7 +691,7 @@ export default function PocketPage() {
 
 
   return (
-    <div className="min-h-screen bg-[#f6e9dc]  overflow-x-hidden">
+    <div className="min-h-screen bg-gray-50 overflow-x-hidden">
       {/* Top Navigation Bar */}
       <FeedNavbar
         isOnline={isOnline}
@@ -739,10 +743,10 @@ export default function PocketPage() {
 
                   {/* Text Content */}
                   <div className="flex-1">
-                    <h3 className={`${(slide.bgColor === "bg-gray-700" || slide.bgColor === "bg-[#FD7675]") ? "text-white" : "text-black"} text-sm font-semibold mb-0.5`}>
+                    <h3 className={`${(slide.bgColor === "bg-gray-700" || slide.bgColor === "bg-[#DC2626]") ? "text-white" : "text-black"} text-sm font-semibold mb-0.5`}>
                       {slide.title}
                     </h3>
-                    <p className={`${(slide.bgColor === "bg-gray-700" || slide.bgColor === "bg-[#FD7675]") ? "text-white/90" : "text-black/80"} text-xs`}>
+                    <p className={`${(slide.bgColor === "bg-gray-700" || slide.bgColor === "bg-[#DC2626]") ? "text-white/90" : "text-black/80"} text-xs`}>
                       {slide.subtitle}
                     </p>
                   </div>
@@ -756,7 +760,7 @@ export default function PocketPage() {
                     }}
                     className={`px-3 py-1.5 rounded-lg font-medium text-xs transition-colors ${slide.bgColor === "bg-gray-700"
                       ? "bg-gray-600 text-white hover:bg-gray-500"
-                      : "bg-white text-[#FD7675] hover:bg-gray-100"
+                      : "bg-white text-[#DC2626] hover:bg-gray-100"
                       }`}>
                     {slide.buttonText}
                   </button>
@@ -811,7 +815,7 @@ export default function PocketPage() {
         >
           {/* Header */}
           <div className="border-b  border-gray-100">
-            <div className="flex p-2 px-3 items-center justify-between bg-[#FD7675]">
+            <div className="flex p-2 px-3 items-center justify-between bg-[#DC2626]">
               <div className="flex-1">
                 <h2 className="text-lg font-bold text-white mb-1">Earnings Guarantee</h2>
                 <div className="flex items-center gap-2">
@@ -825,7 +829,7 @@ export default function PocketPage() {
                 </div>
               </div>
               {/* Summary Box */}
-              <div className="bg-[#FD7675] text-white px-4 py-3 rounded-lg text-center min-w-[80px]">
+              <div className="bg-[#DC2626] text-white px-4 py-3 rounded-lg text-center min-w-[80px]">
                 <div className="text-2xl font-bold">₹{earningsGuaranteeTarget.toFixed(0)}</div>
                 <div className="text-xs text-white/80 mt-1">{earningsGuaranteeOrdersTarget} orders</div>
               </div>
@@ -859,7 +863,7 @@ export default function PocketPage() {
                       cy="60"
                       r="50"
                       fill="none"
-                      stroke="#FD7675"
+                      stroke="#DC2626"
                       strokeWidth="8"
                       strokeLinecap="round"
                       initial={{ pathLength: 0 }}
@@ -903,7 +907,7 @@ export default function PocketPage() {
                       cy="60"
                       r="50"
                       fill="none"
-                      stroke="#FD7675"
+                      stroke="#DC2626"
                       strokeWidth="8"
                       strokeLinecap="round"
                       initial={{ pathLength: 0 }}
@@ -969,7 +973,7 @@ export default function PocketPage() {
               <div className="flex gap-3 pt-2">
                 <Button
                   onClick={() => setShowDepositPopup(true)}
-                  className="flex-1 bg-white hover:bg-gray-300 text-black border border-black font-semibold py-3 rounded-lg"
+                  className="flex-1 bg-white hover:bg-red-50 text-[#DC2626] border border-[#DC2626] font-bold py-3 rounded-lg transition-colors"
                 >
                   Deposit
                 </Button>
@@ -1078,7 +1082,7 @@ export default function PocketPage() {
           onSuccess={() => setShowDepositPopup(false)}
         />
       </BottomPopup>
-    </div>
+    </div >
   )
 }
 

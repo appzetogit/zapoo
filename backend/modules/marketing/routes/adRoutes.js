@@ -52,7 +52,7 @@ const authenticateAny = async (req, res, next) => {
 
 // Restaurant routes
 router.post('/request', restaurantAuth, createAdRequest);
-router.put('/request/:adId', restaurantAuth, updateAdRequest);
+router.put('/request/:adId', restaurantAuth, uploadMiddleware.single('bannerImage'), updateAdRequest);
 router.get('/my-zone', restaurantAuth, getMyZone);
 router.get('/my-ads', restaurantAuth, getMyAdRequests);
 router.post('/payment/create-order/:adId', restaurantAuth, createAdPaymentOrder);

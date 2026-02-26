@@ -132,7 +132,7 @@ export default function SupportTickets() {
         {/* Create New Ticket Button */}
         <button
           onClick={() => navigate("/delivery/help/create-ticket")}
-          className="w-full bg-[#FD7675] text-white font-semibold py-4 rounded-lg hover:bg-[#FD7675]/90 transition-colors flex items-center justify-center gap-2"
+          className="w-full bg-[#DC2626] text-white font-semibold py-4 rounded-lg hover:bg-[#DC2626]/90 transition-colors flex items-center justify-center gap-2"
         >
           <Plus className="w-5 h-5" />
           Create new ticket

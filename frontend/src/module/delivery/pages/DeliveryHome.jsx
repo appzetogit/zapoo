@@ -7698,7 +7698,7 @@ export default function DeliveryHome() {
       subtitle: "PAN & bank details required for payouts",
       icon: "bank",
       buttonText: "Submit",
-      bgColor: "bg-yellow-400"
+      bgColor: "bg-[#DC2626]"
     }])
   ], [bankDetailsFilled])
 
@@ -8246,17 +8246,15 @@ export default function DeliveryHome() {
                     )}
                   </div>
 
-                  {/* Text Content */}
                   <div className="flex-1">
-                    <h3 className={`${slide.bgColor === "bg-gray-700" ? "text-white" : "text-black"} text-sm font-semibold mb-0.5`}>
+                    <h3 className={`${(slide.bgColor === "bg-gray-700" || slide.bgColor === "bg-[#DC2626]") ? "text-white" : "text-black"} text-sm font-semibold mb-0.5`}>
                       {slide.title}
                     </h3>
-                    <p className={`${slide.bgColor === "bg-gray-700" ? "text-white/90" : "text-black/80"} text-xs`}>
+                    <p className={`${(slide.bgColor === "bg-gray-700" || slide.bgColor === "bg-[#DC2626]") ? "text-white/90" : "text-black/80"} text-xs`}>
                       {slide.subtitle}
                     </p>
                   </div>
 
-                  {/* Button */}
                   <button
                     onClick={() => {
                       if (slide.id === 2) {
@@ -8265,7 +8263,7 @@ export default function DeliveryHome() {
                     }}
                     className={`px-3 py-1.5 rounded-lg font-medium text-xs transition-colors ${slide.bgColor === "bg-gray-700"
                       ? "bg-gray-600 text-white hover:bg-gray-500"
-                      : "bg-yellow-300 text-black hover:bg-yellow-200"
+                      : "bg-white text-[#DC2626] hover:bg-gray-100"
                       }`}>
                     {slide.buttonText}
                   </button>
@@ -9526,8 +9524,8 @@ export default function DeliveryHome() {
                         key={reason}
                         onClick={() => setRejectReason(reason)}
                         className={`w-full text-left p-4 rounded-lg border-2 transition-all ${rejectReason === reason
-                            ? "border-black bg-red-50"
-                            : "border-gray-200 bg-white hover:border-gray-300"
+                          ? "border-black bg-red-50"
+                          : "border-gray-200 bg-white hover:border-gray-300"
                           }`}
                       >
                         <div className="flex items-center justify-between">
@@ -9560,8 +9558,8 @@ export default function DeliveryHome() {
                     onClick={handleRejectConfirm}
                     disabled={!rejectReason}
                     className={`flex-1 py-3 rounded-lg font-semibold text-sm transition-colors ${rejectReason
-                        ? "!bg-black !text-white"
-                        : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                      ? "!bg-black !text-white"
+                      : "bg-gray-200 text-gray-400 cursor-not-allowed"
                       }`}
                   >
                     Confirm
@@ -9964,10 +9962,10 @@ export default function DeliveryHome() {
                   onClick={handleCameraCapture}
                   disabled={isUploadingBill}
                   className={`flex items-center justify-center gap-2 px-6 py-3 rounded-lg transition-colors ${isUploadingBill
-                      ? 'bg-gray-400 cursor-not-allowed'
-                      : billImageUploaded
-                        ? 'bg-green-600 hover:bg-green-700'
-                        : 'bg-blue-600 hover:bg-blue-700'
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : billImageUploaded
+                      ? 'bg-green-600 hover:bg-green-700'
+                      : 'bg-blue-600 hover:bg-blue-700'
                     } text-white font-medium`}
                 >
                   {isUploadingBill ? (

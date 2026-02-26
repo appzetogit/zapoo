@@ -32,11 +32,11 @@ export default function BottomNavigation() {
 
   const TabIcon = (active, Outline, Solid) => {
     const Icon = active ? Solid : Outline
-    return <Icon className={`${iconClass} ${active ? "text-[#FD7675]" : "text-gray-500"}`} />
+    return <Icon className={`${iconClass} ${active ? "text-[#DC2626]" : "text-gray-500"}`} />
   }
 
   const TabLabel = (active, label) => (
-    <span className={`text-[10px] font-medium ${active ? "text-[#FD7675]" : "text-gray-500"}`}>
+    <span className={`text-[10px] font-medium ${active ? "text-[#DC2626]" : "text-gray-500"}`}>
       {label}
     </span>
   )
@@ -119,14 +119,14 @@ export default function BottomNavigation() {
             <img
               src={profileImage}
               alt="Profile"
-              className={`w-7 h-7 rounded-full border-2 object-cover ${isActive("/delivery/profile") ? "border-[#FD7675]" : "border-gray-300"
+              className={`w-7 h-7 rounded-full border-2 object-cover ${isActive("/delivery/profile") ? "border-[#DC2626]" : "border-gray-300"
                 }`}
               onError={() => {
                 setImageError(true)
               }}
             />
           ) : (
-            <div className={`w-7 h-7 rounded-full border-2 flex items-center justify-center bg-gray-200 ${isActive("/delivery/profile") ? "border-[#FD7675]" : "border-gray-300"
+            <div className={`w-7 h-7 rounded-full border-2 flex items-center justify-center bg-gray-200 ${isActive("/delivery/profile") ? "border-[#DC2626]" : "border-gray-300"
               }`}>
               <User className="w-4 h-4 text-gray-500" />
             </div>

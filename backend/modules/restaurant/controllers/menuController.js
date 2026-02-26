@@ -87,13 +87,25 @@ export const updateMenu = asyncHandler(async (req, res) => {
       name: section.name || "Unnamed Section",
       items: Array.isArray(section.items) ? section.items.map(item => {
         // CRITICAL: Find existing item to preserve approval status fields
+        // Find existing item to preserve approval status fields
         const existingItem = existingSection?.items?.find(i => String(i.id) === String(item.id));
+
+        // Normalize images array - CRITICAL: Sync with singular image field
+        const itemImages = (() => {
+          if (Array.isArray(item.images)) {
+            return item.images.filter(img => img && typeof img === 'string' && img.trim() !== '');
+          } else if (item.image && typeof item.image === 'string' && item.image.trim() !== '') {
+            return [item.image];
+          } else {
+            return [];
+          }
+        })();
 
         return {
           id: String(item.id || Date.now() + Math.random()),
           name: item.name || "Unnamed Item",
           nameArabic: item.nameArabic || "",
-          image: item.image || "",
+          image: itemImages.length > 0 ? itemImages[0] : (item.image || ""),
           category: item.category || section.name,
           rating: item.rating ?? 0.0,
           reviews: item.reviews ?? 0,
@@ -127,36 +139,7 @@ export const updateMenu = asyncHandler(async (req, res) => {
           itemSizeUnit: item.itemSizeUnit || "piece",
           gst: item.gst ?? 0,
           preparationTime: existingItem?.preparationTime || item.preparationTime || "",
-          images: (() => {
-            // Ensure images array is properly handled - CRITICAL: Preserve all images
-            console.log(`[NORMALIZE] Item "${item.name || 'unnamed'}": Processing images...`);
-            console.log(`  - item.images type: ${Array.isArray(item.images) ? 'Array' : typeof item.images}`);
-            console.log(`  - item.images value:`, item.images);
-            console.log(`  - item.image value:`, item.image);
-            console.log(`  - item.photoCount:`, item.photoCount);
-
-            if (Array.isArray(item.images)) {
-              const filteredImages = item.images.filter(img => {
-                const isValid = img && typeof img === 'string' && img.trim() !== '';
-                if (!isValid) {
-                  console.log(`  - Filtering out invalid image:`, img);
-                }
-                return isValid;
-              });
-              console.log(`  - Input images: ${item.images.length}, Filtered images: ${filteredImages.length}`);
-              console.log(`  - Final images array:`, filteredImages);
-              if (filteredImages.length !== item.images.length) {
-                console.warn(`  - WARNING: Some images were filtered out! Original: ${item.images.length}, Filtered: ${filteredImages.length}`);
-              }
-              return filteredImages;
-            } else if (item.image && typeof item.image === 'string' && item.image.trim() !== '') {
-              console.log(`  - No images array, using single image field:`, item.image);
-              return [item.image];
-            } else {
-              console.log(`  - No images found, returning empty array`);
-              return [];
-            }
-          })(),
+          images: itemImages,
           // CRITICAL: Preserve approval status fields from existing item
           // Restaurant should NOT be able to overwrite these fields
           approvalStatus: existingItem?.approvalStatus || item.approvalStatus || 'pending',
@@ -181,13 +164,25 @@ export const updateMenu = asyncHandler(async (req, res) => {
           name: subsection.name || "Unnamed Subsection",
           items: Array.isArray(subsection.items) ? subsection.items.map(item => {
             // CRITICAL: Find existing item to preserve approval status fields
+            // CRITICAL: Find existing item to preserve approval status fields
             const existingItem = existingSubsection?.items?.find(i => String(i.id) === String(item.id));
+
+            // Normalize images array - CRITICAL: Sync with singular image field
+            const itemImages = (() => {
+              if (Array.isArray(item.images) && item.images.length > 0) {
+                return item.images.filter(img => img && typeof img === 'string' && img.trim() !== '');
+              } else if (item.image && item.image.trim() !== '') {
+                return [item.image];
+              } else {
+                return [];
+              }
+            })();
 
             return {
               id: String(item.id || Date.now() + Math.random()),
               name: item.name || "Unnamed Item",
               nameArabic: item.nameArabic || "",
-              image: item.image || "",
+              image: itemImages.length > 0 ? itemImages[0] : (item.image || ""),
               category: item.category || section.name,
               rating: item.rating ?? 0.0,
               reviews: item.reviews ?? 0,
@@ -221,20 +216,7 @@ export const updateMenu = asyncHandler(async (req, res) => {
               itemSizeUnit: item.itemSizeUnit || "piece",
               gst: item.gst ?? 0,
               preparationTime: existingItem?.preparationTime || item.preparationTime || "",
-              images: (() => {
-                // Ensure images array is properly handled
-                if (Array.isArray(item.images) && item.images.length > 0) {
-                  const filteredImages = item.images.filter(img => img && typeof img === 'string' && img.trim() !== '');
-                  console.log(`[NORMALIZE] Subsection Item "${item.name}": Processing ${item.images.length} images, filtered to ${filteredImages.length} valid images`);
-                  return filteredImages;
-                } else if (item.image && item.image.trim() !== '') {
-                  console.log(`[NORMALIZE] Subsection Item "${item.name}": No images array, using single image field`);
-                  return [item.image];
-                } else {
-                  console.log(`[NORMALIZE] Subsection Item "${item.name}": No images found, returning empty array`);
-                  return [];
-                }
-              })(),
+              images: itemImages,
               // CRITICAL: Preserve approval status fields from existing item
               // Restaurant should NOT be able to overwrite these fields
               approvalStatus: existingItem?.approvalStatus || item.approvalStatus || 'pending',
@@ -398,12 +380,23 @@ export const addItemToSection = asyncHandler(async (req, res) => {
     return errorResponse(res, 404, 'Section not found');
   }
 
+  // Normalize images array - CRITICAL: Sync with singular image field
+  const itemImages = (() => {
+    if (Array.isArray(item.images) && item.images.length > 0) {
+      return item.images.filter(img => img && typeof img === 'string' && img.trim() !== '');
+    } else if (item.image && item.image.trim() !== '') {
+      return [item.image];
+    } else {
+      return [];
+    }
+  })();
+
   // Normalize item data
   const newItem = {
     id: String(item.id || Date.now() + Math.random()),
     name: item.name.trim(),
     nameArabic: item.nameArabic || "",
-    image: item.image || "",
+    image: itemImages.length > 0 ? itemImages[0] : (item.image || ""),
     category: item.category || section.name,
     rating: item.rating ?? 0.0,
     reviews: item.reviews ?? 0,
@@ -436,9 +429,7 @@ export const addItemToSection = asyncHandler(async (req, res) => {
     itemSizeQuantity: item.itemSizeQuantity || "",
     itemSizeUnit: item.itemSizeUnit || "piece",
     gst: item.gst ?? 0,
-    images: Array.isArray(item.images) && item.images.length > 0
-      ? item.images.filter(img => img && typeof img === 'string' && img.trim() !== '')
-      : (item.image && item.image.trim() !== '' ? [item.image] : []),
+    images: itemImages,
     preparationTime: item.preparationTime || "",
     approvalStatus: 'pending', // New items require admin approval
     requestedAt: new Date(),
@@ -544,12 +535,23 @@ export const addItemToSubsection = asyncHandler(async (req, res) => {
     return errorResponse(res, 404, 'Subsection not found');
   }
 
+  // Normalize images array - CRITICAL: Sync with singular image field
+  const itemImages = (() => {
+    if (Array.isArray(item.images) && item.images.length > 0) {
+      return item.images.filter(img => img && typeof img === 'string' && img.trim() !== '');
+    } else if (item.image && item.image.trim() !== '') {
+      return [item.image];
+    } else {
+      return [];
+    }
+  })();
+
   // Normalize item data
   const newItem = {
     id: String(item.id || Date.now() + Math.random()),
     name: item.name.trim(),
     nameArabic: item.nameArabic || "",
-    image: item.image || "",
+    image: itemImages.length > 0 ? itemImages[0] : (item.image || ""),
     category: item.category || section.name,
     rating: item.rating ?? 0.0,
     reviews: item.reviews ?? 0,
@@ -576,9 +578,7 @@ export const addItemToSubsection = asyncHandler(async (req, res) => {
     allergies: Array.isArray(item.allergies) ? item.allergies : [],
     photoCount: item.photoCount ?? 1,
     gst: item.gst ?? 0,
-    images: Array.isArray(item.images) && item.images.length > 0
-      ? item.images.filter(img => img && typeof img === 'string' && img.trim() !== '')
-      : (item.image && item.image.trim() !== '' ? [item.image] : []),
+    images: itemImages,
     preparationTime: item.preparationTime || "",
     approvalStatus: 'pending', // New items require admin approval
     requestedAt: new Date(),

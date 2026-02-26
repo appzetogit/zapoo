@@ -13,10 +13,10 @@ export async function processAutoRejectOrders() {
     const ACCEPT_TIME_LIMIT_SECONDS = 240; // 4 minutes
     const ACCEPT_TIME_LIMIT_MS = ACCEPT_TIME_LIMIT_SECONDS * 1000;
 
-    // Find all orders with status 'pending' or 'confirmed' that haven't been accepted yet
-    // These are orders waiting for restaurant to accept
+    // Find all orders with status 'pending' that haven't been accepted yet
+    // confirmed orders have been accepted by restaurant or payment verified
     const validPendingOrders = await Order.find({
-      status: { $in: ['pending', 'confirmed'] }
+      status: 'pending'
     }).lean();
 
     if (validPendingOrders.length === 0) {

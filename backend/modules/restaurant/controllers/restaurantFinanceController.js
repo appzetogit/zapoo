@@ -206,7 +206,6 @@ export const getRestaurantFinance = asyncHandler(async (req, res) => {
     let recommendedItemsCount = 0;
     let recommendedItemsRevenue = 0;
     let recommendedItemsFees = 0;
-    const recommendedItemPerformance = {}; // Track individual item performance
 
     const currentCycleOrdersData = await Promise.all(currentCycleOrders.map(async (order) => {
       // Food price = subtotal - discount (this is what commission is calculated on)
@@ -220,18 +219,8 @@ export const getRestaurantFinance = asyncHandler(async (req, res) => {
 
       (order.items || []).forEach(item => {
         if (item.isRecommended) {
-          const qty = (item.quantity || 1);
-          const rev = (item.price || 0) * qty;
-          recommendedItemsCount += qty;
-          recommendedItemsRevenue += rev;
-
-          // Track per-item performance
-          const itemName = item.name || 'Unknown Item';
-          if (!recommendedItemPerformance[itemName]) {
-            recommendedItemPerformance[itemName] = { count: 0, revenue: 0 };
-          }
-          recommendedItemPerformance[itemName].count += qty;
-          recommendedItemPerformance[itemName].revenue += rev;
+          recommendedItemsCount += (item.quantity || 1);
+          recommendedItemsRevenue += (item.price || 0) * (item.quantity || 1);
         }
       });
 
@@ -543,13 +532,7 @@ export const getRestaurantFinance = asyncHandler(async (req, res) => {
         recommendedItems: {
           count: recommendedItemsCount,
           revenue: Math.round(recommendedItemsRevenue * 100) / 100,
-          fees: Math.round(recommendedItemsFees * 100) / 100,
-          netRevenue: Math.round((recommendedItemsRevenue - recommendedItemsFees) * 100) / 100,
-          contributionPct: currentCycleTotal > 0 ? Math.round((recommendedItemsRevenue / currentCycleTotal) * 10000) / 100 : 0,
-          topItems: Object.entries(recommendedItemPerformance)
-            .sort((a, b) => b[1].count - a[1].count)
-            .slice(0, 3)
-            .map(([name, stats]) => ({ name, ...stats }))
+          fees: Math.round(recommendedItemsFees * 100) / 100
         },
         orders: currentCycleOrdersData // Include orders array in response
       },

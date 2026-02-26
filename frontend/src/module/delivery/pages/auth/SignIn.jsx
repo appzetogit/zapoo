@@ -146,14 +146,14 @@ export default function DeliverySignIn() {
         <div className="flex flex-col items-center pt-8 pb-6 px-6">
           {/* Appzeto Logo */}
           <div>
-            <h1 className="text-7xl text-[#FD7675] font-extrabold italic lowercase tracking-tight">
+            <h1 className="text-7xl text-[#DC2626] font-extrabold italic lowercase tracking-tight">
               {companyName.toLowerCase()}
             </h1>
           </div>
 
           {/* Delivery Partner Text */}
           <div className="mt-1">
-            <span className="text-[#FD7675] font-medium text-xl italic  tracking-wide">
+            <span className="text-[#DC2626] font-medium text-xl italic  tracking-wide">
               --Delivery Partner--
             </span>
           </div>
@@ -233,7 +233,7 @@ export default function DeliverySignIn() {
               onClick={handleSendOTP}
               disabled={!isValid || isSending}
               className={`w-full py-4 rounded-lg font-bold text-base transition-colors ${isValid && !isSending
-                ? "bg-[#FD7675] hover:bg-[#E66A69] active:bg-[#D15E5D] text-white"
+                ? "bg-[#DC2626] hover:bg-[#C52222] active:bg-[#B31F1F] text-white"
                 : "bg-gray-300 text-gray-500 cursor-not-allowed"
                 }`}
             >
@@ -243,7 +243,7 @@ export default function DeliverySignIn() {
             {/* Terms and Conditions */}
             <p className="text-xs text-center text-white px-4">
               By continuing, you agree to our{" "}
-              <a href="#" className="text-[#FD7675] hover:underline">
+              <a href="#" className="text-[#DC2626] hover:underline">
                 Terms and Conditions
               </a>
             </p>
