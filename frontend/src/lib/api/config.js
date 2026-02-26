@@ -408,6 +408,8 @@ export const API_ENDPOINTS = {
     ZONES: "/admin/zones",
     ZONE_BY_ID: "/admin/zones/:id",
     ZONE_STATUS: "/admin/zones/:id/status",
+    TIERS: "/admin/tiers",
+    TIER_BY_ID: "/admin/tiers/:id",
   },
   // Order endpoints
   ORDER: {

@@ -5,7 +5,7 @@ import Restaurant from '../../restaurant/models/Restaurant.js';
 import Zone from '../../admin/models/Zone.js';
 import mongoose from 'mongoose';
 import winston from 'winston';
-import { calculateOrderPricing } from '../services/orderCalculationService.js';
+import { calculateOrderPricing, calculateDistance } from '../services/orderCalculationService.js';
 import { getRazorpayCredentials } from '../../../shared/utils/envService.js';
 import { notifyRestaurantNewOrder } from '../services/restaurantNotificationService.js';
 import { calculateOrderSettlement } from '../services/orderSettlementService.js';
@@ -242,31 +242,47 @@ export const createOrder = async (req, res) => {
       zoneName: restaurantZone?.name || restaurantZone?.zoneName
     });
 
-    // CRITICAL: Validate user's zone matches restaurant's zone (strict zone matching)
+    // NEW: Calculate distance and validate restaurant's deliveryRange
+    // Get user's coordinates from address
+    const userLat = address.location?.latitude || address.location?.coordinates?.[1];
+    const userLng = address.location?.longitude || address.location?.coordinates?.[0];
+
+    if (userLat && userLng) {
+      const distance = calculateDistance([restaurantLng, restaurantLat], [userLng, userLat]);
+      const maxRange = restaurant.deliveryRange || 5; // Default 5km if not set
+
+      logger.info('📏 Order Distance Check:', {
+        distance: distance.toFixed(2) + 'km',
+        maxRange: maxRange + 'km',
+        restaurantInZone,
+        restaurantZone: restaurantZone?.name
+      });
+
+      if (distance > maxRange) {
+        return res.status(403).json({
+          success: false,
+          message: `This restaurant only delivers up to ${maxRange}km. Your location is ${distance.toFixed(1)}km away.`
+        });
+      }
+    }
+
+    // RELAXED: Validate user's zone matches restaurant's zone (Allow cross-zone if within range)
     const { zoneId: userZoneId } = req.body; // User's zone ID from frontend
 
     if (userZoneId) {
       const restaurantZoneId = restaurantZone._id.toString();
 
       if (restaurantZoneId !== userZoneId) {
-        logger.warn('⚠️ Zone mismatch - user and restaurant are in different zones:', {
+        logger.info('🌐 Cross-zone order allowed due to deliveryRange:', {
           userZoneId,
           restaurantZoneId,
-          restaurantId: restaurant._id?.toString() || restaurant.restaurantId,
+          restaurantId: restaurant._id?.toString(),
           restaurantName: restaurant.name
         });
-        return res.status(403).json({
-          success: false,
-          message: 'This restaurant is not available in your zone. Please select a restaurant from your current delivery zone.'
-        });
+        // We proceed because the distance check passed above
       }
-
-      logger.info('✅ Zone match validated - user and restaurant are in the same zone:', {
-        zoneId: userZoneId,
-        restaurantId: restaurant._id?.toString() || restaurant.restaurantId
-      });
     } else {
-      logger.warn('⚠️ User zoneId not provided in order request - zone validation skipped');
+      logger.warn('⚠️ User zoneId not provided in order request');
     }
 
     assignedRestaurantId = restaurant._id?.toString() || restaurant.restaurantId;

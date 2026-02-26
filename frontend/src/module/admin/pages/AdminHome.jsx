@@ -27,25 +27,40 @@ import zapooLogo from "@/assets/zapoo_logo.png"
 import { adminAPI } from "@/lib/api"
 
 export default function AdminHome() {
-  const [selectedZone, setSelectedZone] = useState("all")
+  const [selectedTier, setSelectedTier] = useState("all")
   const [selectedPeriod, setSelectedPeriod] = useState("overall")
   const [isLoading, setIsLoading] = useState(true)
   const [dashboardData, setDashboardData] = useState(null)
+  const [tiers, setTiers] = useState([])
 
-  // Fetch dashboard stats on mount
+  // Fetch tiers for the dropdown
+  useEffect(() => {
+    const fetchTiers = async () => {
+      try {
+        const response = await adminAPI.getAllTiers()
+        if (response.data?.success && response.data?.data) {
+          setTiers(response.data.data)
+        }
+      } catch (error) {
+        console.error('❌ Error fetching tiers:', error)
+      }
+    }
+    fetchTiers()
+  }, [])
+
+  // Fetch dashboard stats when filters change
   useEffect(() => {
     const fetchDashboardStats = async () => {
       try {
         setIsLoading(true)
-        const response = await adminAPI.getDashboardStats()
+        const params = {
+          period: selectedPeriod,
+          tierId: selectedTier === "all" ? undefined : selectedTier
+        }
+        const response = await adminAPI.getDashboardStats(params)
         if (response.data?.success && response.data?.data) {
           setDashboardData(response.data.data)
           console.log('✅ Dashboard stats fetched:', response.data.data)
-          console.log('💰 Commission:', response.data.data.commission)
-          console.log('💳 Platform Fee:', response.data.data.platformFee)
-          console.log('🚚 Delivery Fee:', response.data.data.deliveryFee)
-          console.log('🧾 GST:', response.data.data.gst)
-          console.log('💵 Total Admin Earnings:', response.data.data.totalAdminEarnings)
         } else {
           console.error('❌ Invalid response format:', response.data)
         }
@@ -57,16 +72,7 @@ export default function AdminHome() {
     }
 
     fetchDashboardStats()
-  }, [])
-
-  // Update loading state when filters change
-  useEffect(() => {
-    if (dashboardData) {
-      setIsLoading(true)
-      const timer = setTimeout(() => setIsLoading(false), 350)
-      return () => clearTimeout(timer)
-    }
-  }, [selectedZone, selectedPeriod])
+  }, [selectedTier, selectedPeriod])
 
   // Get order stats from real data
   const getOrderStats = () => {
@@ -159,16 +165,17 @@ export default function AdminHome() {
 
           </div>
           <div className="flex flex-wrap gap-3">
-            <Select value={selectedZone} onValueChange={setSelectedZone}>
+            <Select value={selectedTier} onValueChange={setSelectedTier}>
               <SelectTrigger className="min-w-[160px] border-neutral-300 bg-white text-neutral-900">
-                <SelectValue placeholder="All zones" />
+                <SelectValue placeholder="All Tiers" />
               </SelectTrigger>
               <SelectContent className="border-neutral-200 bg-white text-neutral-900">
-                <SelectItem value="all">All zones</SelectItem>
-                <SelectItem value="zone1">Zone 1</SelectItem>
-                <SelectItem value="zone2">Zone 2</SelectItem>
-                <SelectItem value="zone3">Zone 3</SelectItem>
-                <SelectItem value="zone4">Zone 4</SelectItem>
+                <SelectItem value="all">All Tiers</SelectItem>
+                {tiers.map((tier) => (
+                  <SelectItem key={tier._id} value={tier._id}>
+                    {tier.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>

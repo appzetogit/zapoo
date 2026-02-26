@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
-import { Search, Download, ChevronDown, Plus, MoreVertical, Building2, Settings, Filter, FileDown, FileSpreadsheet, FileText, Code, Eye, Edit, Trash2, Loader2 } from "lucide-react"
+import { Search, Download, ChevronDown, Plus, MoreVertical, Building2, Settings, Filter, FileDown, FileSpreadsheet, FileText, Code, Eye, Edit, Trash2, Loader2, Upload, X, Image as ImageIcon } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import SettingsDialog from "../../components/orders/SettingsDialog"
@@ -17,8 +17,13 @@ export default function AdsList() {
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [isViewOpen, setIsViewOpen] = useState(false)
+  const [isEditOpen, setIsEditOpen] = useState(false)
   const [isDeleteOpen, setIsDeleteOpen] = useState(false)
   const [selectedAd, setSelectedAd] = useState(null)
+  const [editFile, setEditFile] = useState(null)
+  const [editFilePreview, setEditFilePreview] = useState(null)
+  const [editStatus, setEditStatus] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [filters, setFilters] = useState({
     status: "Active", // Default to Active for "Active Campaigns" page
     restaurant: "",
@@ -50,6 +55,13 @@ export default function AdsList() {
     priority: ad.priority || null,
     raw: ad,
   })
+
+  // Force actions to be visible even if local storage is stale
+  useEffect(() => {
+    if (!visibleColumns.actions) {
+      setVisibleColumns(prev => ({ ...prev, actions: true }))
+    }
+  }, [visibleColumns.actions])
 
   const fetchAds = async () => {
     try {
@@ -150,7 +162,50 @@ export default function AdsList() {
   }
 
   const handleEditAd = (ad) => {
-    navigate("/admin/advertisement/new", { state: { editAd: ad.raw } })
+    setSelectedAd(ad)
+    setEditStatus(ad.status)
+    setEditFile(null)
+    setEditFilePreview(ad.raw?.bannerImage?.url || ad.raw?.bannerImage || null)
+    setIsEditOpen(true)
+  }
+
+  const handleEditSubmit = async () => {
+    if (!selectedAd) return
+
+    try {
+      setIsSubmitting(true)
+
+      // Update status if changed
+      if (editStatus && editStatus !== selectedAd.status) {
+        await apiClient.put(`/marketing/ads/${selectedAd._id}/status`, { status: editStatus })
+      }
+
+      // Update banner image if a new file is selected
+      if (editFile) {
+        const formData = new FormData()
+        formData.append("bannerImage", editFile)
+        await apiClient.post(`/marketing/ads/${selectedAd._id}/banner`, formData, {
+          headers: { "Content-Type": "multipart/form-data" }
+        })
+      }
+
+      toast.success("Advertisement updated successfully")
+      setIsEditOpen(false)
+      setSelectedAd(null)
+      fetchAds()
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Failed to update advertisement")
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0]
+    if (file) {
+      setEditFile(file)
+      setEditFilePreview(URL.createObjectURL(file))
+    }
   }
 
   const handleDeleteClick = (ad) => {
@@ -312,15 +367,15 @@ export default function AdsList() {
           <table className="w-full">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
-                {visibleColumns.si && <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">SI</th>}
-                {visibleColumns.adsId && <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">Ads ID</th>}
-                {visibleColumns.adsTitle && <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">Ads Title</th>}
-                {visibleColumns.restaurantInfo && <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">Restaurant Info</th>}
-                {visibleColumns.adsType && <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">Ads Type</th>}
-                {visibleColumns.duration && <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">Duration</th>}
-                {visibleColumns.status && <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">Status</th>}
-                {visibleColumns.priority && <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">Priority</th>}
-                {visibleColumns.actions && <th className="px-6 py-4 text-center text-[10px] font-bold text-slate-700 uppercase tracking-wider">Action</th>}
+                {visibleColumns.si && <th className="px-4 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">SI</th>}
+                {visibleColumns.adsId && <th className="px-4 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">Ads ID</th>}
+                {visibleColumns.adsTitle && <th className="px-4 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">Ads Title</th>}
+                {visibleColumns.restaurantInfo && <th className="px-4 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">Restaurant Info</th>}
+                {visibleColumns.adsType && <th className="px-4 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">Ads Type</th>}
+                {visibleColumns.duration && <th className="px-4 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">Duration</th>}
+                {visibleColumns.status && <th className="px-4 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">Status</th>}
+                {visibleColumns.priority && <th className="px-4 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">Priority</th>}
+                <th className="px-4 py-4 text-center text-[10px] font-bold text-slate-700 uppercase tracking-wider">Action</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-slate-100">
@@ -345,12 +400,12 @@ export default function AdsList() {
                     className="hover:bg-slate-50 transition-colors"
                   >
                     {visibleColumns.si && (
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-4 py-4 whitespace-nowrap">
                         <span className="text-sm font-medium text-slate-700">{ad.sl}</span>
                       </td>
                     )}
                     {visibleColumns.adsId && (
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-4 py-4 whitespace-nowrap">
                         <button
                           onClick={() => handleViewAd(ad)}
                           className="text-sm font-medium text-[#FF5200] hover:text-[#E64A00]"
@@ -360,46 +415,45 @@ export default function AdsList() {
                       </td>
                     )}
                     {visibleColumns.adsTitle && (
-                      <td className="px-6 py-4">
+                      <td className="px-4 py-4">
                         <span className="text-sm font-medium text-slate-900">{ad.adsTitle}</span>
                       </td>
                     )}
                     {visibleColumns.restaurantInfo && (
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center flex-shrink-0">
-                            <Building2 className="w-5 h-5 text-orange-600" />
+                      <td className="px-4 py-4">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center flex-shrink-0">
+                            <Building2 className="w-4 h-4 text-orange-600" />
                           </div>
                           <div className="flex flex-col">
-                            <span className="text-sm font-medium text-slate-900">{ad.restaurantName}</span>
-                            <span className="text-xs text-slate-500">{ad.restaurantEmail}</span>
+                            <span className="text-sm font-medium text-slate-900 leading-tight">{ad.restaurantName}</span>
                           </div>
                         </div>
                       </td>
                     )}
                     {visibleColumns.adsType && (
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-4 py-4 whitespace-nowrap">
                         <span className="text-sm text-slate-700">{ad.adsType}</span>
                       </td>
                     )}
                     {visibleColumns.duration && (
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-sm text-slate-700">{ad.duration}</span>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <span className="text-xs text-slate-700">{ad.duration}</span>
                       </td>
                     )}
                     {visibleColumns.status && (
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="px-3 py-1 rounded-full text-xs font-medium bg-orange-100 text-[#FF5200]">
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-orange-100 text-[#FF5200]">
                           {ad.status}
                         </span>
                       </td>
                     )}
                     {visibleColumns.priority && (
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-4 py-4 whitespace-nowrap">
                         <select
                           value={ad.priority || ""}
                           onChange={(e) => handlePriorityChange(ad._id, e.target.value)}
-                          className="px-2 py-1 text-xs border border-slate-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-[#FF5200] focus:border-[#FF5200]"
+                          className="px-1 py-0.5 text-[11px] border border-slate-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-[#FF5200]"
                         >
                           <option value="">N/A</option>
                           <option value="1">1</option>
@@ -408,41 +462,39 @@ export default function AdsList() {
                         </select>
                       </td>
                     )}
-                    {visibleColumns.actions && (
-                      <td className="px-6 py-4 whitespace-nowrap text-center">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <button className="p-1.5 rounded text-slate-600 hover:bg-slate-100 transition-colors">
-                              <MoreVertical className="w-4 h-4" />
-                            </button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-48 bg-white border border-slate-200 rounded-lg shadow-lg z-50">
-                            <DropdownMenuItem
-                              onClick={() => handleViewAd(ad)}
-                              className="cursor-pointer"
-                            >
-                              <Eye className="w-4 h-4 mr-2" />
-                              View Details
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => handleEditAd(ad)}
-                              className="cursor-pointer"
-                            >
-                              <Edit className="w-4 h-4 mr-2" />
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              onClick={() => handleDeleteClick(ad)}
-                              className="cursor-pointer text-red-600"
-                            >
-                              <Trash2 className="w-4 h-4 mr-2" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </td>
-                    )}
+                    <td className="px-4 py-4 whitespace-nowrap text-center">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button className="p-1.5 rounded text-slate-600 hover:bg-slate-100 transition-colors">
+                            <MoreVertical className="w-4 h-4" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-48 bg-white border border-slate-200 rounded-lg shadow-lg z-50">
+                          <DropdownMenuItem
+                            onClick={() => handleViewAd(ad)}
+                            className="cursor-pointer"
+                          >
+                            <Eye className="w-4 h-4 mr-2" />
+                            View Details
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => handleEditAd(ad)}
+                            className="cursor-pointer"
+                          >
+                            <Edit className="w-4 h-4 mr-2" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={() => handleDeleteClick(ad)}
+                            className="cursor-pointer text-red-600"
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </td>
                   </tr>
                 ))
               )}
@@ -542,6 +594,11 @@ export default function AdsList() {
           </DialogHeader>
           {selectedAd && (
             <div className="px-6 pb-6 space-y-4">
+              {selectedAd.raw?.bannerImage && (
+                <div className="w-full h-48 border border-slate-200 rounded-lg overflow-hidden mb-4 bg-slate-50 flex items-center justify-center">
+                  <img src={selectedAd.raw.bannerImage.url || selectedAd.raw.bannerImage} alt="Banner Preview" className="w-full h-full object-contain" />
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm font-semibold text-slate-700">Ads ID</p>
@@ -557,7 +614,7 @@ export default function AdsList() {
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-slate-700">Restaurant Email</p>
-                  <p className="text-sm text-slate-900">{selectedAd.restaurantEmail}</p>
+                  <p className="text-sm text-slate-900">{selectedAd.restaurantEmail || "N/A"}</p>
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-slate-700">Ads Type</p>
@@ -578,6 +635,88 @@ export default function AdsList() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Ad Dialog */}
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent className="max-w-md bg-white p-0 opacity-0 data-[state=open]:opacity-100 data-[state=closed]:opacity-0 transition-opacity duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=open]:scale-100 data-[state=closed]:scale-100">
+          <DialogHeader className="px-6 pt-6 pb-4">
+            <DialogTitle>Edit Advertisement</DialogTitle>
+          </DialogHeader>
+          <div className="px-6 pb-6 space-y-4">
+            {selectedAd && (
+              <>
+                <div className="text-sm text-slate-500 mb-4 bg-slate-50 p-3 rounded-lg border border-slate-100">
+                  <span className="font-semibold text-slate-700">Title: </span>{selectedAd.adsTitle} <br />
+                  <span className="font-semibold text-slate-700">Restaurant: </span>{selectedAd.restaurantName}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">
+                    Status
+                  </label>
+                  <select
+                    value={editStatus}
+                    onChange={(e) => setEditStatus(e.target.value)}
+                    className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#FF5200] text-sm"
+                  >
+                    {statuses.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">
+                    Banner Image (Admin Upload)
+                  </label>
+                  <div className="mt-2 flex justify-center rounded-lg border border-dashed border-gray-900/25 px-6 py-10">
+                    <div className="text-center">
+                      {editFilePreview ? (
+                        <div className="mb-4 relative h-32 w-full mx-auto">
+                          <img src={editFilePreview} alt="Preview" className="h-full w-full object-contain mx-auto rounded-md" />
+                          <button onClick={(e) => { e.preventDefault(); setEditFile(null); setEditFilePreview(selectedAd?.raw?.bannerImage?.url || selectedAd?.raw?.bannerImage || null); }} type="button" className="absolute -top-2 -right-2 bg-red-100 text-red-600 rounded-full p-1 border border-red-200">
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <ImageIcon aria-hidden="true" className="mx-auto size-12 text-gray-300" />
+                      )}
+
+                      <div className="mt-4 flex text-sm/6 justify-center text-gray-600">
+                        <label
+                          htmlFor="banner-upload"
+                          className="relative cursor-pointer rounded-md bg-white font-semibold text-[#FF5200] focus-within:outline-none focus-within:ring-2 focus-within:ring-[#FF5200] focus-within:ring-offset-2 hover:text-[#E64A00]"
+                        >
+                          <span>Upload a file</span>
+                          <input id="banner-upload" name="banner-upload" type="file" className="sr-only" onChange={handleFileChange} accept="image/*" />
+                        </label>
+                        <p className="pl-1">or drag and drop</p>
+                      </div>
+                      <p className="text-xs/5 text-gray-600 mt-1">PNG, JPG, WEBP up to 5MB</p>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+
+            <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200 mt-6">
+              <button
+                onClick={() => setIsEditOpen(false)}
+                className="px-4 py-2 text-sm font-medium rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition-all"
+                disabled={isSubmitting}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleEditSubmit}
+                disabled={isSubmitting}
+                className="px-4 py-2 text-sm font-medium rounded-lg bg-[#FF5200] text-white hover:bg-[#E64A00] transition-all shadow-md flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+              >
+                {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
+                {isSubmitting ? "Saving..." : "Save Changes"}
+              </button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 

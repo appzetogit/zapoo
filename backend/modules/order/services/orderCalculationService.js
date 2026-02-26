@@ -62,24 +62,53 @@ export const calculateDeliveryFee = async (orderValue, restaurant, deliveryAddre
       deliveryAddress.location.coordinates
     );
   } else if (deliveryAddress?.location?.latitude && restaurant?.location?.latitude) {
-    // Fallback
     distance = calculateDistance(
       [restaurant.location.longitude, restaurant.location.latitude],
       [deliveryAddress.location.longitude, deliveryAddress.location.latitude]
     );
   }
 
-  // Distance tiers
-  // 0-3 km: 20
-  // 3-5 km: 25
-  // 5-9 km: 30
-  // 9+ km: 30 + 10/km
-  if (distance <= 3) return 20;
-  if (distance <= 5) return 25;
-  if (distance <= 9) return 30;
+  // Get dynamic pricing from Tier/Zone
+  let baseFee = 20;
+  let baseDistance = 3;
+  let extraKmCharge = 10;
+  let freeThreshold = feeSettings.freeDeliveryThreshold || 0;
 
-  const extraKm = Math.ceil(distance - 9);
-  return 30 + (extraKm * 10);
+  if (restaurant && restaurant.zoneId) {
+    const zone = await Zone.findById(restaurant.zoneId).lean();
+    if (zone) {
+      // Use Zone settings if not overridden, fallback to Tier
+      if (zone.tierId) {
+        const tier = await Tier.findById(zone.tierId).lean();
+        if (tier && tier.deliveryPricing) {
+          baseFee = tier.deliveryPricing.baseFee ?? baseFee;
+          baseDistance = tier.deliveryPricing.baseDistance ?? baseDistance;
+          extraKmCharge = tier.deliveryPricing.extraKmCharge ?? extraKmCharge;
+          freeThreshold = tier.deliveryPricing.freeDeliveryThreshold || freeThreshold;
+        }
+      }
+
+      // Final Check: Zone level override (if exists in future)
+      if (zone.deliveryPricing?.isOverridden) {
+        baseFee = zone.deliveryPricing.baseFee ?? baseFee;
+        freeThreshold = zone.deliveryPricing.freeDeliveryThreshold || freeThreshold;
+      }
+    }
+  }
+
+  // Final Free Delivery Check with tier-based threshold
+  if (freeThreshold > 0 && orderValue >= freeThreshold) {
+    return 0;
+  }
+
+  // Calculate Final Delivery Fee
+  if (distance <= baseDistance) {
+    return baseFee;
+  }
+
+  // Additional km charges
+  const extraKm = Math.ceil(distance - baseDistance);
+  return baseFee + (extraKm * extraKmCharge);
 };
 
 /**
@@ -282,30 +311,43 @@ export const calculateOrderPricing = async ({
     // Apply free delivery from coupon
     const finalDeliveryFee = appliedCoupon?.freeDelivery ? 0 : deliveryFee;
 
-    // Calculate platform fee
-    const platformFee = await calculatePlatformFee(subtotal);
-
-    // Calculate GST on subtotal after discount
-    const gst = await calculateGST(subtotal, discount, restaurant);
-
-    // Calculate internal recommended fee (not shown to user)
+    // Calculate platform fee and recommended item fee
     const feeSettings = await getFeeSettings();
+    let platformFee = 0;
     let recommendedFeePerItem = feeSettings.recommendedItemFee || 0;
+    let hasTierFee = false;
 
     // Check for Zone or Tier based overrides
     if (restaurant && restaurant.zoneId) {
       const zone = await Zone.findById(restaurant.zoneId).lean();
       if (zone) {
+        // Fetch from Tier first
+        if (zone.tierId) {
+          const tier = await Tier.findById(zone.tierId).lean();
+          if (tier) {
+            hasTierFee = true;
+            platformFee = tier.platformFee ?? 0;
+            if (!zone.isRecommendedFeeOverridden) {
+              recommendedFeePerItem = tier.recommendedItemFee ?? recommendedFeePerItem;
+            }
+          }
+        }
+
+        // Zone level override for recommended fee
         if (zone.isRecommendedFeeOverridden) {
           recommendedFeePerItem = zone.recommendedItemFee || 0;
-        } else if (zone.tierId) {
-          const tier = await Tier.findById(zone.tierId).lean();
-          if (tier && tier.recommendedItemFee !== undefined) {
-            recommendedFeePerItem = tier.recommendedItemFee;
-          }
         }
       }
     }
+
+    // If no tier-based platform fee was found, use the default percentage-based logic
+    if (!hasTierFee) {
+      platformFee = await calculatePlatformFee(subtotal);
+    }
+
+    // Calculate GST on subtotal after discount
+    const gst = await calculateGST(subtotal, discount, restaurant);
+
 
     let internalRecommendedFee = 0;
 

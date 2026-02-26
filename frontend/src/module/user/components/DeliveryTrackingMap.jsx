@@ -3,7 +3,9 @@ import io from 'socket.io-client';
 import { API_BASE_URL } from '@/lib/api/config';
 import bikeLogo from '@/assets/bikelogo.png';
 import { RouteBasedAnimationController } from '@/module/user/utils/routeBasedAnimation';
-import { extractPolylineFromDirections, findNearestPointOnPolyline } from '@/module/delivery/utils/liveTrackingPolyline';
+import { extractPolylineFromDirections, findNearestPointOnPolyline, decodePolyline } from '@/module/delivery/utils/liveTrackingPolyline';
+import { realtimeDb } from '@/lib/firebaseConfig';
+import { ref, onValue, off } from 'firebase/database';
 import './DeliveryTrackingMap.css';
 
 // Helper function to calculate Haversine distance
@@ -614,63 +616,97 @@ const DeliveryTrackingMap = ({
       console.log('❌ Socket disconnected');
     });
 
-    socketRef.current.on(`location-receive-${orderId}`, (data) => {
-      console.log('📍📍📍 Received REAL-TIME location update via socket:', data);
-      if (data && typeof data.lat === 'number' && typeof data.lng === 'number') {
-        const location = { lat: data.lat, lng: data.lng, heading: data.heading || data.bearing || 0 };
-        console.log('✅✅✅ Updating bike to REAL delivery boy location:', location);
-        setCurrentLocation(location);
-        setDeliveryBoyLocation(location);
+    // Firebase Realtime Database Listener for Live Location & Route Info
+    const orderRef = ref(realtimeDb, `active_orders/${orderId}`);
 
-        // RAPIDO-STYLE: Use route-based animation if progress is available
-        if (isMapLoaded && mapInstance.current) {
-          if (data.progress !== undefined && animationControllerRef.current && routePolylinePointsRef.current) {
-            // Backend sent progress - use route-based animation
-            console.log('🛵 Using route-based animation with progress:', data.progress);
-            animationControllerRef.current.updatePosition(data.progress, data.bearing || data.heading || 0);
-          } else {
-            // Fallback: Use moveBikeSmoothly (will use route-based if polyline available)
-            console.log('🚴 Moving bike to location:', location);
-            moveBikeSmoothly(data.lat, data.lng, data.heading || data.bearing || 0);
+    onValue(orderRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        console.log('🔥 Received REAL-TIME update from Firebase:', data);
+
+        // 1. Update polyline if the route was cached in Firebase
+        // This is useful if the delivery boy was already assigned and route calculated
+        const currentPhase = order?.deliveryState?.currentPhase;
+
+        // Use the appropriate cached route based on phase
+        let encodedPolyline = null;
+        if (currentPhase === 'en_route_to_pickup') {
+          encodedPolyline = data.routeToPickup;
+        } else if (currentPhase === 'en_route_to_delivery') {
+          encodedPolyline = data.routeToDelivery;
+        }
+
+        // Draw cached polyline directly instead of computing (if we have a decoder)
+        if (encodedPolyline && isMapLoaded && mapInstance.current && directionsRendererRef.current) {
+          try {
+            const decodedPoints = decodePolyline(encodedPolyline);
+
+            if (decodedPoints.length > 0) {
+              // Convert to Google Maps LatLng objects
+              const path = decodedPoints.map(p => new window.google.maps.LatLng(p.lat, p.lng));
+
+              // Only draw if we haven't already drawn this exact path
+              if (!routePolylinePointsRef.current || routePolylinePointsRef.current.length !== decodedPoints.length) {
+                routePolylinePointsRef.current = decodedPoints;
+
+                // Initialize animation controller if bike marker exists
+                if (bikeMarkerRef.current && !animationControllerRef.current) {
+                  animationControllerRef.current = new RouteBasedAnimationController(
+                    bikeMarkerRef.current,
+                    decodedPoints
+                  );
+                }
+
+                // Remove existing custom polyline if any
+                if (routePolylineRef.current) {
+                  routePolylineRef.current.setMap(null);
+                }
+
+                // Create dashed polyline directly from decoded path
+                routePolylineRef.current = new window.google.maps.Polyline({
+                  path: path,
+                  geodesic: true,
+                  strokeColor: '#10b981',
+                  strokeOpacity: 0.8,
+                  strokeWeight: 4,
+                  icons: [{
+                    icon: {
+                      path: 'M 0,-1 0,1',
+                      strokeOpacity: 1,
+                      strokeWeight: 2,
+                      strokeColor: '#10b981',
+                      scale: 4
+                    },
+                    offset: '0%',
+                    repeat: '15px'
+                  }],
+                  map: mapInstance.current,
+                  zIndex: 1
+                });
+              }
+            }
+          } catch (err) {
+            console.error('❌ Error decoding cached polyline from Firebase:', err);
           }
-        } else {
-          // Store for when map loads
-          console.log('⏳ Map not loaded yet, storing location for later:', location);
+        }
+
+        // 2. Update Delivery Boy Live Location
+        if (typeof data.boy_lat === 'number' && typeof data.boy_lng === 'number') {
+          const location = { lat: data.boy_lat, lng: data.boy_lng, heading: data.heading || 0 };
+          console.log('✅ Updating bike to Firebase location:', location);
           setCurrentLocation(location);
+          setDeliveryBoyLocation(location);
+
+          if (isMapLoaded && mapInstance.current) {
+            moveBikeSmoothly(data.boy_lat, data.boy_lng, data.heading || 0);
+          }
         }
       } else {
-        console.warn('⚠️ Invalid location data received:', data);
+        console.log('ℹ️ No active tracking data yet in Firebase for this order.');
       }
     });
 
-    socketRef.current.on(`current-location-${orderId}`, (data) => {
-      console.log('📍📍📍 Received CURRENT location via socket:', data);
-      if (data && typeof data.lat === 'number' && typeof data.lng === 'number') {
-        const location = { lat: data.lat, lng: data.lng, heading: data.heading || data.bearing || 0 };
-        console.log('✅✅✅ Updating bike to REAL current delivery boy location:', location);
-        setCurrentLocation(location);
-        setDeliveryBoyLocation(location);
-
-        // RAPIDO-STYLE: Use route-based animation if progress is available
-        if (isMapLoaded && mapInstance.current) {
-          if (data.progress !== undefined && animationControllerRef.current && routePolylinePointsRef.current) {
-            // Backend sent progress - use route-based animation
-            console.log('🛵 Using route-based animation with progress:', data.progress);
-            animationControllerRef.current.updatePosition(data.progress, data.bearing || data.heading || 0);
-          } else {
-            // Fallback: Use moveBikeSmoothly (will use route-based if polyline available)
-            console.log('🚴 Moving bike to current location:', location);
-            moveBikeSmoothly(data.lat, data.lng, data.heading || data.bearing || 0);
-          }
-        } else {
-          // Store for when map loads
-          console.log('⏳ Map not loaded yet, storing location for later:', location);
-          setCurrentLocation(location);
-        }
-      } else {
-        console.warn('⚠️ Invalid current location data received:', data);
-      }
-    });
+    // REPLACED BY FIREBASE
 
     // Listen for route initialization from backend
     socketRef.current.on(`route-initialized-${orderId}`, (data) => {
@@ -721,8 +757,8 @@ const DeliveryTrackingMap = ({
         if (socketRef.current._locationRequestInterval) {
           clearInterval(socketRef.current._locationRequestInterval);
         }
-        socketRef.current.off(`location-receive-${orderId}`);
-        socketRef.current.off(`current-location-${orderId}`);
+        // Cleanup Firebase listener
+        off(orderRef);
         socketRef.current.off('order_status_update');
         socketRef.current.disconnect();
       }

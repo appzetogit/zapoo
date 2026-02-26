@@ -161,6 +161,12 @@ const restaurantSchema = new mongoose.Schema(
       type: String,
       default: "Flat ₹50 OFF above ₹199",
     },
+    deliveryRange: {
+      type: Number,
+      default: 5, // Default 5km
+      min: [1, "Delivery range must be at least 1km"],
+      max: [20, "Delivery range cannot exceed 20km"],
+    },
     // Onboarding fields (merged from RestaurantOnboarding)
     onboarding: {
       step1: {
@@ -324,6 +330,7 @@ const restaurantSchema = new mongoose.Schema(
 );
 
 // Indexes for authentication
+restaurantSchema.index({ "location.coordinates": "2dsphere" });
 restaurantSchema.index({ email: 1 }, { unique: true, sparse: true });
 restaurantSchema.index({ phone: 1 }, { unique: true, sparse: true });
 restaurantSchema.index({ googleId: 1 }, { unique: true, sparse: true });

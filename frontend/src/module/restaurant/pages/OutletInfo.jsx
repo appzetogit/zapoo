@@ -14,6 +14,7 @@ import {
   ChevronRight,
   X,
   Trash2,
+  Truck,
 } from "lucide-react"
 import {
   Dialog,
@@ -32,7 +33,7 @@ const CUISINES_STORAGE_KEY = "restaurant_cuisines"
 
 export default function OutletInfo() {
   const navigate = useNavigate()
-  
+
   // State management
   const [restaurantData, setRestaurantData] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -51,11 +52,14 @@ export default function OutletInfo() {
   const [uploadingCount, setUploadingCount] = useState(0) // Track how many images are being uploaded
   const profileImageInputRef = useRef(null)
   const menuImageInputRef = useRef(null)
+  const [deliveryRange, setDeliveryRange] = useState(5)
+  const [showEditRangeDialog, setShowEditRangeDialog] = useState(false)
+  const [editRangeValue, setEditRangeValue] = useState(5)
 
   // Format address from location object
   const formatAddress = (location) => {
     if (!location) return ""
-    
+
     const parts = []
     if (location.addressLine1) parts.push(location.addressLine1.trim())
     if (location.addressLine2) parts.push(location.addressLine2.trim())
@@ -68,7 +72,7 @@ export default function OutletInfo() {
       }
     }
     if (location.landmark) parts.push(location.landmark.trim())
-    
+
     return parts.join(", ") || ""
   }
 
@@ -81,10 +85,10 @@ export default function OutletInfo() {
         const data = response?.data?.data?.restaurant || response?.data?.restaurant
         if (data) {
           setRestaurantData(data)
-          
+
           // Set restaurant name
           setRestaurantName(data.name || "")
-          
+
           // Set restaurant ID
           setRestaurantId(data.restaurantId || data.id || "")
           // Set MongoDB _id for last 5 digits display
@@ -92,11 +96,11 @@ export default function OutletInfo() {
           // Convert to string to ensure we can slice it
           const mongoId = String(data.id || data._id || "")
           setRestaurantMongoId(mongoId)
-          
+
           // Format and set address
           const formattedAddress = formatAddress(data.location)
           setAddress(formattedAddress)
-          
+
           // Format cuisines
           if (data.cuisines && Array.isArray(data.cuisines) && data.cuisines.length > 0) {
             setCuisineTags(data.cuisines.join(", "))
@@ -114,7 +118,7 @@ export default function OutletInfo() {
               console.error("Error loading cuisines from storage:", error)
             }
           }
-          
+
           // Set images
           if (data.profileImage?.url) {
             setThumbnailImage(data.profileImage.url)
@@ -138,6 +142,11 @@ export default function OutletInfo() {
             setMainImage(data.menuImages[0].url)
           } else {
             setCoverImages([])
+          }
+
+          // Set delivery range
+          if (data.deliveryRange) {
+            setDeliveryRange(data.deliveryRange)
           }
         }
       } catch (error) {
@@ -163,7 +172,7 @@ export default function OutletInfo() {
 
     window.addEventListener("cuisinesUpdated", handleCuisinesUpdate)
     window.addEventListener("addressUpdated", handleAddressUpdate)
-    
+
     return () => {
       window.removeEventListener("cuisinesUpdated", handleCuisinesUpdate)
       window.removeEventListener("addressUpdated", handleAddressUpdate)
@@ -234,7 +243,7 @@ export default function OutletInfo() {
         if (uploadedImage.url) {
           setThumbnailImage(uploadedImage.url)
         }
-        
+
         // Refresh restaurant data to get latest from backend
         const response = await restaurantAPI.getCurrentRestaurant()
         const data = response?.data?.data?.restaurant || response?.data?.restaurant
@@ -279,9 +288,9 @@ export default function OutletInfo() {
       const currentData = currentResponse?.data?.data?.restaurant || currentResponse?.data?.restaurant
       const existingImages = currentData?.menuImages && Array.isArray(currentData.menuImages)
         ? currentData.menuImages.map(img => ({
-            url: img.url,
-            publicId: img.publicId
-          }))
+          url: img.url,
+          publicId: img.publicId
+        }))
         : []
 
       // Upload all images and collect their URLs
@@ -289,11 +298,11 @@ export default function OutletInfo() {
       // and then update profile with complete array
       const uploadedImageData = []
       const failedUploads = []
-      
+
       for (let i = 0; i < files.length; i++) {
         try {
           const uploadResponse = await restaurantAPI.uploadMenuImage(files[i])
-          
+
           // Extract uploaded image URL and publicId
           const uploadedImage = uploadResponse?.data?.data?.menuImage
           if (uploadedImage?.url) {
@@ -485,7 +494,7 @@ export default function OutletInfo() {
         response: error.response?.data,
         status: error.response?.status
       })
-      
+
       let errorMessage = "Failed to delete image. Please try again."
       if (error.response?.data?.message) {
         errorMessage = error.response.data.message
@@ -497,7 +506,7 @@ export default function OutletInfo() {
         }
       }
       alert(errorMessage)
-      
+
       // Revert local state on error
       setCoverImages(originalImages)
       if (originalImages.length > 0) {
@@ -554,13 +563,13 @@ export default function OutletInfo() {
     try {
       // Update restaurant name via API
       const response = await restaurantAPI.updateProfile({ name: newName })
-      
+
       if (response?.data?.data?.restaurant) {
         // Update local state
         setRestaurantName(newName)
         setRestaurantData(prev => prev ? { ...prev, name: newName } : null)
         setShowEditNameDialog(false)
-        
+
         // Refresh restaurant data to get latest from backend
         const refreshResponse = await restaurantAPI.getCurrentRestaurant()
         const data = refreshResponse?.data?.data?.restaurant || refreshResponse?.data?.restaurant
@@ -574,6 +583,29 @@ export default function OutletInfo() {
     } catch (error) {
       console.error("Error updating restaurant name:", error)
       alert(`Failed to update restaurant name: ${error.response?.data?.message || error.message || "Please try again."}`)
+    }
+  }
+
+  const handleSaveRange = async () => {
+    const newRange = parseInt(editRangeValue)
+    if (isNaN(newRange) || newRange < 1 || newRange > 20) {
+      alert("Delivery range must be between 1 and 20 km")
+      return
+    }
+
+    try {
+      // Update delivery range via API
+      const response = await restaurantAPI.updateProfile({ deliveryRange: newRange })
+
+      if (response?.data?.data?.restaurant) {
+        setDeliveryRange(newRange)
+        setRestaurantData(prev => prev ? { ...prev, deliveryRange: newRange } : null)
+        setShowEditRangeDialog(false)
+        toast.success(`Delivery range updated to ${newRange} km`)
+      }
+    } catch (error) {
+      console.error("Error updating delivery range:", error)
+      toast.error(`Failed to update delivery range: ${error.response?.data?.message || error.message}`)
     }
   }
 
@@ -615,12 +647,12 @@ export default function OutletInfo() {
 
       {/* Main Image Section */}
       <div className="relative w-full h-[200px] overflow-visible">
-        <img 
+        <img
           src={mainImage}
           alt="Restaurant banner"
           className="w-full h-full object-cover"
         />
-        
+
         {/* Add Image Button - Black background with white text */}
         <button
           onClick={() => menuImageInputRef.current?.click()}
@@ -629,8 +661,8 @@ export default function OutletInfo() {
         >
           <Plus className="w-4 h-4" />
           <span>
-            {uploadingImage && imageType === 'menu' 
-              ? `Uploading ${uploadingCount} image${uploadingCount > 1 ? 's' : ''}...` 
+            {uploadingImage && imageType === 'menu'
+              ? `Uploading ${uploadingCount} image${uploadingCount > 1 ? 's' : ''}...`
               : 'Add image'}
           </span>
         </button>
@@ -642,7 +674,7 @@ export default function OutletInfo() {
           className="hidden"
           onChange={handleCoverImageAdd}
         />
-        
+
         {/* Cover Images Gallery - Show all cover images with delete buttons */}
         {coverImages.length > 0 && (
           <div className="absolute bottom-2 right-4 flex gap-1.5 z-10">
@@ -682,7 +714,7 @@ export default function OutletInfo() {
         {/* Thumbnail Section - Overlapping bottom edge */}
         <div className="absolute bottom-0 left-4 -mb-[45px] flex flex-col gap-2 shrink-0 z-10">
           <div className="relative w-[70px] h-[70px] rounded overflow-hidden">
-            <img 
+            <img
               src={thumbnailImage}
               alt="Restaurant thumbnail"
               className="w-full h-full rounded-xl object-cover"
@@ -708,7 +740,7 @@ export default function OutletInfo() {
       {/* Thumbnail and Reviews Section */}
       <div className="px-4 pt-[50px] pb-4 bg-white">
         <div className="flex items-start gap-4">
-     
+
           {/* Reviews Section - Left Aligned */}
           <div className="flex flex-col gap-2">
             {/* Delivery Reviews */}
@@ -819,6 +851,35 @@ export default function OutletInfo() {
           </div>
         </motion.div>
 
+        {/* Delivery Range Card */}
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.12 }}
+          className="bg-blue-100/50 rounded-lg p-4 border border-blue-300"
+        >
+          <div className="flex items-start justify-between">
+            <div className="flex-1 min-w-0">
+              <p className="text-xs text-gray-500 font-normal mb-1">Delivery range (max 20km)</p>
+              <div className="flex items-center gap-2">
+                <Truck className="w-4 h-4 text-blue-600" />
+                <p className="text-base font-semibold text-gray-900">
+                  {loading ? "Loading..." : `${deliveryRange} km`}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                setEditRangeValue(deliveryRange)
+                setShowEditRangeDialog(true)
+              }}
+              className="text-blue-600 text-sm font-normal hover:text-blue-700 transition-colors ml-4 shrink-0"
+            >
+              Edit
+            </button>
+          </div>
+        </motion.div>
+
         {/* Action Cards */}
         <motion.div
           initial={{ opacity: 0, y: 8 }}
@@ -879,6 +940,51 @@ export default function OutletInfo() {
             <Button
               onClick={handleSaveName}
               disabled={!editNameValue.trim()}
+              className="bg-black text-white"
+            >
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Delivery Range Dialog */}
+      <Dialog open={showEditRangeDialog} onOpenChange={setShowEditRangeDialog}>
+        <DialogContent className="sm:max-w-md p-4 w-[90%]">
+          <DialogHeader>
+            <DialogTitle className="text-left">Edit Delivery Range</DialogTitle>
+            <DialogDescription className="text-left text-xs text-gray-500">
+              Set the maximum distance (in kilometers) you want to deliver. Maximum allowed is 20km.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <div className="flex items-center gap-3">
+              <Input
+                type="number"
+                min="1"
+                max="20"
+                value={editRangeValue}
+                onChange={(e) => setEditRangeValue(e.target.value)}
+                placeholder="Range (1-20)"
+                className="w-24 focus-visible:border-black focus-visible:ring-0"
+                autoFocus
+              />
+              <span className="text-base font-medium text-gray-700">km</span>
+            </div>
+            {parseInt(editRangeValue) > 20 && (
+              <p className="text-red-500 text-xs mt-2">Maximum range is 20km</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowEditRangeDialog(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveRange}
+              disabled={!editRangeValue || parseInt(editRangeValue) < 1 || parseInt(editRangeValue) > 20}
               className="bg-black text-white"
             >
               Save

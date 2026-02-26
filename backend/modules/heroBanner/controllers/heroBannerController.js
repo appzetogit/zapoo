@@ -11,28 +11,53 @@ import { successResponse, errorResponse } from '../../../shared/utils/response.j
 import { uploadToCloudinary } from '../../../shared/utils/cloudinaryService.js';
 import { cloudinary } from '../../../config/cloudinary.js';
 import mongoose from 'mongoose';
+import { calculateDistance } from '../../order/services/orderCalculationService.js';
 
 /**
  * Get all active hero banners (public endpoint)
  */
 export const getHeroBanners = async (req, res) => {
   try {
+    const { latitude, longitude } = req.query;
+    const userLat = latitude ? parseFloat(latitude) : null;
+    const userLng = longitude ? parseFloat(longitude) : null;
+
     const banners = await HeroBanner.find({ isActive: true })
-      .populate('linkedRestaurants', 'name slug restaurantId profileImage')
+      .populate('linkedRestaurants', 'name slug restaurantId profileImage location deliveryRange')
       .sort({ order: 1, createdAt: -1 })
       .select('imageUrl order linkedRestaurants title subtitle description ctaText ctaLink')
       .lean();
 
     return successResponse(res, 200, 'Hero banners retrieved successfully', {
-      banners: banners.map(b => ({
-        imageUrl: b.imageUrl,
-        title: b.title || '',
-        subtitle: b.subtitle || '',
-        description: b.description || '',
-        ctaText: b.ctaText || 'Order Now',
-        ctaLink: b.ctaLink || '/user',
-        linkedRestaurants: b.linkedRestaurants || []
-      }))
+      banners: banners.map(b => {
+        let filteredRestaurants = b.linkedRestaurants || [];
+
+        // Filter linked restaurants by range if user location available
+        if (userLat !== null && userLng !== null && filteredRestaurants.length > 0) {
+          filteredRestaurants = filteredRestaurants.filter(res => {
+            const resLocation = res.location;
+            const resLat = resLocation?.latitude || resLocation?.coordinates?.[1];
+            const resLng = resLocation?.longitude || resLocation?.coordinates?.[0];
+
+            if (resLat && resLng) {
+              const dist = calculateDistance([resLng, resLat], [userLng, userLat]);
+              const range = res.deliveryRange || 5;
+              return dist <= range;
+            }
+            return true; // Keep if location missing (fallback)
+          });
+        }
+
+        return {
+          imageUrl: b.imageUrl,
+          title: b.title || '',
+          subtitle: b.subtitle || '',
+          description: b.description || '',
+          ctaText: b.ctaText || 'Order Now',
+          ctaLink: b.ctaLink || '/user',
+          linkedRestaurants: filteredRestaurants
+        };
+      })
     });
   } catch (error) {
     console.error('Error fetching hero banners:', error);
@@ -1273,17 +1298,39 @@ export const getAllTop10Restaurants = async (req, res) => {
  */
 export const getTop10Restaurants = async (req, res) => {
   try {
+    const { latitude, longitude } = req.query;
+    const userLat = latitude ? parseFloat(latitude) : null;
+    const userLng = longitude ? parseFloat(longitude) : null;
+
     const restaurants = await Top10Restaurant.find({ isActive: true })
-      .populate('restaurant', 'name restaurantId slug profileImage coverImages menuImages rating estimatedDeliveryTime distance offer featuredDish featuredPrice')
+      .populate('restaurant', 'name restaurantId slug profileImage coverImages menuImages rating estimatedDeliveryTime distance offer featuredDish featuredPrice location deliveryRange')
       .sort({ rank: 1, order: 1 })
       .lean();
 
+    let filteredRestaurants = restaurants.map(r => ({
+      ...r.restaurant,
+      rank: r.rank,
+      _id: r._id
+    }));
+
+    // Range check if user location provided
+    if (userLat !== null && userLng !== null) {
+      filteredRestaurants = filteredRestaurants.filter(res => {
+        const resLocation = res.location;
+        const resLat = resLocation?.latitude || resLocation?.coordinates?.[1];
+        const resLng = resLocation?.longitude || resLocation?.coordinates?.[0];
+
+        if (resLat && resLng) {
+          const dist = calculateDistance([resLng, resLat], [userLng, userLat]);
+          const range = res.deliveryRange || 5;
+          return dist <= range;
+        }
+        return true;
+      });
+    }
+
     return successResponse(res, 200, 'Top 10 restaurants retrieved successfully', {
-      restaurants: restaurants.map(r => ({
-        ...r.restaurant,
-        rank: r.rank,
-        _id: r._id
-      }))
+      restaurants: filteredRestaurants
     });
   } catch (error) {
     console.error('Error fetching Top 10 restaurants:', error);
@@ -1508,16 +1555,38 @@ export const getAllGourmetRestaurants = async (req, res) => {
  */
 export const getGourmetRestaurants = async (req, res) => {
   try {
+    const { latitude, longitude } = req.query;
+    const userLat = latitude ? parseFloat(latitude) : null;
+    const userLng = longitude ? parseFloat(longitude) : null;
+
     const restaurants = await GourmetRestaurant.find({ isActive: true })
-      .populate('restaurant', 'name restaurantId slug profileImage coverImages menuImages rating estimatedDeliveryTime distance offer featuredDish featuredPrice')
+      .populate('restaurant', 'name restaurantId slug profileImage coverImages menuImages rating estimatedDeliveryTime distance offer featuredDish featuredPrice location deliveryRange')
       .sort({ order: 1, createdAt: -1 })
       .lean();
 
+    let filteredRestaurants = restaurants.map(r => ({
+      ...r.restaurant,
+      _id: r._id
+    }));
+
+    // Range check if user location provided
+    if (userLat !== null && userLng !== null) {
+      filteredRestaurants = filteredRestaurants.filter(res => {
+        const resLocation = res.location;
+        const resLat = resLocation?.latitude || resLocation?.coordinates?.[1];
+        const resLng = resLocation?.longitude || resLocation?.coordinates?.[0];
+
+        if (resLat && resLng) {
+          const dist = calculateDistance([resLng, resLat], [userLng, userLat]);
+          const range = res.deliveryRange || 5;
+          return dist <= range;
+        }
+        return true;
+      });
+    }
+
     return successResponse(res, 200, 'Gourmet restaurants retrieved successfully', {
-      restaurants: restaurants.map(r => ({
-        ...r.restaurant,
-        _id: r._id
-      }))
+      restaurants: filteredRestaurants
     });
   } catch (error) {
     console.error('Error fetching Gourmet restaurants:', error);

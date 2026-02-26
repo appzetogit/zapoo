@@ -5,6 +5,7 @@ import Offer from "../../restaurant/models/Offer.js";
 import AdminCommission from "../models/AdminCommission.js";
 import OrderSettlement from "../../order/models/OrderSettlement.js";
 import AdminWallet from "../models/AdminWallet.js";
+import Zone from "../models/Zone.js";
 import {
   successResponse,
   errorResponse,
@@ -32,17 +33,52 @@ const logger = winston.createLogger({
  */
 export const getDashboardStats = asyncHandler(async (req, res) => {
   try {
+    const { tierId, period } = req.query;
+    console.log(`📊 Fetching Dashboard Stats - Tier: ${tierId || 'all'}, Period: ${period || 'overall'}`);
+
     // Calculate date ranges
     const now = new Date();
     const last30Days = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-    // Get total revenue (sum of all completed orders)
+    let startDate = null;
+    if (period === "today") {
+      startDate = new Date(new Date().setHours(0, 0, 0, 0));
+    } else if (period === "week") {
+      startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    } else if (period === "month") {
+      startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    } else if (period === "year") {
+      startDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
+    }
+
+    // Filter by Tier if specified
+    let zoneFilter = {};
+    let restaurantFilter = { isActive: true };
+
+    if (tierId && tierId !== "all") {
+      const zones = await Zone.find({ tierId }).select("_id").lean();
+      const zoneIds = zones.map((z) => z._id);
+      zoneFilter = { zoneId: { $in: zoneIds } };
+      restaurantFilter.zoneId = { $in: zoneIds };
+    }
+
+    // Base match for orders
+    const orderMatch = {
+      status: "delivered",
+      "pricing.total": { $exists: true },
+      ...zoneFilter
+    };
+
+    // Apply period filter to "total" metrics if specified
+    const totalOrderMatch = { ...orderMatch };
+    if (startDate) {
+      totalOrderMatch.createdAt = { $gte: startDate };
+    }
+
+    // Get revenue (sum of all completed orders)
     const revenueStats = await Order.aggregate([
       {
-        $match: {
-          status: "delivered",
-          "pricing.total": { $exists: true },
-        },
+        $match: totalOrderMatch,
       },
       {
         $group: {
@@ -67,59 +103,30 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
       last30DaysRevenue: 0,
     };
 
-    // Get all settlements for delivered orders only (to match with revenue calculation)
-    // First get delivered order IDs
-    const deliveredOrderIds = await Order.find({ status: "delivered" })
+    // Get settlements for matching orders
+    const deliveredOrderIds = await Order.find(totalOrderMatch)
       .select("_id")
       .lean();
     const deliveredOrderIdArray = deliveredOrderIds.map((o) => o._id);
 
-    // Get settlements only for delivered orders
+    // Get settlements only for the filtered orders
     const allSettlements = await OrderSettlement.find({
       orderId: { $in: deliveredOrderIdArray },
     }).lean();
 
-    console.log(
-      `📊 Dashboard Stats - Total settlements found: ${allSettlements.length}`,
-    );
-
-    // Debug: Log first settlement to see actual structure
-    if (allSettlements.length > 0) {
-      const firstSettlement = allSettlements[0];
-      console.log("🔍 First settlement sample:", {
-        orderNumber: firstSettlement.orderNumber,
-        adminEarning: firstSettlement.adminEarning,
-        userPayment: firstSettlement.userPayment,
-      });
-    }
-
-    // Calculate totals from all settlements - use adminEarning fields
+    // Calculate totals from filtered settlements
     let totalCommission = 0;
     let totalPlatformFee = 0;
     let totalDeliveryFee = 0;
     let totalGST = 0;
     let totalRecommendedFee = 0;
 
-    allSettlements.forEach((s, index) => {
-      const commission = s.adminEarning?.commission || 0;
-      const platformFee = s.adminEarning?.platformFee || 0;
-      const deliveryFee = s.adminEarning?.deliveryFee || 0;
-      const gst = s.adminEarning?.gst || 0;
-      const recommendedFee = s.adminEarning?.recommendedItemFee || 0;
-
-      totalCommission += commission;
-      totalPlatformFee += platformFee;
-      totalDeliveryFee += deliveryFee;
-      totalGST += gst;
-      totalRecommendedFee += recommendedFee;
-
-      // Log each settlement for debugging
-      if (index < 5) {
-        // Log first 5 settlements
-        console.log(
-          `📦 Settlement ${index + 1} (${s.orderNumber}): Commission: ₹${commission}, Platform: ₹${platformFee}, Delivery: ₹${deliveryFee}, GST: ₹${gst}, Recommended: ₹${recommendedFee}`,
-        );
-      }
+    allSettlements.forEach((s) => {
+      totalCommission += s.adminEarning?.commission || 0;
+      totalPlatformFee += s.adminEarning?.platformFee || 0;
+      totalDeliveryFee += s.adminEarning?.deliveryFee || 0;
+      totalGST += s.adminEarning?.gst || 0;
+      totalRecommendedFee += s.adminEarning?.recommendedItemFee || 0;
     });
 
     totalCommission = Math.round(totalCommission * 100) / 100;
@@ -128,14 +135,12 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
     totalGST = Math.round(totalGST * 100) / 100;
     totalRecommendedFee = Math.round(totalRecommendedFee * 100) / 100;
 
-    console.log(
-      `💰 Final calculated totals - Commission: ₹${totalCommission}, Platform Fee: ₹${totalPlatformFee}, Delivery Fee: ₹${totalDeliveryFee}, GST: ₹${totalGST}, Recommended Fee: ₹${totalRecommendedFee}`,
-    );
-
-    // Get last 30 days data from OrderSettlement
+    // Get last 30 days data from filtered OrderSettlement
     const last30DaysSettlements = await OrderSettlement.find({
+      orderId: { $in: deliveredOrderIdArray },
       createdAt: { $gte: last30Days, $lte: now },
     }).lean();
+
     const last30DaysCommission = last30DaysSettlements.reduce(
       (sum, s) => sum + (s.adminEarning?.commission || 0),
       0,
@@ -157,8 +162,16 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
       0,
     );
 
-    // Get order statistics
+    // Get order statistics by status (filtered by zone and period)
+    const orderStatsQuery = { ...zoneFilter };
+    if (startDate) {
+      orderStatsQuery.createdAt = { $gte: startDate };
+    }
+
     const orderStats = await Order.aggregate([
+      {
+        $match: orderStatsQuery,
+      },
       {
         $group: {
           _id: "$status",
@@ -172,31 +185,27 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
       orderStatusMap[stat._id] = stat.count;
     });
 
-    // Get total orders processed
-    const totalOrders = await Order.countDocuments({ status: "delivered" });
+    // Get total orders processed (delivered)
+    const totalOrders = await Order.countDocuments(totalOrderMatch);
 
-    // Get active partners count
-    const activeRestaurants = await Restaurant.countDocuments({
-      isActive: true,
-    });
+    // Get active partners count (filtered by zone)
+    const activeRestaurants = await Restaurant.countDocuments(restaurantFilter);
+
     // Note: Delivery partners are stored in User model
     const User = (await import("../../auth/models/User.js")).default;
-    const activeDeliveryPartners = await User.countDocuments({
-      role: "delivery",
-      isActive: true,
-    });
+
+    // For delivery partners, we keeping delivery partners global or active in specified zones if possible.
+    const deliveryPartnerFilter = { role: "delivery", isActive: true };
+    const activeDeliveryPartners = await User.countDocuments(deliveryPartnerFilter);
     const activePartners = activeRestaurants + activeDeliveryPartners;
 
-    // Get additional stats
-    // Total restaurants (only active/approved restaurants)
-    // This matches the admin restaurants list which shows only active restaurants by default
-    const totalRestaurants = await Restaurant.countDocuments({
-      isActive: true,
-    });
+    // Total restaurants (active)
+    const totalRestaurants = await Restaurant.countDocuments(restaurantFilter);
 
-    // Restaurant requests pending (inactive restaurants with completed onboarding, no rejection)
+    // Restaurant requests pending (filtered by zone)
     const pendingRestaurantRequestsQuery = {
       isActive: false,
+      ...zoneFilter,
       $and: [
         {
           $or: [
@@ -226,50 +235,42 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
       pendingRestaurantRequestsQuery,
     );
 
-    // Total delivery boys (all delivery users)
+    // Total delivery boys
     const totalDeliveryBoys = await User.countDocuments({ role: "delivery" });
 
-    // Delivery boy requests pending (delivery users with isActive: false or verification pending)
-    // Assuming deliveryStatus field exists, if not we'll use isActive: false
+    // Delivery boy requests pending
     const pendingDeliveryBoyRequests = await User.countDocuments({
       role: "delivery",
       $or: [{ isActive: false }, { deliveryStatus: "pending" }],
     });
 
-    // Total foods (Menu items) - Count all individual menu items from active menus
-    // Count ALL items (including disabled sections, unavailable items, pending/approved, excluding only rejected)
+    // Total foods (Menu items) - Filtered by restaurants in the selected zones
     const Menu = (await import("../../restaurant/models/Menu.js")).default;
-    // Get all active menus and count items in sections and subsections
-    const activeMenus = await Menu.find({ isActive: true })
-      .select("sections")
-      .lean();
+    const restaurantsInTier = await Restaurant.find(restaurantFilter).select("_id");
+    const restaurantIdsInTier = restaurantsInTier.map(r => r._id);
+
+    const activeMenus = await Menu.find({
+      isActive: true,
+      restaurantId: { $in: restaurantIdsInTier }
+    }).select("sections").lean();
+
     let totalFoods = 0;
     activeMenus.forEach((menu) => {
       if (menu.sections && Array.isArray(menu.sections)) {
         menu.sections.forEach((section) => {
-          // Count items from ALL sections (enabled and disabled)
-
-          // Count items directly in section (all items, excluding only rejected)
           if (section.items && Array.isArray(section.items)) {
             totalFoods += section.items.filter((item) => {
-              // Must have required fields
               if (!item || !item.id || !item.name) return false;
-              // Exclude only rejected items (include all others: pending, approved, available, unavailable)
               if (item.approvalStatus === "rejected") return false;
-              // Count all other items regardless of availability or approval status
               return true;
             }).length;
           }
-          // Count items in subsections (all items, excluding only rejected)
           if (section.subsections && Array.isArray(section.subsections)) {
             section.subsections.forEach((subsection) => {
               if (subsection.items && Array.isArray(subsection.items)) {
                 totalFoods += subsection.items.filter((item) => {
-                  // Must have required fields
                   if (!item || !item.id || !item.name) return false;
-                  // Exclude only rejected items (include all others: pending, approved, available, unavailable)
                   if (item.approvalStatus === "rejected") return false;
-                  // Count all other items regardless of availability or approval status
                   return true;
                 }).length;
               }
@@ -279,138 +280,81 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
       }
     });
 
-    // Total addons - Count all addons from active menus
-    // Count ALL addons (including unavailable, pending/approved, excluding only rejected)
+    // Total addons
     let totalAddons = 0;
-    const menusWithAddons = await Menu.find({ isActive: true })
-      .select("addons")
-      .lean();
-    menusWithAddons.forEach((menu) => {
-      // Only process if menu has addons array and it's not empty
-      if (
-        !menu.addons ||
-        !Array.isArray(menu.addons) ||
-        menu.addons.length === 0
-      ) {
-        return;
-      }
+    const menusWithAddons = await Menu.find({
+      isActive: true,
+      restaurantId: { $in: restaurantIdsInTier }
+    }).select("addons").lean();
 
-      totalAddons += menu.addons.filter((addon) => {
-        // Only count if addon exists and has required fields (id and name are mandatory)
-        if (!addon || typeof addon !== "object") return false;
-        if (!addon.id || typeof addon.id !== "string" || addon.id.trim() === "")
-          return false;
-        if (
-          !addon.name ||
-          typeof addon.name !== "string" ||
-          addon.name.trim() === ""
-        )
-          return false;
-        // Exclude only rejected addons (include all others: pending, approved, available, unavailable)
-        if (addon.approvalStatus === "rejected") return false;
-        // Count all other addons regardless of availability or approval status
-        return true;
-      }).length;
+    menusWithAddons.forEach((menu) => {
+      if (menu.addons && Array.isArray(menu.addons)) {
+        totalAddons += menu.addons.filter((addon) => {
+          if (!addon || !addon.id || !addon.name) return false;
+          if (addon.approvalStatus === "rejected") return false;
+          return true;
+        }).length;
+      }
     });
 
-    // Total customers (users with role 'user' or no role specified)
+    // Total customers
     const totalCustomers = await User.countDocuments({
       $or: [{ role: "user" }, { role: { $exists: false } }, { role: null }],
     });
 
-    // Pending orders (already in orderStatusMap)
     const pendingOrders = orderStatusMap.pending || 0;
-
-    // Completed orders (delivered orders)
     const completedOrders = orderStatusMap.delivered || 0;
 
-    // Get recent activity (last 24 hours)
+    // Recent activity (last 24 hours) - also filter by zone
     const last24Hours = new Date(now.getTime() - 24 * 60 * 60 * 1000);
     const recentOrders = await Order.countDocuments({
+      ...zoneFilter,
       createdAt: { $gte: last24Hours },
     });
     const recentRestaurants = await Restaurant.countDocuments({
+      ...restaurantFilter,
       createdAt: { $gte: last24Hours },
       isActive: true,
     });
 
-    // Get monthly data for last 12 months
-    // Use aggregation to match orders with settlements by orderId and use order's deliveredAt
+    // Monthly data for last 12 months
     const monthlyData = [];
-    const monthNames = [
-      "Jan",
-      "Feb",
-      "Mar",
-      "Apr",
-      "May",
-      "Jun",
-      "Jul",
-      "Aug",
-      "Sep",
-      "Oct",
-      "Nov",
-      "Dec",
-    ];
+    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
     for (let i = 11; i >= 0; i--) {
       const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const monthEnd = new Date(
-        now.getFullYear(),
-        now.getMonth() - i + 1,
-        0,
-        23,
-        59,
-        59,
-        999,
-      );
+      const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59, 999);
 
-      // Get orders delivered in this month
       const monthOrders = await Order.find({
         status: "delivered",
         deliveredAt: { $gte: monthStart, $lte: monthEnd },
-      })
-        .select("_id pricing deliveredAt")
-        .lean();
+        ...zoneFilter
+      }).select("_id pricing deliveredAt").lean();
 
-      // Get order IDs for this month
       const monthOrderIds = monthOrders.map((o) => o._id);
-
-      // Get settlements for these orders (match by orderId, not by createdAt)
       const monthSettlements = await OrderSettlement.find({
         orderId: { $in: monthOrderIds },
-      })
-        .select("orderId adminEarning")
-        .lean();
+      }).select("orderId adminEarning").lean();
 
-      // Create a map of orderId to settlement for quick lookup
       const settlementMap = new Map();
-      monthSettlements.forEach((s) => {
-        settlementMap.set(s.orderId.toString(), s);
-      });
+      monthSettlements.forEach((s) => settlementMap.set(s.orderId.toString(), s));
 
-      // Calculate revenue and commission from orders and their settlements
       let monthRevenue = 0;
       let monthCommission = 0;
 
       monthOrders.forEach((order) => {
-        // Add revenue from order
         monthRevenue += order.pricing?.total || 0;
-
-        // Get commission from matching settlement
         const settlement = settlementMap.get(order._id.toString());
         if (settlement && settlement.adminEarning) {
-          // Only add commission (restaurant commission), not totalEarning
           monthCommission += settlement.adminEarning.commission || 0;
         }
       });
-
-      const monthOrdersCount = monthOrders.length;
 
       monthlyData.push({
         month: monthNames[monthStart.getMonth()],
         revenue: Math.round(monthRevenue * 100) / 100,
         commission: Math.round(monthCommission * 100) / 100,
-        orders: monthOrdersCount,
+        orders: monthOrders.length,
       });
     }
 
@@ -477,8 +421,7 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
         restaurants: recentRestaurants,
         period: "last24Hours",
       },
-      monthlyData: monthlyData, // Add monthly data for graphs
-      // Additional stats
+      monthlyData: monthlyData,
       restaurants: {
         total: totalRestaurants,
         active: activeRestaurants,

@@ -3,11 +3,12 @@ import Restaurant from '../models/Restaurant.js';
 import mongoose from 'mongoose';
 import { successResponse, errorResponse } from '../../../shared/utils/response.js';
 import asyncHandler from '../../../shared/middleware/asyncHandler.js';
+import { calculateDistance } from '../../order/services/orderCalculationService.js';
 
 // Create/Activate offer
 export const createOffer = asyncHandler(async (req, res) => {
   const restaurantId = req.restaurant._id;
-  
+
   const {
     goalId,
     discountType,
@@ -39,8 +40,8 @@ export const createOffer = asyncHandler(async (req, res) => {
   // Validate each item has required fields
   if (items.length > 0) {
     for (const item of items) {
-      if (!item.itemId || !item.itemName || item.originalPrice === undefined || 
-          item.discountPercentage === undefined || !item.couponCode) {
+      if (!item.itemId || !item.itemName || item.originalPrice === undefined ||
+        item.discountPercentage === undefined || !item.couponCode) {
         return errorResponse(res, 400, 'Each item must have itemId, itemName, originalPrice, discountPercentage, and couponCode');
       }
     }
@@ -80,15 +81,15 @@ export const getOffers = asyncHandler(async (req, res) => {
   const { status, goalId, discountType } = req.query;
 
   const query = { restaurant: restaurantId };
-  
+
   if (status) {
     query.status = status;
   }
-  
+
   if (goalId) {
     query.goalId = goalId;
   }
-  
+
   if (discountType) {
     query.discountType = discountType;
   }
@@ -188,7 +189,7 @@ export const getCouponsByItemId = asyncHandler(async (req, res) => {
   })
     .select('items discountType minOrderValue startDate endDate status')
     .lean();
-  
+
   console.log(`[COUPONS] Total active offers for restaurant: ${allRestaurantOffers.length}`);
   allRestaurantOffers.forEach(offer => {
     console.log(`[COUPONS] Offer ${offer._id} has ${offer.items?.length || 0} items`);
@@ -212,20 +213,20 @@ export const getCouponsByItemId = asyncHandler(async (req, res) => {
   const validOffers = allOffers.filter(offer => {
     const startDate = offer.startDate ? new Date(offer.startDate) : null;
     const endDate = offer.endDate ? new Date(offer.endDate) : null;
-    
+
     // Start date should be <= now (or null)
     const startValid = !startDate || startDate <= now;
-    
+
     // End date should be >= now (or null)
     // Add 1 day buffer to include offers that end today
     const endOfToday = new Date(now);
     endOfToday.setHours(23, 59, 59, 999);
     const endValid = !endDate || endDate >= endOfToday;
-    
+
     console.log(`[COUPONS] Offer ${offer._id}:`);
     console.log(`  startDate: ${startDate?.toISOString()}, now: ${now.toISOString()}, startValid: ${startValid}`);
     console.log(`  endDate: ${endDate?.toISOString()}, endOfToday: ${endOfToday.toISOString()}, endValid: ${endValid}`);
-    
+
     return startValid && endValid;
   });
 
@@ -278,11 +279,11 @@ export const getCouponsByItemIdPublic = asyncHandler(async (req, res) => {
 
   // Find restaurant by ID, slug, or restaurantId to get the actual MongoDB _id
   let restaurantObjectId = null;
-  
+
   // Try to find restaurant first
   try {
     const restaurantQuery = {};
-    
+
     // Check if restaurantId is a valid MongoDB ObjectId
     if (mongoose.Types.ObjectId.isValid(restaurantId) && restaurantId.length === 24) {
       restaurantQuery._id = new mongoose.Types.ObjectId(restaurantId);
@@ -326,12 +327,12 @@ export const getCouponsByItemIdPublic = asyncHandler(async (req, res) => {
   const validOffers = allOffers.filter(offer => {
     const startDate = offer.startDate ? new Date(offer.startDate) : null;
     const endDate = offer.endDate ? new Date(offer.endDate) : null;
-    
+
     const startValid = !startDate || startDate <= now;
     const endOfToday = new Date(now);
     endOfToday.setHours(23, 59, 59, 999);
     const endValid = !endDate || endDate >= endOfToday;
-    
+
     return startValid && endValid;
   });
 
@@ -369,30 +370,33 @@ export const getPublicOffers = asyncHandler(async (req, res) => {
   try {
     console.log('[PUBLIC-OFFERS] Request received');
     const now = new Date();
-    
+    const { latitude, longitude } = req.query;
+    const userLat = latitude ? parseFloat(latitude) : null;
+    const userLng = longitude ? parseFloat(longitude) : null;
+
     // Find all active offers
     const offers = await Offer.find({
       status: 'active',
     })
-      .populate('restaurant', 'name restaurantId slug profileImage rating estimatedDeliveryTime distance')
+      .populate('restaurant', 'name restaurantId slug profileImage rating estimatedDeliveryTime distance location deliveryRange')
       .sort({ createdAt: -1 })
       .lean();
-    
+
     console.log(`[PUBLIC-OFFERS] Found ${offers.length} active offers`);
 
     // Filter by date validity and flatten to show dishes with offers
     const offerDishes = [];
-    
+
     offers.forEach((offer) => {
       // Check if offer is valid (date-wise)
       const startDate = offer.startDate ? new Date(offer.startDate) : null;
       const endDate = offer.endDate ? new Date(offer.endDate) : null;
-      
+
       const startValid = !startDate || startDate <= now;
       const endOfToday = new Date(now);
       endOfToday.setHours(23, 59, 59, 999);
       const endValid = !endDate || endDate >= endOfToday;
-      
+
       if (!startValid || !endValid) {
         return; // Skip expired or not yet started offers
       }
@@ -400,6 +404,21 @@ export const getPublicOffers = asyncHandler(async (req, res) => {
       // Skip if restaurant is not found or not active
       if (!offer.restaurant || !offer.restaurant.name) {
         return;
+      }
+
+      // Range check if user location provided
+      if (userLat !== null && userLng !== null) {
+        const resLocation = offer.restaurant.location;
+        const resLat = resLocation?.latitude || resLocation?.coordinates?.[1];
+        const resLng = resLocation?.longitude || resLocation?.coordinates?.[0];
+
+        if (resLat && resLng) {
+          const dist = calculateDistance([resLng, resLat], [userLng, userLat]);
+          const range = offer.restaurant.deliveryRange || 5;
+          if (dist > range) {
+            return; // Skip if out of delivery range
+          }
+        }
       }
 
       // Process each item in the offer
@@ -452,7 +471,7 @@ export const getPublicOffers = asyncHandler(async (req, res) => {
     });
 
     console.log(`[PUBLIC-OFFERS] Returning ${offerDishes.length} offer dishes`);
-    
+
     return successResponse(res, 200, 'Offers retrieved successfully', {
       allOffers: offerDishes,
       groupedByOffer,

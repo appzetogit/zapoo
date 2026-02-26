@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { tierAPI } from "@/lib/api";
+import { tierAPI, adminAPI } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Loader2, Store } from "lucide-react";
+import { ArrowLeft, Loader2, Store, Plus } from "lucide-react";
+import { toast } from "sonner";
 
 export default function TierZones() {
     const { id } = useParams(); // tierId
@@ -30,6 +31,8 @@ export default function TierZones() {
         }
     };
 
+
+
     if (loading) {
         return (
             <div className="flex items-center justify-center min-h-[400px]">
@@ -48,6 +51,10 @@ export default function TierZones() {
                     <h1 className="text-2xl font-bold tracking-tight text-neutral-900">Zones in Tier</h1>
                     <p className="text-neutral-500 text-sm">Zones classified under this tier rule</p>
                 </div>
+                <Button onClick={() => navigate('/admin/restaurant/zone-setup')} className="bg-orange-600 hover:bg-orange-700 text-white gap-2 ml-auto">
+                    <Plus className="w-4 h-4" />
+                    Add Zone
+                </Button>
             </div>
 
             <Card>
@@ -73,10 +80,14 @@ export default function TierZones() {
                                 </TableRow>
                             ) : (
                                 zones.map((zone) => (
-                                    <TableRow key={zone._id} className="hover:bg-neutral-50 cursor-pointer" onClick={() => navigate(`/admin/tiers/zones/${zone._id}/restaurants`)}>
+                                    <TableRow key={zone._id} className="hover:bg-neutral-50 cursor-pointer" onClick={(e) => {
+                                        if (e.target.closest('.status-toggle')) return;
+                                        navigate(`/admin/tiers/zones/${zone._id}/restaurants`)
+                                    }}>
                                         <TableCell className="font-medium">{zone.name}</TableCell>
                                         <TableCell>{zone.serviceLocation}</TableCell>
                                         <TableCell>{zone.area} km²</TableCell>
+
                                         <TableCell className="text-right">
                                             <Button variant="ghost" size="sm" className="text-orange-600 hover:text-orange-700 hover:bg-orange-50">
                                                 View Restaurants <Store className="w-4 h-4 ml-2" />

@@ -8,7 +8,7 @@ import { errorResponse, successResponse } from "../../../shared/utils/response.j
  */
 export const createTier = async (req, res) => {
     try {
-        const { name, minArea, maxArea, description, rank, recommendedItemFee } = req.body;
+        const { name, minArea, maxArea, description, rank, recommendedItemFee, platformFee, baseDistance, extraKmCharge } = req.body;
 
         // Check if rank already exists
         const existingRank = await Tier.findOne({ rank });
@@ -31,9 +31,12 @@ export const createTier = async (req, res) => {
             rank,
             deliveryPricing: {
                 baseFee: req.body.baseFee || 0,
-                freeDeliveryThreshold: req.body.freeDeliveryThreshold || 0
+                freeDeliveryThreshold: req.body.freeDeliveryThreshold || 0,
+                baseDistance: baseDistance || 3,
+                extraKmCharge: extraKmCharge || 10
             },
-            recommendedItemFee: recommendedItemFee || 0
+            recommendedItemFee: recommendedItemFee || 0,
+            platformFee: platformFee || 0
         });
 
         return successResponse(res, 201, "Tier created successfully", tier);
@@ -66,7 +69,7 @@ export const updateTier = async (req, res) => {
     try {
         const { id } = req.params;
         console.log("updateTier body:", req.body);
-        const { name, minArea, maxArea, description, rank, isActive, baseFee, freeDeliveryThreshold, maxBanners, recommendedItemFee } = req.body;
+        const { name, minArea, maxArea, description, rank, isActive, baseFee, freeDeliveryThreshold, maxBanners, recommendedItemFee, platformFee, baseDistance, extraKmCharge } = req.body;
 
         const tier = await Tier.findById(id);
         if (!tier) {
@@ -97,12 +100,14 @@ export const updateTier = async (req, res) => {
         if (isActive !== undefined) tier.isActive = isActive;
 
         // Update delivery pricing
-        if (baseFee !== undefined || freeDeliveryThreshold !== undefined) {
+        if (baseFee !== undefined || freeDeliveryThreshold !== undefined || baseDistance !== undefined || extraKmCharge !== undefined) {
             if (!tier.deliveryPricing) {
                 tier.deliveryPricing = {};
             }
             if (baseFee !== undefined) tier.deliveryPricing.baseFee = baseFee;
             if (freeDeliveryThreshold !== undefined) tier.deliveryPricing.freeDeliveryThreshold = freeDeliveryThreshold;
+            if (baseDistance !== undefined) tier.deliveryPricing.baseDistance = baseDistance;
+            if (extraKmCharge !== undefined) tier.deliveryPricing.extraKmCharge = extraKmCharge;
         }
 
         // Update tier-based banner limit
@@ -112,6 +117,10 @@ export const updateTier = async (req, res) => {
 
         if (recommendedItemFee !== undefined) {
             tier.recommendedItemFee = Number(recommendedItemFee);
+        }
+
+        if (platformFee !== undefined) {
+            tier.platformFee = Number(platformFee);
         }
 
         await tier.save();
@@ -130,6 +139,8 @@ export const updateTier = async (req, res) => {
                     $set: {
                         "deliveryPricing.baseFee": tier.deliveryPricing.baseFee,
                         "deliveryPricing.freeDeliveryThreshold": tier.deliveryPricing.freeDeliveryThreshold,
+                        "deliveryPricing.baseDistance": tier.deliveryPricing.baseDistance,
+                        "deliveryPricing.extraKmCharge": tier.deliveryPricing.extraKmCharge,
                         "deliveryPricing.lastUpdated": new Date()
                     }
                 }
@@ -190,7 +201,7 @@ export const getZonesByTier = async (req, res) => {
             return errorResponse(res, 404, "Tier not found");
         }
 
-        const zones = await Zone.find({ tierId: id }).select('name serviceLocation area coordinates');
+        const zones = await Zone.find({ tierId: id }).select('name serviceLocation area coordinates isActive');
 
         return successResponse(res, 200, "Zones fetched successfully", zones);
 

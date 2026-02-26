@@ -21,7 +21,19 @@ export default function SettingsDialog({ isOpen, onOpenChange, visibleColumns, t
     actions: "Actions",
   }
 
-  const columnLabels = columnsConfig || defaultColumnsConfig
+  const adsColumnsConfig = {
+    si: "Serial Number",
+    adsId: "Ads ID",
+    adsTitle: "Ads Title",
+    restaurantInfo: "Restaurant Info",
+    adsType: "Ads Type",
+    duration: "Duration",
+    status: "Status",
+    priority: "Priority",
+    actions: "Actions",
+  }
+
+  const columnLabels = columnsConfig || adsColumnsConfig || defaultColumnsConfig
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>

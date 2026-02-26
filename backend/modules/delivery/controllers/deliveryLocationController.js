@@ -36,11 +36,11 @@ export const updateLocation = asyncHandler(async (req, res) => {
     const hasLatitude = latitude !== undefined && latitude !== null;
     const hasLongitude = longitude !== undefined && longitude !== null;
     const hasIsOnline = isOnline !== undefined && isOnline !== null;
-    
+
     if (!hasLatitude && !hasLongitude && !hasIsOnline) {
       return errorResponse(res, 400, 'At least one field (latitude, longitude, or isOnline) must be provided');
     }
-    
+
     // If latitude or longitude is provided, both must be provided
     if ((hasLatitude && !hasLongitude) || (!hasLatitude && hasLongitude)) {
       return errorResponse(res, 400, 'Both latitude and longitude must be provided together');
@@ -57,7 +57,7 @@ export const updateLocation = asyncHandler(async (req, res) => {
         return errorResponse(res, 400, locationError.details[0].message);
       }
     }
-    
+
     if (hasIsOnline && typeof isOnline !== 'boolean') {
       return errorResponse(res, 400, 'isOnline must be a boolean');
     }
@@ -95,6 +95,45 @@ export const updateLocation = asyncHandler(async (req, res) => {
 
     const currentLocation = updatedDelivery.availability?.currentLocation;
 
+    // --- FIREBASE REALTIME DB SYNC ---
+    if (currentLocation) {
+      try {
+        const { getDb } = await import('../../../config/firebaseConfig.js');
+        const db = getDb();
+        const boyRef = db.ref(`delivery_boys/${delivery._id}`);
+
+        // Keep boy profile synced
+        await boyRef.update({
+          lat: currentLocation.coordinates[1],
+          lng: currentLocation.coordinates[0],
+          status: updatedDelivery.availability?.isOnline ? 'online' : 'offline',
+          last_updated: Date.now()
+        });
+
+        // Also check if delivery boy is currently actively assigned to an order
+        const Order = (await import('../../order/models/Order.js')).default;
+        const activeOrder = await Order.findOne({
+          deliveryPartnerId: delivery._id,
+          status: { $in: ['confirmed', 'preparing', 'ready', 'out_for_delivery'] }
+        }).select('_id orderId').lean();
+
+        if (activeOrder) {
+          const orderRef = db.ref(`active_orders/${activeOrder._id}`);
+          await orderRef.update({
+            boy_lat: currentLocation.coordinates[1],
+            boy_lng: currentLocation.coordinates[0],
+            last_updated: Date.now()
+          });
+          console.log(`✅ Firebase: Synced live location for active order ${activeOrder.orderId}`);
+        }
+
+        console.log(`✅ Firebase: Delivery partner ${delivery._id} live location synced`);
+      } catch (firebaseErr) {
+        console.error(`❌ Firebase Error syncing delivery location for ${delivery._id}:`, firebaseErr);
+      }
+    }
+    // ---------------------------------
+
     return successResponse(res, 200, 'Status updated successfully', {
       location: currentLocation ? {
         latitude: currentLocation.coordinates[1],
@@ -127,7 +166,7 @@ export const getLocation = asyncHandler(async (req, res) => {
     }
 
     const location = deliveryData.availability?.currentLocation;
-    
+
     return successResponse(res, 200, 'Location retrieved successfully', {
       location: location ? {
         latitude: location.coordinates[1],
@@ -180,7 +219,7 @@ export const getZonesInRadius = asyncHandler(async (req, res) => {
       const R = 6371; // Earth's radius in kilometers
       const dLat = (lat2 - lat1) * Math.PI / 180;
       const dLng = (lng2 - lng1) * Math.PI / 180;
-      const a = 
+      const a =
         Math.sin(dLat / 2) * Math.sin(dLat / 2) +
         Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
         Math.sin(dLng / 2) * Math.sin(dLng / 2);

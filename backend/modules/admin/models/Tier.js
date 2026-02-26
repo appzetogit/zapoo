@@ -43,6 +43,16 @@ const tierSchema = new mongoose.Schema(
                 default: 0,
                 min: 0,
             },
+            baseDistance: {
+                type: Number,
+                default: 3,
+                min: 0,
+            },
+            extraKmCharge: {
+                type: Number,
+                default: 10,
+                min: 0,
+            },
         },
         maxBanners: {
             type: Number,
@@ -55,6 +65,12 @@ const tierSchema = new mongoose.Schema(
             default: 0,
             min: 0,
             comment: 'Default fee for recommended items in this tier'
+        },
+        platformFee: {
+            type: Number,
+            default: 0,
+            min: 0,
+            comment: 'Default platform fee for orders in this tier'
         },
     },
     {

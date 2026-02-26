@@ -1596,7 +1596,7 @@ export default function Cart() {
                       {/* Address Selection Buttons */}
                       <div className="flex gap-2 mt-2">
                         {["Home", "Office", "Other"].map((label) => {
-                          const addressExists = addresses.some(addr => addr.label === label)
+                          const isSelected = defaultAddress?.label?.toLowerCase() === label.toLowerCase()
                           return (
                             <button
                               key={label}
@@ -1605,7 +1605,7 @@ export default function Cart() {
                                 e.stopPropagation()
                                 handleSelectAddressByLabel(label)
                               }}
-                              className={`text-xs md:text-sm px-2 md:px-3 py-1 md:py-1.5 rounded-md border transition-colors ${addressExists
+                              className={`text-xs md:text-sm px-2 md:px-3 py-1 md:py-1.5 rounded-md border transition-colors ${isSelected
                                 ? 'border-[#FF5200] bg-orange-50 dark:bg-orange-900/20 text-[#FF5200] font-medium'
                                 : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600'
                                 }`}

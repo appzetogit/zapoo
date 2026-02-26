@@ -1164,8 +1164,8 @@ export const adminAPI = {
   },
 
   // Get dashboard stats
-  getDashboardStats: () => {
-    return apiClient.get(API_ENDPOINTS.ADMIN.DASHBOARD_STATS);
+  getDashboardStats: (params = {}) => {
+    return apiClient.get(API_ENDPOINTS.ADMIN.DASHBOARD_STATS, { params });
   },
 
   // Get users
@@ -1626,6 +1626,11 @@ export const adminAPI = {
       API_ENDPOINTS.ADMIN.FEE_SETTINGS_BY_ID.replace(":id", id),
       data,
     );
+  },
+
+  // Tier Management
+  getAllTiers: (params = {}) => {
+    return apiClient.get(API_ENDPOINTS.ADMIN.TIERS, { params });
   },
 
   // Zone Management

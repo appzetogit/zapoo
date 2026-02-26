@@ -638,6 +638,24 @@ export const acceptOrder = asyncHandler(async (req, res) => {
       }
       console.log(`✅ Order updated successfully: ${updatedOrder.orderId}, status: ${updatedOrder.status}`);
 
+      // Push initial polyline / route array to Firebase Realtime DB
+      try {
+        const { getDb } = await import('../../../config/firebaseConfig.js');
+        const db = getDb();
+        const orderRef = db.ref(`active_orders/${updatedOrder._id}`);
+        await orderRef.update({
+          routeToPickup: routeToPickup, // Array of arrays [[lat, lng]]
+          status: updatedOrder.status,
+          boy_id: delivery._id.toString(),
+          boy_lat: deliveryLat,
+          boy_lng: deliveryLng,
+          last_updated: Date.now()
+        });
+        console.log(`✅ Firebase: Route to pickup cached successfully for order ${updatedOrder.orderId}`);
+      } catch (firebaseErr) {
+        console.error(`❌ Firebase Error saving route to pickup for order ${updatedOrder.orderId}:`, firebaseErr);
+      }
+
       // Notify relevant parties if status was advanced to 'preparing'
       if (statusUpdate.status === 'preparing') {
         try {
@@ -1184,6 +1202,30 @@ export const confirmOrderId = asyncHandler(async (req, res) => {
 
     console.log(`✅ Order ID confirmed for order ${order.orderId}`);
     console.log(`📍 Route to delivery calculated: ${routeData.distance.toFixed(2)} km, ${routeData.duration.toFixed(1)} mins`);
+
+    // Push delivery polyline / route array to Firebase Realtime DB
+    try {
+      const { getDb } = await import('../../../config/firebaseConfig.js');
+      const db = getDb();
+      const orderRef = db.ref(`active_orders/${updatedOrder._id}`);
+      await orderRef.update({
+        routeToDelivery: {
+          coordinates: routeData.coordinates,
+          distance: routeData.distance,
+          duration: routeData.duration,
+          calculatedAt: Date.now(),
+          method: routeData.method
+        },
+        status: updatedOrder.status,
+        boy_id: delivery._id.toString(),
+        boy_lat: deliveryLat,
+        boy_lng: deliveryLng,
+        last_updated: Date.now()
+      });
+      console.log(`✅ Firebase: Route to delivery cached successfully for order ${updatedOrder.orderId}`);
+    } catch (firebaseErr) {
+      console.error(`❌ Firebase Error saving route to delivery for order ${updatedOrder.orderId}:`, firebaseErr);
+    }
 
     // Send response first, then handle socket notification asynchronously
     const responseData = {

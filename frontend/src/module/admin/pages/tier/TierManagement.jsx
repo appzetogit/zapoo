@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useNavigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 
 export default function TierManagement() {
     const [tiers, setTiers] = useState([]);
@@ -50,7 +51,10 @@ export default function TierManagement() {
                 maxArea: parseFloat(data.maxArea),
                 rank: parseInt(data.rank),
                 baseFee: parseFloat(data.baseFee || 0),
-                freeDeliveryThreshold: parseFloat(data.freeDeliveryThreshold || 0)
+                freeDeliveryThreshold: parseFloat(data.freeDeliveryThreshold || 0),
+                platformFee: parseFloat(data.platformFee || 0),
+                baseDistance: parseFloat(data.baseDistance || 3),
+                extraKmCharge: parseFloat(data.extraKmCharge || 10)
             };
 
             if (editingTier) {
@@ -80,6 +84,10 @@ export default function TierManagement() {
         setValue("rank", tier.rank);
         setValue("baseFee", tier.deliveryPricing?.baseFee || 0);
         setValue("freeDeliveryThreshold", tier.deliveryPricing?.freeDeliveryThreshold || 0);
+        setValue("baseDistance", tier.deliveryPricing?.baseDistance || 3);
+        setValue("extraKmCharge", tier.deliveryPricing?.extraKmCharge || 10);
+        setValue("platformFee", tier.platformFee || 0);
+        setValue("isActive", tier.isActive);
         setIsDialogOpen(true);
     };
 
@@ -101,7 +109,11 @@ export default function TierManagement() {
         reset({
             rank: tiers.length + 1,
             baseFee: 0,
-            freeDeliveryThreshold: 0
+            freeDeliveryThreshold: 0,
+            baseDistance: 3,
+            extraKmCharge: 10,
+            platformFee: 0,
+            isActive: true
         });
         setIsDialogOpen(true);
     };
@@ -126,7 +138,10 @@ export default function TierManagement() {
                         <p className="text-neutral-500 text-sm">Configure automated zone classification rules</p>
                     </div>
                 </div>
-
+                <Button onClick={openNewDialog} className="bg-orange-600 hover:bg-orange-700 text-white gap-2 px-5 py-6 rounded-xl shadow-md transition-all active:scale-95">
+                    <Plus className="w-5 h-5" />
+                    <span className="font-semibold">Add Tier</span>
+                </Button>
             </div>
 
             <Card className="border-neutral-200 shadow-sm">
@@ -143,6 +158,7 @@ export default function TierManagement() {
                                     <TableHead>Tier Name</TableHead>
                                     <TableHead>Area Range</TableHead>
                                     <TableHead>Delivery Pricing</TableHead>
+                                    <TableHead>Platform Fee</TableHead>
                                     <TableHead>Description</TableHead>
                                     <TableHead className="text-right">Actions</TableHead>
                                 </TableRow>
@@ -150,7 +166,7 @@ export default function TierManagement() {
                             <TableBody>
                                 {tiers.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={5} className="text-center py-10 text-neutral-500">
+                                        <TableCell colSpan={7} className="text-center py-10 text-neutral-500">
                                             No tiers configured yet.
                                         </TableCell>
                                     </TableRow>
@@ -176,15 +192,26 @@ export default function TierManagement() {
                                                     <span className="text-neutral-500 text-xs">Free above ₹{tier.deliveryPricing?.freeDeliveryThreshold || 0}</span>
                                                 </div>
                                             </TableCell>
+                                            <TableCell>
+                                                <span className="font-medium text-neutral-900 text-sm">₹{tier.platformFee || 0}</span>
+                                            </TableCell>
                                             <TableCell className="text-neutral-500 max-w-[200px] truncate">{tier.description}</TableCell>
+
                                             <TableCell className="text-right">
                                                 <div className="flex items-center justify-end gap-2">
                                                     <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => handleEdit(tier)}>
                                                         <Edit className="w-4 h-4 text-neutral-600" />
                                                     </Button>
 
-                                                    <Button variant="outline" size="sm" className="ml-1 h-8 w-8 p-0 text-purple-600 border-purple-200 hover:bg-purple-50" onClick={() => navigate(`/admin/tiers/${tier._id}/zones`)} title="View Zones">
+                                                    <Button variant="outline" size="sm" className="h-8 w-8 p-0 text-purple-600 border-purple-200 hover:bg-purple-50" onClick={() => navigate(`/admin/tiers/${tier._id}/zones`)} title="View Zones">
                                                         <MapPin className="w-4 h-4" />
+                                                    </Button>
+
+                                                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-red-500 hover:text-red-600 hover:bg-red-50" onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleDelete(tier._id);
+                                                    }} title="Delete Tier">
+                                                        <Trash2 className="w-4 h-4" />
                                                     </Button>
                                                 </div>
                                             </TableCell>
@@ -198,8 +225,8 @@ export default function TierManagement() {
             </Card>
 
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                <DialogContent className="sm:max-w-[480px] p-0 overflow-hidden bg-white gap-0 rounded-lg">
-                    <DialogHeader className="p-6 pb-2">
+                <DialogContent className="sm:max-w-[420px] p-0 overflow-hidden bg-white gap-0 rounded-lg">
+                    <DialogHeader className="p-5 pb-2">
                         <DialogTitle className="text-xl font-bold text-neutral-900">
                             {editingTier ? "Edit Tier Rule" : "Create New Tier"}
                         </DialogTitle>
@@ -208,119 +235,161 @@ export default function TierManagement() {
                         </p>
                     </DialogHeader>
 
-                    <form onSubmit={handleSubmit(onSubmit)}>
-                        <div className="p-6 space-y-5">
-                            <div className="space-y-2">
-                                <Label htmlFor="name" className="text-neutral-700 font-medium">Tier Name</Label>
+                    <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col max-h-[80vh]">
+                        <div className="p-5 space-y-4 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                            <div className="space-y-1.5">
+                                <Label htmlFor="name" className="text-sm text-neutral-700 font-medium">Tier Name</Label>
                                 <Input
                                     id="name"
                                     placeholder="e.g. Small"
-                                    className="h-10 border-neutral-200 focus:border-orange-500 focus:ring-orange-500/20"
+                                    className="h-9 border-neutral-200 focus:border-orange-500 focus:ring-orange-500/20"
                                     {...register("name", { required: "Required" })}
                                 />
                             </div>
 
-                            <div className="grid grid-cols-2 gap-5">
-                                <div className="space-y-2">
-                                    <Label htmlFor="rank" className="text-neutral-700 font-medium">Rank Priority</Label>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="platformFee" className="text-sm text-neutral-700 font-medium">Platform Fee (₹)</Label>
+                                    <Input
+                                        id="platformFee"
+                                        type="number"
+                                        min="0"
+                                        step="0.1"
+                                        placeholder="0"
+                                        className="h-9 border-neutral-200 focus:border-orange-500 focus:ring-orange-500/20 appearance-none"
+                                        onWheel={(e) => e.target.blur()}
+                                        {...register("platformFee", { required: "Required", min: 0 })}
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label htmlFor="rank" className="text-xs text-neutral-700 font-semibold uppercase tracking-wider">Priority Rank</Label>
                                     <Input
                                         id="rank"
                                         type="number"
                                         placeholder="1"
-                                        className="h-10 border-neutral-200 focus:border-orange-500 focus:ring-orange-500/20"
+                                        className="h-9 border-neutral-200 focus:border-orange-500 focus:ring-orange-500/20"
                                         {...register("rank", { required: "Required" })}
                                     />
                                 </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="description" className="text-neutral-700 font-medium">Description</Label>
-                                    <Input
-                                        id="description"
-                                        placeholder="Optional"
-                                        className="h-10 border-neutral-200 focus:border-orange-500 focus:ring-orange-500/20"
-                                        {...register("description")}
-                                    />
+                            </div>
+
+                            <div className="bg-neutral-50/50 p-3 rounded-lg border border-neutral-100 space-y-3">
+                                <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Delivery Pricing</p>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="space-y-1">
+                                        <Label htmlFor="baseFee" className="text-xs text-neutral-700 font-medium">Base Fee (₹)</Label>
+                                        <Input
+                                            id="baseFee"
+                                            type="number"
+                                            min="0"
+                                            placeholder="0"
+                                            className="h-9 bg-white border-neutral-200 focus:border-orange-500"
+                                            onWheel={(e) => e.target.blur()}
+                                            {...register("baseFee", { required: "Required", min: 0 })}
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label htmlFor="baseDistance" className="text-xs text-neutral-700 font-medium">Base Dist. (km)</Label>
+                                        <Input
+                                            id="baseDistance"
+                                            type="number"
+                                            min="0"
+                                            step="0.1"
+                                            placeholder="3"
+                                            className="h-9 bg-white border-neutral-200 focus:border-orange-500"
+                                            onWheel={(e) => e.target.blur()}
+                                            {...register("baseDistance", { required: "Required", min: 0 })}
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="space-y-1">
+                                        <Label htmlFor="extraKmCharge" className="text-xs text-neutral-700 font-medium">Extra km (₹)</Label>
+                                        <Input
+                                            id="extraKmCharge"
+                                            type="number"
+                                            min="0"
+                                            placeholder="10"
+                                            className="h-9 bg-white border-neutral-200 focus:border-orange-500"
+                                            onWheel={(e) => e.target.blur()}
+                                            {...register("extraKmCharge", { required: "Required", min: 0 })}
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label htmlFor="freeDeliveryThreshold" className="text-xs text-neutral-700 font-medium">Free Above (₹)</Label>
+                                        <Input
+                                            id="freeDeliveryThreshold"
+                                            type="number"
+                                            min="0"
+                                            placeholder="0"
+                                            className="h-9 bg-white border-neutral-200 focus:border-orange-500"
+                                            onWheel={(e) => e.target.blur()}
+                                            {...register("freeDeliveryThreshold", { required: "Required", min: 0 })}
+                                        />
+                                    </div>
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-5 pt-2">
-                                <div className="space-y-2">
-                                    <Label htmlFor="baseFee" className="text-neutral-700 font-medium">Base Delivery Fee (₹)</Label>
-                                    <Input
-                                        id="baseFee"
-                                        type="number"
-                                        min="0"
-                                        placeholder="0"
-                                        className="h-10 border-neutral-200 focus:border-orange-500 focus:ring-orange-500/20 appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [appearance:textfield]"
-                                        onWheel={(e) => e.target.blur()}
-                                        {...register("baseFee", { required: "Required", min: 0 })}
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="freeDeliveryThreshold" className="text-neutral-700 font-medium">Free Delivery Above (₹)</Label>
-                                    <Input
-                                        id="freeDeliveryThreshold"
-                                        type="number"
-                                        min="0"
-                                        placeholder="0"
-                                        className="h-10 border-neutral-200 focus:border-orange-500 focus:ring-orange-500/20 appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [appearance:textfield]"
-                                        onWheel={(e) => e.target.blur()}
-                                        {...register("freeDeliveryThreshold", { required: "Required", min: 0 })}
-                                    />
-                                </div>
+                            <div className="space-y-1">
+                                <Label htmlFor="description" className="text-xs text-neutral-700 font-semibold uppercase tracking-wider">Description</Label>
+                                <Input
+                                    id="description"
+                                    placeholder="Optional description"
+                                    className="h-9 border-neutral-200 focus:border-orange-500 focus:ring-orange-500/20"
+                                    {...register("description")}
+                                />
                             </div>
 
-                            <div className="space-y-3 pt-2">
-                                <Label className="text-neutral-700 font-medium block">Area Range (km²)</Label>
-                                <div className="flex items-center gap-3">
+                            <div className="space-y-2 pt-1">
+                                <Label className="text-xs text-neutral-700 font-semibold uppercase tracking-wider block">Auto-Assign Range (km²)</Label>
+                                <div className="flex items-center gap-2">
                                     <div className="relative flex-1">
-                                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                            <span className="text-neutral-400 text-sm">Min</span>
+                                        <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
+                                            <span className="text-neutral-400 text-[10px] font-bold uppercase">Min</span>
                                         </div>
                                         <Input
                                             type="number"
                                             placeholder="0"
                                             step="0.1"
-                                            className="pl-12 h-10 border-neutral-200 focus:border-orange-500 focus:ring-orange-500/20 appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [appearance:textfield]"
+                                            className="pl-10 h-8 border-neutral-200 text-sm bg-white"
                                             onWheel={(e) => e.target.blur()}
                                             {...register("minArea", { required: "Required" })}
                                         />
                                     </div>
-                                    <div className="h-px w-4 bg-neutral-300"></div>
+                                    <div className="h-px w-3 bg-neutral-200"></div>
                                     <div className="relative flex-1">
-                                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                            <span className="text-neutral-400 text-sm">Max</span>
+                                        <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
+                                            <span className="text-neutral-400 text-[10px] font-bold uppercase">Max</span>
                                         </div>
                                         <Input
                                             type="number"
                                             placeholder="10"
                                             step="0.1"
-                                            className="pl-12 h-10 border-neutral-200 focus:border-orange-500 focus:ring-orange-500/20 appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [appearance:textfield]"
+                                            className="pl-10 h-8 border-neutral-200 text-sm bg-white"
                                             onWheel={(e) => e.target.blur()}
                                             {...register("maxArea", { required: "Required" })}
                                         />
                                     </div>
                                 </div>
-                                <p className="text-xs text-neutral-500">
-                                    Zones within this area range will be automatically assigned to this tier.
-                                </p>
                             </div>
                         </div>
 
-                        <DialogFooter className="p-6 pt-2 pb-6 bg-white border-t-0 sm:justify-end gap-3">
+                        <DialogFooter className="p-4 bg-neutral-50/80 border-t border-neutral-100 sm:justify-end gap-2">
                             <Button
                                 type="button"
-                                variant="outline"
+                                variant="ghost"
                                 onClick={() => setIsDialogOpen(false)}
-                                className="h-10 px-4 border-neutral-300 text-neutral-700 hover:bg-neutral-50"
+                                className="h-9 px-4 text-neutral-500 text-sm hover:bg-neutral-200/50"
                             >
                                 Cancel
                             </Button>
                             <Button
                                 type="submit"
                                 disabled={isSubmitting}
-                                className="h-10 px-6 bg-orange-600 hover:bg-orange-700 text-white shadow-sm"
+                                className="h-9 px-6 bg-orange-600 hover:bg-orange-700 text-white text-sm shadow-md font-bold transition-all"
                             >
-                                {isSubmitting ? "Saving..." : "Save Tier"}
+                                {isSubmitting ? "Saving..." : "Save Tier Changes"}
                             </Button>
                         </DialogFooter>
                     </form>
