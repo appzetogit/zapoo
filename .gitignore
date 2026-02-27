@@ -1,0 +1,8 @@
+# Ignore service account files with private keys
+backend/config/firebase-service-account.json
+backend/config/zomato-607fa-firebase-adminsdk-fbsvc-f5f782c2cc.json
+/backend/config/firebase-service-account.json
+/.env.local
+node_modules/
+dist/
+build/
