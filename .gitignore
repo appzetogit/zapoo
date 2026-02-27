@@ -1,0 +1,5 @@
+/backend/config/firebase-service-account.json
+/.env.local
+node_modules/
+dist/
+build/
