@@ -184,7 +184,7 @@ class EmailService {
       month: "long",
       day: "numeric",
     });
-    const bookingUrl = `${process.env.FRONTEND_URL || "http://localhost:5173"}/user/dining/bookings`;
+    // const bookingUrl = ... (Dining removed)
 
     const html = templates.bookingConfirmation({
       companyName,

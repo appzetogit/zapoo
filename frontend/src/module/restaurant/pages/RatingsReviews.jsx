@@ -18,7 +18,7 @@ const accordionItems = [
   {
     id: 1,
     question: "How is my restaurant's rating calculated",
-    answer: "Your restaurant's rating is calculated based on customer reviews and ratings from delivery and dining orders. The system takes an average of all ratings received, with more recent reviews having slightly more weight."
+    answer: "Your restaurant's rating is calculated based on customer reviews and ratings from delivery orders. The system takes an average of all ratings received, with more recent reviews having slightly more weight."
   },
   {
     id: 2,
@@ -122,7 +122,7 @@ export default function RatingsReviews() {
 
       {/* Top Banner Section */}
       <div className="relative w-full">
-        <img 
+        <img
           src={restaurantReviewBanner}
           alt="Ratings and reviews banner"
           className="w-full h-auto object-cover"
@@ -151,7 +151,7 @@ export default function RatingsReviews() {
       <div className="px-4 py-4">
         <div className="border  border-gray-100 rounded-lg p-4">
           <h3 className="text-base font-bold  text-gray-900 mb-4">Select your concern</h3>
-          
+
           <div className="space-y-0">
             {accordionItems.map((item, index) => {
               const isExpanded = expandedItems.has(item.id)
@@ -165,12 +165,11 @@ export default function RatingsReviews() {
                       {item.question}
                     </span>
                     <ChevronDown
-                      className={`w-5 h-5 text-gray-900 shrink-0 transition-transform ${
-                        isExpanded ? "rotate-180" : ""
-                      }`}
+                      className={`w-5 h-5 text-gray-900 shrink-0 transition-transform ${isExpanded ? "rotate-180" : ""
+                        }`}
                     />
                   </button>
-                  
+
                   {index < accordionItems.length - 1 && (
                     <div className="border-b border-gray-300" />
                   )}

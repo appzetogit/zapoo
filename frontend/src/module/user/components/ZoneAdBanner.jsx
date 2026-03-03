@@ -113,7 +113,7 @@ export default function ZoneAdBanner() {
         // Navigate based on redirect target
         if (ad.redirectTarget === "menu" && ad.restaurant) {
             const restaurantId = typeof ad.restaurant === 'object' ? ad.restaurant._id : ad.restaurant
-            navigate(`/restaurant/${restaurantId}`)
+            navigate(`/restaurants/${restaurantId}`)
         } else if (ad.redirectTarget === "gourmet") {
             navigate("/user/gourmet")
         } else if (ad.redirectTarget === "top-10") {
@@ -122,7 +122,7 @@ export default function ZoneAdBanner() {
             window.open(ad.redirectTarget, "_blank")
         } else if (ad.restaurant) {
             const restaurantId = typeof ad.restaurant === 'object' ? ad.restaurant._id : ad.restaurant
-            navigate(`/restaurant/${restaurantId}`)
+            navigate(`/restaurants/${restaurantId}`)
         }
     }
 

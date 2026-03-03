@@ -1,16 +1,16 @@
 import { Outlet, useLocation } from "react-router-dom"
-import { useEffect, useState, createContext, useContext, lazy, Suspense } from "react"
+import { useEffect, createContext, useContext, lazy, Suspense, useState } from "react"
 import { ProfileProvider } from "../context/ProfileContext"
 import LocationPrompt from "./LocationPrompt"
 import { CartProvider } from "../context/CartContext"
 import { OrdersProvider } from "../context/OrdersContext"
-// Lazy load overlays to reduce initial bundle size
-const SearchOverlay = lazy(() => import("./SearchOverlay"))
-const LocationSelectorOverlay = lazy(() => import("./LocationSelectorOverlay"))
+import { useFCMNotification } from "@/hooks/useFCMNotification"
 import BottomNavigation from "./BottomNavigation"
 import DesktopNavbar from "./DesktopNavbar"
 
-// Create SearchOverlay context with default value
+const SearchOverlay = lazy(() => import("./SearchOverlay"))
+const LocationSelectorOverlay = lazy(() => import("./LocationSelectorOverlay"))
+
 const SearchOverlayContext = createContext({
   isSearchOpen: false,
   searchValue: "",
@@ -25,7 +25,6 @@ const SearchOverlayContext = createContext({
 
 export function useSearchOverlay() {
   const context = useContext(SearchOverlayContext)
-  // Always return context, even if provider is not available (will use default values)
   return context
 }
 
@@ -59,11 +58,10 @@ function SearchOverlayProvider({ children }) {
   )
 }
 
-// Create LocationSelector context with default value
 const LocationSelectorContext = createContext({
   isLocationSelectorOpen: false,
   locationSelectorLabel: null,
-  openLocationSelector: (label = null) => {
+  openLocationSelector: () => {
     console.warn("LocationSelectorProvider not available")
   },
   closeLocationSelector: () => { }
@@ -117,19 +115,16 @@ function LocationSelectorProvider({ children }) {
 export default function UserLayout() {
   const location = useLocation()
 
+  const isLoggedIn = localStorage.getItem("user_authenticated") === "true"
+  useFCMNotification({ isLoggedIn })
+
   useEffect(() => {
-    // Reset scroll to top whenever location changes (pathname, search, or hash)
-    window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" })
   }, [location.pathname, location.search, location.hash])
 
-  // Note: Authentication checks and redirects are handled by ProtectedRoute components
-  // UserLayout should not interfere with authentication redirects
-
-  // Show bottom navigation only on home page, dining page, under-250 page, and profile page
-  const showBottomNav = location.pathname === "/" ||
+  const showBottomNav =
+    location.pathname === "/" ||
     location.pathname === "/user" ||
-    location.pathname === "/dining" ||
-    location.pathname === "/user/dining" ||
     location.pathname === "/under-250" ||
     location.pathname === "/user/under-250" ||
     location.pathname === "/profile" ||
@@ -161,4 +156,3 @@ export default function UserLayout() {
     </div>
   )
 }
-

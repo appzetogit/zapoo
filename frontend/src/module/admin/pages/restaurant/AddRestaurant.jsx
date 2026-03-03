@@ -81,11 +81,6 @@ export default function AddRestaurant() {
     featuredDish: "",
     featuredPrice: "249",
     offer: "",
-    diningSettings: {
-      isEnabled: false,
-      maxGuests: 6,
-      diningType: "family-dining"
-    }
   })
 
   // Authentication
@@ -295,11 +290,7 @@ export default function AddRestaurant() {
         // Auth
         email: auth.email || null,
         phone: auth.phone || null,
-        email: auth.email || null,
-        phone: auth.phone || null,
         signupMethod: auth.email ? 'email' : 'phone',
-        // Dining Settings
-        diningSettings: step4.diningSettings,
       }
 
       // Call backend API
@@ -712,57 +703,6 @@ export default function AddRestaurant() {
         </div>
       </section>
 
-      <section className="bg-white p-4 sm:p-6 rounded-md space-y-4">
-        <h2 className="text-lg font-semibold text-black">Dining Configuration</h2>
-
-        <div className="flex items-center justify-between border p-3 rounded-md">
-          <div>
-            <Label className="text-sm font-medium text-black">Enable Dining</Label>
-            <p className="text-xs text-gray-500">Allow users to book tables</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setStep4({ ...step4, diningSettings: { ...step4.diningSettings, isEnabled: !step4.diningSettings?.isEnabled } })}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${step4.diningSettings?.isEnabled ? 'bg-black' : 'bg-gray-200'}`}
-            >
-              <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition duration-200 ease-in-out ${step4.diningSettings?.isEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
-            </button>
-            <span className="text-xs font-medium">{step4.diningSettings?.isEnabled ? "Active" : "Inactive"}</span>
-          </div>
-        </div>
-
-        {step4.diningSettings?.isEnabled && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <Label className="text-xs text-gray-700">Max Guests per Booking</Label>
-              <Input
-                type="number"
-                min="1"
-                max="50"
-                value={step4.diningSettings?.maxGuests || 6}
-                onChange={(e) => setStep4({ ...step4, diningSettings: { ...step4.diningSettings, maxGuests: parseInt(e.target.value) || 1 } })}
-                className="mt-1 bg-white text-sm"
-              />
-            </div>
-            <div>
-              <Label className="text-xs text-gray-700">Dining Type</Label>
-              <select
-                className="flex h-9 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 mt-1"
-                value={step4.diningSettings?.diningType || "family-dining"}
-                onChange={(e) => setStep4({ ...step4, diningSettings: { ...step4.diningSettings, diningType: e.target.value } })}
-              >
-                <option value="family-dining">Family Dining</option>
-                <option value="fine-dining">Fine Dining</option>
-                <option value="cafe">Cafe</option>
-                <option value="casual-dining">Casual Dining</option>
-                <option value="pub-bar">Pub & Bar</option>
-                <option value="buffet">Buffet</option>
-              </select>
-            </div>
-          </div>
-        )}
-      </section>
     </div>
   )
 

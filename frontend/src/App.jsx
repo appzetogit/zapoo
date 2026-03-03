@@ -28,6 +28,7 @@ const EditFoodPage = lazy(() => import("@/module/restaurant/pages/EditFoodPage")
 const AllFoodPage = lazy(() => import("@/module/restaurant/pages/AllFoodPage"))
 const WalletPage = lazy(() => import("@/module/restaurant/pages/WalletPage"))
 const RestaurantNotifications = lazy(() => import("@/module/restaurant/pages/Notifications"))
+const RestaurantNotificationRequest = lazy(() => import("@/module/restaurant/pages/NotificationRequest"))
 const OrderDetails = lazy(() => import("@/module/restaurant/pages/OrderDetails"))
 const OrdersMain = lazy(() => import("@/module/restaurant/pages/OrdersMain"))
 const RestaurantOnboarding = lazy(() => import("@/module/restaurant/pages/Onboarding"))
@@ -103,8 +104,6 @@ const ToHub = lazy(() => import("@/module/restaurant/pages/ToHub"))
 const ManageOutlets = lazy(() => import("@/module/restaurant/pages/ManageOutlets"))
 const UpdateBankDetails = lazy(() => import("@/module/restaurant/pages/UpdateBankDetails"))
 const ZoneSetup = lazy(() => import("@/module/restaurant/pages/ZoneSetup"))
-const DiningReservations = lazy(() => import("@/module/restaurant/pages/DiningReservations"))
-const DiningTableManagement = lazy(() => import("@/module/restaurant/pages/DiningTableManagement"))
 const SubscriptionPlans = lazy(() => import("@/module/restaurant/pages/SubscriptionPlans"))
 
 // Admin Module
@@ -182,6 +181,14 @@ export default function App() {
           element={
             <ProtectedRoute requiredRole="restaurant" loginPath="/restaurant/login">
               <RestaurantNotifications />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/restaurant/notify-customers"
+          element={
+            <ProtectedRoute requiredRole="restaurant" loginPath="/restaurant/login">
+              <RestaurantNotificationRequest />
             </ProtectedRoute>
           }
         />
@@ -772,22 +779,6 @@ export default function App() {
           element={
             <ProtectedRoute requiredRole="restaurant" loginPath="/restaurant/login">
               <UpdateBankDetails />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/restaurant/reservations"
-          element={
-            <ProtectedRoute requiredRole="restaurant" loginPath="/restaurant/login">
-              <DiningReservations />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/restaurant/tables"
-          element={
-            <ProtectedRoute requiredRole="restaurant" loginPath="/restaurant/login">
-              <DiningTableManagement />
             </ProtectedRoute>
           }
         />

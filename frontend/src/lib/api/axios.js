@@ -130,7 +130,6 @@ apiClient.interceptors.request.use(
         !requestUrl.includes("/restaurant/offers") &&
         !requestUrl.includes("/restaurant/inventory") &&
         !requestUrl.includes("/restaurant/categories") &&
-        !requestUrl.includes("/dining/") &&
         !requestUrl.includes("/restaurant/onboarding") &&
         !requestUrl.includes("/restaurant/delivery-status") &&
         !requestUrl.includes("/restaurant/finance") &&

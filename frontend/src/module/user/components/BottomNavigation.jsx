@@ -5,10 +5,9 @@ export default function BottomNavigation() {
   const location = useLocation()
 
   // Check active routes - support both /user/* and /* paths
-  const isDining = location.pathname === "/dining" || location.pathname === "/user/dining"
   const isUnder250 = location.pathname === "/under-250" || location.pathname === "/user/under-250"
   const isProfile = location.pathname.startsWith("/profile") || location.pathname.startsWith("/user/profile")
-  const isDelivery = !isDining && !isUnder250 && !isProfile && (location.pathname === "/" || location.pathname === "/user" || (location.pathname.startsWith("/") && !location.pathname.startsWith("/restaurant") && !location.pathname.startsWith("/delivery") && !location.pathname.startsWith("/admin") && !location.pathname.startsWith("/usermain")))
+  const isDelivery = !isUnder250 && !isProfile && (location.pathname === "/" || location.pathname === "/user" || (location.pathname.startsWith("/") && !location.pathname.startsWith("/restaurant") && !location.pathname.startsWith("/delivery") && !location.pathname.startsWith("/admin") && !location.pathname.startsWith("/usermain")))
 
   return (
     <div
@@ -51,29 +50,6 @@ export default function BottomNavigation() {
             <div className="absolute top-0 left-0 right-0 h-0.5 bg-orange-600 dark:bg-orange-500 rounded-b-full" />
           )}
         </Link>
-
-        {/* Divider */}
-        <div className="h-8 w-px bg-gray-300 dark:bg-gray-700" />
-
-        {/* Dining Tab */}
-        <Link
-          to="/user/dining"
-          className={`flex flex-col items-center gap-1.5 px-4 sm:px-5 py-2 transition-all duration-200 relative ${isDining
-            ? "text-orange-600 dark:text-orange-500"
-            : "text-gray-600 dark:text-gray-400"
-            }`}
-        >
-          <UtensilsCrossed className={`h-5 w-5 ${isDining ? "text-orange-600 dark:text-orange-500 fill-orange-600 dark:fill-orange-500" : "text-gray-600 dark:text-gray-400"}`} strokeWidth={2} />
-          <span className={`text-xs sm:text-sm font-medium ${isDining ? "text-orange-600 dark:text-orange-500 font-semibold" : "text-gray-600 dark:text-gray-400"}`}>
-            Dining
-          </span>
-          {isDining && (
-            <div className="absolute top-0 left-0 right-0 h-0.5 bg-orange-600 dark:bg-orange-500 rounded-b-full" />
-          )}
-        </Link>
-
-        {/* Divider */}
-        <div className="h-8 w-px bg-gray-300 dark:bg-gray-700" />
 
         {/* Profile Tab */}
         <Link

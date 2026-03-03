@@ -1580,11 +1580,11 @@ export default function Cart() {
               </div>
 
               <div className="bg-white dark:bg-[#1a1a1a] px-4 md:px-6 py-3 md:py-4 rounded-lg md:rounded-xl">
-                <button
+                <div
                   onClick={() => openLocationSelector()}
-                  className="flex items-center justify-between w-full text-left"
+                  className="flex items-center justify-between w-full text-left cursor-pointer hover:bg-gray-50/50 dark:hover:bg-white/5 transition-colors rounded-lg"
                 >
-                  <div className="flex items-center gap-3 md:gap-4">
+                  <div className="flex items-center gap-3 md:gap-4 flex-1">
                     <MapPin className="h-4 w-4 md:h-5 md:w-5 text-gray-500 dark:text-gray-400" />
                     <div className="flex-1">
                       <p className="text-sm md:text-base text-gray-800 dark:text-gray-200">
@@ -1618,7 +1618,7 @@ export default function Cart() {
                     </div>
                   </div>
                   <ChevronRight className="h-4 w-4 md:h-5 md:w-5 text-gray-400" />
-                </button>
+                </div>
               </div>
 
               {/* Contact */}

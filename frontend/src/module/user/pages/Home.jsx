@@ -521,6 +521,7 @@ export default function Home() {
     touchEndX.current = 0
     touchEndY.current = 0
   }
+
   const [activeFilters, setActiveFilters] = useState(new Set())
   const [sortBy, setSortBy] = useState(null) // null, 'price-low', 'price-high', 'rating-high', 'rating-low'
   const [selectedCuisine, setSelectedCuisine] = useState(null)
@@ -1328,18 +1329,11 @@ export default function Home() {
                 <>
                   {/* MOBILE: Vertical card layout (hidden on sm+) */}
                   <div
-                    className="sm:hidden relative w-full rounded-2xl overflow-hidden shadow-md border-t border-gray-200 bg-white cursor-pointer"
+                    className="sm:hidden relative w-full rounded-2xl overflow-hidden shadow-md border-t border-gray-200 bg-white"
                     style={{ minHeight: '270px' }}
                     onTouchStart={handleTouchStart}
                     onTouchMove={handleTouchMove}
                     onTouchEnd={handleTouchEnd}
-                    onClick={() => {
-                      if (hasLinkedRestaurants) {
-                        const firstRestaurant = linkedRestaurants[0]
-                        const restaurantSlug = firstRestaurant.slug || firstRestaurant.restaurantId || firstRestaurant._id
-                        navigate(`/restaurants/${restaurantSlug}`)
-                      }
-                    }}
                   >
                     {/* Top: Text with Animation */}
                     <div className="px-5 pt-5 pb-3 bg-white relative z-10 min-h-[110px]">
@@ -1380,14 +1374,12 @@ export default function Home() {
                           className="absolute left-5 z-20"
                           style={{ top: hasText ? '105px' : '12px' }}
                         >
-                          <a
-                            href={currentBanner?.ctaLink || '/user'}
-                            onClick={e => e.stopPropagation()}
-                            className="flex flex-col items-center justify-center bg-orange-500 text-white font-bold text-[10px] leading-tight rounded-full shadow-lg px-3 py-3 text-center uppercase"
+                          <button
+                            className="flex flex-col items-center justify-center bg-orange-500 text-white font-bold text-[10px] leading-tight rounded-full shadow-lg px-3 py-3 text-center uppercase pointer-events-none"
                             style={{ width: '72px', height: '72px' }}
                           >
                             {currentBanner.ctaText}
-                          </a>
+                          </button>
                         </motion.div>
                       )}
                     </AnimatePresence>
@@ -1451,7 +1443,9 @@ export default function Home() {
                     onMouseUp={handleMouseUp}
                   >
                     {/* Left: Text with Animation */}
-                    <div className="flex flex-col justify-center px-8 py-6 w-2/5 bg-white z-10 min-h-[220px]">
+                    <div
+                      className="flex flex-col justify-center px-8 py-6 w-2/5 bg-white z-10 min-h-[220px]"
+                    >
                       <AnimatePresence mode="wait">
                         <motion.div
                           key={currentBannerIndex}
@@ -1473,12 +1467,11 @@ export default function Home() {
                           {currentBanner?.description && (
                             <p className="text-gray-500 text-sm mb-4 line-clamp-3">{currentBanner.description}</p>
                           )}
-                          <a
-                            href={currentBanner?.ctaLink || '/user'}
-                            className="inline-flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold px-5 py-2 rounded-full w-fit transition-colors shadow"
+                          <button
+                            className="inline-flex items-center gap-2 bg-orange-500 text-white text-sm font-semibold px-5 py-2 rounded-full w-fit shadow pointer-events-none"
                           >
                             {currentBanner?.ctaText || 'Order Now'}
-                          </a>
+                          </button>
                         </motion.div>
                       </AnimatePresence>
                     </div>
@@ -1495,19 +1488,10 @@ export default function Home() {
                         style={{ width: `${heroBannerImages.length * 100}%` }}
                       >
                         {heroBannerImages.map((image, index) => {
-                          const bd = heroBannersData[index]
-                          const lr = bd?.linkedRestaurants || []
                           return (
                             <div
                               key={index}
                               className="w-full h-full flex-shrink-0"
-                              style={{ cursor: lr.length > 0 ? 'pointer' : 'default' }}
-                              onClick={() => {
-                                if (lr.length > 0) {
-                                  const slug = lr[0].slug || lr[0].restaurantId || lr[0]._id
-                                  navigate(`/restaurants/${slug}`)
-                                }
-                              }}
                             >
                               <OptimizedImage
                                 src={image}

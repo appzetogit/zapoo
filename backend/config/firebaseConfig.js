@@ -6,27 +6,49 @@ import fs from 'fs';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Read the service account key using fs
+// Read the RTDB service account key (zapoo-d23ea project)
 const serviceAccountPath = path.join(__dirname, 'firebase-service-account.json');
-const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
+let serviceAccount = null;
+try {
+    serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
+} catch (err) {
+    console.warn('⚠️ firebase-service-account.json not found or invalid. Firebase RTDB will be unavailable.');
+}
 
+// Named app for RTDB — completely separate from the default Auth app (zomato-607fa)
+const RTDB_APP_NAME = 'zapoo-rtdb';
 let db;
 
 export const initializeFirebaseRealtime = () => {
-    if (!admin.apps.length) {
-        admin.initializeApp({
-            credential: admin.credential.cert(serviceAccount),
-            databaseURL: "https://zapoo-d23ea.firebaseio.com" // Extracted from project_id
-        });
+    if (!serviceAccount) {
+        console.warn('⚠️ Firebase Realtime Database skipped: service account not available.');
+        return null;
     }
-    db = admin.database();
-    console.log("✅ Firebase Realtime Database Initialized Successfully");
-    return db;
+
+    try {
+        // Use a named app so it NEVER conflicts with the default Admin app used by FirebaseAuthService
+        const existingApp = admin.apps.find(a => a?.name === RTDB_APP_NAME);
+        const rtdbApp = existingApp || admin.initializeApp(
+            {
+                credential: admin.credential.cert(serviceAccount),
+                // Asia-southeast1 regional URL (your project lives here)
+                databaseURL: 'https://zapoo-d23ea-default-rtdb.asia-southeast1.firebasedatabase.app'
+            },
+            RTDB_APP_NAME  // <-- named app, not the default app
+        );
+
+        db = rtdbApp.database();
+        console.log('✅ Firebase Realtime Database Initialized Successfully');
+        return db;
+    } catch (err) {
+        console.warn('⚠️ Firebase RTDB initialization error:', err.message);
+        return null;
+    }
 };
 
 export const getDb = () => {
     if (!db) {
-        throw new Error("⚠️ Firebase Realtime Database not initialized. Call initializeFirebaseRealtime() first.");
+        throw new Error('⚠️ Firebase Realtime Database not initialized. Call initializeFirebaseRealtime() first.');
     }
     return db;
 };

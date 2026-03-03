@@ -2,8 +2,9 @@ import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import Lenis from "lenis"
 import { ArrowLeft, ChevronDown } from "lucide-react"
-import BottomPopup from "@/module/delivery/components/BottomPopup"
 import { restaurantAPI } from "@/lib/api"
+import { toast } from "sonner"
+import { Loader2 } from "lucide-react"
 
 const ADDRESS_STORAGE_KEY = "restaurant_address"
 
@@ -17,10 +18,15 @@ export default function EditRestaurantAddress() {
   const [restaurantName, setRestaurantName] = useState("")
   const [location, setLocation] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [showSelectOptionDialog, setShowSelectOptionDialog] = useState(false)
-  const [selectedOption, setSelectedOption] = useState("minor_correction") // "update_address" or "minor_correction"
   const [lat, setLat] = useState(DEFAULT_LAT)
   const [lng, setLng] = useState(DEFAULT_LNG)
+  const [addressFields, setAddressFields] = useState({
+    addressLine1: "",
+    addressLine2: "",
+    area: "",
+    city: "",
+    landmark: ""
+  })
 
   // Format address from location object
   const formatAddress = (loc) => {
@@ -50,6 +56,13 @@ export default function EditRestaurantAddress() {
           setRestaurantName(data.name || "")
           if (data.location) {
             setLocation(data.location)
+            setAddressFields({
+              addressLine1: data.location.addressLine1 || "",
+              addressLine2: data.location.addressLine2 || "",
+              area: data.location.area || "",
+              city: data.location.city || "",
+              landmark: data.location.landmark || ""
+            })
             const formatted = formatAddress(data.location)
             setAddress(formatted)
             // Set coordinates if available
@@ -81,9 +94,9 @@ export default function EditRestaurantAddress() {
             setAddress(savedAddress)
           }
           // Try to get restaurant name from localStorage, but prefer empty string over hardcoded value
-          const savedName = localStorage.getItem("restaurant_name") || 
-                           localStorage.getItem("restaurantName") ||
-                           ""
+          const savedName = localStorage.getItem("restaurant_name") ||
+            localStorage.getItem("restaurantName") ||
+            ""
           setRestaurantName(savedName)
         } catch (e) {
           console.error("Error loading from localStorage:", e)
@@ -128,83 +141,57 @@ export default function EditRestaurantAddress() {
   const handleViewOnMap = () => {
     // Create Google Maps URL for the restaurant location
     const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`
-    
+
     // Try to open in Google Maps app (mobile) or web
     window.open(googleMapsUrl, "_blank")
   }
 
-  // Handle Update button click
-  const handleUpdateClick = () => {
-    setShowSelectOptionDialog(true)
+  // Handle input changes
+  const handleInputChange = (e) => {
+    const { name, value } = e.target
+    const updatedFields = {
+      ...addressFields,
+      [name]: value
+    }
+    setAddressFields(updatedFields)
+    setAddress(formatAddress(updatedFields))
   }
 
-  // Handle Proceed to update
-  const handleProceedUpdate = async () => {
+  // Removed handleUpdateClick as it's no longer needed
+
+  // Handle Proceed to update (Now used directly by the main Update button)
+  const handleSaveAddress = async () => {
     try {
-      // For now, we'll update the location in the database
-      // In a real scenario, you might want to handle FSSAI update flow separately
-      if (selectedOption === "update_address") {
-        // For major address update, you might want to navigate to a form
-        // For now, we'll just show a message
-        alert("For major address updates, FSSAI verification may be required. Please contact support.")
-        setShowSelectOptionDialog(false)
-        return
+      setLoading(true)
+
+      const finalFormattedAddress = formatAddress(addressFields)
+
+      // Update location with both manual fields and map coordinates
+      const updatedLocation = {
+        ...location,
+        ...addressFields,
+        latitude: lat,
+        longitude: lng,
+        coordinates: [lng, lat], // GeoJSON format: [longitude, latitude]
+        formattedAddress: finalFormattedAddress || address
+      }
+
+      const response = await restaurantAPI.updateProfile({ location: updatedLocation })
+
+      if (response?.data?.success || response?.data?.data?.restaurant) {
+        setLocation(updatedLocation)
+        setAddress(finalFormattedAddress)
+        window.dispatchEvent(new Event("addressUpdated"))
+        toast.success("Address updated successfully!")
+        navigate(-1)
       } else {
-        // Minor correction - update location coordinates
-        // Fetch live address from coordinates using Google Maps API
-        try {
-          // Get Google Maps API key
-          const { getGoogleMapsApiKey } = await import('@/lib/utils/googleMapsApiKey.js')
-          const GOOGLE_MAPS_API_KEY = await getGoogleMapsApiKey()
-          
-          let formattedAddress = location?.formattedAddress || ""
-          
-          // Fetch formattedAddress from coordinates if API key available
-          if (GOOGLE_MAPS_API_KEY && lat && lng) {
-            try {
-              const response = await fetch(
-                `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${GOOGLE_MAPS_API_KEY}&language=en&region=in&result_type=street_address|premise|point_of_interest|establishment`
-              )
-              const data = await response.json()
-              
-              if (data.status === 'OK' && data.results && data.results.length > 0) {
-                formattedAddress = data.results[0].formatted_address
-                console.log("✅ Fetched formattedAddress from coordinates:", formattedAddress)
-              }
-            } catch (error) {
-              console.warn("⚠️ Failed to fetch formattedAddress, using existing:", error)
-            }
-          }
-          
-          // Update location with coordinates array and formattedAddress
-          const updatedLocation = {
-            ...location,
-            latitude: lat,
-            longitude: lng,
-            coordinates: [lng, lat], // GeoJSON format: [longitude, latitude]
-            formattedAddress: formattedAddress || location?.formattedAddress || ""
-          }
-          
-          const response = await restaurantAPI.updateProfile({ location: updatedLocation })
-          
-          if (response?.data?.data?.restaurant) {
-            // Update local state
-            setLocation(updatedLocation)
-            // Dispatch event to notify other components
-            window.dispatchEvent(new Event("addressUpdated"))
-            setShowSelectOptionDialog(false)
-            navigate(-1)
-          } else {
-            throw new Error("Invalid response from server")
-          }
-        } catch (updateError) {
-          console.error("Error updating address:", updateError)
-          alert(`Failed to update address: ${updateError.response?.data?.message || updateError.message || "Please try again."}`)
-        }
+        throw new Error("Failed to update profile")
       }
     } catch (error) {
       console.error("Error updating address:", error)
-      alert(`Failed to update address: ${error.response?.data?.message || error.message || "Please try again."}`)
+      toast.error(error.response?.data?.message || error.message || "Failed to update address")
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -217,13 +204,13 @@ export default function EditRestaurantAddress() {
     }
     return fullAddress
   }
-  
+
   const simplifiedAddress = getSimplifiedAddress(address)
 
   return (
-    <div className="h-screen bg-white overflow-hidden flex flex-col">
+    <div className="min-h-[100dvh] bg-white flex flex-col">
       {/* Sticky Header */}
-      <div className="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-50 flex items-center gap-3 shrink-0">
+      <div className="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-[60] flex items-center gap-3 shrink-0">
         <button
           onClick={() => navigate(-1)}
           className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors shrink-0"
@@ -240,130 +227,119 @@ export default function EditRestaurantAddress() {
         </div>
       </div>
 
-      {/* Map Section - Takes remaining space */}
-      <div className="relative flex-1 min-h-0 overflow-hidden">
-        {/* Google Maps Embed */}
-        <iframe
-          src={`https://www.google.com/maps?q=${lat},${lng}&hl=en&z=15&output=embed`}
-          width="100%"
-          height="100%"
-          style={{ border: 0 }}
-          allowFullScreen
-          loading="lazy"
-          referrerPolicy="no-referrer-when-downgrade"
-          className="absolute inset-0"
-        />
-        
-        {/* Custom Marker Tooltip Overlay */}
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 pointer-events-none z-10">
-          {/* Tooltip */}
-          <div className="bg-black text-white px-3 py-2 rounded-lg mb-2 whitespace-nowrap shadow-lg">
-            <p className="text-xs font-semibold">Your outlet location</p>
-            <p className="text-[10px] text-gray-300">Orders will be picked up from here</p>
+      {/* Content Area */}
+      <div className="flex-1 flex flex-col min-h-0 relative">
+        {/* Map Section - Takes flexible remaining space */}
+        <div className="flex-1 min-h-[180px] md:min-h-[200px] relative overflow-hidden bg-gray-50">
+          {/* Google Maps Embed */}
+          <iframe
+            src={`https://www.google.com/maps?q=${lat},${lng}&hl=en&z=15&output=embed`}
+            width="100%"
+            height="100%"
+            style={{ border: 0 }}
+            allowFullScreen
+            loading="lazy"
+            referrerPolicy="no-referrer-when-downgrade"
+            className="absolute inset-0"
+          />
+
+          {/* Custom Marker Tooltip Overlay */}
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 pointer-events-none z-10">
+            {/* Tooltip */}
+            <div className="bg-black text-white px-3 py-2 rounded-lg mb-2 whitespace-nowrap shadow-lg">
+              <p className="text-xs font-semibold">Your outlet location</p>
+              <p className="text-[10px] text-gray-300">Orders will be picked up from here</p>
+            </div>
+            {/* Marker Pin */}
+            <div className="w-6 h-6 bg-black rounded-full border-2 border-white shadow-lg mx-auto"></div>
           </div>
-          {/* Marker Pin */}
-          <div className="w-6 h-6 bg-black rounded-full border-2 border-white shadow-lg mx-auto"></div>
         </div>
 
-        {/* Address Details Section - Overlays map at bottom */}
-        <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl z-20 px-4 pt-6">
-          <h2 className="text-xl font-bold text-gray-900 text-center mb-3">Outlet address</h2>
-          
-          {/* Informational Banner */}
-          <div className="bg-blue-100 rounded-lg px-4 py-3 mb-4">
-            <p className="text-sm text-gray-900">
-              Customers and Zomato delivery partners will use this to locate your outlet.
-            </p>
-          </div>
+        {/* Address Details Section - Stays below map in flex flow but can scroll */}
+        <div className="bg-white rounded-t-3xl shadow-[0_-4px_20px_rgba(0,0,0,0.05)] px-4 pt-6 pb-2 z-20 shrink-0 border-t border-gray-100 mobile-address-container">
+          <h2 className="text-xl font-bold text-gray-900 text-center mb-4">Outlet address</h2>
 
-          {/* Current Address Display */}
-          <div className="mb-4">
-            <p className="text-base text-gray-900">{address}</p>
+          {/* Manual Address Entry - Integrated and scrollable if height is tight */}
+          <div
+            className="max-h-[40vh] md:max-h-[35vh] overflow-y-auto pr-1 space-y-4 mb-4 custom-scrollbar"
+            style={{ touchAction: 'pan-y' }}
+            data-lenis-prevent
+          >
+            <div className="relative z-50">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 block">Building / Street</label>
+              <input
+                type="text"
+                name="addressLine1"
+                value={addressFields.addressLine1}
+                onChange={handleInputChange}
+                placeholder="Building name, street etc."
+                className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black transition-all"
+              />
+            </div>
+
+            <div className="relative z-50">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 block">Floor / Suite (Optional)</label>
+              <input
+                type="text"
+                name="addressLine2"
+                value={addressFields.addressLine2}
+                onChange={handleInputChange}
+                placeholder="Floor, suite, subunit etc."
+                className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black transition-all"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="relative z-50">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 block">Area</label>
+                <input
+                  type="text"
+                  name="area"
+                  value={addressFields.area}
+                  onChange={handleInputChange}
+                  placeholder="Area / Locality"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black transition-all"
+                />
+              </div>
+              <div className="relative z-50">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 block">City</label>
+                <input
+                  type="text"
+                  name="city"
+                  value={addressFields.city}
+                  onChange={handleInputChange}
+                  placeholder="City"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black transition-all"
+                />
+              </div>
+            </div>
+
+            <div className="relative z-50">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 block">Landmark</label>
+              <input
+                type="text"
+                name="landmark"
+                value={addressFields.landmark}
+                onChange={handleInputChange}
+                placeholder="Famous nearby place"
+                className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black transition-all"
+              />
+            </div>
           </div>
 
           {/* Update Button */}
-          <div className="pb-4">
+          <div className="pb-4 pt-2">
             <button
-              onClick={handleUpdateClick}
-              className="w-full bg-black text-white font-semibold py-4 text-base rounded-lg"
+              onClick={handleSaveAddress}
+              disabled={loading}
+              className="w-full bg-black text-white font-semibold py-4 text-base rounded-xl flex items-center justify-center gap-2 hover:bg-gray-900 active:scale-[0.98] transition-all disabled:bg-gray-400 disabled:cursor-not-allowed shadow-lg shadow-black/10"
             >
-              Update
+              {loading && <Loader2 className="w-5 h-5 animate-spin" />}
+              {loading ? "Updating Details..." : "Save Address"}
             </button>
           </div>
         </div>
       </div>
-
-      {/* Select Option Bottom Popup */}
-      <BottomPopup
-        isOpen={showSelectOptionDialog}
-        onClose={() => setShowSelectOptionDialog(false)}
-        title="Select an option"
-        maxHeight="auto"
-      >
-        <div className=" space-y-0">
-          {/* Option 1: Update outlet address */}
-          <button
-            onClick={() => setSelectedOption("update_address")}
-            className="w-full flex items-start justify-between py-4 border-b border-dashed border-gray-300"
-          >
-            <div className="flex-1 text-left">
-              <p className="text-base font-semibold text-gray-900 mb-1">
-                Update outlet address (FSSAI required)
-              </p>
-              <p className="text-sm text-gray-500">{address}</p>
-            </div>
-            <div className="ml-4 shrink-0">
-              <div
-                className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                  selectedOption === "update_address"
-                    ? "border-black bg-black"
-                    : "border-gray-300"
-                }`}
-              >
-                {selectedOption === "update_address" && (
-                  <div className="w-2 h-2 rounded-full bg-white"></div>
-                )}
-              </div>
-            </div>
-          </button>
-
-          {/* Option 2: Minor correction */}
-          <button
-            onClick={() => setSelectedOption("minor_correction")}
-            className="w-full flex items-start justify-between py-4"
-          >
-            <div className="flex-1 text-left">
-              <p className="text-base font-semibold text-gray-900 mb-1">
-                Make a minor correction to the location pin
-              </p>
-              <p className="text-sm text-gray-500">
-                If location pin on the map is slightly misplaced
-              </p>
-            </div>
-            <div className="ml-4 shrink-0">
-              <div
-                className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                  selectedOption === "minor_correction"
-                    ? "border-black bg-black"
-                    : "border-gray-300"
-                }`}
-              >
-                {selectedOption === "minor_correction" && (
-                  <div className="w-2 h-2 rounded-full bg-white"></div>
-                )}
-              </div>
-            </div>
-          </button>
-
-          {/* Proceed Button */}
-          <button
-            onClick={handleProceedUpdate}
-            className="w-full bg-black text-white font-semibold py-4 rounded-lg mt-6"
-          >
-            Proceed to update
-          </button>
-        </div>
-      </BottomPopup>
     </div>
   )
 }

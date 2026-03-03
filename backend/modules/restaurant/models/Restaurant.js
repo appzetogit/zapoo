@@ -268,20 +268,6 @@ const restaurantSchema = new mongoose.Schema(
       ref: "Admin",
       default: null,
     },
-    diningSettings: {
-      isEnabled: {
-        type: Boolean,
-        default: false,
-      },
-      maxGuests: {
-        type: Number,
-        default: 6,
-      },
-      diningType: {
-        type: String,
-        default: "family-dining", // e.g., 'fine-dining', 'cafe', 'casual-dining'
-      },
-    },
     businessModel: {
       type: String,
       enum: ["Commission Base", "Subscription Base"],

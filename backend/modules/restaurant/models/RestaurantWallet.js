@@ -126,7 +126,7 @@ const restaurantWalletSchema = new mongoose.Schema({
 
 // Indexes
 // restaurantWalletSchema.index({ restaurantId: 1 }); // Removed duplicate index
-restaurantWalletSchema.index({ 'transactions.orderId': 1 });
+// restaurantWalletSchema.index({ 'transactions.orderId': 1 });
 restaurantWalletSchema.index({ 'transactions.status': 1 });
 restaurantWalletSchema.index({ 'transactions.type': 1 });
 restaurantWalletSchema.index({ lastTransactionAt: -1 });

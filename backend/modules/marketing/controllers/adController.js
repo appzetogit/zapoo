@@ -300,10 +300,10 @@ export const getActiveAdsByZone = async (req, res) => {
         const { zoneId } = req.params;
         const now = new Date();
 
-        // Fetch ALL active ads for this zone
+        // Fetch ALL active/scheduled ads for this zone that are within the current date range
         const ads = await AdRequest.find({
             targetZones: zoneId,
-            status: 'Active',
+            status: { $in: ['Active', 'Scheduled'] },
             startDate: { $lte: now },
             endDate: { $gte: now }
         })

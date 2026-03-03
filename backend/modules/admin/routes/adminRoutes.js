@@ -25,7 +25,7 @@ import {
   rejectRestaurant,
   reverifyRestaurant,
   deleteRestaurant,
-  updateRestaurantDiningSettings,
+  // updateRestaurantDiningSettings, (Dining removed)
   getAllOffers,
   getRestaurantAnalytics,
   getCustomerWalletReport,
@@ -293,7 +293,7 @@ router.post("/restaurants/:id/approve", approveRestaurant);
 router.post("/restaurants/:id/reject", rejectRestaurant);
 router.post("/restaurants/:id/reverify", reverifyRestaurant);
 router.put("/restaurants/:id/status", updateRestaurantStatus);
-router.put("/restaurants/:id/dining-settings", updateRestaurantDiningSettings);
+// router.put("/restaurants/:id/dining-settings", updateRestaurantDiningSettings); (Dining removed)
 router.delete("/restaurants/:id", deleteRestaurant);
 router.post("/restaurants/:id/extend-subscription", extendRestaurantSubscription);
 

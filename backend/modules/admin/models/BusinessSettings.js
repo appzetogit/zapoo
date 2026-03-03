@@ -96,6 +96,12 @@ const businessSettingsSchema = new mongoose.Schema(
       default: 100,
       min: 0,
     },
+    // Maximum notification requests a restaurant can submit per day
+    restaurantNotificationDailyLimit: {
+      type: Number,
+      default: 2,
+      min: 0,
+    },
     updatedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Admin",

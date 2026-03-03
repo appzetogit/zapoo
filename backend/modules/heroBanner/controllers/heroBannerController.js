@@ -1,16 +1,13 @@
+import mongoose from 'mongoose';
 import HeroBanner from '../models/HeroBanner.js';
 import LandingPageCategory from '../models/LandingPageCategory.js';
 import LandingPageExploreMore from '../models/LandingPageExploreMore.js';
 import LandingPageSettings from '../models/LandingPageSettings.js';
-import Under250Banner from '../models/Under250Banner.js';
-import DiningBanner from '../models/DiningBanner.js';
 import Top10Restaurant from '../models/Top10Restaurant.js';
 import GourmetRestaurant from '../models/GourmetRestaurant.js';
+import Under250Banner from '../models/Under250Banner.js';
 import Restaurant from '../../restaurant/models/Restaurant.js';
 import { successResponse, errorResponse } from '../../../shared/utils/response.js';
-import { uploadToCloudinary } from '../../../shared/utils/cloudinaryService.js';
-import { cloudinary } from '../../../config/cloudinary.js';
-import mongoose from 'mongoose';
 import { calculateDistance } from '../../order/services/orderCalculationService.js';
 
 /**
@@ -18,248 +15,27 @@ import { calculateDistance } from '../../order/services/orderCalculationService.
  */
 export const getHeroBanners = async (req, res) => {
   try {
-    const { latitude, longitude } = req.query;
-    const userLat = latitude ? parseFloat(latitude) : null;
-    const userLng = longitude ? parseFloat(longitude) : null;
-
     const banners = await HeroBanner.find({ isActive: true })
-      .populate('linkedRestaurants', 'name slug restaurantId profileImage location deliveryRange')
       .sort({ order: 1, createdAt: -1 })
-      .select('imageUrl order linkedRestaurants title subtitle description ctaText ctaLink')
+      .populate('linkedRestaurants', 'name slug restaurantId profileImage rating estimatedDeliveryTime distance')
       .lean();
 
     return successResponse(res, 200, 'Hero banners retrieved successfully', {
-      banners: banners.map(b => {
-        let filteredRestaurants = b.linkedRestaurants || [];
-
-        // Filter linked restaurants by range if user location available
-        if (userLat !== null && userLng !== null && filteredRestaurants.length > 0) {
-          filteredRestaurants = filteredRestaurants.filter(res => {
-            const resLocation = res.location;
-            const resLat = resLocation?.latitude || resLocation?.coordinates?.[1];
-            const resLng = resLocation?.longitude || resLocation?.coordinates?.[0];
-
-            if (resLat && resLng) {
-              const dist = calculateDistance([resLng, resLat], [userLng, userLat]);
-              const range = res.deliveryRange || 5;
-              return dist <= range;
-            }
-            return true; // Keep if location missing (fallback)
-          });
-        }
-
-        return {
-          imageUrl: b.imageUrl,
-          title: b.title || '',
-          subtitle: b.subtitle || '',
-          description: b.description || '',
-          ctaText: b.ctaText || 'Order Now',
-          ctaLink: b.ctaLink || '/user',
-          linkedRestaurants: filteredRestaurants
-        };
-      })
+      banners: banners.map(b => ({
+        ...b,
+        imageUrl: b.image?.url || b.imageUrl || b // Handle different image formats
+      }))
     });
   } catch (error) {
     console.error('Error fetching hero banners:', error);
     return errorResponse(res, 500, 'Failed to fetch hero banners');
-  }
-};
-
-/**
- * Get all hero banners (admin endpoint)
- */
-export const getAllHeroBanners = async (req, res) => {
-  try {
-    const banners = await HeroBanner.find()
-      .populate('linkedRestaurants', 'name slug restaurantId profileImage')
-      .sort({ order: 1, createdAt: -1 })
-      .lean();
-
-    return successResponse(res, 200, 'Hero banners retrieved successfully', {
-      banners
-    });
-  } catch (error) {
-    console.error('Error fetching hero banners:', error);
-    return errorResponse(res, 500, 'Failed to fetch hero banners');
-  }
-};
-
-/**
- * Upload a new hero banner
- */
-export const createHeroBanner = async (req, res) => {
-  try {
-    if (!req.file) {
-      return errorResponse(res, 400, 'No image file provided');
-    }
-
-    // Upload to Cloudinary
-    const folder = 'appzeto/hero-banners';
-    const result = await uploadToCloudinary(req.file.buffer, {
-      folder,
-      resource_type: 'image'
-    });
-
-    // Get the highest order number
-    const lastBanner = await HeroBanner.findOne()
-      .sort({ order: -1 })
-      .select('order')
-      .lean();
-
-    const newOrder = lastBanner ? lastBanner.order + 1 : 0;
-
-    // Get text fields from request body
-    const { title, subtitle, description, ctaText, ctaLink } = req.body;
-
-    // Create banner record
-    const banner = new HeroBanner({
-      imageUrl: result.secure_url,
-      cloudinaryPublicId: result.public_id,
-      order: newOrder,
-      isActive: true,
-      title: title || '',
-      subtitle: subtitle || '',
-      description: description || '',
-      ctaText: ctaText || 'Order Now',
-      ctaLink: ctaLink || '/user'
-    });
-
-    await banner.save();
-
-    return successResponse(res, 201, 'Hero banner uploaded successfully', {
-      banner: {
-        _id: banner._id,
-        imageUrl: banner.imageUrl,
-        title: banner.title,
-        subtitle: banner.subtitle,
-        description: banner.description,
-        ctaText: banner.ctaText,
-        ctaLink: banner.ctaLink,
-        order: banner.order,
-        isActive: banner.isActive,
-        createdAt: banner.createdAt
-      }
-    });
-  } catch (error) {
-    console.error('Error creating hero banner:', error);
-    return errorResponse(res, 500, 'Failed to upload hero banner');
-  }
-};
-
-/**
- * Upload multiple hero banners (up to 5)
- */
-export const createMultipleHeroBanners = async (req, res) => {
-  try {
-    if (!req.files || req.files.length === 0) {
-      return errorResponse(res, 400, 'No image files provided');
-    }
-
-    // Validate number of files (max 5)
-    if (req.files.length > 5) {
-      return errorResponse(res, 400, 'Maximum 5 images can be uploaded at once');
-    }
-
-    // Get the highest order number
-    const lastBanner = await HeroBanner.findOne()
-      .sort({ order: -1 })
-      .select('order')
-      .lean();
-
-    let currentOrder = lastBanner ? lastBanner.order + 1 : 0;
-
-    const folder = 'appzeto/hero-banners';
-    const uploadedBanners = [];
-    const errors = [];
-
-    // Upload all files
-    for (let i = 0; i < req.files.length; i++) {
-      const file = req.files[i];
-      try {
-        // Upload to Cloudinary
-        const result = await uploadToCloudinary(file.buffer, {
-          folder,
-          resource_type: 'image'
-        });
-
-        // Create banner record
-        const banner = new HeroBanner({
-          imageUrl: result.secure_url,
-          cloudinaryPublicId: result.public_id,
-          order: currentOrder++,
-          isActive: true
-        });
-
-        await banner.save();
-        uploadedBanners.push({
-          _id: banner._id,
-          imageUrl: banner.imageUrl,
-          order: banner.order,
-          isActive: banner.isActive,
-          createdAt: banner.createdAt
-        });
-      } catch (error) {
-        console.error(`Error uploading file ${i + 1}:`, error);
-        errors.push(`Failed to upload file ${i + 1}: ${error.message}`);
-      }
-    }
-
-    // If some files failed but others succeeded
-    if (errors.length > 0 && uploadedBanners.length > 0) {
-      return successResponse(res, 201, `Uploaded ${uploadedBanners.length} banner(s) with some errors`, {
-        banners: uploadedBanners,
-        errors
-      });
-    }
-
-    // If all files failed
-    if (uploadedBanners.length === 0) {
-      return errorResponse(res, 500, 'Failed to upload banners. ' + errors.join(', '));
-    }
-
-    // All successful
-    return successResponse(res, 201, `${uploadedBanners.length} hero banner(s) uploaded successfully`, {
-      banners: uploadedBanners
-    });
-  } catch (error) {
-    console.error('Error creating multiple hero banners:', error);
-    return errorResponse(res, 500, 'Failed to upload hero banners');
-  }
-};
-
-/**
- * Delete a hero banner
- */
-export const deleteHeroBanner = async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const banner = await HeroBanner.findById(id);
-    if (!banner) {
-      return errorResponse(res, 404, 'Hero banner not found');
-    }
-
-    // Delete from Cloudinary
-    try {
-      await cloudinary.uploader.destroy(banner.cloudinaryPublicId);
-    } catch (cloudinaryError) {
-      console.error('Error deleting from Cloudinary:', cloudinaryError);
-      // Continue with database deletion even if Cloudinary deletion fails
-    }
-
-    // Delete from database
-    await HeroBanner.findByIdAndDelete(id);
-
-    return successResponse(res, 200, 'Hero banner deleted successfully');
-  } catch (error) {
-    console.error('Error deleting hero banner:', error);
-    return errorResponse(res, 500, 'Failed to delete hero banner');
   }
 };
 
 /**
  * Update banner order
  */
+// Duplicate import removed
 export const updateBannerOrder = async (req, res) => {
   try {
     const { id } = req.params;
@@ -490,12 +266,12 @@ export const deleteLandingCategory = async (req, res) => {
     // Delete from database
     await LandingPageCategory.findByIdAndDelete(id);
 
-    return successResponse(res, 200, 'Category deleted successfully');
   } catch (error) {
     console.error('Error deleting landing category:', error);
     return errorResponse(res, 500, 'Failed to delete category');
   }
 };
+// Removed illegal top-level code and stray return statement
 
 /**
  * Update category order
@@ -1017,260 +793,6 @@ export const toggleUnder250BannerStatus = async (req, res) => {
 };
 
 
-// ==================== DINING BANNERS ====================
-
-/**
- * Get all active dining banners (public endpoint)
- */
-export const getDiningBanners = async (req, res) => {
-  try {
-    const banners = await DiningBanner.find({ isActive: true })
-      .sort({ order: 1, createdAt: -1 })
-      .select('imageUrl order')
-      .lean();
-
-    return successResponse(res, 200, 'Dining banners retrieved successfully', {
-      banners: banners.map(b => b.imageUrl)
-    });
-  } catch (error) {
-    console.error('Error fetching dining banners:', error);
-    return errorResponse(res, 500, 'Failed to fetch dining banners');
-  }
-};
-
-/**
- * Get all dining banners (admin endpoint)
- */
-export const getAllDiningBanners = async (req, res) => {
-  try {
-    const banners = await DiningBanner.find()
-      .sort({ order: 1, createdAt: -1 })
-      .lean();
-
-    return successResponse(res, 200, 'Dining banners retrieved successfully', {
-      banners
-    });
-  } catch (error) {
-    console.error('Error fetching dining banners:', error);
-    return errorResponse(res, 500, 'Failed to fetch dining banners');
-  }
-};
-
-/**
- * Upload a new dining banner
- */
-export const createDiningBanner = async (req, res) => {
-  try {
-    if (!req.file) {
-      return errorResponse(res, 400, 'No image file provided');
-    }
-
-    // Upload to Cloudinary
-    const folder = 'appzeto/dining-banners';
-    const result = await uploadToCloudinary(req.file.buffer, {
-      folder,
-      resource_type: 'image'
-    });
-
-    // Get the highest order number
-    const lastBanner = await DiningBanner.findOne()
-      .sort({ order: -1 })
-      .select('order')
-      .lean();
-
-    const newOrder = lastBanner ? lastBanner.order + 1 : 0;
-
-    // Create banner record
-    const banner = new DiningBanner({
-      imageUrl: result.secure_url,
-      cloudinaryPublicId: result.public_id,
-      order: newOrder,
-      isActive: true
-    });
-
-    await banner.save();
-
-    return successResponse(res, 201, 'Dining banner uploaded successfully', {
-      banner: {
-        _id: banner._id,
-        imageUrl: banner.imageUrl,
-        order: banner.order,
-        isActive: banner.isActive,
-        createdAt: banner.createdAt
-      }
-    });
-  } catch (error) {
-    console.error('Error creating dining banner:', error);
-    return errorResponse(res, 500, 'Failed to upload dining banner');
-  }
-};
-
-/**
- * Upload multiple dining banners (up to 5)
- */
-export const createMultipleDiningBanners = async (req, res) => {
-  try {
-    if (!req.files || req.files.length === 0) {
-      return errorResponse(res, 400, 'No image files provided');
-    }
-
-    // Validate number of files (max 5)
-    if (req.files.length > 5) {
-      return errorResponse(res, 400, 'Maximum 5 images can be uploaded at once');
-    }
-
-    // Get the highest order number
-    const lastBanner = await DiningBanner.findOne()
-      .sort({ order: -1 })
-      .select('order')
-      .lean();
-
-    let currentOrder = lastBanner ? lastBanner.order + 1 : 0;
-
-    const folder = 'appzeto/dining-banners';
-    const uploadedBanners = [];
-    const errors = [];
-
-    // Upload all files
-    for (let i = 0; i < req.files.length; i++) {
-      const file = req.files[i];
-      try {
-        // Upload to Cloudinary
-        const result = await uploadToCloudinary(file.buffer, {
-          folder,
-          resource_type: 'image'
-        });
-
-        // Create banner record
-        const banner = new DiningBanner({
-          imageUrl: result.secure_url,
-          cloudinaryPublicId: result.public_id,
-          order: currentOrder++,
-          isActive: true
-        });
-
-        await banner.save();
-        uploadedBanners.push({
-          _id: banner._id,
-          imageUrl: banner.imageUrl,
-          order: banner.order,
-          isActive: banner.isActive,
-          createdAt: banner.createdAt
-        });
-      } catch (error) {
-        console.error(`Error uploading file ${i + 1}:`, error);
-        errors.push(`Failed to upload file ${i + 1}: ${error.message}`);
-      }
-    }
-
-    // If some files failed but others succeeded
-    if (errors.length > 0 && uploadedBanners.length > 0) {
-      return successResponse(res, 201, `Uploaded ${uploadedBanners.length} dining banner(s) with some errors`, {
-        banners: uploadedBanners,
-        errors
-      });
-    }
-
-    // If all files failed
-    if (uploadedBanners.length === 0) {
-      return errorResponse(res, 500, 'Failed to upload banners. ' + errors.join(', '));
-    }
-
-    // All successful
-    return successResponse(res, 201, `${uploadedBanners.length} dining banner(s) uploaded successfully`, {
-      banners: uploadedBanners
-    });
-  } catch (error) {
-    console.error('Error creating multiple dining banners:', error);
-    return errorResponse(res, 500, 'Failed to upload dining banners');
-  }
-};
-
-/**
- * Delete a dining banner
- */
-export const deleteDiningBanner = async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const banner = await DiningBanner.findById(id);
-    if (!banner) {
-      return errorResponse(res, 404, 'Dining banner not found');
-    }
-
-    // Delete from Cloudinary
-    try {
-      await cloudinary.uploader.destroy(banner.cloudinaryPublicId);
-    } catch (cloudinaryError) {
-      console.error('Error deleting from Cloudinary:', cloudinaryError);
-      // Continue with database deletion even if Cloudinary deletion fails
-    }
-
-    // Delete from database
-    await DiningBanner.findByIdAndDelete(id);
-
-    return successResponse(res, 200, 'Dining banner deleted successfully');
-  } catch (error) {
-    console.error('Error deleting dining banner:', error);
-    return errorResponse(res, 500, 'Failed to delete dining banner');
-  }
-};
-
-/**
- * Update dining banner order
- */
-export const updateDiningBannerOrder = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { order } = req.body;
-
-    if (typeof order !== 'number') {
-      return errorResponse(res, 400, 'Order must be a number');
-    }
-
-    const banner = await DiningBanner.findByIdAndUpdate(
-      id,
-      { order, updatedAt: new Date() },
-      { new: true }
-    );
-
-    if (!banner) {
-      return errorResponse(res, 404, 'Dining banner not found');
-    }
-
-    return successResponse(res, 200, 'Banner order updated successfully', {
-      banner
-    });
-  } catch (error) {
-    console.error('Error updating dining banner order:', error);
-    return errorResponse(res, 500, 'Failed to update banner order');
-  }
-};
-
-/**
- * Toggle dining banner active status
- */
-export const toggleDiningBannerStatus = async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const banner = await DiningBanner.findById(id);
-    if (!banner) {
-      return errorResponse(res, 404, 'Dining banner not found');
-    }
-
-    banner.isActive = !banner.isActive;
-    banner.updatedAt = new Date();
-    await banner.save();
-
-    return successResponse(res, 200, 'Banner status updated successfully', {
-      banner
-    });
-  } catch (error) {
-    console.error('Error toggling dining banner status:', error);
-    return errorResponse(res, 500, 'Failed to update banner status');
-  }
-};
 
 // ==================== TOP 10 RESTAURANTS ====================
 

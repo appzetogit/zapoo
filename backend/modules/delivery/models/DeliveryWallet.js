@@ -24,7 +24,8 @@ const transactionSchema = new mongoose.Schema({
   },
   orderId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Order'
+    ref: 'Order',
+    sparse: true
   },
   paymentMethod: {
     type: String,
@@ -155,7 +156,7 @@ const deliveryWalletSchema = new mongoose.Schema({
 
 // Indexes
 // deliveryWalletSchema.index({ deliveryId: 1 }, { unique: true }); // Removed duplicate index
-deliveryWalletSchema.index({ 'transactions.orderId': 1 });
+// deliveryWalletSchema.index({ 'transactions.orderId': 1 });
 deliveryWalletSchema.index({ 'transactions.status': 1 });
 deliveryWalletSchema.index({ 'transactions.type': 1 });
 deliveryWalletSchema.index({ 'transactions.createdAt': -1 });

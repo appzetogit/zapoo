@@ -3,10 +3,6 @@ import { uploadMiddleware } from '../../../shared/utils/cloudinaryService.js';
 import { authenticateAdmin } from '../../../modules/admin/middleware/adminAuth.js';
 import {
   getHeroBanners,
-  getAllHeroBanners,
-  createHeroBanner,
-  createMultipleHeroBanners,
-  deleteHeroBanner,
   updateBannerOrder,
   toggleBannerStatus,
   linkRestaurantsToBanner,
@@ -30,13 +26,6 @@ import {
   deleteUnder250Banner,
   updateUnder250BannerOrder,
   toggleUnder250BannerStatus,
-  getDiningBanners,
-  getAllDiningBanners,
-  createDiningBanner,
-  createMultipleDiningBanners,
-  deleteDiningBanner,
-  updateDiningBannerOrder,
-  toggleDiningBannerStatus,
   getAllTop10Restaurants,
   getTop10Restaurants,
   createTop10Restaurant,
@@ -57,27 +46,11 @@ const router = express.Router();
 // Public routes
 router.get('/public', getHeroBanners);
 router.get('/landing/public', getLandingConfig);
-
 router.get('/under-250/public', getUnder250Banners);
-router.get('/dining/public', getDiningBanners);
 router.get('/top-10/public', getTop10Restaurants);
 router.get('/gourmet/public', getGourmetRestaurants);
 
 // Admin routes - Hero Banners
-router.get('/', authenticateAdmin, getAllHeroBanners);
-router.post(
-  '/',
-  authenticateAdmin,
-  uploadMiddleware.single('image'),
-  createHeroBanner
-);
-router.post(
-  '/multiple',
-  authenticateAdmin,
-  uploadMiddleware.array('images', 5),
-  createMultipleHeroBanners
-);
-router.delete('/:id', authenticateAdmin, deleteHeroBanner);
 router.patch('/:id/order', authenticateAdmin, updateBannerOrder);
 router.patch('/:id/status', authenticateAdmin, toggleBannerStatus);
 router.patch('/:id/link-restaurants', authenticateAdmin, linkRestaurantsToBanner);
@@ -127,27 +100,6 @@ router.post(
 router.delete('/under-250/:id', authenticateAdmin, deleteUnder250Banner);
 router.patch('/under-250/:id/order', authenticateAdmin, updateUnder250BannerOrder);
 
-
-
-
-// Admin routes - Dining Banners
-router.get('/dining', authenticateAdmin, getAllDiningBanners);
-router.post(
-  '/dining',
-  authenticateAdmin,
-  uploadMiddleware.single('image'),
-  createDiningBanner
-);
-router.post(
-  '/dining/multiple',
-  authenticateAdmin,
-  uploadMiddleware.array('images', 5),
-  createMultipleDiningBanners
-);
-router.delete('/dining/:id', authenticateAdmin, deleteDiningBanner);
-router.patch('/dining/:id/order', authenticateAdmin, updateDiningBannerOrder);
-router.patch('/dining/:id/status', authenticateAdmin, toggleDiningBannerStatus);
-
 // Admin routes - Top 10 Restaurants
 router.get('/top-10', authenticateAdmin, getAllTop10Restaurants);
 router.post('/top-10', authenticateAdmin, createTop10Restaurant);
@@ -164,4 +116,3 @@ router.patch('/gourmet/:id/order', authenticateAdmin, updateGourmetRestaurantOrd
 router.patch('/gourmet/:id/status', authenticateAdmin, toggleGourmetRestaurantStatus);
 
 export default router;
-

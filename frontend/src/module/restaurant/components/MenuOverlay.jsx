@@ -53,8 +53,6 @@ export default function MenuOverlay({ showMenu, setShowMenu }) {
   const getMenuOptions = () => {
     const baseOptions = [
       { id: 4, name: "All Food", icon: Utensils, route: "/restaurant/food/all" },
-      { id: 25, name: "Dining Reservations", icon: Calendar, route: "/restaurant/reservations" },
-      { id: 26, name: "Manage Tables", icon: Utensils, route: "/restaurant/tables" },
       { id: 6, name: "Restaurant Config", icon: Settings, route: "/restaurant/config" },
       { id: 7, name: "Advertisements", icon: Monitor, route: "/restaurant/advertisements" },
       { id: 9, name: "Categories", icon: Grid3x3, route: "/restaurant/categories" },

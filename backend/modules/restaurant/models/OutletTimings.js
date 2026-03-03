@@ -50,7 +50,7 @@ const outletTimingsSchema = new mongoose.Schema(
     },
     outletType: {
       type: String,
-      enum: ['Appzeto delivery', 'Dining', 'Takeaway', 'All'],
+      enum: ['Appzeto delivery', 'Takeaway', 'All'],
       default: 'Appzeto delivery'
     },
     timings: {

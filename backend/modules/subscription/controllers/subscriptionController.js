@@ -397,8 +397,8 @@ export const verifySubscriptionPayment = async (req, res) => {
         const { razorpay_payment_id, razorpay_order_id, razorpay_signature, planId } = req.body;
         const restaurantId = req.user._id || req.user.id;
 
-        // Verify Razorpay signature
-        const isSignatureValid = razorpayService.verifyPayment(
+        // Verify Razorpay signature — NOTE: must await since verifyPayment is async
+        const isSignatureValid = await razorpayService.verifyPayment(
             razorpay_order_id,
             razorpay_payment_id,
             razorpay_signature
@@ -419,7 +419,10 @@ export const verifySubscriptionPayment = async (req, res) => {
             });
         }
 
-        const restaurant = await Restaurant.findById(restaurantId);
+        const restaurant = await Restaurant.findById(restaurantId).populate({
+            path: 'zoneId',
+            populate: { path: 'tierId' }
+        });
         if (!restaurant) {
             return res.status(404).json({
                 success: false,
@@ -427,58 +430,29 @@ export const verifySubscriptionPayment = async (req, res) => {
             });
         }
 
-        // Calculate amount
+        // Calculate amount from tier pricing
         let amount = 0;
-        if (restaurant.zoneId) {
-            const populatedRestaurant = await Restaurant.findById(restaurantId).populate({
-                path: 'zoneId',
-                populate: { path: 'tierId' }
-            });
-            if (populatedRestaurant.zoneId && populatedRestaurant.zoneId.tierId && populatedRestaurant.zoneId.tierId.rank) {
-                const tierRank = populatedRestaurant.zoneId.tierId.rank;
-                const tierKey = `tier${tierRank}`;
-                amount = plan.pricing[tierKey] !== undefined ? plan.pricing[tierKey] : (plan.pricing?.tier1 || 0);
-            } else {
-                amount = plan.pricing?.tier1 || 0;
-            }
+        if (restaurant.zoneId && restaurant.zoneId.tierId && restaurant.zoneId.tierId.rank) {
+            const tierKey = `tier${restaurant.zoneId.tierId.rank}`;
+            amount = plan.pricing[tierKey] !== undefined ? plan.pricing[tierKey] : (plan.pricing?.tier1 || 0);
         } else {
             amount = plan.pricing?.tier1 || 0;
         }
 
-        // Create Payment record
-        const payment = new Payment({
-            paymentId: `PAY_SUB_${Date.now()}`,
-            userId: restaurantId,
-            amount: amount,
-            currency: 'INR',
-            method: 'razorpay',
-            status: 'completed',
-            razorpay: {
-                orderId: razorpay_order_id,
-                paymentId: razorpay_payment_id,
-                signature: razorpay_signature,
-                notes: {
-                    restaurantId: restaurantId.toString(),
-                    planId: planId.toString(),
-                    type: 'subscription_purchase'
-                }
-            },
-            completedAt: new Date()
-        });
-        await payment.save();
-
-        // Activate subscription
+        // Activate subscription (store payment info directly on restaurant — no Payment model needed for subscriptions)
         const startDate = new Date();
         const endDate = new Date();
         endDate.setDate(startDate.getDate() + (plan.durationInDays || 30));
 
         restaurant.subscription = {
             planId: plan._id,
-            startDate: startDate,
-            endDate: endDate,
+            startDate,
+            endDate,
             status: "active",
             autoRenew: true,
             paymentId: razorpay_payment_id,
+            razorpayOrderId: razorpay_order_id,
+            amount,
             features: plan.features,
         };
         restaurant.businessModel = "Subscription Base";
@@ -489,7 +463,6 @@ export const verifySubscriptionPayment = async (req, res) => {
             message: "Subscription payment verified and activated successfully",
             data: {
                 subscription: restaurant.subscription,
-                paymentId: payment._id
             }
         });
 
@@ -498,6 +471,7 @@ export const verifySubscriptionPayment = async (req, res) => {
         res.status(500).json({
             success: false,
             message: "Failed to verify subscription payment",
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined,
         });
     }
 };

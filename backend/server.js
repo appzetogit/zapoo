@@ -24,6 +24,7 @@ console.log(`✅ CLOUDINARY_API_SECRET: ${process.env.CLOUDINARY_API_SECRET ? '�
 // Import configurations
 import { connectDB } from './config/database.js';
 import { connectRedis } from './config/redis.js';
+import { initializeFirebaseRealtime } from './config/firebaseConfig.js';
 
 // Import middleware
 import { errorHandler } from './shared/middleware/errorHandler.js';
@@ -58,11 +59,7 @@ import subscriptionRoutes from './modules/subscription/index.js';
 import uploadModuleRoutes from './modules/upload/index.js';
 import locationRoutes from './modules/location/index.js';
 import heroBannerRoutes from './modules/heroBanner/index.js';
-import diningRoutes from './modules/dining/index.js';
-import diningAdminRoutes from './modules/dining/routes/diningAdminRoutes.js';
-import diningRestaurantRoutes from './modules/dining/routes/diningRestaurantRoutes.js';
 import marketingRoutes from './modules/marketing/index.js';
-import tableReservationRoutes from './modules/tableReservation/routes/reservationRoutes.js';
 
 
 // Validate required environment variables
@@ -101,6 +98,13 @@ if (missingEnvVars.length > 0) {
   console.error('\nPlease update your .env file with valid values.');
   console.error('You can copy .env.example to .env and update the values.\n');
   process.exit(1);
+}
+
+// Initialize Firebase RTDB — must happen before any route/controller uses getDb()
+try {
+  initializeFirebaseRealtime();
+} catch (firebaseErr) {
+  console.warn('⚠️ Firebase initialization failed (non-fatal):', firebaseErr.message);
 }
 
 // Initialize Express app
@@ -413,11 +417,7 @@ app.use('/api/subscription', subscriptionRoutes);
 app.use('/api', uploadModuleRoutes);
 app.use('/api/location', locationRoutes);
 app.use('/api', heroBannerRoutes);
-app.use('/api/dining', diningRoutes);
-app.use('/api/admin/dining', diningAdminRoutes);
-app.use('/api/restaurant/dining', diningRestaurantRoutes);
 app.use('/api/marketing', marketingRoutes);
-app.use('/api', tableReservationRoutes);
 
 // 404 handler - but skip Socket.IO paths
 app.use((req, res, next) => {

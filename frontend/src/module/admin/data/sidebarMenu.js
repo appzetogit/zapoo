@@ -139,6 +139,12 @@ export const sidebarMenuData = [
         path: "/admin/push-notification",
         icon: "Bell",
       },
+      {
+        type: "link",
+        label: "Notification Requests",
+        path: "/admin/notification-requests",
+        icon: "BellRing",
+      },
     ],
   },
   {
@@ -334,30 +340,6 @@ export const sidebarMenuData = [
           { label: "Admin Banners", path: "/admin/hero-banner-management" },
           { label: "Restaurant Banners", path: "/admin/restaurant-banners" },
         ],
-      },
-    ],
-  },
-  {
-    type: "section",
-    label: "DINING MANAGEMENT",
-    items: [
-      {
-        type: "link",
-        label: "Dining Banners",
-        path: "/admin/dining-management",
-        icon: "UtensilsCrossed",
-      },
-      {
-        type: "link",
-        label: "Dining List",
-        path: "/admin/dining-list",
-        icon: "FileText",
-      },
-      {
-        type: "link",
-        label: "Table Management",
-        path: "/admin/dining-table-management",
-        icon: "LayoutGrid",
       },
     ],
   },

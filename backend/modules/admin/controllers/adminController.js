@@ -1511,51 +1511,6 @@ export const approveRestaurant = asyncHandler(async (req, res) => {
   }
 });
 
-/**
- * Update Restaurant Dining Settings
- * PUT /api/admin/restaurants/:id/dining-settings
- */
-export const updateRestaurantDiningSettings = asyncHandler(async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { diningSettings } = req.body;
-
-    if (!diningSettings) {
-      return errorResponse(res, 400, "Dining settings are required");
-    }
-
-    const restaurant = await Restaurant.findById(id);
-
-    if (!restaurant) {
-      return errorResponse(res, 404, "Restaurant not found");
-    }
-
-    // Update dining settings
-    restaurant.diningSettings = {
-      ...restaurant.diningSettings,
-      ...diningSettings,
-    };
-
-    await restaurant.save();
-
-    logger.info(`Restaurant dining settings updated: ${id}`, {
-      updatedBy: req.user._id,
-      diningSettings: restaurant.diningSettings,
-    });
-
-    return successResponse(res, 200, "Dining settings updated successfully", {
-      restaurant: {
-        id: restaurant._id,
-        diningSettings: restaurant.diningSettings,
-      },
-    });
-  } catch (error) {
-    logger.error(`Error updating dining settings: ${error.message}`, {
-      error: error.stack,
-    });
-    return errorResponse(res, 500, "Failed to update dining settings");
-  }
-});
 
 /**
  * Reject Restaurant Join Request

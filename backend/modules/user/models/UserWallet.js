@@ -24,7 +24,8 @@ const transactionSchema = new mongoose.Schema({
   },
   orderId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Order'
+    ref: 'Order',
+    sparse: true
   },
   paymentMethod: {
     type: String,
@@ -99,7 +100,7 @@ const userWalletSchema = new mongoose.Schema({
 
 // Indexes
 // userWalletSchema.index({ userId: 1 }, { unique: true }); // Removed duplicate index
-userWalletSchema.index({ 'transactions.orderId': 1 });
+// userWalletSchema.index({ 'transactions.orderId': 1 });
 userWalletSchema.index({ 'transactions.status': 1 });
 userWalletSchema.index({ 'transactions.type': 1 });
 userWalletSchema.index({ 'transactions.createdAt': -1 });

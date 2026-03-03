@@ -877,15 +877,9 @@ export default function Feedback() {
                 </div>
 
                 {/* Reviews heading + info */}
-                <div className="space-y-1 mt-8">
-                  <h2 className="text-sm font-semibold text-gray-900">
-                    Reviews ({displayedReviews.length})
-                  </h2>
-                  <div className="flex items-center gap-1 text-[11px] text-gray-500">
-                    <span>ⓘ</span>
-                    <span>Delivery reviews are only visible to you</span>
-                  </div>
-                </div>
+                <h2 className="text-sm font-semibold text-gray-900">
+                  Reviews ({displayedReviews.length})
+                </h2>
 
                 {/* Review cards */}
                 <div className="space-y-2 relative">
@@ -1272,27 +1266,6 @@ export default function Feedback() {
                           className="w-5 h-5 text-black border-gray-300 focus:ring-black rounded"
                         />
                         <span className="text-sm text-gray-900 font-medium">Detailed reviews</span>
-                      </label>
-                      <label className="flex items-center gap-3 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={filterValues.reviewType.includes("dining")}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setFilterValues(prev => ({
-                                ...prev,
-                                reviewType: [...prev.reviewType, "dining"]
-                              }))
-                            } else {
-                              setFilterValues(prev => ({
-                                ...prev,
-                                reviewType: prev.reviewType.filter(t => t !== "dining")
-                              }))
-                            }
-                          }}
-                          className="w-5 h-5 text-black border-gray-300 focus:ring-black rounded"
-                        />
-                        <span className="text-sm text-gray-900 font-medium">Dining</span>
                       </label>
                       <label className="flex items-center gap-3 cursor-pointer">
                         <input
