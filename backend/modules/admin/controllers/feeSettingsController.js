@@ -32,6 +32,16 @@ export const getFeeSettings = asyncHandler(async (req, res) => {
         platformFee: 5,
         gstRate: 5,
         recommendedItemFee: 0,
+        distanceSlabs: [
+          {
+            name: 'Base',
+            minKm: 0,
+            maxKm: 3,
+            isBaseSlab: true,
+            adminPerKmRate: 0,
+            isActive: true,
+          }
+        ],
         isActive: true,
         createdBy: req.admin?._id || null,
       });
@@ -55,7 +65,7 @@ export const getFeeSettings = asyncHandler(async (req, res) => {
  */
 export const createOrUpdateFeeSettings = asyncHandler(async (req, res) => {
   try {
-    const { deliveryFee, deliveryFeeRanges, freeDeliveryThreshold, platformFee, gstRate, recommendedItemFee, isActive } = req.body;
+    const { deliveryFee, deliveryFeeRanges, freeDeliveryThreshold, platformFee, gstRate, recommendedItemFee, distanceSlabs, isActive } = req.body;
 
     // Validate platform fee
     if (platformFee === undefined || platformFee < 0) {
@@ -80,6 +90,32 @@ export const createOrUpdateFeeSettings = asyncHandler(async (req, res) => {
         }
         if (range.fee === undefined || range.fee < 0) {
           return errorResponse(res, 400, 'Each range must have a valid fee value (≥ 0)');
+        }
+      }
+    }
+
+    if (distanceSlabs !== undefined) {
+      if (!Array.isArray(distanceSlabs) || distanceSlabs.length === 0) {
+        return errorResponse(res, 400, 'distanceSlabs must be a non-empty array');
+      }
+
+      const baseSlabCount = distanceSlabs.filter(slab => slab.isBaseSlab === true).length;
+      if (baseSlabCount !== 1) {
+        return errorResponse(res, 400, 'Exactly one base distance slab is required');
+      }
+
+      for (const slab of distanceSlabs) {
+        if (!slab.name || !String(slab.name).trim()) {
+          return errorResponse(res, 400, 'Each distance slab must have a name');
+        }
+        if (slab.minKm === undefined || slab.minKm < 0) {
+          return errorResponse(res, 400, 'Each distance slab must have minKm >= 0');
+        }
+        if (slab.maxKm !== null && slab.maxKm !== undefined && slab.maxKm <= slab.minKm) {
+          return errorResponse(res, 400, 'Each distance slab maxKm must be greater than minKm (or null)');
+        }
+        if (slab.adminPerKmRate === undefined || slab.adminPerKmRate < 0) {
+          return errorResponse(res, 400, 'Each distance slab must have adminPerKmRate >= 0');
         }
       }
     }
@@ -113,6 +149,17 @@ export const createOrUpdateFeeSettings = asyncHandler(async (req, res) => {
       }));
     }
 
+    if (distanceSlabs && Array.isArray(distanceSlabs)) {
+      feeSettingsData.distanceSlabs = distanceSlabs.map((slab) => ({
+        name: String(slab.name).trim(),
+        minKm: Number(slab.minKm),
+        maxKm: slab.maxKm === null || slab.maxKm === undefined ? null : Number(slab.maxKm),
+        isBaseSlab: slab.isBaseSlab === true,
+        adminPerKmRate: Number(slab.adminPerKmRate || 0),
+        isActive: slab.isActive !== false,
+      }));
+    }
+
     const feeSettings = new FeeSettings(feeSettingsData);
 
     await feeSettings.save();
@@ -133,7 +180,7 @@ export const createOrUpdateFeeSettings = asyncHandler(async (req, res) => {
 export const updateFeeSettings = asyncHandler(async (req, res) => {
   try {
     const { id } = req.params;
-    const { deliveryFee, deliveryFeeRanges, freeDeliveryThreshold, platformFee, gstRate, recommendedItemFee, isActive } = req.body;
+    const { deliveryFee, deliveryFeeRanges, freeDeliveryThreshold, platformFee, gstRate, recommendedItemFee, distanceSlabs, isActive } = req.body;
 
     const feeSettings = await FeeSettings.findById(id);
 
@@ -177,6 +224,42 @@ export const updateFeeSettings = asyncHandler(async (req, res) => {
         min: Number(range.min),
         max: Number(range.max),
         fee: Number(range.fee),
+      }));
+    }
+
+    if (distanceSlabs !== undefined) {
+      if (!Array.isArray(distanceSlabs) || distanceSlabs.length === 0) {
+        return errorResponse(res, 400, 'distanceSlabs must be a non-empty array');
+      }
+
+      const baseSlabCount = distanceSlabs.filter(slab => slab.isBaseSlab === true).length;
+      if (baseSlabCount !== 1) {
+        return errorResponse(res, 400, 'Exactly one base distance slab is required');
+      }
+
+      for (const slab of distanceSlabs) {
+        if (!slab.name || !String(slab.name).trim()) {
+          return errorResponse(res, 400, 'Each distance slab must have a name');
+        }
+        if (slab.minKm === undefined || slab.minKm < 0) {
+          return errorResponse(res, 400, 'Each distance slab must have minKm >= 0');
+        }
+        if (slab.maxKm !== null && slab.maxKm !== undefined && slab.maxKm <= slab.minKm) {
+          return errorResponse(res, 400, 'Each distance slab maxKm must be greater than minKm (or null)');
+        }
+        if (slab.adminPerKmRate === undefined || slab.adminPerKmRate < 0) {
+          return errorResponse(res, 400, 'Each distance slab must have adminPerKmRate >= 0');
+        }
+      }
+
+      feeSettings.distanceSlabs = distanceSlabs.map((slab) => ({
+        _id: slab._id,
+        name: String(slab.name).trim(),
+        minKm: Number(slab.minKm),
+        maxKm: slab.maxKm === null || slab.maxKm === undefined ? null : Number(slab.maxKm),
+        isBaseSlab: slab.isBaseSlab === true,
+        adminPerKmRate: Number(slab.adminPerKmRate || 0),
+        isActive: slab.isActive !== false,
       }));
     }
 
@@ -255,7 +338,7 @@ export const getPublicFeeSettings = asyncHandler(async (req, res) => {
   try {
     const feeSettings = await FeeSettings.findOne({ isActive: true })
       .sort({ createdAt: -1 })
-      .select('deliveryFee freeDeliveryThreshold platformFee gstRate recommendedItemFee')
+      .select('deliveryFee freeDeliveryThreshold platformFee gstRate recommendedItemFee distanceSlabs')
       .lean();
 
     // If no active settings, return default values
@@ -267,6 +350,16 @@ export const getPublicFeeSettings = asyncHandler(async (req, res) => {
           platformFee: 5,
           gstRate: 5,
           recommendedItemFee: 0,
+          distanceSlabs: [
+            {
+              name: 'Base',
+              minKm: 0,
+              maxKm: 3,
+              isBaseSlab: true,
+              adminPerKmRate: 0,
+              isActive: true,
+            }
+          ]
         },
       });
     }
@@ -279,4 +372,3 @@ export const getPublicFeeSettings = asyncHandler(async (req, res) => {
     return errorResponse(res, 500, 'Failed to fetch fee settings');
   }
 });
-

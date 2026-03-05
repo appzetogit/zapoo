@@ -70,10 +70,10 @@ export const createOrder = async (req, res) => {
       });
     }
 
-    if (!pricing || !pricing.total) {
+    if (!pricing) {
       return res.status(400).json({
         success: false,
-        message: 'Order total is required'
+        message: 'Pricing payload is required'
       });
     }
 
@@ -339,6 +339,11 @@ export const createOrder = async (req, res) => {
         discount: pricingData.discount,
         deliveryFee: pricingData.deliveryFee,
         platformFee: pricingData.platformFee,
+        adminDeliveryCost: pricingData.internalAdminDeliveryCost || 0,
+        restaurantPayableToAdmin: pricingData.restaurantPayableToAdmin || 0,
+        gstCollected: pricingData.gstCollected || pricingData.tax || 0,
+        distanceKm: pricingData.distanceKm || 0,
+        pricingMeta: pricingData.pricingMeta || null,
         tax: pricingData.tax,
         total: pricingData.total,
         internalRecommendedFee: pricingData.internalRecommendedFee, // Track internal fee
@@ -462,14 +467,14 @@ export const createOrder = async (req, res) => {
         const wallet = await UserWallet.findOrCreateByUserId(userId);
 
         // Check if sufficient balance
-        if (pricing.total > wallet.balance) {
+        if (pricingData.total > wallet.balance) {
           return res.status(400).json({
             success: false,
             message: 'Insufficient wallet balance',
             data: {
-              required: pricing.total,
+              required: pricingData.total,
               available: wallet.balance,
-              shortfall: pricing.total - wallet.balance
+              shortfall: pricingData.total - wallet.balance
             }
           });
         }
@@ -487,7 +492,7 @@ export const createOrder = async (req, res) => {
         } else {
           // Deduct money from wallet
           const transaction = wallet.addTransaction({
-            amount: pricing.total,
+            amount: pricingData.total,
             type: 'deduction',
             status: 'Completed',
             description: `Order payment - Order #${order.orderId}`,
@@ -506,7 +511,7 @@ export const createOrder = async (req, res) => {
           logger.info('✅ Wallet payment deducted for order:', {
             orderId: order.orderId,
             userId: userId,
-            amount: pricing.total,
+            amount: pricingData.total,
             transactionId: transaction._id,
             newBalance: wallet.balance
           });
@@ -518,7 +523,7 @@ export const createOrder = async (req, res) => {
             paymentId: `PAY-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
             orderId: order._id,
             userId,
-            amount: pricing.total,
+            amount: pricingData.total,
             currency: 'INR',
             method: 'wallet',
             status: 'completed',
@@ -547,6 +552,13 @@ export const createOrder = async (req, res) => {
         // };
         await order.save();
 
+        try {
+          await calculateOrderSettlement(order._id);
+          await holdEscrow(order._id, userId, order.pricing.total);
+        } catch (settlementError) {
+          logger.error(`Error calculating settlement/escrow for wallet order ${order.orderId}:`, settlementError);
+        }
+
         // Notify restaurant about new wallet payment order
         try {
           const notifyRestaurantResult = await notifyRestaurantNewOrder(order, assignedRestaurantId, 'wallet');
@@ -567,12 +579,12 @@ export const createOrder = async (req, res) => {
               id: order._id.toString(),
               orderId: order.orderId,
               status: order.status,
-              total: pricing.total
+              total: pricingData.total
             },
             razorpay: null,
             wallet: {
               balance: wallet.balance,
-              deducted: pricing.total
+              deducted: pricingData.total
             }
           }
         });
@@ -627,6 +639,13 @@ export const createOrder = async (req, res) => {
       // };
       await order.save();
 
+      try {
+        await calculateOrderSettlement(order._id);
+        await holdEscrow(order._id, userId, order.pricing.total);
+      } catch (settlementError) {
+        logger.error(`Error calculating settlement/escrow for COD order ${order.orderId}:`, settlementError);
+      }
+
       // Notify restaurant about new COD order via Socket.IO (non-blocking)
       try {
         const notifyRestaurantResult = await notifyRestaurantNewOrder(order, assignedRestaurantId, 'cash');
@@ -650,7 +669,7 @@ export const createOrder = async (req, res) => {
             id: order._id.toString(),
             orderId: order.orderId,
             status: order.status,
-            total: pricing.total
+            total: pricingData.total
           },
           razorpay: null
         }
@@ -666,7 +685,7 @@ export const createOrder = async (req, res) => {
     if (normalizedPaymentMethod === 'razorpay' || !normalizedPaymentMethod) {
       try {
         razorpayOrder = await createRazorpayOrder({
-          amount: Math.round(pricing.total * 100), // Convert to paise
+          amount: Math.round(pricingData.total * 100), // Convert to paise
           currency: 'INR',
           receipt: order.orderId,
           notes: {
@@ -689,7 +708,7 @@ export const createOrder = async (req, res) => {
     logger.info(`Order created: ${order.orderId}`, {
       orderId: order.orderId,
       userId,
-      amount: pricing.total,
+      amount: pricingData.total,
       razorpayOrderId: razorpayOrder?.id
     });
 
@@ -712,7 +731,7 @@ export const createOrder = async (req, res) => {
           id: order._id.toString(),
           orderId: order.orderId,
           status: order.status,
-          total: pricing.total
+          total: pricingData.total
         },
         razorpay: razorpayOrder ? {
           orderId: razorpayOrder.id,

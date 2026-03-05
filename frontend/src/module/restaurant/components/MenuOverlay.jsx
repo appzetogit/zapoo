@@ -19,11 +19,13 @@ import {
   LogOut,
   LogIn,
   UserPlus,
-  Calendar
+  Calendar,
+  Truck
 } from "lucide-react"
 
 export default function MenuOverlay({ showMenu, setShowMenu }) {
   const navigate = useNavigate()
+  const menuAnimationType = motion ? "spring" : "spring"
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     return localStorage.getItem("restaurant_authenticated") === "true"
   })
@@ -54,6 +56,7 @@ export default function MenuOverlay({ showMenu, setShowMenu }) {
     const baseOptions = [
       { id: 4, name: "All Food", icon: Utensils, route: "/restaurant/food/all" },
       { id: 6, name: "Restaurant Config", icon: Settings, route: "/restaurant/config" },
+      { id: 61, name: "Delivery Pricing", icon: Truck, route: "/restaurant/delivery-settings" },
       { id: 7, name: "Advertisements", icon: Monitor, route: "/restaurant/advertisements" },
       { id: 9, name: "Categories", icon: Grid3x3, route: "/restaurant/categories" },
       { id: 10, name: "Coupon", icon: Tag, route: "/restaurant/coupon" },
@@ -103,7 +106,7 @@ export default function MenuOverlay({ showMenu, setShowMenu }) {
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: "100%", opacity: 0 }}
             transition={{
-              type: "spring",
+              type: menuAnimationType,
               damping: 25,
               stiffness: 300,
               mass: 0.8

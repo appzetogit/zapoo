@@ -1,11 +1,13 @@
 import Order from '../models/Order.js';
 import OrderSettlement from '../models/OrderSettlement.js';
-import RestaurantCommission from '../../admin/models/RestaurantCommission.js';
 import DeliveryBoyCommission from '../../admin/models/DeliveryBoyCommission.js';
 import FeeSettings from '../../admin/models/FeeSettings.js';
+import Zone from '../../admin/models/Zone.js';
+import Tier from '../../admin/models/Tier.js';
 import Restaurant from '../../restaurant/models/Restaurant.js';
 import mongoose from 'mongoose';
-import { calculateDistance } from './orderCalculationService.js';
+
+const roundCurrency = (value) => Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
 
 /**
  * Calculate comprehensive order settlement breakdown
@@ -18,15 +20,10 @@ export const calculateOrderSettlement = async (orderId) => {
       throw new Error('Order not found');
     }
 
-    // Get fee settings
     const feeSettings = await FeeSettings.findOne({ isActive: true })
       .sort({ createdAt: -1 })
       .lean();
 
-    const platformFee = feeSettings?.platformFee || 5;
-    const gstRate = (feeSettings?.gstRate || 5) / 100;
-
-    // Get restaurant details
     let restaurant = null;
     if (mongoose.Types.ObjectId.isValid(order.restaurantId) && order.restaurantId.length === 24) {
       restaurant = await Restaurant.findById(order.restaurantId).lean();
@@ -44,56 +41,58 @@ export const calculateOrderSettlement = async (orderId) => {
       throw new Error('Restaurant not found');
     }
 
-    // Calculate user payment breakdown
-    const userPayment = {
-      subtotal: order.pricing.subtotal || 0,
-      discount: order.pricing.discount || 0,
-      deliveryFee: order.pricing.deliveryFee || 0,
-      platformFee: order.pricing.platformFee || platformFee,
-      gst: order.pricing.tax || 0,
-      packagingFee: 0, // Can be added later if needed
-      total: order.pricing.total || 0
-    };
-
-    // Calculate restaurant commission and earnings
-    // Commission is calculated on food price (subtotal - discount)
-    const foodPrice = userPayment.subtotal - userPayment.discount;
-
-    let restaurantCommissionData = {
-      commission: 0,
-      type: 'subscription',
-      value: 0,
-      rule: 'Subscription Model - Zero Commission'
-    };
-
-    // Only calculate commission if business model is Commission Base
-    if (restaurant.businessModel === 'Commission Base') {
-      restaurantCommissionData = await RestaurantCommission.calculateCommissionForOrder(
-        restaurant._id,
-        foodPrice
-      );
+    let tierDistanceSlabs = [];
+    let tierMeta = null;
+    if (restaurant.zoneId) {
+      const zone = await Zone.findById(restaurant.zoneId).select('tierId').lean();
+      if (zone?.tierId) {
+        const tier = await Tier.findById(zone.tierId).select('name deliveryPricing.distanceSlabs').lean();
+        if (tier) {
+          tierMeta = { id: tier._id, name: tier.name };
+          tierDistanceSlabs = Array.isArray(tier?.deliveryPricing?.distanceSlabs)
+            ? tier.deliveryPricing.distanceSlabs
+            : [];
+        }
+      }
     }
-    // Else: Subscription Base -> 0 commission (already set)
 
-    const commissionAmount = Math.round(restaurantCommissionData.commission * 100) / 100;
+    const userPayment = {
+      subtotal: roundCurrency(order.pricing.subtotal || 0),
+      discount: roundCurrency(order.pricing.discount || 0),
+      deliveryFee: roundCurrency(order.pricing.deliveryFee || 0),
+      platformFee: 0,
+      gst: roundCurrency(order.pricing.tax || 0),
+      packagingFee: 0,
+      total: roundCurrency(order.pricing.total || 0)
+    };
 
-    // Internal Recommended Fee (Deducted from restaurant, earned by admin)
-    const recommendedItemFee = order.pricing.internalRecommendedFee || 0;
+    const foodPrice = roundCurrency(userPayment.subtotal - userPayment.discount);
+    const adminDeliveryCost = roundCurrency(order.pricing.adminDeliveryCost || order.pricing.deliveryFee || 0);
+    const platformFee = roundCurrency(
+      order.pricing.platformFee !== undefined
+        ? order.pricing.platformFee
+        : feeSettings?.platformFee || 0
+    );
+    const gstCollected = roundCurrency(order.pricing.gstCollected ?? userPayment.gst);
+    const payableToAdmin = roundCurrency(adminDeliveryCost + platformFee + gstCollected);
+    const recommendedItemFee = roundCurrency(order.pricing.internalRecommendedFee || 0);
 
-    const restaurantNetEarning = Math.round((foodPrice - commissionAmount - recommendedItemFee) * 100) / 100;
+    const restaurantGrossCollection = roundCurrency(foodPrice + userPayment.deliveryFee + userPayment.gst);
+    const restaurantNetEarning = roundCurrency(restaurantGrossCollection - payableToAdmin - recommendedItemFee);
 
     const restaurantEarning = {
-      foodPrice: foodPrice, // Full order value (₹200)
-      commission: commissionAmount, // Commission deducted (₹30 for 15% or 0 for SaaS)
-      recommendedItemFee: recommendedItemFee, // Internal fee for recommended items
-      commissionPercentage: restaurantCommissionData.type === 'percentage'
-        ? restaurantCommissionData.value
-        : (foodPrice > 0 ? (commissionAmount / foodPrice) * 100 : 0),
-      netEarning: restaurantNetEarning, // Amount restaurant receives (₹170 or ₹200)
+      foodPrice,
+      commission: 0,
+      adminDeliveryCost,
+      platformFee,
+      gstCollected,
+      payableToAdmin,
+      recommendedItemFee,
+      commissionPercentage: 0,
+      netEarning: restaurantNetEarning,
       status: 'pending'
     };
 
-    // Calculate delivery partner earnings
     let deliveryPartnerEarning = {
       basePayout: 0,
       distance: 0,
@@ -108,8 +107,6 @@ export const calculateOrderSettlement = async (orderId) => {
     if (order.deliveryPartnerId && order.assignmentInfo?.distance) {
       const distance = order.assignmentInfo.distance;
       const deliveryCommission = await DeliveryBoyCommission.calculateCommission(distance);
-
-      // Get surge multiplier (can be configured in order or settings)
       const surgeMultiplier = order.assignmentInfo?.surgeMultiplier || 1;
       const baseEarning = deliveryCommission.commission;
       const surgeAmount = baseEarning * (surgeMultiplier - 1);
@@ -121,35 +118,32 @@ export const calculateOrderSettlement = async (orderId) => {
         distanceCommission: deliveryCommission.breakdown.distanceCommission,
         surgeMultiplier: surgeMultiplier,
         surgeAmount: surgeAmount,
-        totalEarning: baseEarning + surgeAmount,
+        totalEarning: roundCurrency(baseEarning + surgeAmount),
         status: 'pending'
       };
     }
 
-    // Calculate admin/platform earnings
-    // Admin gets: Restaurant commission + Platform fee + Delivery fee + GST
-    // Note: Even if delivery is free for user, delivery fee amount still goes to admin
-    const deliveryMargin = userPayment.deliveryFee - deliveryPartnerEarning.totalEarning;
-
-    const adminCommission = Math.round(restaurantEarning.commission * 100) / 100;
-    const adminPlatformFee = Math.round(userPayment.platformFee * 100) / 100;
-    const adminDeliveryFee = Math.round(userPayment.deliveryFee * 100) / 100;
-    const adminGST = Math.round(userPayment.gst * 100) / 100;
-    const adminRecommendedFee = Math.round(restaurantEarning.recommendedItemFee * 100) / 100;
-    const adminTotal = Math.round((adminCommission + adminPlatformFee + adminDeliveryFee + adminGST + adminRecommendedFee) * 100) / 100;
+    const deliveryMargin = roundCurrency(adminDeliveryCost - deliveryPartnerEarning.totalEarning);
+    const adminRecommendedFee = roundCurrency(restaurantEarning.recommendedItemFee);
+    const adminTotal = roundCurrency(platformFee + adminDeliveryCost + gstCollected + adminRecommendedFee);
 
     const adminEarning = {
-      commission: adminCommission, // Restaurant commission (₹30)
-      platformFee: adminPlatformFee, // Platform fee (₹6)
-      deliveryFee: adminDeliveryFee, // Delivery fee (₹0 if free, but still tracked)
-      gst: adminGST, // GST (₹10)
-      recommendedItemFee: adminRecommendedFee, // Recommended item fee (₹5)
-      deliveryMargin: Math.max(0, Math.round(deliveryMargin * 100) / 100), // Delivery fee - delivery partner earning
-      totalEarning: adminTotal, // Total admin earnings
+      commission: 0,
+      platformFee,
+      adminDeliveryCost,
+      restaurantPayable: payableToAdmin,
+      deliveryFee: adminDeliveryCost,
+      gst: gstCollected,
+      recommendedItemFee: adminRecommendedFee,
+      deliveryMargin: deliveryMargin,
+      totalEarning: adminTotal,
       status: 'pending'
     };
 
-    // Create or update settlement
+    const now = new Date();
+    const restaurantEligibleAt = new Date(now.getTime() + (3 * 24 * 60 * 60 * 1000));
+    const deliveryEligibleAt = new Date(now.getTime() + (7 * 24 * 60 * 60 * 1000));
+
     let settlement = await OrderSettlement.findOne({ orderId });
 
     const settlementData = {
@@ -165,23 +159,31 @@ export const calculateOrderSettlement = async (orderId) => {
       escrowStatus: 'pending',
       escrowAmount: userPayment.total,
       settlementStatus: 'pending',
+      settlementWindows: {
+        restaurantEligibleAt,
+        deliveryPartnerEligibleAt: deliveryEligibleAt
+      },
       calculationSnapshot: {
         feeSettings: {
           platformFee: feeSettings?.platformFee,
           gstRate: feeSettings?.gstRate,
-          deliveryFee: feeSettings?.deliveryFee
+          distanceSlabs: tierDistanceSlabs,
+          tier: tierMeta
         },
-        restaurantCommission: {
-          type: restaurantCommissionData.type,
-          value: restaurantCommissionData.value,
-          rule: restaurantCommissionData.rule
+        pricingSnapshot: {
+          distanceKm: order.pricing.distanceKm || 0,
+          customerDeliveryFee: userPayment.deliveryFee,
+          adminDeliveryCost,
+          platformFee,
+          gstCollected,
+          payableToAdmin
         },
         deliveryCommission: deliveryPartnerEarning.distance > 0 ? {
           distance: deliveryPartnerEarning.distance,
           basePayout: deliveryPartnerEarning.basePayout,
           commissionPerKm: deliveryPartnerEarning.commissionPerKm
         } : null,
-        calculatedAt: new Date()
+        calculatedAt: now
       }
     };
 
@@ -214,7 +216,6 @@ export const getOrderSettlement = async (orderId) => {
       .lean();
 
     if (!settlement) {
-      // Calculate if doesn't exist
       settlement = await calculateOrderSettlement(orderId);
     }
 
@@ -228,14 +229,13 @@ export const getOrderSettlement = async (orderId) => {
 /**
  * Update settlement when order status changes
  */
-export const updateSettlementOnStatusChange = async (orderId, newStatus, previousStatus) => {
+export const updateSettlementOnStatusChange = async (orderId, newStatus) => {
   try {
     const settlement = await OrderSettlement.findOne({ orderId });
     if (!settlement) {
       return;
     }
 
-    // Update escrow status based on order status
     if (newStatus === 'delivered') {
       settlement.escrowStatus = 'released';
       settlement.escrowReleasedAt = new Date();
@@ -251,4 +251,3 @@ export const updateSettlementOnStatusChange = async (orderId, newStatus, previou
     throw error;
   }
 };
-

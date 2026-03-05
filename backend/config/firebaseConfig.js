@@ -6,13 +6,20 @@ import fs from 'fs';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Read the RTDB service account key (zapoo-d23ea project)
-const serviceAccountPath = path.join(__dirname, 'firebase-service-account.json');
+// Read the RTDB service account key from environment variable
 let serviceAccount = null;
 try {
-    serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
+    if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+        serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+    } else {
+        // Fallback to file for local development if env not set
+        const serviceAccountPath = path.join(__dirname, 'firebase-service-account.json');
+        if (fs.existsSync(serviceAccountPath)) {
+            serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
+        }
+    }
 } catch (err) {
-    console.warn('⚠️ firebase-service-account.json not found or invalid. Firebase RTDB will be unavailable.');
+    console.warn('⚠️ Firebase service account could not be loaded from env or file.');
 }
 
 // Named app for RTDB — completely separate from the default Auth app (zomato-607fa)
@@ -32,7 +39,7 @@ export const initializeFirebaseRealtime = () => {
             {
                 credential: admin.credential.cert(serviceAccount),
                 // Asia-southeast1 regional URL (your project lives here)
-                databaseURL: 'https://zapoo-d23ea-default-rtdb.asia-southeast1.firebasedatabase.app'
+                databaseURL: process.env.FIREBASE_DATABASE_URL || 'https://zapoo-d23ea-default-rtdb.asia-southeast1.firebasedatabase.app'
             },
             RTDB_APP_NAME  // <-- named app, not the default app
         );

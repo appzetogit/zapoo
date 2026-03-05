@@ -1,17 +1,67 @@
 import OrderSettlement from '../models/OrderSettlement.js';
 import RestaurantWallet from '../../restaurant/models/RestaurantWallet.js';
 import DeliveryWallet from '../../delivery/models/DeliveryWallet.js';
-import mongoose from 'mongoose';
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+const creditRestaurantWallet = async (settlement) => {
+  if (!settlement.restaurantId || settlement.restaurantEarning?.netEarning <= 0) return;
+
+  const wallet = await RestaurantWallet.findOrCreateByRestaurantId(settlement.restaurantId);
+  const alreadyCredited = wallet.transactions?.some(
+    (t) => t.orderId && String(t.orderId) === String(settlement.orderId) && t.type === 'payment'
+  );
+
+  if (alreadyCredited) {
+    return;
+  }
+
+  wallet.addTransaction({
+    amount: settlement.restaurantEarning.netEarning,
+    type: 'payment',
+    status: 'Completed',
+    description: `Settlement credit for order ${settlement.orderNumber}`,
+    orderId: settlement.orderId
+  });
+
+  await wallet.save();
+};
+
+const creditDeliveryWallet = async (settlement) => {
+  if (!settlement.deliveryPartnerId || settlement.deliveryPartnerEarning?.totalEarning <= 0) return;
+
+  const wallet = await DeliveryWallet.findOrCreateByDeliveryId(settlement.deliveryPartnerId);
+  const alreadyCredited = wallet.transactions?.some(
+    (t) => t.orderId && String(t.orderId) === String(settlement.orderId) && t.type === 'payment'
+  );
+
+  if (alreadyCredited) {
+    return;
+  }
+
+  wallet.addTransaction({
+    amount: settlement.deliveryPartnerEarning.totalEarning,
+    type: 'payment',
+    status: 'Completed',
+    description: `Weekly settlement for order ${settlement.orderNumber}`,
+    orderId: settlement.orderId,
+    paymentCollected: false
+  });
+
+  await wallet.save();
+};
 
 /**
  * Get pending settlements for restaurants
  */
 export const getPendingRestaurantSettlements = async (restaurantId = null, startDate = null, endDate = null) => {
   try {
+    const now = new Date();
     const query = {
-      'restaurantEarning.status': 'credited',
+      'restaurantEarning.status': 'pending',
       restaurantSettled: false,
-      settlementStatus: 'completed'
+      settlementStatus: 'completed',
+      'settlementWindows.restaurantEligibleAt': { $lte: now }
     };
 
     if (restaurantId) {
@@ -43,11 +93,13 @@ export const getPendingRestaurantSettlements = async (restaurantId = null, start
  */
 export const getPendingDeliverySettlements = async (deliveryId = null, startDate = null, endDate = null) => {
   try {
+    const now = new Date();
     const query = {
-      'deliveryPartnerEarning.status': 'credited',
+      'deliveryPartnerEarning.status': 'pending',
       deliveryPartnerSettled: false,
       settlementStatus: 'completed',
-      deliveryPartnerId: { $ne: null }
+      deliveryPartnerId: { $ne: null },
+      'settlementWindows.deliveryPartnerEligibleAt': { $lte: now }
     };
 
     if (deliveryId) {
@@ -75,13 +127,12 @@ export const getPendingDeliverySettlements = async (deliveryId = null, startDate
 };
 
 /**
- * Generate settlement report for restaurants (daily/weekly)
+ * Generate settlement report for restaurants
  */
 export const generateRestaurantSettlementReport = async (restaurantId, startDate, endDate) => {
   try {
     const settlements = await OrderSettlement.find({
       restaurantId: restaurantId,
-      'restaurantEarning.status': 'credited',
       createdAt: {
         $gte: new Date(startDate),
         $lte: new Date(endDate)
@@ -91,9 +142,8 @@ export const generateRestaurantSettlementReport = async (restaurantId, startDate
       .sort({ createdAt: -1 })
       .lean();
 
-    const totalEarnings = settlements.reduce((sum, s) => sum + s.restaurantEarning.netEarning, 0);
+    const totalEarnings = settlements.reduce((sum, s) => sum + (s.restaurantEarning.netEarning || 0), 0);
     const totalOrders = settlements.length;
-    const totalCommission = settlements.reduce((sum, s) => sum + s.restaurantEarning.commission, 0);
 
     return {
       restaurantId,
@@ -104,14 +154,16 @@ export const generateRestaurantSettlementReport = async (restaurantId, startDate
       summary: {
         totalOrders,
         totalEarnings,
-        totalCommission,
         averageOrderValue: totalOrders > 0 ? totalEarnings / totalOrders : 0
       },
       settlements: settlements.map(s => ({
         orderNumber: s.orderNumber,
         orderDate: s.createdAt,
         foodPrice: s.restaurantEarning.foodPrice,
-        commission: s.restaurantEarning.commission,
+        adminDeliveryCost: s.restaurantEarning.adminDeliveryCost || 0,
+        platformFee: s.restaurantEarning.platformFee || 0,
+        gstCollected: s.restaurantEarning.gstCollected || 0,
+        payableToAdmin: s.restaurantEarning.payableToAdmin || 0,
         netEarning: s.restaurantEarning.netEarning,
         status: s.restaurantEarning.status
       }))
@@ -123,13 +175,12 @@ export const generateRestaurantSettlementReport = async (restaurantId, startDate
 };
 
 /**
- * Generate settlement report for delivery partners (weekly)
+ * Generate settlement report for delivery partners
  */
 export const generateDeliverySettlementReport = async (deliveryId, startDate, endDate) => {
   try {
     const settlements = await OrderSettlement.find({
       deliveryPartnerId: deliveryId,
-      'deliveryPartnerEarning.status': 'credited',
       createdAt: {
         $gte: new Date(startDate),
         $lte: new Date(endDate)
@@ -139,12 +190,9 @@ export const generateDeliverySettlementReport = async (deliveryId, startDate, en
       .sort({ createdAt: -1 })
       .lean();
 
-    const totalEarnings = settlements.reduce((sum, s) => sum + s.deliveryPartnerEarning.totalEarning, 0);
+    const totalEarnings = settlements.reduce((sum, s) => sum + (s.deliveryPartnerEarning.totalEarning || 0), 0);
     const totalOrders = settlements.length;
     const totalDistance = settlements.reduce((sum, s) => sum + (s.deliveryPartnerEarning.distance || 0), 0);
-    const totalBasePayout = settlements.reduce((sum, s) => sum + s.deliveryPartnerEarning.basePayout, 0);
-    const totalDistanceCommission = settlements.reduce((sum, s) => sum + s.deliveryPartnerEarning.distanceCommission, 0);
-    const totalSurge = settlements.reduce((sum, s) => sum + s.deliveryPartnerEarning.surgeAmount, 0);
 
     return {
       deliveryId,
@@ -156,9 +204,6 @@ export const generateDeliverySettlementReport = async (deliveryId, startDate, en
         totalOrders,
         totalEarnings,
         totalDistance: totalDistance.toFixed(2),
-        totalBasePayout,
-        totalDistanceCommission,
-        totalSurge,
         averageEarningPerOrder: totalOrders > 0 ? totalEarnings / totalOrders : 0
       },
       settlements: settlements.map(s => ({
@@ -179,21 +224,42 @@ export const generateDeliverySettlementReport = async (deliveryId, startDate, en
 };
 
 /**
- * Mark settlements as processed (for weekly payouts)
+ * Mark settlements as processed
  */
-export const markSettlementsAsProcessed = async (settlementIds, actorType, actorId) => {
+export const markSettlementsAsProcessed = async (settlementIds, actorType) => {
   try {
     const settlements = await OrderSettlement.find({
       _id: { $in: settlementIds }
     });
 
+    const now = new Date();
     for (const settlement of settlements) {
-      if (settlement.restaurantEarning.status === 'credited' && !settlement.restaurantSettled) {
+      if (
+        (actorType === 'admin' || actorType === 'restaurant') &&
+        !settlement.restaurantSettled &&
+        settlement.restaurantEarning?.status === 'pending' &&
+        settlement.settlementWindows?.restaurantEligibleAt &&
+        settlement.settlementWindows.restaurantEligibleAt <= now
+      ) {
+        await creditRestaurantWallet(settlement);
+        settlement.restaurantEarning.status = 'credited';
+        settlement.restaurantEarning.creditedAt = now;
         settlement.restaurantSettled = true;
       }
-      if (settlement.deliveryPartnerEarning.status === 'credited' && !settlement.deliveryPartnerSettled) {
+
+      if (
+        (actorType === 'admin' || actorType === 'delivery') &&
+        !settlement.deliveryPartnerSettled &&
+        settlement.deliveryPartnerEarning?.status === 'pending' &&
+        settlement.settlementWindows?.deliveryPartnerEligibleAt &&
+        settlement.settlementWindows.deliveryPartnerEligibleAt <= now
+      ) {
+        await creditDeliveryWallet(settlement);
+        settlement.deliveryPartnerEarning.status = 'credited';
+        settlement.deliveryPartnerEarning.creditedAt = now;
         settlement.deliveryPartnerSettled = true;
       }
+
       await settlement.save();
     }
 
@@ -204,3 +270,24 @@ export const markSettlementsAsProcessed = async (settlementIds, actorType, actor
   }
 };
 
+export const initializeSettlementWindows = async () => {
+  const now = new Date();
+  const restaurantEligibleAt = new Date(now.getTime() + (3 * DAY_MS));
+  const deliveryEligibleAt = new Date(now.getTime() + (7 * DAY_MS));
+
+  await OrderSettlement.updateMany(
+    {
+      settlementStatus: 'completed',
+      $or: [
+        { 'settlementWindows.restaurantEligibleAt': { $exists: false } },
+        { 'settlementWindows.deliveryPartnerEligibleAt': { $exists: false } }
+      ]
+    },
+    {
+      $set: {
+        'settlementWindows.restaurantEligibleAt': restaurantEligibleAt,
+        'settlementWindows.deliveryPartnerEligibleAt': deliveryEligibleAt
+      }
+    }
+  );
+};

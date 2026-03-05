@@ -31,6 +31,41 @@ const deliveryTimingsSchema = new mongoose.Schema({
   closingTime: String,
 });
 
+const orderValueSlabSchema = new mongoose.Schema({
+  label: {
+    type: String,
+    trim: true,
+  },
+  minOrderValue: {
+    type: Number,
+    required: true,
+    min: 0,
+  },
+  maxOrderValue: {
+    type: Number,
+    default: null,
+    min: 0,
+  }
+}, { _id: true });
+
+const customerDeliveryRateSchema = new mongoose.Schema({
+  distanceSlabId: {
+    type: String,
+    required: true,
+    trim: true,
+  },
+  orderValueSlabId: {
+    type: String,
+    required: true,
+    trim: true,
+  },
+  perKmRate: {
+    type: Number,
+    required: true,
+    min: 0,
+  }
+}, { _id: true });
+
 const restaurantSchema = new mongoose.Schema(
   {
     restaurantId: {
@@ -309,6 +344,24 @@ const restaurantSchema = new mongoose.Schema(
       ref: "Zone",
       default: null,
     },
+    deliveryPricingConfig: {
+      isEnabled: {
+        type: Boolean,
+        default: false,
+      },
+      orderValueSlabs: {
+        type: [orderValueSlabSchema],
+        default: [],
+      },
+      customerDeliveryRates: {
+        type: [customerDeliveryRateSchema],
+        default: [],
+      },
+      lastUpdatedAt: {
+        type: Date,
+        default: null,
+      }
+    },
   },
   {
     timestamps: true,
@@ -317,9 +370,9 @@ const restaurantSchema = new mongoose.Schema(
 
 // Indexes for authentication
 restaurantSchema.index({ "location.coordinates": "2dsphere" });
-restaurantSchema.index({ email: 1 }, { unique: true, sparse: true });
-restaurantSchema.index({ phone: 1 }, { unique: true, sparse: true });
-restaurantSchema.index({ googleId: 1 }, { unique: true, sparse: true });
+// restaurantSchema.index({ email: 1 }, { unique: true, sparse: true });
+// restaurantSchema.index({ phone: 1 }, { unique: true, sparse: true });
+// restaurantSchema.index({ googleId: 1 }, { unique: true, sparse: true });
 
 // Hash password before saving
 restaurantSchema.pre("save", async function (next) {

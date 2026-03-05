@@ -51,6 +51,10 @@ const orderSettlementSchema = new mongoose.Schema({
   restaurantEarning: {
     foodPrice: { type: Number, required: true, min: 0 },
     commission: { type: Number, required: true, min: 0 },
+    adminDeliveryCost: { type: Number, default: 0, min: 0 },
+    platformFee: { type: Number, default: 0, min: 0 },
+    gstCollected: { type: Number, default: 0, min: 0 },
+    payableToAdmin: { type: Number, default: 0, min: 0 },
     commissionPercentage: { type: Number, default: 0 },
     netEarning: { type: Number, required: true, min: 0 },
     status: {
@@ -81,6 +85,9 @@ const orderSettlementSchema = new mongoose.Schema({
   // Admin/Platform Earnings
   adminEarning: {
     commission: { type: Number, required: true, min: 0 },
+    platformFee: { type: Number, default: 0, min: 0 },
+    adminDeliveryCost: { type: Number, default: 0, min: 0 },
+    restaurantPayable: { type: Number, default: 0, min: 0 },
     deliveryFee: { type: Number, required: true, min: 0 },
     gst: { type: Number, required: true, min: 0 },
     recommendedItemFee: { type: Number, default: 0, min: 0 },
@@ -156,6 +163,11 @@ const orderSettlementSchema = new mongoose.Schema({
     comment: 'Snapshot of calculation at time of order'
   },
 
+  settlementWindows: {
+    restaurantEligibleAt: { type: Date, default: null },
+    deliveryPartnerEligibleAt: { type: Date, default: null }
+  },
+
   // Metadata
   metadata: {
     type: Map,
@@ -184,11 +196,26 @@ orderSettlementSchema.statics.findOrCreateByOrderId = async function (orderId) {
       throw new Error('Order not found');
     }
 
+    let resolvedRestaurantId = order.restaurantId;
+    if (typeof resolvedRestaurantId === 'string' && !mongoose.Types.ObjectId.isValid(resolvedRestaurantId)) {
+      const restaurant = await mongoose.model('Restaurant').findOne({
+        $or: [
+          { restaurantId: resolvedRestaurantId },
+          { slug: resolvedRestaurantId }
+        ]
+      }).select('_id name').lean();
+      resolvedRestaurantId = restaurant?._id || null;
+    }
+
+    if (!resolvedRestaurantId) {
+      throw new Error('Unable to resolve restaurant for settlement');
+    }
+
     settlement = await this.create({
       orderId,
       orderNumber: order.orderId,
       userId: order.userId,
-      restaurantId: order.restaurantId,
+      restaurantId: resolvedRestaurantId,
       restaurantName: order.restaurantName
     });
   }
@@ -199,4 +226,3 @@ orderSettlementSchema.statics.findOrCreateByOrderId = async function (orderId) {
 const OrderSettlement = mongoose.model('OrderSettlement', orderSettlementSchema);
 
 export default OrderSettlement;
-

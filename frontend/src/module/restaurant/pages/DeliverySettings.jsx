@@ -1,371 +1,419 @@
-import { useState, useEffect } from "react"
-import { useNavigate } from "react-router-dom"
-import { motion, AnimatePresence } from "framer-motion"
-import Lenis from "lenis"
-import { ArrowLeft, Truck, X, CheckCircle, AlertCircle } from "lucide-react"
-import { Switch } from "@/components/ui/switch"
-import { Card, CardContent } from "@/components/ui/card"
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { ArrowLeft, Loader2, Plus, Save, Trash2 } from "lucide-react";
+import { restaurantAPI } from "@/lib/api";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 
-const STORAGE_KEY = "restaurant_outlet_timings"
-const DELIVERY_STATUS_KEY = "restaurant_delivery_status"
+const generateObjectIdLike = () => {
+  const ts = Math.floor(Date.now() / 1000).toString(16).padStart(8, "0");
+  const chars = "abcdef0123456789";
+  let rest = "";
+  for (let i = 0; i < 16; i += 1) {
+    rest += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return `${ts}${rest}`;
+};
+
+const isObjectIdLike = (value) => /^[a-f\d]{24}$/i.test(String(value || ""));
+
+const defaultOrderSlab = () => ({
+  _id: generateObjectIdLike(),
+  label: "",
+  minOrderValue: 0,
+  maxOrderValue: null,
+});
+
+const getRateKey = (distanceSlabId, orderValueSlabId) =>
+  `${String(distanceSlabId)}::${String(orderValueSlabId)}`;
 
 export default function DeliverySettings() {
-  const navigate = useNavigate()
-  const [deliveryStatus, setDeliveryStatus] = useState(false)
-  const [showWarning, setShowWarning] = useState(false)
-  const [showConfirmDialog, setShowConfirmDialog] = useState(false)
-  const [pendingStatus, setPendingStatus] = useState(false)
-  const [showSuccessToast, setShowSuccessToast] = useState(false)
-  const [toastMessage, setToastMessage] = useState("")
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [isEnabled, setIsEnabled] = useState(false);
+  const [tierInfo, setTierInfo] = useState(null);
+  const [distanceSlabs, setDistanceSlabs] = useState([]);
+  const [orderValueSlabs, setOrderValueSlabs] = useState([]);
+  const [rateMap, setRateMap] = useState({});
 
-  // Lenis smooth scrolling
-  useEffect(() => {
-    const lenis = new Lenis({
-      duration: 1.2,
-      easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
-      smoothWheel: true,
-    })
+  const activeDistanceSlabs = useMemo(
+    () =>
+      (distanceSlabs || [])
+        .filter((s) => s.isActive !== false)
+        .sort((a, b) => Number(a.minKm || 0) - Number(b.minKm || 0)),
+    [distanceSlabs],
+  );
 
-    function raf(time) {
-      lenis.raf(time)
-      requestAnimationFrame(raf)
-    }
+  const seedRateMap = (distance, order, rates) => {
+    const nextMap = {};
+    (rates || []).forEach((r) => {
+      nextMap[getRateKey(r.distanceSlabId, r.orderValueSlabId)] = Number(
+        r.perKmRate || 0,
+      );
+    });
 
-    requestAnimationFrame(raf)
+    distance.forEach((d) => {
+      order.forEach((o) => {
+        const key = getRateKey(d._id, o._id);
+        if (nextMap[key] === undefined) nextMap[key] = 0;
+      });
+    });
+    return nextMap;
+  };
 
-    return () => {
-      lenis.destroy()
-    }
-  }, [])
-
-  // Load delivery status from localStorage on mount
-  useEffect(() => {
+  const loadData = useCallback(async () => {
     try {
-      const savedStatus = localStorage.getItem(DELIVERY_STATUS_KEY)
-      if (savedStatus !== null) {
-        setDeliveryStatus(JSON.parse(savedStatus))
-      }
-    } catch (error) {
-      // Only log error if it's not a network/timeout error (backend might be down/slow)
-      if (error.code !== 'ERR_NETWORK' && error.code !== 'ECONNABORTED' && !error.message?.includes('timeout')) {
-        console.error("Error loading delivery status:", error)
-      }
-    }
-  }, [])
+      setLoading(true);
+      const res = await restaurantAPI.getDeliveryPricing();
+      const payload = res?.data?.data || {};
+      const cfg = payload.deliveryPricingConfig || {};
+      setTierInfo(payload.tier || null);
+      const fetchedDistanceSlabs = Array.isArray(payload.distanceSlabs)
+        ? payload.distanceSlabs
+        : [];
+      const fetchedOrderSlabs =
+        Array.isArray(cfg.orderValueSlabs) && cfg.orderValueSlabs.length
+          ? cfg.orderValueSlabs
+          : [];
 
-  // Prevent body scroll when dialog is open
-  useEffect(() => {
-    if (showConfirmDialog) {
-      document.body.style.overflow = 'hidden'
-    } else {
-      document.body.style.overflow = 'unset'
-    }
-    return () => {
-      document.body.style.overflow = 'unset'
-    }
-  }, [showConfirmDialog])
+      setDistanceSlabs(fetchedDistanceSlabs);
+      setIsEnabled(Boolean(cfg.isEnabled));
 
-  // Check if current time is within outlet timings
-  const isWithinOutletTimings = () => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY)
-      if (!saved) return false
-
-      const days = JSON.parse(saved)
-      const now = new Date()
-      const currentDay = now.toLocaleDateString('en-US', { weekday: 'long' })
-      const currentHour = now.getHours()
-      const currentMinute = now.getMinutes()
-      const currentTimeInMinutes = currentHour * 60 + currentMinute
-
-      const dayData = days[currentDay]
-      if (!dayData || !dayData.isOpen || !dayData.slots || dayData.slots.length === 0) {
-        return false
-      }
-
-      // Check if current time falls within any slot for today
-      return dayData.slots.some(slot => {
-        if (!slot || !slot.start || !slot.end) return false
-
-        const parseTime = (timeStr, period) => {
-          if (!timeStr || !timeStr.includes(":")) return 0
-          const [hours, minutes] = timeStr.split(":")
-          let hour = parseInt(hours) || 0
-          const mins = parseInt(minutes) || 0
-          if (period === "pm" && hour !== 12) hour += 12
-          if (period === "am" && hour === 12) hour = 0
-          return hour * 60 + mins
-        }
-
-        const startMinutes = parseTime(slot.start, slot.startPeriod || "am")
-        const endMinutes = parseTime(slot.end, slot.endPeriod || "pm")
-
-        // Handle slots that span midnight (e.g., 11pm to 2am)
-        if (endMinutes < startMinutes) {
-          // Slot spans midnight
-          return currentTimeInMinutes >= startMinutes || currentTimeInMinutes <= endMinutes
-        } else {
-          // Normal slot within same day
-          return currentTimeInMinutes >= startMinutes && currentTimeInMinutes <= endMinutes
-        }
-      })
-    } catch (error) {
-      console.error("Error checking outlet timings:", error)
-      return false
-    }
-  }
-
-  const canEnableDelivery = isWithinOutletTimings()
-
-  const showToast = (message) => {
-    setToastMessage(message)
-    setShowSuccessToast(true)
-    setTimeout(() => setShowSuccessToast(false), 3000)
-  }
-
-  const saveDeliveryStatus = (status) => {
-    try {
-      localStorage.setItem(DELIVERY_STATUS_KEY, JSON.stringify(status))
-      setDeliveryStatus(status)
-
-      if (status) {
-        showToast("Delivery is now ON - You're receiving orders")
+      if (fetchedOrderSlabs.length) {
+        setOrderValueSlabs(
+          fetchedOrderSlabs.map((s) => ({
+            _id: String(s._id || generateObjectIdLike()),
+            label: s.label || "",
+            minOrderValue: Number(s.minOrderValue || 0),
+            maxOrderValue:
+              s.maxOrderValue === null || s.maxOrderValue === undefined
+                ? null
+                : Number(s.maxOrderValue),
+          })),
+        );
       } else {
-        showToast("Delivery is now OFF - Not receiving orders")
+        setOrderValueSlabs([
+          { _id: generateObjectIdLike(), label: "50-149", minOrderValue: 50, maxOrderValue: 149 },
+          { _id: generateObjectIdLike(), label: "149-299", minOrderValue: 149, maxOrderValue: 299 },
+          { _id: generateObjectIdLike(), label: "Above 299", minOrderValue: 299, maxOrderValue: null },
+        ]);
+      }
+
+      const finalOrderSlabs =
+        fetchedOrderSlabs.length > 0
+          ? fetchedOrderSlabs.map((s) => ({
+            _id: String(s._id || generateObjectIdLike()),
+            label: s.label || "",
+            minOrderValue: Number(s.minOrderValue || 0),
+            maxOrderValue:
+              s.maxOrderValue === null || s.maxOrderValue === undefined
+                ? null
+                : Number(s.maxOrderValue),
+          }))
+          : [
+            { _id: generateObjectIdLike(), label: "50-149", minOrderValue: 50, maxOrderValue: 149 },
+            { _id: generateObjectIdLike(), label: "149-299", minOrderValue: 149, maxOrderValue: 299 },
+            { _id: generateObjectIdLike(), label: "Above 299", minOrderValue: 299, maxOrderValue: null },
+          ];
+
+      setRateMap(
+        seedRateMap(
+          fetchedDistanceSlabs.filter((s) => s.isActive !== false),
+          finalOrderSlabs,
+          cfg.customerDeliveryRates || [],
+        ),
+      );
+    } catch (error) {
+      console.error("Failed to load delivery pricing:", error);
+      toast.error("Failed to load delivery pricing");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const addOrderValueSlab = () => {
+    const slab = defaultOrderSlab();
+    const nextSlabs = [...orderValueSlabs, slab];
+    setOrderValueSlabs(nextSlabs);
+    const nextMap = { ...rateMap };
+    activeDistanceSlabs.forEach((d) => {
+      nextMap[getRateKey(d._id, slab._id)] = 0;
+    });
+    setRateMap(nextMap);
+  };
+
+  const removeOrderValueSlab = (idx) => {
+    const slab = orderValueSlabs[idx];
+    const nextSlabs = orderValueSlabs.filter((_, i) => i !== idx);
+    setOrderValueSlabs(nextSlabs);
+
+    const nextMap = { ...rateMap };
+    activeDistanceSlabs.forEach((d) => {
+      delete nextMap[getRateKey(d._id, slab._id)];
+    });
+    setRateMap(nextMap);
+  };
+
+  const updateOrderValueSlab = (idx, field, value) => {
+    setOrderValueSlabs((prev) =>
+      prev.map((s, i) => (i === idx ? { ...s, [field]: value } : s)),
+    );
+  };
+
+  const validateBeforeSave = () => {
+    if (!activeDistanceSlabs.length) {
+      return "No active distance slabs available. Ask admin to configure slabs.";
+    }
+    if (!orderValueSlabs.length) return "Add at least one order value slab.";
+
+    for (const slab of orderValueSlabs) {
+      if (!slab._id) return "Each order value slab must have an id.";
+      if (Number(slab.minOrderValue) < 0) return "Order value slab min must be >= 0.";
+      if (
+        slab.maxOrderValue !== null &&
+        slab.maxOrderValue !== "" &&
+        Number(slab.maxOrderValue) <= Number(slab.minOrderValue)
+      ) {
+        return "Order value slab max must be greater than min (or empty).";
+      }
+    }
+
+    for (const d of activeDistanceSlabs) {
+      for (const o of orderValueSlabs) {
+        const key = getRateKey(d._id, o._id);
+        const rate = Number(rateMap[key] ?? 0);
+        if (Number.isNaN(rate) || rate < 0) {
+          return "Per-km rates must be 0 or more.";
+        }
+      }
+    }
+
+    return null;
+  };
+
+  const handleSave = async () => {
+    try {
+      const validationError = validateBeforeSave();
+      if (validationError) {
+        toast.error(validationError);
+        return;
+      }
+
+      setSaving(true);
+      const slabIdMap = new Map();
+      const normalizedOrderValueSlabs = orderValueSlabs.map((s) => {
+        const oldId = String(s._id || "");
+        const nextId = isObjectIdLike(oldId) ? oldId : generateObjectIdLike();
+        slabIdMap.set(oldId, nextId);
+        return {
+          _id: nextId,
+          label: s.label || "",
+          minOrderValue: Number(s.minOrderValue),
+          maxOrderValue:
+            s.maxOrderValue === null || s.maxOrderValue === ""
+              ? null
+              : Number(s.maxOrderValue),
+        };
+      });
+
+      const payload = {
+        isEnabled,
+        orderValueSlabs: normalizedOrderValueSlabs,
+        customerDeliveryRates: activeDistanceSlabs.flatMap((d) =>
+          orderValueSlabs.map((o) => {
+            const oldOrderSlabId = String(o._id || "");
+            const mappedOrderSlabId = slabIdMap.get(oldOrderSlabId) || oldOrderSlabId;
+            return {
+              distanceSlabId: String(d._id),
+              orderValueSlabId: String(mappedOrderSlabId),
+              perKmRate: Number(rateMap[getRateKey(d._id, oldOrderSlabId)] || 0),
+            };
+          }),
+        ),
+      };
+
+      const res = await restaurantAPI.updateDeliveryPricing(payload);
+      if (res?.data?.success) {
+        toast.success("Delivery pricing saved");
+        loadData();
+      } else {
+        toast.error(res?.data?.message || "Failed to save delivery pricing");
       }
     } catch (error) {
-      console.error("Error saving delivery status:", error)
-      showToast("Error updating delivery status")
+      console.error("Failed to save delivery pricing:", error);
+      toast.error(error.response?.data?.message || "Failed to save delivery pricing");
+    } finally {
+      setSaving(false);
     }
-  }
+  };
 
-  const handleDeliveryStatusChange = (checked) => {
-    // If turning ON and outside outlet timings, show warning
-    if (checked && !canEnableDelivery) {
-      setPendingStatus(checked)
-      setShowConfirmDialog(true)
-      return
-    }
-
-    // If turning OFF, show confirmation
-    if (!checked && deliveryStatus) {
-      setPendingStatus(checked)
-      setShowConfirmDialog(true)
-      return
-    }
-
-    // Otherwise, update directly
-    saveDeliveryStatus(checked)
-  }
-
-  const handleConfirmStatusChange = () => {
-    saveDeliveryStatus(pendingStatus)
-    setShowConfirmDialog(false)
-
-    // Show warning if enabled outside timings
-    if (pendingStatus && !canEnableDelivery) {
-      setShowWarning(true)
-      setTimeout(() => setShowWarning(false), 5000)
-    }
-  }
-
-  const handleCancelStatusChange = () => {
-    setShowConfirmDialog(false)
-    setPendingStatus(deliveryStatus)
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <Loader2 className="w-6 h-6 animate-spin text-slate-600" />
+      </div>
+    );
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-50">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => navigate(-1)}
-            className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
-            aria-label="Go back"
-          >
-            <ArrowLeft className="w-6 h-6 text-gray-900" />
-          </button>
-          <div className="flex-1">
-            <h1 className="text-lg font-bold text-gray-900">Delivery Settings</h1>
-            <p className="text-sm text-gray-500 mt-0.5">Manage your delivery status</p>
+    <div className="min-h-screen bg-slate-50">
+      <div className="bg-white border-b border-slate-200 px-4 py-3 sticky top-0 z-20">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <button onClick={() => navigate(-1)} className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors" aria-label="Go back">
+              <ArrowLeft className="w-5 h-5 text-slate-900" />
+            </button>
+            <div>
+              <h1 className="text-lg font-bold text-slate-900">Delivery Pricing</h1>
+              <p className="text-xs text-slate-500">Configure customer-facing per-km pricing matrix</p>
+            </div>
           </div>
+          <Button onClick={handleSave} disabled={saving} className="bg-blue-600 hover:bg-blue-700 text-white">
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+            Save
+          </Button>
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="flex-1 overflow-y-auto px-4 py-6">
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-        >
-          <Card className="bg-white border-gray-200 shadow-sm">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="p-2 bg-gray-100 rounded-lg">
-                  <Truck className="w-5 h-5 text-gray-900" />
+      <div className="max-w-7xl mx-auto p-4 space-y-6">
+        <div className="bg-white border border-slate-200 rounded-xl p-4">
+          <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+            <input
+              type="checkbox"
+              checked={isEnabled}
+              onChange={(e) => setIsEnabled(e.target.checked)}
+            />
+            Enable custom customer delivery pricing
+          </label>
+          {tierInfo?.name ? (
+            <p className="text-xs text-slate-500 mt-2">
+              Active tier: {tierInfo.name}
+            </p>
+          ) : null}
+        </div>
+
+        <div className="bg-white border border-slate-200 rounded-xl p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-base font-semibold text-slate-900">Order Value Slabs</h2>
+            <Button variant="outline" onClick={addOrderValueSlab}>
+              <Plus className="w-4 h-4 mr-2" />
+              Add Slab
+            </Button>
+          </div>
+          <div className="space-y-3">
+            {orderValueSlabs.map((slab, idx) => (
+              <div key={slab._id} className="grid grid-cols-1 md:grid-cols-5 gap-3 items-end border border-slate-200 rounded-lg p-3">
+                <div>
+                  <label className="text-xs text-slate-500">Label</label>
+                  <input
+                    type="text"
+                    className="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"
+                    value={slab.label}
+                    onChange={(e) => updateOrderValueSlab(idx, "label", e.target.value)}
+                    placeholder="e.g. 50-149"
+                  />
                 </div>
                 <div>
-                  <h2 className="text-base font-bold text-gray-900">Delivery Status</h2>
-                  <p className="text-sm text-gray-500">Control when you receive delivery orders</p>
+                  <label className="text-xs text-slate-500">Min Value (Rs)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    className="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"
+                    value={slab.minOrderValue}
+                    onChange={(e) => updateOrderValueSlab(idx, "minOrderValue", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-slate-500">Max Value (Rs)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    className="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"
+                    value={slab.maxOrderValue ?? ""}
+                    onChange={(e) => updateOrderValueSlab(idx, "maxOrderValue", e.target.value === "" ? null : e.target.value)}
+                    placeholder="Leave empty for open ended"
+                  />
+                </div>
+                <div className="md:col-span-2 flex justify-end">
+                  <Button
+                    variant="ghost"
+                    className="text-red-600 hover:text-red-700"
+                    onClick={() => removeOrderValueSlab(idx)}
+                    disabled={orderValueSlabs.length === 1}
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Remove
+                  </Button>
                 </div>
               </div>
+            ))}
+          </div>
+        </div>
 
-              <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <p className="text-base font-bold text-gray-900 mb-1.5">Turn on delivery</p>
-                  <motion.div
-                    className="flex items-center gap-2"
-                    initial={false}
-                    animate={{ scale: deliveryStatus ? 1.05 : 1 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <div className={`w-2 h-2 rounded-full ${deliveryStatus ? "bg-[#3B82F6] animate-pulse" : "bg-gray-600"}`}></div>
-                    <p className="text-sm text-gray-500">
-                      {deliveryStatus ? "Receiving orders" : "Not receiving orders"}
-                    </p>
-                  </motion.div>
-                  <AnimatePresence>
-                    {!canEnableDelivery && !deliveryStatus && (
-                      <motion.p
-                        initial={{ opacity: 0, y: -5 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -5 }}
-                        className="text-xs text-orange-600 mt-2 flex items-center gap-1"
-                      >
-                        <AlertCircle className="w-3 h-3" />
-                        You are outside outlet timings
-                      </motion.p>
-                    )}
-                    {showWarning && deliveryStatus && (
-                      <motion.p
-                        initial={{ opacity: 0, y: -5 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -5 }}
-                        className="text-xs text-red-600 mt-2 animate-pulse flex items-center gap-1"
-                      >
-                        <AlertCircle className="w-3 h-3" />
-                        Warning: Delivery enabled outside outlet timings!
-                      </motion.p>
-                    )}
-                  </AnimatePresence>
-                </div>
-                <Switch
-                  checked={deliveryStatus}
-                  onCheckedChange={handleDeliveryStatusChange}
-                  className="ml-4 data-[state=checked]:bg-[#3B82F6] data-[state=unchecked]:bg-gray-300"
-                />
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
+        <div className="bg-white border border-slate-200 rounded-xl p-4">
+          <h2 className="text-base font-semibold text-slate-900 mb-1">Per Km Pricing Matrix</h2>
+          <p className="text-xs text-slate-500 mb-4">
+            Distance slabs are admin-defined and read-only here.
+          </p>
 
-        {/* Info Card */}
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: 0.1 }}
-          className="mt-4"
-        >
-          <Card className="bg-blue-50 border-blue-200 shadow-sm">
-            <CardContent className="p-4">
-              <p className="text-sm text-gray-700">
-                <strong>Note:</strong> When delivery is turned off, customers won't be able to place delivery orders from your restaurant. You can turn it back on anytime.
-              </p>
-            </CardContent>
-          </Card>
-        </motion.div>
-      </div>
-
-      {/* Confirmation Dialog */}
-      <AnimatePresence>
-        {showConfirmDialog && (
-          <>
-            {/* Backdrop */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="fixed inset-0 bg-black/50 z-[100]"
-              onClick={handleCancelStatusChange}
-            />
-
-            {/* Dialog */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              className="fixed inset-0 flex items-center justify-center z-[100] px-4"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6">
-                <div className="flex justify-center mb-4">
-                  <div className={`w-16 h-16 rounded-full flex items-center justify-center ${pendingStatus ? "bg-orange-100" : "bg-red-100"
-                    }`}>
-                    <AlertCircle className={`w-10 h-10 ${pendingStatus ? "text-orange-600" : "text-red-600"
-                      }`} />
-                  </div>
-                </div>
-
-                <h3 className="text-xl font-bold text-gray-900 mb-2 text-center">
-                  {pendingStatus ? "Enable Delivery?" : "Disable Delivery?"}
-                </h3>
-
-                <p className="text-sm text-gray-600 mb-6 text-center">
-                  {pendingStatus ? (
-                    !canEnableDelivery ? (
-                      <>You are currently outside your outlet timings. Are you sure you want to enable delivery?</>
-                    ) : (
-                      <>You will start receiving delivery orders. Make sure you're ready to accept orders.</>
-                    )
-                  ) : (
-                    <>Customers won't be able to place delivery orders. You can turn it back on anytime.</>
-                  )}
-                </p>
-
-                <div className="flex gap-3">
-                  <button
-                    onClick={handleCancelStatusChange}
-                    className="flex-1 px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-900 font-semibold rounded-lg transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleConfirmStatusChange}
-                    className={`flex-1 px-4 py-3 font-semibold rounded-lg transition-colors ${pendingStatus
-                      ? "bg-[#3B82F6] hover:bg-blue-700 text-white"
-                      : "bg-red-600 hover:bg-red-700 text-white"
-                      }`}
-                  >
-                    {pendingStatus ? "Enable" : "Disable"}
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
-
-      {/* Success Toast */}
-      <AnimatePresence>
-        {showSuccessToast && (
-          <motion.div
-            initial={{ opacity: 0, y: 50 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 50 }}
-            transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[200] px-4 w-full max-w-md"
-          >
-            <div className="bg-gray-900 text-white px-4 py-3 rounded-lg shadow-2xl flex items-center gap-3">
-              <CheckCircle className="w-5 h-5 text-green-400 shrink-0" />
-              <p className="text-sm font-medium flex-1">{toastMessage}</p>
+          {!activeDistanceSlabs.length ? (
+            <p className="text-sm text-red-600">No active distance slabs available for your tier configuration.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full border border-slate-200 rounded-lg">
+                <thead className="bg-slate-50">
+                  <tr>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-slate-700 border-b">Distance Slab</th>
+                    {orderValueSlabs.map((o) => (
+                      <th key={o._id} className="px-3 py-2 text-left text-xs font-semibold text-slate-700 border-b">
+                        {o.label || "Unlabeled"} (Rs/km)
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {activeDistanceSlabs.map((d) => (
+                    <tr key={d._id}>
+                      <td className="px-3 py-2 text-sm border-b border-slate-100 align-top">
+                        <div className="font-medium text-slate-900">{d.name}</div>
+                        <div className="text-xs text-slate-500">
+                          {d.minKm} to {d.maxKm === null ? "Open" : d.maxKm} km
+                          {d.isBaseSlab ? " (Base slab)" : ""}
+                        </div>
+                      </td>
+                      {orderValueSlabs.map((o) => {
+                        const key = getRateKey(d._id, o._id);
+                        return (
+                          <td key={key} className="px-3 py-2 border-b border-slate-100">
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.1"
+                              value={rateMap[key] ?? 0}
+                              onChange={(e) =>
+                                setRateMap((prev) => ({
+                                  ...prev,
+                                  [key]: e.target.value,
+                                }))
+                              }
+                              className="w-28 border border-slate-300 rounded px-2 py-1.5 text-sm"
+                            />
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          )}
+        </div>
+      </div>
     </div>
-  )
+  );
 }

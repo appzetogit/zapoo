@@ -1645,14 +1645,60 @@ export const completeDelivery = asyncHandler(async (req, res) => {
       }
     }
 
-    // Release escrow and distribute funds (this handles all wallet credits)
+    // Release escrow and distribute funds
+    let escrowReleased = false;
     try {
       const { releaseEscrow } = await import('../../order/services/escrowWalletService.js');
       await releaseEscrow(orderMongoId);
-      console.log(`✅ Escrow released and funds distributed for order ${orderIdForLog}`);
+      escrowReleased = true;
+      console.log(`Escrow released for order ${orderIdForLog}. Restaurant and delivery payouts will follow settlement windows.`);
     } catch (escrowError) {
-      console.error(`❌ Error releasing escrow for order ${orderIdForLog}:`, escrowError);
+      console.error(`Error releasing escrow for order ${orderIdForLog}:`, escrowError);
       // Continue with legacy wallet update as fallback
+    }
+
+    if (escrowReleased) {
+      const { default: OrderSettlement } = await import('../../order/models/OrderSettlement.js');
+      const settlement = await OrderSettlement.findOne({ orderId: orderMongoId }).lean();
+
+      const orderIdForNotification = orderMongoId?.toString ? orderMongoId.toString() : orderMongoId;
+      Promise.all([
+        (async () => {
+          try {
+            const { notifyRestaurantOrderUpdate } = await import('../../order/services/restaurantNotificationService.js');
+            await notifyRestaurantOrderUpdate(orderIdForNotification, 'delivered');
+          } catch (notifError) {
+            console.error('Error sending restaurant notification:', notifError);
+          }
+        })(),
+        (async () => {
+          try {
+            const { notifyUserOrderUpdate } = await import('../../order/services/userNotificationService.js');
+            if (notifyUserOrderUpdate) {
+              await notifyUserOrderUpdate(orderIdForNotification, 'delivered');
+            }
+          } catch (notifError) {
+            console.error('Error sending user notification:', notifError);
+          }
+        })()
+      ]).catch(error => {
+        console.error('Error in notification promises:', error);
+      });
+
+      return successResponse(res, 200, 'Delivery completed successfully', {
+        order: updatedOrder,
+        settlement: {
+          restaurantEligibleAt: settlement?.settlementWindows?.restaurantEligibleAt || null,
+          deliveryPartnerEligibleAt: settlement?.settlementWindows?.deliveryPartnerEligibleAt || null
+        },
+        earnings: {
+          amount: settlement?.deliveryPartnerEarning?.totalEarning || 0,
+          currency: 'INR',
+          distance: settlement?.deliveryPartnerEarning?.distance || 0,
+          breakdown: settlement?.deliveryPartnerEarning || null
+        },
+        message: 'Order completed. Restaurant settlement is on a 3-day window and delivery payout is weekly.'
+      });
     }
 
     // Calculate delivery earnings based on admin's commission rules
@@ -1989,4 +2035,5 @@ export const completeDelivery = asyncHandler(async (req, res) => {
     return errorResponse(res, 500, `Failed to complete delivery: ${error.message}`);
   }
 });
+
 

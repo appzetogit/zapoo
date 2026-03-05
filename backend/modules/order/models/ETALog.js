@@ -8,8 +8,8 @@ const etaLogSchema = new mongoose.Schema({
   orderId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Order',
-    required: true,
-    index: true
+    required: true
+    // Index handled via compound index etaLogSchema.index
   },
   previousETA: {
     min: {

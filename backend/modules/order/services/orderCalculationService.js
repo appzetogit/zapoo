@@ -5,119 +5,218 @@ import Zone from '../../admin/models/Zone.js';
 import Tier from '../../admin/models/Tier.js';
 import mongoose from 'mongoose';
 
-/**
- * Get active fee settings from database
- * Returns default values if no settings found
- */
+const roundCurrency = (value) => Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
+
+const isInRange = (value, min, max) => {
+  if (value < min) return false;
+  if (max === null || max === undefined) return true;
+  return value <= max;
+};
+
+const getDefaultDistanceSlabs = () => ([
+  {
+    _id: 'default-base-slab',
+    name: 'Base',
+    minKm: 0,
+    maxKm: 3,
+    isBaseSlab: true,
+    adminPerKmRate: 0,
+    isActive: true
+  }
+]);
+
+const getFallbackFeeSettings = () => ({
+  deliveryFee: 25,
+  freeDeliveryThreshold: 149,
+  platformFee: 5,
+  gstRate: 5,
+  recommendedItemFee: 0,
+  distanceSlabs: getDefaultDistanceSlabs(),
+});
+
+const getTierDistanceSlabs = (tier) => {
+  const slabs = tier?.deliveryPricing?.distanceSlabs;
+  if (!Array.isArray(slabs) || slabs.length === 0) return [];
+  return slabs;
+};
+
 const getFeeSettings = async () => {
   try {
     const feeSettings = await FeeSettings.findOne({ isActive: true })
       .sort({ createdAt: -1 })
       .lean();
 
-    if (feeSettings) {
-      return feeSettings;
+    if (!feeSettings) {
+      return getFallbackFeeSettings();
     }
 
-    // Return default values if no active settings found
     return {
-      deliveryFee: 25,
-      freeDeliveryThreshold: 149,
-      platformFee: 5,
-      gstRate: 5,
-      recommendedItemFee: 0,
+      ...getFallbackFeeSettings(),
+      ...feeSettings,
+      distanceSlabs: (feeSettings.distanceSlabs && feeSettings.distanceSlabs.length > 0)
+        ? feeSettings.distanceSlabs
+        : getDefaultDistanceSlabs()
     };
   } catch (error) {
     console.error('Error fetching fee settings:', error);
-    // Return default values on error
-    return {
-      deliveryFee: 25,
-      freeDeliveryThreshold: 149,
-      platformFee: 5,
-      gstRate: 5,
-    };
+    return getFallbackFeeSettings();
   }
 };
 
-/**
- * Calculate delivery fee based on order value, distance, and restaurant settings
- */
-export const calculateDeliveryFee = async (orderValue, restaurant, deliveryAddress = null) => {
-  // Check restaurant settings for free delivery threshold (takes priority)
-  if (restaurant?.freeDeliveryAbove && orderValue >= restaurant.freeDeliveryAbove) {
-    return 0; // Free delivery
-  }
+const findOrderValueSlab = (orderValueSlabs, subtotal) => {
+  if (!Array.isArray(orderValueSlabs) || orderValueSlabs.length === 0) return null;
 
-  // Admin free delivery threshold
-  const feeSettings = await getFeeSettings();
-  if (feeSettings.freeDeliveryThreshold && orderValue >= feeSettings.freeDeliveryThreshold) {
-    return 0;
-  }
+  const sortedSlabs = [...orderValueSlabs].sort((a, b) => Number(a.minOrderValue || 0) - Number(b.minOrderValue || 0));
+  return sortedSlabs.find((slab) =>
+    isInRange(
+      subtotal,
+      Number(slab.minOrderValue || 0),
+      slab.maxOrderValue === null || slab.maxOrderValue === undefined ? null : Number(slab.maxOrderValue)
+    )
+  ) || null;
+};
 
-  // Calculate distance
-  let distance = 0;
+const findDistanceSlab = (distanceSlabs, distanceKm) => {
+  const activeSlabs = (distanceSlabs || []).filter((slab) => slab.isActive !== false);
+  if (activeSlabs.length === 0) return null;
+
+  const sortedSlabs = [...activeSlabs].sort((a, b) => Number(a.minKm || 0) - Number(b.minKm || 0));
+  return sortedSlabs.find((slab) =>
+    isInRange(
+      distanceKm,
+      Number(slab.minKm || 0),
+      slab.maxKm === null || slab.maxKm === undefined ? null : Number(slab.maxKm)
+    )
+  ) || sortedSlabs[sortedSlabs.length - 1] || null;
+};
+
+const findBaseDistanceSlab = (distanceSlabs) => {
+  const activeSlabs = (distanceSlabs || []).filter((slab) => slab.isActive !== false);
+  return activeSlabs.find((slab) => slab.isBaseSlab === true) || activeSlabs[0] || null;
+};
+
+const calculateDistanceFromAddresses = (restaurant, deliveryAddress) => {
   if (deliveryAddress?.location?.coordinates && restaurant?.location?.coordinates) {
-    distance = calculateDistance(
+    return calculateDistance(
       restaurant.location.coordinates,
       deliveryAddress.location.coordinates
     );
-  } else if (deliveryAddress?.location?.latitude && restaurant?.location?.latitude) {
-    distance = calculateDistance(
+  }
+
+  if (deliveryAddress?.location?.latitude && restaurant?.location?.latitude) {
+    return calculateDistance(
       [restaurant.location.longitude, restaurant.location.latitude],
       [deliveryAddress.location.longitude, deliveryAddress.location.latitude]
     );
   }
 
-  // Get dynamic pricing from Tier/Zone
-  let baseFee = 20;
-  let baseDistance = 3;
-  let extraKmCharge = 10;
-  let freeThreshold = feeSettings.freeDeliveryThreshold || 0;
-
-  if (restaurant && restaurant.zoneId) {
-    const zone = await Zone.findById(restaurant.zoneId).lean();
-    if (zone) {
-      // Use Zone settings if not overridden, fallback to Tier
-      if (zone.tierId) {
-        const tier = await Tier.findById(zone.tierId).lean();
-        if (tier && tier.deliveryPricing) {
-          baseFee = tier.deliveryPricing.baseFee ?? baseFee;
-          baseDistance = tier.deliveryPricing.baseDistance ?? baseDistance;
-          extraKmCharge = tier.deliveryPricing.extraKmCharge ?? extraKmCharge;
-          freeThreshold = tier.deliveryPricing.freeDeliveryThreshold || freeThreshold;
-        }
-      }
-
-      // Final Check: Zone level override (if exists in future)
-      if (zone.deliveryPricing?.isOverridden) {
-        baseFee = zone.deliveryPricing.baseFee ?? baseFee;
-        freeThreshold = zone.deliveryPricing.freeDeliveryThreshold || freeThreshold;
-      }
-    }
-  }
-
-  // Final Free Delivery Check with tier-based threshold
-  if (freeThreshold > 0 && orderValue >= freeThreshold) {
-    return 0;
-  }
-
-  // Calculate Final Delivery Fee
-  if (distance <= baseDistance) {
-    return baseFee;
-  }
-
-  // Additional km charges
-  const extraKm = Math.ceil(distance - baseDistance);
-  return baseFee + (extraKm * extraKmCharge);
+  return 0;
 };
 
-/**
- * Calculate platform fee
- */
-export const calculatePlatformFee = async (subtotal) => {
-  // 2% platform fee, min Rs 5
-  const fee = Math.round(subtotal * 0.02);
-  return Math.max(fee, 5);
+const resolveTierAndZone = async (restaurant) => {
+  if (!restaurant?.zoneId) {
+    return { zone: null, tier: null };
+  }
+
+  const zone = await Zone.findById(restaurant.zoneId).lean();
+  if (!zone?.tierId) {
+    return { zone, tier: null };
+  }
+
+  const tier = await Tier.findById(zone.tierId).lean();
+  return { zone, tier };
+};
+
+const calculateRestaurantCustomerDeliveryFee = ({
+  subtotal,
+  distanceKm,
+  restaurant,
+  matchedDistanceSlab,
+}) => {
+  const config = restaurant?.deliveryPricingConfig;
+
+  if (!config?.isEnabled) {
+    return {
+      customerDeliveryFee: 0,
+      customerPerKmRate: 0,
+      matchedOrderValueSlab: null,
+    };
+  }
+
+  const matchedOrderValueSlab = findOrderValueSlab(config.orderValueSlabs, subtotal);
+  if (!matchedOrderValueSlab || !matchedDistanceSlab) {
+    return {
+      customerDeliveryFee: 0,
+      customerPerKmRate: 0,
+      matchedOrderValueSlab,
+    };
+  }
+
+  const matchedRateRule = (config.customerDeliveryRates || []).find((rate) =>
+    String(rate.distanceSlabId) === String(matchedDistanceSlab._id) &&
+    String(rate.orderValueSlabId) === String(matchedOrderValueSlab._id)
+  );
+
+  const customerPerKmRate = Number(matchedRateRule?.perKmRate || 0);
+  const customerDeliveryFee = roundCurrency(distanceKm * customerPerKmRate);
+
+  return {
+    customerDeliveryFee,
+    customerPerKmRate,
+    matchedOrderValueSlab,
+  };
+};
+
+const calculateAdminDeliveryCost = ({
+  distanceKm,
+  tier,
+  matchedDistanceSlab,
+  baseDistanceSlab,
+}) => {
+  const tierBasePay = Number(tier?.deliveryPricing?.basePay || tier?.deliveryPricing?.baseFee || 0);
+
+  if (!matchedDistanceSlab) {
+    return {
+      adminDeliveryCost: 0,
+      usedTierBasePay: false,
+      tierBasePay,
+    };
+  }
+
+  if (!baseDistanceSlab) {
+    return {
+      adminDeliveryCost: roundCurrency(distanceKm * Number(matchedDistanceSlab.adminPerKmRate || 0)),
+      usedTierBasePay: false,
+      tierBasePay,
+    };
+  }
+
+  const minBaseKm = Number(baseDistanceSlab.minKm || 0);
+  const maxBaseKm = baseDistanceSlab.maxKm === null || baseDistanceSlab.maxKm === undefined
+    ? null
+    : Number(baseDistanceSlab.maxKm);
+
+  if (isInRange(distanceKm, minBaseKm, maxBaseKm)) {
+    return {
+      adminDeliveryCost: roundCurrency(tierBasePay),
+      usedTierBasePay: true,
+      tierBasePay,
+    };
+  }
+
+  const adminPerKmRate = Number(matchedDistanceSlab?.adminPerKmRate || 0);
+  return {
+    adminDeliveryCost: roundCurrency(distanceKm * adminPerKmRate),
+    usedTierBasePay: false,
+    tierBasePay,
+  };
+};
+
+const calculateTierPlatformFee = (tier, defaultPlatformFee) => {
+  if (tier?.platformFee !== undefined && tier?.platformFee !== null) {
+    return Number(tier.platformFee);
+  }
+  return Number(defaultPlatformFee || 0);
 };
 
 /**
@@ -129,10 +228,7 @@ export const calculateGST = async (subtotal, discount = 0, restaurant = null) =>
   const feeSettings = await getFeeSettings();
   const gstRate = (feeSettings.gstRate || 5) / 100;
 
-  // If restaurant is registered, GST is inclusive (return 0 or calculated for display?)
-  // For now, assuming inclusive for registered, exclusive (added) for unregistered
   const isRegistered = restaurant?.onboarding?.step3?.gst?.isRegistered || false;
-
   if (isRegistered) {
     return 0;
   }
@@ -147,7 +243,7 @@ export const calculateDiscount = (coupon, subtotal) => {
   if (!coupon) return 0;
 
   if (coupon.minOrder && subtotal < coupon.minOrder) {
-    return 0; // Minimum order not met
+    return 0;
   }
 
   if (coupon.type === 'percentage') {
@@ -158,10 +254,9 @@ export const calculateDiscount = (coupon, subtotal) => {
     );
     return discount;
   } else if (coupon.type === 'flat') {
-    return Math.min(coupon.discount, subtotal); // Can't discount more than subtotal
+    return Math.min(coupon.discount, subtotal);
   }
 
-  // Default: flat discount
   return Math.min(coupon.discount || 0, subtotal);
 };
 
@@ -173,7 +268,7 @@ export const calculateDistance = (coord1, coord2) => {
   const [lng1, lat1] = coord1;
   const [lng2, lat2] = coord2;
 
-  const R = 6371; // Earth's radius in kilometers
+  const R = 6371;
   const dLat = (lat2 - lat1) * Math.PI / 180;
   const dLng = (lng2 - lng1) * Math.PI / 180;
 
@@ -183,9 +278,7 @@ export const calculateDistance = (coord1, coord2) => {
     Math.sin(dLng / 2) * Math.sin(dLng / 2);
 
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  const distance = R * c;
-
-  return distance;
+  return R * c;
 };
 
 /**
@@ -196,10 +289,8 @@ export const calculateOrderPricing = async ({
   restaurantId,
   deliveryAddress = null,
   couponCode = null,
-  deliveryFleet = 'standard'
 }) => {
   try {
-    // Calculate subtotal from items
     const subtotal = items.reduce((sum, item) => {
       return sum + (item.price || 0) * (item.quantity || 1);
     }, 0);
@@ -208,7 +299,6 @@ export const calculateOrderPricing = async ({
       throw new Error('Order subtotal must be greater than 0');
     }
 
-    // Get restaurant details
     let restaurant = null;
     if (restaurantId) {
       if (mongoose.Types.ObjectId.isValid(restaurantId) && restaurantId.length === 24) {
@@ -224,13 +314,11 @@ export const calculateOrderPricing = async ({
       }
     }
 
-    // Calculate coupon discount
     let discount = 0;
     let appliedCoupon = null;
 
     if (couponCode && restaurant) {
       try {
-        // Get restaurant ObjectId
         let restaurantObjectId = restaurant._id;
         if (!restaurantObjectId && mongoose.Types.ObjectId.isValid(restaurantId) && restaurantId.length === 24) {
           restaurantObjectId = new mongoose.Types.ObjectId(restaurantId);
@@ -239,7 +327,6 @@ export const calculateOrderPricing = async ({
         if (restaurantObjectId) {
           const now = new Date();
 
-          // Find active offer with this coupon code for this restaurant
           const offer = await Offer.findOne({
             restaurant: restaurantObjectId,
             status: 'active',
@@ -252,30 +339,18 @@ export const calculateOrderPricing = async ({
           }).lean();
 
           if (offer) {
-            // Find the specific item coupon
             const couponItem = offer.items.find(item => item.couponCode === couponCode);
-
             if (couponItem) {
-              // Check if coupon is valid for items in cart
               const cartItemIds = items.map(item => item.itemId);
               const isValidForCart = couponItem.itemId && cartItemIds.includes(couponItem.itemId);
-
-              // Check minimum order value
               const minOrderMet = !offer.minOrderValue || subtotal >= offer.minOrderValue;
 
               if (isValidForCart && minOrderMet) {
-                // Calculate discount based on offer type
                 const itemInCart = items.find(item => item.itemId === couponItem.itemId);
                 if (itemInCart) {
                   const itemQuantity = itemInCart.quantity || 1;
-
-                  // Calculate discount per item
                   const discountPerItem = couponItem.originalPrice - couponItem.discountedPrice;
-
-                  // Apply discount to all quantities of this item
                   discount = Math.round(discountPerItem * itemQuantity);
-
-                  // Ensure discount doesn't exceed item subtotal
                   const itemSubtotal = (itemInCart.price || 0) * itemQuantity;
                   discount = Math.min(discount, itemSubtotal);
                 }
@@ -297,59 +372,50 @@ export const calculateOrderPricing = async ({
         }
       } catch (error) {
         console.error(`Error fetching coupon from database: ${error.message}`);
-        // Continue without coupon if there's an error
       }
     }
 
-    // Calculate delivery fee
-    const deliveryFee = await calculateDeliveryFee(
-      subtotal,
-      restaurant,
-      deliveryAddress
-    );
-
-    // Apply free delivery from coupon
-    const finalDeliveryFee = appliedCoupon?.freeDelivery ? 0 : deliveryFee;
-
-    // Calculate platform fee and recommended item fee
     const feeSettings = await getFeeSettings();
-    let platformFee = 0;
-    let recommendedFeePerItem = feeSettings.recommendedItemFee || 0;
-    let hasTierFee = false;
+    const { tier } = await resolveTierAndZone(restaurant);
+    const distanceKmRaw = calculateDistanceFromAddresses(restaurant, deliveryAddress);
+    const distanceKm = roundCurrency(distanceKmRaw);
 
-    // Check for Zone or Tier based overrides
-    if (restaurant && restaurant.zoneId) {
-      const zone = await Zone.findById(restaurant.zoneId).lean();
-      if (zone) {
-        // Fetch from Tier first
-        if (zone.tierId) {
-          const tier = await Tier.findById(zone.tierId).lean();
-          if (tier) {
-            hasTierFee = true;
-            platformFee = tier.platformFee ?? 0;
-            if (!zone.isRecommendedFeeOverridden) {
-              recommendedFeePerItem = tier.recommendedItemFee ?? recommendedFeePerItem;
-            }
-          }
-        }
+    const tierDistanceSlabs = getTierDistanceSlabs(tier);
+    const distanceSlabs = tierDistanceSlabs;
+    const matchedDistanceSlab = findDistanceSlab(distanceSlabs, distanceKm) || findBaseDistanceSlab(distanceSlabs);
+    const baseDistanceSlab = findBaseDistanceSlab(distanceSlabs);
 
-        // Zone level override for recommended fee
-        if (zone.isRecommendedFeeOverridden) {
-          recommendedFeePerItem = zone.recommendedItemFee || 0;
-        }
-      }
-    }
+    const {
+      customerDeliveryFee,
+      customerPerKmRate,
+      matchedOrderValueSlab,
+    } = calculateRestaurantCustomerDeliveryFee({
+      subtotal,
+      distanceKm,
+      restaurant,
+      matchedDistanceSlab,
+    });
 
-    // If no tier-based platform fee was found, use the default percentage-based logic
-    if (!hasTierFee) {
-      platformFee = await calculatePlatformFee(subtotal);
-    }
+    const {
+      adminDeliveryCost,
+      usedTierBasePay,
+      tierBasePay,
+    } = calculateAdminDeliveryCost({
+      distanceKm,
+      tier,
+      matchedDistanceSlab,
+      baseDistanceSlab,
+    });
 
-    // Calculate GST on subtotal after discount
+    const platformFee = roundCurrency(calculateTierPlatformFee(tier, feeSettings.platformFee));
     const gst = await calculateGST(subtotal, discount, restaurant);
 
-
     let internalRecommendedFee = 0;
+    let recommendedFeePerItem = Number(feeSettings.recommendedItemFee || 0);
+
+    if (tier?.recommendedItemFee !== undefined && tier?.recommendedItemFee !== null) {
+      recommendedFeePerItem = Number(tier.recommendedItemFee);
+    }
 
     if (recommendedFeePerItem > 0) {
       items.forEach(item => {
@@ -359,37 +425,69 @@ export const calculateOrderPricing = async ({
       });
     }
 
-    // Calculate total
-    const total = subtotal - discount + finalDeliveryFee + platformFee + gst;
-
-    // Calculate savings (discount + any delivery savings)
-    const savings = discount + (deliveryFee > finalDeliveryFee ? deliveryFee - finalDeliveryFee : 0);
+    const total = roundCurrency(subtotal - discount + customerDeliveryFee + gst);
+    const restaurantPayableToAdmin = roundCurrency(adminDeliveryCost + platformFee + gst);
+    const savings = roundCurrency(discount);
 
     return {
-      subtotal: Math.round(subtotal),
-      discount: Math.round(discount),
-      deliveryFee: Math.round(finalDeliveryFee),
-      platformFee: Math.round(platformFee),
-      tax: gst, // Already rounded in calculateGST
-      total: Math.round(total),
-      savings: Math.round(savings),
-      internalRecommendedFee: Math.round(internalRecommendedFee),
+      subtotal: roundCurrency(subtotal),
+      discount: roundCurrency(discount),
+      deliveryFee: customerDeliveryFee,
+      platformFee,
+      tax: gst,
+      total,
+      customerPayableTotal: total,
+      savings,
+      internalRecommendedFee: roundCurrency(internalRecommendedFee),
+      internalAdminDeliveryCost: adminDeliveryCost,
+      restaurantPayableToAdmin,
+      gstCollected: gst,
+      distanceKm,
       appliedCoupon: appliedCoupon ? {
         code: appliedCoupon.code,
         discount: discount,
-        freeDelivery: appliedCoupon.freeDelivery || false
+        freeDelivery: false
       } : null,
+      pricingMeta: {
+        tierId: tier?._id || null,
+        tierName: tier?.name || null,
+        tierDistanceSlabCount: distanceSlabs.length,
+        tierBasePay: roundCurrency(tierBasePay),
+        usedTierBasePay,
+        distanceSlabId: matchedDistanceSlab?._id || null,
+        distanceSlabName: matchedDistanceSlab?.name || null,
+        baseDistanceSlabId: baseDistanceSlab?._id || null,
+        baseDistanceSlabRange: baseDistanceSlab
+          ? {
+            minKm: Number(baseDistanceSlab.minKm || 0),
+            maxKm: baseDistanceSlab.maxKm === null || baseDistanceSlab.maxKm === undefined ? null : Number(baseDistanceSlab.maxKm),
+          }
+          : null,
+        orderValueSlabId: matchedOrderValueSlab?._id || null,
+        orderValueSlab: matchedOrderValueSlab
+          ? {
+            minOrderValue: Number(matchedOrderValueSlab.minOrderValue || 0),
+            maxOrderValue: matchedOrderValueSlab.maxOrderValue === null || matchedOrderValueSlab.maxOrderValue === undefined
+              ? null
+              : Number(matchedOrderValueSlab.maxOrderValue),
+            label: matchedOrderValueSlab.label || null,
+          }
+          : null,
+        customerPerKmRate: roundCurrency(customerPerKmRate),
+        adminPerKmRate: roundCurrency(Number(matchedDistanceSlab?.adminPerKmRate || 0)),
+      },
       breakdown: {
-        itemTotal: Math.round(subtotal),
-        discountAmount: Math.round(discount),
-        deliveryFee: Math.round(finalDeliveryFee),
-        platformFee: Math.round(platformFee),
-        gst: gst,
-        total: Math.round(total)
+        itemTotal: roundCurrency(subtotal),
+        discountAmount: roundCurrency(discount),
+        customerDeliveryFee,
+        gstCollected: gst,
+        customerTotal: total,
+        adminDeliveryCost,
+        platformFee,
+        restaurantPayableToAdmin,
       }
     };
   } catch (error) {
     throw new Error(`Failed to calculate order pricing: ${error.message}`);
   }
 };
-

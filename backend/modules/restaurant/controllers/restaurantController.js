@@ -1,6 +1,8 @@
 import Restaurant from '../models/Restaurant.js';
 import Menu from '../models/Menu.js';
 import Zone from '../../admin/models/Zone.js';
+
+import Tier from '../../admin/models/Tier.js';
 import { successResponse, errorResponse } from '../../../shared/utils/response.js';
 import { uploadToCloudinary, deleteFromCloudinary } from '../../../shared/utils/cloudinaryService.js';
 import { initializeCloudinary } from '../../../config/cloudinary.js';
@@ -719,6 +721,158 @@ export const uploadMenuImage = asyncHandler(async (req, res) => {
 });
 
 /**
+ * Get restaurant customer delivery pricing config
+ * GET /api/restaurant/delivery-pricing
+ */
+export const getDeliveryPricingConfig = asyncHandler(async (req, res) => {
+  try {
+    const restaurant = await Restaurant.findById(req.restaurant._id)
+      .select('deliveryPricingConfig zoneId')
+      .lean();
+
+    if (!restaurant) {
+      return errorResponse(res, 404, 'Restaurant not found');
+    }
+
+    let distanceSlabs = [];
+    let tier = null;
+    if (restaurant.zoneId) {
+      const zone = await Zone.findById(restaurant.zoneId).select('tierId').lean();
+      if (zone?.tierId) {
+        tier = await Tier.findById(zone.tierId).select('name deliveryPricing.distanceSlabs').lean();
+        distanceSlabs = Array.isArray(tier?.deliveryPricing?.distanceSlabs)
+          ? tier.deliveryPricing.distanceSlabs
+          : [];
+      }
+    }
+
+    if (!distanceSlabs.length) {
+      distanceSlabs = [];
+    }
+
+    return successResponse(res, 200, 'Delivery pricing config fetched successfully', {
+      deliveryPricingConfig: restaurant.deliveryPricingConfig || {
+        isEnabled: false,
+        orderValueSlabs: [],
+        customerDeliveryRates: [],
+        lastUpdatedAt: null,
+      },
+      tier: tier
+        ? { id: tier._id, name: tier.name }
+        : null,
+      distanceSlabs
+    });
+  } catch (error) {
+    console.error('Error fetching delivery pricing config:', error);
+    return errorResponse(res, 500, 'Failed to fetch delivery pricing config');
+  }
+});
+
+/**
+ * Update restaurant customer delivery pricing config
+ * PUT /api/restaurant/delivery-pricing
+ */
+export const updateDeliveryPricingConfig = asyncHandler(async (req, res) => {
+  try {
+    const { isEnabled, orderValueSlabs, customerDeliveryRates } = req.body;
+
+    const restaurant = await Restaurant.findById(req.restaurant._id);
+    if (!restaurant) {
+      return errorResponse(res, 404, 'Restaurant not found');
+    }
+
+    let distanceSlabs = [];
+    if (restaurant.zoneId) {
+      const zone = await Zone.findById(restaurant.zoneId).select('tierId').lean();
+      if (zone?.tierId) {
+        const tier = await Tier.findById(zone.tierId).select('deliveryPricing.distanceSlabs').lean();
+        distanceSlabs = Array.isArray(tier?.deliveryPricing?.distanceSlabs)
+          ? tier.deliveryPricing.distanceSlabs
+          : [];
+      }
+    }
+
+    if (!distanceSlabs.length) {
+      distanceSlabs = [];
+    }
+
+    const activeDistanceSlabs = (distanceSlabs || []).filter(s => s.isActive !== false);
+    const activeDistanceSlabIds = new Set(activeDistanceSlabs.map(s => String(s._id)));
+
+    if (!Array.isArray(orderValueSlabs) || orderValueSlabs.length === 0) {
+      return errorResponse(res, 400, 'orderValueSlabs must be a non-empty array');
+    }
+
+    for (const slab of orderValueSlabs) {
+      if (!slab._id) {
+        return errorResponse(res, 400, 'Each order value slab must include an _id for rate mapping');
+      }
+      if (slab.minOrderValue === undefined || Number(slab.minOrderValue) < 0) {
+        return errorResponse(res, 400, 'Each order value slab must have minOrderValue >= 0');
+      }
+      if (slab.maxOrderValue !== null && slab.maxOrderValue !== undefined && Number(slab.maxOrderValue) <= Number(slab.minOrderValue)) {
+        return errorResponse(res, 400, 'Each order value slab maxOrderValue must be greater than minOrderValue (or null)');
+      }
+    }
+
+    if (!Array.isArray(customerDeliveryRates)) {
+      return errorResponse(res, 400, 'customerDeliveryRates must be an array');
+    }
+
+    const normalizedOrderValueSlabs = orderValueSlabs.map(slab => ({
+      _id: slab._id,
+      label: slab.label || '',
+      minOrderValue: Number(slab.minOrderValue),
+      maxOrderValue: slab.maxOrderValue === null || slab.maxOrderValue === undefined ? null : Number(slab.maxOrderValue),
+    }));
+
+    const orderValueSlabIds = new Set(
+      normalizedOrderValueSlabs
+        .map((slab) => slab._id)
+        .filter(Boolean)
+        .map((id) => String(id))
+    );
+
+    for (const rate of customerDeliveryRates) {
+      const distanceSlabId = String(rate.distanceSlabId || '');
+      const orderValueSlabId = String(rate.orderValueSlabId || '');
+      const perKmRate = Number(rate.perKmRate);
+
+      if (!distanceSlabId || !activeDistanceSlabIds.has(distanceSlabId)) {
+        return errorResponse(res, 400, `Invalid distanceSlabId: ${distanceSlabId || '(empty)'}`);
+      }
+      if (!orderValueSlabId || !orderValueSlabIds.has(orderValueSlabId)) {
+        return errorResponse(res, 400, `Invalid orderValueSlabId: ${orderValueSlabId || '(empty)'}`);
+      }
+      if (Number.isNaN(perKmRate) || perKmRate < 0) {
+        return errorResponse(res, 400, 'Each delivery rate must have perKmRate >= 0');
+      }
+    }
+
+    restaurant.deliveryPricingConfig = {
+      isEnabled: isEnabled !== false,
+      orderValueSlabs: normalizedOrderValueSlabs,
+      customerDeliveryRates: customerDeliveryRates.map(rate => ({
+        _id: rate._id,
+        distanceSlabId: String(rate.distanceSlabId),
+        orderValueSlabId: String(rate.orderValueSlabId),
+        perKmRate: Number(rate.perKmRate),
+      })),
+      lastUpdatedAt: new Date(),
+    };
+
+    await restaurant.save();
+
+    return successResponse(res, 200, 'Delivery pricing config updated successfully', {
+      deliveryPricingConfig: restaurant.deliveryPricingConfig
+    });
+  } catch (error) {
+    console.error('Error updating delivery pricing config:', error);
+    return errorResponse(res, 500, 'Failed to update delivery pricing config');
+  }
+});
+
+/**
  * Update restaurant delivery status (isAcceptingOrders)
  * PUT /api/restaurant/delivery-status
  */
@@ -964,4 +1118,3 @@ export const getRestaurantsWithDishesUnder250 = async (req, res) => {
     return errorResponse(res, 500, 'Failed to fetch restaurants with dishes under ₹250');
   }
 };
-

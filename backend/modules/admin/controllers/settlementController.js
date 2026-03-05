@@ -279,9 +279,9 @@ export const getSettlementStatistics = asyncHandler(async (req, res) => {
       totalDeliveryEarnings: settlements.reduce((sum, s) => sum + (s.deliveryPartnerEarning.totalEarning || 0), 0),
       totalAdminEarnings: settlements.reduce((sum, s) => sum + s.adminEarning.totalEarning, 0),
       totalCommission: settlements.reduce((sum, s) => sum + s.restaurantEarning.commission, 0),
-      totalPlatformFee: settlements.reduce((sum, s) => sum + s.userPayment.platformFee, 0),
-      totalDeliveryFee: settlements.reduce((sum, s) => sum + s.userPayment.deliveryFee, 0),
-      totalGST: settlements.reduce((sum, s) => sum + s.userPayment.gst, 0),
+      totalPlatformFee: settlements.reduce((sum, s) => sum + (s.adminEarning.platformFee || 0), 0),
+      totalDeliveryFee: settlements.reduce((sum, s) => sum + (s.adminEarning.adminDeliveryCost || s.adminEarning.deliveryFee || 0), 0),
+      totalGST: settlements.reduce((sum, s) => sum + (s.adminEarning.gst || 0), 0),
       totalRecommendedFee: settlements.reduce((sum, s) => sum + (s.adminEarning.recommendedItemFee || 0), 0)
     };
 
@@ -294,4 +294,3 @@ export const getSettlementStatistics = asyncHandler(async (req, res) => {
     return errorResponse(res, 500, 'Failed to get settlement statistics');
   }
 });
-

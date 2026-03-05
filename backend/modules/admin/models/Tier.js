@@ -1,6 +1,40 @@
 
 import mongoose from "mongoose";
 
+const distanceSlabSchema = new mongoose.Schema(
+    {
+        name: {
+            type: String,
+            required: true,
+            trim: true,
+        },
+        minKm: {
+            type: Number,
+            required: true,
+            min: 0,
+        },
+        maxKm: {
+            type: Number,
+            default: null,
+            min: 0,
+        },
+        isBaseSlab: {
+            type: Boolean,
+            default: false,
+        },
+        adminPerKmRate: {
+            type: Number,
+            default: 0,
+            min: 0,
+        },
+        isActive: {
+            type: Boolean,
+            default: true,
+        },
+    },
+    { _id: true },
+);
+
 const tierSchema = new mongoose.Schema(
     {
         name: {
@@ -33,6 +67,12 @@ const tierSchema = new mongoose.Schema(
             default: true,
         },
         deliveryPricing: {
+            basePay: {
+                type: Number,
+                default: 0,
+                min: 0,
+                comment: 'Admin base payout used when distance falls within base slab'
+            },
             baseFee: {
                 type: Number,
                 default: 0,
@@ -52,6 +92,11 @@ const tierSchema = new mongoose.Schema(
                 type: Number,
                 default: 10,
                 min: 0,
+            },
+            distanceSlabs: {
+                type: [distanceSlabSchema],
+                default: [],
+                comment: "Tier-level distance slabs used for delivery pricing and settlements",
             },
         },
         maxBanners: {

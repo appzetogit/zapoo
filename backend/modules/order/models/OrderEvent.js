@@ -8,8 +8,8 @@ const orderEventSchema = new mongoose.Schema({
   orderId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Order',
-    required: true,
-    index: true
+    required: true
+    // Index handled via compound index orderEventSchema.index
   },
   eventType: {
     type: String,
@@ -40,30 +40,30 @@ const orderEventSchema = new mongoose.Schema({
   data: {
     // For RESTAURANT_ACCEPTED_LATE
     delayMinutes: Number,
-    
+
     // For RIDER_ASSIGNED
     riderId: mongoose.Schema.Types.ObjectId,
     riderLocation: {
       latitude: Number,
       longitude: Number
     },
-    
+
     // For RIDER_REACHED_RESTAURANT
     reachedAt: Date,
-    
+
     // For FOOD_NOT_READY
     waitingTime: Number, // minutes
-    
+
     // For TRAFFIC_DETECTED
     trafficLevel: {
       type: String,
       enum: ['low', 'medium', 'high']
     },
     trafficMultiplier: Number,
-    
+
     // For RIDER_NEARING_DROP
     distanceToDrop: Number, // in km
-    
+
     // For ETA_UPDATED
     previousETA: {
       min: Number,

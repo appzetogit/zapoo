@@ -15,8 +15,8 @@ const paymentSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true,
-    index: true
+    required: true
+    // Index added in schema.index below
   },
   amount: {
     type: Number,
@@ -36,8 +36,8 @@ const paymentSchema = new mongoose.Schema({
   status: {
     type: String,
     enum: ['pending', 'processing', 'completed', 'failed', 'refunded', 'cancelled'],
-    default: 'pending',
-    index: true
+    default: 'pending'
+    // Index added in schema.index below
   },
   // Razorpay specific fields
   razorpay: {
@@ -79,8 +79,8 @@ const paymentSchema = new mongoose.Schema({
   },
   // Transaction details
   transactionId: {
-    type: String,
-    index: true
+    type: String
+    // Index added manually via schema.index
   },
   gatewayResponse: {
     type: mongoose.Schema.Types.Mixed // Store full gateway response

@@ -1,18 +1,170 @@
-import { ShoppingBag } from "lucide-react"
-import DisbursementPage from "../components/disbursement/DisbursementPage"
-import { deliverymanDisbursementsDummy } from "../data/deliverymanDisbursementsDummy"
+import { useEffect, useMemo, useState } from "react";
+import { ShoppingBag, Loader2 } from "lucide-react";
+import { adminAPI } from "@/lib/api";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+
+const formatDateTime = (value) => {
+  if (!value) return "-";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "-";
+  return d.toLocaleString("en-IN");
+};
 
 export default function DeliverymanDisbursement() {
-  const tabs = ["All", "Pending", "Processing", "Completed", "Partially completed", "Canceled"]
-  
-  return (
-    <DisbursementPage
-      title="Deliveryman Disbursement"
-      icon={ShoppingBag}
-      tabs={tabs}
-      disbursements={deliverymanDisbursementsDummy}
-      count={deliverymanDisbursementsDummy.length}
-    />
-  )
-}
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [settlements, setSettlements] = useState([]);
+  const [selectedIds, setSelectedIds] = useState([]);
 
+  const totalPayable = useMemo(
+    () =>
+      settlements.reduce(
+        (sum, s) => sum + Number(s?.deliveryPartnerEarning?.totalEarning || 0),
+        0,
+      ),
+    [settlements],
+  );
+
+  const loadSettlements = async () => {
+    try {
+      setLoading(true);
+      const res = await adminAPI.getDeliverySettlements();
+      setSettlements(res?.data?.data?.settlements || []);
+      setSelectedIds([]);
+    } catch (error) {
+      console.error("Failed to fetch delivery settlements:", error);
+      toast.error("Failed to load delivery settlements");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadSettlements();
+  }, []);
+
+  const toggleRow = (id) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+  };
+
+  const toggleAll = () => {
+    if (selectedIds.length === settlements.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(settlements.map((s) => String(s._id)));
+    }
+  };
+
+  const markProcessed = async () => {
+    if (!selectedIds.length) {
+      toast.error("Select at least one settlement");
+      return;
+    }
+    try {
+      setSubmitting(true);
+      const res = await adminAPI.markSettlementsProcessed(selectedIds, "delivery");
+      if (res?.data?.success) {
+        toast.success("Selected settlements marked as processed");
+        loadSettlements();
+      } else {
+        toast.error(res?.data?.message || "Failed to mark processed");
+      }
+    } catch (error) {
+      console.error("Failed to mark settlements:", error);
+      toast.error(error.response?.data?.message || "Failed to mark processed");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="p-4 lg:p-6 bg-slate-50 min-h-screen">
+      <div className="max-w-7xl mx-auto">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <ShoppingBag className="w-5 h-5 text-blue-600" />
+              <div>
+                <h1 className="text-2xl font-bold text-slate-900">Deliveryman Disbursement</h1>
+                <p className="text-sm text-slate-500">
+                  Pending settlements eligible after weekly cycle
+                </p>
+              </div>
+            </div>
+            <Button onClick={markProcessed} disabled={submitting || !selectedIds.length}>
+              {submitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              Mark Processed
+            </Button>
+          </div>
+          <p className="text-sm text-slate-600 mt-3">
+            Total payable now: Rs {totalPayable.toFixed(2)}
+          </p>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          {loading ? (
+            <div className="flex items-center justify-center p-10">
+              <Loader2 className="w-6 h-6 animate-spin text-slate-600" />
+            </div>
+          ) : settlements.length === 0 ? (
+            <div className="p-8 text-center text-slate-500">No pending delivery settlements found.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-slate-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-sm">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.length === settlements.length && settlements.length > 0}
+                        onChange={toggleAll}
+                      />
+                    </th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700">Order</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700">Delivery Partner</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700">Distance</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700">Total Earning</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700">Eligible At</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {settlements.map((s) => (
+                    <tr key={s._id} className="border-t border-slate-100">
+                      <td className="px-4 py-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(String(s._id))}
+                          onChange={() => toggleRow(String(s._id))}
+                        />
+                      </td>
+                      <td className="px-4 py-3 text-sm text-slate-800">{s.orderNumber || "-"}</td>
+                      <td className="px-4 py-3 text-sm text-slate-800">
+                        {s.deliveryPartnerId?.name || s.deliveryPartnerId?.phone || "-"}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-slate-800">
+                        {Number(s.deliveryPartnerEarning?.distance || 0).toFixed(2)} km
+                      </td>
+                      <td className="px-4 py-3 text-sm text-slate-800">
+                        Rs {Number(s.deliveryPartnerEarning?.totalEarning || 0).toFixed(2)}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-slate-800">
+                        {formatDateTime(s.settlementWindows?.deliveryPartnerEligibleAt)}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-slate-800">
+                        {s.deliveryPartnerEarning?.status || "-"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

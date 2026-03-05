@@ -368,6 +368,15 @@ export const restaurantAPI = {
     });
   },
 
+  // Delivery pricing config
+  getDeliveryPricing: () => {
+    return apiClient.get(API_ENDPOINTS.RESTAURANT.DELIVERY_PRICING);
+  },
+
+  updateDeliveryPricing: (data) => {
+    return apiClient.put(API_ENDPOINTS.RESTAURANT.DELIVERY_PRICING, data);
+  },
+
   // Upload profile image
   uploadProfileImage: (file) => {
     const formData = new FormData();
@@ -1615,6 +1624,33 @@ export const adminAPI = {
       API_ENDPOINTS.ADMIN.FEE_SETTINGS_BY_ID.replace(":id", id),
       data,
     );
+  },
+
+  // Settlement Management
+  getOrderSettlementDetails: (orderId) => {
+    return apiClient.get(
+      API_ENDPOINTS.ADMIN.SETTLEMENTS_ORDER.replace(":orderId", orderId),
+    );
+  },
+
+  getRestaurantSettlements: (params = {}) => {
+    return apiClient.get(API_ENDPOINTS.ADMIN.SETTLEMENTS_RESTAURANTS, {
+      params,
+    });
+  },
+
+  getDeliverySettlements: (params = {}) => {
+    return apiClient.get(API_ENDPOINTS.ADMIN.SETTLEMENTS_DELIVERY, { params });
+  },
+
+  markSettlementsProcessed: (settlementIds, actorType = "admin", actorId) => {
+    const payload = { settlementIds, actorType };
+    if (actorId) payload.actorId = actorId;
+    return apiClient.post(API_ENDPOINTS.ADMIN.SETTLEMENTS_MARK_PROCESSED, payload);
+  },
+
+  getSettlementStatistics: (params = {}) => {
+    return apiClient.get(API_ENDPOINTS.ADMIN.SETTLEMENTS_STATISTICS, { params });
   },
 
   // Tier Management

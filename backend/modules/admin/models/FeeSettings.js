@@ -18,6 +18,37 @@ const deliveryFeeRangeSchema = new mongoose.Schema({
   },
 }, { _id: false });
 
+const distanceSlabSchema = new mongoose.Schema({
+  name: {
+    type: String,
+    required: true,
+    trim: true,
+  },
+  minKm: {
+    type: Number,
+    required: true,
+    min: 0,
+  },
+  maxKm: {
+    type: Number,
+    default: null,
+    min: 0,
+  },
+  isBaseSlab: {
+    type: Boolean,
+    default: false,
+  },
+  adminPerKmRate: {
+    type: Number,
+    default: 0,
+    min: 0,
+  },
+  isActive: {
+    type: Boolean,
+    default: true,
+  }
+}, { _id: true });
+
 const feeSettingsSchema = new mongoose.Schema(
   {
     deliveryFee: {
@@ -30,6 +61,11 @@ const feeSettingsSchema = new mongoose.Schema(
       type: [deliveryFeeRangeSchema],
       default: [],
       comment: 'Delivery fee based on order value ranges'
+    },
+    distanceSlabs: {
+      type: [distanceSlabSchema],
+      default: [],
+      comment: 'Admin-managed distance slabs for delivery pricing and settlement'
     },
     freeDeliveryThreshold: {
       type: Number,
@@ -82,4 +118,3 @@ feeSettingsSchema.index({ createdAt: -1 });
 const FeeSettings = mongoose.model('FeeSettings', feeSettingsSchema);
 
 export default FeeSettings;
-

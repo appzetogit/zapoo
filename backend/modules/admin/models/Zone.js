@@ -47,6 +47,11 @@ const zoneSchema = new mongoose.Schema(
       required: false
     },
     deliveryPricing: {
+      basePay: {
+        type: Number,
+        default: 0,
+        min: 0
+      },
       baseFee: {
         type: Number,
         default: 0,
@@ -202,6 +207,7 @@ zoneSchema.pre('save', async function (next) {
         if (!this.deliveryPricing || !this.deliveryPricing.isOverridden) {
           if (tier.deliveryPricing) {
             this.deliveryPricing = {
+              basePay: tier.deliveryPricing.basePay,
               baseFee: tier.deliveryPricing.baseFee,
               freeDeliveryThreshold: tier.deliveryPricing.freeDeliveryThreshold,
               isOverridden: false,

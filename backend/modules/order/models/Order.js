@@ -103,6 +103,30 @@ const orderSchema = new mongoose.Schema({
       default: 0,
       min: 0
     },
+    adminDeliveryCost: {
+      type: Number,
+      default: 0,
+      min: 0
+    },
+    restaurantPayableToAdmin: {
+      type: Number,
+      default: 0,
+      min: 0
+    },
+    gstCollected: {
+      type: Number,
+      default: 0,
+      min: 0
+    },
+    distanceKm: {
+      type: Number,
+      default: 0,
+      min: 0
+    },
+    pricingMeta: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null
+    },
     tax: {
       type: Number,
       default: 0,

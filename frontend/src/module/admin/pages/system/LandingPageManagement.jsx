@@ -55,8 +55,6 @@ export default function LandingPageManagement() {
   const [under250BannersDeleting, setUnder250BannersDeleting] = useState(null)
   const under250BannersFileInputRef = useRef(null)
 
-  const under250BannersFileInputRef = useRef(null)
-
   // Settings
   const [settings, setSettings] = useState({ exploreMoreHeading: "Explore More" })
   const [settingsLoading, setSettingsLoading] = useState(true)
