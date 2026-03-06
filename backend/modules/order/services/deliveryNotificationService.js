@@ -672,18 +672,17 @@ async function calculateEstimatedEarnings(deliveryDistance) {
     const deliveryDistanceForCalc = deliveryDistance || 0;
     const commissionResult = await DeliveryBoyCommission.calculateCommission(deliveryDistanceForCalc);
     
-    // If distance is 0 or not provided, still return base payout
+    // If distance is 0 or not provided, payout remains 0 (0 km excluded from payout range)
     if (!deliveryDistance || deliveryDistance <= 0) {
-      console.log(`💰 Distance is 0 or missing, returning base payout only: ₹${commissionResult.breakdown.basePayout}`);
       return {
-        basePayout: commissionResult.breakdown.basePayout,
+        basePayout: 0,
         distance: 0,
-        commissionPerKm: commissionResult.breakdown.commissionPerKm,
+        commissionPerKm: 0,
         distanceCommission: 0,
-        totalEarning: commissionResult.breakdown.basePayout, // Base payout only when distance is 0
-        breakdown: `Base payout: ₹${commissionResult.breakdown.basePayout}`,
-        minDistance: commissionResult.rule.minDistance,
-        maxDistance: commissionResult.rule.maxDistance
+        totalEarning: 0,
+        breakdown: 'No payout for 0 km distance',
+        minDistance: commissionResult.breakdown?.minDistance ?? 0,
+        maxDistance: commissionResult.breakdown?.maxDistance ?? 0
       };
     }
 
@@ -697,10 +696,10 @@ async function calculateEstimatedEarnings(deliveryDistance) {
 
     // Create breakdown text
     let breakdown = `Base payout: ₹${basePayout}`;
-    if (distance > commissionResult.rule.minDistance) {
+    if (commissionResult.breakdown?.perKmApplied) {
       breakdown += ` + Distance (${distance.toFixed(1)} km × ₹${commissionPerKm}/km) = ₹${distanceCommission.toFixed(0)}`;
     } else {
-      breakdown += ` (Distance ${distance.toFixed(1)} km ≤ ${commissionResult.rule.minDistance} km, per km not applicable)`;
+      breakdown += ` (Distance ${distance.toFixed(1)} km within base slab up to ${commissionResult.breakdown.maxDistance} km, per km not applicable)`;
     }
     breakdown += ` = ₹${totalEarning.toFixed(0)}`;
 
@@ -727,4 +726,5 @@ async function calculateEstimatedEarnings(deliveryDistance) {
     };
   }
 }
+
 

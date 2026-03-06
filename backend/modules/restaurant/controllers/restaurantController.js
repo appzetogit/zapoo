@@ -234,15 +234,6 @@ export const getRestaurants = async (req, res) => {
     delete totalQuery.$or; // Remove $or for count
     const total = await Restaurant.countDocuments(totalQuery);
 
-    console.log(`Fetched ${restaurants.length} restaurants from database with filters:`, {
-      sortBy,
-      cuisine,
-      minRating,
-      maxDeliveryTime,
-      maxDistance,
-      maxPrice,
-      hasOffers
-    });
 
     return successResponse(res, 200, 'Restaurants retrieved successfully', {
       restaurants,

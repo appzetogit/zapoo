@@ -70,14 +70,6 @@ export const getRestaurantOrders = asyncHandler(async (req, res) => {
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
-    console.log('🔍 Fetching orders for restaurant:', {
-      restaurantId: restaurantIdString,
-      restaurant_id: restaurant._id?.toString(),
-      restaurant_restaurantId: restaurant.restaurantId,
-      restaurantIdVariations: restaurantIdVariations,
-      query: JSON.stringify(query),
-      status: status || 'all'
-    });
 
     const orders = await Order.find(query)
       .populate('userId', 'name email phone')
@@ -102,19 +94,6 @@ export const getRestaurantOrders = asyncHandler(async (req, res) => {
     });
 
     // Log detailed order info for debugging
-    console.log('✅ Found orders:', {
-      count: orders.length,
-      total,
-      restaurantId: restaurantIdString,
-      queryUsed: JSON.stringify(query),
-      orders: orders.map(o => ({
-        orderId: o.orderId,
-        status: o.status,
-        restaurantId: o.restaurantId,
-        restaurantIdType: typeof o.restaurantId,
-        createdAt: o.createdAt
-      }))
-    });
 
     // If no orders found, log a warning with more details
     if (orders.length === 0 && total === 0) {

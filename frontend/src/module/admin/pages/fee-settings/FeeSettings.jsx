@@ -295,7 +295,7 @@ export default function FeeSettings() {
                 >
                   {tiers.map((tier) => (
                     <option key={tier._id} value={tier._id}>
-                      {tier.name} (Rank {tier.rank})
+                      {tier.name}
                     </option>
                   ))}
                 </select>

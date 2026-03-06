@@ -104,7 +104,7 @@ export const calculateOrderSettlement = async (orderId) => {
       status: 'pending'
     };
 
-    if (order.deliveryPartnerId && order.assignmentInfo?.distance) {
+    if (order.deliveryPartnerId && order.assignmentInfo?.distance !== undefined && order.assignmentInfo?.distance !== null) {
       const distance = order.assignmentInfo.distance;
       const deliveryCommission = await DeliveryBoyCommission.calculateCommission(distance);
       const surgeMultiplier = order.assignmentInfo?.surgeMultiplier || 1;

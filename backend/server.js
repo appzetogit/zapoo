@@ -14,11 +14,6 @@ import mongoose from 'mongoose';
 // Load environment variables
 dotenv.config();
 
-console.log('✅ server.js: Environment Variables Loaded');
-console.log(`✅ PORT: ${process.env.PORT}`);
-console.log(`✅ CLOUDINARY_CLOUD_NAME: ${process.env.CLOUDINARY_CLOUD_NAME || '❌ MISSING'}`);
-console.log(`✅ CLOUDINARY_API_KEY: ${process.env.CLOUDINARY_API_KEY ? '✅ Present' : '❌ MISSING'}`);
-console.log(`✅ CLOUDINARY_API_SECRET: ${process.env.CLOUDINARY_API_SECRET ? '✅ Present' : '❌ MISSING'}`);
 
 
 // Import configurations
@@ -127,23 +122,19 @@ const io = new Server(httpServer, {
     origin: (origin, callback) => {
       // Allow requests with no origin (like mobile apps or Postman)
       if (!origin) {
-        console.log('✅ Socket.IO: Allowing connection with no origin');
         return callback(null, true);
       }
 
       // Check if origin is in allowed list
       if (allowedSocketOrigins.includes(origin)) {
-        console.log(`✅ Socket.IO: Allowing connection from: ${origin}`);
         callback(null, true);
       } else {
         // In development, allow all localhost origins
         if (process.env.NODE_ENV !== 'production') {
           if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
-            console.log(`✅ Socket.IO: Allowing localhost connection from: ${origin}`);
             return callback(null, true);
           }
           // Allow all origins in development for easier debugging
-          console.log(`⚠️ Socket.IO: Allowing connection from: ${origin} (development mode)`);
           return callback(null, true);
         } else {
           console.error(`❌ Socket.IO: Blocking connection from: ${origin} (not in allowed list)`);
@@ -175,13 +166,6 @@ const restaurantNamespace = io.of('/restaurant');
 restaurantNamespace.use((socket, next) => {
   try {
     // Log connection attempt
-    console.log('🍽️ Restaurant connection attempt:', {
-      socketId: socket.id,
-      auth: socket.handshake.auth,
-      query: socket.handshake.query,
-      origin: socket.handshake.headers.origin,
-      userAgent: socket.handshake.headers['user-agent']
-    });
 
     // Allow all connections - authentication can be handled later if needed
     // The token is passed in auth.token but we don't validate it here
@@ -194,10 +178,6 @@ restaurantNamespace.use((socket, next) => {
 });
 
 restaurantNamespace.on('connection', (socket) => {
-  console.log('🍽️ Restaurant client connected:', socket.id);
-  console.log('🍽️ Socket auth:', socket.handshake.auth);
-  console.log('🍽️ Socket query:', socket.handshake.query);
-  console.log('🍽️ Socket headers:', socket.handshake.headers);
 
   // Restaurant joins their room
   socket.on('join-restaurant', (restaurantId) => {
@@ -207,18 +187,9 @@ restaurantNamespace.on('connection', (socket) => {
       const room = `restaurant:${normalizedRestaurantId}`;
 
       // Log room join attempt with detailed info
-      console.log(`🍽️ Restaurant attempting to join room:`, {
-        restaurantId: restaurantId,
-        normalizedRestaurantId: normalizedRestaurantId,
-        room: room,
-        socketId: socket.id,
-        socketAuth: socket.handshake.auth
-      });
 
       socket.join(room);
       const roomSize = restaurantNamespace.adapter.rooms.get(room)?.size || 0;
-      console.log(`✅ Restaurant ${normalizedRestaurantId} joined room: ${room}`);
-      console.log(`📊 Total sockets in room ${room}: ${roomSize}`);
 
       // Also join with ObjectId format if it's a valid ObjectId (for compatibility)
       if (mongoose.Types.ObjectId.isValid(normalizedRestaurantId)) {
@@ -226,7 +197,6 @@ restaurantNamespace.on('connection', (socket) => {
         if (objectIdRoom !== room) {
           socket.join(objectIdRoom);
           const objectIdRoomSize = restaurantNamespace.adapter.rooms.get(objectIdRoom)?.size || 0;
-          console.log(`✅ Restaurant also joined ObjectId room: ${objectIdRoom} (${objectIdRoomSize} sockets)`);
         }
       }
 
@@ -239,7 +209,6 @@ restaurantNamespace.on('connection', (socket) => {
 
       // Log all rooms this socket is now in
       const socketRooms = Array.from(socket.rooms).filter(r => r.startsWith('restaurant:'));
-      console.log(`📋 Socket ${socket.id} is now in restaurant rooms:`, socketRooms);
     } else {
       console.warn('⚠️ Restaurant tried to join without restaurantId');
       console.warn('⚠️ Socket ID:', socket.id);
@@ -248,7 +217,6 @@ restaurantNamespace.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
-    console.log('🍽️ Restaurant client disconnected:', socket.id);
   });
 
   // Handle connection errors
@@ -261,8 +229,6 @@ restaurantNamespace.on('connection', (socket) => {
 const deliveryNamespace = io.of('/delivery');
 
 deliveryNamespace.on('connection', (socket) => {
-  console.log('🚴 Delivery client connected:', socket.id);
-  console.log('🚴 Socket auth:', socket.handshake.auth);
 
   // Delivery boy joins their room
   socket.on('join-delivery', (deliveryId) => {
@@ -272,15 +238,12 @@ deliveryNamespace.on('connection', (socket) => {
       const room = `delivery:${normalizedDeliveryId}`;
 
       socket.join(room);
-      console.log(`🚴 Delivery partner ${normalizedDeliveryId} joined room: ${room}`);
-      console.log(`🚴 Total sockets in room ${room}:`, deliveryNamespace.adapter.rooms.get(room)?.size || 0);
 
       // Also join with ObjectId format if it's a valid ObjectId (for compatibility)
       if (mongoose.Types.ObjectId.isValid(normalizedDeliveryId)) {
         const objectIdRoom = `delivery:${new mongoose.Types.ObjectId(normalizedDeliveryId).toString()}`;
         if (objectIdRoom !== room) {
           socket.join(objectIdRoom);
-          console.log(`🚴 Delivery partner also joined ObjectId room: ${objectIdRoom}`);
         }
       }
 
@@ -296,7 +259,6 @@ deliveryNamespace.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
-    console.log('🚴 Delivery client disconnected:', socket.id);
   });
 
   // Handle connection errors
@@ -373,9 +335,7 @@ if (process.env.NODE_ENV === 'production') {
   });
 
   app.use('/api/', limiter);
-  console.log('Rate limiting enabled (production mode)');
 } else {
-  console.log('Rate limiting disabled (development mode)');
 }
 
 // Health check route
@@ -458,7 +418,6 @@ app.use(errorHandler);
 
 // Socket.IO connection handling
 io.on('connection', (socket) => {
-  console.log('Client connected:', socket.id);
 
   // Delivery boy sends location update
   socket.on('update-location', (data) => {
@@ -482,17 +441,7 @@ io.on('connection', (socket) => {
       // Send to specific order room
       io.to(`order:${data.orderId}`).emit(`location-receive-${data.orderId}`, locationData);
 
-      console.log(`📍 Location broadcasted to order room ${data.orderId}:`, {
-        lat: locationData.lat,
-        lng: locationData.lng,
-        heading: locationData.heading
-      });
 
-      console.log(`📍 Location update for order ${data.orderId}:`, {
-        lat: data.lat,
-        lng: data.lng,
-        heading: data.heading
-      });
     } catch (error) {
       console.error('Error handling location update:', error);
     }
@@ -502,7 +451,6 @@ io.on('connection', (socket) => {
   socket.on('join-order-tracking', async (orderId) => {
     if (orderId) {
       socket.join(`order:${orderId}`);
-      console.log(`Customer joined order tracking: ${orderId}`);
 
       // Send current location immediately when customer joins
       try {
@@ -531,7 +479,6 @@ io.on('connection', (socket) => {
 
           // Send current location immediately
           socket.emit(`current-location-${orderId}`, locationData);
-          console.log(`📍 Sent current location to customer for order ${orderId}`);
         }
       } catch (error) {
         console.error('Error sending current location:', error.message);
@@ -566,7 +513,6 @@ io.on('connection', (socket) => {
 
         // Send current location immediately
         socket.emit(`current-location-${orderId}`, locationData);
-        console.log(`📍 Sent requested location for order ${orderId}`);
       }
     } catch (error) {
       console.error('Error fetching current location:', error.message);
@@ -577,12 +523,10 @@ io.on('connection', (socket) => {
   socket.on('join-delivery', (deliveryId) => {
     if (deliveryId) {
       socket.join(`delivery:${deliveryId}`);
-      console.log(`Delivery boy joined: ${deliveryId}`);
     }
   });
 
   socket.on('disconnect', () => {
-    console.log('Client disconnected:', socket.id);
   });
 });
 
@@ -590,7 +534,6 @@ io.on('connection', (socket) => {
 const PORT = process.env.PORT || 5000;
 
 httpServer.listen(PORT, () => {
-  console.log(`Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
 
   // Initialize scheduled tasks after DB connection is established
   // Wait a bit for DB to connect, then start cron jobs
@@ -608,14 +551,12 @@ function initializeScheduledTasks() {
       try {
         const result = await processScheduledAvailability();
         if (result.processed > 0) {
-          console.log(`[Menu Schedule Cron] ${result.message}`);
         }
       } catch (error) {
         console.error('[Menu Schedule Cron] Error:', error);
       }
     });
 
-    console.log('✅ Menu item availability scheduler initialized (runs every minute)');
   }).catch((error) => {
     console.error('❌ Failed to initialize menu schedule service:', error);
   });
@@ -627,14 +568,12 @@ function initializeScheduledTasks() {
       try {
         const result = await processAutoReadyOrders();
         if (result.processed > 0) {
-          console.log(`[Auto Ready Cron] ${result.message}`);
         }
       } catch (error) {
         console.error('[Auto Ready Cron] Error:', error);
       }
     });
 
-    console.log('✅ Auto-ready order scheduler initialized (runs every 30 seconds)');
   }).catch((error) => {
     console.error('❌ Failed to initialize auto-ready service:', error);
   });
@@ -646,14 +585,12 @@ function initializeScheduledTasks() {
       try {
         const result = await processAutoRejectOrders();
         if (result.processed > 0) {
-          console.log(`[Auto Reject Cron] ${result.message}`);
         }
       } catch (error) {
         console.error('[Auto Reject Cron] Error:', error);
       }
     });
 
-    console.log('✅ Auto-reject order scheduler initialized (runs every 30 seconds)');
   }).catch((error) => {
     console.error('❌ Failed to initialize auto-reject service:', error);
   });
@@ -665,14 +602,12 @@ function initializeScheduledTasks() {
       try {
         const result = await syncCampaignStatuses();
         if (result.activated > 0 || result.completed > 0) {
-          console.log(`[Marketing Cron] Updated ${result.activated} campaigns to Active, ${result.completed} to Completed`);
         }
       } catch (error) {
         console.error('[Marketing Cron] Error:', error);
       }
     });
 
-    console.log('✅ Marketing campaign status synchronizer initialized (runs every 5 minutes)');
   }).catch((error) => {
     console.error('❌ Failed to initialize marketing campaign service:', error);
   });

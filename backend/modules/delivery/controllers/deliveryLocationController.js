@@ -124,10 +124,8 @@ export const updateLocation = asyncHandler(async (req, res) => {
             boy_lng: currentLocation.coordinates[0],
             last_updated: Date.now()
           });
-          console.log(`✅ Firebase: Synced live location for active order ${activeOrder.orderId}`);
         }
 
-        console.log(`✅ Firebase: Delivery partner ${delivery._id} live location synced`);
       } catch (firebaseErr) {
         console.error(`❌ Firebase Error syncing delivery location for ${delivery._id}:`, firebaseErr);
       }

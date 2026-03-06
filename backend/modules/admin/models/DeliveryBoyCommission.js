@@ -82,6 +82,9 @@ deliveryBoyCommissionSchema.index({ status: 1 });
 deliveryBoyCommissionSchema.index({ createdAt: -1 });
 deliveryBoyCommissionSchema.index({ createdBy: 1 });
 
+const DELIVERY_SLAB_MARGIN_KM = 0.2;
+const roundKm = (value) => Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
+
 // Method to check if a distance falls within this commission range
 deliveryBoyCommissionSchema.methods.isDistanceInRange = function(distance) {
   if (distance < this.minDistance) return false;
@@ -123,92 +126,97 @@ deliveryBoyCommissionSchema.statics.findApplicableRule = async function(distance
 deliveryBoyCommissionSchema.statics.calculateCommission = async function(distance) {
   // Get all active rules sorted by minDistance (ascending)
   const rules = await this.find({ status: true }).sort({ minDistance: 1 });
-  
+
   if (!rules || rules.length === 0) {
     throw new Error('No commission rules found');
   }
-  
-  // Find the applicable rule based on distance
-  // Logic: Find the rule where distance falls within the range (minDistance <= distance <= maxDistance)
-  // Or find the highest tier rule if distance exceeds all maxDistance limits
-  let applicableRule = null;
-  
-  // First, try to find exact match (distance within rule's range)
-  for (const rule of rules) {
-    if (distance >= rule.minDistance) {
-      // Check if distance is within this rule's range
-      if (rule.maxDistance === null || rule.maxDistance === undefined) {
-        // Unlimited range (e.g., 10+ km) - this is the highest tier
-        applicableRule = rule;
-        break;
-      } else if (distance <= rule.maxDistance) {
-        // Distance is within this rule's range (e.g., 4-10 km)
-        applicableRule = rule;
-        break;
+
+  const normalizedDistance = Math.max(0, Number(distance) || 0);
+
+  // Explicit rule: exact 0 km is excluded from payout range.
+  if (normalizedDistance === 0) {
+    return {
+      rule: null,
+      commission: 0,
+      breakdown: {
+        basePayout: 0,
+        distance: 0,
+        minDistance: 0,
+        maxDistance: 0,
+        commissionPerKm: 0,
+        distanceCommission: 0,
+        perKmApplied: false,
+        slabShiftKm: DELIVERY_SLAB_MARGIN_KM
       }
-      // If distance > maxDistance, continue to next (higher) rule
-      // Keep this rule as potential fallback
-      applicableRule = rule;
+    };
+  }
+
+  // Delivery partner slabs are shifted by +0.2 km (Option A)
+  // Example: 0-4 -> 0-4.2, 4-6 -> 4.2-6.2
+  const shiftedRules = rules.map((rule, index) => {
+    const originalMin = Number(rule.minDistance || 0);
+    const originalMax = rule.maxDistance === null || rule.maxDistance === undefined
+      ? null
+      : Number(rule.maxDistance);
+
+    return {
+      rule,
+      index,
+      effectiveMin: index === 0 ? originalMin : roundKm(originalMin + DELIVERY_SLAB_MARGIN_KM),
+      effectiveMax: originalMax === null ? null : roundKm(originalMax + DELIVERY_SLAB_MARGIN_KM)
+    };
+  });
+
+  const baseRuleEntry = shiftedRules.find((entry) => Number(entry.rule.minDistance) === 0) || shiftedRules[0];
+
+  let applicableRuleEntry = null;
+  for (const entry of shiftedRules) {
+    const lowerBoundOk = entry.index === 0
+      ? normalizedDistance >= entry.effectiveMin
+      : normalizedDistance > entry.effectiveMin;
+    const upperBoundOk = entry.effectiveMax === null || normalizedDistance <= entry.effectiveMax;
+
+    if (lowerBoundOk && upperBoundOk) {
+      applicableRuleEntry = entry;
+      break;
     }
   }
-  
-  // If distance is less than all minDistances, use first rule (lowest tier)
-  // This should typically be 0-4km with base payout only
-  if (!applicableRule || distance < applicableRule.minDistance) {
-    applicableRule = rules[0];
+
+  if (!applicableRuleEntry) {
+    applicableRuleEntry = shiftedRules[shiftedRules.length - 1] || baseRuleEntry;
   }
-  
-  // If still no rule found (edge case), use first rule
-  if (!applicableRule) {
-    applicableRule = rules[0];
-  }
-  
-  // Calculate commission
-  // IMPORTANT: Base payout is ALWAYS given to delivery boy
-  let basePayout = applicableRule.basePayout;
+
+  const inBaseSlab = normalizedDistance >= baseRuleEntry.effectiveMin &&
+    (baseRuleEntry.effectiveMax === null || normalizedDistance <= baseRuleEntry.effectiveMax);
+
+  const appliedEntry = inBaseSlab ? baseRuleEntry : applicableRuleEntry;
+  const appliedRule = appliedEntry.rule;
+
+  // Payout rule:
+  // - Base slab: fixed base payout
+  // - Non-base slabs: full distance * slab per-km
+  let basePayout = 0;
   let distanceCommission = 0;
-  
-  // Per km commission logic based on user requirement:
-  // - Base payout: ₹10 (always given)
-  // - If distance > 4 km: Additional ₹5 per km for the entire distance
-  // Example scenarios:
-  // - Distance = 4 km: commission = ₹10 (base only, 4 is not > 4)
-  // - Distance = 5 km: commission = ₹10 + (5 × ₹5) = ₹35
-  // - Distance = 6 km: commission = ₹10 + (6 × ₹5) = ₹40
-  // - Distance = 2 km: commission = ₹10 (base only, 2 < 4)
-  if (distance > applicableRule.minDistance) {
-    // Apply per km commission for the entire distance if distance > minDistance
-    // Example: If minDistance = 4, commissionPerKm = 5, distance = 5
-    // Then: 5 × 5 = ₹25 additional, total = ₹10 + ₹25 = ₹35
-    distanceCommission = distance * applicableRule.commissionPerKm;
+
+  if (inBaseSlab) {
+    basePayout = Number(baseRuleEntry.rule.basePayout || 0);
+  } else {
+    distanceCommission = normalizedDistance * Number(appliedRule.commissionPerKm || 0);
   }
-  // If distance <= minDistance, only base payout is given (distanceCommission = 0)
-  
+
   const commission = basePayout + distanceCommission;
-  
-  console.log(`📊 Commission calculation for ${distance.toFixed(2)} km:`, {
-    rule: applicableRule.name,
-    minDistance: applicableRule.minDistance,
-    maxDistance: applicableRule.maxDistance,
-    basePayout: basePayout,
-    commissionPerKm: applicableRule.commissionPerKm,
-    perKmApplied: distance >= applicableRule.minDistance,
-    distanceCommission: distanceCommission,
-    totalCommission: commission
-  });
-  
   return {
-    rule: applicableRule,
-    commission: Math.round(commission * 100) / 100, // Round to 2 decimal places
+    rule: appliedRule,
+    commission: Math.round(commission * 100) / 100,
     breakdown: {
-      basePayout: basePayout,
-      distance: distance,
-      minDistance: applicableRule.minDistance,
-      maxDistance: applicableRule.maxDistance,
-      commissionPerKm: applicableRule.commissionPerKm,
-      distanceCommission: distanceCommission,
-      // Flag to indicate if per km commission was applied
-      perKmApplied: distance >= applicableRule.minDistance
+      basePayout,
+      distance: normalizedDistance,
+      minDistance: appliedEntry.effectiveMin,
+      maxDistance: appliedEntry.effectiveMax,
+      commissionPerKm: appliedRule.commissionPerKm,
+      distanceCommission,
+      perKmApplied: !inBaseSlab,
+      slabShiftKm: DELIVERY_SLAB_MARGIN_KM
     }
   };
 };
@@ -216,4 +224,6 @@ deliveryBoyCommissionSchema.statics.calculateCommission = async function(distanc
 const DeliveryBoyCommission = mongoose.model('DeliveryBoyCommission', deliveryBoyCommissionSchema);
 
 export default DeliveryBoyCommission;
+
+
 

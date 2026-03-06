@@ -205,8 +205,6 @@ export const getActiveEarningAddons = asyncHandler(async (req, res) => {
       .sort({ createdAt: -1 }) // Get most recent first
       .lean();
 
-    logger.info(`Found ${activeAddons.length} active earning addons for delivery partner ${delivery._id}`);
-
     // Check validity for each addon and add delivery partner's progress
     const addonsWithProgress = await Promise.all(
       activeAddons.map(async (addon) => {
@@ -278,8 +276,6 @@ export const getActiveEarningAddons = asyncHandler(async (req, res) => {
       })
     );
 
-    logger.info(`Returning ${addonsWithProgress.length} offers with progress data`);
-
     return successResponse(res, 200, 'Active earning addons retrieved successfully', {
       activeOffers: addonsWithProgress
     });
@@ -288,4 +284,3 @@ export const getActiveEarningAddons = asyncHandler(async (req, res) => {
     return errorResponse(res, 500, 'Failed to fetch active earning addons');
   }
 });
-
