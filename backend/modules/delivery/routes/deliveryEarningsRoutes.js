@@ -1,5 +1,5 @@
 import express from 'express';
-import { getEarnings, getActiveEarningAddons } from '../controllers/deliveryEarningsController.js';
+import { getEarnings } from '../controllers/deliveryEarningsController.js';
 import { authenticate } from '../middleware/deliveryAuth.js';
 
 const router = express.Router();
@@ -8,8 +8,6 @@ const router = express.Router();
 router.use(authenticate);
 
 // Earnings routes
-// IMPORTANT: More specific routes must come before less specific ones
-router.get('/earnings/active-offers', getActiveEarningAddons);
 router.get('/earnings', getEarnings);
 
 export default router;

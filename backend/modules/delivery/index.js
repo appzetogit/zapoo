@@ -8,6 +8,8 @@ import deliveryEarningsRoutes from './routes/deliveryEarningsRoutes.js';
 import deliveryLocationRoutes from './routes/deliveryLocationRoutes.js';
 import deliverySignupRoutes from './routes/deliverySignupRoutes.js';
 import deliveryWalletRoutes from './routes/deliveryWalletRoutes.js';
+import { getMyChallenges } from './controllers/deliveryChallengeController.js';
+import { authenticate } from './middleware/deliveryAuth.js';
 
 const router = express.Router();
 
@@ -34,6 +36,9 @@ router.use('/', deliveryLocationRoutes);
 
 // Delivery wallet routes (protected)
 router.use('/wallet', deliveryWalletRoutes);
+
+// Challenges route (protected)
+router.get('/challenges', authenticate, getMyChallenges);
 
 export default router;
 

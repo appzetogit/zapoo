@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import { useEffect, useRef, useState, useMemo } from "react";
 import Lenis from "lenis";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -17,6 +18,49 @@ import FeedNavbar from "../components/FeedNavbar";
 import AvailableCashLimit from "../components/AvailableCashLimit";
 import BottomPopup from "../components/BottomPopup";
 import DepositPopup from "../components/DepositPopup";
+=======
+import { useEffect, useRef, useState, useMemo } from "react"
+import Lenis from "lenis"
+import { useNavigate, useLocation } from "react-router-dom"
+import { motion } from "framer-motion"
+import {
+  Home,
+  FileText,
+  UtensilsCrossed,
+  User,
+  ArrowRight,
+  Lightbulb,
+  HelpCircle,
+  Wallet,
+  CheckCircle,
+  Receipt,
+  FileText as FileTextIcon,
+  Wallet as WalletIcon,
+  Sparkles
+} from "lucide-react"
+import { Card, CardContent } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import {
+  fetchDeliveryWallet,
+  calculateDeliveryBalances,
+  calculatePeriodEarnings
+} from "../utils/deliveryWalletState"
+import { formatCurrency } from "../../restaurant/utils/currency"
+import { useGigStore } from "../store/gigStore"
+import { useProgressStore } from "../store/progressStore"
+import {
+  HelpCircle as HelpIcon
+
+} from "lucide-react"
+import { getAllDeliveryOrders } from "../utils/deliveryOrderStatus"
+import { deliveryAPI } from "@/lib/api"
+import { API_BASE_URL } from "@/lib/api/config"
+import FeedNavbar from "../components/FeedNavbar"
+import AvailableCashLimit from "../components/AvailableCashLimit"
+import BottomPopup from "../components/BottomPopup"
+import DepositPopup from "../components/DepositPopup"
+
+>>>>>>> 6bbb4ca (Challenges flow implemented)
 export default function PocketPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -28,6 +72,7 @@ export default function PocketPage() {
     totalEarned: 0,
     transactions: [],
     joiningBonusClaimed: false
+<<<<<<< HEAD
   });
   const [walletLoading, setWalletLoading] = useState(true);
   const [currentCarouselSlide, setCurrentCarouselSlide] = useState(0);
@@ -42,6 +87,23 @@ export default function PocketPage() {
   const [dashboardLoading, setDashboardLoading] = useState(true);
   const [activeEarningAddon, setActiveEarningAddon] = useState(null);
   const [earningAddonLoading, setEarningAddonLoading] = useState(true);
+=======
+  })
+  const [walletLoading, setWalletLoading] = useState(true)
+
+  const [currentCarouselSlide, setCurrentCarouselSlide] = useState(0)
+  const carouselRef = useRef(null)
+  const carouselStartX = useRef(0)
+  const carouselIsSwiping = useRef(false)
+  const carouselAutoRotateRef = useRef(null)
+
+  const [showCashLimitPopup, setShowCashLimitPopup] = useState(false)
+  const [showDepositPopup, setShowDepositPopup] = useState(false)
+  const [bankDetailsFilled, setBankDetailsFilled] = useState(false)
+  const [dashboardData, setDashboardData] = useState(null)
+  const [dashboardLoading, setDashboardLoading] = useState(true)
+
+>>>>>>> 6bbb4ca (Challenges flow implemented)
   const {
     isOnline,
     bookedGigs,
@@ -111,6 +173,7 @@ export default function PocketPage() {
     }
   }, [walletState, balances]);
 
+<<<<<<< HEAD
   // Calculate weekly earnings from wallet transactions (payment + earning_addon bonus)
   // Include both payment and earning_addon transactions in weekly earnings
   const weeklyEarnings = walletState?.transactions?.filter(t => {
@@ -264,6 +327,23 @@ export default function PocketPage() {
   // Offer is live if it's valid (started) or upcoming (not started yet but active)
   const isOfferLive = activeEarningAddon?.isValid || activeEarningAddon?.isUpcoming || false;
 
+=======
+  // Calculate weekly earnings from wallet transactions
+  const weeklyEarnings = walletState?.transactions
+    ?.filter(t => {
+      // Include only completed payment transactions
+      if (t.type !== 'payment' || t.status !== 'Completed') return false
+      const now = new Date()
+      const startOfWeek = new Date(now)
+      startOfWeek.setDate(now.getDate() - now.getDay())
+      startOfWeek.setHours(0, 0, 0, 0)
+      const transactionDate = t.date ? new Date(t.date) : (t.createdAt ? new Date(t.createdAt) : null)
+      if (!transactionDate) return false
+      return transactionDate >= startOfWeek && transactionDate <= now
+    })
+    .reduce((sum, t) => sum + (t.amount || 0), 0) || 0
+
+>>>>>>> 6bbb4ca (Challenges flow implemented)
   // Calculate total bonus amount from all bonus transactions
   const totalBonus = walletState?.transactions?.filter(t => t.type === 'bonus' && t.status === 'Completed').reduce((sum, t) => sum + (t.amount || 0), 0) || 0;
 
@@ -646,6 +726,7 @@ export default function PocketPage() {
 
           </CardContent>
         </Card>
+<<<<<<< HEAD
 
         {/* Earnings Guarantee Card */}
         <motion.div initial={{
@@ -761,6 +842,8 @@ export default function PocketPage() {
           </div>
         </motion.div>
 
+=======
+>>>>>>> 6bbb4ca (Challenges flow implemented)
         {/* Pocket Section */}
         <div className="my-6 ">
           <div className="relative mb-4 my-4">
@@ -880,5 +963,13 @@ export default function PocketPage() {
       <BottomPopup isOpen={showDepositPopup} onClose={() => setShowDepositPopup(false)} title="Deposit" showCloseButton={true} closeOnBackdropClick={true} maxHeight="50vh">
         <DepositPopup cashInHand={balances.cashInHand ?? walletState?.cashInHand ?? 0} onSuccess={() => setShowDepositPopup(false)} />
       </BottomPopup>
+<<<<<<< HEAD
     </div>;
 }
+=======
+    </div >
+  )
+}
+
+
+>>>>>>> 6bbb4ca (Challenges flow implemented)

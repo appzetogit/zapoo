@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Bell, Send, Clock, CheckCircle2, XCircle, AlertCircle, ImagePlus, X } from 'lucide-react';
+import { Bell, Send, Clock, CheckCircle2, XCircle, AlertCircle, ImagePlus, X, Trash2 } from 'lucide-react';
 import apiClient from '@/lib/api';
 
 const STATUS_CONFIG = {
@@ -16,6 +16,9 @@ export default function RestaurantNotificationRequest() {
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
+    const [page, setPage] = useState(1);
+
+    const PAGE_SIZE = 5;
 
     // Image state
     const [imageFile, setImageFile] = useState(null);       // File object for preview
@@ -34,6 +37,22 @@ export default function RestaurantNotificationRequest() {
             // fail silently — list just stays empty
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleDelete = async (id) => {
+        try {
+            await apiClient.delete(`/notification/requests/${id}`);
+            setRequests((prev) => {
+                const next = prev.filter((r) => r._id !== id);
+                const totalPages = Math.max(1, Math.ceil(next.length / PAGE_SIZE));
+                if (page > totalPages) {
+                    setPage(totalPages);
+                }
+                return next;
+            });
+        } catch {
+            // optionally show toast in future
         }
     };
 
@@ -306,7 +325,7 @@ export default function RestaurantNotificationRequest() {
                         </div>
                     ) : (
                         <div className="space-y-3">
-                            {requests.map((req) => {
+                            {requests.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((req) => {
                                 const cfg = STATUS_CONFIG[req.status] || STATUS_CONFIG.pending;
                                 const Icon = cfg.icon;
                                 return (
@@ -326,13 +345,48 @@ export default function RestaurantNotificationRequest() {
                                                 {new Date(req.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                                             </p>
                                         </div>
-                                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border whitespace-nowrap ${cfg.color}`}>
-                                            <Icon className="w-3 h-3" />
-                                            {cfg.label}
-                                        </span>
+                                        <div className="flex flex-col items-end gap-2">
+                                            <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border whitespace-nowrap ${cfg.color}`}>
+                                                <Icon className="w-3 h-3" />
+                                                {cfg.label}
+                                            </span>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleDelete(req._id)}
+                                                className="p-1.5 rounded-full hover:bg-red-50 text-red-500 hover:text-red-600"
+                                                aria-label="Delete request"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        </div>
                                     </div>
                                 );
                             })}
+                            {requests.length > PAGE_SIZE && (
+                                <div className="flex items-center justify-between pt-3 border-t border-slate-200 text-xs text-slate-500">
+                                    <span>
+                                        Page {page} of {Math.max(1, Math.ceil(requests.length / PAGE_SIZE))}
+                                    </span>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            type="button"
+                                            disabled={page === 1}
+                                            onClick={() => setPage((p) => Math.max(1, p - 1))}
+                                            className="px-2 py-1 rounded-lg border border-slate-200 disabled:opacity-40"
+                                        >
+                                            Prev
+                                        </button>
+                                        <button
+                                            type="button"
+                                            disabled={page >= Math.ceil(requests.length / PAGE_SIZE)}
+                                            onClick={() => setPage((p) => Math.min(Math.ceil(requests.length / PAGE_SIZE), p + 1))}
+                                            className="px-2 py-1 rounded-lg border border-slate-200 disabled:opacity-40"
+                                        >
+                                            Next
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>

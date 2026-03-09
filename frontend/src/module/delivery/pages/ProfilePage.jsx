@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import { useEffect, useRef, useState } from "react";
 import { gsap } from "gsap";
 import Lenis from "lenis";
@@ -9,6 +10,39 @@ import { toast } from "sonner";
 import { clearModuleAuth } from "@/lib/utils/auth";
 import alertSound from "@/assets/audio/alert.mp3";
 import originalSound from "@/assets/audio/original.mp3";
+=======
+import { useEffect, useRef, useState } from "react"
+import { gsap } from "gsap"
+import Lenis from "lenis"
+import { useNavigate, useLocation } from "react-router-dom"
+import {
+  Home,
+  FileText,
+  UtensilsCrossed,
+  User,
+  ArrowLeft,
+  ArrowRight,
+  Star,
+  Briefcase,
+  Bike,
+  Headphones,
+  Ticket,
+  Bell,
+  ChevronRight,
+  IndianRupee,
+  Sparkles,
+  LogOut,
+  X,
+  Trophy
+} from "lucide-react"
+import { Card, CardContent } from "@/components/ui/card"
+import { deliveryAPI } from "@/lib/api"
+import { toast } from "sonner"
+import { clearModuleAuth } from "@/lib/utils/auth"
+import alertSound from "@/assets/audio/alert.mp3"
+import originalSound from "@/assets/audio/original.mp3"
+
+>>>>>>> 6bbb4ca (Challenges flow implemented)
 export default function ProfilePage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -299,6 +333,7 @@ export default function ProfilePage() {
           </Card>
         </div>
 
+<<<<<<< HEAD
         {/* Logout Section */}
         <div className="pt-4">
           <Card onClick={handleLogout} className="bg-white py-0 border-0 shadow-none rounded-lg cursor-pointer hover:bg-gray-200 transition-colors">
@@ -310,6 +345,75 @@ export default function ProfilePage() {
               <ArrowRight className="w-5 h-5 text-gray-400" />
             </CardContent>
           </Card>
+=======
+          {/* Support Section */}
+          <div>
+            <h3 className="text-base font-medium mb-3 px-1">Support</h3>
+            <div className="space-y-0">
+              <div className="h-px bg-gray-200"></div>
+              <Card
+                onClick={() => navigate("/delivery/help/tickets")}
+                className="bg-white py-0 border-0 shadow-none rounded-none first:rounded-t-lg last:rounded-b-lg cursor-pointer hover:bg-gray-200 transition-colors"
+              >
+                <CardContent className="p-4 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Ticket className="w-5 h-5" />
+                    <span className="text-sm font-medium">Support tickets</span>
+                  </div>
+                  <ArrowRight className="w-5 h-5 text-gray-400" />
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+
+          {/* Partner options Section */}
+          <div>
+            <h3 className="text-base font-medium mb-3 px-1">Partner options</h3>
+            <div className="space-y-3">
+              <Card
+                onClick={() => setShowAlertSoundPopup(true)}
+                className="bg-white py-0 border-0 shadow-none rounded-lg cursor-pointer hover:bg-gray-200 transition-colors"
+              >
+                <CardContent className="p-4 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Bell className="w-5 h-5" />
+                    <span className="text-sm font-medium">Order alert sound</span>
+                  </div>
+                  <ArrowRight className="w-5 h-5 text-gray-400" />
+                </CardContent>
+              </Card>
+
+              <Card
+                onClick={() => navigate("/delivery/challenges")}
+                className="bg-white py-0 border-0 shadow-none rounded-lg cursor-pointer hover:bg-gray-200 transition-colors"
+              >
+                <CardContent className="p-4 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Trophy className="w-5 h-5 text-purple-600" />
+                    <span className="text-sm font-medium">Earnings Challenges</span>
+                  </div>
+                  <ArrowRight className="w-5 h-5 text-gray-400" />
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+
+          {/* Logout Section */}
+          <div className="pt-4">
+            <Card
+              onClick={handleLogout}
+              className="bg-white py-0 border-0 shadow-none rounded-lg cursor-pointer hover:bg-gray-200 transition-colors"
+            >
+              <CardContent className="p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <LogOut className="w-5 h-5 text-[#DC2626]" />
+                  <span className="text-sm font-medium text-[#DC2626]">Log out</span>
+                </div>
+                <ArrowRight className="w-5 h-5 text-gray-400" />
+              </CardContent>
+            </Card>
+          </div>
+>>>>>>> 6bbb4ca (Challenges flow implemented)
         </div>
       </div>
     </div>

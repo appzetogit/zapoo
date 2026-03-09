@@ -10,7 +10,11 @@ import RestaurantWallet from '../../restaurant/models/RestaurantWallet.js';
 import RestaurantCommission from '../../admin/models/RestaurantCommission.js';
 import AdminCommission from '../../admin/models/AdminCommission.js';
 import { calculateRoute } from '../../order/services/routeCalculationService.js';
-import { sendNotificationToUser } from '../../notification/utils/pushNotificationHelper.js';
+import {
+  evaluateChallengesOnOrderCompleted,
+  evaluateChallengesOnDeliveryCompleted,
+  evaluateChallengesOnDeliveryAccepted
+} from '../../order/services/challengeEngineService.js';
 import mongoose from 'mongoose';
 import winston from 'winston';
 const logger = winston.createLogger({
@@ -568,6 +572,24 @@ export const acceptOrder = asyncHandler(async (req, res) => {
       }
       return errorResponse(res, 500, `Failed to update order: ${updateError.message || 'Unknown error'}`);
     }
+<<<<<<< HEAD
+=======
+
+    console.log(`✅ Order ${order.orderId} accepted by delivery partner ${delivery._id}`);
+    console.log(`📍 Route calculated: ${routeData.distance.toFixed(2)} km, ${routeData.duration.toFixed(1)} mins`);
+
+    try {
+      await evaluateChallengesOnDeliveryAccepted({
+        orderId: updatedOrder._id,
+        deliveryPartnerId: delivery._id,
+        eventDate: new Date(),
+        zoneId: updatedOrder?.assignmentInfo?.zoneId || null
+      });
+    } catch (_) {
+      // Challenge evaluation is non-blocking for order acceptance flow.
+    }
+
+>>>>>>> 6bbb4ca (Challenges flow implemented)
     // Calculate delivery distance (restaurant to customer) for earnings calculation
     let deliveryDistance = 0;
     if (updatedOrder.restaurantId?.location?.coordinates && updatedOrder.address?.location?.coordinates) {
@@ -1092,24 +1114,6 @@ export const confirmOrderId = asyncHandler(async (req, res) => {
           console.warn('⚠️ Socket.IO not initialized, skipping customer notification');
         }
 
-        // Also send a push notification via FCM so the user is notified
-        // even if they are offline or the app is in background.
-        try {
-          await sendNotificationToUser(
-            updatedOrder.userId,
-            'user',
-            'Order Update',
-            'Your delivery partner is on the way! 🏍️',
-            {
-              orderId: updatedOrder.orderId,
-              status: 'out_for_delivery',
-              target: 'user',
-              clickUrl: '/'
-            }
-          );
-        } catch (pushErr) {
-          console.warn('[FCM] Failed to send order out_for_delivery push:', pushErr.message);
-        }
       } catch (notifError) {
         console.error('Error sending customer notification:', notifError);
         // Don't fail the response if notification fails
@@ -1420,6 +1424,17 @@ export const completeDelivery = asyncHandler(async (req, res) => {
     if (!updatedOrder) {
       return errorResponse(res, 500, 'Failed to update order status');
     }
+<<<<<<< HEAD
+=======
+
+    try {
+      await evaluateChallengesOnOrderCompleted(updatedOrder);
+      await evaluateChallengesOnDeliveryCompleted(updatedOrder);
+    } catch (_) {
+      // Challenge evaluation is non-blocking for delivery completion flow.
+    }
+
+>>>>>>> 6bbb4ca (Challenges flow implemented)
     const orderIdForLog = updatedOrder.orderId || order.orderId || orderMongoId?.toString() || orderId;
     // Mark COD payment as collected (admin Payment Status → Collected)
     if (order.payment?.method === 'cash' || order.payment?.method === 'cod') {
@@ -1589,6 +1604,7 @@ export const completeDelivery = asyncHandler(async (req, res) => {
       // But log it for investigation
     }
 
+<<<<<<< HEAD
     // Check and award earning addon bonuses if delivery boy qualifies
     let earningAddonBonus = null;
     try {
@@ -1603,6 +1619,8 @@ export const completeDelivery = asyncHandler(async (req, res) => {
       // Don't fail the delivery completion if bonus check fails
     }
 
+=======
+>>>>>>> 6bbb4ca (Challenges flow implemented)
     // Calculate restaurant commission and update restaurant wallet
     let restaurantWalletTransaction = null;
     let adminCommissionRecord = null;
@@ -1699,13 +1717,6 @@ export const completeDelivery = asyncHandler(async (req, res) => {
       wallet: walletTransaction ? {
         transactionId: walletTransaction._id,
         balance: walletTransaction.amount
-      } : null,
-      earningAddonBonus: earningAddonBonus ? {
-        offerId: earningAddonBonus.offerId,
-        offerTitle: earningAddonBonus.offerTitle,
-        amount: earningAddonBonus.amount,
-        ordersCompleted: earningAddonBonus.ordersCompleted,
-        ordersRequired: earningAddonBonus.ordersRequired
       } : null,
       message: 'Delivery completed successfully'
     };

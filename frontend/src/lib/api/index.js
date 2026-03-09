@@ -595,6 +595,9 @@ export const restaurantAPI = {
   getRestaurantByOwner: () => {
     return apiClient.get(API_ENDPOINTS.RESTAURANT.BY_OWNER);
   },
+  getMyChallenges: (params = {}) => {
+    return apiClient.get(API_ENDPOINTS.RESTAURANT.CHALLENGES, { params });
+  },
 
   // Menu operations (for restaurant module)
   getMenu: () => {
@@ -934,6 +937,9 @@ export const deliveryAPI = {
   getDashboard: () => {
     return apiClient.get(API_ENDPOINTS.DELIVERY.DASHBOARD);
   },
+  getMyChallenges: (params = {}) => {
+    return apiClient.get(API_ENDPOINTS.DELIVERY.CHALLENGES, { params });
+  },
 
   // Wallet
   getWallet: () => {
@@ -1076,15 +1082,6 @@ export const deliveryAPI = {
   // Get earnings
   getEarnings: (params = {}) => {
     return apiClient.get(API_ENDPOINTS.DELIVERY.EARNINGS, { params });
-  },
-
-  // Get active earning addon offers
-  getActiveEarningAddons: () => {
-    const endpoint = API_ENDPOINTS.DELIVERY.EARNINGS_ACTIVE_OFFERS;
-    if (import.meta.env.DEV) {
-      console.log("📡 Fetching active earning addons from:", endpoint);
-    }
-    return apiClient.get(endpoint);
   },
 
   // Update location
@@ -1658,6 +1655,40 @@ export const adminAPI = {
     return apiClient.get(API_ENDPOINTS.ADMIN.TIERS, { params });
   },
 
+  // Challenge Management
+  getChallengeTemplates: (params = {}) => {
+    return apiClient.get(API_ENDPOINTS.ADMIN.CHALLENGE_TEMPLATES, { params });
+  },
+  getChallenges: (params = {}) => {
+    return apiClient.get(API_ENDPOINTS.ADMIN.CHALLENGES, { params });
+  },
+  getChallengeById: (id) => {
+    return apiClient.get(
+      API_ENDPOINTS.ADMIN.CHALLENGE_BY_ID.replace(":id", id),
+    );
+  },
+  createChallenge: (data) => {
+    return apiClient.post(API_ENDPOINTS.ADMIN.CHALLENGES, data);
+  },
+  updateChallenge: (id, data) => {
+    return apiClient.put(
+      API_ENDPOINTS.ADMIN.CHALLENGE_BY_ID.replace(":id", id),
+      data,
+    );
+  },
+  updateChallengeStatus: (id, status) => {
+    return apiClient.patch(
+      API_ENDPOINTS.ADMIN.CHALLENGE_STATUS.replace(":id", id),
+      { status },
+    );
+  },
+  getChallengeProgress: (id, params = {}) => {
+    return apiClient.get(
+      API_ENDPOINTS.ADMIN.CHALLENGE_PROGRESS.replace(":id", id),
+      { params },
+    );
+  },
+
   // Zone Management
   getZones: (params = {}) => {
     return apiClient.get(API_ENDPOINTS.ADMIN.ZONES, { params });
@@ -1685,80 +1716,6 @@ export const adminAPI = {
   toggleZoneStatus: (id) => {
     return apiClient.patch(API_ENDPOINTS.ADMIN.ZONE_STATUS.replace(":id", id));
   },
-
-  // Earning Addon Management
-  createEarningAddon: (data) => {
-    return apiClient.post(API_ENDPOINTS.ADMIN.EARNING_ADDON, data);
-  },
-
-  getEarningAddons: (params = {}) => {
-    return apiClient.get(API_ENDPOINTS.ADMIN.EARNING_ADDON, { params });
-  },
-
-  getEarningAddonById: (id) => {
-    return apiClient.get(
-      API_ENDPOINTS.ADMIN.EARNING_ADDON_BY_ID.replace(":id", id),
-    );
-  },
-
-  updateEarningAddon: (id, data) => {
-    return apiClient.put(
-      API_ENDPOINTS.ADMIN.EARNING_ADDON_BY_ID.replace(":id", id),
-      data,
-    );
-  },
-
-  deleteEarningAddon: (id) => {
-    return apiClient.delete(
-      API_ENDPOINTS.ADMIN.EARNING_ADDON_BY_ID.replace(":id", id),
-    );
-  },
-
-  toggleEarningAddonStatus: (id, status) => {
-    return apiClient.patch(
-      API_ENDPOINTS.ADMIN.EARNING_ADDON_STATUS.replace(":id", id),
-      { status },
-    );
-  },
-
-  checkEarningAddonCompletions: (deliveryPartnerId, debug = false) => {
-    return apiClient.post(API_ENDPOINTS.ADMIN.EARNING_ADDON_CHECK_COMPLETIONS, {
-      deliveryPartnerId,
-      debug,
-    });
-  },
-
-  // Earning Addon History Management
-  getEarningAddonHistory: (params = {}) => {
-    return apiClient.get(API_ENDPOINTS.ADMIN.EARNING_ADDON_HISTORY, { params });
-  },
-
-  getEarningAddonHistoryById: (id) => {
-    return apiClient.get(
-      API_ENDPOINTS.ADMIN.EARNING_ADDON_HISTORY_BY_ID.replace(":id", id),
-    );
-  },
-
-  creditEarningToWallet: (id, notes = "") => {
-    return apiClient.post(
-      API_ENDPOINTS.ADMIN.EARNING_ADDON_HISTORY_CREDIT.replace(":id", id),
-      { notes },
-    );
-  },
-
-  cancelEarningAddonHistory: (id, reason = "") => {
-    return apiClient.patch(
-      API_ENDPOINTS.ADMIN.EARNING_ADDON_HISTORY_CANCEL.replace(":id", id),
-      { reason },
-    );
-  },
-
-  getEarningAddonHistoryStatistics: (params = {}) => {
-    return apiClient.get(API_ENDPOINTS.ADMIN.EARNING_ADDON_HISTORY_STATISTICS, {
-      params,
-    });
-  },
-
   // Environment Variables Management
   getEnvVariables: () => {
     return apiClient.get(API_ENDPOINTS.ADMIN.ENV_VARIABLES);

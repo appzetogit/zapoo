@@ -9,7 +9,7 @@ const transactionSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['payment', 'withdrawal', 'bonus', 'deduction', 'refund', 'deposit', 'earning_addon'],
+    enum: ['payment', 'withdrawal', 'bonus', 'deduction', 'refund', 'deposit'],
     required: true
   },
   status: {
@@ -191,14 +191,10 @@ deliveryWalletSchema.methods.addTransaction = function (transactionData) {
 
   // Update balances based on transaction type and status
   if (transaction.status === 'Completed') {
-    if (transaction.type === 'payment' || transaction.type === 'bonus' || transaction.type === 'refund' || transaction.type === 'earning_addon') {
+    if (transaction.type === 'payment' || transaction.type === 'bonus' || transaction.type === 'refund') {
       const oldBalance = this.totalBalance || 0;
       this.totalBalance += transaction.amount;
       this.totalEarned += transaction.amount;
-
-      // Log bonus/earning_addon transaction for debugging
-      if (transaction.type === 'bonus' || transaction.type === 'earning_addon') {}
-
       // If payment is collected (COD), add to cash in hand
       if (transaction.paymentCollected) {
         this.cashInHand += transaction.amount;
@@ -238,7 +234,7 @@ deliveryWalletSchema.methods.updateTransactionStatus = function (transactionId, 
 
   // If transaction status changed from Pending to Completed, update balances
   if (oldStatus === 'Pending' && status === 'Completed') {
-    if (transaction.type === 'payment' || transaction.type === 'bonus' || transaction.type === 'refund' || transaction.type === 'earning_addon') {
+    if (transaction.type === 'payment' || transaction.type === 'bonus' || transaction.type === 'refund') {
       this.totalBalance += oldAmount;
       this.totalEarned += oldAmount;
       if (transaction.paymentCollected) {
@@ -258,7 +254,7 @@ deliveryWalletSchema.methods.updateTransactionStatus = function (transactionId, 
 
   // If transaction status changed from Completed to Failed/Cancelled, reverse balances
   if (oldStatus === 'Completed' && (status === 'Failed' || status === 'Cancelled')) {
-    if (transaction.type === 'payment' || transaction.type === 'bonus' || transaction.type === 'refund' || transaction.type === 'earning_addon') {
+    if (transaction.type === 'payment' || transaction.type === 'bonus' || transaction.type === 'refund') {
       this.totalBalance = Math.max(0, this.totalBalance - oldAmount);
       this.totalEarned = Math.max(0, this.totalEarned - oldAmount);
       if (transaction.paymentCollected) {
@@ -304,4 +300,11 @@ deliveryWalletSchema.statics.findOrCreateByDeliveryId = async function (delivery
   }
   return wallet;
 };
+<<<<<<< HEAD
 export default mongoose.model('DeliveryWallet', deliveryWalletSchema);
+=======
+
+export default mongoose.model('DeliveryWallet', deliveryWalletSchema);
+
+
+>>>>>>> 6bbb4ca (Challenges flow implemented)

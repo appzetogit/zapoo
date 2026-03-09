@@ -99,6 +99,24 @@ export const getMyNotificationRequests = asyncHandler(async (req, res) => {
 });
 
 /**
+ * DELETE /api/notification/requests/:id
+ * Restaurant deletes one of its own requests (soft delete).
+ */
+export const deleteMyNotificationRequest = asyncHandler(async (req, res) => {
+  const restaurantId = req.restaurant._id;
+  const { id } = req.params;
+
+  const existing = await NotificationRequest.findOne({ _id: id, restaurantId });
+  if (!existing) {
+    return errorResponse(res, 404, 'Notification request not found');
+  }
+
+  await NotificationRequest.deleteOne({ _id: id });
+
+  return successResponse(res, 200, 'Notification request deleted successfully', {});
+});
+
+/**
  * GET /api/admin/notification-requests
  * Admin fetches all requests with optional status filter.
  * Query: ?status=pending|approved|rejected

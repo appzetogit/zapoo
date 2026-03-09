@@ -52,8 +52,12 @@ export default function ZoneAdBanner() {
 
             try {
                 setLoading(true)
-                // Fetch active ads for this zone
-                const res = await api.get(`/marketing/ads/active/${zoneId}`)
+                const params = {}
+                if (location?.latitude != null && location?.longitude != null) {
+                    params.latitude = location.latitude
+                    params.longitude = location.longitude
+                }
+                const res = await api.get(`/marketing/ads/active/${zoneId}`, { params })
 
                 if (res.data.success && res.data.data && res.data.data.length > 0) {
                     setAds(res.data.data)
@@ -69,7 +73,7 @@ export default function ZoneAdBanner() {
         }
 
         fetchAds()
-    }, [zoneId])
+    }, [zoneId, location?.latitude, location?.longitude])
 
     // Auto-slide logic
     useEffect(() => {
@@ -219,7 +223,7 @@ export default function ZoneAdBanner() {
 
                 {/* Status Badge */}
                 <div className="absolute top-4 left-4 bg-black/40 backdrop-blur-md text-white text-[10px] md:text-xs font-bold px-2.5 py-1 rounded-full border border-white/20 z-10">
-                    {currentAd._id.startsWith('fallback-') ? 'SUGGESTED' : 'AD'}
+                    {currentAd._id.startsWith('fallback-') ? 'SUGGESTED' : currentAd.source === 'challenge' ? 'FREE REWARD' : 'AD'}
                 </div>
             </div>
         </div>

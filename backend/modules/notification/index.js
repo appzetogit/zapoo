@@ -6,6 +6,7 @@ import { authenticate as authenticateDelivery } from '../delivery/middleware/del
 import {
   submitNotificationRequest,
   getMyNotificationRequests,
+  deleteMyNotificationRequest,
   adminGetAllRequests,
   adminApproveRequest,
   adminRejectRequest,
@@ -51,6 +52,9 @@ router.post('/requests', authenticateRestaurant, submitNotificationRequest);
 
 // Get own submitted requests + quota info
 router.get('/requests/my', authenticateRestaurant, getMyNotificationRequests);
+
+// Delete own request
+router.delete('/requests/:id', authenticateRestaurant, deleteMyNotificationRequest);
 
 // ── User route (/api/notification/...) ────────────────────────────────────
 // Get all active notifications (history/list view)

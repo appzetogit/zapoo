@@ -43,6 +43,7 @@ const TimeOnOrders = lazy(() => import("../pages/TimeOnOrders"))
 const PocketBalancePage = lazy(() => import("../pages/PocketBalance"))
 const CustomerTipsBalancePage = lazy(() => import("../pages/CustomerTips"))
 const PocketDetails = lazy(() => import("../pages/PocketDetails"))
+const DeliveryChallenges = lazy(() => import("../pages/Challenges"))
 
 export default function DeliveryRouter() {
   return (
@@ -156,6 +157,16 @@ export default function DeliveryRouter() {
             </ProtectedRoute>
           }
           path="/profile"
+        />
+        <Route
+          element={
+            <ProtectedRoute>
+              <DeliveryLayout showGig={true}>
+                <DeliveryChallenges />
+              </DeliveryLayout>
+            </ProtectedRoute>
+          }
+          path="/challenges"
         />
         <Route
           element={

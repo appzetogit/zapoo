@@ -591,6 +591,7 @@ export default function DeliveryHome() {
   const [orderDeliveredIsAnimatingToComplete, setOrderDeliveredIsAnimatingToComplete] = useState(false);
   const orderDeliveredButtonRef = useRef(null);
   // Trip distance and time from Google Maps API
+<<<<<<< HEAD
   const [tripDistance, setTripDistance] = useState(null); // in meters
   const [tripTime, setTripTime] = useState(null); // in seconds
   const pickupRouteDistanceRef = useRef(0); // Distance to pickup in meters
@@ -612,6 +613,27 @@ export default function DeliveryHome() {
   const acceptButtonSwipeStartY = useRef(0);
   const acceptButtonIsSwiping = useRef(false);
   const autoShowTimerRef = useRef(null);
+=======
+  const [tripDistance, setTripDistance] = useState(null) // in meters
+  const [tripTime, setTripTime] = useState(null) // in seconds
+  const pickupRouteDistanceRef = useRef(0) // Distance to pickup in meters
+  const pickupRouteTimeRef = useRef(0) // Time to pickup in seconds
+  const deliveryRouteDistanceRef = useRef(0) // Distance to delivery in meters
+  const deliveryRouteTimeRef = useRef(0) // Time to delivery in seconds
+  const orderDeliveredSwipeStartX = useRef(0)
+  const orderDeliveredSwipeStartY = useRef(0)
+  const orderDeliveredIsSwiping = useRef(false)
+  const bottomSheetRef = useRef(null)
+  const handleRef = useRef(null)
+  const acceptButtonRef = useRef(null)
+  const swipeStartY = useRef(0)
+  const isSwiping = useRef(false)
+  const acceptButtonSwipeStartX = useRef(0)
+  const acceptButtonSwipeStartY = useRef(0)
+  const acceptButtonIsSwiping = useRef(false)
+  const autoShowTimerRef = useRef(null)
+
+>>>>>>> 6bbb4ca (Challenges flow implemented)
   const {
     bookedGigs,
     currentGig,
@@ -764,6 +786,7 @@ export default function DeliveryHome() {
   // Calculate today's gigs count
   const todayGigsCount = bookedGigs.filter(gig => gig.date === todayDateKey).length;
 
+<<<<<<< HEAD
   // Calculate weekly earnings from wallet transactions (payment + earning_addon bonus)
   // Include both payment and earning_addon transactions in weekly earnings
   const weeklyEarnings = walletState?.transactions?.filter(t => {
@@ -922,6 +945,23 @@ export default function DeliveryHome() {
   // Offer is live if it's valid (started) or upcoming (not started yet but active)
   const isOfferLive = activeEarningAddon?.isValid || activeEarningAddon?.isUpcoming || false;
 
+=======
+  // Calculate weekly earnings from wallet transactions
+  const weeklyEarnings = walletState?.transactions
+    ?.filter(t => {
+      // Include only completed payment transactions
+      if (t.type !== 'payment' || t.status !== 'Completed') return false
+      const now = new Date()
+      const startOfWeek = new Date(now)
+      startOfWeek.setDate(now.getDate() - now.getDay())
+      startOfWeek.setHours(0, 0, 0, 0)
+      const transactionDate = t.date ? new Date(t.date) : (t.createdAt ? new Date(t.createdAt) : null)
+      if (!transactionDate) return false
+      return transactionDate >= startOfWeek && transactionDate <= now
+    })
+    .reduce((sum, t) => sum + (t.amount || 0), 0) || 0
+
+>>>>>>> 6bbb4ca (Challenges flow implemented)
   // Calculate total hours worked today (prefer store, then calculated; default to 0)
   const calculatedHours = bookedGigs.filter(gig => gig.date === todayDateKey).reduce((total, gig) => total + (gig.totalHours || 0), 0);
   const todayHoursWorked = hasStoreDataForToday && todayData ? todayData.timeOnOrders ?? calculatedHours : calculatedHours;
@@ -1230,6 +1270,7 @@ export default function DeliveryHome() {
     }
   }, [showNewOrderPopup]);
 
+<<<<<<< HEAD
   // Simulate audio playback for Earnings Guarantee
   useEffect(() => {
     if (earningsGuaranteeIsPlaying) {
@@ -1254,6 +1295,8 @@ export default function DeliveryHome() {
     setEarningsGuaranteeIsPlaying(!earningsGuaranteeIsPlaying);
   };
 
+=======
+>>>>>>> 6bbb4ca (Challenges flow implemented)
   // Reject reasons for order cancellation
   const rejectReasons = ["Too far from current location", "Vehicle issue", "Personal emergency", "Weather conditions", "Already have too many orders", "Other reason"];
 
@@ -7516,6 +7559,7 @@ export default function DeliveryHome() {
                   <ArrowRight className="w-5 h-5" />
                 </button>
               </motion.div>
+<<<<<<< HEAD
 
 
               {/* Earnings Guarantee Card */}
@@ -7632,6 +7676,8 @@ export default function DeliveryHome() {
                 </div>
               </motion.div>
 
+=======
+>>>>>>> 6bbb4ca (Challenges flow implemented)
               {/* Today's Progress Card */}
               <motion.div initial={{
             opacity: 0,
@@ -9001,5 +9047,11 @@ export default function DeliveryHome() {
             </div>
           </motion.div>}
       </AnimatePresence>
+<<<<<<< HEAD
     </div>;
 }
+=======
+    </div>
+  )
+}
+>>>>>>> 6bbb4ca (Challenges flow implemented)

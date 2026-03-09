@@ -70,9 +70,8 @@ const AddDeliveryman = lazy(() => import("../pages/delivery-partners/AddDelivery
 const DeliverymanList = lazy(() => import("../pages/delivery-partners/DeliverymanList"));
 const DeliverymanReviews = lazy(() => import("../pages/delivery-partners/DeliverymanReviews"));
 const DeliverymanBonus = lazy(() => import("../pages/delivery-partners/DeliverymanBonus"));
-const EarningAddon = lazy(() => import("../pages/delivery-partners/EarningAddon"));
-const EarningAddonHistory = lazy(() => import("../pages/delivery-partners/EarningAddonHistory"));
 const DeliveryEarnings = lazy(() => import("../pages/delivery-partners/DeliveryEarnings"));
+const Challenges = lazy(() => import("../pages/delivery-partners/Challenges"));
 // Disbursement Management
 const RestaurantDisbursement = lazy(() => import("../pages/RestaurantDisbursement"));
 const DeliverymanDisbursement = lazy(() => import("../pages/DeliverymanDisbursement"));
@@ -242,14 +241,13 @@ export default function AdminRouter() {
           <Route path="delivery-boy-wallet" element={<DeliveryBoyWallet />} />
           <Route path="delivery-emergency-help" element={<DeliveryEmergencyHelp />} />
           <Route path="delivery-support-tickets" element={<DeliverySupportTickets />} />
+          <Route path="challenges" element={<Challenges />} />
           {/* Delivery Partners */}
           <Route path="delivery-partners/join-request" element={<JoinRequest />} />
           <Route path="delivery-partners/add" element={<AddDeliveryman />} />
           <Route path="delivery-partners" element={<DeliverymanList />} />
           <Route path="delivery-partners/reviews" element={<DeliverymanReviews />} />
           <Route path="delivery-partners/bonus" element={<DeliverymanBonus />} />
-          <Route path="delivery-partners/earning-addon" element={<EarningAddon />} />
-          <Route path="delivery-partners/earning-addon-history" element={<EarningAddonHistory />} />
           <Route path="delivery-partners/earnings" element={<DeliveryEarnings />} />
 
           {/* DISBURSEMENT MANAGEMENT */}

@@ -183,7 +183,8 @@ export const API_ENDPOINTS = {
     LIST: "/restaurant/list",
     UNDER_250: "/restaurant/under-250",
     BY_ID: "/restaurant/:id",
-    BY_OWNER: "/restaurant/owner/me"
+    BY_OWNER: "/restaurant/owner/me",
+    CHALLENGES: "/restaurant/challenges",
   },
   // Marketing / Advertisement endpoints
   MARKETING: {
@@ -235,13 +236,14 @@ export const API_ENDPOINTS = {
     ORDER_COMPLETE_DELIVERY: "/delivery/orders/:orderId/complete-delivery",
     TRIP_HISTORY: "/delivery/trip-history",
     EARNINGS: "/delivery/earnings",
-    EARNINGS_ACTIVE_OFFERS: "/delivery/earnings/active-offers",
     LOCATION: "/delivery/location",
     ZONES_IN_RADIUS: "/delivery/zones/in-radius",
     REVERIFY: "/delivery/reverify",
     EMERGENCY_HELP: "/delivery/emergency-help",
     SUPPORT_TICKETS: "/delivery/support-tickets",
-    SUPPORT_TICKET_BY_ID: "/delivery/support-tickets/:id"
+    SUPPORT_TICKET_BY_ID: "/delivery/support-tickets/:id",
+    SUPPORT_TICKETS_STATS: "/delivery/support-tickets/stats",
+    CHALLENGES: "/delivery/challenges",
   },
   // Admin endpoints
   ADMIN: {
@@ -278,6 +280,7 @@ export const API_ENDPOINTS = {
     DELIVERY_PARTNER_DELETE: "/admin/delivery-partners/:id",
     DELIVERY_PARTNER_BONUS: "/admin/delivery-partners/bonus",
     DELIVERY_PARTNER_REVIEWS: "/admin/delivery-partners/reviews",
+<<<<<<< HEAD
     DELIVERY_PARTNER_BONUS_TRANSACTIONS: "/admin/delivery-partners/bonus/transactions",
     EARNING_ADDON: "/admin/earning-addon",
     EARNING_ADDON_BY_ID: "/admin/earning-addon/:id",
@@ -288,6 +291,10 @@ export const API_ENDPOINTS = {
     EARNING_ADDON_HISTORY_CREDIT: "/admin/earning-addon-history/:id/credit",
     EARNING_ADDON_HISTORY_CANCEL: "/admin/earning-addon-history/:id/cancel",
     EARNING_ADDON_HISTORY_STATISTICS: "/admin/earning-addon-history/statistics",
+=======
+    DELIVERY_PARTNER_BONUS_TRANSACTIONS:
+      "/admin/delivery-partners/bonus/transactions",
+>>>>>>> 6bbb4ca (Challenges flow implemented)
     ABOUT: "/admin/about",
     ABOUT_PUBLIC: "/about/public",
     TERMS: "/admin/terms",
@@ -371,6 +378,11 @@ export const API_ENDPOINTS = {
     ZONES: "/admin/zones",
     ZONE_BY_ID: "/admin/zones/:id",
     ZONE_STATUS: "/admin/zones/:id/status",
+    CHALLENGE_TEMPLATES: "/admin/challenge-templates",
+    CHALLENGES: "/admin/challenges",
+    CHALLENGE_BY_ID: "/admin/challenges/:id",
+    CHALLENGE_STATUS: "/admin/challenges/:id/status",
+    CHALLENGE_PROGRESS: "/admin/challenges/:id/progress",
     TIERS: "/admin/tiers",
     TIER_BY_ID: "/admin/tiers/:id"
   },

@@ -105,6 +105,7 @@ const ManageOutlets = lazy(() => import("@/module/restaurant/pages/ManageOutlets
 const UpdateBankDetails = lazy(() => import("@/module/restaurant/pages/UpdateBankDetails"))
 const ZoneSetup = lazy(() => import("@/module/restaurant/pages/ZoneSetup"))
 const SubscriptionPlans = lazy(() => import("@/module/restaurant/pages/SubscriptionPlans"))
+const RestaurantChallenges = lazy(() => import("@/module/restaurant/pages/Challenges"))
 
 // Admin Module
 const AdminRouter = lazy(() => import("@/module/admin/components/AdminRouter"))
@@ -120,6 +121,7 @@ const DeliveryOTP = lazy(() => import("@/module/delivery/pages/auth/OTP"))
 const DeliverySignupStep1 = lazy(() => import("@/module/delivery/pages/auth/SignupStep1"))
 const DeliverySignupStep2 = lazy(() => import("@/module/delivery/pages/auth/SignupStep2"))
 const DeliveryWelcome = lazy(() => import("@/module/delivery/pages/auth/Welcome"))
+const DeliveryChallenges = lazy(() => import("@/module/delivery/pages/Challenges"))
 
 function UserPathRedirect() {
   const location = useLocation()
@@ -795,6 +797,14 @@ export default function App() {
           element={
             <ProtectedRoute requiredRole="restaurant" loginPath="/restaurant/login">
               <SubscriptionPlans />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/restaurant/challenges"
+          element={
+            <ProtectedRoute requiredRole="restaurant" loginPath="/restaurant/login">
+              <RestaurantChallenges />
             </ProtectedRoute>
           }
         />

@@ -8,6 +8,7 @@ import { getRestaurants, getRestaurantById, getRestaurantByOwner, updateRestaura
 import { getRestaurantFinance } from './controllers/restaurantFinanceController.js';
 import { getWallet, getWalletTransactions, getWalletStats } from './controllers/restaurantWalletController.js';
 import { createWithdrawalRequest, getRestaurantWithdrawalRequests } from './controllers/withdrawalController.js';
+import { getMyChallenges } from './controllers/restaurantChallengeController.js';
 import { getMenu, updateMenu, getMenuByRestaurantId, addSection, addItemToSection, addSubsectionToSection, addItemToSubsection, addAddon, getAddons, getAddonsByRestaurantId, updateAddon, deleteAddon } from './controllers/menuController.js';
 import { scheduleItemAvailability, cancelScheduledAvailability, getItemSchedule } from './controllers/menuScheduleController.js';
 import { getInventory, updateInventory, getInventoryByRestaurantId } from './controllers/inventoryController.js';
@@ -89,6 +90,7 @@ router.get('/finance', authenticate, getRestaurantFinance);
 router.get('/wallet', authenticate, getWallet);
 router.get('/wallet/transactions', authenticate, getWalletTransactions);
 router.get('/wallet/stats', authenticate, getWalletStats);
+router.get('/challenges', authenticate, getMyChallenges);
 
 // Withdrawal routes (authenticated - for restaurant module)
 router.post('/withdrawal/request', authenticate, createWithdrawalRequest);

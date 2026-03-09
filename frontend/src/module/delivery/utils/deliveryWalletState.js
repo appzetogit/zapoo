@@ -171,14 +171,18 @@ export const calculatePeriodEarnings = (state, period) => {
     default:
       return 0;
   }
-  return state.transactions.filter(t => {
-    // Include both payment and earning_addon transactions in earnings
-    if (t.type !== 'payment' && t.type !== 'earning_addon') return false;
-    if (t.status !== 'Completed') return false;
-    const transactionDate = t.date ? new Date(t.date) : t.createdAt ? new Date(t.createdAt) : null;
-    if (!transactionDate) return false;
-    return transactionDate >= startDate && transactionDate <= now;
-  }).reduce((sum, t) => sum + (t.amount || 0), 0);
+
+  return state.transactions
+    .filter(t => {
+      if (t.type !== 'payment') return false;
+      if (t.status !== 'Completed') return false;
+
+      const transactionDate = t.date ? new Date(t.date) : (t.createdAt ? new Date(t.createdAt) : null);
+      if (!transactionDate) return false;
+
+      return transactionDate >= startDate && transactionDate <= now;
+    })
+    .reduce((sum, t) => sum + (t.amount || 0), 0);
 };
 
 /**

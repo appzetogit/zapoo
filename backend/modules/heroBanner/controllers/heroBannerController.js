@@ -824,7 +824,11 @@ export const getTop10Restaurants = async (req, res) => {
     const userLat = latitude ? parseFloat(latitude) : null;
     const userLng = longitude ? parseFloat(longitude) : null;
 
-    const restaurants = await Top10Restaurant.find({ isActive: true })
+    const now = new Date();
+    const restaurants = await Top10Restaurant.find({
+      isActive: true,
+      $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }]
+    })
       .populate('restaurant', 'name restaurantId slug profileImage coverImages menuImages rating estimatedDeliveryTime distance offer featuredDish featuredPrice location deliveryRange')
       .sort({ rank: 1, order: 1 })
       .lean();

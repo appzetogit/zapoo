@@ -8,6 +8,7 @@ import {
   getDeliveryTickets,
   getTicketById
 } from '../../admin/controllers/deliverySupportTicketController.js';
+import { getMyChallenges } from '../controllers/deliveryChallengeController.js';
 
 const router = express.Router();
 
@@ -72,6 +73,6 @@ router.post('/support-tickets', validate(Joi.object({
 
 router.get('/support-tickets', getDeliveryTickets);
 router.get('/support-tickets/:id', getTicketById);
+router.get('/challenges', getMyChallenges);
 
 export default router;
-

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import { useNavigate } from "react-router-dom"
-import { ChevronRight, Menu, Megaphone, Crown, Bell } from "lucide-react"
+import { ChevronRight, Menu, Megaphone, Crown, Bell, Trophy } from "lucide-react"
 import BottomNavOrders from "../components/BottomNavOrders"
 import offersAndDiscountsIcon from "@/assets/hub/icons/offersanddiscounts.png"
 import { subscriptionAPI } from "@/lib/api"
@@ -125,6 +125,24 @@ export default function HubGrowth() {
               <ChevronRight className="w-5 h-5 text-blue-600 shrink-0" />
             </motion.div>
             */}
+
+            {/* Challenges card */}
+            <motion.div
+              whileTap={{ scale: 0.98 }}
+              onClick={() => navigate("/restaurant/challenges")}
+              className="bg-white rounded-lg p-4 flex items-center gap-4 border border-gray-200 cursor-pointer"
+            >
+              <div className="shrink-0">
+                <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                  <Trophy className="w-6 h-6 text-purple-600" />
+                </div>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-base font-bold text-gray-900 mb-1">Business Challenges</h3>
+                <p className="text-sm text-gray-600">Complete milestones to earn rewards and grow faster</p>
+              </div>
+              <ChevronRight className="w-5 h-5 text-blue-600 shrink-0" />
+            </motion.div>
 
           </div>
         </div>

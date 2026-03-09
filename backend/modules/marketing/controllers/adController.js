@@ -1,10 +1,12 @@
 import mongoose from 'mongoose';
 import AdRequest from '../models/AdRequest.js';
+import ChallengeBanner from '../models/ChallengeBanner.js';
 import { createOrder, verifyPayment } from '../../payment/services/razorpayService.js';
 import express from 'express';
 import Zone from '../../admin/models/Zone.js';
 import Tier from '../../admin/models/Tier.js';
 import Restaurant from '../../restaurant/models/Restaurant.js';
+import { calculateDistance } from '../../order/services/orderCalculationService.js';
 
 // Pricing configuration based on Tier Rank
 const AD_PRICING = {
@@ -303,9 +305,11 @@ export const updateAdStatus = async (req, res) => {
 };
 
 /**
- * Get active ads for user display by zone
+ * Get active ads for user display by zone (paid ads + challenge reward banners).
+ * Optional query: latitude, longitude — when provided, challenge banners are filtered by restaurant.deliveryRange.
  */
 export const getActiveAdsByZone = async (req, res) => {
+<<<<<<< HEAD
   try {
     const {
       zoneId
@@ -343,6 +347,66 @@ export const getActiveAdsByZone = async (req, res) => {
       message: error.message
     });
   }
+=======
+    try {
+        const { zoneId } = req.params;
+        const { latitude, longitude } = req.query;
+        const userLat = latitude != null ? parseFloat(latitude) : null;
+        const userLng = longitude != null ? parseFloat(longitude) : null;
+        const now = new Date();
+
+        const [paidAds, challengeBanners] = await Promise.all([
+            AdRequest.find({
+                targetZones: zoneId,
+                status: { $in: ['Active', 'Scheduled'] },
+                startDate: { $lte: now },
+                endDate: { $gte: now }
+            })
+                .populate('restaurant', 'name logo address')
+                .limit(20)
+                .lean(),
+            ChallengeBanner.find({
+                zoneId,
+                startDate: { $lte: now },
+                endDate: { $gte: now }
+            })
+                .populate('restaurant', 'name logo address location deliveryRange')
+                .lean()
+        ]);
+
+        let challengeAds = challengeBanners.map((cb) => ({
+            _id: cb._id,
+            bannerImage: cb.bannerImage,
+            title: cb.title,
+            description: cb.description,
+            redirectTarget: cb.redirectTarget || 'menu',
+            restaurant: cb.restaurant,
+            source: 'challenge'
+        }));
+
+        if (userLat != null && userLng != null && Number.isFinite(userLat) && Number.isFinite(userLng)) {
+            challengeAds = challengeAds.filter((ad) => {
+                const rest = ad.restaurant;
+                if (!rest) return false;
+                const lat = rest.location?.latitude ?? rest.location?.coordinates?.[1];
+                const lng = rest.location?.longitude ?? rest.location?.coordinates?.[0];
+                if (lat == null || lng == null) return true;
+                const rangeKm = rest.deliveryRange ?? 5;
+                const dist = calculateDistance([lng, lat], [userLng, userLat]);
+                return dist <= rangeKm;
+            });
+        }
+
+        const zone = await Zone.findById(zoneId).populate('tierId');
+        const maxBanners = zone?.tierId?.maxBanners ?? 5;
+        const selectedPaid = paidAds.slice(0, maxBanners);
+        const combined = [...selectedPaid, ...challengeAds].slice(0, 20);
+
+        res.status(200).json({ success: true, data: combined });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+>>>>>>> 6bbb4ca (Challenges flow implemented)
 };
 
 /**

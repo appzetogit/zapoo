@@ -12,8 +12,7 @@ const top10RestaurantSchema = new mongoose.Schema({
     type: Number,
     required: true,
     min: 1,
-    max: 10,
-    unique: true
+    max: 20
   },
   order: {
     type: Number,
@@ -22,6 +21,17 @@ const top10RestaurantSchema = new mongoose.Schema({
   isActive: {
     type: Boolean,
     default: true
+  },
+  source: {
+    type: String,
+    enum: ['curated', 'challenge'],
+    default: 'curated',
+    index: true
+  },
+  expiresAt: {
+    type: Date,
+    default: null,
+    index: true
   },
   createdAt: {
     type: Date,
@@ -39,23 +49,26 @@ const top10RestaurantSchema = new mongoose.Schema({
 top10RestaurantSchema.index({ rank: 1, isActive: 1 });
 top10RestaurantSchema.index({ order: 1, isActive: 1 });
 
-// Ensure only 10 restaurants can be active
+// Ensure only 10 curated (non-challenge) slots; challenge entries are unlimited and time-bound via expiresAt
 top10RestaurantSchema.pre('save', async function(next) {
-  if (this.isActive && this.isNew) {
-    const activeCount = await mongoose.model('Top10Restaurant').countDocuments({ isActive: true });
-    if (activeCount >= 10) {
-      return next(new Error('Maximum 10 restaurants can be active in Top 10'));
-    }
-  }
-  // If activating an existing restaurant, check count excluding current document
-  if (this.isActive && !this.isNew && this.isModified('isActive')) {
-    const activeCount = await mongoose.model('Top10Restaurant').countDocuments({ 
-      isActive: true, 
-      _id: { $ne: this._id } 
+  if (this.source === 'challenge') return next(); // No limit for challenge entries
+  if (!this.isActive) return next();
+
+  const now = new Date();
+  const query = {
+    isActive: true,
+    source: { $ne: 'challenge' },
+    $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }]
+  };
+  if (this.isNew) {
+    const count = await mongoose.model('Top10Restaurant').countDocuments(query);
+    if (count >= 10) return next(new Error('Maximum 10 curated restaurants can be active in Top 10'));
+  } else if (this.isModified('isActive') || this.isModified('expiresAt') || this.isModified('source')) {
+    const count = await mongoose.model('Top10Restaurant').countDocuments({
+      ...query,
+      _id: { $ne: this._id }
     });
-    if (activeCount >= 10) {
-      return next(new Error('Maximum 10 restaurants can be active in Top 10'));
-    }
+    if (count >= 10) return next(new Error('Maximum 10 curated restaurants can be active in Top 10'));
   }
   next();
 });
