@@ -280,21 +280,8 @@ export const API_ENDPOINTS = {
     DELIVERY_PARTNER_DELETE: "/admin/delivery-partners/:id",
     DELIVERY_PARTNER_BONUS: "/admin/delivery-partners/bonus",
     DELIVERY_PARTNER_REVIEWS: "/admin/delivery-partners/reviews",
-<<<<<<< HEAD
-    DELIVERY_PARTNER_BONUS_TRANSACTIONS: "/admin/delivery-partners/bonus/transactions",
-    EARNING_ADDON: "/admin/earning-addon",
-    EARNING_ADDON_BY_ID: "/admin/earning-addon/:id",
-    EARNING_ADDON_STATUS: "/admin/earning-addon/:id/status",
-    EARNING_ADDON_CHECK_COMPLETIONS: "/admin/earning-addon/check-completions",
-    EARNING_ADDON_HISTORY: "/admin/earning-addon-history",
-    EARNING_ADDON_HISTORY_BY_ID: "/admin/earning-addon-history/:id",
-    EARNING_ADDON_HISTORY_CREDIT: "/admin/earning-addon-history/:id/credit",
-    EARNING_ADDON_HISTORY_CANCEL: "/admin/earning-addon-history/:id/cancel",
-    EARNING_ADDON_HISTORY_STATISTICS: "/admin/earning-addon-history/statistics",
-=======
     DELIVERY_PARTNER_BONUS_TRANSACTIONS:
       "/admin/delivery-partners/bonus/transactions",
->>>>>>> 6bbb4ca (Challenges flow implemented)
     ABOUT: "/admin/about",
     ABOUT_PUBLIC: "/about/public",
     TERMS: "/admin/terms",

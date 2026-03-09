@@ -1,20 +1,7 @@
-<<<<<<< HEAD
 import { useEffect, useRef, useState } from "react";
 import { gsap } from "gsap";
 import Lenis from "lenis";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Home, FileText, UtensilsCrossed, User, ArrowLeft, ArrowRight, Star, Briefcase, Bike, Headphones, Ticket, Bell, ChevronRight, IndianRupee, Sparkles, LogOut, X } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
-import { deliveryAPI, notificationAPI } from "@/lib/api";
-import { toast } from "sonner";
-import { clearModuleAuth } from "@/lib/utils/auth";
-import alertSound from "@/assets/audio/alert.mp3";
-import originalSound from "@/assets/audio/original.mp3";
-=======
-import { useEffect, useRef, useState } from "react"
-import { gsap } from "gsap"
-import Lenis from "lenis"
-import { useNavigate, useLocation } from "react-router-dom"
 import {
   Home,
   FileText,
@@ -33,16 +20,14 @@ import {
   Sparkles,
   LogOut,
   X,
-  Trophy
-} from "lucide-react"
-import { Card, CardContent } from "@/components/ui/card"
-import { deliveryAPI } from "@/lib/api"
-import { toast } from "sonner"
-import { clearModuleAuth } from "@/lib/utils/auth"
-import alertSound from "@/assets/audio/alert.mp3"
-import originalSound from "@/assets/audio/original.mp3"
-
->>>>>>> 6bbb4ca (Challenges flow implemented)
+  Trophy,
+} from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { deliveryAPI } from "@/lib/api";
+import { toast } from "sonner";
+import { clearModuleAuth } from "@/lib/utils/auth";
+import alertSound from "@/assets/audio/alert.mp3";
+import originalSound from "@/assets/audio/original.mp3";
 export default function ProfilePage() {
   const navigate = useNavigate();
   const location = useLocation();

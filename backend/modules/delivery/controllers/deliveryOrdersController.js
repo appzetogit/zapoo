@@ -572,11 +572,6 @@ export const acceptOrder = asyncHandler(async (req, res) => {
       }
       return errorResponse(res, 500, `Failed to update order: ${updateError.message || 'Unknown error'}`);
     }
-<<<<<<< HEAD
-=======
-
-    console.log(`✅ Order ${order.orderId} accepted by delivery partner ${delivery._id}`);
-    console.log(`📍 Route calculated: ${routeData.distance.toFixed(2)} km, ${routeData.duration.toFixed(1)} mins`);
 
     try {
       await evaluateChallengesOnDeliveryAccepted({
@@ -585,11 +580,9 @@ export const acceptOrder = asyncHandler(async (req, res) => {
         eventDate: new Date(),
         zoneId: updatedOrder?.assignmentInfo?.zoneId || null
       });
-    } catch (_) {
+    } catch {
       // Challenge evaluation is non-blocking for order acceptance flow.
     }
-
->>>>>>> 6bbb4ca (Challenges flow implemented)
     // Calculate delivery distance (restaurant to customer) for earnings calculation
     let deliveryDistance = 0;
     if (updatedOrder.restaurantId?.location?.coordinates && updatedOrder.address?.location?.coordinates) {
@@ -1424,17 +1417,13 @@ export const completeDelivery = asyncHandler(async (req, res) => {
     if (!updatedOrder) {
       return errorResponse(res, 500, 'Failed to update order status');
     }
-<<<<<<< HEAD
-=======
 
     try {
       await evaluateChallengesOnOrderCompleted(updatedOrder);
       await evaluateChallengesOnDeliveryCompleted(updatedOrder);
-    } catch (_) {
+    } catch {
       // Challenge evaluation is non-blocking for delivery completion flow.
     }
-
->>>>>>> 6bbb4ca (Challenges flow implemented)
     const orderIdForLog = updatedOrder.orderId || order.orderId || orderMongoId?.toString() || orderId;
     // Mark COD payment as collected (admin Payment Status → Collected)
     if (order.payment?.method === 'cash' || order.payment?.method === 'cod') {
@@ -1604,23 +1593,6 @@ export const completeDelivery = asyncHandler(async (req, res) => {
       // But log it for investigation
     }
 
-<<<<<<< HEAD
-    // Check and award earning addon bonuses if delivery boy qualifies
-    let earningAddonBonus = null;
-    try {
-      const {
-        checkAndAwardEarningAddon
-      } = await import('../services/earningAddonService.js');
-      earningAddonBonus = await checkAndAwardEarningAddon(delivery._id, orderMongoId || order._id, updatedOrder.deliveredAt || new Date());
-      if (earningAddonBonus) {}
-    } catch (earningAddonError) {
-      logger.error('❌ Error checking earning addon bonuses:', earningAddonError);
-      console.error('❌ Error processing earning addon bonus:', earningAddonError);
-      // Don't fail the delivery completion if bonus check fails
-    }
-
-=======
->>>>>>> 6bbb4ca (Challenges flow implemented)
     // Calculate restaurant commission and update restaurant wallet
     let restaurantWalletTransaction = null;
     let adminCommissionRecord = null;

@@ -300,11 +300,5 @@ deliveryWalletSchema.statics.findOrCreateByDeliveryId = async function (delivery
   }
   return wallet;
 };
-<<<<<<< HEAD
-export default mongoose.model('DeliveryWallet', deliveryWalletSchema);
-=======
 
 export default mongoose.model('DeliveryWallet', deliveryWalletSchema);
-
-
->>>>>>> 6bbb4ca (Challenges flow implemented)
