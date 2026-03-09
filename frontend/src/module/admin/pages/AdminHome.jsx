@@ -1,105 +1,110 @@
-import { useEffect, useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
-  Area,
-  AreaChart,
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Legend,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts"
-import { Activity, ArrowUpRight, ShoppingBag, CreditCard, Truck, Receipt, DollarSign, Store, UserCheck, Package, UserCircle, Clock, CheckCircle, Plus } from "lucide-react"
-import zapooLogo from "@/assets/zapoo_logo.png"
-import { adminAPI } from "@/lib/api"
-
+import { useEffect, useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Activity, ArrowUpRight, ShoppingBag, CreditCard, Truck, Receipt, DollarSign, Store, UserCheck, Package, UserCircle, Clock, CheckCircle, Plus } from "lucide-react";
+import zapooLogo from "@/assets/zapoo_logo.png";
+import { adminAPI } from "@/lib/api";
 export default function AdminHome() {
-  const [selectedTier, setSelectedTier] = useState("all")
-  const [selectedPeriod, setSelectedPeriod] = useState("overall")
-  const [isLoading, setIsLoading] = useState(true)
-  const [dashboardData, setDashboardData] = useState(null)
-  const [tiers, setTiers] = useState([])
+  const [selectedTier, setSelectedTier] = useState("all");
+  const [selectedPeriod, setSelectedPeriod] = useState("overall");
+  const [isLoading, setIsLoading] = useState(true);
+  const [dashboardData, setDashboardData] = useState(null);
+  const [tiers, setTiers] = useState([]);
 
   // Fetch tiers for the dropdown
   useEffect(() => {
     const fetchTiers = async () => {
       try {
-        const response = await adminAPI.getAllTiers()
+        const response = await adminAPI.getAllTiers();
         if (response.data?.success && response.data?.data) {
-          setTiers(response.data.data)
+          setTiers(response.data.data);
         }
       } catch (error) {
-        console.error('❌ Error fetching tiers:', error)
+        console.error('❌ Error fetching tiers:', error);
       }
-    }
-    fetchTiers()
-  }, [])
+    };
+    fetchTiers();
+  }, []);
 
   // Fetch dashboard stats when filters change
   useEffect(() => {
     const fetchDashboardStats = async () => {
       try {
-        setIsLoading(true)
+        setIsLoading(true);
         const params = {
           period: selectedPeriod,
           tierId: selectedTier === "all" ? undefined : selectedTier
-        }
-        const response = await adminAPI.getDashboardStats(params)
+        };
+        const response = await adminAPI.getDashboardStats(params);
         if (response.data?.success && response.data?.data) {
-          setDashboardData(response.data.data)
-          console.log('✅ Dashboard stats fetched:', response.data.data)
+          setDashboardData(response.data.data);
         } else {
-          console.error('❌ Invalid response format:', response.data)
+          console.error('❌ Invalid response format:', response.data);
         }
       } catch (error) {
-        console.error('❌ Error fetching dashboard stats:', error)
+        console.error('❌ Error fetching dashboard stats:', error);
       } finally {
-        setIsLoading(false)
+        setIsLoading(false);
       }
-    }
-
-    fetchDashboardStats()
-  }, [selectedTier, selectedPeriod])
+    };
+    fetchDashboardStats();
+  }, [selectedTier, selectedPeriod]);
 
   // Get order stats from real data
   const getOrderStats = () => {
     if (!dashboardData?.orders?.byStatus) {
-      return [
-        { label: "Delivered", value: 0, color: "#0ea5e9" },
-        { label: "Cancelled", value: 0, color: "#ef4444" },
-        { label: "Refunded", value: 0, color: "#f59e0b" },
-        { label: "Pending", value: 0, color: "#10b981" },
-      ]
+      return [{
+        label: "Delivered",
+        value: 0,
+        color: "#0ea5e9"
+      }, {
+        label: "Cancelled",
+        value: 0,
+        color: "#ef4444"
+      }, {
+        label: "Refunded",
+        value: 0,
+        color: "#f59e0b"
+      }, {
+        label: "Pending",
+        value: 0,
+        color: "#10b981"
+      }];
     }
-
-    const byStatus = dashboardData.orders.byStatus
-    return [
-      { label: "Delivered", value: byStatus.delivered || 0, color: "#0ea5e9" },
-      { label: "Cancelled", value: byStatus.cancelled || 0, color: "#ef4444" },
-      { label: "Refunded", value: 0, color: "#f59e0b" }, // Refunded not tracked separately
-      { label: "Pending", value: byStatus.pending || 0, color: "#10b981" },
-    ]
-  }
+    const byStatus = dashboardData.orders.byStatus;
+    return [{
+      label: "Delivered",
+      value: byStatus.delivered || 0,
+      color: "#0ea5e9"
+    }, {
+      label: "Cancelled",
+      value: byStatus.cancelled || 0,
+      color: "#ef4444"
+    }, {
+      label: "Refunded",
+      value: 0,
+      color: "#f59e0b"
+    },
+    // Refunded not tracked separately
+    {
+      label: "Pending",
+      value: byStatus.pending || 0,
+      color: "#10b981"
+    }];
+  };
 
   // Get monthly data from real data
   const getMonthlyData = () => {
     if (!dashboardData?.monthlyData || dashboardData.monthlyData.length === 0) {
       // Return empty data structure if no data
-      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-      return monthNames.map(month => ({ month, commission: 0, revenue: 0, orders: 0 }))
+      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      return monthNames.map(month => ({
+        month,
+        commission: 0,
+        revenue: 0,
+        orders: 0
+      }));
     }
 
     // Use real monthly data from backend
@@ -108,53 +113,46 @@ export default function AdminHome() {
       commission: item.commission || 0,
       revenue: item.revenue || 0,
       orders: item.orders || 0
-    }))
-  }
-
-  const orderStats = getOrderStats()
-  const monthlyData = getMonthlyData()
+    }));
+  };
+  const orderStats = getOrderStats();
+  const monthlyData = getMonthlyData();
 
   // Calculate totals from real data
-  const revenueTotal = dashboardData?.revenue?.total || 0
-  const commissionTotal = dashboardData?.commission?.total || 0
-  const ordersTotal = dashboardData?.orders?.total || 0
-  const platformFeeTotal = dashboardData?.platformFee?.total || 0
-  const deliveryFeeTotal = dashboardData?.deliveryFee?.total || 0
-  const gstTotal = dashboardData?.gst?.total || 0
-  const recommendedItemFeeTotal = dashboardData?.recommendedItemFee?.total || 0
+  const revenueTotal = dashboardData?.revenue?.total || 0;
+  const commissionTotal = dashboardData?.commission?.total || 0;
+  const ordersTotal = dashboardData?.orders?.total || 0;
+  const platformFeeTotal = dashboardData?.platformFee?.total || 0;
+  const deliveryFeeTotal = dashboardData?.deliveryFee?.total || 0;
+  const gstTotal = dashboardData?.gst?.total || 0;
+  const recommendedItemFeeTotal = dashboardData?.recommendedItemFee?.total || 0;
   // Total revenue = Commission + Platform Fee + Delivery Fee + GST + Recommended Item Fee
-  const totalAdminEarnings = commissionTotal + platformFeeTotal + deliveryFeeTotal + gstTotal + recommendedItemFeeTotal
+  const totalAdminEarnings = commissionTotal + platformFeeTotal + deliveryFeeTotal + gstTotal + recommendedItemFeeTotal;
 
   // Additional stats
-  const totalRestaurants = dashboardData?.restaurants?.total || 0
-  const pendingRestaurantRequests = dashboardData?.restaurants?.pendingRequests || 0
-  const totalDeliveryBoys = dashboardData?.deliveryBoys?.total || 0
-  const pendingDeliveryBoyRequests = dashboardData?.deliveryBoys?.pendingRequests || 0
-  const totalFoods = dashboardData?.foods?.total || 0
-  const totalAddons = dashboardData?.addons?.total || 0
-  const totalCustomers = dashboardData?.customers?.total || 0
-  const pendingOrders = dashboardData?.orderStats?.pending || 0
-  const completedOrders = dashboardData?.orderStats?.completed || 0
-
-  const pieData = orderStats.map((item) => ({
+  const totalRestaurants = dashboardData?.restaurants?.total || 0;
+  const pendingRestaurantRequests = dashboardData?.restaurants?.pendingRequests || 0;
+  const totalDeliveryBoys = dashboardData?.deliveryBoys?.total || 0;
+  const pendingDeliveryBoyRequests = dashboardData?.deliveryBoys?.pendingRequests || 0;
+  const totalFoods = dashboardData?.foods?.total || 0;
+  const totalAddons = dashboardData?.addons?.total || 0;
+  const totalCustomers = dashboardData?.customers?.total || 0;
+  const pendingOrders = dashboardData?.orderStats?.pending || 0;
+  const completedOrders = dashboardData?.orderStats?.completed || 0;
+  const pieData = orderStats.map(item => ({
     name: item.label,
     value: item.value,
-    fill: item.color,
-  }))
-
-  const activityFeed = []
-
-  return (
-    <div className="px-4 pb-10 lg:px-6 pt-4">
+    fill: item.color
+  }));
+  const activityFeed = [];
+  return <div className="px-4 pb-10 lg:px-6 pt-4">
       <div className="relative overflow-hidden rounded-3xl border border-neutral-200 bg-white shadow-[0_30px_120px_-60px_rgba(0,0,0,0.28)]">
-        {isLoading && (
-          <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/70 backdrop-blur-sm">
+        {isLoading && <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/70 backdrop-blur-sm">
             <div className="flex items-center gap-3 rounded-full bg-white px-4 py-2 text-sm text-neutral-700 ring-1 ring-neutral-200">
               <span className="h-3 w-3 animate-ping rounded-full bg-neutral-800/70" />
               Updating metrics...
             </div>
-          </div>
-        )}
+          </div>}
 
         <div className="flex flex-col gap-4 border-b border-neutral-200 bg-linear-to-br from-white via-neutral-50 to-neutral-100 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-4">
@@ -171,11 +169,9 @@ export default function AdminHome() {
               </SelectTrigger>
               <SelectContent className="border-neutral-200 bg-white text-neutral-900">
                 <SelectItem value="all">All Tiers</SelectItem>
-                {tiers.map((tier) => (
-                  <SelectItem key={tier._id} value={tier._id}>
+                {tiers.map(tier => <SelectItem key={tier._id} value={tier._id}>
                     {tier.name}
-                  </SelectItem>
-                ))}
+                  </SelectItem>)}
               </SelectContent>
             </Select>
             <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
@@ -195,125 +191,26 @@ export default function AdminHome() {
 
         <div className="space-y-6 px-6 py-6">
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <MetricCard
-              title="Gross revenue"
-              value={`₹${revenueTotal.toLocaleString("en-IN")}`}
-              helper="Rolling 12 months"
-              icon={<ShoppingBag className="h-5 w-5 text-emerald-600" />}
-              accent="bg-emerald-200/40"
-            />
-            <MetricCard
-              title="Commission earned"
-              value={`₹${commissionTotal.toLocaleString("en-IN")}`}
-              helper="Restaurant commission"
-              icon={<ArrowUpRight className="h-5 w-5 text-indigo-600" />}
-              accent="bg-indigo-200/40"
-            />
-            <MetricCard
-              title="Orders processed"
-              value={ordersTotal.toLocaleString("en-IN")}
-              helper="Fulfilled & billed"
-              icon={<Activity className="h-5 w-5 text-amber-600" />}
-              accent="bg-amber-200/40"
-            />
-            <MetricCard
-              title="Platform fee"
-              value={`₹${platformFeeTotal.toLocaleString("en-IN")}`}
-              helper="Total platform fees"
-              icon={<CreditCard className="h-5 w-5 text-purple-600" />}
-              accent="bg-purple-200/40"
-            />
-            <MetricCard
-              title="Delivery fee"
-              value={`₹${deliveryFeeTotal.toLocaleString("en-IN")}`}
-              helper="Total delivery fees"
-              icon={<Truck className="h-5 w-5 text-blue-600" />}
-              accent="bg-blue-200/40"
-            />
-            <MetricCard
-              title="GST"
-              value={`₹${gstTotal.toLocaleString("en-IN")}`}
-              helper="Total GST collected"
-              icon={<Receipt className="h-5 w-5 text-orange-600" />}
-              accent="bg-orange-200/40"
-            />
-            <MetricCard
-              title="Recommended Item fees"
-              value={`₹${recommendedItemFeeTotal.toLocaleString("en-IN")}`}
-              helper="Total recommended fees"
-              icon={<Plus className="h-5 w-5 text-pink-600" />}
-              accent="bg-pink-200/40"
-            />
-            <MetricCard
-              title="Total revenue"
-              value={`₹${totalAdminEarnings.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-              helper={`Commission ₹${commissionTotal.toFixed(2)} + Platform ₹${platformFeeTotal.toFixed(2)} + Delivery ₹${deliveryFeeTotal.toFixed(2)} + GST ₹${gstTotal.toFixed(2)} + Rec ₹${recommendedItemFeeTotal.toFixed(2)}`}
-              icon={<DollarSign className="h-5 w-5 text-green-600" />}
-              accent="bg-green-200/40"
-            />
-            <MetricCard
-              title="Total restaurants"
-              value={totalRestaurants.toLocaleString("en-IN")}
-              helper="All registered restaurants"
-              icon={<Store className="h-5 w-5 text-blue-600" />}
-              accent="bg-blue-200/40"
-            />
-            <MetricCard
-              title="Restaurant request pending"
-              value={pendingRestaurantRequests.toLocaleString("en-IN")}
-              helper="Awaiting approval"
-              icon={<UserCheck className="h-5 w-5 text-orange-600" />}
-              accent="bg-orange-200/40"
-            />
-            <MetricCard
-              title="Total delivery boy"
-              value={totalDeliveryBoys.toLocaleString("en-IN")}
-              helper="All delivery partners"
-              icon={<Truck className="h-5 w-5 text-indigo-600" />}
-              accent="bg-indigo-200/40"
-            />
-            <MetricCard
-              title="Delivery boy request pending"
-              value={pendingDeliveryBoyRequests.toLocaleString("en-IN")}
-              helper="Awaiting verification"
-              icon={<Clock className="h-5 w-5 text-yellow-600" />}
-              accent="bg-yellow-200/40"
-            />
-            <MetricCard
-              title="Total foods"
-              value={totalFoods.toLocaleString("en-IN")}
-              helper="Active menu items"
-              icon={<Package className="h-5 w-5 text-purple-600" />}
-              accent="bg-purple-200/40"
-            />
-            <MetricCard
-              title="Total addons"
-              value={totalAddons.toLocaleString("en-IN")}
-              helper="Active addon items"
-              icon={<Plus className="h-5 w-5 text-pink-600" />}
-              accent="bg-pink-200/40"
-            />
-            <MetricCard
-              title="Total customers"
-              value={totalCustomers.toLocaleString("en-IN")}
-              helper="Registered users"
-              icon={<UserCircle className="h-5 w-5 text-cyan-600" />}
-              accent="bg-cyan-200/40"
-            />
-            <MetricCard
-              title="Pending orders"
-              value={pendingOrders.toLocaleString("en-IN")}
-              helper="Orders awaiting processing"
-              icon={<Clock className="h-5 w-5 text-red-600" />}
-              accent="bg-red-200/40"
-            />
-            <MetricCard
-              title="Completed orders"
-              value={completedOrders.toLocaleString("en-IN")}
-              helper="Successfully delivered"
-              icon={<CheckCircle className="h-5 w-5 text-emerald-600" />}
-              accent="bg-emerald-200/40"
-            />
+            <MetricCard title="Gross revenue" value={`₹${revenueTotal.toLocaleString("en-IN")}`} helper="Rolling 12 months" icon={<ShoppingBag className="h-5 w-5 text-emerald-600" />} accent="bg-emerald-200/40" />
+            <MetricCard title="Commission earned" value={`₹${commissionTotal.toLocaleString("en-IN")}`} helper="Restaurant commission" icon={<ArrowUpRight className="h-5 w-5 text-indigo-600" />} accent="bg-indigo-200/40" />
+            <MetricCard title="Orders processed" value={ordersTotal.toLocaleString("en-IN")} helper="Fulfilled & billed" icon={<Activity className="h-5 w-5 text-amber-600" />} accent="bg-amber-200/40" />
+            <MetricCard title="Platform fee" value={`₹${platformFeeTotal.toLocaleString("en-IN")}`} helper="Total platform fees" icon={<CreditCard className="h-5 w-5 text-purple-600" />} accent="bg-purple-200/40" />
+            <MetricCard title="Delivery fee" value={`₹${deliveryFeeTotal.toLocaleString("en-IN")}`} helper="Total delivery fees" icon={<Truck className="h-5 w-5 text-blue-600" />} accent="bg-blue-200/40" />
+            <MetricCard title="GST" value={`₹${gstTotal.toLocaleString("en-IN")}`} helper="Total GST collected" icon={<Receipt className="h-5 w-5 text-orange-600" />} accent="bg-orange-200/40" />
+            <MetricCard title="Recommended Item fees" value={`₹${recommendedItemFeeTotal.toLocaleString("en-IN")}`} helper="Total recommended fees" icon={<Plus className="h-5 w-5 text-pink-600" />} accent="bg-pink-200/40" />
+            <MetricCard title="Total revenue" value={`₹${totalAdminEarnings.toLocaleString("en-IN", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+          })}`} helper={`Commission ₹${commissionTotal.toFixed(2)} + Platform ₹${platformFeeTotal.toFixed(2)} + Delivery ₹${deliveryFeeTotal.toFixed(2)} + GST ₹${gstTotal.toFixed(2)} + Rec ₹${recommendedItemFeeTotal.toFixed(2)}`} icon={<DollarSign className="h-5 w-5 text-green-600" />} accent="bg-green-200/40" />
+            <MetricCard title="Total restaurants" value={totalRestaurants.toLocaleString("en-IN")} helper="All registered restaurants" icon={<Store className="h-5 w-5 text-blue-600" />} accent="bg-blue-200/40" />
+            <MetricCard title="Restaurant request pending" value={pendingRestaurantRequests.toLocaleString("en-IN")} helper="Awaiting approval" icon={<UserCheck className="h-5 w-5 text-orange-600" />} accent="bg-orange-200/40" />
+            <MetricCard title="Total delivery boy" value={totalDeliveryBoys.toLocaleString("en-IN")} helper="All delivery partners" icon={<Truck className="h-5 w-5 text-indigo-600" />} accent="bg-indigo-200/40" />
+            <MetricCard title="Delivery boy request pending" value={pendingDeliveryBoyRequests.toLocaleString("en-IN")} helper="Awaiting verification" icon={<Clock className="h-5 w-5 text-yellow-600" />} accent="bg-yellow-200/40" />
+            <MetricCard title="Total foods" value={totalFoods.toLocaleString("en-IN")} helper="Active menu items" icon={<Package className="h-5 w-5 text-purple-600" />} accent="bg-purple-200/40" />
+            <MetricCard title="Total addons" value={totalAddons.toLocaleString("en-IN")} helper="Active addon items" icon={<Plus className="h-5 w-5 text-pink-600" />} accent="bg-pink-200/40" />
+            <MetricCard title="Total customers" value={totalCustomers.toLocaleString("en-IN")} helper="Registered users" icon={<UserCircle className="h-5 w-5 text-cyan-600" />} accent="bg-cyan-200/40" />
+            <MetricCard title="Pending orders" value={pendingOrders.toLocaleString("en-IN")} helper="Orders awaiting processing" icon={<Clock className="h-5 w-5 text-red-600" />} accent="bg-red-200/40" />
+            <MetricCard title="Completed orders" value={completedOrders.toLocaleString("en-IN")} helper="Successfully delivered" icon={<CheckCircle className="h-5 w-5 text-emerald-600" />} accent="bg-emerald-200/40" />
           </div>
 
           <div className="grid gap-4 lg:grid-cols-3">
@@ -341,35 +238,19 @@ export default function AdminHome() {
                       <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                       <XAxis dataKey="month" stroke="#6b7280" />
                       <YAxis stroke="#6b7280" />
-                      <Tooltip
-                        contentStyle={{ background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 12 }}
-                        labelStyle={{ color: "#111827" }}
-                        itemStyle={{ color: "#111827" }}
-                      />
+                      <Tooltip contentStyle={{
+                      background: "#ffffff",
+                      border: "1px solid #e5e7eb",
+                      borderRadius: 12
+                    }} labelStyle={{
+                      color: "#111827"
+                    }} itemStyle={{
+                      color: "#111827"
+                    }} />
                       <Legend />
-                      <Area
-                        type="monotone"
-                        dataKey="revenue"
-                        stroke="#0ea5e9"
-                        fillOpacity={1}
-                        fill="url(#revFill)"
-                        name="Gross revenue"
-                      />
-                      <Area
-                        type="monotone"
-                        dataKey="commission"
-                        stroke="#a855f7"
-                        fillOpacity={1}
-                        fill="url(#comFill)"
-                        name="Commission"
-                      />
-                      <Bar
-                        dataKey="orders"
-                        fill="#ef4444"
-                        radius={[6, 6, 0, 0]}
-                        name="Orders"
-                        barSize={10}
-                      />
+                      <Area type="monotone" dataKey="revenue" stroke="#0ea5e9" fillOpacity={1} fill="url(#revFill)" name="Gross revenue" />
+                      <Area type="monotone" dataKey="commission" stroke="#a855f7" fillOpacity={1} fill="url(#comFill)" name="Commission" />
+                      <Bar dataKey="orders" fill="#ef4444" radius={[6, 6, 0, 0]} name="Orders" barSize={10} />
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
@@ -390,42 +271,35 @@ export default function AdminHome() {
                 <div className="h-72">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
-                      <Pie
-                        data={pieData}
-                        dataKey="value"
-                        nameKey="name"
-                        innerRadius={60}
-                        outerRadius={90}
-                        paddingAngle={4}
-                      >
-                        {pieData.map((entry, index) => (
-                          <Cell key={index} fill={entry.fill} stroke="none" />
-                        ))}
+                      <Pie data={pieData} dataKey="value" nameKey="name" innerRadius={60} outerRadius={90} paddingAngle={4}>
+                        {pieData.map((entry, index) => <Cell key={index} fill={entry.fill} stroke="none" />)}
                       </Pie>
-                      <Tooltip
-                        contentStyle={{ background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 12 }}
-                        labelStyle={{ color: "#111827" }}
-                        itemStyle={{ color: "#111827" }}
-                      />
-                      <Legend
-                        formatter={(value) => <span style={{ color: "#111827", fontSize: 12 }}>{value}</span>}
-                      />
+                      <Tooltip contentStyle={{
+                      background: "#ffffff",
+                      border: "1px solid #e5e7eb",
+                      borderRadius: 12
+                    }} labelStyle={{
+                      color: "#111827"
+                    }} itemStyle={{
+                      color: "#111827"
+                    }} />
+                      <Legend formatter={value => <span style={{
+                      color: "#111827",
+                      fontSize: 12
+                    }}>{value}</span>} />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
                 <div className="mt-3 grid grid-cols-2 gap-3">
-                  {orderStats.map((item) => (
-                    <div
-                      key={item.label}
-                      className="flex items-center justify-between rounded-xl border border-neutral-200 bg-white px-3 py-2"
-                    >
+                  {orderStats.map(item => <div key={item.label} className="flex items-center justify-between rounded-xl border border-neutral-200 bg-white px-3 py-2">
                       <div className="flex items-center gap-2">
-                        <span className="h-2.5 w-2.5 rounded-full" style={{ background: item.color }} />
+                        <span className="h-2.5 w-2.5 rounded-full" style={{
+                      background: item.color
+                    }} />
                         <p className="text-sm text-neutral-800">{item.label}</p>
                       </div>
                       <p className="text-sm font-semibold text-neutral-900">{item.value}</p>
-                    </div>
-                  ))}
+                    </div>)}
                 </div>
               </CardContent>
             </Card>
@@ -435,13 +309,16 @@ export default function AdminHome() {
 
         </div>
       </div>
-    </div>
-  )
+    </div>;
 }
-
-function MetricCard({ title, value, helper, icon, accent }) {
-  return (
-    <Card className="overflow-hidden border-neutral-200 bg-white p-0">
+function MetricCard({
+  title,
+  value,
+  helper,
+  icon,
+  accent
+}) {
+  return <Card className="overflow-hidden border-neutral-200 bg-white p-0">
       <CardContent className="relative flex flex-col gap-2 px-4 pb-4 pt-4">
         <div className={`absolute inset-0 ${accent} `} />
         <div className="relative flex items-center justify-between">
@@ -455,6 +332,5 @@ function MetricCard({ title, value, helper, icon, accent }) {
           </div>
         </div>
       </CardContent>
-    </Card>
-  )
+    </Card>;
 }

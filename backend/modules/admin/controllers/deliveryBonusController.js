@@ -4,15 +4,12 @@ import Delivery from '../../delivery/models/Delivery.js';
 import DeliveryWallet from '../../delivery/models/DeliveryWallet.js';
 import mongoose from 'mongoose';
 import winston from 'winston';
-
 const logger = winston.createLogger({
   level: 'info',
   format: winston.format.json(),
-  transports: [
-    new winston.transports.Console({
-      format: winston.format.simple()
-    })
-  ]
+  transports: [new winston.transports.Console({
+    format: winston.format.simple()
+  })]
 });
 
 /**
@@ -23,11 +20,13 @@ const logger = winston.createLogger({
 export const addBonus = asyncHandler(async (req, res) => {
   // Declare variables outside try block so they're accessible in catch
   let deliveryPartnerId, amount, reference, adminId;
-  
   try {
-    ({ deliveryPartnerId, amount, reference } = req.body);
+    ({
+      deliveryPartnerId,
+      amount,
+      reference
+    } = req.body);
     adminId = req.user?._id || req.user?.id;
-    
     if (!adminId) {
       logger.error('Admin ID not found in request');
       return errorResponse(res, 401, 'Unauthorized: Admin authentication required');
@@ -37,11 +36,9 @@ export const addBonus = asyncHandler(async (req, res) => {
     if (!deliveryPartnerId) {
       return errorResponse(res, 400, 'Delivery partner ID is required');
     }
-
     if (!amount || parseFloat(amount) <= 0) {
       return errorResponse(res, 400, 'Valid bonus amount is required');
     }
-
     const bonusAmount = parseFloat(amount);
 
     // Validate delivery partner ID format
@@ -56,11 +53,10 @@ export const addBonus = asyncHandler(async (req, res) => {
       logger.error(`Delivery partner not found with ID: ${deliveryPartnerId}`);
       return errorResponse(res, 404, `Delivery partner not found with ID: ${deliveryPartnerId}`);
     }
-    
-    logger.info(`Found delivery partner: ${delivery.name} (${delivery.deliveryId})`);
-
     // Find or create wallet
-    let wallet = await DeliveryWallet.findOne({ deliveryId: deliveryPartnerId });
+    let wallet = await DeliveryWallet.findOne({
+      deliveryId: deliveryPartnerId
+    });
     if (!wallet) {
       wallet = await DeliveryWallet.create({
         deliveryId: deliveryPartnerId,
@@ -76,13 +72,6 @@ export const addBonus = asyncHandler(async (req, res) => {
     const oldPocketBalance = (wallet.totalBalance || 0) - (wallet.cashInHand || 0);
 
     // Log before adding transaction
-    logger.info(`📝 Before adding bonus:`, {
-      walletId: wallet._id,
-      currentTotalBalance: wallet.totalBalance,
-      currentTotalEarned: wallet.totalEarned,
-      currentCashInHand: wallet.cashInHand,
-      bonusAmount: bonusAmount
-    });
 
     // Add bonus transaction
     const transaction = wallet.addTransaction({
@@ -101,23 +90,15 @@ export const addBonus = asyncHandler(async (req, res) => {
     });
 
     // Log after adding transaction (before save)
-    logger.info(`📝 After addTransaction (before save):`, {
-      walletId: wallet._id,
-      totalBalance: wallet.totalBalance,
-      totalEarned: wallet.totalEarned,
-      transactionAmount: transaction.amount,
-      transactionType: transaction.type,
-      transactionStatus: transaction.status
-    });
 
     // Mark wallet as modified to ensure Mongoose saves all changes
     wallet.markModified('transactions');
     wallet.markModified('totalBalance');
     wallet.markModified('totalEarned');
-    
+
     // Save wallet (this will update totalBalance and totalEarned)
     await wallet.save();
-    
+
     // Double-check: Verify wallet was saved correctly
     const verifyWallet = await DeliveryWallet.findById(wallet._id);
     if (verifyWallet.totalBalance !== wallet.totalBalance) {
@@ -125,15 +106,9 @@ export const addBonus = asyncHandler(async (req, res) => {
     }
 
     // Log after save
-    logger.info(`📝 After wallet.save():`, {
-      walletId: wallet._id,
-      totalBalance: wallet.totalBalance,
-      totalEarned: wallet.totalEarned
-    });
 
     // Reload wallet from database to ensure we have the latest data
     const updatedWallet = await DeliveryWallet.findById(wallet._id);
-    
     if (!updatedWallet) {
       logger.error(`❌ Wallet not found after save: ${wallet._id}`);
       return errorResponse(res, 500, 'Failed to update wallet');
@@ -142,85 +117,53 @@ export const addBonus = asyncHandler(async (req, res) => {
     // Verify the balance was updated
     const newBalance = updatedWallet.totalBalance || 0;
     const newPocketBalance = updatedWallet.totalBalance || 0; // Pocket balance = total balance
-    
+
     // Log final state
-    logger.info(`📝 Final wallet state:`, {
-      walletId: updatedWallet._id,
-      newTotalBalance: newBalance,
-      newPocketBalance: newPocketBalance,
-      totalEarned: updatedWallet.totalEarned,
-      cashInHand: updatedWallet.cashInHand,
-      transactionsCount: updatedWallet.transactions.length,
-      lastTransaction: updatedWallet.transactions[updatedWallet.transactions.length - 1]
-    });
-    
-    logger.info(`✅ Bonus added successfully:`, {
-      deliveryPartnerId: deliveryPartnerId,
-      bonusAmount: bonusAmount,
-      oldBalance: oldBalance,
-      newBalance: newBalance,
-      balanceIncrease: newBalance - oldBalance,
-      oldPocketBalance: oldPocketBalance,
-      newPocketBalance: newPocketBalance,
-      pocketBalanceIncrease: newPocketBalance - oldPocketBalance,
-      totalEarned: updatedWallet.totalEarned,
-      cashInHand: updatedWallet.cashInHand,
-      transactionId: transaction._id?.toString()
-    });
 
     // Transaction is already available from addTransaction() call above
 
     // Safe helper to convert ID to string
-    const safeIdToString = (id) => {
+    const safeIdToString = id => {
       if (!id) return null;
       if (typeof id === 'string') return id;
       if (id.toString && typeof id.toString === 'function') return id.toString();
       return String(id);
     };
-
-    logger.info(`Bonus added to delivery partner: ${deliveryPartnerId}`, {
-      adminId: safeIdToString(adminId) || 'not set',
-      deliveryId: delivery.deliveryId || 'not set',
-      bonusAmount,
-      transactionId: transaction && transaction._id ? safeIdToString(transaction._id) : 'not set',
-      reference: reference || 'none'
-    });
-
     // Build response safely
     const responseData = {
       transaction: {
         _id: transaction && transaction._id ? transaction._id : null,
         transactionId: transaction && transaction._id ? safeIdToString(transaction._id) : null,
-        amount: (transaction && transaction.amount !== undefined) ? transaction.amount : bonusAmount,
-        type: (transaction && transaction.type) ? transaction.type : 'bonus',
-        status: (transaction && transaction.status) ? transaction.status : 'Completed',
-        description: (transaction && transaction.description) ? transaction.description : (reference ? `Admin Bonus: ${reference}` : 'Admin Bonus'),
-        createdAt: (transaction && transaction.createdAt) ? transaction.createdAt : new Date(),
+        amount: transaction && transaction.amount !== undefined ? transaction.amount : bonusAmount,
+        type: transaction && transaction.type ? transaction.type : 'bonus',
+        status: transaction && transaction.status ? transaction.status : 'Completed',
+        description: transaction && transaction.description ? transaction.description : reference ? `Admin Bonus: ${reference}` : 'Admin Bonus',
+        createdAt: transaction && transaction.createdAt ? transaction.createdAt : new Date(),
         reference: reference || null
       },
       wallet: {
         totalBalance: newBalance,
-        totalEarned: (updatedWallet && updatedWallet.totalEarned !== undefined) ? updatedWallet.totalEarned : 0,
-        cashInHand: (updatedWallet && updatedWallet.cashInHand !== undefined) ? updatedWallet.cashInHand : 0,
-        pocketBalance: newPocketBalance, // Pocket balance = total balance (includes bonus)
+        totalEarned: updatedWallet && updatedWallet.totalEarned !== undefined ? updatedWallet.totalEarned : 0,
+        cashInHand: updatedWallet && updatedWallet.cashInHand !== undefined ? updatedWallet.cashInHand : 0,
+        pocketBalance: newPocketBalance,
+        // Pocket balance = total balance (includes bonus)
         bonusAdded: bonusAmount,
         balanceBefore: oldBalance,
         balanceAfter: newBalance
       },
       delivery: {
-        _id: (delivery && delivery._id) ? safeIdToString(delivery._id) : null,
-        name: (delivery && delivery.name) ? delivery.name : 'Unknown',
-        deliveryId: (delivery && delivery.deliveryId) ? delivery.deliveryId : null
+        _id: delivery && delivery._id ? safeIdToString(delivery._id) : null,
+        name: delivery && delivery.name ? delivery.name : 'Unknown',
+        deliveryId: delivery && delivery.deliveryId ? delivery.deliveryId : null
       }
     };
-
     return successResponse(res, 200, 'Bonus added successfully', responseData);
   } catch (error) {
-    logger.error(`Error adding bonus: ${error.message}`, { 
+    logger.error(`Error adding bonus: ${error.message}`, {
       error: error.stack,
       deliveryPartnerId: deliveryPartnerId || 'not set',
       amount: amount || 'not set',
-      adminId: adminId ? (adminId.toString ? adminId.toString() : String(adminId)) : 'not set',
+      adminId: adminId ? adminId.toString ? adminId.toString() : String(adminId) : 'not set',
       errorName: error.name
     });
     console.error('=== FULL ERROR DETAILS ===');
@@ -229,9 +172,12 @@ export const addBonus = asyncHandler(async (req, res) => {
     console.error('Error stack:', error.stack);
     console.error('Delivery Partner ID:', deliveryPartnerId || 'not set');
     console.error('Amount:', amount || 'not set');
-    console.error('Admin ID:', adminId ? (adminId.toString ? adminId.toString() : String(adminId)) : 'not set');
+    console.error('Admin ID:', adminId ? adminId.toString ? adminId.toString() : String(adminId) : 'not set');
     console.error('Request body:', req.body);
-    console.error('Request user:', req.user ? { id: req.user._id || req.user.id, role: req.user.role } : 'not set');
+    console.error('Request user:', req.user ? {
+      id: req.user._id || req.user.id,
+      role: req.user.role
+    } : 'not set');
     console.error('==========================');
     return errorResponse(res, 500, `Failed to add bonus: ${error.message}`);
   }
@@ -244,8 +190,8 @@ export const addBonus = asyncHandler(async (req, res) => {
  */
 export const getBonusTransactions = asyncHandler(async (req, res) => {
   try {
-    const { 
-      page = 1, 
+    const {
+      page = 1,
       limit = 50,
       search,
       deliveryPartnerId
@@ -258,38 +204,29 @@ export const getBonusTransactions = asyncHandler(async (req, res) => {
     }
 
     // Find wallets with bonus transactions
-    const wallets = await DeliveryWallet.find(walletQuery)
-      .populate('deliveryId', 'name deliveryId phone email')
-      .lean();
+    const wallets = await DeliveryWallet.find(walletQuery).populate('deliveryId', 'name deliveryId phone email').lean();
 
     // Extract all bonus transactions
     let allTransactions = [];
     wallets.forEach(wallet => {
-      wallet.transactions
-        .filter(t => t.type === 'bonus')
-        .forEach(transaction => {
-          allTransactions.push({
-            ...transaction,
-            deliveryPartner: {
-              _id: wallet.deliveryId._id || wallet.deliveryId,
-              name: wallet.deliveryId.name || 'Unknown',
-              deliveryId: wallet.deliveryId.deliveryId || 'N/A',
-              phone: wallet.deliveryId.phone || 'N/A'
-            },
-            walletId: wallet._id
-          });
+      wallet.transactions.filter(t => t.type === 'bonus').forEach(transaction => {
+        allTransactions.push({
+          ...transaction,
+          deliveryPartner: {
+            _id: wallet.deliveryId._id || wallet.deliveryId,
+            name: wallet.deliveryId.name || 'Unknown',
+            deliveryId: wallet.deliveryId.deliveryId || 'N/A',
+            phone: wallet.deliveryId.phone || 'N/A'
+          },
+          walletId: wallet._id
         });
+      });
     });
 
     // Search filter
     if (search) {
       const searchLower = search.toLowerCase();
-      allTransactions = allTransactions.filter(t => 
-        t.deliveryPartner.name.toLowerCase().includes(searchLower) ||
-        t.deliveryPartner.deliveryId.toLowerCase().includes(searchLower) ||
-        t._id.toString().toLowerCase().includes(searchLower) ||
-        (t.metadata?.reference && t.metadata.reference.toLowerCase().includes(searchLower))
-      );
+      allTransactions = allTransactions.filter(t => t.deliveryPartner.name.toLowerCase().includes(searchLower) || t.deliveryPartner.deliveryId.toLowerCase().includes(searchLower) || t._id.toString().toLowerCase().includes(searchLower) || t.metadata?.reference && t.metadata.reference.toLowerCase().includes(searchLower));
     }
 
     // Sort by date (newest first)
@@ -314,7 +251,6 @@ export const getBonusTransactions = asyncHandler(async (req, res) => {
       status: transaction.status,
       processedBy: transaction.processedBy
     }));
-
     return successResponse(res, 200, 'Bonus transactions retrieved successfully', {
       transactions: formattedTransactions,
       pagination: {
@@ -325,8 +261,9 @@ export const getBonusTransactions = asyncHandler(async (req, res) => {
       }
     });
   } catch (error) {
-    logger.error(`Error fetching bonus transactions: ${error.message}`, { error: error.stack });
+    logger.error(`Error fetching bonus transactions: ${error.message}`, {
+      error: error.stack
+    });
     return errorResponse(res, 500, 'Failed to fetch bonus transactions');
   }
 });
-

@@ -1,14 +1,11 @@
 import axios from 'axios';
 import winston from 'winston';
-
 const logger = winston.createLogger({
   level: 'info',
   format: winston.format.json(),
-  transports: [
-    new winston.transports.Console({
-      format: winston.format.simple()
-    })
-  ]
+  transports: [new winston.transports.Console({
+    format: winston.format.simple()
+  })]
 });
 
 /**
@@ -53,7 +50,6 @@ class SMSHubService {
     try {
       // Format phone number (ensure it starts with country code)
       const formattedPhone = this.formatPhoneNumber(phone);
-
       const message = await this.generateOTPMessage(otp);
 
       // SMSHub API endpoint
@@ -64,22 +60,23 @@ class SMSHubService {
       // - Body params: apiKey/api_key, phone/to, message, senderId/sender
 
       // Option 1: Body-based request (most common)
-      const response = await axios.post(
-        `${this.apiUrl}/send`,
-        {
-          apiKey: this.apiKey, // or api_key depending on provider
-          phone: formattedPhone, // or 'to' depending on provider
-          message: message, // or 'text' depending on provider
-          senderId: this.senderId // or 'sender' depending on provider
+      const response = await axios.post(`${this.apiUrl}/send`, {
+        apiKey: this.apiKey,
+        // or api_key depending on provider
+        phone: formattedPhone,
+        // or 'to' depending on provider
+        message: message,
+        // or 'text' depending on provider
+        senderId: this.senderId // or 'sender' depending on provider
+      }, {
+        headers: {
+          'Content-Type': 'application/json',
+          ...(this.apiKey && {
+            'Authorization': `Bearer ${this.apiKey}`
+          }) // If using Bearer token
         },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            ...(this.apiKey && { 'Authorization': `Bearer ${this.apiKey}` }) // If using Bearer token
-          },
-          timeout: 10000 // 10 seconds timeout
-        }
-      );
+        timeout: 10000 // 10 seconds timeout
+      });
 
       // Alternative: Query-based request (uncomment if your provider uses query params)
       /*
@@ -96,11 +93,6 @@ class SMSHubService {
         }
       );
       */
-
-      logger.info(`OTP sent successfully to ${formattedPhone}`, {
-        phone: formattedPhone,
-        status: response.data?.status
-      });
 
       return {
         success: true,
@@ -135,7 +127,6 @@ class SMSHubService {
       // Add +91 for India
       cleaned = '+91' + cleaned;
     }
-
     return cleaned;
   }
 
@@ -144,16 +135,12 @@ class SMSHubService {
    */
   async verifyDeliveryStatus(messageId) {
     try {
-      const response = await axios.get(
-        `${this.apiUrl}/status/${messageId}`,
-        {
-          params: {
-            apiKey: this.apiKey
-          },
-          timeout: 5000
-        }
-      );
-
+      const response = await axios.get(`${this.apiUrl}/status/${messageId}`, {
+        params: {
+          apiKey: this.apiKey
+        },
+        timeout: 5000
+      });
       return {
         success: true,
         status: response.data?.status,
@@ -168,6 +155,4 @@ class SMSHubService {
     }
   }
 }
-
 export default new SMSHubService();
-

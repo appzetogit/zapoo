@@ -4,15 +4,12 @@ import Delivery from '../models/Delivery.js';
 import DeliveryWallet from '../models/DeliveryWallet.js';
 import Order from '../../order/models/Order.js';
 import winston from 'winston';
-
 const logger = winston.createLogger({
   level: 'info',
   format: winston.format.json(),
-  transports: [
-    new winston.transports.Console({
-      format: winston.format.simple()
-    })
-  ]
+  transports: [new winston.transports.Console({
+    format: winston.format.simple()
+  })]
 });
 
 /**
@@ -29,28 +26,27 @@ export const getDashboard = asyncHandler(async (req, res) => {
     let totalOrders = 0;
     let completedOrders = 0;
     let pendingOrders = 0;
-
     try {
-      totalOrders = await Order.countDocuments({ 
-        deliveryPartnerId: delivery._id 
+      totalOrders = await Order.countDocuments({
+        deliveryPartnerId: delivery._id
       });
     } catch (error) {
       logger.warn(`Error counting total orders for delivery ${delivery._id}:`, error);
     }
-
     try {
-      completedOrders = await Order.countDocuments({ 
+      completedOrders = await Order.countDocuments({
         deliveryPartnerId: delivery._id,
         status: 'delivered'
       });
     } catch (error) {
       logger.warn(`Error counting completed orders for delivery ${delivery._id}:`, error);
     }
-
     try {
-      pendingOrders = await Order.countDocuments({ 
+      pendingOrders = await Order.countDocuments({
         deliveryPartnerId: delivery._id,
-        status: { $in: ['out_for_delivery', 'ready'] }
+        status: {
+          $in: ['out_for_delivery', 'ready']
+        }
       });
     } catch (error) {
       logger.warn(`Error counting pending orders for delivery ${delivery._id}:`, error);
@@ -61,15 +57,16 @@ export const getDashboard = asyncHandler(async (req, res) => {
     const joiningBonusAmount = 100;
     const joiningBonusUnlockThreshold = 1; // Complete 1 order to unlock
     const joiningBonusUnlocked = completedOrders >= joiningBonusUnlockThreshold;
-    
+
     // Get wallet data (using new DeliveryWallet model)
     let wallet = null;
     try {
-      wallet = await DeliveryWallet.findOne({ deliveryId: delivery._id });
+      wallet = await DeliveryWallet.findOne({
+        deliveryId: delivery._id
+      });
     } catch (error) {
       logger.warn(`Error fetching wallet for dashboard:`, error);
     }
-    
     const joiningBonusClaimed = wallet?.joiningBonusClaimed || false;
     const joiningBonusValidTill = new Date('2025-12-10'); // Valid till 10 December 2025
 
@@ -77,28 +74,24 @@ export const getDashboard = asyncHandler(async (req, res) => {
     const walletBalance = wallet?.totalBalance || 0;
     const totalEarned = wallet?.totalEarned || delivery.earnings?.totalEarned || 0;
     const currentBalance = wallet?.totalBalance || delivery.earnings?.currentBalance || 0;
-    const pendingPayout = wallet?.transactions
-      ?.filter(t => t.type === 'withdrawal' && t.status === 'Pending')
-      .reduce((sum, t) => sum + t.amount, 0) || delivery.earnings?.pendingPayout || 0;
-    const tips = wallet?.transactions
-      ?.filter(t => t.type === 'payment' && t.description?.toLowerCase().includes('tip'))
-      .reduce((sum, t) => sum + t.amount, 0) || delivery.earnings?.tips || 0;
+    const pendingPayout = wallet?.transactions?.filter(t => t.type === 'withdrawal' && t.status === 'Pending').reduce((sum, t) => sum + t.amount, 0) || delivery.earnings?.pendingPayout || 0;
+    const tips = wallet?.transactions?.filter(t => t.type === 'payment' && t.description?.toLowerCase().includes('tip')).reduce((sum, t) => sum + t.amount, 0) || delivery.earnings?.tips || 0;
 
     // Calculate weekly earnings (last 7 days)
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    
     let weeklyOrders = [];
     try {
       weeklyOrders = await Order.find({
         deliveryPartnerId: delivery._id,
         status: 'delivered',
-        deliveredAt: { $gte: sevenDaysAgo }
+        deliveredAt: {
+          $gte: sevenDaysAgo
+        }
       }).select('pricing.deliveryFee');
     } catch (error) {
       logger.warn(`Error fetching weekly orders for delivery ${delivery._id}:`, error);
     }
-
     const weeklyEarnings = weeklyOrders.reduce((sum, order) => {
       return sum + (order.pricing?.deliveryFee || 0);
     }, 0);
@@ -108,11 +101,9 @@ export const getDashboard = asyncHandler(async (req, res) => {
     try {
       recentOrders = await Order.find({
         deliveryPartnerId: delivery._id
-      })
-        .sort({ createdAt: -1 })
-        .limit(5)
-        .select('orderId status createdAt deliveredAt pricing.deliveryFee restaurantName')
-        .lean();
+      }).sort({
+        createdAt: -1
+      }).limit(5).select('orderId status createdAt deliveredAt pricing.deliveryFee restaurantName').lean();
     } catch (error) {
       logger.warn(`Error fetching recent orders for delivery ${delivery._id}:`, error);
     }
@@ -120,18 +111,18 @@ export const getDashboard = asyncHandler(async (req, res) => {
     // Calculate today's earnings
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
-    
     let todayOrders = [];
     try {
       todayOrders = await Order.find({
         deliveryPartnerId: delivery._id,
         status: 'delivered',
-        deliveredAt: { $gte: todayStart }
+        deliveredAt: {
+          $gte: todayStart
+        }
       }).select('pricing.deliveryFee');
     } catch (error) {
       logger.warn(`Error fetching today's orders for delivery ${delivery._id}:`, error);
     }
-
     const todayEarnings = todayOrders.reduce((sum, order) => {
       return sum + (order.pricing?.deliveryFee || 0);
     }, 0);
@@ -148,7 +139,7 @@ export const getDashboard = asyncHandler(async (req, res) => {
         status: delivery.status,
         level: delivery.level,
         rating: delivery.metrics?.rating || 0,
-        ratingCount: delivery.metrics?.ratingCount || 0,
+        ratingCount: delivery.metrics?.ratingCount || 0
       },
       wallet: {
         balance: walletBalance,
@@ -157,7 +148,7 @@ export const getDashboard = asyncHandler(async (req, res) => {
         pendingPayout: pendingPayout,
         tips: tips,
         todayEarnings: todayEarnings,
-        weeklyEarnings: weeklyEarnings,
+        weeklyEarnings: weeklyEarnings
       },
       stats: {
         totalOrders: totalOrders,
@@ -165,7 +156,7 @@ export const getDashboard = asyncHandler(async (req, res) => {
         pendingOrders: pendingOrders,
         cancelledOrders: delivery.metrics?.cancelledOrders || 0,
         onTimeDeliveryRate: delivery.metrics?.onTimeDeliveryRate || 0,
-        averageDeliveryTime: delivery.metrics?.averageDeliveryTime || 0,
+        averageDeliveryTime: delivery.metrics?.averageDeliveryTime || 0
       },
       joiningBonus: {
         amount: joiningBonusAmount,
@@ -175,9 +166,7 @@ export const getDashboard = asyncHandler(async (req, res) => {
         ordersCompleted: completedOrders,
         ordersRequired: joiningBonusUnlockThreshold,
         validTill: joiningBonusValidTill,
-        message: joiningBonusUnlocked 
-          ? (joiningBonusClaimed ? 'Bonus claimed' : 'Complete 1 order to unlock')
-          : 'Complete 1 order to unlock',
+        message: joiningBonusUnlocked ? joiningBonusClaimed ? 'Bonus claimed' : 'Complete 1 order to unlock' : 'Complete 1 order to unlock'
       },
       recentOrders: recentOrders.map(order => ({
         orderId: order.orderId,
@@ -185,20 +174,13 @@ export const getDashboard = asyncHandler(async (req, res) => {
         restaurantName: order.restaurantName,
         deliveryFee: order.pricing?.deliveryFee || 0,
         createdAt: order.createdAt,
-        deliveredAt: order.deliveredAt,
+        deliveredAt: order.deliveredAt
       })),
       availability: {
         isOnline: delivery.availability?.isOnline || false,
-        lastLocationUpdate: delivery.availability?.lastLocationUpdate || null,
+        lastLocationUpdate: delivery.availability?.lastLocationUpdate || null
       }
     };
-
-    logger.info(`Dashboard data retrieved for delivery: ${delivery._id}`, {
-      deliveryId: delivery.deliveryId,
-      totalOrders,
-      completedOrders,
-    });
-
     return successResponse(res, 200, 'Dashboard data retrieved successfully', dashboardData);
   } catch (error) {
     logger.error('Error fetching delivery dashboard:', error);
@@ -216,8 +198,9 @@ export const getWalletBalance = asyncHandler(async (req, res) => {
     const delivery = req.delivery;
 
     // Use new DeliveryWallet model
-    let wallet = await DeliveryWallet.findOne({ deliveryId: delivery._id });
-
+    let wallet = await DeliveryWallet.findOne({
+      deliveryId: delivery._id
+    });
     if (!wallet) {
       // Create wallet if doesn't exist
       wallet = await DeliveryWallet.create({
@@ -228,17 +211,12 @@ export const getWalletBalance = asyncHandler(async (req, res) => {
         totalEarned: 0
       });
     }
-
     const walletData = {
       balance: wallet.totalBalance || 0,
       totalEarned: wallet.totalEarned || 0,
       currentBalance: wallet.totalBalance || 0,
-      pendingPayout: wallet.transactions
-        .filter(t => t.type === 'withdrawal' && t.status === 'Pending')
-        .reduce((sum, t) => sum + t.amount, 0),
-      tips: wallet.transactions
-        .filter(t => t.type === 'payment' && t.description?.toLowerCase().includes('tip'))
-        .reduce((sum, t) => sum + t.amount, 0),
+      pendingPayout: wallet.transactions.filter(t => t.type === 'withdrawal' && t.status === 'Pending').reduce((sum, t) => sum + t.amount, 0),
+      tips: wallet.transactions.filter(t => t.type === 'payment' && t.description?.toLowerCase().includes('tip')).reduce((sum, t) => sum + t.amount, 0),
       transactions: wallet.transactions.slice(0, 10).map(t => ({
         id: t._id,
         amount: t.amount,
@@ -247,9 +225,8 @@ export const getWalletBalance = asyncHandler(async (req, res) => {
         description: t.description,
         date: t.createdAt
       })),
-      joiningBonusClaimed: wallet.joiningBonusClaimed || false,
+      joiningBonusClaimed: wallet.joiningBonusClaimed || false
     };
-
     return successResponse(res, 200, 'Wallet balance retrieved successfully', walletData);
   } catch (error) {
     logger.error('Error fetching wallet balance:', error);
@@ -277,14 +254,13 @@ export const claimJoiningBonus = asyncHandler(async (req, res) => {
     // Check if bonus is unlocked (completed at least 1 order)
     let completedOrders = 0;
     try {
-      completedOrders = await Order.countDocuments({ 
+      completedOrders = await Order.countDocuments({
         deliveryPartnerId: delivery._id,
         status: 'delivered'
       });
     } catch (error) {
       logger.warn(`Error counting completed orders for joining bonus:`, error);
     }
-
     if (completedOrders < 1) {
       return errorResponse(res, 400, 'Complete at least 1 order to unlock joining bonus');
     }
@@ -310,13 +286,6 @@ export const claimJoiningBonus = asyncHandler(async (req, res) => {
     wallet.joiningBonusClaimed = true;
     wallet.joiningBonusAmount = bonusAmount;
     await wallet.save();
-
-    logger.info(`Joining bonus claimed for delivery: ${delivery._id}`, {
-      deliveryId: delivery.deliveryId,
-      bonusAmount,
-      transactionId: transaction._id
-    });
-
     return successResponse(res, 200, 'Joining bonus claimed successfully', {
       bonusAmount,
       wallet: {
@@ -344,12 +313,13 @@ export const claimJoiningBonus = asyncHandler(async (req, res) => {
 export const getOrderStats = asyncHandler(async (req, res) => {
   try {
     const delivery = req.delivery;
-    const { period = 'all' } = req.query; // 'today', 'week', 'month', 'all'
+    const {
+      period = 'all'
+    } = req.query; // 'today', 'week', 'month', 'all'
 
     // Calculate date range based on period
     let startDate = null;
     const now = new Date();
-
     switch (period) {
       case 'today':
         startDate = new Date(now);
@@ -364,23 +334,36 @@ export const getOrderStats = asyncHandler(async (req, res) => {
         startDate.setMonth(now.getMonth() - 1);
         break;
       default:
-        startDate = null; // All time
+        startDate = null;
+      // All time
     }
 
     // Build query
-    const query = { deliveryPartnerId: delivery._id };
+    const query = {
+      deliveryPartnerId: delivery._id
+    };
     if (startDate) {
-      query.createdAt = { $gte: startDate };
+      query.createdAt = {
+        $gte: startDate
+      };
     }
 
     // Get order counts
     const totalOrders = await Order.countDocuments(query);
-    const completedOrders = await Order.countDocuments({ ...query, status: 'delivered' });
-    const pendingOrders = await Order.countDocuments({ 
-      ...query, 
-      status: { $in: ['out_for_delivery', 'ready'] } 
+    const completedOrders = await Order.countDocuments({
+      ...query,
+      status: 'delivered'
     });
-    const cancelledOrders = await Order.countDocuments({ ...query, status: 'cancelled' });
+    const pendingOrders = await Order.countDocuments({
+      ...query,
+      status: {
+        $in: ['out_for_delivery', 'ready']
+      }
+    });
+    const cancelledOrders = await Order.countDocuments({
+      ...query,
+      status: 'cancelled'
+    });
 
     // Calculate earnings
     let orders = [];
@@ -392,11 +375,9 @@ export const getOrderStats = asyncHandler(async (req, res) => {
     } catch (error) {
       logger.warn(`Error fetching orders for stats:`, error);
     }
-
     const totalEarnings = orders.reduce((sum, order) => {
       return sum + (order.pricing?.deliveryFee || 0);
     }, 0);
-
     const stats = {
       period,
       totalOrders,
@@ -405,13 +386,11 @@ export const getOrderStats = asyncHandler(async (req, res) => {
       cancelledOrders,
       totalEarnings,
       averageEarningsPerOrder: completedOrders > 0 ? totalEarnings / completedOrders : 0,
-      completionRate: totalOrders > 0 ? (completedOrders / totalOrders) * 100 : 0,
+      completionRate: totalOrders > 0 ? completedOrders / totalOrders * 100 : 0
     };
-
     return successResponse(res, 200, 'Order statistics retrieved successfully', stats);
   } catch (error) {
     logger.error('Error fetching order statistics:', error);
     return errorResponse(res, 500, 'Failed to fetch order statistics');
   }
 });
-

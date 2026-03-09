@@ -2,37 +2,30 @@ import Razorpay from 'razorpay';
 import crypto from 'crypto';
 import winston from 'winston';
 import { getRazorpayCredentials } from '../../../shared/utils/envService.js';
-
 const logger = winston.createLogger({
   level: 'info',
   format: winston.format.json(),
-  transports: [
-    new winston.transports.Console({
-      format: winston.format.simple()
-    })
-  ]
+  transports: [new winston.transports.Console({
+    format: winston.format.simple()
+  })]
 });
 
 // Initialize Razorpay instance
 let razorpayInstance = null;
-
 const initializeRazorpay = async () => {
   try {
     const credentials = await getRazorpayCredentials();
     const keyId = credentials.keyId;
     const keySecret = credentials.keySecret;
-
     if (!keyId || !keySecret) {
       logger.warn('Razorpay credentials not found.');
       return null;
     }
-
     try {
       razorpayInstance = new Razorpay({
         key_id: keyId,
         key_secret: keySecret
       });
-      logger.info('Razorpay initialized successfully');
       return razorpayInstance;
     } catch (error) {
       logger.error(`Error initializing Razorpay: ${error.message}`, {
@@ -67,37 +60,21 @@ const getRazorpayInstance = async () => {
  * @param {Object} options.notes - Additional notes
  * @returns {Promise<Object>} Razorpay order object
  */
-const createOrder = async (options) => {
-  logger.info('Creating Razorpay order with options:', {
-    amount: options.amount,
-    currency: options.currency,
-    receipt: options.receipt
-  });
-
+const createOrder = async options => {
   const razorpay = await getRazorpayInstance();
   if (!razorpay) {
     logger.error('Razorpay instance is null - credentials may be missing or invalid');
     throw new Error('Razorpay is not initialized. Please check your credentials.');
   }
-
   try {
     const orderOptions = {
-      amount: options.amount, // Amount in paise
+      amount: options.amount,
+      // Amount in paise
       currency: options.currency || 'INR',
       receipt: options.receipt || `receipt_${Date.now()}`,
       notes: options.notes || {}
     };
-
-    logger.info('Calling Razorpay API to create order...');
     const order = await razorpay.orders.create(orderOptions);
-
-    logger.info(`Razorpay order created successfully: ${order.id}`, {
-      orderId: order.id,
-      amount: order.amount,
-      receipt: order.receipt,
-      status: order.status
-    });
-
     return order;
   } catch (error) {
     logger.error(`Error creating Razorpay order:`, {
@@ -120,7 +97,6 @@ const createOrder = async (options) => {
     } else if (error.message) {
       errorMessage = error.message;
     }
-
     throw new Error(errorMessage);
   }
 };
@@ -135,20 +111,13 @@ const createOrder = async (options) => {
 const verifyPayment = async (razorpayOrderId, razorpayPaymentId, razorpaySignature) => {
   const credentials = await getRazorpayCredentials();
   const keySecret = credentials.keySecret;
-
   if (!keySecret) {
     logger.error('Razorpay key secret not found');
     return false;
   }
-
   try {
-    const generatedSignature = crypto
-      .createHmac('sha256', keySecret)
-      .update(`${razorpayOrderId}|${razorpayPaymentId}`)
-      .digest('hex');
-
+    const generatedSignature = crypto.createHmac('sha256', keySecret).update(`${razorpayOrderId}|${razorpayPaymentId}`).digest('hex');
     const isValid = generatedSignature === razorpaySignature;
-
     if (!isValid) {
       logger.warn('Invalid Razorpay signature', {
         razorpayOrderId,
@@ -157,7 +126,6 @@ const verifyPayment = async (razorpayOrderId, razorpayPaymentId, razorpaySignatu
         generatedSignature
       });
     }
-
     return isValid;
   } catch (error) {
     logger.error(`Error verifying Razorpay payment: ${error.message}`);
@@ -170,12 +138,11 @@ const verifyPayment = async (razorpayOrderId, razorpayPaymentId, razorpaySignatu
  * @param {String} paymentId - Razorpay payment ID
  * @returns {Promise<Object>} Payment details
  */
-const fetchPayment = async (paymentId) => {
+const fetchPayment = async paymentId => {
   const razorpay = await getRazorpayInstance();
   if (!razorpay) {
     throw new Error('Razorpay is not initialized');
   }
-
   try {
     const payment = await razorpay.payments.fetch(paymentId);
     return payment;
@@ -197,36 +164,18 @@ const createRefund = async (paymentId, amount = null, notes = {}) => {
   if (!razorpay) {
     throw new Error('Razorpay is not initialized');
   }
-
   try {
     const refundOptions = {
       notes: notes
     };
-
     if (amount) {
       refundOptions.amount = amount;
     }
-
     const refund = await razorpay.payments.refund(paymentId, refundOptions);
-    logger.info(`Refund created: ${refund.id}`, {
-      refundId: refund.id,
-      paymentId,
-      amount: refund.amount
-    });
-
     return refund;
   } catch (error) {
     logger.error(`Error creating refund: ${error.message}`);
     throw error;
   }
 };
-
-export {
-  initializeRazorpay,
-  getRazorpayInstance,
-  createOrder,
-  verifyPayment,
-  fetchPayment,
-  createRefund
-};
-
+export { initializeRazorpay, getRazorpayInstance, createOrder, verifyPayment, fetchPayment, createRefund };

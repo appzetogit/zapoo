@@ -2,10 +2,14 @@ import { useState, useEffect } from "react"
 import { Outlet } from "react-router-dom"
 import AdminSidebar from "./AdminSidebar"
 import AdminNavbar from "./AdminNavbar"
+import { useFCMNotification } from "@/hooks/useFCMNotification"
 
 export default function AdminLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+
+  const isLoggedIn = localStorage.getItem("admin_authenticated") === "true" || !!localStorage.getItem("admin_accessToken");
+  useFCMNotification({ isLoggedIn, role: 'admin' });
 
   // Get initial collapsed state from localStorage to set initial margin
   useEffect(() => {

@@ -1,25 +1,24 @@
-import { useState, useMemo, useEffect } from "react"
-import { Search, Settings, MoreVertical, Building2, Download, ChevronDown, Filter, FileDown, FileSpreadsheet, FileText, Code, Eye, CheckCircle2, XCircle, Loader2, Trash2 } from "lucide-react"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger } from "@/components/ui/dropdown-menu"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
-import SettingsDialog from "../../components/orders/SettingsDialog"
-import { exportAdvertisementsToCSV, exportAdvertisementsToExcel, exportAdvertisementsToPDF, exportAdvertisementsToJSON } from "../../components/advertisements/advertisementsExportUtils"
-import apiClient from "@/lib/api/axios"
-import { toast } from "sonner"
-
+import { useState, useMemo, useEffect } from "react";
+import { Search, Settings, MoreVertical, Building2, Download, ChevronDown, Filter, FileDown, FileSpreadsheet, FileText, Code, Eye, CheckCircle2, XCircle, Loader2, Trash2 } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger } from "@/components/ui/dropdown-menu";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import SettingsDialog from "../../components/orders/SettingsDialog";
+import { exportAdvertisementsToCSV, exportAdvertisementsToExcel, exportAdvertisementsToPDF, exportAdvertisementsToJSON } from "../../components/advertisements/advertisementsExportUtils";
+import apiClient from "@/lib/api/axios";
+import { toast } from "sonner";
 export default function AdRequests() {
-  const [activeTab, setActiveTab] = useState("new")
-  const [searchQuery, setSearchQuery] = useState("")
-  const [requests, setRequests] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [isFilterOpen, setIsFilterOpen] = useState(false)
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
-  const [isViewOpen, setIsViewOpen] = useState(false)
-  const [selectedRequest, setSelectedRequest] = useState(null)
+  const [activeTab, setActiveTab] = useState("new");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [requests, setRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isViewOpen, setIsViewOpen] = useState(false);
+  const [selectedRequest, setSelectedRequest] = useState(null);
   const [filters, setFilters] = useState({
     adsType: "",
-    restaurant: "",
-  })
+    restaurant: ""
+  });
   const [visibleColumns, setVisibleColumns] = useState({
     si: true,
     adsId: true,
@@ -27,9 +26,8 @@ export default function AdRequests() {
     restaurantInfo: true,
     adsType: true,
     duration: true,
-    actions: true,
-  })
-
+    actions: true
+  });
   const columnsConfig = {
     si: "Serial Number",
     adsId: "Ads ID",
@@ -37,8 +35,8 @@ export default function AdRequests() {
     restaurantInfo: "Restaurant Info",
     adsType: "Ads Type",
     duration: "Duration",
-    actions: "Actions",
-  }
+    actions: "Actions"
+  };
 
   // Map DB fields to table-friendly shape
   const mapAd = (ad, idx) => ({
@@ -50,129 +48,121 @@ export default function AdRequests() {
     restaurantEmail: "",
     adsType: ad.targetZones?.map(z => z.name || z).join(", ") || "Banner",
     duration: `${new Date(ad.startDate).toLocaleDateString("en-IN")} – ${new Date(ad.endDate).toLocaleDateString("en-IN")}`,
-    status: ad.status,        // 'Pending' | 'Approved' | 'Rejected'
+    status: ad.status,
+    // 'Pending' | 'Approved' | 'Rejected'
     bannerImage: ad.bannerImage,
     totalCost: ad.totalCost,
-    raw: ad,
-  })
-
+    raw: ad
+  });
   const fetchRequests = async () => {
     try {
-      setLoading(true)
-      console.log("📡 [AdRequests] Fetching from /marketing/ads/all ...")
-      const res = await apiClient.get("/marketing/ads/all")
-      console.log("✅ [AdRequests] Response:", res.data)
-      const data = res.data.data || []
-      setRequests(data.map(mapAd))
+      setLoading(true);
+      const res = await apiClient.get("/marketing/ads/all");
+      const data = res.data.data || [];
+      setRequests(data.map(mapAd));
     } catch (err) {
-      console.error("❌ [AdRequests] Fetch error:", err.response?.status, err.response?.data, err.message)
-      toast.error(`Failed to load ad requests: ${err.response?.data?.message || err.message}`)
+      console.error("❌ [AdRequests] Fetch error:", err.response?.status, err.response?.data, err.message);
+      toast.error(`Failed to load ad requests: ${err.response?.data?.message || err.message}`);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
-
-  useEffect(() => { fetchRequests() }, [])
-
+  };
+  useEffect(() => {
+    fetchRequests();
+  }, []);
   const filteredRequests = useMemo(() => {
-    let result = [...requests]
+    let result = [...requests];
 
     // Filter by tab — match real DB status strings
     if (activeTab === "new") {
-      result = result.filter(r => r.status === "Pending")
+      result = result.filter(r => r.status === "Pending");
     } else if (activeTab === "update") {
-      result = result.filter(r => r.status === "Approved")
+      result = result.filter(r => r.status === "Approved");
     } else if (activeTab === "active") {
-      result = result.filter(r => r.status === "Active" || r.status === "Scheduled")
+      result = result.filter(r => r.status === "Active" || r.status === "Scheduled");
     } else if (activeTab === "denied") {
-      result = result.filter(r => r.status === "Rejected")
+      result = result.filter(r => r.status === "Rejected");
     }
 
     // Filter by search query
     if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase().trim()
-      result = result.filter(request =>
-        request.adsId?.toLowerCase().includes(query) ||
-        request.restaurantName?.toLowerCase().includes(query) ||
-        request.adsTitle?.toLowerCase().includes(query)
-      )
+      const query = searchQuery.toLowerCase().trim();
+      result = result.filter(request => request.adsId?.toLowerCase().includes(query) || request.restaurantName?.toLowerCase().includes(query) || request.adsTitle?.toLowerCase().includes(query));
     }
 
     // Filter by ads type
     if (filters.adsType) {
-      result = result.filter(r => r.adsType === filters.adsType)
+      result = result.filter(r => r.adsType === filters.adsType);
     }
 
     // Filter by restaurant
     if (filters.restaurant) {
-      result = result.filter(r => r.restaurantName === filters.restaurant)
+      result = result.filter(r => r.restaurantName === filters.restaurant);
     }
-
-    return result
-  }, [requests, searchQuery, activeTab, filters])
-
-  const activeFiltersCount = Object.values(filters).filter(v => v).length
-
-  const handleExport = (format) => {
-    const filename = `ad_requests_${activeTab}`
+    return result;
+  }, [requests, searchQuery, activeTab, filters]);
+  const activeFiltersCount = Object.values(filters).filter(v => v).length;
+  const handleExport = format => {
+    const filename = `ad_requests_${activeTab}`;
     switch (format) {
       case "csv":
-        exportAdvertisementsToCSV(filteredRequests, filename)
-        break
+        exportAdvertisementsToCSV(filteredRequests, filename);
+        break;
       case "excel":
-        exportAdvertisementsToExcel(filteredRequests, filename)
-        break
+        exportAdvertisementsToExcel(filteredRequests, filename);
+        break;
       case "pdf":
-        exportAdvertisementsToPDF(filteredRequests, filename)
-        break
+        exportAdvertisementsToPDF(filteredRequests, filename);
+        break;
       case "json":
-        exportAdvertisementsToJSON(filteredRequests, filename)
-        break
+        exportAdvertisementsToJSON(filteredRequests, filename);
+        break;
       default:
-        break
+        break;
     }
-  }
-
-  const handleViewRequest = (request) => {
-    setSelectedRequest(request)
-    setIsViewOpen(true)
-  }
-
-  const handleApprove = async (id) => {
+  };
+  const handleViewRequest = request => {
+    setSelectedRequest(request);
+    setIsViewOpen(true);
+  };
+  const handleApprove = async id => {
     try {
-      await apiClient.put(`/marketing/ads/${id}/status`, { status: "Approved" })
-      toast.success("Ad approved!")
-      fetchRequests()
+      await apiClient.put(`/marketing/ads/${id}/status`, {
+        status: "Approved"
+      });
+      toast.success("Ad approved!");
+      fetchRequests();
     } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to approve")
+      toast.error(err.response?.data?.message || "Failed to approve");
     }
-  }
-
-  const handleDeny = async (id) => {
+  };
+  const handleDeny = async id => {
     try {
-      await apiClient.put(`/marketing/ads/${id}/status`, { status: "Rejected" })
-      toast.success("Ad rejected")
-      fetchRequests()
+      await apiClient.put(`/marketing/ads/${id}/status`, {
+        status: "Rejected"
+      });
+      toast.success("Ad rejected");
+      fetchRequests();
     } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to reject")
+      toast.error(err.response?.data?.message || "Failed to reject");
     }
-  }
-
-  const handleDelete = async (id) => {
+  };
+  const handleDelete = async id => {
     if (!window.confirm("Are you sure you want to delete this ad request?")) return;
     try {
-      await apiClient.delete(`/marketing/ads/${id}`)
-      toast.success("Ad request deleted successfully")
-      fetchRequests()
+      await apiClient.delete(`/marketing/ads/${id}`);
+      toast.success("Ad request deleted successfully");
+      fetchRequests();
     } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to delete")
+      toast.error(err.response?.data?.message || "Failed to delete");
     }
-  }
-
-  const toggleColumn = (key) => {
-    setVisibleColumns(prev => ({ ...prev, [key]: !prev[key] }))
-  }
-
+  };
+  const toggleColumn = key => {
+    setVisibleColumns(prev => ({
+      ...prev,
+      [key]: !prev[key]
+    }));
+  };
   const resetColumns = () => {
     setVisibleColumns({
       si: true,
@@ -181,33 +171,34 @@ export default function AdRequests() {
       restaurantInfo: true,
       adsType: true,
       duration: true,
-      actions: true,
-    })
-  }
-
+      actions: true
+    });
+  };
   const handleApplyFilters = () => {
-    setIsFilterOpen(false)
-  }
-
+    setIsFilterOpen(false);
+  };
   const handleResetFilters = () => {
     setFilters({
       adsType: "",
-      restaurant: "",
-    })
-  }
-
-  const restaurants = [...new Set(requests.map(r => r.restaurantName))].filter(Boolean)
-  const adsTypes = [...new Set(requests.map(r => r.adsType))].filter(Boolean)
-
-  const tabs = [
-    { key: "new", label: "New Request" },
-    { key: "update", label: "Update Request" },
-    { key: "active", label: "Active Campaigns" },
-    { key: "denied", label: "Denied Requests" },
-  ]
-
-  return (
-    <div className="p-4 lg:p-6 bg-slate-50 min-h-screen">
+      restaurant: ""
+    });
+  };
+  const restaurants = [...new Set(requests.map(r => r.restaurantName))].filter(Boolean);
+  const adsTypes = [...new Set(requests.map(r => r.adsType))].filter(Boolean);
+  const tabs = [{
+    key: "new",
+    label: "New Request"
+  }, {
+    key: "update",
+    label: "Update Request"
+  }, {
+    key: "active",
+    label: "Active Campaigns"
+  }, {
+    key: "denied",
+    label: "Denied Requests"
+  }];
+  return <div className="p-4 lg:p-6 bg-slate-50 min-h-screen">
       {/* Header */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
@@ -221,18 +212,9 @@ export default function AdRequests() {
 
         {/* Tabs */}
         <div className="flex items-center gap-2 border-b border-slate-200 mb-4">
-          {tabs.map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === tab.key
-                ? "border-[#FF5200] text-[#FF5200]"
-                : "border-transparent text-slate-600 hover:text-slate-900"
-                }`}
-            >
+          {tabs.map(tab => <button key={tab.key} onClick={() => setActiveTab(tab.key)} className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === tab.key ? "border-[#FF5200] text-[#FF5200]" : "border-transparent text-slate-600 hover:text-slate-900"}`}>
               {tab.label}
-            </button>
-          ))}
+            </button>)}
         </div>
 
         <div className="flex items-center gap-3">
@@ -245,13 +227,7 @@ export default function AdRequests() {
 
           <div className="flex items-center gap-3 ml-auto">
             <div className="relative flex-1 sm:flex-initial min-w-[250px]">
-              <input
-                type="text"
-                placeholder="Search by ads ID or restaurant"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 pr-4 py-2.5 w-full text-sm rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-[#FF5200] focus:border-[#FF5200]"
-              />
+              <input type="text" placeholder="Search by ads ID or restaurant" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-10 pr-4 py-2.5 w-full text-sm rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-[#FF5200] focus:border-[#FF5200]" />
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             </div>
 
@@ -285,24 +261,15 @@ export default function AdRequests() {
               </DropdownMenuContent>
             </DropdownMenu>
 
-            <button
-              onClick={() => setIsFilterOpen(true)}
-              className={`px-4 py-2.5 text-sm font-medium rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 flex items-center gap-2 transition-all relative ${activeFiltersCount > 0 ? "border-emerald-500 bg-emerald-50" : ""
-                }`}
-            >
+            <button onClick={() => setIsFilterOpen(true)} className={`px-4 py-2.5 text-sm font-medium rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 flex items-center gap-2 transition-all relative ${activeFiltersCount > 0 ? "border-emerald-500 bg-emerald-50" : ""}`}>
               <Filter className="w-4 h-4" />
               <span className="text-black font-bold">Filters</span>
-              {activeFiltersCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-5 h-5 bg-emerald-500 text-white rounded-full text-[10px] flex items-center justify-center font-bold">
+              {activeFiltersCount > 0 && <span className="absolute -top-1 -right-1 w-5 h-5 bg-emerald-500 text-white rounded-full text-[10px] flex items-center justify-center font-bold">
                   {activeFiltersCount}
-                </span>
-              )}
+                </span>}
             </button>
 
-            <button
-              onClick={() => setIsSettingsOpen(true)}
-              className="p-2.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 transition-all"
-            >
+            <button onClick={() => setIsSettingsOpen(true)} className="p-2.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 transition-all">
               <Settings className="w-5 h-5" />
             </button>
           </div>
@@ -325,43 +292,27 @@ export default function AdRequests() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-slate-100">
-              {loading ? (
-                <tr>
+              {loading ? <tr>
                   <td colSpan={Object.values(visibleColumns).filter(v => v).length} className="px-6 py-20 text-center">
                     <Loader2 className="w-8 h-8 animate-spin text-orange-500 mx-auto mb-2" />
                     <p className="text-sm text-slate-500">Loading requests...</p>
                   </td>
-                </tr>
-              ) : filteredRequests.length === 0 ? (
-                <tr>
+                </tr> : filteredRequests.length === 0 ? <tr>
                   <td colSpan={Object.values(visibleColumns).filter(v => v).length} className="px-6 py-20 text-center">
                     <p className="text-lg font-semibold text-slate-700 mb-1">No Data Found</p>
                     <p className="text-sm text-slate-500">No requests match your search</p>
                   </td>
-                </tr>
-              ) : (
-                filteredRequests.map((request) => (
-                  <tr
-                    key={request._id}
-                    className="hover:bg-slate-50 transition-colors"
-                  >
-                    {visibleColumns.si && (
-                      <td className="px-6 py-4 whitespace-nowrap">
+                </tr> : filteredRequests.map(request => <tr key={request._id} className="hover:bg-slate-50 transition-colors">
+                    {visibleColumns.si && <td className="px-6 py-4 whitespace-nowrap">
                         <span className="text-sm font-medium text-slate-700">{request.sl}</span>
-                      </td>
-                    )}
-                    {visibleColumns.adsId && (
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      </td>}
+                    {visibleColumns.adsId && <td className="px-6 py-4 whitespace-nowrap">
                         <span className="text-sm font-medium text-slate-900">{request.adsId}</span>
-                      </td>
-                    )}
-                    {visibleColumns.adsTitle && (
-                      <td className="px-6 py-4">
+                      </td>}
+                    {visibleColumns.adsTitle && <td className="px-6 py-4">
                         <span className="text-sm font-medium text-slate-900">{request.adsTitle}</span>
-                      </td>
-                    )}
-                    {visibleColumns.restaurantInfo && (
-                      <td className="px-6 py-4">
+                      </td>}
+                    {visibleColumns.restaurantInfo && <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center flex-shrink-0">
                             <Building2 className="w-5 h-5 text-orange-600" />
@@ -371,20 +322,14 @@ export default function AdRequests() {
                             <span className="text-xs text-slate-500">{request.restaurantEmail}</span>
                           </div>
                         </div>
-                      </td>
-                    )}
-                    {visibleColumns.adsType && (
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      </td>}
+                    {visibleColumns.adsType && <td className="px-6 py-4 whitespace-nowrap">
                         <span className="text-sm text-slate-700">{request.adsType}</span>
-                      </td>
-                    )}
-                    {visibleColumns.duration && (
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      </td>}
+                    {visibleColumns.duration && <td className="px-6 py-4 whitespace-nowrap">
                         <span className="text-sm text-slate-700">{request.duration}</span>
-                      </td>
-                    )}
-                    {visibleColumns.actions && (
-                      <td className="px-6 py-4 whitespace-nowrap text-center">
+                      </td>}
+                    {visibleColumns.actions && <td className="px-6 py-4 whitespace-nowrap text-center">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <button className="p-1.5 rounded text-slate-600 hover:bg-slate-100 transition-colors">
@@ -392,47 +337,30 @@ export default function AdRequests() {
                             </button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-48 bg-white border border-slate-200 rounded-lg shadow-lg z-50">
-                            <DropdownMenuItem
-                              onClick={() => handleViewRequest(request)}
-                              className="cursor-pointer"
-                            >
+                            <DropdownMenuItem onClick={() => handleViewRequest(request)} className="cursor-pointer">
                               <Eye className="w-4 h-4 mr-2" />
                               View Details
                             </DropdownMenuItem>
-                            {activeTab === "new" && (
-                              <>
+                            {activeTab === "new" && <>
                                 <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                  onClick={() => handleApprove(request._id)}
-                                  className="cursor-pointer text-emerald-600"
-                                >
+                                <DropdownMenuItem onClick={() => handleApprove(request._id)} className="cursor-pointer text-emerald-600">
                                   <CheckCircle2 className="w-4 h-4 mr-2" />
                                   Approve
                                 </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={() => handleDeny(request._id)}
-                                  className="cursor-pointer text-red-600"
-                                >
+                                <DropdownMenuItem onClick={() => handleDeny(request._id)} className="cursor-pointer text-red-600">
                                   <XCircle className="w-4 h-4 mr-2" />
                                   Deny
                                 </DropdownMenuItem>
-                              </>
-                            )}
+                              </>}
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              onClick={() => handleDelete(request._id)}
-                              className="cursor-pointer text-red-600 focus:text-red-700 focus:bg-red-50"
-                            >
+                            <DropdownMenuItem onClick={() => handleDelete(request._id)} className="cursor-pointer text-red-600 focus:text-red-700 focus:bg-red-50">
                               <Trash2 className="w-4 h-4 mr-2" />
                               Delete
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
-                      </td>
-                    )}
-                  </tr>
-                ))
-              )}
+                      </td>}
+                  </tr>)}
             </tbody>
           </table>
         </div>
@@ -452,43 +380,31 @@ export default function AdRequests() {
               <label className="block text-sm font-semibold text-slate-700 mb-2">
                 Ads Type
               </label>
-              <select
-                value={filters.adsType}
-                onChange={(e) => setFilters(prev => ({ ...prev, adsType: e.target.value }))}
-                className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#FF5200] focus:border-[#FF5200] text-sm"
-              >
+              <select value={filters.adsType} onChange={e => setFilters(prev => ({
+              ...prev,
+              adsType: e.target.value
+            }))} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#FF5200] focus:border-[#FF5200] text-sm">
                 <option value="">All Types</option>
-                {adsTypes.map(type => (
-                  <option key={type} value={type}>{type}</option>
-                ))}
+                {adsTypes.map(type => <option key={type} value={type}>{type}</option>)}
               </select>
             </div>
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-2">
                 Restaurant
               </label>
-              <select
-                value={filters.restaurant}
-                onChange={(e) => setFilters(prev => ({ ...prev, restaurant: e.target.value }))}
-                className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#FF5200] focus:border-[#FF5200] text-sm"
-              >
+              <select value={filters.restaurant} onChange={e => setFilters(prev => ({
+              ...prev,
+              restaurant: e.target.value
+            }))} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#FF5200] focus:border-[#FF5200] text-sm">
                 <option value="">All Restaurants</option>
-                {restaurants.map(restaurant => (
-                  <option key={restaurant} value={restaurant}>{restaurant}</option>
-                ))}
+                {restaurants.map(restaurant => <option key={restaurant} value={restaurant}>{restaurant}</option>)}
               </select>
             </div>
             <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
-              <button
-                onClick={handleResetFilters}
-                className="px-4 py-2 text-sm font-medium rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition-all"
-              >
+              <button onClick={handleResetFilters} className="px-4 py-2 text-sm font-medium rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition-all">
                 Reset
               </button>
-              <button
-                onClick={handleApplyFilters}
-                className="px-4 py-2 text-sm font-medium rounded-lg bg-[#FF5200] text-white hover:bg-[#E64A00] transition-all shadow-md"
-              >
+              <button onClick={handleApplyFilters} className="px-4 py-2 text-sm font-medium rounded-lg bg-[#FF5200] text-white hover:bg-[#E64A00] transition-all shadow-md">
                 Apply
               </button>
             </div>
@@ -497,14 +413,7 @@ export default function AdRequests() {
       </Dialog>
 
       {/* Settings Dialog */}
-      <SettingsDialog
-        isOpen={isSettingsOpen}
-        onOpenChange={setIsSettingsOpen}
-        visibleColumns={visibleColumns}
-        toggleColumn={toggleColumn}
-        resetColumns={resetColumns}
-        columnsConfig={columnsConfig}
-      />
+      <SettingsDialog isOpen={isSettingsOpen} onOpenChange={setIsSettingsOpen} visibleColumns={visibleColumns} toggleColumn={toggleColumn} resetColumns={resetColumns} columnsConfig={columnsConfig} />
 
       {/* View Request Dialog */}
       <Dialog open={isViewOpen} onOpenChange={setIsViewOpen}>
@@ -512,8 +421,7 @@ export default function AdRequests() {
           <DialogHeader className="px-6 pt-6 pb-4">
             <DialogTitle>Advertisement Request Details</DialogTitle>
           </DialogHeader>
-          {selectedRequest && (
-            <div className="px-6 pb-6 space-y-4">
+          {selectedRequest && <div className="px-6 pb-6 space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm font-semibold text-slate-700">Ads ID</p>
@@ -540,10 +448,8 @@ export default function AdRequests() {
                   <p className="text-sm text-slate-900">{selectedRequest.duration}</p>
                 </div>
               </div>
-            </div>
-          )}
+            </div>}
         </DialogContent>
       </Dialog>
-    </div >
-  )
+    </div>;
 }

@@ -3,21 +3,15 @@ import otpService from "../services/otpService.js";
 import jwtService from "../services/jwtService.js";
 import googleAuthService from "../services/googleAuthService.js";
 import firebaseAuthService from "../services/firebaseAuthService.js";
-import {
-  successResponse,
-  errorResponse,
-} from "../../../shared/utils/response.js";
+import { successResponse, errorResponse } from "../../../shared/utils/response.js";
 import { asyncHandler } from "../../../shared/middleware/asyncHandler.js";
 import winston from "winston";
-
 const logger = winston.createLogger({
   level: "info",
   format: winston.format.json(),
-  transports: [
-    new winston.transports.Console({
-      format: winston.format.simple(),
-    }),
-  ],
+  transports: [new winston.transports.Console({
+    format: winston.format.simple()
+  })]
 });
 
 /**
@@ -25,7 +19,11 @@ const logger = winston.createLogger({
  * POST /api/auth/send-otp
  */
 export const sendOTP = asyncHandler(async (req, res) => {
-  const { phone, email, purpose = "login" } = req.body;
+  const {
+    phone,
+    email,
+    purpose = "login"
+  } = req.body;
 
   // Validate that either phone or email is provided
   if (!phone && !email) {
@@ -34,8 +32,7 @@ export const sendOTP = asyncHandler(async (req, res) => {
 
   // Validate phone number format if provided
   if (phone) {
-    const phoneRegex =
-      /^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{1,9}$/;
+    const phoneRegex = /^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{1,9}$/;
     if (!phoneRegex.test(phone)) {
       return errorResponse(res, 400, "Invalid phone number format");
     }
@@ -48,16 +45,11 @@ export const sendOTP = asyncHandler(async (req, res) => {
       return errorResponse(res, 400, "Invalid email format");
     }
   }
-
   try {
-    const result = await otpService.generateAndSendOTP(
-      phone || null,
-      purpose,
-      email || null,
-    );
+    const result = await otpService.generateAndSendOTP(phone || null, purpose, email || null);
     return successResponse(res, 200, result.message, {
       expiresIn: result.expiresIn,
-      identifierType: result.identifierType,
+      identifierType: result.identifierType
     });
   } catch (error) {
     logger.error(`Error sending OTP: ${error.message}`);
@@ -77,57 +69,42 @@ export const verifyOTP = asyncHandler(async (req, res) => {
     purpose = "login",
     name,
     role = "user",
-    password,
+    password
   } = req.body;
 
   // Validate that either phone or email is provided
-  if ((!phone && !email) || !otp) {
-    return errorResponse(
-      res,
-      400,
-      "Either phone number or email, and OTP are required",
-    );
+  if (!phone && !email || !otp) {
+    return errorResponse(res, 400, "Either phone number or email, and OTP are required");
   }
 
   // Validate role - admin can be used for admin signup/reset
   const allowedRoles = ["user", "restaurant", "delivery", "admin"];
   const userRole = role || "user";
   if (!allowedRoles.includes(userRole)) {
-    return errorResponse(
-      res,
-      400,
-      `Invalid role. Allowed roles: ${allowedRoles.join(", ")}`,
-    );
+    return errorResponse(res, 400, `Invalid role. Allowed roles: ${allowedRoles.join(", ")}`);
   }
 
   // For email-based admin registration, password is mandatory
   if (purpose === "register" && !phone && userRole === "admin" && !password) {
-    return errorResponse(
-      res,
-      400,
-      "Password is required for admin email registration",
-    );
+    return errorResponse(res, 400, "Password is required for admin email registration");
   }
-
   try {
     let user;
     const identifier = phone || email;
     const identifierType = phone ? "phone" : "email";
-
     if (purpose === "register") {
       // Registration flow
       // Check if user already exists with same email/phone AND role
-      const findQuery = phone
-        ? { phone, role: userRole }
-        : { email, role: userRole };
+      const findQuery = phone ? {
+        phone,
+        role: userRole
+      } : {
+        email,
+        role: userRole
+      };
       user = await User.findOne(findQuery);
-
       if (user) {
-        return errorResponse(
-          res,
-          400,
-          `User already exists with this ${identifierType} and role. Please login.`,
-        );
+        return errorResponse(res, 400, `User already exists with this ${identifierType} and role. Please login.`);
       }
 
       // Name is mandatory for explicit registration
@@ -137,13 +114,11 @@ export const verifyOTP = asyncHandler(async (req, res) => {
 
       // Verify OTP (phone or email) before creating user
       await otpService.verifyOTP(phone || null, otp, purpose, email || null);
-
       const userData = {
         name,
         role: userRole,
-        signupMethod: phone ? "phone" : "email",
+        signupMethod: phone ? "phone" : "email"
       };
-
       if (phone) {
         userData.phone = phone;
         userData.phoneVerified = true;
@@ -157,81 +132,63 @@ export const verifyOTP = asyncHandler(async (req, res) => {
       if (password && !phone) {
         userData.password = password;
       }
-
       try {
         user = await User.create(userData);
       } catch (createError) {
         // Handle duplicate key error - user might have been created between findOne and create
         if (createError.code === 11000) {
           // Try to find the user again
-          const findQuery = phone
-            ? { phone, role: userRole }
-            : { email, role: userRole };
+          const findQuery = phone ? {
+            phone,
+            role: userRole
+          } : {
+            email,
+            role: userRole
+          };
           user = await User.findOne(findQuery);
           if (!user) {
             throw createError; // Re-throw if still not found
           }
           // User exists, return error that they should login instead
-          return errorResponse(
-            res,
-            400,
-            `User already exists with this ${identifierType} and role. Please login.`,
-          );
+          return errorResponse(res, 400, `User already exists with this ${identifierType} and role. Please login.`);
         } else {
           throw createError;
         }
       }
-
-      logger.info(`New user registered: ${user._id}`, {
-        [identifierType]: identifier,
-        userId: user._id,
-        role: userRole,
-      });
     } else {
       // Login (with optional auto-registration)
       // Find user by email/phone AND role to ensure correct module access
-      const findQuery = phone
-        ? { phone, role: userRole }
-        : { email, role: userRole };
+      const findQuery = phone ? {
+        phone,
+        role: userRole
+      } : {
+        email,
+        role: userRole
+      };
       user = await User.findOne(findQuery);
-
       if (!user && !name) {
         // OTP has NOT been verified yet in this flow.
         // Tell the client that we need user's name to proceed with auto-registration.
         // The client should collect name and call this endpoint again with the same OTP and name.
-        return successResponse(
-          res,
-          200,
-          "User not found. Please provide name for registration.",
-          {
-            needsName: true,
-            identifierType,
-            identifier,
-          },
-        );
+        return successResponse(res, 200, "User not found. Please provide name for registration.", {
+          needsName: true,
+          identifierType,
+          identifier
+        });
       }
 
       // Handle reset-password purpose
       if (purpose === "reset-password") {
         if (!user) {
-          return errorResponse(
-            res,
-            404,
-            `No ${userRole} account found with this email.`,
-          );
+          return errorResponse(res, 404, `No ${userRole} account found with this email.`);
         }
         // Verify OTP for password reset
         await otpService.verifyOTP(phone || null, otp, purpose, email || null);
         // Return success - frontend will call reset-password endpoint with OTP
-        return successResponse(
-          res,
-          200,
-          "OTP verified. You can now reset your password.",
-          {
-            verified: true,
-            email: user.email,
-          },
-        );
+        return successResponse(res, 200, "OTP verified. You can now reset your password.", {
+          verified: true,
+          email: user.email
+        });
       }
 
       // At this point, either:
@@ -239,15 +196,13 @@ export const verifyOTP = asyncHandler(async (req, res) => {
       // - user does not exist but name is provided (auto-registration)
       // In both cases we must verify OTP first.
       await otpService.verifyOTP(phone || null, otp, purpose, email || null);
-
       if (!user) {
         // Auto-register new user after OTP verification
         const userData = {
           name,
           role: userRole,
-          signupMethod: phone ? "phone" : "email",
+          signupMethod: phone ? "phone" : "email"
         };
-
         if (phone) {
           userData.phone = phone;
           userData.phoneVerified = true;
@@ -256,36 +211,31 @@ export const verifyOTP = asyncHandler(async (req, res) => {
         if (email) {
           userData.email = email;
         }
-
         if (password && !phone) {
           userData.password = password;
         }
-
         try {
           user = await User.create(userData);
         } catch (createError) {
           // Handle duplicate key error - user might have been created between findOne and create
           if (createError.code === 11000) {
             // Try to find the user again
-            const findQuery = phone
-              ? { phone, role: userRole }
-              : { email, role: userRole };
+            const findQuery = phone ? {
+              phone,
+              role: userRole
+            } : {
+              email,
+              role: userRole
+            };
             user = await User.findOne(findQuery);
             if (!user) {
               throw createError; // Re-throw if still not found
             }
             // User exists, continue with login flow
-            logger.info(`User found after duplicate key error: ${user._id}`);
           } else {
             throw createError;
           }
         }
-
-        logger.info(`New user auto-registered: ${user._id}`, {
-          [identifierType]: identifier,
-          userId: user._id,
-          role: userRole,
-        });
       } else {
         // Existing user login - update verification status if needed
         if (phone && !user.phoneVerified) {
@@ -300,7 +250,7 @@ export const verifyOTP = asyncHandler(async (req, res) => {
     const tokens = jwtService.generateTokens({
       userId: user._id.toString(),
       role: user.role,
-      phone: user.phone,
+      phone: user.phone
     });
 
     // Set refresh token in httpOnly cookie
@@ -308,7 +258,7 @@ export const verifyOTP = asyncHandler(async (req, res) => {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
     });
 
     // Return access token and user info
@@ -322,8 +272,8 @@ export const verifyOTP = asyncHandler(async (req, res) => {
         phoneVerified: user.phoneVerified,
         role: user.role,
         profileImage: user.profileImage,
-        signupMethod: user.signupMethod,
-      },
+        signupMethod: user.signupMethod
+      }
     });
   } catch (error) {
     logger.error(`Error verifying OTP: ${error.message}`);
@@ -338,18 +288,15 @@ export const verifyOTP = asyncHandler(async (req, res) => {
 export const refreshToken = asyncHandler(async (req, res) => {
   // Get refresh token from cookie
   const refreshToken = req.cookies?.refreshToken;
-
   if (!refreshToken) {
     return errorResponse(res, 401, "Refresh token not found");
   }
-
   try {
     // Verify refresh token
     const decoded = jwtService.verifyRefreshToken(refreshToken);
 
     // Get user
     const user = await User.findById(decoded.userId).select("-password");
-
     if (!user || !user.isActive) {
       return errorResponse(res, 401, "User not found or inactive");
     }
@@ -358,11 +305,10 @@ export const refreshToken = asyncHandler(async (req, res) => {
     const accessToken = jwtService.generateAccessToken({
       userId: user._id.toString(),
       role: user.role,
-      phone: user.phone,
+      phone: user.phone
     });
-
     return successResponse(res, 200, "Token refreshed successfully", {
-      accessToken,
+      accessToken
     });
   } catch (error) {
     return errorResponse(res, 401, error.message || "Invalid refresh token");
@@ -378,9 +324,8 @@ export const logout = asyncHandler(async (req, res) => {
   res.clearCookie("refreshToken", {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
+    sameSite: "strict"
   });
-
   return successResponse(res, 200, "Logged out successfully");
 });
 
@@ -389,8 +334,13 @@ export const logout = asyncHandler(async (req, res) => {
  * POST /api/auth/register
  */
 export const register = asyncHandler(async (req, res) => {
-  const { name, email, password, phone, role = "user" } = req.body;
-
+  const {
+    name,
+    email,
+    password,
+    phone,
+    role = "user"
+  } = req.body;
   if (!name || !email || !password) {
     return errorResponse(res, 400, "Name, email, and password are required");
   }
@@ -399,11 +349,7 @@ export const register = asyncHandler(async (req, res) => {
   const allowedRoles = ["user", "restaurant", "delivery", "admin"];
   const userRole = role || "user";
   if (!allowedRoles.includes(userRole)) {
-    return errorResponse(
-      res,
-      400,
-      `Invalid role. Allowed roles: ${allowedRoles.join(", ")}`,
-    );
+    return errorResponse(res, 400, `Invalid role. Allowed roles: ${allowedRoles.join(", ")}`);
   }
 
   // Check if user already exists with same email/phone AND role
@@ -412,23 +358,13 @@ export const register = asyncHandler(async (req, res) => {
   if (email) findQuery.email = email;
   if (phone) findQuery.phone = phone;
   findQuery.role = userRole;
-
   const existingUser = await User.findOne(findQuery);
-
   if (existingUser) {
     if (existingUser.email === email) {
-      return errorResponse(
-        res,
-        400,
-        `User with this email and role (${userRole}) already exists. Please login.`,
-      );
+      return errorResponse(res, 400, `User with this email and role (${userRole}) already exists. Please login.`);
     }
     if (existingUser.phone === phone) {
-      return errorResponse(
-        res,
-        400,
-        `User with this phone number and role (${userRole}) already exists. Please login.`,
-      );
+      return errorResponse(res, 400, `User with this phone number and role (${userRole}) already exists. Please login.`);
     }
   }
 
@@ -436,17 +372,18 @@ export const register = asyncHandler(async (req, res) => {
   const user = await User.create({
     name,
     email,
-    password, // Will be hashed by pre-save hook
+    password,
+    // Will be hashed by pre-save hook
     phone: phone || null,
     role: userRole,
-    signupMethod: "email", // Email/password registration
+    signupMethod: "email" // Email/password registration
   });
 
   // Generate tokens
   const tokens = jwtService.generateTokens({
     userId: user._id.toString(),
     role: user.role,
-    email: user.email,
+    email: user.email
   });
 
   // Set refresh token in httpOnly cookie
@@ -454,24 +391,16 @@ export const register = asyncHandler(async (req, res) => {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "strict",
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
   });
-
-  logger.info(`New user registered via email: ${user._id}`, {
-    email,
-    userId: user._id,
-    role: userRole,
-  });
-
   // Send welcome email
   if (user.email) {
     // Import emailService dynamically to avoid circular dependencies if any
     const emailService = (await import("../services/emailService.js")).default;
-    emailService.sendWelcomeEmail(user.email, user.name).catch((err) => {
+    emailService.sendWelcomeEmail(user.email, user.name).catch(err => {
       logger.error(`Failed to send welcome email: ${err.message}`);
     });
   }
-
   return successResponse(res, 201, "Registration successful", {
     accessToken: tokens.accessToken,
     user: {
@@ -482,8 +411,8 @@ export const register = asyncHandler(async (req, res) => {
       phoneVerified: user.phoneVerified,
       role: user.role,
       profileImage: user.profileImage,
-      signupMethod: user.signupMethod,
-    },
+      signupMethod: user.signupMethod
+    }
   });
 });
 
@@ -492,54 +421,43 @@ export const register = asyncHandler(async (req, res) => {
  * POST /api/auth/login
  */
 export const login = asyncHandler(async (req, res) => {
-  const { email, password, role } = req.body;
-
+  const {
+    email,
+    password,
+    role
+  } = req.body;
   if (!email || !password) {
     return errorResponse(res, 400, "Email and password are required");
   }
 
   // Find user by email and role (if role provided) to ensure correct module access
   // If role not provided, find by email only (backward compatibility)
-  const findQuery = { email };
+  const findQuery = {
+    email
+  };
   if (role) {
     findQuery.role = role;
   }
-
   const user = await User.findOne(findQuery).select("+password");
-
   if (!user) {
     return errorResponse(res, 401, "Invalid email or password");
   }
 
   // If role was provided but doesn't match, return error
   if (role && user.role !== role) {
-    return errorResponse(
-      res,
-      401,
-      `No ${role} account found with this email. Please check your credentials.`,
-    );
+    return errorResponse(res, 401, `No ${role} account found with this email. Please check your credentials.`);
   }
-
   if (!user.isActive) {
-    return errorResponse(
-      res,
-      401,
-      "Account is inactive. Please contact support.",
-    );
+    return errorResponse(res, 401, "Account is inactive. Please contact support.");
   }
 
   // Check if user has a password set
   if (!user.password) {
-    return errorResponse(
-      res,
-      400,
-      "Account was created with phone. Please use OTP login.",
-    );
+    return errorResponse(res, 400, "Account was created with phone. Please use OTP login.");
   }
 
   // Verify password
   const isPasswordValid = await user.comparePassword(password);
-
   if (!isPasswordValid) {
     return errorResponse(res, 401, "Invalid email or password");
   }
@@ -548,7 +466,7 @@ export const login = asyncHandler(async (req, res) => {
   const tokens = jwtService.generateTokens({
     userId: user._id.toString(),
     role: user.role,
-    email: user.email,
+    email: user.email
   });
 
   // Set refresh token in httpOnly cookie
@@ -556,14 +474,8 @@ export const login = asyncHandler(async (req, res) => {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "strict",
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
   });
-
-  logger.info(`User logged in via email: ${user._id}`, {
-    email,
-    userId: user._id,
-  });
-
   return successResponse(res, 200, "Login successful", {
     accessToken: tokens.accessToken,
     user: {
@@ -574,8 +486,8 @@ export const login = asyncHandler(async (req, res) => {
       phoneVerified: user.phoneVerified,
       role: user.role,
       profileImage: user.profileImage,
-      signupMethod: user.signupMethod,
-    },
+      signupMethod: user.signupMethod
+    }
   });
 });
 
@@ -584,34 +496,29 @@ export const login = asyncHandler(async (req, res) => {
  * POST /api/auth/reset-password
  */
 export const resetPassword = asyncHandler(async (req, res) => {
-  const { email, otp, newPassword, role } = req.body;
-
+  const {
+    email,
+    otp,
+    newPassword,
+    role
+  } = req.body;
   if (!email || !otp || !newPassword) {
     return errorResponse(res, 400, "Email, OTP, and new password are required");
   }
-
   if (newPassword.length < 6) {
-    return errorResponse(
-      res,
-      400,
-      "Password must be at least 6 characters long",
-    );
+    return errorResponse(res, 400, "Password must be at least 6 characters long");
   }
 
   // Find user by email and role (if role provided) to ensure correct module access
-  const findQuery = { email };
+  const findQuery = {
+    email
+  };
   if (role) {
     findQuery.role = role;
   }
-
   const user = await User.findOne(findQuery).select("+password");
-
   if (!user) {
-    return errorResponse(
-      res,
-      404,
-      role ? `No ${role} account found with this email.` : "User not found",
-    );
+    return errorResponse(res, 404, role ? `No ${role} account found with this email.` : "User not found");
   }
 
   // If role was provided but doesn't match, return error
@@ -623,30 +530,14 @@ export const resetPassword = asyncHandler(async (req, res) => {
   try {
     await otpService.verifyOTP(null, otp, "reset-password", email);
   } catch (error) {
-    logger.error(
-      `OTP verification failed for password reset: ${error.message}`,
-    );
-    return errorResponse(
-      res,
-      400,
-      "Invalid or expired OTP. Please request a new one.",
-    );
+    logger.error(`OTP verification failed for password reset: ${error.message}`);
+    return errorResponse(res, 400, "Invalid or expired OTP. Please request a new one.");
   }
 
   // Update password
   user.password = newPassword; // Will be hashed by pre-save hook
   await user.save();
-
-  logger.info(`Password reset successful for user: ${user._id}`, {
-    email,
-    userId: user._id,
-  });
-
-  return successResponse(
-    res,
-    200,
-    "Password reset successfully. Please login with your new password.",
-  );
+  return successResponse(res, 200, "Password reset successfully. Please login with your new password.");
 });
 
 /**
@@ -670,8 +561,8 @@ export const getCurrentUser = asyncHandler(async (req, res) => {
       // Include additional profile fields
       dateOfBirth: req.user.dateOfBirth,
       anniversary: req.user.anniversary,
-      gender: req.user.gender,
-    },
+      gender: req.user.gender
+    }
   });
 });
 
@@ -680,8 +571,10 @@ export const getCurrentUser = asyncHandler(async (req, res) => {
  * POST /api/auth/firebase/google-login
  */
 export const firebaseGoogleLogin = asyncHandler(async (req, res) => {
-  const { idToken, role = "restaurant" } = req.body;
-
+  const {
+    idToken,
+    role = "restaurant"
+  } = req.body;
   if (!idToken) {
     return errorResponse(res, 400, "Firebase ID token is required");
   }
@@ -690,26 +583,16 @@ export const firebaseGoogleLogin = asyncHandler(async (req, res) => {
   const allowedRoles = ["user", "restaurant", "delivery"];
   const userRole = role || "restaurant";
   if (!allowedRoles.includes(userRole)) {
-    return errorResponse(
-      res,
-      400,
-      `Invalid role. Allowed roles: ${allowedRoles.join(", ")}`,
-    );
+    return errorResponse(res, 400, `Invalid role. Allowed roles: ${allowedRoles.join(", ")}`);
   }
 
   // Ensure Firebase Admin is configured
   if (!firebaseAuthService.isEnabled()) {
-    return errorResponse(
-      res,
-      500,
-      "Firebase Auth is not configured. Please set FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL and FIREBASE_PRIVATE_KEY in backend .env",
-    );
+    return errorResponse(res, 500, "Firebase Auth is not configured. Please set FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL and FIREBASE_PRIVATE_KEY in backend .env");
   }
-
   try {
     // Verify Firebase ID token
     const decoded = await firebaseAuthService.verifyIdToken(idToken);
-
     const firebaseUid = decoded.uid;
     const email = decoded.email || null;
     const name = decoded.name || decoded.display_name || "Google User";
@@ -719,33 +602,29 @@ export const firebaseGoogleLogin = asyncHandler(async (req, res) => {
     // Validate email is present
     if (!email) {
       logger.error("Firebase Google login failed: Email not found in token", {
-        uid: firebaseUid,
+        uid: firebaseUid
       });
-      return errorResponse(
-        res,
-        400,
-        "Email not found in Firebase user. Please ensure email is available in your Google account.",
-      );
+      return errorResponse(res, 400, "Email not found in Firebase user. Please ensure email is available in your Google account.");
     }
 
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       logger.error("Firebase Google login failed: Invalid email format", {
-        email,
+        email
       });
-      return errorResponse(
-        res,
-        400,
-        "Invalid email format received from Google.",
-      );
+      return errorResponse(res, 400, "Invalid email format received from Google.");
     }
 
     // Find existing user by firebase UID (stored in googleId) or email with same role
     let user = await User.findOne({
-      $or: [{ googleId: firebaseUid }, { email, role: userRole }],
+      $or: [{
+        googleId: firebaseUid
+      }, {
+        email,
+        role: userRole
+      }]
     });
-
     if (user) {
       // If user exists but googleId not linked yet, link it
       if (!user.googleId) {
@@ -759,35 +638,17 @@ export const firebaseGoogleLogin = asyncHandler(async (req, res) => {
           user.signupMethod = "google";
         }
         await user.save();
-        logger.info("Linked Google account to existing user", {
-          userId: user._id,
-          email,
-        });
       }
 
       // If this is a restaurant login, make sure role matches
       if (userRole === "restaurant" && user.role !== "restaurant") {
-        return errorResponse(
-          res,
-          403,
-          "This account is not registered as a restaurant partner",
-        );
+        return errorResponse(res, 403, "This account is not registered as a restaurant partner");
       }
 
       // If user role doesn't match requested role, return error
       if (user.role !== userRole) {
-        return errorResponse(
-          res,
-          403,
-          `This account is registered as ${user.role}, not ${userRole}`,
-        );
+        return errorResponse(res, 403, `This account is registered as ${user.role}, not ${userRole}`);
       }
-
-      logger.info("Existing user logged in via Firebase Google", {
-        userId: user._id,
-        email,
-        role: user.role,
-      });
     } else {
       // Auto-register new user based on Firebase data
       const userData = {
@@ -798,31 +659,25 @@ export const firebaseGoogleLogin = asyncHandler(async (req, res) => {
         role: userRole,
         signupMethod: "google",
         profileImage: picture || null,
-        isActive: true,
+        isActive: true
       };
-
       try {
         user = await User.create(userData);
-
-        logger.info("New user registered via Firebase Google login", {
-          firebaseUid,
-          email,
-          userId: user._id,
-          role: userRole,
-          name: user.name,
-        });
       } catch (createError) {
         // Handle duplicate key error - user might have been created between findOne and create
         if (createError.code === 11000) {
-          logger.warn(
-            "Duplicate key error during user creation, retrying find",
-            { email, role: userRole },
-          );
-          user = await User.findOne({ email, role: userRole });
+          logger.warn("Duplicate key error during user creation, retrying find", {
+            email,
+            role: userRole
+          });
+          user = await User.findOne({
+            email,
+            role: userRole
+          });
           if (!user) {
             logger.error("User not found after duplicate key error", {
               email,
-              role: userRole,
+              role: userRole
             });
             throw createError;
           }
@@ -842,7 +697,7 @@ export const firebaseGoogleLogin = asyncHandler(async (req, res) => {
           logger.error("Error creating user via Firebase Google login", {
             error: createError.message,
             email,
-            role: userRole,
+            role: userRole
           });
           throw createError;
         }
@@ -851,19 +706,18 @@ export const firebaseGoogleLogin = asyncHandler(async (req, res) => {
 
     // Ensure user is active
     if (!user.isActive) {
-      logger.warn("Inactive user attempted login", { userId: user._id, email });
-      return errorResponse(
-        res,
-        403,
-        "Your account has been deactivated. Please contact support.",
-      );
+      logger.warn("Inactive user attempted login", {
+        userId: user._id,
+        email
+      });
+      return errorResponse(res, 403, "Your account has been deactivated. Please contact support.");
     }
 
     // Generate JWT tokens for our app
     const tokens = jwtService.generateTokens({
       userId: user._id.toString(),
       role: user.role,
-      email: user.email,
+      email: user.email
     });
 
     // Set refresh token in httpOnly cookie
@@ -871,34 +725,24 @@ export const firebaseGoogleLogin = asyncHandler(async (req, res) => {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
     });
-
-    return successResponse(
-      res,
-      200,
-      "Firebase Google authentication successful",
-      {
-        accessToken: tokens.accessToken,
-        user: {
-          id: user._id,
-          name: user.name,
-          email: user.email,
-          phone: user.phone,
-          phoneVerified: user.phoneVerified,
-          role: user.role,
-          profileImage: user.profileImage,
-          signupMethod: user.signupMethod,
-        },
-      },
-    );
+    return successResponse(res, 200, "Firebase Google authentication successful", {
+      accessToken: tokens.accessToken,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        phoneVerified: user.phoneVerified,
+        role: user.role,
+        profileImage: user.profileImage,
+        signupMethod: user.signupMethod
+      }
+    });
   } catch (error) {
     logger.error(`Error in Firebase Google login: ${error.message}`);
-    return errorResponse(
-      res,
-      400,
-      error.message || "Firebase Google authentication failed",
-    );
+    return errorResponse(res, 400, error.message || "Firebase Google authentication failed");
   }
 });
 
@@ -907,38 +751,33 @@ export const firebaseGoogleLogin = asyncHandler(async (req, res) => {
  * GET /api/auth/google/:role
  */
 export const googleAuth = asyncHandler(async (req, res) => {
-  const { role } = req.params;
+  const {
+    role
+  } = req.params;
 
   // Validate role
   const allowedRoles = ["user", "restaurant", "delivery"];
   const userRole = role || "restaurant";
-
   if (!allowedRoles.includes(userRole)) {
-    return errorResponse(
-      res,
-      400,
-      `Invalid role. Allowed roles: ${allowedRoles.join(", ")}`,
-    );
+    return errorResponse(res, 400, `Invalid role. Allowed roles: ${allowedRoles.join(", ")}`);
   }
 
   // Check if Google OAuth is configured
   if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
-    return errorResponse(
-      res,
-      500,
-      "Google OAuth is not configured. Please set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env",
-    );
+    return errorResponse(res, 500, "Google OAuth is not configured. Please set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env");
   }
-
   try {
-    const { authUrl, state } = googleAuthService.getAuthUrl(userRole);
+    const {
+      authUrl,
+      state
+    } = googleAuthService.getAuthUrl(userRole);
 
     // Store state in session/cookie for verification (optional, for extra security)
     res.cookie("oauth_state", state, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
-      maxAge: 10 * 60 * 1000, // 10 minutes
+      maxAge: 10 * 60 * 1000 // 10 minutes
     });
 
     // Redirect to Google OAuth
@@ -954,62 +793,55 @@ export const googleAuth = asyncHandler(async (req, res) => {
  * GET /api/auth/google/:role/callback
  */
 export const googleCallback = asyncHandler(async (req, res) => {
-  const { role } = req.params;
-  const { code, state, error } = req.query;
+  const {
+    role
+  } = req.params;
+  const {
+    code,
+    state,
+    error
+  } = req.query;
 
   // Validate role
   const allowedRoles = ["user", "restaurant", "delivery"];
   const userRole = role || "restaurant";
-
   if (!allowedRoles.includes(userRole)) {
-    return errorResponse(
-      res,
-      400,
-      `Invalid role. Allowed roles: ${allowedRoles.join(", ")}`,
-    );
+    return errorResponse(res, 400, `Invalid role. Allowed roles: ${allowedRoles.join(", ")}`);
   }
 
   // Check for OAuth errors
   if (error) {
     logger.error(`Google OAuth error: ${error}`);
-    return res.redirect(
-      `${process.env.FRONTEND_URL || "http://localhost:5173"}/restaurant/login?error=oauth_failed`,
-    );
+    return res.redirect(`${process.env.FRONTEND_URL || "http://localhost:5173"}/restaurant/login?error=oauth_failed`);
   }
-
   if (!code) {
-    return res.redirect(
-      `${process.env.FRONTEND_URL || "http://localhost:5173"}/restaurant/login?error=no_code`,
-    );
+    return res.redirect(`${process.env.FRONTEND_URL || "http://localhost:5173"}/restaurant/login?error=no_code`);
   }
 
   // Verify state (optional but recommended)
   const storedState = req.cookies?.oauth_state;
   if (storedState && state !== storedState) {
     logger.warn("OAuth state mismatch - possible CSRF attack");
-    return res.redirect(
-      `${process.env.FRONTEND_URL || "http://localhost:5173"}/restaurant/login?error=invalid_state`,
-    );
+    return res.redirect(`${process.env.FRONTEND_URL || "http://localhost:5173"}/restaurant/login?error=invalid_state`);
   }
-
   try {
     // Exchange code for tokens
     const tokens = await googleAuthService.getTokens(code);
 
     // Get user info from Google
     const googleUser = await googleAuthService.getUserInfoFromToken(tokens);
-
     if (!googleUser.email) {
-      return res.redirect(
-        `${process.env.FRONTEND_URL || "http://localhost:5173"}/restaurant/login?error=no_email`,
-      );
+      return res.redirect(`${process.env.FRONTEND_URL || "http://localhost:5173"}/restaurant/login?error=no_email`);
     }
 
     // Find or create user
     let user = await User.findOne({
-      $or: [{ googleId: googleUser.googleId }, { email: googleUser.email }],
+      $or: [{
+        googleId: googleUser.googleId
+      }, {
+        email: googleUser.email
+      }]
     });
-
     if (user) {
       // Update Google info if not set
       if (!user.googleId) {
@@ -1027,9 +859,7 @@ export const googleCallback = asyncHandler(async (req, res) => {
 
       // Ensure role matches (for restaurant login, user should be restaurant)
       if (userRole === "restaurant" && user.role !== "restaurant") {
-        return res.redirect(
-          `${process.env.FRONTEND_URL || "http://localhost:5173"}/restaurant/login?error=wrong_role`,
-        );
+        return res.redirect(`${process.env.FRONTEND_URL || "http://localhost:5173"}/restaurant/login?error=wrong_role`);
       }
     } else {
       // Create new user
@@ -1040,22 +870,16 @@ export const googleCallback = asyncHandler(async (req, res) => {
         googleEmail: googleUser.email,
         role: userRole,
         signupMethod: "google",
-        profileImage: googleUser.picture || null,
+        profileImage: googleUser.picture || null
       };
-
       user = await User.create(userData);
-      logger.info(`New user registered via Google: ${user._id}`, {
-        email: googleUser.email,
-        userId: user._id,
-        role: userRole,
-      });
     }
 
     // Generate JWT tokens
     const jwtTokens = jwtService.generateTokens({
       userId: user._id.toString(),
       role: user.role,
-      email: user.email,
+      email: user.email
     });
 
     // Set refresh token in httpOnly cookie
@@ -1063,7 +887,7 @@ export const googleCallback = asyncHandler(async (req, res) => {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
     });
 
     // Clear OAuth state cookie
@@ -1071,13 +895,7 @@ export const googleCallback = asyncHandler(async (req, res) => {
 
     // Redirect to frontend with access token as query param
     const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
-    const redirectPath =
-      userRole === "restaurant"
-        ? "/restaurant/auth/google-callback"
-        : userRole === "delivery"
-          ? "/delivery/auth/google-callback"
-          : "/user/auth/google-callback";
-
+    const redirectPath = userRole === "restaurant" ? "/restaurant/auth/google-callback" : userRole === "delivery" ? "/delivery/auth/google-callback" : "/user/auth/google-callback";
     const userData = {
       id: user._id,
       name: user.name,
@@ -1086,16 +904,12 @@ export const googleCallback = asyncHandler(async (req, res) => {
       phoneVerified: user.phoneVerified,
       role: user.role,
       profileImage: user.profileImage,
-      signupMethod: user.signupMethod,
+      signupMethod: user.signupMethod
     };
-
     const redirectUrl = `${frontendUrl}${redirectPath}?token=${jwtTokens.accessToken}&user=${encodeURIComponent(JSON.stringify(userData))}`;
-
     return res.redirect(redirectUrl);
   } catch (error) {
     logger.error(`Error in Google OAuth callback: ${error.message}`);
-    return res.redirect(
-      `${process.env.FRONTEND_URL || "http://localhost:5173"}/restaurant/login?error=auth_failed`,
-    );
+    return res.redirect(`${process.env.FRONTEND_URL || "http://localhost:5173"}/restaurant/login?error=auth_failed`);
   }
 });

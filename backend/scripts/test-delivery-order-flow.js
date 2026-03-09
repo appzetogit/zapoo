@@ -22,9 +22,7 @@ import dotenv from 'dotenv';
 import axios from 'axios';
 import Order from '../modules/order/models/Order.js';
 import Delivery from '../modules/delivery/models/Delivery.js';
-
 dotenv.config();
-
 const BASE_URL = process.env.BASE_URL || 'http://localhost:5000';
 const DELIVERY_TOKEN = process.env.DELIVERY_TOKEN;
 const ORDER_ID = process.env.ORDER_ID;
@@ -39,29 +37,21 @@ const colors = {
   blue: '\x1b[34m',
   cyan: '\x1b[36m'
 };
-
-function log(message, color = 'reset') {
-  console.log(`${colors[color]}${message}${colors.reset}`);
-}
-
+function log(message, color = 'reset') {}
 function logStep(step, message) {
   log(`\n${'='.repeat(60)}`, 'cyan');
   log(`STEP ${step}: ${message}`, 'bright');
   log('='.repeat(60), 'cyan');
 }
-
 function logSuccess(message) {
   log(`✅ ${message}`, 'green');
 }
-
 function logError(message) {
   log(`❌ ${message}`, 'red');
 }
-
 function logInfo(message) {
   log(`ℹ️  ${message}`, 'blue');
 }
-
 function logWarning(message) {
   log(`⚠️  ${message}`, 'yellow');
 }
@@ -77,7 +67,10 @@ const api = axios.create({
 
 // Test data
 let testOrderId = null;
-let deliveryBoyLocation = { lat: 22.7196, lng: 75.8577 }; // Indore coordinates
+let deliveryBoyLocation = {
+  lat: 22.7196,
+  lng: 75.8577
+}; // Indore coordinates
 let restaurantLocation = null;
 let customerLocation = null;
 
@@ -86,11 +79,10 @@ let customerLocation = null;
  */
 async function setup() {
   logStep(0, 'Setting up test environment');
-  
+
   // Connect to MongoDB
   const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/appzetofood';
   logInfo(`Connecting to MongoDB: ${mongoUri}`);
-  
   try {
     await mongoose.connect(mongoUri);
     logSuccess('Connected to MongoDB');
@@ -98,7 +90,7 @@ async function setup() {
     logError(`Failed to connect to MongoDB: ${error.message}`);
     process.exit(1);
   }
-  
+
   // Get test order
   if (ORDER_ID) {
     testOrderId = ORDER_ID;
@@ -106,21 +98,20 @@ async function setup() {
   } else {
     // Find an order that's ready for delivery
     const order = await Order.findOne({
-      status: { $in: ['preparing', 'ready'] },
-      deliveryPartnerId: { $exists: true }
-    })
-      .populate('restaurantId', 'location')
-      .populate('address', 'location')
-      .lean();
-    
+      status: {
+        $in: ['preparing', 'ready']
+      },
+      deliveryPartnerId: {
+        $exists: true
+      }
+    }).populate('restaurantId', 'location').populate('address', 'location').lean();
     if (!order) {
       logError('No suitable order found. Please create an order first or provide ORDER_ID');
       process.exit(1);
     }
-    
     testOrderId = order._id.toString();
     logInfo(`Found test order: ${testOrderId} (${order.orderId})`);
-    
+
     // Get restaurant and customer locations
     if (order.restaurantId?.location?.coordinates) {
       restaurantLocation = {
@@ -128,7 +119,6 @@ async function setup() {
         lng: order.restaurantId.location.coordinates[0]
       };
     }
-    
     if (order.address?.location?.coordinates) {
       customerLocation = {
         lat: order.address.location.coordinates[1],
@@ -136,13 +126,12 @@ async function setup() {
       };
     }
   }
-  
+
   // Get delivery boy info
   if (!DELIVERY_TOKEN) {
     logError('DELIVERY_TOKEN is required. Please set it in .env file');
     process.exit(1);
   }
-  
   logSuccess('Setup completed');
 }
 
@@ -151,16 +140,13 @@ async function setup() {
  */
 async function testAcceptOrder() {
   logStep(1, 'Accept Order');
-  
   try {
     logInfo(`Accepting order: ${testOrderId}`);
     logInfo(`Delivery boy location: ${deliveryBoyLocation.lat}, ${deliveryBoyLocation.lng}`);
-    
     const response = await api.patch(`/api/delivery/orders/${testOrderId}/accept`, {
       currentLat: deliveryBoyLocation.lat,
       currentLng: deliveryBoyLocation.lng
     });
-    
     if (response.data?.success) {
       logSuccess('Order accepted successfully');
       logInfo(`Order status: ${response.data.data?.order?.status}`);
@@ -188,15 +174,12 @@ async function testAcceptOrder() {
  */
 async function testReachedPickup() {
   logStep(2, 'Reached Pickup');
-  
   try {
     logInfo(`Confirming reached pickup for order: ${testOrderId}`);
-    
     const response = await api.patch(`/api/delivery/orders/${testOrderId}/reached-pickup`, {
       currentLat: restaurantLocation?.lat || deliveryBoyLocation.lat,
       currentLng: restaurantLocation?.lng || deliveryBoyLocation.lng
     });
-    
     if (response.data?.success) {
       logSuccess('Reached pickup confirmed successfully');
       logInfo(`Current phase: ${response.data.data?.order?.deliveryState?.currentPhase}`);
@@ -222,20 +205,16 @@ async function testReachedPickup() {
  */
 async function testConfirmOrderId() {
   logStep(3, 'Confirm Order ID');
-  
   try {
     // Get order details to get the order ID
     const orderDetails = await api.get(`/api/delivery/orders/${testOrderId}`);
     const orderId = orderDetails.data?.data?.order?.orderId || 'TEST-ORDER-ID';
-    
     logInfo(`Confirming order ID: ${orderId}`);
-    
     const response = await api.patch(`/api/delivery/orders/${testOrderId}/confirm-order-id`, {
       orderId: orderId,
       currentLat: restaurantLocation?.lat || deliveryBoyLocation.lat,
       currentLng: restaurantLocation?.lng || deliveryBoyLocation.lng
     });
-    
     if (response.data?.success) {
       logSuccess('Order ID confirmed successfully');
       logInfo(`Current phase: ${response.data.data?.order?.deliveryState?.currentPhase}`);
@@ -261,15 +240,12 @@ async function testConfirmOrderId() {
  */
 async function testReachedDrop() {
   logStep(4, 'Reached Drop');
-  
   try {
     logInfo(`Confirming reached drop for order: ${testOrderId}`);
-    
     const response = await api.patch(`/api/delivery/orders/${testOrderId}/reached-drop`, {
       currentLat: customerLocation?.lat || deliveryBoyLocation.lat,
       currentLng: customerLocation?.lng || deliveryBoyLocation.lng
     });
-    
     if (response.data?.success) {
       logSuccess('Reached drop confirmed successfully');
       logInfo(`Current phase: ${response.data.data?.order?.deliveryState?.currentPhase}`);
@@ -295,19 +271,17 @@ async function testReachedDrop() {
  */
 async function testCompleteDelivery() {
   logStep(5, 'Complete Delivery');
-  
   try {
     logInfo(`Completing delivery for order: ${testOrderId}`);
-    
     const response = await api.patch(`/api/delivery/orders/${testOrderId}/complete`, {
       currentLat: customerLocation?.lat || deliveryBoyLocation.lat,
       currentLng: customerLocation?.lng || deliveryBoyLocation.lng,
-      paymentMethod: 'cash', // or 'razorpay'
+      paymentMethod: 'cash',
+      // or 'razorpay'
       paymentReceived: true,
       customerRating: 5,
       customerReview: 'Great delivery service!'
     });
-    
     if (response.data?.success) {
       logSuccess('Delivery completed successfully');
       logInfo(`Order status: ${response.data.data?.order?.status}`);
@@ -356,14 +330,13 @@ async function runTests() {
   log('\n🚀 Starting Delivery Order Flow Test', 'bright');
   log(`Base URL: ${BASE_URL}`, 'cyan');
   log(`Order ID: ${testOrderId || 'Will be found automatically'}`, 'cyan');
-  
   try {
     // Setup
     await setup();
-    
+
     // Get initial order status
     await getOrderStatus();
-    
+
     // Run tests
     const results = {
       acceptOrder: false,
@@ -372,7 +345,7 @@ async function runTests() {
       reachedDrop: false,
       completeDelivery: false
     };
-    
+
     // Step 1: Accept Order
     results.acceptOrder = await testAcceptOrder();
     if (!results.acceptOrder) {
@@ -380,34 +353,34 @@ async function runTests() {
       return;
     }
     await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
-    
+
     // Step 2: Reached Pickup
     results.reachedPickup = await testReachedPickup();
     if (!results.reachedPickup) {
       logWarning('Reached pickup failed, but continuing...');
     }
     await new Promise(resolve => setTimeout(resolve, 1000));
-    
+
     // Step 3: Confirm Order ID
     results.confirmOrderId = await testConfirmOrderId();
     if (!results.confirmOrderId) {
       logWarning('Order ID confirmation failed, but continuing...');
     }
     await new Promise(resolve => setTimeout(resolve, 1000));
-    
+
     // Step 4: Reached Drop
     results.reachedDrop = await testReachedDrop();
     if (!results.reachedDrop) {
       logWarning('Reached drop failed, but continuing...');
     }
     await new Promise(resolve => setTimeout(resolve, 1000));
-    
+
     // Step 5: Complete Delivery
     results.completeDelivery = await testCompleteDelivery();
-    
+
     // Final status
     await getOrderStatus();
-    
+
     // Summary
     logStep('SUMMARY', 'Test Results');
     log(`Accept Order: ${results.acceptOrder ? '✅ PASS' : '❌ FAIL'}`, results.acceptOrder ? 'green' : 'red');
@@ -415,11 +388,9 @@ async function runTests() {
     log(`Confirm Order ID: ${results.confirmOrderId ? '✅ PASS' : '❌ FAIL'}`, results.confirmOrderId ? 'green' : 'red');
     log(`Reached Drop: ${results.reachedDrop ? '✅ PASS' : '❌ FAIL'}`, results.reachedDrop ? 'green' : 'red');
     log(`Complete Delivery: ${results.completeDelivery ? '✅ PASS' : '❌ FAIL'}`, results.completeDelivery ? 'green' : 'red');
-    
     const passed = Object.values(results).filter(r => r).length;
     const total = Object.keys(results).length;
     log(`\n📊 Results: ${passed}/${total} tests passed`, passed === total ? 'green' : 'yellow');
-    
   } catch (error) {
     logError(`Test failed with error: ${error.message}`);
     logError(`Stack: ${error.stack}`);

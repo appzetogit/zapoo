@@ -15,15 +15,12 @@ import etaCalculationService from '../services/etaCalculationService.js';
 import etaWebSocketService from '../services/etaWebSocketService.js';
 import OrderEvent from '../models/OrderEvent.js';
 import UserWallet from '../../user/models/UserWallet.js';
-
 const logger = winston.createLogger({
   level: 'info',
   format: winston.format.json(),
-  transports: [
-    new winston.transports.Console({
-      format: winston.format.simple()
-    })
-  ]
+  transports: [new winston.transports.Console({
+    format: winston.format.simple()
+  })]
 });
 
 /**
@@ -48,13 +45,11 @@ export const createOrder = async (req, res) => {
 
     // Normalize payment method: 'cod' / 'COD' / 'Cash on Delivery' → 'cash', 'wallet' → 'wallet'
     const normalizedPaymentMethod = (() => {
-      const m = (paymentMethod && String(paymentMethod).toLowerCase().trim()) || '';
+      const m = paymentMethod && String(paymentMethod).toLowerCase().trim() || '';
       if (m === 'cash' || m === 'cod' || m === 'cash on delivery') return 'cash';
       if (m === 'wallet') return 'wallet';
       return paymentMethod || 'razorpay';
     })();
-    logger.info('Order create paymentMethod:', { raw: paymentMethod, normalized: normalizedPaymentMethod, bodyKeys: Object.keys(req.body || {}).filter(k => k.toLowerCase().includes('payment')) });
-
     // Validate required fields
     if (!items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({
@@ -62,14 +57,12 @@ export const createOrder = async (req, res) => {
         message: 'Order must have at least one item'
       });
     }
-
     if (!address) {
       return res.status(400).json({
         success: false,
         message: 'Delivery address is required'
       });
     }
-
     if (!pricing) {
       return res.status(400).json({
         success: false,
@@ -84,45 +77,26 @@ export const createOrder = async (req, res) => {
         message: 'Restaurant ID is required. Please select a restaurant.'
       });
     }
-
     let assignedRestaurantId = restaurantId;
     let assignedRestaurantName = restaurantName;
 
     // Log incoming restaurant data for debugging
-    logger.info('🔍 Order creation - Restaurant lookup:', {
-      incomingRestaurantId: restaurantId,
-      incomingRestaurantName: restaurantName,
-      restaurantIdType: typeof restaurantId,
-      restaurantIdLength: restaurantId?.length
-    });
 
     // Find and validate the restaurant
     let restaurant = null;
     // Try to find restaurant by restaurantId, _id, or slug
     if (mongoose.Types.ObjectId.isValid(restaurantId) && restaurantId.length === 24) {
       restaurant = await Restaurant.findById(restaurantId);
-      logger.info('🔍 Restaurant lookup by _id:', {
-        restaurantId: restaurantId,
-        found: !!restaurant,
-        restaurantName: restaurant?.name
-      });
     }
     if (!restaurant) {
       restaurant = await Restaurant.findOne({
-        $or: [
-          { restaurantId: restaurantId },
-          { slug: restaurantId }
-        ]
-      });
-      logger.info('🔍 Restaurant lookup by restaurantId/slug:', {
-        restaurantId: restaurantId,
-        found: !!restaurant,
-        restaurantName: restaurant?.name,
-        restaurant_restaurantId: restaurant?.restaurantId,
-        restaurant__id: restaurant?._id?.toString()
+        $or: [{
+          restaurantId: restaurantId
+        }, {
+          slug: restaurantId
+        }]
       });
     }
-
     if (!restaurant) {
       logger.error('❌ Restaurant not found:', {
         searchedRestaurantId: restaurantId,
@@ -172,7 +146,6 @@ export const createOrder = async (req, res) => {
     // CRITICAL: Validate that restaurant's location (pin) is within an active zone
     const restaurantLat = restaurant.location?.latitude || restaurant.location?.coordinates?.[1];
     const restaurantLng = restaurant.location?.longitude || restaurant.location?.coordinates?.[0];
-
     if (!restaurantLat || !restaurantLng) {
       logger.error('❌ Restaurant location not found:', {
         restaurantId: restaurant._id?.toString() || restaurant.restaurantId,
@@ -185,13 +158,13 @@ export const createOrder = async (req, res) => {
     }
 
     // Check if restaurant is within any active zone
-    const activeZones = await Zone.find({ isActive: true }).lean();
+    const activeZones = await Zone.find({
+      isActive: true
+    }).lean();
     let restaurantInZone = false;
     let restaurantZone = null;
-
     for (const zone of activeZones) {
       if (!zone.coordinates || zone.coordinates.length < 3) continue;
-
       let isInZone = false;
       if (typeof zone.containsPoint === 'function') {
         isInZone = zone.containsPoint(restaurantLat, restaurantLng);
@@ -201,27 +174,22 @@ export const createOrder = async (req, res) => {
         for (let i = 0, j = zone.coordinates.length - 1; i < zone.coordinates.length; j = i++) {
           const coordI = zone.coordinates[i];
           const coordJ = zone.coordinates[j];
-          const xi = typeof coordI === 'object' ? (coordI.latitude || coordI.lat) : null;
-          const yi = typeof coordI === 'object' ? (coordI.longitude || coordI.lng) : null;
-          const xj = typeof coordJ === 'object' ? (coordJ.latitude || coordJ.lat) : null;
-          const yj = typeof coordJ === 'object' ? (coordJ.longitude || coordJ.lng) : null;
-
+          const xi = typeof coordI === 'object' ? coordI.latitude || coordI.lat : null;
+          const yi = typeof coordI === 'object' ? coordI.longitude || coordI.lng : null;
+          const xj = typeof coordJ === 'object' ? coordJ.latitude || coordJ.lat : null;
+          const yj = typeof coordJ === 'object' ? coordJ.longitude || coordJ.lng : null;
           if (xi === null || yi === null || xj === null || yj === null) continue;
-
-          const intersect = ((yi > restaurantLng) !== (yj > restaurantLng)) &&
-            (restaurantLat < (xj - xi) * (restaurantLng - yi) / (yj - yi) + xi);
+          const intersect = yi > restaurantLng !== yj > restaurantLng && restaurantLat < (xj - xi) * (restaurantLng - yi) / (yj - yi) + xi;
           if (intersect) inside = !inside;
         }
         isInZone = inside;
       }
-
       if (isInZone) {
         restaurantInZone = true;
         restaurantZone = zone;
         break;
       }
     }
-
     if (!restaurantInZone) {
       logger.warn('⚠️ Restaurant location is not within any active zone:', {
         restaurantId: restaurant._id?.toString() || restaurant.restaurantId,
@@ -234,29 +202,13 @@ export const createOrder = async (req, res) => {
         message: 'This restaurant is not available in your area. Only restaurants within active delivery zones can receive orders.'
       });
     }
-
-    logger.info('✅ Restaurant validated - location is within active zone:', {
-      restaurantId: restaurant._id?.toString() || restaurant.restaurantId,
-      restaurantName: restaurant.name,
-      zoneId: restaurantZone?._id?.toString(),
-      zoneName: restaurantZone?.name || restaurantZone?.zoneName
-    });
-
     // NEW: Calculate distance and validate restaurant's deliveryRange
     // Get user's coordinates from address
     const userLat = address.location?.latitude || address.location?.coordinates?.[1];
     const userLng = address.location?.longitude || address.location?.coordinates?.[0];
-
     if (userLat && userLng) {
       const distance = calculateDistance([restaurantLng, restaurantLat], [userLng, userLat]);
       const maxRange = restaurant.deliveryRange || 5; // Default 5km if not set
-
-      logger.info('📏 Order Distance Check:', {
-        distance: distance.toFixed(2) + 'km',
-        maxRange: maxRange + 'km',
-        restaurantInZone,
-        restaurantZone: restaurantZone?.name
-      });
 
       if (distance > maxRange) {
         return res.status(403).json({
@@ -267,36 +219,20 @@ export const createOrder = async (req, res) => {
     }
 
     // RELAXED: Validate user's zone matches restaurant's zone (Allow cross-zone if within range)
-    const { zoneId: userZoneId } = req.body; // User's zone ID from frontend
+    const {
+      zoneId: userZoneId
+    } = req.body; // User's zone ID from frontend
 
     if (userZoneId) {
       const restaurantZoneId = restaurantZone._id.toString();
-
-      if (restaurantZoneId !== userZoneId) {
-        logger.info('🌐 Cross-zone order allowed due to deliveryRange:', {
-          userZoneId,
-          restaurantZoneId,
-          restaurantId: restaurant._id?.toString(),
-          restaurantName: restaurant.name
-        });
-        // We proceed because the distance check passed above
-      }
+      if (restaurantZoneId !== userZoneId) {}
     } else {
       logger.warn('⚠️ User zoneId not provided in order request');
     }
-
     assignedRestaurantId = restaurant._id?.toString() || restaurant.restaurantId;
     assignedRestaurantName = restaurant.name;
 
     // Log restaurant assignment for debugging
-    logger.info('✅ Restaurant assigned to order:', {
-      assignedRestaurantId: assignedRestaurantId,
-      assignedRestaurantName: assignedRestaurantName,
-      restaurant_id: restaurant._id?.toString(),
-      restaurant_restaurantId: restaurant.restaurantId,
-      incomingRestaurantId: restaurantId,
-      incomingRestaurantName: restaurantName
-    });
 
     // Generate order ID before creating order
     const timestamp = Date.now();
@@ -319,7 +255,8 @@ export const createOrder = async (req, res) => {
 
     // Create the order
     const order = new Order({
-      orderId: generatedOrderId, // Re-added orderId generation
+      orderId: generatedOrderId,
+      // Re-added orderId generation
       userId,
       restaurantId: assignedRestaurantId,
       restaurantName: assignedRestaurantName,
@@ -346,7 +283,8 @@ export const createOrder = async (req, res) => {
         pricingMeta: pricingData.pricingMeta || null,
         tax: pricingData.tax,
         total: pricingData.total,
-        internalRecommendedFee: pricingData.internalRecommendedFee, // Track internal fee
+        internalRecommendedFee: pricingData.internalRecommendedFee,
+        // Track internal fee
         couponCode: pricing.couponCode
       },
       deliveryFleet: deliveryFleet || 'standard',
@@ -377,27 +315,16 @@ export const createOrder = async (req, res) => {
       });
     }
     order.preparationTime = maxPreparationTime;
-    logger.info('📋 Preparation time extracted from items:', {
-      maxPreparationTime,
-      itemsCount: items?.length || 0
-    });
-
     // Calculate initial ETA
     try {
-      const restaurantLocation = restaurant.location
-        ? {
-          latitude: restaurant.location.latitude,
-          longitude: restaurant.location.longitude
-        }
-        : null;
-
-      const userLocation = address.location?.coordinates
-        ? {
-          latitude: address.location.coordinates[1],
-          longitude: address.location.coordinates[0]
-        }
-        : null;
-
+      const restaurantLocation = restaurant.location ? {
+        latitude: restaurant.location.latitude,
+        longitude: restaurant.location.longitude
+      } : null;
+      const userLocation = address.location?.coordinates ? {
+        latitude: address.location.coordinates[1],
+        longitude: address.location.coordinates[0]
+      } : null;
       if (restaurantLocation && userLocation) {
         const etaResult = await etaCalculationService.calculateInitialETA({
           restaurantId: assignedRestaurantId,
@@ -431,13 +358,6 @@ export const createOrder = async (req, res) => {
           },
           timestamp: new Date()
         });
-
-        logger.info('✅ ETA calculated for order:', {
-          orderId: order.orderId,
-          eta: `${finalMinETA}-${finalMaxETA} mins`,
-          preparationTime: maxPreparationTime,
-          baseETA: `${etaResult.minETA}-${etaResult.maxETA} mins`
-        });
       } else {
         logger.warn('⚠️ Could not calculate ETA - missing location data');
       }
@@ -445,20 +365,9 @@ export const createOrder = async (req, res) => {
       logger.error('❌ Error calculating ETA:', etaError);
       // Continue with order creation even if ETA calculation fails
     }
-
     await order.save();
 
     // Log order creation for debugging
-    logger.info('Order created successfully:', {
-      orderId: order.orderId,
-      orderMongoId: order._id.toString(),
-      restaurantId: order.restaurantId,
-      userId: order.userId,
-      status: order.status,
-      total: order.pricing.total,
-      eta: order.eta ? `${order.eta.min}-${order.eta.max} mins` : 'N/A',
-      paymentMethod: normalizedPaymentMethod
-    });
 
     // For wallet payments, check balance and deduct before creating order
     if (normalizedPaymentMethod === 'wallet') {
@@ -480,10 +389,7 @@ export const createOrder = async (req, res) => {
         }
 
         // Check if transaction already exists for this order (prevent duplicate)
-        const existingTransaction = wallet.transactions.find(
-          t => t.orderId && t.orderId.toString() === order._id.toString() && t.type === 'deduction'
-        );
-
+        const existingTransaction = wallet.transactions.find(t => t.orderId && t.orderId.toString() === order._id.toString() && t.type === 'deduction');
         if (existingTransaction) {
           logger.warn('⚠️ Wallet payment already processed for this order', {
             orderId: order.orderId,
@@ -498,7 +404,6 @@ export const createOrder = async (req, res) => {
             description: `Order payment - Order #${order.orderId}`,
             orderId: order._id
           });
-
           await wallet.save();
 
           // Update user's wallet balance in User model (for backward compatibility)
@@ -506,14 +411,6 @@ export const createOrder = async (req, res) => {
           await User.findByIdAndUpdate(userId, {
             'wallet.balance': wallet.balance,
             'wallet.currency': wallet.currency
-          });
-
-          logger.info('✅ Wallet payment deducted for order:', {
-            orderId: order.orderId,
-            userId: userId,
-            amount: pricingData.total,
-            transactionId: transaction._id,
-            newBalance: wallet.balance
           });
         }
 
@@ -551,7 +448,6 @@ export const createOrder = async (req, res) => {
         //   timestamp: new Date()
         // };
         await order.save();
-
         try {
           await calculateOrderSettlement(order._id);
           await holdEscrow(order._id, userId, order.pricing.total);
@@ -562,11 +458,6 @@ export const createOrder = async (req, res) => {
         // Notify restaurant about new wallet payment order
         try {
           const notifyRestaurantResult = await notifyRestaurantNewOrder(order, assignedRestaurantId, 'wallet');
-          logger.info('✅ Wallet payment order notification sent to restaurant', {
-            orderId: order.orderId,
-            restaurantId: assignedRestaurantId,
-            notifyRestaurantResult
-          });
         } catch (notifyError) {
           logger.error('❌ Error notifying restaurant about wallet payment order:', notifyError);
         }
@@ -638,7 +529,6 @@ export const createOrder = async (req, res) => {
       //   timestamp: new Date()
       // };
       await order.save();
-
       try {
         await calculateOrderSettlement(order._id);
         await holdEscrow(order._id, userId, order.pricing.total);
@@ -649,11 +539,6 @@ export const createOrder = async (req, res) => {
       // Notify restaurant about new COD order via Socket.IO (non-blocking)
       try {
         const notifyRestaurantResult = await notifyRestaurantNewOrder(order, assignedRestaurantId, 'cash');
-        logger.info('✅ COD order notification sent to restaurant', {
-          orderId: order.orderId,
-          restaurantId: assignedRestaurantId,
-          notifyRestaurantResult
-        });
       } catch (notifyError) {
         logger.error('❌ Error notifying restaurant about COD order (order still created):', {
           error: notifyError.message,
@@ -685,7 +570,8 @@ export const createOrder = async (req, res) => {
     if (normalizedPaymentMethod === 'razorpay' || !normalizedPaymentMethod) {
       try {
         razorpayOrder = await createRazorpayOrder({
-          amount: Math.round(pricingData.total * 100), // Convert to paise
+          amount: Math.round(pricingData.total * 100),
+          // Convert to paise
           currency: 'INR',
           receipt: order.orderId,
           notes: {
@@ -704,14 +590,6 @@ export const createOrder = async (req, res) => {
         // Payment can be handled later
       }
     }
-
-    logger.info(`Order created: ${order.orderId}`, {
-      orderId: order.orderId,
-      userId,
-      amount: pricingData.total,
-      razorpayOrderId: razorpayOrder?.id
-    });
-
     // Get Razorpay key ID from env service
     let razorpayKeyId = null;
     if (razorpayOrder) {
@@ -723,7 +601,6 @@ export const createOrder = async (req, res) => {
         razorpayKeyId = process.env.RAZORPAY_KEY_ID || process.env.RAZORPAY_API_KEY;
       }
     }
-
     res.status(201).json({
       success: true,
       data: {
@@ -760,8 +637,12 @@ export const createOrder = async (req, res) => {
 export const verifyOrderPayment = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { orderId, razorpayOrderId, razorpayPaymentId, razorpaySignature } = req.body;
-
+    const {
+      orderId,
+      razorpayOrderId,
+      razorpayPaymentId,
+      razorpaySignature
+    } = req.body;
     if (!orderId || !razorpayOrderId || !razorpayPaymentId || !razorpaySignature) {
       return res.status(400).json({
         success: false,
@@ -791,14 +672,14 @@ export const verifyOrderPayment = async (req, res) => {
     } catch (error) {
       // Fallback: try both
       order = await Order.findOne({
-        $or: [
-          { _id: orderId },
-          { orderId: orderId }
-        ],
+        $or: [{
+          _id: orderId
+        }, {
+          orderId: orderId
+        }],
         userId
       });
     }
-
     if (!order) {
       return res.status(404).json({
         success: false,
@@ -808,12 +689,10 @@ export const verifyOrderPayment = async (req, res) => {
 
     // Verify payment signature
     const isValid = await verifyPayment(razorpayOrderId, razorpayPaymentId, razorpaySignature);
-
     if (!isValid) {
       // Update order payment status to failed
       order.payment.status = 'failed';
       await order.save();
-
       return res.status(400).json({
         success: false,
         message: 'Invalid payment signature'
@@ -847,7 +726,6 @@ export const verifyOrderPayment = async (req, res) => {
         userAgent: req.get('user-agent')
       }]
     });
-
     await payment.save();
 
     // Update order status - Keep as pending for restaurant to accept
@@ -866,8 +744,6 @@ export const verifyOrderPayment = async (req, res) => {
 
       // Hold funds in escrow
       await holdEscrow(order._id, userId, order.pricing.total);
-
-      logger.info(`✅ Order settlement calculated and escrow held for order ${order.orderId}`);
     } catch (settlementError) {
       logger.error(`❌ Error calculating settlement for order ${order.orderId}:`, settlementError);
       // Don't fail payment verification if settlement calculation fails
@@ -880,18 +756,6 @@ export const verifyOrderPayment = async (req, res) => {
       const restaurantName = order.restaurantName;
 
       // CRITICAL: Log detailed info before notification
-      logger.info('🔔 CRITICAL: Attempting to notify restaurant about confirmed order:', {
-        orderId: order.orderId,
-        orderMongoId: order._id.toString(),
-        restaurantId: restaurantId,
-        restaurantName: restaurantName,
-        restaurantIdType: typeof restaurantId,
-        orderRestaurantId: order.restaurantId,
-        orderRestaurantIdType: typeof order.restaurantId,
-        orderStatus: order.status,
-        orderCreatedAt: order.createdAt,
-        orderItems: order.items.map(item => ({ name: item.name, quantity: item.quantity }))
-      });
 
       // Verify order has restaurantId before notifying
       if (!restaurantId) {
@@ -913,15 +777,7 @@ export const verifyOrderPayment = async (req, res) => {
           restaurantId: restaurantId
         });
       }
-
       const notificationResult = await notifyRestaurantNewOrder(order, restaurantId);
-
-      logger.info(`✅ Successfully notified restaurant about confirmed order:`, {
-        orderId: order.orderId,
-        restaurantId: restaurantId,
-        restaurantName: restaurantName,
-        notificationResult: notificationResult
-      });
     } catch (notificationError) {
       logger.error(`❌ CRITICAL: Error notifying restaurant after payment verification:`, {
         error: notificationError.message,
@@ -936,13 +792,6 @@ export const verifyOrderPayment = async (req, res) => {
       // Order is still saved and restaurant can fetch it via API
       // But log it as critical for debugging
     }
-
-    logger.info(`Order payment verified: ${order.orderId}`, {
-      orderId: order.orderId,
-      paymentId: payment.paymentId,
-      razorpayPaymentId
-    });
-
     res.json({
       success: true,
       data: {
@@ -977,8 +826,11 @@ export const verifyOrderPayment = async (req, res) => {
 export const getUserOrders = async (req, res) => {
   try {
     const userId = req.user?.id || req.user?._id;
-    const { status, limit = 20, page = 1 } = req.query;
-
+    const {
+      status,
+      limit = 20,
+      page = 1
+    } = req.query;
     if (!userId) {
       logger.error('User ID not found in request');
       return res.status(401).json({
@@ -990,14 +842,17 @@ export const getUserOrders = async (req, res) => {
     // Build query - MongoDB should handle string/ObjectId conversion automatically
     // But we'll try both formats to be safe
     const mongoose = (await import('mongoose')).default;
-    const query = { userId };
+    const query = {
+      userId
+    };
 
     // If userId is a string that looks like ObjectId, also try ObjectId format
     if (typeof userId === 'string' && mongoose.Types.ObjectId.isValid(userId)) {
-      query.$or = [
-        { userId: userId },
-        { userId: new mongoose.Types.ObjectId(userId) }
-      ];
+      query.$or = [{
+        userId: userId
+      }, {
+        userId: new mongoose.Types.ObjectId(userId)
+      }];
       delete query.userId; // Remove direct userId since we're using $or
     }
 
@@ -1005,7 +860,10 @@ export const getUserOrders = async (req, res) => {
     if (status) {
       if (query.$or) {
         // Add status to each $or condition
-        query.$or = query.$or.map(condition => ({ ...condition, status }));
+        query.$or = query.$or.map(condition => ({
+          ...condition,
+          status
+        }));
       } else {
         query.status = status;
       }
@@ -1013,24 +871,11 @@ export const getUserOrders = async (req, res) => {
     if (status) {
       query.status = status;
     }
-
     const skip = (parseInt(page) - 1) * parseInt(limit);
-
-    logger.info(`Fetching orders for user: ${userId}, query: ${JSON.stringify(query)}`);
-
-    const orders = await Order.find(query)
-      .sort({ createdAt: -1 })
-      .limit(parseInt(limit))
-      .skip(skip)
-      .select('-__v')
-      .populate('restaurantId', 'name slug profileImage address location phone ownerPhone')
-      .populate('userId', 'name phone email')
-      .lean();
-
+    const orders = await Order.find(query).sort({
+      createdAt: -1
+    }).limit(parseInt(limit)).skip(skip).select('-__v').populate('restaurantId', 'name slug profileImage address location phone ownerPhone').populate('userId', 'name phone email').lean();
     const total = await Order.countDocuments(query);
-
-    logger.info(`Found ${orders.length} orders for user ${userId} (total: ${total})`);
-
     res.json({
       success: true,
       data: {
@@ -1059,7 +904,9 @@ export const getUserOrders = async (req, res) => {
 export const getOrderDetails = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { id } = req.params;
+    const {
+      id
+    } = req.params;
 
     // Try to find order by MongoDB _id or orderId (custom order ID)
     let order = null;
@@ -1069,10 +916,7 @@ export const getOrderDetails = async (req, res) => {
       order = await Order.findOne({
         _id: id,
         userId
-      })
-        .populate('deliveryPartnerId', 'name email phone')
-        .populate('userId', 'name fullName phone email')
-        .lean();
+      }).populate('deliveryPartnerId', 'name email phone').populate('userId', 'name fullName phone email').lean();
     }
 
     // If not found, try by orderId (custom order ID like "ORD-123456-789")
@@ -1080,12 +924,8 @@ export const getOrderDetails = async (req, res) => {
       order = await Order.findOne({
         orderId: id,
         userId
-      })
-        .populate('deliveryPartnerId', 'name email phone')
-        .populate('userId', 'name fullName phone email')
-        .lean();
+      }).populate('deliveryPartnerId', 'name email phone').populate('userId', 'name fullName phone email').lean();
     }
-
     if (!order) {
       return res.status(404).json({
         success: false,
@@ -1097,7 +937,6 @@ export const getOrderDetails = async (req, res) => {
     const payment = await Payment.findOne({
       orderId: order._id
     }).lean();
-
     res.json({
       success: true,
       data: {
@@ -1121,9 +960,12 @@ export const getOrderDetails = async (req, res) => {
 export const cancelOrder = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { id } = req.params;
-    const { reason } = req.body;
-
+    const {
+      id
+    } = req.params;
+    const {
+      reason
+    } = req.body;
     if (!reason || reason.trim().length === 0) {
       return res.status(400).json({
         success: false,
@@ -1139,14 +981,12 @@ export const cancelOrder = async (req, res) => {
         userId
       });
     }
-
     if (!order) {
       order = await Order.findOne({
         orderId: id,
         userId
       });
     }
-
     if (!order) {
       return res.status(404).json({
         success: false,
@@ -1161,7 +1001,6 @@ export const cancelOrder = async (req, res) => {
         message: 'Order is already cancelled'
       });
     }
-
     if (order.status === 'delivered') {
       return res.status(400).json({
         success: false,
@@ -1171,7 +1010,9 @@ export const cancelOrder = async (req, res) => {
 
     // Get payment method from order or payment record
     const paymentMethod = order.payment?.method;
-    const payment = await Payment.findOne({ orderId: order._id });
+    const payment = await Payment.findOne({
+      orderId: order._id
+    });
     const paymentMethodFromPayment = payment?.method || payment?.paymentMethod;
 
     // Determine the actual payment method
@@ -1192,9 +1033,10 @@ export const cancelOrder = async (req, res) => {
     let refundMessage = '';
     if (actualPaymentMethod === 'razorpay' || actualPaymentMethod === 'wallet') {
       try {
-        const { calculateCancellationRefund } = await import('../services/cancellationRefundService.js');
+        const {
+          calculateCancellationRefund
+        } = await import('../services/cancellationRefundService.js');
         await calculateCancellationRefund(order._id, reason);
-        logger.info(`Cancellation refund calculated for order ${order.orderId} - awaiting admin approval`);
         refundMessage = ' Refund will be processed after admin approval.';
       } catch (refundError) {
         logger.error(`Error calculating cancellation refund for order ${order.orderId}:`, refundError);
@@ -1203,7 +1045,6 @@ export const cancelOrder = async (req, res) => {
     } else if (actualPaymentMethod === 'cash') {
       refundMessage = ' No refund required as payment was not made.';
     }
-
     res.json({
       success: true,
       message: `Order cancelled successfully.${refundMessage}`,
@@ -1233,7 +1074,14 @@ export const cancelOrder = async (req, res) => {
  */
 export const calculateOrder = async (req, res) => {
   try {
-    const { items, restaurantId, deliveryAddress, addressId, couponCode, deliveryFleet } = req.body;
+    const {
+      items,
+      restaurantId,
+      deliveryAddress,
+      addressId,
+      couponCode,
+      deliveryFleet
+    } = req.body;
 
     // Validate required fields
     if (!items || !Array.isArray(items) || items.length === 0) {
@@ -1250,7 +1098,9 @@ export const calculateOrder = async (req, res) => {
     if (addressId && req.user && req.user.id) {
       try {
         // Dynamic import to avoid circular dependency
-        const { default: User } = await import('../../auth/models/User.js');
+        const {
+          default: User
+        } = await import('../../auth/models/User.js');
         const user = await User.findById(req.user.id);
         if (user && user.addresses) {
           const foundAddress = user.addresses.id(addressId);
@@ -1271,7 +1121,6 @@ export const calculateOrder = async (req, res) => {
       couponCode,
       deliveryFleet: deliveryFleet || 'standard'
     });
-
     res.json({
       success: true,
       data: {
@@ -1290,4 +1139,3 @@ export const calculateOrder = async (req, res) => {
     });
   }
 };
-

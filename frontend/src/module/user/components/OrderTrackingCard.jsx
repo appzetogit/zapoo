@@ -4,10 +4,11 @@ import { UtensilsCrossed, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useOrders } from '../context/OrdersContext';
 import { orderAPI } from '@/lib/api';
-
 export default function OrderTrackingCard() {
   const navigate = useNavigate();
-  const { orders: contextOrders } = useOrders();
+  const {
+    orders: contextOrders
+  } = useOrders();
   const [activeOrder, setActiveOrder] = useState(null);
   const [timeRemaining, setTimeRemaining] = useState(null);
   const [apiOrders, setApiOrders] = useState([]);
@@ -21,10 +22,12 @@ export default function OrderTrackingCard() {
       // No token, skip API call
       return;
     }
-
     const fetchOrders = async () => {
       try {
-        const response = await orderAPI.getOrders({ limit: 10, page: 1 });
+        const response = await orderAPI.getOrders({
+          limit: 10,
+          page: 1
+        });
         if (response?.data?.success && response?.data?.data?.orders) {
           setApiOrders(response.data.data.orders);
         } else if (response?.data?.orders) {
@@ -50,45 +53,20 @@ export default function OrderTrackingCard() {
   useEffect(() => {
     // Combine context orders and API orders
     const allOrders = [...contextOrders, ...apiOrders];
-    
+
     // Remove duplicates by ID
-    const uniqueOrders = allOrders.filter((order, index, self) =>
-      index === self.findIndex((o) => (o.id || o._id) === (order.id || order._id))
-    );
-
-    console.log('🔍 OrderTrackingCard - Checking for active orders:', {
-      contextOrdersCount: contextOrders.length,
-      apiOrdersCount: apiOrders.length,
-      uniqueOrdersCount: uniqueOrders.length,
-      orders: uniqueOrders.map(o => ({
-        id: o.id || o._id,
-        status: o.status || o.deliveryState?.status,
-        restaurant: o.restaurant || o.restaurantName
-      }))
-    });
-
+    const uniqueOrders = allOrders.filter((order, index, self) => index === self.findIndex(o => (o.id || o._id) === (order.id || order._id)));
     // Find active order - any order that is NOT delivered, cancelled, or completed
     const active = uniqueOrders.find(order => {
       const status = (order.status || order.deliveryState?.status || '').toLowerCase();
-      const isInactive = status === 'delivered' || 
-                        status === 'cancelled' || 
-                        status === 'completed' ||
-                        status === '';
-      
+      const isInactive = status === 'delivered' || status === 'cancelled' || status === 'completed' || status === '';
       if (isInactive) {
         return false;
       }
-      
+
       // If status exists and is not inactive, it's active
       return true;
     });
-    
-    console.log('✅ OrderTrackingCard - Active order found:', active ? {
-      id: active.id || active._id,
-      status: active.status || active.deliveryState?.status,
-      restaurant: active.restaurant || active.restaurantName
-    } : 'No active order');
-    
     if (active) {
       setActiveOrder(active);
       // Calculate estimated delivery time
@@ -97,7 +75,6 @@ export default function OrderTrackingCard() {
       const deliveryTime = new Date(orderTime.getTime() + estimatedMinutes * 60000);
       const remaining = Math.max(0, Math.floor((deliveryTime - new Date()) / 60000));
       setTimeRemaining(remaining);
-      console.log('⏰ OrderTrackingCard - Time remaining:', remaining, 'minutes');
     } else {
       setActiveOrder(null);
       setTimeRemaining(null);
@@ -110,7 +87,6 @@ export default function OrderTrackingCard() {
 
     // Update more frequently when time is running out (every second if <= 1 minute, otherwise every minute)
     const updateInterval = timeRemaining <= 1 ? 1000 : 60000;
-
     const interval = setInterval(() => {
       // Check both context and API orders
       const allOrders = [...contextOrders, ...apiOrders];
@@ -119,32 +95,27 @@ export default function OrderTrackingCard() {
         const activeOrderId = activeOrder.id || activeOrder._id;
         return orderId === activeOrderId;
       });
-
       if (!currentActive) {
         setActiveOrder(null);
         setTimeRemaining(null);
         return;
       }
-
       const status = (currentActive.status || currentActive.deliveryState?.status || '').toLowerCase();
       if (status === 'delivered' || status === 'cancelled' || status === 'completed') {
         setActiveOrder(null);
         setTimeRemaining(null);
         return;
       }
-
       const orderTime = new Date(currentActive.createdAt || currentActive.orderDate || currentActive.created_at || Date.now());
       const estimatedMinutes = currentActive.estimatedDeliveryTime || currentActive.estimatedTime || currentActive.estimated_delivery_time || 35;
       const deliveryTime = new Date(orderTime.getTime() + estimatedMinutes * 60000);
       const remaining = Math.max(0, Math.floor((deliveryTime - new Date()) / 60000));
       setTimeRemaining(remaining);
-
       if (remaining === 0) {
         setActiveOrder(null);
         setTimeRemaining(null);
       }
     }, updateInterval);
-
     return () => clearInterval(interval);
   }, [activeOrder, timeRemaining, contextOrders, apiOrders]);
 
@@ -155,10 +126,8 @@ export default function OrderTrackingCard() {
       // No need to fetch from API again - just rely on context orders
       // This prevents unnecessary API calls and errors
     };
-
     window.addEventListener('storage', handleStorageChange);
     window.addEventListener('orderStatusUpdated', handleStorageChange);
-
     return () => {
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('orderStatusUpdated', handleStorageChange);
@@ -166,51 +135,33 @@ export default function OrderTrackingCard() {
   }, []);
 
   // Debug: Log when component renders
-  useEffect(() => {
-    console.log('🎯 OrderTrackingCard render:', {
-      hasActiveOrder: !!activeOrder,
-      timeRemaining,
-      contextOrdersCount: contextOrders.length,
-      apiOrdersCount: apiOrders.length
-    });
-  }, [activeOrder, timeRemaining, contextOrders.length, apiOrders.length]);
-
+  useEffect(() => {}, [activeOrder, timeRemaining, contextOrders.length, apiOrders.length]);
   if (!activeOrder) {
-    console.log('❌ OrderTrackingCard - No active order, not rendering');
     return null;
   }
 
   // Check if order is delivered or time remaining is 0 - hide card
   const orderStatus = (activeOrder.status || activeOrder.deliveryState?.status || 'preparing').toLowerCase();
   if (orderStatus === 'delivered' || orderStatus === 'completed' || timeRemaining === 0) {
-    console.log('❌ OrderTrackingCard - Order delivered or time is 0, hiding card');
     return null;
   }
-
   const restaurantName = activeOrder.restaurant || activeOrder.restaurantName || activeOrder.restaurantName || 'Restaurant';
-  const statusText = orderStatus === 'preparing' || orderStatus === 'confirmed' || orderStatus === 'pending'
-    ? 'Preparing your order' 
-    : orderStatus === 'out_for_delivery' || orderStatus === 'outfordelivery' || orderStatus === 'on_way'
-    ? 'On the way'
-    : 'Preparing your order';
-
-  console.log('✅ OrderTrackingCard - Rendering card:', {
-    restaurantName,
-    orderStatus,
-    statusText,
-    timeRemaining
-  });
-
-  return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ y: 100, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        exit={{ y: 100, opacity: 0 }}
-        transition={{ type: "spring", damping: 25, stiffness: 200 }}
-        className="fixed bottom-20 left-4 right-4 z-[60] md:hidden"
-        onClick={() => navigate(`/user/orders/${activeOrder.id || activeOrder._id}`)}
-      >
+  const statusText = orderStatus === 'preparing' || orderStatus === 'confirmed' || orderStatus === 'pending' ? 'Preparing your order' : orderStatus === 'out_for_delivery' || orderStatus === 'outfordelivery' || orderStatus === 'on_way' ? 'On the way' : 'Preparing your order';
+  return <AnimatePresence>
+      <motion.div initial={{
+      y: 100,
+      opacity: 0
+    }} animate={{
+      y: 0,
+      opacity: 1
+    }} exit={{
+      y: 100,
+      opacity: 0
+    }} transition={{
+      type: "spring",
+      damping: 25,
+      stiffness: 200
+    }} className="fixed bottom-20 left-4 right-4 z-[60] md:hidden" onClick={() => navigate(`/user/orders/${activeOrder.id || activeOrder._id}`)}>
         <div className="bg-gray-800 rounded-xl p-4 shadow-2xl border border-gray-700">
           <div className="flex items-center gap-3">
             {/* Left Side - Icon and Text */}
@@ -237,7 +188,5 @@ export default function OrderTrackingCard() {
           </div>
         </div>
       </motion.div>
-    </AnimatePresence>
-  );
+    </AnimatePresence>;
 }
-

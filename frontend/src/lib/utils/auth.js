@@ -10,7 +10,6 @@
  */
 export function decodeToken(token) {
   if (!token) return null;
-
   try {
     // JWT format: header.payload.signature
     const parts = token.split('.');
@@ -19,7 +18,6 @@ export function decodeToken(token) {
     // Decode base64url encoded payload
     const payload = parts[1];
     const decoded = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')));
-    
     return decoded;
   } catch (error) {
     console.error('Error decoding token:', error);
@@ -45,7 +43,7 @@ export function getRoleFromToken(token) {
 export function isTokenExpired(token) {
   const decoded = decodeToken(token);
   if (!decoded || !decoded.exp) return true;
-  
+
   // exp is in seconds, Date.now() is in milliseconds
   return decoded.exp * 1000 < Date.now();
 }
@@ -73,7 +71,6 @@ export function hasModuleAccess(role, module) {
     'delivery': 'delivery',
     'user': 'user'
   };
-
   return roleModuleMap[role] === module;
 }
 
@@ -96,16 +93,14 @@ export function getCurrentUserRole(module = null) {
   if (module) {
     const token = getModuleToken(module);
     if (!token) return null;
-    
     if (isTokenExpired(token)) {
       // Token expired, clear it
       clearModuleAuth(module);
       return null;
     }
-    
     return getRoleFromToken(token);
   }
-  
+
   // Legacy: check all modules and return the first valid role found
   // This is for backward compatibility but should be avoided
   const modules = ['user', 'restaurant', 'delivery', 'admin'];
@@ -115,7 +110,6 @@ export function getCurrentUserRole(module = null) {
       return getRoleFromToken(token);
     }
   }
-  
   return null;
 }
 
@@ -127,12 +121,10 @@ export function getCurrentUserRole(module = null) {
 export function isModuleAuthenticated(module) {
   const token = getModuleToken(module);
   if (!token) return false;
-  
   if (isTokenExpired(token)) {
     clearModuleAuth(module);
     return false;
   }
-  
   return true;
 }
 
@@ -179,21 +171,12 @@ export function setAuthData(module, token, user) {
     if (!module || !token) {
       throw new Error(`Invalid parameters: module=${module}, token=${!!token}`);
     }
-
-    console.log(`[setAuthData] Storing auth for module: ${module}`, {
-      hasToken: !!token,
-      tokenLength: token?.length,
-      hasUser: !!user
-    });
-
     // Store module-specific token (don't clear other modules)
     const tokenKey = `${module}_accessToken`;
     const authKey = `${module}_authenticated`;
     const userKey = `${module}_user`;
-
     localStorage.setItem(tokenKey, token);
     localStorage.setItem(authKey, 'true');
-    
     if (user) {
       try {
         localStorage.setItem(userKey, JSON.stringify(user));
@@ -206,7 +189,6 @@ export function setAuthData(module, token, user) {
     // Verify the token was stored correctly
     const storedToken = localStorage.getItem(tokenKey);
     const storedAuth = localStorage.getItem(authKey);
-    
     if (storedToken !== token) {
       console.error(`[setAuthData] Token mismatch:`, {
         expected: token?.substring(0, 20) + '...',
@@ -214,7 +196,6 @@ export function setAuthData(module, token, user) {
       });
       throw new Error(`Token storage verification failed for module: ${module}`);
     }
-
     if (storedAuth !== 'true') {
       console.error(`[setAuthData] Auth flag mismatch:`, {
         expected: 'true',
@@ -222,8 +203,6 @@ export function setAuthData(module, token, user) {
       });
       throw new Error(`Authentication flag storage failed for module: ${module}`);
     }
-
-    console.log(`[setAuthData] Successfully stored auth data for ${module}`);
   } catch (error) {
     // If quota exceeded, try to clear some space
     if (error.name === 'QuotaExceededError' || error.code === 22) {
@@ -238,7 +217,7 @@ export function setAuthData(module, token, user) {
         if (user) {
           localStorage.setItem(`${module}_user`, JSON.stringify(user));
         }
-        
+
         // Verify again after retry
         const storedToken = localStorage.getItem(`${module}_accessToken`);
         if (storedToken !== token) {
@@ -254,4 +233,3 @@ export function setAuthData(module, token, user) {
     }
   }
 }
-

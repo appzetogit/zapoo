@@ -33,7 +33,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import zapooLogo from "@/assets/zapoo_logo.png";
-import { adminAPI } from "@/lib/api";
+import { adminAPI, notificationAPI } from "@/lib/api";
 import { clearModuleAuth } from "@/lib/utils/auth";
 import { getCachedSettings, loadBusinessSettings } from "@/lib/utils/businessSettings";
 
@@ -159,6 +159,14 @@ export default function AdminNavbar({ onMenuClick }) {
     try {
       // Call backend logout API to clear refresh token cookie
       try {
+        // Remove FCM token before standard logout
+        const savedToken = localStorage.getItem(`fcm_token_registered_admin_VAL`);
+        if (savedToken) {
+          console.log("[Logout] Removing FCM token for admin...");
+          await notificationAPI.removeToken(savedToken);
+          localStorage.removeItem(`fcm_token_registered_admin_VAL`);
+          localStorage.removeItem(`fcm_token_registered_admin`);
+        }
         await adminAPI.logout();
       } catch (apiError) {
         // Continue with logout even if API call fails (network issues, etc.)

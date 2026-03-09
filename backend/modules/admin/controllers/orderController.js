@@ -38,13 +38,15 @@ export const getOrders = asyncHandler(async (req, res) => {
         'food-on-the-way': 'out_for_delivery',
         'delivered': 'delivered',
         'canceled': 'cancelled',
-        'restaurant-cancelled': 'cancelled', // Restaurant cancelled orders
-        'payment-failed': 'pending', // Payment failed orders have pending status
-        'refunded': 'cancelled', // Refunded orders might be cancelled
+        'restaurant-cancelled': 'cancelled',
+        // Restaurant cancelled orders
+        'payment-failed': 'pending',
+        // Payment failed orders have pending status
+        'refunded': 'cancelled',
+        // Refunded orders might be cancelled
         'dine-in': 'dine_in',
         'offline-payments': 'pending' // Offline payment orders
       };
-
       const mappedStatus = statusMap[status] || status;
       query.status = mappedStatus;
 
@@ -89,13 +91,17 @@ export const getOrders = asyncHandler(async (req, res) => {
       // Try to find restaurant by name or ID
       const Restaurant = (await import('../../restaurant/models/Restaurant.js')).default;
       const restaurantDoc = await Restaurant.findOne({
-        $or: [
-          { name: { $regex: restaurant, $options: 'i' } },
-          { _id: mongoose.Types.ObjectId.isValid(restaurant) ? restaurant : null },
-          { restaurantId: restaurant }
-        ]
+        $or: [{
+          name: {
+            $regex: restaurant,
+            $options: 'i'
+          }
+        }, {
+          _id: mongoose.Types.ObjectId.isValid(restaurant) ? restaurant : null
+        }, {
+          restaurantId: restaurant
+        }]
       }).select('_id restaurantId').lean();
-
       if (restaurantDoc) {
         query.restaurantId = restaurantDoc._id?.toString() || restaurantDoc.restaurantId;
       }
@@ -106,9 +112,11 @@ export const getOrders = asyncHandler(async (req, res) => {
       // Find zone by name
       const Zone = (await import('../models/Zone.js')).default;
       const zoneDoc = await Zone.findOne({
-        name: { $regex: zone, $options: 'i' }
+        name: {
+          $regex: zone,
+          $options: 'i'
+        }
       }).select('_id name').lean();
-
       if (zoneDoc) {
         query['assignmentInfo.zoneId'] = zoneDoc._id?.toString();
       }
@@ -118,9 +126,11 @@ export const getOrders = asyncHandler(async (req, res) => {
     if (customer && customer !== 'All customers') {
       const User = (await import('../../auth/models/User.js')).default;
       const userDoc = await User.findOne({
-        name: { $regex: customer, $options: 'i' }
+        name: {
+          $regex: customer,
+          $options: 'i'
+        }
       }).select('_id').lean();
-
       if (userDoc) {
         query.userId = userDoc._id;
       }
@@ -128,35 +138,54 @@ export const getOrders = asyncHandler(async (req, res) => {
 
     // Search filter (orderId, customer name, customer phone)
     if (search) {
-      query.$or = [
-        { orderId: { $regex: search, $options: 'i' } }
-      ];
+      query.$or = [{
+        orderId: {
+          $regex: search,
+          $options: 'i'
+        }
+      }];
 
       // If search looks like a phone number, search in customer data
       const phoneRegex = /[\d\s\+\-()]+/;
       if (phoneRegex.test(search)) {
         const User = (await import('../../auth/models/User.js')).default;
         const cleanSearch = search.replace(/\D/g, '');
-        const userSearchQuery = { phone: { $regex: cleanSearch, $options: 'i' } };
+        const userSearchQuery = {
+          phone: {
+            $regex: cleanSearch,
+            $options: 'i'
+          }
+        };
         if (mongoose.Types.ObjectId.isValid(search)) {
           userSearchQuery._id = search;
         }
         const users = await User.find(userSearchQuery).select('_id').lean();
         const userIds = users.map(u => u._id);
         if (userIds.length > 0) {
-          query.$or.push({ userId: { $in: userIds } });
+          query.$or.push({
+            userId: {
+              $in: userIds
+            }
+          });
         }
       }
 
       // Also search by customer name
       const User = (await import('../../auth/models/User.js')).default;
       const usersByName = await User.find({
-        name: { $regex: search, $options: 'i' }
+        name: {
+          $regex: search,
+          $options: 'i'
+        }
       }).select('_id').lean();
       const userIdsByName = usersByName.map(u => u._id);
       if (userIdsByName.length > 0) {
         if (!query.$or) query.$or = [];
-        query.$or.push({ userId: { $in: userIdsByName } });
+        query.$or.push({
+          userId: {
+            $in: userIdsByName
+          }
+        });
       }
 
       // Ensure $or array is not empty
@@ -169,14 +198,9 @@ export const getOrders = asyncHandler(async (req, res) => {
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
     // Fetch orders with population
-    const orders = await Order.find(query)
-      .populate('userId', 'name email phone')
-      .populate('restaurantId', 'name slug')
-      .populate('deliveryPartnerId', 'name phone')
-      .sort({ createdAt: -1 })
-      .limit(parseInt(limit))
-      .skip(skip)
-      .lean();
+    const orders = await Order.find(query).populate('userId', 'name email phone').populate('restaurantId', 'name slug').populate('deliveryPartnerId', 'name phone').sort({
+      createdAt: -1
+    }).limit(parseInt(limit)).skip(skip).lean();
 
     // Get total count
     const total = await Order.countDocuments(query);
@@ -187,9 +211,11 @@ export const getOrders = asyncHandler(async (req, res) => {
     try {
       const OrderSettlement = (await import('../../order/models/OrderSettlement.js')).default;
       const orderIds = orders.map(o => o._id);
-      const settlements = await OrderSettlement.find({ orderId: { $in: orderIds } })
-        .select('orderId userPayment.platformFee cancellationDetails.refundStatus')
-        .lean();
+      const settlements = await OrderSettlement.find({
+        orderId: {
+          $in: orderIds
+        }
+      }).select('orderId userPayment.platformFee cancellationDetails.refundStatus').lean();
 
       // Create maps for quick lookup
       settlements.forEach(s => {
@@ -263,9 +289,7 @@ export const getOrders = asyncHandler(async (req, res) => {
       }
 
       // Determine delivery type
-      const deliveryType = order.deliveryFleet === 'standard' ?
-        'Home Delivery' :
-        (order.deliveryFleet === 'fast' ? 'Fast Delivery' : 'Home Delivery');
+      const deliveryType = order.deliveryFleet === 'standard' ? 'Home Delivery' : order.deliveryFleet === 'fast' ? 'Fast Delivery' : 'Home Delivery';
 
       // Calculate report-specific fields
       const subtotal = order.pricing?.subtotal || 0;
@@ -286,7 +310,7 @@ export const getOrders = asyncHandler(async (req, res) => {
           const actualTotal = order.pricing?.total || 0;
           const difference = actualTotal - calculatedTotal;
           // If difference is positive and reasonable (between 0 and 50), assume it's platform fee
-          platformFee = (difference > 0 && difference <= 50) ? difference : 0;
+          platformFee = difference > 0 && difference <= 50 ? difference : 0;
         }
       }
 
@@ -306,7 +330,6 @@ export const getOrders = asyncHandler(async (req, res) => {
       const totalItemAmount = subtotal;
       // Order amount (final total)
       const orderAmount = order.pricing?.total || 0;
-
       return {
         sl: skip + index + 1,
         orderId: order.orderId,
@@ -340,11 +363,10 @@ export const getOrders = asyncHandler(async (req, res) => {
             return 'Online';
           }
         })(),
-        paymentCollectionStatus: (order.payment?.method === 'cash' || order.payment?.method === 'cod')
-          ? (order.status === 'delivered' ? 'Collected' : 'Not Collected')
-          : 'Collected',
+        paymentCollectionStatus: order.payment?.method === 'cash' || order.payment?.method === 'cod' ? order.status === 'delivered' ? 'Collected' : 'Not Collected' : 'Collected',
         orderStatus: orderStatusDisplay,
-        status: order.status, // Backend status
+        status: order.status,
+        // Backend status
         deliveryType: deliveryType,
         items: order.items || [],
         address: order.address || {},
@@ -357,7 +379,8 @@ export const getOrders = asyncHandler(async (req, res) => {
         cancelledBy: order.cancelledBy || null,
         tracking: order.tracking || {},
         deliveryState: order.deliveryState || {},
-        billImageUrl: order.billImageUrl || null, // Bill image captured by delivery boy
+        billImageUrl: order.billImageUrl || null,
+        // Bill image captured by delivery boy
         createdAt: order.createdAt,
         updatedAt: order.updatedAt,
         // Zone info from assignmentInfo
@@ -367,7 +390,6 @@ export const getOrders = asyncHandler(async (req, res) => {
         refundStatus: refundStatusMap.get(order._id.toString()) || null
       };
     });
-
     return successResponse(res, 200, 'Orders retrieved successfully', {
       orders: transformedOrders,
       pagination: {
@@ -389,32 +411,25 @@ export const getOrders = asyncHandler(async (req, res) => {
  */
 export const getOrderById = asyncHandler(async (req, res) => {
   try {
-    const { id } = req.params;
-
+    const {
+      id
+    } = req.params;
     let order = null;
 
     // Try MongoDB _id first
     if (mongoose.Types.ObjectId.isValid(id) && id.length === 24) {
-      order = await Order.findById(id)
-        .populate('userId', 'name email phone')
-        .populate('restaurantId', 'name slug location address phone')
-        .populate('deliveryPartnerId', 'name phone availability')
-        .lean();
+      order = await Order.findById(id).populate('userId', 'name email phone').populate('restaurantId', 'name slug location address phone').populate('deliveryPartnerId', 'name phone availability').lean();
     }
 
     // If not found, try by orderId
     if (!order) {
-      order = await Order.findOne({ orderId: id })
-        .populate('userId', 'name email phone')
-        .populate('restaurantId', 'name slug location address phone')
-        .populate('deliveryPartnerId', 'name phone availability')
-        .lean();
+      order = await Order.findOne({
+        orderId: id
+      }).populate('userId', 'name email phone').populate('restaurantId', 'name slug location address phone').populate('deliveryPartnerId', 'name phone availability').lean();
     }
-
     if (!order) {
       return errorResponse(res, 404, 'Order not found');
     }
-
     return successResponse(res, 200, 'Order retrieved successfully', {
       order
     });
@@ -431,87 +446,98 @@ export const getOrderById = asyncHandler(async (req, res) => {
  */
 export const getSearchingDeliverymanOrders = asyncHandler(async (req, res) => {
   try {
-    console.log('🔍 Fetching searching deliveryman orders...');
     const {
       page = 1,
       limit = 50,
       search
     } = req.query;
-
-    console.log('📋 Query params:', { page, limit, search });
-
     // Build base conditions for orders that are ready but don't have delivery partner assigned
     // deliveryPartnerId is ObjectId, so we only check for null or missing
     const baseConditions = {
-      status: { $in: ['ready', 'preparing'] },
-      $or: [
-        { deliveryPartnerId: { $exists: false } },
-        { deliveryPartnerId: null }
-      ]
+      status: {
+        $in: ['ready', 'preparing']
+      },
+      $or: [{
+        deliveryPartnerId: {
+          $exists: false
+        }
+      }, {
+        deliveryPartnerId: null
+      }]
     };
 
     // Build search conditions if search is provided
     let searchConditions = null;
     if (search) {
-      const searchOrConditions = [
-        { orderId: { $regex: search, $options: 'i' } }
-      ];
+      const searchOrConditions = [{
+        orderId: {
+          $regex: search,
+          $options: 'i'
+        }
+      }];
 
       // If search looks like a phone number, search in customer data
       const phoneRegex = /[\d\s\+\-()]+/;
       if (phoneRegex.test(search)) {
         const User = (await import('../../auth/models/User.js')).default;
         const cleanSearch = search.replace(/\D/g, '');
-        const userSearchQuery = { phone: { $regex: cleanSearch, $options: 'i' } };
+        const userSearchQuery = {
+          phone: {
+            $regex: cleanSearch,
+            $options: 'i'
+          }
+        };
         if (mongoose.Types.ObjectId.isValid(search)) {
           userSearchQuery._id = search;
         }
         const users = await User.find(userSearchQuery).select('_id').lean();
         const userIds = users.map(u => u._id);
         if (userIds.length > 0) {
-          searchOrConditions.push({ userId: { $in: userIds } });
+          searchOrConditions.push({
+            userId: {
+              $in: userIds
+            }
+          });
         }
       }
 
       // Also search by customer name
       const User = (await import('../../auth/models/User.js')).default;
       const usersByName = await User.find({
-        name: { $regex: search, $options: 'i' }
+        name: {
+          $regex: search,
+          $options: 'i'
+        }
       }).select('_id').lean();
       const userIdsByName = usersByName.map(u => u._id);
       if (userIdsByName.length > 0) {
-        searchOrConditions.push({ userId: { $in: userIdsByName } });
+        searchOrConditions.push({
+          userId: {
+            $in: userIdsByName
+          }
+        });
       }
-
       if (searchOrConditions.length > 0) {
-        searchConditions = { $or: searchOrConditions };
+        searchConditions = {
+          $or: searchOrConditions
+        };
       }
     }
 
     // Combine all conditions
-    const finalQuery = searchConditions
-      ? { $and: [baseConditions, searchConditions] }
-      : baseConditions;
+    const finalQuery = searchConditions ? {
+      $and: [baseConditions, searchConditions]
+    } : baseConditions;
 
     // Calculate pagination
     const skip = (parseInt(page) - 1) * parseInt(limit);
-
-    console.log('🔎 Final query:', JSON.stringify(finalQuery, null, 2));
-
     // Fetch orders with population
-    const orders = await Order.find(finalQuery)
-      .populate('userId', 'name email phone')
-      .populate('restaurantId', 'name slug')
-      .sort({ createdAt: -1 })
-      .limit(parseInt(limit))
-      .skip(skip)
-      .lean();
+    const orders = await Order.find(finalQuery).populate('userId', 'name email phone').populate('restaurantId', 'name slug').sort({
+      createdAt: -1
+    }).limit(parseInt(limit)).skip(skip).lean();
 
     // Get total count
     const total = await Order.countDocuments(finalQuery);
-
-    console.log(`✅ Found ${orders.length} orders (total: ${total})`);
-
     // Transform orders to match frontend format
     const transformedOrders = orders.map((order, index) => {
       const orderDate = new Date(order.createdAt);
@@ -560,14 +586,14 @@ export const getSearchingDeliverymanOrders = asyncHandler(async (req, res) => {
       const orderStatusDisplay = statusMap[order.status] || 'Pending';
 
       // Determine delivery type
-      const deliveryType = order.deliveryFleet === 'standard' ?
-        'Home Delivery' :
-        (order.deliveryFleet === 'fast' ? 'Fast Delivery' : 'Home Delivery');
+      const deliveryType = order.deliveryFleet === 'standard' ? 'Home Delivery' : order.deliveryFleet === 'fast' ? 'Fast Delivery' : 'Home Delivery';
 
       // Format total amount
       const totalAmount = order.pricing?.total || 0;
-      const formattedTotal = `$ ${totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
+      const formattedTotal = `$ ${totalAmount.toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      })}`;
       return {
         id: order.orderId || order._id.toString(),
         sl: skip + index + 1,
@@ -593,7 +619,6 @@ export const getSearchingDeliverymanOrders = asyncHandler(async (req, res) => {
         pricing: order.pricing || {}
       };
     });
-
     return successResponse(res, 200, 'Searching deliveryman orders retrieved successfully', {
       orders: transformedOrders,
       pagination: {
@@ -617,85 +642,95 @@ export const getSearchingDeliverymanOrders = asyncHandler(async (req, res) => {
  */
 export const getOngoingOrders = asyncHandler(async (req, res) => {
   try {
-    console.log('🔍 Fetching ongoing orders...');
     const {
       page = 1,
       limit = 50,
       search
     } = req.query;
-
-    console.log('📋 Query params:', { page, limit, search });
-
     // Build base conditions for ongoing orders
     // Orders that have deliveryPartnerId assigned but are not delivered/cancelled
     const baseConditions = {
-      deliveryPartnerId: { $exists: true, $ne: null },
-      status: { $nin: ['delivered', 'cancelled'] }
+      deliveryPartnerId: {
+        $exists: true,
+        $ne: null
+      },
+      status: {
+        $nin: ['delivered', 'cancelled']
+      }
     };
 
     // Build search conditions if search is provided
     let searchConditions = null;
     if (search) {
-      const searchOrConditions = [
-        { orderId: { $regex: search, $options: 'i' } }
-      ];
+      const searchOrConditions = [{
+        orderId: {
+          $regex: search,
+          $options: 'i'
+        }
+      }];
 
       // If search looks like a phone number, search in customer data
       const phoneRegex = /[\d\s\+\-()]+/;
       if (phoneRegex.test(search)) {
         const User = (await import('../../auth/models/User.js')).default;
         const cleanSearch = search.replace(/\D/g, '');
-        const userSearchQuery = { phone: { $regex: cleanSearch, $options: 'i' } };
+        const userSearchQuery = {
+          phone: {
+            $regex: cleanSearch,
+            $options: 'i'
+          }
+        };
         if (mongoose.Types.ObjectId.isValid(search)) {
           userSearchQuery._id = search;
         }
         const users = await User.find(userSearchQuery).select('_id').lean();
         const userIds = users.map(u => u._id);
         if (userIds.length > 0) {
-          searchOrConditions.push({ userId: { $in: userIds } });
+          searchOrConditions.push({
+            userId: {
+              $in: userIds
+            }
+          });
         }
       }
 
       // Also search by customer name
       const User = (await import('../../auth/models/User.js')).default;
       const usersByName = await User.find({
-        name: { $regex: search, $options: 'i' }
+        name: {
+          $regex: search,
+          $options: 'i'
+        }
       }).select('_id').lean();
       const userIdsByName = usersByName.map(u => u._id);
       if (userIdsByName.length > 0) {
-        searchOrConditions.push({ userId: { $in: userIdsByName } });
+        searchOrConditions.push({
+          userId: {
+            $in: userIdsByName
+          }
+        });
       }
-
       if (searchOrConditions.length > 0) {
-        searchConditions = { $or: searchOrConditions };
+        searchConditions = {
+          $or: searchOrConditions
+        };
       }
     }
 
     // Combine all conditions
-    const finalQuery = searchConditions
-      ? { $and: [baseConditions, searchConditions] }
-      : baseConditions;
+    const finalQuery = searchConditions ? {
+      $and: [baseConditions, searchConditions]
+    } : baseConditions;
 
     // Calculate pagination
     const skip = (parseInt(page) - 1) * parseInt(limit);
-
-    console.log('🔎 Final query:', JSON.stringify(finalQuery, null, 2));
-
     // Fetch orders with population
-    const orders = await Order.find(finalQuery)
-      .populate('userId', 'name email phone')
-      .populate('restaurantId', 'name slug')
-      .populate('deliveryPartnerId', 'name phone')
-      .sort({ createdAt: -1 })
-      .limit(parseInt(limit))
-      .skip(skip)
-      .lean();
+    const orders = await Order.find(finalQuery).populate('userId', 'name email phone').populate('restaurantId', 'name slug').populate('deliveryPartnerId', 'name phone').sort({
+      createdAt: -1
+    }).limit(parseInt(limit)).skip(skip).lean();
 
     // Get total count
     const total = await Order.countDocuments(finalQuery);
-
-    console.log(`✅ Found ${orders.length} ongoing orders (total: ${total})`);
-
     // Transform orders to match frontend format
     const transformedOrders = orders.map((order, index) => {
       const orderDate = new Date(order.createdAt);
@@ -731,15 +766,42 @@ export const getOngoingOrders = asyncHandler(async (req, res) => {
 
       // Map order status for display with colors
       const statusMap = {
-        'pending': { text: 'Pending', color: 'bg-gray-100 text-gray-600' },
-        'confirmed': { text: 'Confirmed', color: 'bg-blue-50 text-blue-600' },
-        'preparing': { text: 'Preparing', color: 'bg-yellow-50 text-yellow-600' },
-        'ready': { text: 'Ready', color: 'bg-green-50 text-green-600' },
-        'out_for_delivery': { text: 'Out For Delivery', color: 'bg-orange-100 text-orange-600' },
-        'delivered': { text: 'Delivered', color: 'bg-green-100 text-green-600' },
-        'cancelled': { text: 'Cancelled', color: 'bg-red-50 text-red-600' },
-        'scheduled': { text: 'Scheduled', color: 'bg-purple-50 text-purple-600' },
-        'dine_in': { text: 'Dine In', color: 'bg-indigo-50 text-indigo-600' }
+        'pending': {
+          text: 'Pending',
+          color: 'bg-gray-100 text-gray-600'
+        },
+        'confirmed': {
+          text: 'Confirmed',
+          color: 'bg-blue-50 text-blue-600'
+        },
+        'preparing': {
+          text: 'Preparing',
+          color: 'bg-yellow-50 text-yellow-600'
+        },
+        'ready': {
+          text: 'Ready',
+          color: 'bg-green-50 text-green-600'
+        },
+        'out_for_delivery': {
+          text: 'Out For Delivery',
+          color: 'bg-orange-100 text-orange-600'
+        },
+        'delivered': {
+          text: 'Delivered',
+          color: 'bg-green-100 text-green-600'
+        },
+        'cancelled': {
+          text: 'Cancelled',
+          color: 'bg-red-50 text-red-600'
+        },
+        'scheduled': {
+          text: 'Scheduled',
+          color: 'bg-purple-50 text-purple-600'
+        },
+        'dine_in': {
+          text: 'Dine In',
+          color: 'bg-indigo-50 text-indigo-600'
+        }
       };
 
       // Check for handover status (when delivery partner has reached pickup)
@@ -747,22 +809,20 @@ export const getOngoingOrders = asyncHandler(async (req, res) => {
       let orderStatusColor = statusMap[order.status]?.color || 'bg-gray-100 text-gray-600';
 
       // If delivery partner has reached pickup, show as "Handover"
-      if (order.deliveryState?.currentPhase === 'at_pickup' ||
-        order.deliveryState?.currentPhase === 'en_route_to_delivery' ||
-        order.deliveryState?.currentPhase === 'at_delivery') {
+      if (order.deliveryState?.currentPhase === 'at_pickup' || order.deliveryState?.currentPhase === 'en_route_to_delivery' || order.deliveryState?.currentPhase === 'at_delivery') {
         orderStatusDisplay = 'Handover';
         orderStatusColor = 'bg-blue-50 text-blue-600';
       }
 
       // Determine delivery type
-      const deliveryType = order.deliveryFleet === 'standard' ?
-        'Home Delivery' :
-        (order.deliveryFleet === 'fast' ? 'Fast Delivery' : 'Home Delivery');
+      const deliveryType = order.deliveryFleet === 'standard' ? 'Home Delivery' : order.deliveryFleet === 'fast' ? 'Fast Delivery' : 'Home Delivery';
 
       // Format total amount
       const totalAmount = order.pricing?.total || 0;
-      const formattedTotal = `$ ${totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
+      const formattedTotal = `$ ${totalAmount.toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      })}`;
       return {
         id: order.orderId || order._id.toString(),
         sl: skip + index + 1,
@@ -791,7 +851,6 @@ export const getOngoingOrders = asyncHandler(async (req, res) => {
         deliveryPartnerPhone: order.deliveryPartnerId?.phone || null
       };
     });
-
     return successResponse(res, 200, 'Ongoing orders retrieved successfully', {
       orders: transformedOrders,
       pagination: {
@@ -815,7 +874,6 @@ export const getOngoingOrders = asyncHandler(async (req, res) => {
  */
 export const getTransactionReport = asyncHandler(async (req, res) => {
   try {
-    console.log('🔍 Fetching transaction report...');
     const {
       page = 1,
       limit = 50,
@@ -825,9 +883,6 @@ export const getTransactionReport = asyncHandler(async (req, res) => {
       fromDate,
       toDate
     } = req.query;
-
-    console.log('📋 Query params:', { page, limit, search, zone, restaurant, fromDate, toDate });
-
     // Build query for orders
     const query = {};
 
@@ -850,13 +905,17 @@ export const getTransactionReport = asyncHandler(async (req, res) => {
     if (restaurant && restaurant !== 'All restaurants') {
       const Restaurant = (await import('../../restaurant/models/Restaurant.js')).default;
       const restaurantDoc = await Restaurant.findOne({
-        $or: [
-          { name: { $regex: restaurant, $options: 'i' } },
-          { _id: mongoose.Types.ObjectId.isValid(restaurant) ? restaurant : null },
-          { restaurantId: restaurant }
-        ]
+        $or: [{
+          name: {
+            $regex: restaurant,
+            $options: 'i'
+          }
+        }, {
+          _id: mongoose.Types.ObjectId.isValid(restaurant) ? restaurant : null
+        }, {
+          restaurantId: restaurant
+        }]
       }).select('_id restaurantId').lean();
-
       if (restaurantDoc) {
         query.restaurantId = restaurantDoc._id?.toString() || restaurantDoc.restaurantId;
       }
@@ -866,9 +925,11 @@ export const getTransactionReport = asyncHandler(async (req, res) => {
     if (zone && zone !== 'All Zones') {
       const Zone = (await import('../models/Zone.js')).default;
       const zoneDoc = await Zone.findOne({
-        name: { $regex: zone, $options: 'i' }
+        name: {
+          $regex: zone,
+          $options: 'i'
+        }
       }).select('_id name').lean();
-
       if (zoneDoc) {
         query['assignmentInfo.zoneId'] = zoneDoc._id?.toString();
       }
@@ -876,20 +937,19 @@ export const getTransactionReport = asyncHandler(async (req, res) => {
 
     // Search filter (orderId)
     if (search) {
-      query.orderId = { $regex: search, $options: 'i' };
+      query.orderId = {
+        $regex: search,
+        $options: 'i'
+      };
     }
 
     // Calculate pagination
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
     // Fetch orders with population
-    const orders = await Order.find(query)
-      .populate('userId', 'name email phone')
-      .populate('restaurantId', 'name slug')
-      .sort({ createdAt: -1 })
-      .limit(parseInt(limit))
-      .skip(skip)
-      .lean();
+    const orders = await Order.find(query).populate('userId', 'name email phone').populate('restaurantId', 'name slug').sort({
+      createdAt: -1
+    }).limit(parseInt(limit)).skip(skip).lean();
 
     // Get total count
     const total = await Order.countDocuments(query);
@@ -918,45 +978,38 @@ export const getTransactionReport = asyncHandler(async (req, res) => {
     if (restaurant && restaurant !== 'All restaurants') {
       const Restaurant = (await import('../../restaurant/models/Restaurant.js')).default;
       const restaurantDoc = await Restaurant.findOne({
-        $or: [
-          { name: { $regex: restaurant, $options: 'i' } },
-          { _id: mongoose.Types.ObjectId.isValid(restaurant) ? restaurant : null },
-          { restaurantId: restaurant }
-        ]
+        $or: [{
+          name: {
+            $regex: restaurant,
+            $options: 'i'
+          }
+        }, {
+          _id: mongoose.Types.ObjectId.isValid(restaurant) ? restaurant : null
+        }, {
+          restaurantId: restaurant
+        }]
       }).select('_id restaurantId').lean();
-
       if (restaurantDoc) {
         summaryRestaurantQuery.restaurantId = restaurantDoc._id || restaurantDoc.restaurantId;
       }
     }
 
     // Get all orders for summary calculation (without pagination)
-    const summaryQuery = { ...query };
-    const allOrdersForSummary = await Order.find(summaryQuery)
-      .populate('userId', 'name')
-      .populate('restaurantId', 'name')
-      .lean();
+    const summaryQuery = {
+      ...query
+    };
+    const allOrdersForSummary = await Order.find(summaryQuery).populate('userId', 'name').populate('restaurantId', 'name').lean();
 
     // Calculate completed transactions (delivered orders)
-    const completedOrders = allOrdersForSummary.filter(order =>
-      order.status === 'delivered' && order.payment?.status === 'completed'
-    );
-    const completedTransaction = completedOrders.reduce((sum, order) =>
-      sum + (order.pricing?.total || 0), 0
-    );
+    const completedOrders = allOrdersForSummary.filter(order => order.status === 'delivered' && order.payment?.status === 'completed');
+    const completedTransaction = completedOrders.reduce((sum, order) => sum + (order.pricing?.total || 0), 0);
 
     // Calculate refunded transactions
-    const refundedOrders = allOrdersForSummary.filter(order =>
-      order.payment?.status === 'refunded' || order.status === 'cancelled'
-    );
-    const refundedTransaction = refundedOrders.reduce((sum, order) =>
-      sum + (order.pricing?.total || 0), 0
-    );
+    const refundedOrders = allOrdersForSummary.filter(order => order.payment?.status === 'refunded' || order.status === 'cancelled');
+    const refundedTransaction = refundedOrders.reduce((sum, order) => sum + (order.pricing?.total || 0), 0);
 
     // Calculate recommended item fees from orders
-    const totalRecommendedFee = completedOrders.reduce((sum, order) =>
-      sum + (order.pricing?.internalRecommendedFee || 0), 0
-    );
+    const totalRecommendedFee = completedOrders.reduce((sum, order) => sum + (order.pricing?.internalRecommendedFee || 0), 0);
 
     // Get admin earning from AdminCommission
     const adminCommissionQuery = {
@@ -1004,7 +1057,6 @@ export const getTransactionReport = asyncHandler(async (req, res) => {
       const totalItemAmount = subtotal;
       // Order amount (final total)
       const orderAmount = order.pricing?.total || 0;
-
       return {
         id: order._id.toString(),
         orderId: order.orderId,
@@ -1018,10 +1070,9 @@ export const getTransactionReport = asyncHandler(async (req, res) => {
         vatTax: vatTax,
         deliveryCharge: deliveryCharge,
         orderAmount: orderAmount,
-        recommendedItemFee: order.pricing?.internalRecommendedFee || 0,
+        recommendedItemFee: order.pricing?.internalRecommendedFee || 0
       };
     });
-
     return successResponse(res, 200, 'Transaction report retrieved successfully', {
       summary: {
         completedTransaction,
@@ -1053,7 +1104,6 @@ export const getTransactionReport = asyncHandler(async (req, res) => {
  */
 export const getRestaurantReport = asyncHandler(async (req, res) => {
   try {
-    console.log('🔍 Fetching restaurant report...');
     const {
       zone,
       all,
@@ -1061,9 +1111,6 @@ export const getRestaurantReport = asyncHandler(async (req, res) => {
       time,
       search
     } = req.query;
-
-    console.log('📋 Query params:', { zone, all, type, time, search });
-
     const Restaurant = (await import('../../restaurant/models/Restaurant.js')).default;
     const AdminCommission = (await import('../models/AdminCommission.js')).default;
     const FeedbackExperience = (await import('../models/FeedbackExperience.js')).default;
@@ -1075,20 +1122,26 @@ export const getRestaurantReport = asyncHandler(async (req, res) => {
     if (zone && zone !== 'All Zones') {
       const Zone = (await import('../models/Zone.js')).default;
       const zoneDoc = await Zone.findOne({
-        name: { $regex: zone, $options: 'i' }
+        name: {
+          $regex: zone,
+          $options: 'i'
+        }
       }).select('_id name').lean();
-
       if (zoneDoc) {
         // Find restaurants in this zone by checking orders with this zoneId
         const ordersInZone = await Order.find({
           'assignmentInfo.zoneId': zoneDoc._id?.toString()
         }).distinct('restaurantId').lean();
-
         if (ordersInZone.length > 0) {
-          restaurantQuery.$or = [
-            { _id: { $in: ordersInZone } },
-            { restaurantId: { $in: ordersInZone } }
-          ];
+          restaurantQuery.$or = [{
+            _id: {
+              $in: ordersInZone
+            }
+          }, {
+            restaurantId: {
+              $in: ordersInZone
+            }
+          }];
         } else {
           // No restaurants found in this zone
           return successResponse(res, 200, 'Restaurant report retrieved successfully', {
@@ -1111,25 +1164,26 @@ export const getRestaurantReport = asyncHandler(async (req, res) => {
 
     // Search filter
     if (search) {
-      restaurantQuery.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { restaurantId: { $regex: search, $options: 'i' } }
-      ];
+      restaurantQuery.$or = [{
+        name: {
+          $regex: search,
+          $options: 'i'
+        }
+      }, {
+        restaurantId: {
+          $regex: search,
+          $options: 'i'
+        }
+      }];
     }
 
     // Get all restaurants matching the query
-    const restaurants = await Restaurant.find(restaurantQuery)
-      .select('_id restaurantId name profileImage rating totalRatings isActive')
-      .lean();
-
-    console.log(`📊 Found ${restaurants.length} restaurants`);
-
+    const restaurants = await Restaurant.find(restaurantQuery).select('_id restaurantId name profileImage rating totalRatings isActive').lean();
     // Date range filter for orders
     let dateQuery = {};
     if (time && time !== 'All Time') {
       const now = new Date();
       dateQuery.createdAt = {};
-
       if (time === 'Today') {
         const startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         const endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
@@ -1156,114 +1210,107 @@ export const getRestaurantReport = asyncHandler(async (req, res) => {
     }
 
     // Process each restaurant
-    const restaurantReports = await Promise.all(
-      restaurants.map(async (restaurant) => {
-        const restaurantId = restaurant._id?.toString();
-        const restaurantIdField = restaurant.restaurantId;
+    const restaurantReports = await Promise.all(restaurants.map(async restaurant => {
+      const restaurantId = restaurant._id?.toString();
+      const restaurantIdField = restaurant.restaurantId;
 
-        // Build order query for this restaurant
-        const orderQuery = {
-          ...dateQuery,
-          $or: [
-            { restaurantId: restaurantId },
-            { restaurantId: restaurantIdField }
-          ]
-        };
+      // Build order query for this restaurant
+      const orderQuery = {
+        ...dateQuery,
+        $or: [{
+          restaurantId: restaurantId
+        }, {
+          restaurantId: restaurantIdField
+        }]
+      };
 
-        // Get orders for this restaurant
-        const orders = await Order.find(orderQuery).lean();
+      // Get orders for this restaurant
+      const orders = await Order.find(orderQuery).lean();
 
-        // Calculate statistics
-        const totalOrder = orders.length;
+      // Calculate statistics
+      const totalOrder = orders.length;
 
-        // Total order amount
-        const totalOrderAmount = orders.reduce((sum, order) =>
-          sum + (order.pricing?.total || 0), 0
-        );
+      // Total order amount
+      const totalOrderAmount = orders.reduce((sum, order) => sum + (order.pricing?.total || 0), 0);
 
-        // Total discount given
-        const totalDiscountGiven = orders.reduce((sum, order) =>
-          sum + (order.pricing?.discount || 0), 0
-        );
+      // Total discount given
+      const totalDiscountGiven = orders.reduce((sum, order) => sum + (order.pricing?.discount || 0), 0);
 
-        // Total VAT/TAX
-        const totalVATTAX = orders.reduce((sum, order) =>
-          sum + (order.pricing?.tax || 0), 0
-        );
+      // Total VAT/TAX
+      const totalVATTAX = orders.reduce((sum, order) => sum + (order.pricing?.tax || 0), 0);
 
-        // Get unique food items (count distinct itemIds from all orders)
-        const uniqueItemIds = new Set();
-        orders.forEach(order => {
-          if (order.items && Array.isArray(order.items)) {
-            order.items.forEach(item => {
-              if (item.itemId) {
-                uniqueItemIds.add(item.itemId);
-              }
-            });
-          }
-        });
-        const totalFood = uniqueItemIds.size;
-
-        // Get admin commission for this restaurant
-        const restaurantObjectId = restaurant._id instanceof mongoose.Types.ObjectId
-          ? restaurant._id
-          : new mongoose.Types.ObjectId(restaurant._id);
-
-        const commissionQuery = {
-          restaurantId: restaurantObjectId,
-          status: 'completed'
-        };
-
-        if (dateQuery.createdAt) {
-          commissionQuery.orderDate = dateQuery.createdAt;
+      // Get unique food items (count distinct itemIds from all orders)
+      const uniqueItemIds = new Set();
+      orders.forEach(order => {
+        if (order.items && Array.isArray(order.items)) {
+          order.items.forEach(item => {
+            if (item.itemId) {
+              uniqueItemIds.add(item.itemId);
+            }
+          });
         }
+      });
+      const totalFood = uniqueItemIds.size;
 
-        const commissions = await AdminCommission.find(commissionQuery).lean();
-        const totalAdminCommission = commissions.reduce((sum, comm) =>
-          sum + (comm.commissionAmount || 0), 0
-        );
+      // Get admin commission for this restaurant
+      const restaurantObjectId = restaurant._id instanceof mongoose.Types.ObjectId ? restaurant._id : new mongoose.Types.ObjectId(restaurant._id);
+      const commissionQuery = {
+        restaurantId: restaurantObjectId,
+        status: 'completed'
+      };
+      if (dateQuery.createdAt) {
+        commissionQuery.orderDate = dateQuery.createdAt;
+      }
+      const commissions = await AdminCommission.find(commissionQuery).lean();
+      const totalAdminCommission = commissions.reduce((sum, comm) => sum + (comm.commissionAmount || 0), 0);
 
-        // Get ratings from FeedbackExperience
-        const ratingStats = await FeedbackExperience.aggregate([
-          {
-            $match: {
-              restaurantId: restaurantObjectId,
-              rating: { $exists: true, $ne: null, $gt: 0 }
-            }
-          },
-          {
-            $group: {
-              _id: null,
-              averageRating: { $avg: '$rating' },
-              totalRatings: { $sum: 1 }
-            }
+      // Get ratings from FeedbackExperience
+      const ratingStats = await FeedbackExperience.aggregate([{
+        $match: {
+          restaurantId: restaurantObjectId,
+          rating: {
+            $exists: true,
+            $ne: null,
+            $gt: 0
           }
-        ]);
+        }
+      }, {
+        $group: {
+          _id: null,
+          averageRating: {
+            $avg: '$rating'
+          },
+          totalRatings: {
+            $sum: 1
+          }
+        }
+      }]);
+      const averageRatings = ratingStats[0]?.averageRating || restaurant.rating || 0;
+      const reviews = ratingStats[0]?.totalRatings || restaurant.totalRatings || 0;
 
-        const averageRatings = ratingStats[0]?.averageRating || restaurant.rating || 0;
-        const reviews = ratingStats[0]?.totalRatings || restaurant.totalRatings || 0;
-
-        // Format currency values
-        const formatCurrency = (amount) => {
-          return `₹${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-        };
-
-        return {
-          sl: 0, // Will be set in frontend
-          id: restaurantId,
-          restaurantName: restaurant.name,
-          icon: restaurant.profileImage?.url || restaurant.profileImage || null,
-          totalFood,
-          totalOrder,
-          totalOrderAmount: formatCurrency(totalOrderAmount),
-          totalDiscountGiven: formatCurrency(totalDiscountGiven),
-          totalAdminCommission: formatCurrency(totalAdminCommission),
-          totalVATTAX: formatCurrency(totalVATTAX),
-          averageRatings: parseFloat(averageRatings.toFixed(1)),
-          reviews
-        };
-      })
-    );
+      // Format currency values
+      const formatCurrency = amount => {
+        return `₹${amount.toLocaleString('en-US', {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2
+        })}`;
+      };
+      return {
+        sl: 0,
+        // Will be set in frontend
+        id: restaurantId,
+        restaurantName: restaurant.name,
+        icon: restaurant.profileImage?.url || restaurant.profileImage || null,
+        totalFood,
+        totalOrder,
+        totalOrderAmount: formatCurrency(totalOrderAmount),
+        totalDiscountGiven: formatCurrency(totalDiscountGiven),
+        totalAdminCommission: formatCurrency(totalAdminCommission),
+        totalVATTAX: formatCurrency(totalVATTAX),
+        averageRatings: parseFloat(averageRatings.toFixed(1)),
+        reviews
+      };
+    }));
 
     // Filter by type (Commission/Subscription) if needed
     let filteredReports = restaurantReports;
@@ -1281,7 +1328,6 @@ export const getRestaurantReport = asyncHandler(async (req, res) => {
       ...report,
       sl: index + 1
     }));
-
     return successResponse(res, 200, 'Restaurant report retrieved successfully', {
       restaurants: filteredReports,
       pagination: {
@@ -1304,11 +1350,6 @@ export const getRestaurantReport = asyncHandler(async (req, res) => {
  */
 export const getRefundRequests = asyncHandler(async (req, res) => {
   try {
-    console.log('✅ getRefundRequests route hit!');
-    console.log('Request URL:', req.url);
-    console.log('Request method:', req.method);
-    console.log('Request query:', req.query);
-
     const {
       page = 1,
       limit = 50,
@@ -1317,9 +1358,6 @@ export const getRefundRequests = asyncHandler(async (req, res) => {
       toDate,
       restaurant
     } = req.query;
-
-    console.log('🔍 Fetching refund requests with params:', { page, limit, search, fromDate, toDate, restaurant });
-
     // Build query for restaurant cancelled orders with pending refunds
     const query = {
       status: 'cancelled',
@@ -1327,21 +1365,22 @@ export const getRefundRequests = asyncHandler(async (req, res) => {
         $regex: /rejected by restaurant|restaurant rejected|restaurant cancelled|restaurant is too busy|item not available|outside delivery area|kitchen closing|technical issue/i
       }
     };
-
-    console.log('📋 Initial query:', JSON.stringify(query, null, 2));
-
     // Restaurant filter
     if (restaurant && restaurant !== 'All restaurants') {
       try {
         const Restaurant = (await import('../../restaurant/models/Restaurant.js')).default;
         const restaurantDoc = await Restaurant.findOne({
-          $or: [
-            { name: { $regex: restaurant, $options: 'i' } },
-            ...(mongoose.Types.ObjectId.isValid(restaurant) ? [{ _id: restaurant }] : []),
-            { restaurantId: restaurant }
-          ]
+          $or: [{
+            name: {
+              $regex: restaurant,
+              $options: 'i'
+            }
+          }, ...(mongoose.Types.ObjectId.isValid(restaurant) ? [{
+            _id: restaurant
+          }] : []), {
+            restaurantId: restaurant
+          }]
         }).select('_id restaurantId').lean();
-
         if (restaurantDoc) {
           query.restaurantId = restaurantDoc._id?.toString() || restaurantDoc.restaurantId;
         }
@@ -1369,51 +1408,59 @@ export const getRefundRequests = asyncHandler(async (req, res) => {
     // Search filter - build search conditions separately
     const searchConditions = [];
     if (search) {
-      searchConditions.push(
-        { orderId: { $regex: search, $options: 'i' } },
-        { restaurantName: { $regex: search, $options: 'i' } }
-      );
+      searchConditions.push({
+        orderId: {
+          $regex: search,
+          $options: 'i'
+        }
+      }, {
+        restaurantName: {
+          $regex: search,
+          $options: 'i'
+        }
+      });
     }
 
     // Combine search with existing query
     if (searchConditions.length > 0) {
       if (Object.keys(query).length > 0 && !query.$and) {
         // Convert existing query to $and format
-        const existingQuery = { ...query };
+        const existingQuery = {
+          ...query
+        };
         query = {
-          $and: [
-            existingQuery,
-            { $or: searchConditions }
-          ]
+          $and: [existingQuery, {
+            $or: searchConditions
+          }]
         };
       } else if (query.$and) {
         // Add search to existing $and
-        query.$and.push({ $or: searchConditions });
+        query.$and.push({
+          $or: searchConditions
+        });
       } else {
         // Simple case - just add $or
         query.$or = searchConditions;
       }
     }
-
-    console.log('📋 Final query:', JSON.stringify(query, null, 2));
-
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
     // Fetch orders with population
     // Sort by cancelledAt if available, otherwise by createdAt
     let orders = [];
     try {
-      orders = await Order.find(query)
-        .populate('userId', 'name email phone')
-        .populate({
-          path: 'restaurantId',
-          select: 'name slug',
-          match: { _id: { $exists: true } } // Only populate if it's a valid ObjectId
-        })
-        .sort({ cancelledAt: -1, createdAt: -1 })
-        .limit(parseInt(limit))
-        .skip(skip)
-        .lean();
+      orders = await Order.find(query).populate('userId', 'name email phone').populate({
+        path: 'restaurantId',
+        select: 'name slug',
+        match: {
+          _id: {
+            $exists: true
+          }
+        } // Only populate if it's a valid ObjectId
+      }).sort({
+        cancelledAt: -1,
+        createdAt: -1
+      }).limit(parseInt(limit)).skip(skip).lean();
 
       // Filter out orders where restaurantId population failed (null)
       orders = orders.filter(order => order.restaurantId !== null || order.restaurantName);
@@ -1421,10 +1468,7 @@ export const getRefundRequests = asyncHandler(async (req, res) => {
       console.error('Error fetching orders:', error);
       throw error;
     }
-
     const total = await Order.countDocuments(query);
-    console.log(`✅ Found ${total} restaurant cancelled orders`);
-
     // Get settlement info for each order to check refund status
     let OrderSettlement;
     try {
@@ -1433,17 +1477,17 @@ export const getRefundRequests = asyncHandler(async (req, res) => {
       console.error('Error importing OrderSettlement:', error);
       OrderSettlement = null;
     }
-
     const transformedOrders = await Promise.all(orders.map(async (order, index) => {
       let settlement = null;
       if (OrderSettlement) {
         try {
-          settlement = await OrderSettlement.findOne({ orderId: order._id }).lean();
+          settlement = await OrderSettlement.findOne({
+            orderId: order._id
+          }).lean();
         } catch (error) {
           console.error(`Error fetching settlement for order ${order._id}:`, error);
         }
       }
-
       const orderDate = new Date(order.createdAt);
       const dateStr = orderDate.toLocaleDateString('en-GB', {
         day: '2-digit',
@@ -1455,13 +1499,11 @@ export const getRefundRequests = asyncHandler(async (req, res) => {
         minute: '2-digit',
         hour12: true
       }).toUpperCase();
-
       const customerPhone = order.userId?.phone || '';
 
       // Check refund status from settlement
       const refundStatus = settlement?.cancellationDetails?.refundStatus || 'pending';
       const refundAmount = settlement?.cancellationDetails?.refundAmount || 0;
-
       return {
         sl: skip + index + 1,
         orderId: order.orderId,
@@ -1488,9 +1530,6 @@ export const getRefundRequests = asyncHandler(async (req, res) => {
         } : null
       };
     }));
-
-    console.log(`✅ Returning ${transformedOrders.length} refund requests`);
-
     return successResponse(res, 200, 'Refund requests retrieved successfully', {
       orders: transformedOrders || [],
       pagination: {
@@ -1518,63 +1557,27 @@ export const getRefundRequests = asyncHandler(async (req, res) => {
  */
 export const processRefund = asyncHandler(async (req, res) => {
   try {
-    console.log('🔍 [processRefund] ========== ROUTE HIT ==========');
-    console.log('🔍 [processRefund] Method:', req.method);
-    console.log('🔍 [processRefund] URL:', req.url);
-    console.log('🔍 [processRefund] Original URL:', req.originalUrl);
-    console.log('🔍 [processRefund] Path:', req.path);
-    console.log('🔍 [processRefund] Base URL:', req.baseUrl);
-    console.log('🔍 [processRefund] Params:', req.params);
-    console.log('🔍 [processRefund] Headers:', {
-      authorization: req.headers.authorization ? 'Present' : 'Missing',
-      'content-type': req.headers['content-type']
-    });
-
-    const { orderId } = req.params;
-    const { notes, refundAmount } = req.body;
+    const {
+      orderId
+    } = req.params;
+    const {
+      notes,
+      refundAmount
+    } = req.body;
     const adminId = req.user?.id || req.admin?.id || null;
-
-    console.log('🔍 [processRefund] Processing refund request:', {
-      orderId,
-      orderIdType: typeof orderId,
-      orderIdLength: orderId?.length,
-      isObjectId: mongoose.Types.ObjectId.isValid(orderId),
-      adminId,
-      url: req.url,
-      method: req.method,
-      params: req.params,
-      body: req.body,
-      refundAmount: refundAmount,
-      refundAmountType: typeof refundAmount,
-      notes: notes
-    });
-
     // Find order in database - try both MongoDB _id and orderId string
     let order = null;
-
-    console.log('🔍 [processRefund] Searching order in database...', {
-      searchId: orderId,
-      isObjectId: mongoose.Types.ObjectId.isValid(orderId) && orderId.length === 24
-    });
-
     // First try MongoDB _id if it's a valid ObjectId
     if (mongoose.Types.ObjectId.isValid(orderId) && orderId.length === 24) {
-      console.log('🔍 [processRefund] Searching by MongoDB _id:', orderId);
-      order = await Order.findById(orderId)
-        .populate('userId', 'name email phone _id')
-        .lean();
-      console.log('🔍 [processRefund] Order found by _id:', order ? 'Yes' : 'No');
+      order = await Order.findById(orderId).populate('userId', 'name email phone _id').lean();
     }
 
     // If not found by _id, try orderId string
     if (!order) {
-      console.log('🔍 [processRefund] Searching by orderId string:', orderId);
-      order = await Order.findOne({ orderId: orderId })
-        .populate('userId', 'name email phone _id')
-        .lean();
-      console.log('🔍 [processRefund] Order found by orderId:', order ? 'Yes' : 'No');
+      order = await Order.findOne({
+        orderId: orderId
+      }).populate('userId', 'name email phone _id').lean();
     }
-
     if (!order) {
       console.error('❌ [processRefund] Order NOT FOUND in database');
       console.error('❌ [processRefund] Searched by:', {
@@ -1587,22 +1590,19 @@ export const processRefund = asyncHandler(async (req, res) => {
       // Try to find any order with similar orderId (for debugging)
       try {
         const similarOrders = await Order.find({
-          $or: [
-            { orderId: { $regex: orderId, $options: 'i' } },
-            { orderId: { $regex: orderId.substring(0, 10), $options: 'i' } }
-          ]
-        })
-          .select('_id orderId status')
-          .limit(5)
-          .lean();
-
-        if (similarOrders.length > 0) {
-          console.log('💡 [processRefund] Found similar orders:', similarOrders.map(o => ({
-            mongoId: o._id.toString(),
-            orderId: o.orderId,
-            status: o.status
-          })));
-        }
+          $or: [{
+            orderId: {
+              $regex: orderId,
+              $options: 'i'
+            }
+          }, {
+            orderId: {
+              $regex: orderId.substring(0, 10),
+              $options: 'i'
+            }
+          }]
+        }).select('_id orderId status').limit(5).lean();
+        if (similarOrders.length > 0) {}
       } catch (debugError) {
         console.error('Error searching for similar orders:', debugError.message);
       }
@@ -1610,47 +1610,27 @@ export const processRefund = asyncHandler(async (req, res) => {
       // Check total orders count
       try {
         const totalOrders = await Order.countDocuments();
-        console.log(`📊 [processRefund] Total orders in database: ${totalOrders}`);
       } catch (countError) {
         console.error('Error counting orders:', countError.message);
       }
-
       return errorResponse(res, 404, `Order not found (ID: ${orderId}). Please check if the order exists.`);
     }
 
     // Verify order exists and log complete details
-    console.log('✅✅✅ [processRefund] ORDER FOUND IN DATABASE ✅✅✅');
-    console.log('📋 [processRefund] Complete Order Details:', {
-      mongoId: order._id.toString(),
-      orderId: order.orderId,
-      status: order.status,
-      paymentMethod: order.payment?.method || 'unknown',
-      paymentType: order.paymentType || 'unknown',
-      total: order.pricing?.total || 0,
-      cancelledBy: order.cancelledBy || 'unknown',
-      userId: order.userId?._id?.toString() || order.userId?.toString() || 'unknown',
-      userName: order.userId?.name || 'unknown',
-      userPhone: order.userId?.phone || 'unknown'
-    });
 
     if (order.status !== 'cancelled') {
       return errorResponse(res, 400, 'Order is not cancelled');
     }
 
     // Check if it's a cancelled order (by restaurant or user)
-    const isRestaurantCancelled = order.cancelledBy === 'restaurant' ||
-      (order.cancellationReason &&
-        /rejected by restaurant|restaurant rejected|restaurant cancelled|restaurant is too busy|item not available|outside delivery area|kitchen closing|technical issue/i.test(order.cancellationReason));
-
+    const isRestaurantCancelled = order.cancelledBy === 'restaurant' || order.cancellationReason && /rejected by restaurant|restaurant rejected|restaurant cancelled|restaurant is too busy|item not available|outside delivery area|kitchen closing|technical issue/i.test(order.cancellationReason);
     const isUserCancelled = order.cancelledBy === 'user';
-
     if (!isRestaurantCancelled && !isUserCancelled) {
       return errorResponse(res, 400, 'This order was not cancelled by restaurant or user');
     }
 
     // Check payment method - wallet payments don't use Razorpay
     const paymentMethod = order.payment?.method;
-
     if (!paymentMethod) {
       return errorResponse(res, 400, 'Payment method not found for this order');
     }
@@ -1668,12 +1648,12 @@ export const processRefund = asyncHandler(async (req, res) => {
 
     // Get settlement (for wallet payments, settlement might not exist - create one if needed)
     const OrderSettlement = (await import('../../order/models/OrderSettlement.js')).default;
-    let settlement = await OrderSettlement.findOne({ orderId: order._id });
+    let settlement = await OrderSettlement.findOne({
+      orderId: order._id
+    });
 
     // For wallet payments, if settlement doesn't exist, create a proper one with all required fields
     if (!settlement && paymentMethod === 'wallet') {
-      console.log('📝 [processRefund] Settlement not found for wallet order, creating settlement with order data...');
-
       const pricing = order.pricing || {};
       const subtotal = pricing.subtotal || 0;
       const deliveryFee = pricing.deliveryFee || 0;
@@ -1737,15 +1717,13 @@ export const processRefund = asyncHandler(async (req, res) => {
         }
       });
       await settlement.save();
-      console.log('✅ [processRefund] Settlement created for wallet refund');
     } else if (!settlement) {
       // For non-wallet payments, settlement is required
       return errorResponse(res, 404, 'Settlement not found for this order');
     }
 
     // Check if refund already processed
-    if (settlement.cancellationDetails?.refundStatus === 'processed' ||
-      settlement.cancellationDetails?.refundStatus === 'initiated') {
+    if (settlement.cancellationDetails?.refundStatus === 'processed' || settlement.cancellationDetails?.refundStatus === 'initiated') {
       return errorResponse(res, 400, 'Refund already processed or initiated for this order');
     }
 
@@ -1760,13 +1738,6 @@ export const processRefund = asyncHandler(async (req, res) => {
       // If refundAmount is provided in request body, use it (validate it)
       if (refundAmount !== undefined && refundAmount !== null && refundAmount !== '') {
         const requestedAmount = parseFloat(refundAmount);
-        console.log('💰 [processRefund] Validating refund amount:', {
-          original: refundAmount,
-          parsed: requestedAmount,
-          isNaN: isNaN(requestedAmount),
-          orderTotal: orderTotal
-        });
-
         if (isNaN(requestedAmount) || requestedAmount <= 0) {
           console.error('❌ [processRefund] Invalid refund amount:', requestedAmount);
           return errorResponse(res, 400, `Invalid refund amount provided: ${refundAmount}. Please provide a valid positive number.`);
@@ -1779,14 +1750,12 @@ export const processRefund = asyncHandler(async (req, res) => {
           return errorResponse(res, 400, `Refund amount (₹${requestedAmount}) cannot exceed order total (₹${orderTotal})`);
         }
         finalRefundAmount = requestedAmount;
-        console.log('✅ [processRefund] Wallet payment - using provided refund amount:', finalRefundAmount);
       } else {
         // If no amount provided, use calculated refund or order total
         const calculatedRefund = settlement.cancellationDetails?.refundAmount || 0;
 
         // For wallet, always use order total if calculated refund is 0
         if (calculatedRefund <= 0 && orderTotal > 0) {
-          console.log('💰 [processRefund] Wallet payment - using full order total for refund:', orderTotal);
           finalRefundAmount = orderTotal;
         } else if (calculatedRefund > 0) {
           finalRefundAmount = calculatedRefund;
@@ -1803,7 +1772,9 @@ export const processRefund = asyncHandler(async (req, res) => {
       await settlement.save();
 
       // Process wallet refund (add to user wallet) with the specified amount
-      const { processWalletRefund } = await import('../../order/services/cancellationRefundService.js');
+      const {
+        processWalletRefund
+      } = await import('../../order/services/cancellationRefundService.js');
       refundResult = await processWalletRefund(order._id, adminId, finalRefundAmount);
     } else {
       // For Razorpay, check if refund amount is calculated
@@ -1813,7 +1784,9 @@ export const processRefund = asyncHandler(async (req, res) => {
       }
 
       // Process Razorpay refund
-      const { processRazorpayRefund } = await import('../../order/services/cancellationRefundService.js');
+      const {
+        processRazorpayRefund
+      } = await import('../../order/services/cancellationRefundService.js');
       refundResult = await processRazorpayRefund(order._id, adminId);
     }
 
@@ -1823,7 +1796,6 @@ export const processRefund = asyncHandler(async (req, res) => {
       settlement.metadata.set('adminRefundNotes', notes);
       await settlement.save();
     }
-
     return successResponse(res, 200, refundResult.message || 'Refund processed successfully', {
       orderId: order.orderId,
       refundId: refundResult.refundId,
@@ -1836,4 +1808,3 @@ export const processRefund = asyncHandler(async (req, res) => {
     return errorResponse(res, 500, error.message || 'Failed to process refund');
   }
 });
-

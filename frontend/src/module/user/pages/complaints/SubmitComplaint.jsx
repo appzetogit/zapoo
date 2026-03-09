@@ -1,159 +1,142 @@
-import { useState, useEffect } from "react"
-import { useNavigate, useParams } from "react-router-dom"
-import { ArrowLeft, AlertCircle, FileText } from "lucide-react"
-import { orderAPI } from "@/lib/api"
-import { toast } from "sonner"
-
-const COMPLAINT_TYPES = [
-  { value: 'food_quality', label: 'Food Quality Issue' },
-  { value: 'wrong_item', label: 'Wrong Item Received' },
-  { value: 'missing_item', label: 'Missing Item' },
-  { value: 'delivery_issue', label: 'Delivery Issue' },
-  { value: 'packaging', label: 'Packaging Problem' },
-  { value: 'pricing', label: 'Pricing Issue' },
-  { value: 'service', label: 'Service Issue' },
-  { value: 'other', label: 'Other' },
-]
-
+import { useState, useEffect } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { ArrowLeft, AlertCircle, FileText } from "lucide-react";
+import { orderAPI } from "@/lib/api";
+import { toast } from "sonner";
+const COMPLAINT_TYPES = [{
+  value: 'food_quality',
+  label: 'Food Quality Issue'
+}, {
+  value: 'wrong_item',
+  label: 'Wrong Item Received'
+}, {
+  value: 'missing_item',
+  label: 'Missing Item'
+}, {
+  value: 'delivery_issue',
+  label: 'Delivery Issue'
+}, {
+  value: 'packaging',
+  label: 'Packaging Problem'
+}, {
+  value: 'pricing',
+  label: 'Pricing Issue'
+}, {
+  value: 'service',
+  label: 'Service Issue'
+}, {
+  value: 'other',
+  label: 'Other'
+}];
 export default function SubmitComplaint() {
-  const navigate = useNavigate()
-  const { orderId } = useParams()
-
-  const [order, setOrder] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [submitting, setSubmitting] = useState(false)
-  
+  const navigate = useNavigate();
+  const {
+    orderId
+  } = useParams();
+  const [order, setOrder] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     complaintType: '',
     subject: '',
-    description: '',
-  })
-
+    description: ''
+  });
   useEffect(() => {
     if (!orderId) {
-      console.error("Order ID missing from URL params")
-      toast.error("Order ID is required")
+      console.error("Order ID missing from URL params");
+      toast.error("Order ID is required");
       setTimeout(() => {
-        navigate("/user/orders")
-      }, 2000)
-      return
+        navigate("/user/orders");
+      }, 2000);
+      return;
     }
-
     const fetchOrder = async () => {
       try {
-        setLoading(true)
-        console.log("Fetching order details for orderId:", orderId)
-        const response = await orderAPI.getOrderDetails(orderId)
-        
-        let orderData = null
+        setLoading(true);
+        const response = await orderAPI.getOrderDetails(orderId);
+        let orderData = null;
         if (response?.data?.success && response.data.data?.order) {
-          orderData = response.data.data.order
+          orderData = response.data.data.order;
         } else if (response?.data?.order) {
-          orderData = response.data.order
+          orderData = response.data.order;
         } else {
-          console.error("Order not found in response:", response?.data)
-          toast.error("Order not found")
+          console.error("Order not found in response:", response?.data);
+          toast.error("Order not found");
           setTimeout(() => {
-            navigate("/user/orders")
-          }, 2000)
-          return
+            navigate("/user/orders");
+          }, 2000);
+          return;
         }
-
-        console.log("Order fetched successfully:", { 
-          _id: orderData._id, 
-          orderId: orderData.orderId,
-          restaurantName: orderData.restaurantName 
-        })
-        setOrder(orderData)
+        setOrder(orderData);
       } catch (error) {
-        console.error("Error fetching order:", error)
-        toast.error(error?.response?.data?.message || "Failed to load order details")
+        console.error("Error fetching order:", error);
+        toast.error(error?.response?.data?.message || "Failed to load order details");
         setTimeout(() => {
-          navigate("/user/orders")
-        }, 2000)
+          navigate("/user/orders");
+        }, 2000);
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
-    }
-
-    fetchOrder()
-  }, [orderId, navigate])
-
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-
+    };
+    fetchOrder();
+  }, [orderId, navigate]);
+  const handleSubmit = async e => {
+    e.preventDefault();
     if (!formData.complaintType) {
-      toast.error("Please select a complaint type")
-      return
+      toast.error("Please select a complaint type");
+      return;
     }
     if (!formData.subject.trim()) {
-      toast.error("Please enter a subject")
-      return
+      toast.error("Please enter a subject");
+      return;
     }
     if (!formData.description.trim()) {
-      toast.error("Please enter a description")
-      return
+      toast.error("Please enter a description");
+      return;
     }
-
     try {
-      setSubmitting(true)
+      setSubmitting(true);
       // Use order._id (MongoDB ObjectId) for the complaint submission
-      const orderMongoId = order?._id || orderId
+      const orderMongoId = order?._id || orderId;
       if (!orderMongoId) {
-        toast.error("Order ID not available")
-        setSubmitting(false)
-        return
+        toast.error("Order ID not available");
+        setSubmitting(false);
+        return;
       }
-      
-      const orderIdString = typeof orderMongoId === 'object' && orderMongoId.toString 
-        ? orderMongoId.toString() 
-        : String(orderMongoId)
-      
-      console.log("Submitting complaint for orderId:", orderIdString)
+      const orderIdString = typeof orderMongoId === 'object' && orderMongoId.toString ? orderMongoId.toString() : String(orderMongoId);
       const response = await orderAPI.submitComplaint({
         orderId: orderIdString,
         complaintType: formData.complaintType,
         subject: formData.subject,
-        description: formData.description,
-      })
-
+        description: formData.description
+      });
       if (response?.data?.success) {
-        toast.success("Complaint submitted successfully")
+        toast.success("Complaint submitted successfully");
         // Navigate back to order details using the orderId from URL or order._id
-        const orderIdForNav = order?._id || orderId
-        navigate(`/user/orders/${orderIdForNav}/details`)
+        const orderIdForNav = order?._id || orderId;
+        navigate(`/user/orders/${orderIdForNav}/details`);
       } else {
-        toast.error(response?.data?.message || "Failed to submit complaint")
+        toast.error(response?.data?.message || "Failed to submit complaint");
       }
     } catch (error) {
-      console.error("Error submitting complaint:", error)
-      toast.error(error?.response?.data?.message || "Failed to submit complaint")
+      console.error("Error submitting complaint:", error);
+      toast.error(error?.response?.data?.message || "Failed to submit complaint");
     } finally {
-      setSubmitting(false)
+      setSubmitting(false);
     }
-  }
-
+  };
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+    return <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <p className="text-gray-600 text-sm">Loading...</p>
-      </div>
-    )
+      </div>;
   }
-
   if (!order) {
-    return null
+    return null;
   }
-
-  return (
-    <div className="min-h-screen bg-gray-50 pb-24">
+  return <div className="min-h-screen bg-gray-50 pb-24">
       {/* Header */}
       <div className="bg-white p-4 flex items-center sticky top-0 z-20 shadow-sm">
-        <button
-          type="button"
-          onClick={() => navigate(-1)}
-          className="p-1 rounded-full hover:bg-gray-100"
-        >
+        <button type="button" onClick={() => navigate(-1)} className="p-1 rounded-full hover:bg-gray-100">
           <ArrowLeft className="w-6 h-6 text-gray-700" />
         </button>
         <h1 className="text-lg font-semibold text-gray-800 ml-3">Submit Complaint</h1>
@@ -176,12 +159,12 @@ export default function SubmitComplaint() {
         </div>
         <p className="text-sm text-gray-600">
           {new Date(order.createdAt).toLocaleDateString('en-IN', {
-            day: 'numeric',
-            month: 'short',
-            year: 'numeric',
-            hour: 'numeric',
-            minute: '2-digit'
-          })}
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric',
+          hour: 'numeric',
+          minute: '2-digit'
+        })}
         </p>
       </div>
 
@@ -192,18 +175,14 @@ export default function SubmitComplaint() {
           <label className="block text-sm font-semibold text-gray-700 mb-2">
             Complaint Type <span className="text-red-500">*</span>
           </label>
-          <select
-            value={formData.complaintType}
-            onChange={(e) => setFormData({ ...formData, complaintType: e.target.value })}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#E23744] focus:border-transparent"
-            required
-          >
+          <select value={formData.complaintType} onChange={e => setFormData({
+          ...formData,
+          complaintType: e.target.value
+        })} className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#E23744] focus:border-transparent" required>
             <option value="">Select complaint type</option>
-            {COMPLAINT_TYPES.map((type) => (
-              <option key={type.value} value={type.value}>
+            {COMPLAINT_TYPES.map(type => <option key={type.value} value={type.value}>
                 {type.label}
-              </option>
-            ))}
+              </option>)}
           </select>
         </div>
 
@@ -212,15 +191,10 @@ export default function SubmitComplaint() {
           <label className="block text-sm font-semibold text-gray-700 mb-2">
             Subject <span className="text-red-500">*</span>
           </label>
-          <input
-            type="text"
-            value={formData.subject}
-            onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
-            placeholder="Brief description of your complaint"
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#E23744] focus:border-transparent"
-            required
-            maxLength={200}
-          />
+          <input type="text" value={formData.subject} onChange={e => setFormData({
+          ...formData,
+          subject: e.target.value
+        })} placeholder="Brief description of your complaint" className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#E23744] focus:border-transparent" required maxLength={200} />
         </div>
 
         {/* Description */}
@@ -228,15 +202,10 @@ export default function SubmitComplaint() {
           <label className="block text-sm font-semibold text-gray-700 mb-2">
             Description <span className="text-red-500">*</span>
           </label>
-          <textarea
-            value={formData.description}
-            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-            placeholder="Please provide detailed information about your complaint..."
-            rows={6}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#E23744] focus:border-transparent resize-none"
-            required
-            maxLength={1000}
-          />
+          <textarea value={formData.description} onChange={e => setFormData({
+          ...formData,
+          description: e.target.value
+        })} placeholder="Please provide detailed information about your complaint..." rows={6} className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#E23744] focus:border-transparent resize-none" required maxLength={1000} />
           <p className="text-xs text-gray-500 mt-1">
             {formData.description.length}/1000 characters
           </p>
@@ -255,22 +224,13 @@ export default function SubmitComplaint() {
 
         {/* Submit Button */}
         <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 z-20">
-          <button
-            type="submit"
-            disabled={submitting}
-            className="w-full bg-[#E23744] text-white py-3 rounded-lg font-semibold flex items-center justify-center gap-2 hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {submitting ? (
-              <>
+          <button type="submit" disabled={submitting} className="w-full bg-[#E23744] text-white py-3 rounded-lg font-semibold flex items-center justify-center gap-2 hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+            {submitting ? <>
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 Submitting...
-              </>
-            ) : (
-              "Submit Complaint"
-            )}
+              </> : "Submit Complaint"}
           </button>
         </div>
       </form>
-    </div>
-  )
+    </div>;
 }

@@ -3,15 +3,12 @@ import { successResponse, errorResponse } from '../../../shared/utils/response.j
 import { asyncHandler } from '../../../shared/middleware/asyncHandler.js';
 import mongoose from 'mongoose';
 import winston from 'winston';
-
 const logger = winston.createLogger({
   level: 'info',
   format: winston.format.json(),
-  transports: [
-    new winston.transports.Console({
-      format: winston.format.simple()
-    })
-  ]
+  transports: [new winston.transports.Console({
+    format: winston.format.simple()
+  })]
 });
 
 /**
@@ -21,9 +18,9 @@ const logger = winston.createLogger({
  */
 export const getJoinRequests = asyncHandler(async (req, res) => {
   try {
-    const { 
-      status = 'pending', 
-      page = 1, 
+    const {
+      status = 'pending',
+      page = 1,
       limit = 50,
       search,
       zone,
@@ -33,7 +30,7 @@ export const getJoinRequests = asyncHandler(async (req, res) => {
 
     // Build query
     const query = {};
-    
+
     // Status filter
     if (status === 'pending') {
       query.status = 'pending';
@@ -43,11 +40,22 @@ export const getJoinRequests = asyncHandler(async (req, res) => {
 
     // Search filter
     if (search) {
-      query.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } },
-        { phone: { $regex: search, $options: 'i' } }
-      ];
+      query.$or = [{
+        name: {
+          $regex: search,
+          $options: 'i'
+        }
+      }, {
+        email: {
+          $regex: search,
+          $options: 'i'
+        }
+      }, {
+        phone: {
+          $regex: search,
+          $options: 'i'
+        }
+      }];
     }
 
     // Zone filter (if zones are stored in availability.zones)
@@ -69,12 +77,9 @@ export const getJoinRequests = asyncHandler(async (req, res) => {
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
     // Fetch delivery partners
-    const deliveries = await Delivery.find(query)
-      .select('-password -refreshToken')
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(parseInt(limit))
-      .lean();
+    const deliveries = await Delivery.find(query).select('-password -refreshToken').sort({
+      createdAt: -1
+    }).skip(skip).limit(parseInt(limit)).lean();
 
     // Get total count
     const total = await Delivery.countDocuments(query);
@@ -87,24 +92,24 @@ export const getJoinRequests = asyncHandler(async (req, res) => {
 
       // Get zone from location (city, state, country)
       let zone = 'All over the World'; // Default
-      
+
       if (delivery.location) {
         const locationParts = [];
-        
+
         // Add city if available
         if (delivery.location.city) {
           locationParts.push(delivery.location.city);
         }
-        
+
         // Add state if available
         if (delivery.location.state) {
           locationParts.push(delivery.location.state);
         }
-        
+
         // Add country (default to India if not specified)
         const country = delivery.location.country || 'India';
         locationParts.push(country);
-        
+
         // If we have location parts, join them
         if (locationParts.length > 0) {
           zone = locationParts.join(', ');
@@ -117,10 +122,7 @@ export const getJoinRequests = asyncHandler(async (req, res) => {
       }
 
       // Get vehicle type
-      const vehicleType = delivery.vehicle?.type 
-        ? delivery.vehicle.type.charAt(0).toUpperCase() + delivery.vehicle.type.slice(1)
-        : 'N/A';
-
+      const vehicleType = delivery.vehicle?.type ? delivery.vehicle.type.charAt(0).toUpperCase() + delivery.vehicle.type.slice(1) : 'N/A';
       return {
         _id: delivery._id.toString(),
         sl: skip + index + 1,
@@ -140,7 +142,6 @@ export const getJoinRequests = asyncHandler(async (req, res) => {
         }
       };
     });
-
     return successResponse(res, 200, 'Join requests retrieved successfully', {
       requests: formattedRequests,
       pagination: {
@@ -151,7 +152,9 @@ export const getJoinRequests = asyncHandler(async (req, res) => {
       }
     });
   } catch (error) {
-    logger.error(`Error fetching join requests: ${error.message}`, { error: error.stack });
+    logger.error(`Error fetching join requests: ${error.message}`, {
+      error: error.stack
+    });
     return errorResponse(res, 500, 'Failed to fetch join requests');
   }
 });
@@ -162,21 +165,20 @@ export const getJoinRequests = asyncHandler(async (req, res) => {
  */
 export const getDeliveryPartnerById = asyncHandler(async (req, res) => {
   try {
-    const { id } = req.params;
-
-    const delivery = await Delivery.findById(id)
-      .select('-password -refreshToken')
-      .lean();
-
+    const {
+      id
+    } = req.params;
+    const delivery = await Delivery.findById(id).select('-password -refreshToken').lean();
     if (!delivery) {
       return errorResponse(res, 404, 'Delivery partner not found');
     }
-
     return successResponse(res, 200, 'Delivery partner retrieved successfully', {
       delivery
     });
   } catch (error) {
-    logger.error(`Error fetching delivery partner: ${error.message}`, { error: error.stack });
+    logger.error(`Error fetching delivery partner: ${error.message}`, {
+      error: error.stack
+    });
     return errorResponse(res, 500, 'Failed to fetch delivery partner');
   }
 });
@@ -187,15 +189,15 @@ export const getDeliveryPartnerById = asyncHandler(async (req, res) => {
  */
 export const approveDeliveryPartner = asyncHandler(async (req, res) => {
   try {
-    const { id } = req.params;
+    const {
+      id
+    } = req.params;
     const adminId = req.user._id; // Admin who is approving
 
     const delivery = await Delivery.findById(id);
-
     if (!delivery) {
       return errorResponse(res, 404, 'Delivery partner not found');
     }
-
     if (delivery.status === 'approved' || delivery.status === 'active') {
       return errorResponse(res, 400, 'Delivery partner is already approved');
     }
@@ -205,14 +207,7 @@ export const approveDeliveryPartner = asyncHandler(async (req, res) => {
     delivery.verifiedAt = new Date();
     delivery.verifiedBy = adminId;
     delivery.isActive = true;
-
     await delivery.save();
-
-    logger.info(`Delivery partner approved: ${id}`, {
-      approvedBy: adminId,
-      deliveryId: delivery.deliveryId
-    });
-
     return successResponse(res, 200, 'Delivery partner approved successfully', {
       delivery: {
         _id: delivery._id.toString(),
@@ -222,7 +217,9 @@ export const approveDeliveryPartner = asyncHandler(async (req, res) => {
       }
     });
   } catch (error) {
-    logger.error(`Error approving delivery partner: ${error.message}`, { error: error.stack });
+    logger.error(`Error approving delivery partner: ${error.message}`, {
+      error: error.stack
+    });
     return errorResponse(res, 500, 'Failed to approve delivery partner');
   }
 });
@@ -233,21 +230,22 @@ export const approveDeliveryPartner = asyncHandler(async (req, res) => {
  */
 export const rejectDeliveryPartner = asyncHandler(async (req, res) => {
   try {
-    const { id } = req.params;
-    const { reason } = req.body; // Rejection reason/note (required)
+    const {
+      id
+    } = req.params;
+    const {
+      reason
+    } = req.body; // Rejection reason/note (required)
     const adminId = req.user._id; // Admin who is rejecting
 
     // Validate reason is provided
     if (!reason || !reason.trim()) {
       return errorResponse(res, 400, 'Rejection reason is required');
     }
-
     const delivery = await Delivery.findById(id);
-
     if (!delivery) {
       return errorResponse(res, 404, 'Delivery partner not found');
     }
-
     if (delivery.status === 'blocked') {
       return errorResponse(res, 400, 'Delivery partner is already rejected');
     }
@@ -258,15 +256,7 @@ export const rejectDeliveryPartner = asyncHandler(async (req, res) => {
     delivery.rejectionReason = reason.trim();
     delivery.rejectedAt = new Date();
     delivery.rejectedBy = adminId;
-
     await delivery.save();
-
-    logger.info(`Delivery partner rejected: ${id}`, {
-      rejectedBy: adminId,
-      reason: reason,
-      deliveryId: delivery.deliveryId
-    });
-
     return successResponse(res, 200, 'Delivery partner rejected successfully', {
       delivery: {
         _id: delivery._id.toString(),
@@ -276,7 +266,9 @@ export const rejectDeliveryPartner = asyncHandler(async (req, res) => {
       }
     });
   } catch (error) {
-    logger.error(`Error rejecting delivery partner: ${error.message}`, { error: error.stack });
+    logger.error(`Error rejecting delivery partner: ${error.message}`, {
+      error: error.stack
+    });
     return errorResponse(res, 500, 'Failed to reject delivery partner');
   }
 });
@@ -288,9 +280,9 @@ export const rejectDeliveryPartner = asyncHandler(async (req, res) => {
  */
 export const getDeliveryPartners = asyncHandler(async (req, res) => {
   try {
-    const { 
-      status, 
-      page = 1, 
+    const {
+      status,
+      page = 1,
       limit = 50,
       search,
       isActive,
@@ -299,9 +291,11 @@ export const getDeliveryPartners = asyncHandler(async (req, res) => {
 
     // Build query - only get approved/active delivery partners for list
     const query = {
-      status: { $in: ['approved', 'active'] } // Only show approved/active partners
+      status: {
+        $in: ['approved', 'active']
+      } // Only show approved/active partners
     };
-    
+
     // Status filter (if provided, override default)
     if (status) {
       query.status = status;
@@ -314,12 +308,27 @@ export const getDeliveryPartners = asyncHandler(async (req, res) => {
 
     // Search filter
     if (search) {
-      query.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } },
-        { phone: { $regex: search, $options: 'i' } },
-        { deliveryId: { $regex: search, $options: 'i' } }
-      ];
+      query.$or = [{
+        name: {
+          $regex: search,
+          $options: 'i'
+        }
+      }, {
+        email: {
+          $regex: search,
+          $options: 'i'
+        }
+      }, {
+        phone: {
+          $regex: search,
+          $options: 'i'
+        }
+      }, {
+        deliveryId: {
+          $regex: search,
+          $options: 'i'
+        }
+      }];
     }
 
     // Calculate pagination
@@ -329,21 +338,16 @@ export const getDeliveryPartners = asyncHandler(async (req, res) => {
     // Note: In Mongoose, if a field is not explicitly excluded, it's included by default
     // So we just need to make sure we're not excluding availability
     let selectFields = '-password -refreshToken';
-    
+
     // Fetch delivery partners
-    const deliveries = await Delivery.find(query)
-      .select(selectFields)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(parseInt(limit))
-      .lean();
-    
+    const deliveries = await Delivery.find(query).select(selectFields).sort({
+      createdAt: -1
+    }).skip(skip).limit(parseInt(limit)).lean();
+
     // Log for debugging
     if (includeAvailability === 'true' || includeAvailability === true) {
-      console.log(`📦 Fetching ${deliveries.length} delivery partners with availability data`);
       deliveries.forEach((d, idx) => {
         const hasLocation = d.availability?.currentLocation?.coordinates;
-        console.log(`  ${idx + 1}. ${d.name}: online=${d.availability?.isOnline}, hasLocation=${!!hasLocation}`);
       });
     }
 
@@ -352,30 +356,29 @@ export const getDeliveryPartners = asyncHandler(async (req, res) => {
 
     // Get order statistics for each delivery partner
     const deliveryIds = deliveries.map(d => d._id);
-    
+
     // Get order counts for each delivery partner
-    const orderStats = await Order.aggregate([
-      {
-        $match: {
-          deliveryPartnerId: { $in: deliveryIds }
+    const orderStats = await Order.aggregate([{
+      $match: {
+        deliveryPartnerId: {
+          $in: deliveryIds
         }
-      },
-      {
-        $group: {
-          _id: '$deliveryPartnerId',
-          totalOrders: { $sum: 1 },
-          assignedOrders: {
-            $sum: {
-              $cond: [
-                { $in: ['$status', ['out_for_delivery', 'ready', 'preparing']] },
-                1,
-                0
-              ]
-            }
+      }
+    }, {
+      $group: {
+        _id: '$deliveryPartnerId',
+        totalOrders: {
+          $sum: 1
+        },
+        assignedOrders: {
+          $sum: {
+            $cond: [{
+              $in: ['$status', ['out_for_delivery', 'ready', 'preparing']]
+            }, 1, 0]
           }
         }
       }
-    ]);
+    }]);
 
     // Create a map of deliveryId -> stats
     const statsMap = {};
@@ -388,8 +391,11 @@ export const getDeliveryPartners = asyncHandler(async (req, res) => {
 
     // Format response with order stats and zone info
     const formattedPartners = deliveries.map((delivery, index) => {
-      const stats = statsMap[delivery._id.toString()] || { totalOrders: 0, assignedOrders: 0 };
-      
+      const stats = statsMap[delivery._id.toString()] || {
+        totalOrders: 0,
+        assignedOrders: 0
+      };
+
       // Get zone from location
       let zone = 'All over the World';
       if (delivery.location) {
@@ -406,7 +412,6 @@ export const getDeliveryPartners = asyncHandler(async (req, res) => {
       // Get availability status
       const isOnline = delivery.availability?.isOnline || false;
       const availabilityStatus = isOnline ? 'Online' : 'Offline';
-
       return {
         _id: delivery._id.toString(),
         sl: skip + index + 1,
@@ -435,7 +440,6 @@ export const getDeliveryPartners = asyncHandler(async (req, res) => {
 
     // Get total count
     const total = await Delivery.countDocuments(query);
-
     return successResponse(res, 200, 'Delivery partners retrieved successfully', {
       deliveryPartners: formattedPartners,
       pagination: {
@@ -446,7 +450,9 @@ export const getDeliveryPartners = asyncHandler(async (req, res) => {
       }
     });
   } catch (error) {
-    logger.error(`Error fetching delivery partners: ${error.message}`, { error: error.stack });
+    logger.error(`Error fetching delivery partners: ${error.message}`, {
+      error: error.stack
+    });
     return errorResponse(res, 500, 'Failed to fetch delivery partners');
   }
 });
@@ -458,10 +464,10 @@ export const getDeliveryPartners = asyncHandler(async (req, res) => {
  */
 export const deleteDeliveryPartner = asyncHandler(async (req, res) => {
   try {
-    const { id } = req.params;
-
+    const {
+      id
+    } = req.params;
     const delivery = await Delivery.findById(id);
-
     if (!delivery) {
       return errorResponse(res, 404, 'Delivery partner not found');
     }
@@ -473,45 +479,42 @@ export const deleteDeliveryPartner = asyncHandler(async (req, res) => {
     // Start transaction for atomic operations
     const session = await mongoose.startSession();
     session.startTransaction();
-
     try {
       // 1. Delete Delivery Wallet and all transactions
-      const walletDeleted = await DeliveryWallet.deleteOne({ deliveryId: id }).session(session);
-      logger.info(`Deleted wallet for delivery partner: ${id}`, { walletDeleted });
-
+      const walletDeleted = await DeliveryWallet.deleteOne({
+        deliveryId: id
+      }).session(session);
       // 2. Update Orders - Remove deliveryPartnerId (set to null)
       // This preserves order history but removes the delivery partner assignment
-      const ordersUpdated = await Order.updateMany(
-        { deliveryPartnerId: id },
-        { $unset: { deliveryPartnerId: 1 } },
-        { session }
-      );
-      logger.info(`Updated orders for delivery partner: ${id}`, { 
-        ordersUpdated: ordersUpdated.modifiedCount 
+      const ordersUpdated = await Order.updateMany({
+        deliveryPartnerId: id
+      }, {
+        $unset: {
+          deliveryPartnerId: 1
+        }
+      }, {
+        session
       });
-
       // 3. Clear refreshToken to force logout
       // This will invalidate all active sessions
-      await Delivery.updateOne(
-        { _id: id },
-        { $unset: { refreshToken: 1 } },
-        { session }
-      );
+      await Delivery.updateOne({
+        _id: id
+      }, {
+        $unset: {
+          refreshToken: 1
+        }
+      }, {
+        session
+      });
 
       // 4. Delete the Delivery partner record
-      await Delivery.deleteOne({ _id: id }).session(session);
+      await Delivery.deleteOne({
+        _id: id
+      }).session(session);
 
       // Commit transaction
       await session.commitTransaction();
       session.endSession();
-
-      logger.info(`Delivery partner deleted successfully: ${id}`, {
-        deletedBy: req.user._id,
-        deliveryId: delivery.deliveryId,
-        walletDeleted: walletDeleted.deletedCount,
-        ordersUpdated: ordersUpdated.modifiedCount
-      });
-
       return successResponse(res, 200, 'Delivery partner and all related data deleted successfully. Partner has been logged out.');
     } catch (error) {
       // Rollback transaction on error
@@ -520,7 +523,9 @@ export const deleteDeliveryPartner = asyncHandler(async (req, res) => {
       throw error;
     }
   } catch (error) {
-    logger.error(`Error deleting delivery partner: ${error.message}`, { error: error.stack });
+    logger.error(`Error deleting delivery partner: ${error.message}`, {
+      error: error.stack
+    });
     return errorResponse(res, 500, 'Failed to delete delivery partner');
   }
 });
@@ -531,14 +536,13 @@ export const deleteDeliveryPartner = asyncHandler(async (req, res) => {
  */
 export const reverifyDeliveryPartner = asyncHandler(async (req, res) => {
   try {
-    const { id } = req.params;
-
+    const {
+      id
+    } = req.params;
     const delivery = await Delivery.findById(id);
-
     if (!delivery) {
       return errorResponse(res, 404, 'Delivery partner not found');
     }
-
     if (delivery.status !== 'blocked') {
       return errorResponse(res, 400, 'Only rejected delivery partners can be reverted');
     }
@@ -549,13 +553,7 @@ export const reverifyDeliveryPartner = asyncHandler(async (req, res) => {
     delivery.rejectionReason = undefined;
     delivery.rejectedAt = undefined;
     delivery.rejectedBy = undefined;
-
     await delivery.save();
-
-    logger.info(`Delivery partner reverted for reverification: ${id}`, {
-      deliveryId: delivery.deliveryId
-    });
-
     return successResponse(res, 200, 'Delivery partner request resubmitted for verification', {
       delivery: {
         _id: delivery._id.toString(),
@@ -564,7 +562,9 @@ export const reverifyDeliveryPartner = asyncHandler(async (req, res) => {
       }
     });
   } catch (error) {
-    logger.error(`Error reverifying delivery partner: ${error.message}`, { error: error.stack });
+    logger.error(`Error reverifying delivery partner: ${error.message}`, {
+      error: error.stack
+    });
     return errorResponse(res, 500, 'Failed to reverify delivery partner');
   }
 });
@@ -575,11 +575,14 @@ export const reverifyDeliveryPartner = asyncHandler(async (req, res) => {
  */
 export const updateDeliveryPartnerStatus = asyncHandler(async (req, res) => {
   try {
-    const { id } = req.params;
-    const { status, isActive } = req.body;
-
+    const {
+      id
+    } = req.params;
+    const {
+      status,
+      isActive
+    } = req.body;
     const delivery = await Delivery.findById(id);
-
     if (!delivery) {
       return errorResponse(res, 404, 'Delivery partner not found');
     }
@@ -597,15 +600,7 @@ export const updateDeliveryPartnerStatus = asyncHandler(async (req, res) => {
     if (typeof isActive === 'boolean') {
       delivery.isActive = isActive;
     }
-
     await delivery.save();
-
-    logger.info(`Delivery partner status updated: ${id}`, {
-      status: delivery.status,
-      isActive: delivery.isActive,
-      updatedBy: req.user._id
-    });
-
     return successResponse(res, 200, 'Delivery partner status updated successfully', {
       delivery: {
         _id: delivery._id.toString(),
@@ -615,8 +610,9 @@ export const updateDeliveryPartnerStatus = asyncHandler(async (req, res) => {
       }
     });
   } catch (error) {
-    logger.error(`Error updating delivery partner status: ${error.message}`, { error: error.stack });
+    logger.error(`Error updating delivery partner status: ${error.message}`, {
+      error: error.stack
+    });
     return errorResponse(res, 500, 'Failed to update delivery partner status');
   }
 });
-

@@ -5,8 +5,7 @@
 
 // Get API base URL from environment variable or use default
 // IMPORTANT: Backend runs on port 5000, frontend on port 5173
-let rawApiBaseUrl =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
+let rawApiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
 
 // Normalize URL - fix common issues like double slashes, missing protocols
 if (rawApiBaseUrl && typeof rawApiBaseUrl === "string") {
@@ -14,24 +13,18 @@ if (rawApiBaseUrl && typeof rawApiBaseUrl === "string") {
   rawApiBaseUrl = rawApiBaseUrl.trim();
 
   // Fix duplicate protocols (https://https:// becomes https://)
-  rawApiBaseUrl = rawApiBaseUrl.replace(
-    /^(https?:\/\/)+(https?:\/\/)+/gi,
-    (match) => {
-      const protocol = match.match(/^(https?):\/\//i)?.[1] || "https";
-      return `${protocol}://`;
-    },
-  );
+  rawApiBaseUrl = rawApiBaseUrl.replace(/^(https?:\/\/)+(https?:\/\/)+/gi, match => {
+    const protocol = match.match(/^(https?):\/\//i)?.[1] || "https";
+    return `${protocol}://`;
+  });
 
   // Fix malformed protocol patterns:
   // - https:/ becomes https://
   // - https: becomes https://
   // - https://https becomes https://
-  rawApiBaseUrl = rawApiBaseUrl.replace(
-    /^(https?):\/?(?=\/|$)/i,
-    (match, protocol) => {
-      return `${protocol}://`;
-    },
-  );
+  rawApiBaseUrl = rawApiBaseUrl.replace(/^(https?):\/?(?=\/|$)/i, (match, protocol) => {
+    return `${protocol}://`;
+  });
 
   // Fix patterns like https://https:// or http://http://
   rawApiBaseUrl = rawApiBaseUrl.replace(/^(https?:\/\/)(https?:\/\/)/i, "$1");
@@ -49,7 +42,6 @@ if (rawApiBaseUrl && typeof rawApiBaseUrl === "string") {
     }
   }
 }
-
 export const API_BASE_URL = rawApiBaseUrl;
 
 // Validate URL format - catch malformed URLs like "https:/" or "https://https://"
@@ -57,20 +49,13 @@ try {
   const urlObj = new URL(API_BASE_URL);
   if (!urlObj.protocol || !urlObj.hostname) {
     console.error("❌ Invalid API_BASE_URL format:", API_BASE_URL);
-    console.error(
-      "💡 Expected format: https://your-domain.com/api or http://localhost:5000/api",
-    );
+    console.error("💡 Expected format: https://your-domain.com/api or http://localhost:5000/api");
   }
 } catch (urlError) {
   console.error("❌ Invalid API_BASE_URL format:", API_BASE_URL);
   console.error("💡 URL validation error:", urlError.message);
-  console.error(
-    "💡 Raw VITE_API_BASE_URL:",
-    import.meta.env.VITE_API_BASE_URL || "Not set",
-  );
-  console.error(
-    "💡 Expected format: https://your-domain.com/api or http://localhost:5000/api",
-  );
+  console.error("💡 Raw VITE_API_BASE_URL:", import.meta.env.VITE_API_BASE_URL || "Not set");
+  console.error("💡 Expected format: https://your-domain.com/api or http://localhost:5000/api");
 
   // Try to auto-fix common malformed patterns
   let fixedUrl = API_BASE_URL;
@@ -92,39 +77,18 @@ try {
 
 // Validate API base URL
 if (API_BASE_URL.includes("5173")) {
-  console.error(
-    "❌ ERROR: API_BASE_URL is pointing to frontend port (5173) instead of backend port (5000)",
-  );
-  console.error(
-    "💡 Fix: Set VITE_API_BASE_URL=http://localhost:5000/api in .env file",
-  );
-  console.error(
-    "💡 Or remove VITE_API_BASE_URL to use default: http://localhost:5000/api",
-  );
+  console.error("❌ ERROR: API_BASE_URL is pointing to frontend port (5173) instead of backend port (5000)");
+  console.error("💡 Fix: Set VITE_API_BASE_URL=http://localhost:5000/api in .env file");
+  console.error("💡 Or remove VITE_API_BASE_URL to use default: http://localhost:5000/api");
 }
 
 // Log API base URL in both development and production for debugging
-console.log("🌐 API Base URL:", API_BASE_URL);
-console.log("🌐 Backend URL:", API_BASE_URL.replace("/api", ""));
-console.log("🌐 Frontend URL:", window.location.origin);
-console.log("🌐 Environment:", import.meta.env.MODE);
-console.log(
-  "🌐 VITE_API_BASE_URL:",
-  import.meta.env.VITE_API_BASE_URL || "Not set (using default)",
-);
 
 // Warn if API_BASE_URL is localhost in production
-if (
-  import.meta.env.MODE === "production" &&
-  API_BASE_URL.includes("localhost")
-) {
+if (import.meta.env.MODE === "production" && API_BASE_URL.includes("localhost")) {
   console.error("❌ WARNING: API_BASE_URL is set to localhost in production!");
-  console.error(
-    "💡 Fix: Set VITE_API_BASE_URL environment variable to your production backend URL",
-  );
-  console.error(
-    "💡 Example: VITE_API_BASE_URL=https://your-backend-domain.com/api",
-  );
+  console.error("💡 Fix: Set VITE_API_BASE_URL environment variable to your production backend URL");
+  console.error("💡 Example: VITE_API_BASE_URL=https://your-backend-domain.com/api");
 }
 
 // API endpoints
@@ -138,7 +102,7 @@ export const API_ENDPOINTS = {
     FIREBASE_GOOGLE_LOGIN: "/auth/firebase/google-login",
     REFRESH_TOKEN: "/auth/refresh-token",
     LOGOUT: "/auth/logout",
-    ME: "/auth/me",
+    ME: "/auth/me"
   },
   // User endpoints
   USER: {
@@ -149,16 +113,16 @@ export const API_ENDPOINTS = {
     ORDERS: "/user/orders",
     LOCATION: "/user/location",
     COMPLAINTS: "/user/complaints",
-    COMPLAINT_BY_ID: "/user/complaints/:id",
+    COMPLAINT_BY_ID: "/user/complaints/:id"
   },
   // Location endpoints
   LOCATION: {
     REVERSE_GEOCODE: "/location/reverse",
-    NEARBY: "/location/nearby",
+    NEARBY: "/location/nearby"
   },
   // Zone endpoints
   ZONE: {
-    DETECT: "/zones/detect", // Public endpoint for zone detection
+    DETECT: "/zones/detect" // Public endpoint for zone detection
   },
   // Restaurant endpoints
   RESTAURANT: {
@@ -172,7 +136,7 @@ export const API_ENDPOINTS = {
       LOGOUT: "/restaurant/auth/logout",
       ME: "/restaurant/auth/me",
       REVERIFY: "/restaurant/auth/reverify",
-      RESET_PASSWORD: "/restaurant/auth/reset-password",
+      RESET_PASSWORD: "/restaurant/auth/reset-password"
     },
     PROFILE: "/restaurant/profile",
     DELIVERY_STATUS: "/restaurant/delivery-status",
@@ -182,8 +146,7 @@ export const API_ENDPOINTS = {
     ADDONS_BY_RESTAURANT_ID: "/restaurant/:id/addons",
     MENU_ITEM_SCHEDULE: "/restaurant/menu/item/schedule",
     MENU_ITEM_SCHEDULE_BY_ID: "/restaurant/menu/item/schedule/:scheduleId",
-    MENU_ITEM_SCHEDULE_BY_ITEM:
-      "/restaurant/menu/item/schedule/:sectionId/:itemId",
+    MENU_ITEM_SCHEDULE_BY_ITEM: "/restaurant/menu/item/schedule/:sectionId/:itemId",
     ADDONS: "/restaurant/menu/addons",
     ADDON: "/restaurant/menu/addon",
     ADDON_BY_ID: "/restaurant/menu/addon/:id",
@@ -198,16 +161,14 @@ export const API_ENDPOINTS = {
     OFFER_BY_ID: "/restaurant/offers/:id",
     OFFER_STATUS: "/restaurant/offers/:id/status",
     COUPONS_BY_ITEM_ID: "/restaurant/offers/item/:itemId/coupons",
-    COUPONS_BY_ITEM_ID_PUBLIC:
-      "/restaurant/:restaurantId/offers/item/:itemId/coupons",
+    COUPONS_BY_ITEM_ID_PUBLIC: "/restaurant/:restaurantId/offers/item/:itemId/coupons",
     ORDERS: "/restaurant/orders",
     ORDER_BY_ID: "/restaurant/orders/:id",
     ORDER_ACCEPT: "/restaurant/orders/:id/accept",
     ORDER_REJECT: "/restaurant/orders/:id/reject",
     ORDER_PREPARING: "/restaurant/orders/:id/preparing",
     ORDER_READY: "/restaurant/orders/:id/ready",
-    ORDER_RESEND_DELIVERY_NOTIFICATION:
-      "/restaurant/orders/:id/resend-delivery-notification",
+    ORDER_RESEND_DELIVERY_NOTIFICATION: "/restaurant/orders/:id/resend-delivery-notification",
     FINANCE: "/restaurant/finance",
     DELIVERY_PRICING: "/restaurant/delivery-pricing",
     WALLET: "/restaurant/wallet",
@@ -222,7 +183,7 @@ export const API_ENDPOINTS = {
     LIST: "/restaurant/list",
     UNDER_250: "/restaurant/under-250",
     BY_ID: "/restaurant/:id",
-    BY_OWNER: "/restaurant/owner/me",
+    BY_OWNER: "/restaurant/owner/me"
   },
   // Marketing / Advertisement endpoints
   MARKETING: {
@@ -238,7 +199,7 @@ export const API_ENDPOINTS = {
     SLOTS: "/marketing/slots",
     CONFIGURE_SLOTS: "/marketing/slots/configure",
     PAYMENT_CREATE_ORDER: "/marketing/ads/payment/create-order/:adId",
-    PAYMENT_VERIFY: "/marketing/ads/payment/verify",
+    PAYMENT_VERIFY: "/marketing/ads/payment/verify"
   },
   // Delivery endpoints
   DELIVERY: {
@@ -247,11 +208,11 @@ export const API_ENDPOINTS = {
       VERIFY_OTP: "/delivery/auth/verify-otp",
       REFRESH_TOKEN: "/delivery/auth/refresh-token",
       LOGOUT: "/delivery/auth/logout",
-      ME: "/delivery/auth/me",
+      ME: "/delivery/auth/me"
     },
     SIGNUP: {
       DETAILS: "/delivery/signup/details",
-      DOCUMENTS: "/delivery/signup/documents",
+      DOCUMENTS: "/delivery/signup/documents"
     },
     DASHBOARD: "/delivery/dashboard",
     WALLET: "/delivery/wallet",
@@ -280,7 +241,7 @@ export const API_ENDPOINTS = {
     REVERIFY: "/delivery/reverify",
     EMERGENCY_HELP: "/delivery/emergency-help",
     SUPPORT_TICKETS: "/delivery/support-tickets",
-    SUPPORT_TICKET_BY_ID: "/delivery/support-tickets/:id",
+    SUPPORT_TICKET_BY_ID: "/delivery/support-tickets/:id"
   },
   // Admin endpoints
   ADMIN: {
@@ -289,7 +250,7 @@ export const API_ENDPOINTS = {
       SIGNUP_OTP: "/admin/auth/signup/otp",
       LOGIN: "/admin/auth/login",
       LOGOUT: "/admin/auth/logout",
-      ME: "/admin/auth/me",
+      ME: "/admin/auth/me"
     },
     PROFILE: "/admin/profile",
     CHANGE_PASSWORD: "/admin/settings/change-password",
@@ -317,8 +278,7 @@ export const API_ENDPOINTS = {
     DELIVERY_PARTNER_DELETE: "/admin/delivery-partners/:id",
     DELIVERY_PARTNER_BONUS: "/admin/delivery-partners/bonus",
     DELIVERY_PARTNER_REVIEWS: "/admin/delivery-partners/reviews",
-    DELIVERY_PARTNER_BONUS_TRANSACTIONS:
-      "/admin/delivery-partners/bonus/transactions",
+    DELIVERY_PARTNER_BONUS_TRANSACTIONS: "/admin/delivery-partners/bonus/transactions",
     EARNING_ADDON: "/admin/earning-addon",
     EARNING_ADDON_BY_ID: "/admin/earning-addon/:id",
     EARNING_ADDON_STATUS: "/admin/earning-addon/:id/status",
@@ -379,8 +339,7 @@ export const API_ENDPOINTS = {
     DELIVERY_BOY_COMMISSION: "/admin/delivery-boy-commission",
     DELIVERY_BOY_COMMISSION_BY_ID: "/admin/delivery-boy-commission/:id",
     DELIVERY_BOY_COMMISSION_STATUS: "/admin/delivery-boy-commission/:id/status",
-    DELIVERY_BOY_COMMISSION_CALCULATE:
-      "/admin/delivery-boy-commission/calculate",
+    DELIVERY_BOY_COMMISSION_CALCULATE: "/admin/delivery-boy-commission/calculate",
     DELIVERY_CASH_LIMIT: "/admin/delivery-cash-limit",
     CASH_LIMIT_SETTLEMENT: "/admin/cash-limit-settlement",
     DELIVERY_WITHDRAWAL_REQUESTS: "/admin/delivery-withdrawal/requests",
@@ -394,10 +353,8 @@ export const API_ENDPOINTS = {
     DELIVERY_SUPPORT_TICKET_BY_ID: "/admin/delivery-support-tickets/:id",
     DELIVERY_SUPPORT_TICKETS_STATS: "/admin/delivery-support-tickets/stats",
     RESTAURANT_COMMISSION: "/admin/restaurant-commission",
-    RESTAURANT_COMMISSION_APPROVED_RESTAURANTS:
-      "/admin/restaurant-commission/approved-restaurants",
-    RESTAURANT_COMMISSION_BY_RESTAURANT_ID:
-      "/admin/restaurant-commission/restaurant/:restaurantId",
+    RESTAURANT_COMMISSION_APPROVED_RESTAURANTS: "/admin/restaurant-commission/approved-restaurants",
+    RESTAURANT_COMMISSION_BY_RESTAURANT_ID: "/admin/restaurant-commission/restaurant/:restaurantId",
     RESTAURANT_COMMISSION_BY_ID: "/admin/restaurant-commission/:id",
     RESTAURANT_COMMISSION_STATUS: "/admin/restaurant-commission/:id/status",
     RESTAURANT_COMMISSION_CALCULATE: "/admin/restaurant-commission/calculate",
@@ -415,7 +372,7 @@ export const API_ENDPOINTS = {
     ZONE_BY_ID: "/admin/zones/:id",
     ZONE_STATUS: "/admin/zones/:id/status",
     TIERS: "/admin/tiers",
-    TIER_BY_ID: "/admin/tiers/:id",
+    TIER_BY_ID: "/admin/tiers/:id"
   },
   // Order endpoints
   ORDER: {
@@ -425,23 +382,23 @@ export const API_ENDPOINTS = {
     UPDATE_STATUS: "/order/:id/status",
     VERIFY_PAYMENT: "/order/verify-payment",
     CALCULATE: "/order/calculate",
-    CANCEL: "/order/:id/cancel",
+    CANCEL: "/order/:id/cancel"
   },
   // Payment endpoints
   PAYMENT: {
     METHODS: "/payment/methods",
     PROCESS: "/payment/process",
-    WALLET: "/payment/wallet",
+    WALLET: "/payment/wallet"
   },
   // Menu endpoints
   MENU: {
     CATEGORIES: "/menu/categories",
     ITEMS: "/menu/items",
-    SEARCH: "/menu/search",
+    SEARCH: "/menu/search"
   },
   // Upload / media endpoints
   UPLOAD: {
-    MEDIA: "/upload/media",
+    MEDIA: "/upload/media"
   },
   // Hero Banner endpoints
   HERO_BANNER: {
@@ -452,7 +409,7 @@ export const API_ENDPOINTS = {
     UPDATE_ORDER: "/hero-banners/:id/order",
     TOGGLE_STATUS: "/hero-banners/:id/status",
     TOP_10_PUBLIC: "/hero-banners/top-10/public",
-    GOURMET_PUBLIC: "/hero-banners/gourmet/public",
+    GOURMET_PUBLIC: "/hero-banners/gourmet/public"
   },
   // Subscription endpoints
   SUBSCRIPTION: {
@@ -462,11 +419,14 @@ export const API_ENDPOINTS = {
     SUBSCRIBE: "/subscription/subscribe",
     VERIFY_PAYMENT: "/subscription/verify-payment",
     MY_SUBSCRIPTION: "/subscription/my-subscription",
-    CANCEL: "/subscription/cancel",
+    CANCEL: "/subscription/cancel"
   },
+  // Notification endpoints
+  NOTIFICATION: {
+    TOKENS: "/notification/tokens"
+  }
 };
-
 export default {
   API_BASE_URL,
-  API_ENDPOINTS,
+  API_ENDPOINTS
 };

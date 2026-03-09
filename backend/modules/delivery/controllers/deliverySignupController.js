@@ -4,15 +4,12 @@ import Delivery from '../models/Delivery.js';
 import { validate } from '../../../shared/middleware/validate.js';
 import Joi from 'joi';
 import winston from 'winston';
-
 const logger = winston.createLogger({
   level: 'info',
   format: winston.format.json(),
-  transports: [
-    new winston.transports.Console({
-      format: winston.format.simple()
-    })
-  ]
+  transports: [new winston.transports.Console({
+    format: winston.format.simple()
+  })]
 });
 
 /**
@@ -31,7 +28,6 @@ const signupDetailsSchema = Joi.object({
   panNumber: Joi.string().trim().required(),
   aadharNumber: Joi.string().trim().required()
 });
-
 export const submitSignupDetails = asyncHandler(async (req, res) => {
   try {
     const delivery = req.delivery; // From authenticate middleware
@@ -49,7 +45,9 @@ export const submitSignupDetails = asyncHandler(async (req, res) => {
     } = req.body;
 
     // Validate input
-    const { error } = signupDetailsSchema.validate(req.body);
+    const {
+      error
+    } = signupDetailsSchema.validate(req.body);
     if (error) {
       return errorResponse(res, 400, error.details[0].message);
     }
@@ -81,29 +79,26 @@ export const submitSignupDetails = asyncHandler(async (req, res) => {
         }
       }
     };
-
-    const updatedDelivery = await Delivery.findByIdAndUpdate(
-      delivery._id,
-      { $set: updateData },
-      { new: true, runValidators: true }
-    ).select('-password -refreshToken');
-
+    const updatedDelivery = await Delivery.findByIdAndUpdate(delivery._id, {
+      $set: updateData
+    }, {
+      new: true,
+      runValidators: true
+    }).select('-password -refreshToken');
     if (!updatedDelivery) {
       return errorResponse(res, 404, 'Delivery partner not found');
     }
-
     return successResponse(res, 200, 'Signup details saved successfully', {
       profile: updatedDelivery,
       nextStep: 'documents'
     });
   } catch (error) {
     logger.error(`Error saving signup details: ${error.message}`);
-    
+
     // Handle duplicate email error
     if (error.code === 11000) {
       return errorResponse(res, 400, 'Email already exists');
     }
-    
     return errorResponse(res, 500, 'Failed to save signup details');
   }
 });
@@ -130,7 +125,6 @@ const signupDocumentsSchema = Joi.object({
     publicId: Joi.string().trim().required()
   }).required()
 });
-
 export const submitSignupDocuments = asyncHandler(async (req, res) => {
   try {
     const delivery = req.delivery; // From authenticate middleware
@@ -142,7 +136,9 @@ export const submitSignupDocuments = asyncHandler(async (req, res) => {
     } = req.body;
 
     // Validate input
-    const { error } = signupDocumentsSchema.validate(req.body);
+    const {
+      error
+    } = signupDocumentsSchema.validate(req.body);
     if (error) {
       return errorResponse(res, 400, error.details[0].message);
     }
@@ -153,13 +149,6 @@ export const submitSignupDocuments = asyncHandler(async (req, res) => {
     }
 
     // Log document URLs for debugging
-    logger.info('Storing documents for delivery partner', {
-      deliveryId: delivery.deliveryId || delivery._id,
-      profilePhoto: profilePhoto.url ? 'Uploaded' : 'Missing',
-      aadharPhoto: aadharPhoto.url ? 'Uploaded' : 'Missing',
-      panPhoto: panPhoto.url ? 'Uploaded' : 'Missing',
-      drivingLicensePhoto: drivingLicensePhoto.url ? 'Uploaded' : 'Missing'
-    });
 
     // Update delivery profile with documents
     // Store all documents in database with Cloudinary URLs
@@ -195,25 +184,17 @@ export const submitSignupDocuments = asyncHandler(async (req, res) => {
       // Mark signup as complete - status remains pending until admin approval
       status: 'pending'
     };
-
-    const updatedDelivery = await Delivery.findByIdAndUpdate(
-      delivery._id,
-      { $set: updateData },
-      { new: true, runValidators: true }
-    ).select('-password -refreshToken');
-
+    const updatedDelivery = await Delivery.findByIdAndUpdate(delivery._id, {
+      $set: updateData
+    }, {
+      new: true,
+      runValidators: true
+    }).select('-password -refreshToken');
     if (!updatedDelivery) {
       return errorResponse(res, 404, 'Delivery partner not found');
     }
 
     // Log successful document storage
-    logger.info('Documents stored successfully in database', {
-      deliveryId: updatedDelivery.deliveryId || updatedDelivery._id,
-      hasProfileImage: !!updatedDelivery.profileImage?.url,
-      hasAadhar: !!updatedDelivery.documents?.aadhar?.document,
-      hasPan: !!updatedDelivery.documents?.pan?.document,
-      hasDrivingLicense: !!updatedDelivery.documents?.drivingLicense?.document
-    });
 
     return successResponse(res, 200, 'Documents uploaded successfully', {
       profile: updatedDelivery,
@@ -224,4 +205,3 @@ export const submitSignupDocuments = asyncHandler(async (req, res) => {
     return errorResponse(res, 500, 'Failed to upload documents');
   }
 });
-

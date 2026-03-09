@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useNavigate } from "react-router-dom"
+import { restaurantAPI, notificationAPI } from "@/lib/api"
 import {
   User,
   Utensils,
@@ -153,6 +154,23 @@ export default function MenuOverlay({ showMenu, setShowMenu }) {
                         if (option.isLogout) {
                           // Handle logout
                           if (window.confirm("Are you sure you want to logout?")) {
+                            // Remove FCM token before standard logout
+                            const removeFCMToken = async () => {
+                              try {
+                                const savedToken = localStorage.getItem(`fcm_token_registered_restaurant_VAL`);
+                                if (savedToken) {
+                                  console.log("[Logout] Removing FCM token for restaurant...");
+                                  await notificationAPI.removeToken(savedToken);
+                                  localStorage.removeItem(`fcm_token_registered_restaurant_VAL`);
+                                  localStorage.removeItem(`fcm_token_registered_restaurant`);
+                                }
+                                await restaurantAPI.logout();
+                              } catch (err) {
+                                console.warn("Logout cleanup error:", err);
+                              }
+                            };
+                            removeFCMToken();
+
                             // Clear authentication state
                             localStorage.removeItem("restaurant_authenticated")
                             localStorage.removeItem("restaurant_user")

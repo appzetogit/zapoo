@@ -10,11 +10,9 @@ export const authenticate = async (req, res, next) => {
   try {
     // Get token from Authorization header
     const authHeader = req.headers.authorization;
-
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return errorResponse(res, 401, 'No token provided');
     }
-
     const token = authHeader.substring(7); // Remove 'Bearer ' prefix
 
     // Verify token
@@ -27,12 +25,11 @@ export const authenticate = async (req, res, next) => {
 
     // Get restaurant from database
     const restaurant = await Restaurant.findById(decoded.userId).select('-password');
-
     if (!restaurant) {
       console.error('❌ Restaurant not found in database:', {
         userId: decoded.userId,
         role: decoded.role,
-        email: decoded.email,
+        email: decoded.email
       });
       return errorResponse(res, 401, 'Restaurant not found');
     }
@@ -53,43 +50,19 @@ export const authenticate = async (req, res, next) => {
     // - reqPath: /me or /reverify (relative to /auth mount point)
     // - baseUrl: /auth (if mounted)
     // /owner/me is directly under /api/restaurant, so reqPath would be /owner/me
-    const isProfileRoute = requestPath.includes('/auth/me') || requestPath.includes('/auth/reverify') ||
-      requestPath.includes('/owner/me') ||
-      reqPath === '/me' || reqPath === '/reverify' || reqPath === '/owner/me' ||
-      (baseUrl.includes('/auth') && (reqPath === '/me' || reqPath === '/reverify'));
+    const isProfileRoute = requestPath.includes('/auth/me') || requestPath.includes('/auth/reverify') || requestPath.includes('/owner/me') || reqPath === '/me' || reqPath === '/reverify' || reqPath === '/owner/me' || baseUrl.includes('/auth') && (reqPath === '/me' || reqPath === '/reverify');
 
     // Check for menu routes - restaurants need to access menu even when inactive
     // They might need to set up menu during onboarding or after approval
     // Routes: /api/restaurant/menu, /api/restaurant/menu/section, /api/restaurant/menu/item/schedule, etc.
-    const isMenuRoute = requestPath.includes('/menu') ||
-      reqPath === '/menu' ||
-      reqPath.startsWith('/menu/') ||
-      baseUrl.includes('/menu');
+    const isMenuRoute = requestPath.includes('/menu') || reqPath === '/menu' || reqPath.startsWith('/menu/') || baseUrl.includes('/menu');
 
     // Check for inventory routes - restaurants need to manage inventory even when inactive
     // Routes: /api/restaurant/inventory
-    const isInventoryRoute = requestPath.includes('/inventory') ||
-      reqPath === '/inventory' ||
-      reqPath.startsWith('/inventory/');
+    const isInventoryRoute = requestPath.includes('/inventory') || reqPath === '/inventory' || reqPath.startsWith('/inventory/');
 
     // Debug logging for inactive restaurants
-    if (!restaurant.isActive) {
-      console.log('🔍 Inactive restaurant route check:', {
-        restaurantId: restaurant._id,
-        restaurantName: restaurant.name,
-        isActive: restaurant.isActive,
-        requestPath,
-        reqPath,
-        baseUrl,
-        originalUrl: req.originalUrl,
-        url: req.url,
-        isOnboardingRoute,
-        isProfileRoute,
-        isMenuRoute,
-        isInventoryRoute,
-        willAllow: isOnboardingRoute || isProfileRoute || isMenuRoute || isInventoryRoute
-      });
-    }
+    if (!restaurant.isActive) {}
 
     // Allow access to onboarding, profile, menu, and inventory routes even if inactive
     // These are essential for restaurant setup and management
@@ -118,12 +91,11 @@ export const authenticate = async (req, res, next) => {
     req.restaurant = restaurant;
     req.user = restaurant; // Also set req.user for consistency
     req.token = decoded;
-
     next();
   } catch (error) {
     return errorResponse(res, 401, error.message || 'Invalid token');
   }
 };
-
-export default { authenticate };
-
+export default {
+  authenticate
+};

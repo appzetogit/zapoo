@@ -1,15 +1,12 @@
 import EnvironmentVariable from "../../modules/admin/models/EnvironmentVariable.js";
 import { decrypt, isEncrypted } from "./encryption.js";
 import winston from "winston";
-
 const logger = winston.createLogger({
   level: "info",
   format: winston.format.json(),
-  transports: [
-    new winston.transports.Console({
-      format: winston.format.simple(),
-    }),
-  ],
+  transports: [new winston.transports.Console({
+    format: winston.format.simple()
+  })]
 });
 
 // Cache for environment variables (cache for 5 minutes)
@@ -39,12 +36,9 @@ export async function getEnvVar(key, defaultValue = "") {
         return defaultValue;
       }
     }
-
     return value;
   } catch (error) {
-    logger.warn(
-      `Error fetching env var ${key} from database, using process.env: ${error.message}`,
-    );
+    logger.warn(`Error fetching env var ${key} from database, using process.env: ${error.message}`);
     return process.env[key] || defaultValue;
   }
 }
@@ -69,12 +63,9 @@ export async function getAllEnvVars() {
     // Update cache
     envCache = envData;
     cacheTimestamp = now;
-
     return envData;
   } catch (error) {
-    logger.error(
-      `Error fetching environment variables from database: ${error.message}`,
-    );
+    logger.error(`Error fetching environment variables from database: ${error.message}`);
     // Return empty object on error, will fallback to process.env in getEnvVar
     return {};
   }
@@ -87,7 +78,6 @@ export async function getAllEnvVars() {
 export function clearEnvCache() {
   envCache = null;
   cacheTimestamp = null;
-  logger.info("Environment variables cache cleared");
 }
 
 /**
@@ -101,7 +91,7 @@ export async function getRazorpayCredentials() {
   // Fallback to old env var names
   return {
     keyId: apiKey || process.env.RAZORPAY_KEY_ID || "",
-    keySecret: secretKey || process.env.RAZORPAY_KEY_SECRET || "",
+    keySecret: secretKey || process.env.RAZORPAY_KEY_SECRET || ""
   };
 }
 
@@ -113,7 +103,7 @@ export async function getCloudinaryCredentials() {
   return {
     cloudName: await getEnvVar("CLOUDINARY_CLOUD_NAME"),
     apiKey: await getEnvVar("CLOUDINARY_API_KEY"),
-    apiSecret: await getEnvVar("CLOUDINARY_API_SECRET"),
+    apiSecret: await getEnvVar("CLOUDINARY_API_SECRET")
   };
 }
 
@@ -131,7 +121,7 @@ export async function getFirebaseCredentials() {
     measurementId: await getEnvVar("MEASUREMENT_ID"),
     projectId: await getEnvVar("FIREBASE_PROJECT_ID"),
     clientEmail: await getEnvVar("FIREBASE_CLIENT_EMAIL"),
-    privateKey: await getEnvVar("FIREBASE_PRIVATE_KEY"),
+    privateKey: await getEnvVar("FIREBASE_PRIVATE_KEY")
   };
 }
 
@@ -144,7 +134,7 @@ export async function getSMTPCredentials() {
     host: await getEnvVar("SMTP_HOST"),
     port: await getEnvVar("SMTP_PORT"),
     user: await getEnvVar("SMTP_USER"),
-    pass: await getEnvVar("SMTP_PASS"),
+    pass: await getEnvVar("SMTP_PASS")
   };
 }
 
@@ -155,7 +145,7 @@ export async function getSMTPCredentials() {
 export async function getSMSHubIndiaCredentials() {
   return {
     apiKey: await getEnvVar("SMSINDIAHUB_API_KEY"),
-    senderId: await getEnvVar("SMSINDIAHUB_SENDER_ID"),
+    senderId: await getEnvVar("SMSINDIAHUB_SENDER_ID")
   };
 }
 

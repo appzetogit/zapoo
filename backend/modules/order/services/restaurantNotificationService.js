@@ -5,7 +5,6 @@ import mongoose from 'mongoose';
 
 // Dynamic import to avoid circular dependency
 let getIO = null;
-
 async function getIOInstance() {
   if (!getIO) {
     const serverModule = await import('../../../server.js');
@@ -23,7 +22,6 @@ async function getIOInstance() {
 export async function notifyRestaurantNewOrder(order, restaurantId, paymentMethodOverride) {
   try {
     const io = await getIOInstance();
-
     if (!io) {
       console.warn('Socket.IO not initialized, skipping restaurant notification');
       return;
@@ -32,7 +30,6 @@ export async function notifyRestaurantNewOrder(order, restaurantId, paymentMetho
     // CRITICAL: Validate restaurantId matches order's restaurantId
     const orderRestaurantId = order.restaurantId?.toString() || order.restaurantId;
     const providedRestaurantId = restaurantId?.toString() || restaurantId;
-    
     if (orderRestaurantId !== providedRestaurantId) {
       console.error('❌ CRITICAL: RestaurantId mismatch in notification!', {
         orderRestaurantId: orderRestaurantId,
@@ -51,13 +48,14 @@ export async function notifyRestaurantNewOrder(order, restaurantId, paymentMetho
     }
     if (!restaurant) {
       restaurant = await Restaurant.findOne({
-        $or: [
-          { restaurantId: restaurantId },
-          { _id: restaurantId }
-        ]
+        $or: [{
+          restaurantId: restaurantId
+        }, {
+          _id: restaurantId
+        }]
       }).lean();
     }
-    
+
     // Validate restaurant name matches order
     if (restaurant && order.restaurantName && restaurant.name !== order.restaurantName) {
       console.warn('⚠️ Restaurant name mismatch:', {
@@ -72,9 +70,11 @@ export async function notifyRestaurantNewOrder(order, restaurantId, paymentMetho
     let resolvedPaymentMethod = paymentMethodOverride ?? order.payment?.method ?? 'razorpay';
     if (resolvedPaymentMethod !== 'cash') {
       try {
-        const paymentRecord = await Payment.findOne({ orderId: order._id }).select('method').lean();
+        const paymentRecord = await Payment.findOne({
+          orderId: order._id
+        }).select('method').lean();
         if (paymentRecord?.method === 'cash') resolvedPaymentMethod = 'cash';
-      } catch (e) { /* ignore */ }
+      } catch (e) {/* ignore */}
     }
 
     // Prepare order notification data
@@ -102,8 +102,6 @@ export async function notifyRestaurantNewOrder(order, restaurantId, paymentMetho
       sendCutlery: order.sendCutlery,
       paymentMethod: resolvedPaymentMethod
     };
-    console.log('📢 Restaurant notification payload paymentMethod:', orderNotification.paymentMethod, { override: paymentMethodOverride, orderPaymentMethod: order.payment?.method });
-
     // Get restaurant namespace
     const restaurantNamespace = io.of('/restaurant');
 
@@ -111,13 +109,7 @@ export async function notifyRestaurantNewOrder(order, restaurantId, paymentMetho
     const normalizedRestaurantId = restaurantId?.toString() || restaurantId;
 
     // Try multiple room formats to ensure we find the restaurant
-    const roomVariations = [
-      `restaurant:${normalizedRestaurantId}`,
-      `restaurant:${restaurantId}`,
-      ...(mongoose.Types.ObjectId.isValid(normalizedRestaurantId)
-        ? [`restaurant:${new mongoose.Types.ObjectId(normalizedRestaurantId).toString()}`]
-        : [])
-    ];
+    const roomVariations = [`restaurant:${normalizedRestaurantId}`, `restaurant:${restaurantId}`, ...(mongoose.Types.ObjectId.isValid(normalizedRestaurantId) ? [`restaurant:${new mongoose.Types.ObjectId(normalizedRestaurantId).toString()}`] : [])];
 
     // Get all connected sockets in the restaurant room
     let socketsInRoom = [];
@@ -125,22 +117,10 @@ export async function notifyRestaurantNewOrder(order, restaurantId, paymentMetho
       const sockets = await restaurantNamespace.in(room).fetchSockets();
       if (sockets.length > 0) {
         socketsInRoom = sockets;
-        console.log(`📢 Found ${sockets.length} socket(s) in room: ${room}`);
         break;
       }
     }
-
     const primaryRoom = roomVariations[0];
-
-    console.log(`📢 CRITICAL: Attempting to notify restaurant about new order:`);
-    console.log(`📢 Order ID: ${order.orderId}`);
-    console.log(`📢 Order MongoDB ID: ${order._id?.toString()}`);
-    console.log(`📢 Restaurant ID (normalized): ${normalizedRestaurantId}`);
-    console.log(`📢 Restaurant Name: ${order.restaurantName}`);
-    console.log(`📢 Restaurant ID from order: ${order.restaurantId}`);
-    console.log(`📢 Room variations to try:`, roomVariations);
-    console.log(`📢 Connected sockets in primary room ${primaryRoom}: ${socketsInRoom.length}`);
-
     // CRITICAL: Only emit to the specific restaurant room - NEVER broadcast to all restaurants
     // This ensures orders only go to the correct restaurant
     if (socketsInRoom.length > 0) {
@@ -152,9 +132,7 @@ export async function notifyRestaurantNewOrder(order, restaurantId, paymentMetho
           orderId: order.orderId,
           message: `New order received: ${order.orderId}`
         });
-        console.log(`📤 Sent notification to room: ${room}`);
       });
-      console.log(`✅ Notified restaurant ${normalizedRestaurantId} about new order ${order.orderId} (${socketsInRoom.length} socket(s) connected)`);
     } else {
       // No sockets found in restaurant room - log error but DO NOT broadcast to all restaurants
       console.error(`❌ CRITICAL: No sockets found for restaurant ${normalizedRestaurantId} in any room!`);
@@ -163,10 +141,9 @@ export async function notifyRestaurantNewOrder(order, restaurantId, paymentMetho
       console.error(`❌ Restaurant name: ${order.restaurantName}`);
       console.error(`❌ Restaurant ID from order: ${order.restaurantId}`);
       console.error(`❌ Normalized restaurant ID: ${normalizedRestaurantId}`);
-      
+
       // Log all connected restaurant sockets for debugging (but don't send to them)
       const allSockets = await restaurantNamespace.fetchSockets();
-      console.log(`📊 Total restaurant sockets connected: ${allSockets.length}`);
       if (allSockets.length > 0) {
         // Get room information for each socket
         const socketRooms = [];
@@ -177,9 +154,8 @@ export async function notifyRestaurantNewOrder(order, restaurantId, paymentMetho
             rooms: rooms.filter(r => r.startsWith('restaurant:'))
           });
         }
-        console.log(`📊 Connected restaurant sockets and their rooms:`, socketRooms);
       }
-      
+
       // Still try to emit to room variations (in case socket connects later)
       // But DO NOT broadcast to all restaurants
       roomVariations.forEach(room => {
@@ -189,9 +165,8 @@ export async function notifyRestaurantNewOrder(order, restaurantId, paymentMetho
           orderId: order.orderId,
           message: `New order received: ${order.orderId}`
         });
-        console.log(`📤 Emitted to room ${room} (no sockets found, but room exists for future connections)`);
       });
-      
+
       // Return error instead of success
       return {
         success: false,
@@ -201,7 +176,6 @@ export async function notifyRestaurantNewOrder(order, restaurantId, paymentMetho
         message: `Restaurant ${normalizedRestaurantId} (${order.restaurantName}) is not connected. Order notification not sent.`
       };
     }
-
     return {
       success: true,
       restaurantId,
@@ -221,11 +195,9 @@ export async function notifyRestaurantNewOrder(order, restaurantId, paymentMetho
 export async function notifyRestaurantOrderUpdate(orderId, status) {
   try {
     const io = await getIOInstance();
-
     if (!io) {
       return;
     }
-
     const order = await Order.findById(orderId).lean();
     if (!order) {
       throw new Error('Order not found');
@@ -233,17 +205,13 @@ export async function notifyRestaurantOrderUpdate(orderId, status) {
 
     // Get restaurant namespace
     const restaurantNamespace = io.of('/restaurant');
-
     restaurantNamespace.to(`restaurant:${order.restaurantId}`).emit('order_status_update', {
       orderId: order.orderId,
       status,
       updatedAt: new Date()
     });
-
-    console.log(`📢 Notified restaurant ${order.restaurantId} about order ${order.orderId} status: ${status}`);
   } catch (error) {
     console.error('Error notifying restaurant about order update:', error);
     throw error;
   }
 }
-

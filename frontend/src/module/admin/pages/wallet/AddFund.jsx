@@ -1,33 +1,29 @@
-import { useState } from "react"
-import { Wallet, Settings } from "lucide-react"
-
+import { useState } from "react";
+import { Wallet, Settings } from "lucide-react";
 export default function AddFund() {
   const [formData, setFormData] = useState({
     customer: "",
     amount: "",
-    reference: "",
-  })
-
+    reference: ""
+  });
   const handleInputChange = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
-  }
-
-  const handleSubmit = (e) => {
-    e.preventDefault()
-    console.log("Form submitted:", formData)
-    alert("Fund added successfully!")
-  }
-
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+  const handleSubmit = e => {
+    e.preventDefault();
+    alert("Fund added successfully!");
+  };
   const handleReset = () => {
     setFormData({
       customer: "",
       amount: "",
-      reference: "",
-    })
-  }
-
-  return (
-    <div className="p-4 lg:p-6 bg-slate-50 min-h-screen">
+      reference: ""
+    });
+  };
+  return <div className="p-4 lg:p-6 bg-slate-50 min-h-screen">
       <div className="max-w-3xl mx-auto">
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 relative">
           {/* Settings Icon */}
@@ -49,11 +45,7 @@ export default function AddFund() {
                 <label className="block text-sm font-semibold text-slate-700 mb-2">
                   Customer <span className="text-red-500">*</span>
                 </label>
-                <select
-                  value={formData.customer}
-                  onChange={(e) => handleInputChange("customer", e.target.value)}
-                  className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                >
+                <select value={formData.customer} onChange={e => handleInputChange("customer", e.target.value)} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm">
                   <option value="">Select Customer</option>
                   <option value="jane-doe">Jane Doe</option>
                   <option value="john-doe">John Doe</option>
@@ -64,40 +56,21 @@ export default function AddFund() {
                 <label className="block text-sm font-semibold text-slate-700 mb-2">
                   Amount <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="number"
-                  value={formData.amount}
-                  onChange={(e) => handleInputChange("amount", e.target.value)}
-                  placeholder="Enter amount"
-                  className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                />
+                <input type="number" value={formData.amount} onChange={e => handleInputChange("amount", e.target.value)} placeholder="Enter amount" className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm" />
               </div>
 
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">
                   Reference (Optional)
                 </label>
-                <textarea
-                  value={formData.reference}
-                  onChange={(e) => handleInputChange("reference", e.target.value)}
-                  placeholder="Enter reference"
-                  rows={4}
-                  className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm resize-none"
-                />
+                <textarea value={formData.reference} onChange={e => handleInputChange("reference", e.target.value)} placeholder="Enter reference" rows={4} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm resize-none" />
               </div>
 
               <div className="flex items-center justify-end gap-4">
-                <button
-                  type="button"
-                  onClick={handleReset}
-                  className="px-6 py-2.5 text-sm font-medium rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition-all"
-                >
+                <button type="button" onClick={handleReset} className="px-6 py-2.5 text-sm font-medium rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition-all">
                   Reset
                 </button>
-                <button
-                  type="submit"
-                  className="px-6 py-2.5 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-all shadow-md"
-                >
+                <button type="submit" className="px-6 py-2.5 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-all shadow-md">
                   Submit
                 </button>
               </div>
@@ -105,6 +78,5 @@ export default function AddFund() {
           </form>
         </div>
       </div>
-    </div>
-  )
+    </div>;
 }

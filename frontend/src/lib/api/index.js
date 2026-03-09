@@ -2074,3 +2074,13 @@ export const heroBannerAPI = {
   },
 };
 
+// Export notification API helper functions
+export const notificationAPI = {
+  // Remove device token on logout
+  removeToken: (token) => {
+    return apiClient.delete(API_ENDPOINTS.NOTIFICATION.TOKENS, {
+      data: { token },
+    });
+  },
+};
+

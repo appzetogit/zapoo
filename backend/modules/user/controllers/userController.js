@@ -4,15 +4,12 @@ import User from '../../auth/models/User.js';
 import { uploadToCloudinary } from '../../../shared/utils/cloudinaryService.js';
 import axios from 'axios';
 import winston from 'winston';
-
 const logger = winston.createLogger({
   level: 'info',
   format: winston.format.json(),
-  transports: [
-    new winston.transports.Console({
-      format: winston.format.simple()
-    })
-  ]
+  transports: [new winston.transports.Console({
+    format: winston.format.simple()
+  })]
 });
 
 /**
@@ -21,14 +18,10 @@ const logger = winston.createLogger({
  */
 export const getUserProfile = asyncHandler(async (req, res) => {
   try {
-    const user = await User.findById(req.user._id)
-      .select('-password')
-      .lean();
-
+    const user = await User.findById(req.user._id).select('-password').lean();
     if (!user) {
       return errorResponse(res, 404, 'User profile not found');
     }
-
     return successResponse(res, 200, 'User profile retrieved successfully', {
       user
     });
@@ -44,10 +37,15 @@ export const getUserProfile = asyncHandler(async (req, res) => {
  */
 export const updateUserProfile = asyncHandler(async (req, res) => {
   try {
-    const { name, email, phone, dateOfBirth, anniversary, gender } = req.body;
-
+    const {
+      name,
+      email,
+      phone,
+      dateOfBirth,
+      anniversary,
+      gender
+    } = req.body;
     const user = await User.findById(req.user._id);
-
     if (!user) {
       return errorResponse(res, 404, 'User profile not found');
     }
@@ -56,36 +54,34 @@ export const updateUserProfile = asyncHandler(async (req, res) => {
     if (name !== undefined && name !== null) {
       user.name = name.trim();
     }
-
     if (email !== undefined && email !== null && email.trim() !== '') {
       // Check if email already exists for another user
       const existingUser = await User.findOne({
         email: email.toLowerCase().trim(),
-        _id: { $ne: user._id },
+        _id: {
+          $ne: user._id
+        },
         role: 'user'
       });
-
       if (existingUser) {
         return errorResponse(res, 400, 'Email already in use');
       }
-
       user.email = email.toLowerCase().trim();
     }
-
     if (phone !== undefined && phone !== null) {
       // Check if phone already exists for another user
       if (phone.trim() !== '') {
         const existingUser = await User.findOne({
           phone: phone.trim(),
-          _id: { $ne: user._id },
+          _id: {
+            $ne: user._id
+          },
           role: 'user'
         });
-
         if (existingUser) {
           return errorResponse(res, 400, 'Phone number already in use');
         }
       }
-
       user.phone = phone ? phone.trim() : null;
     }
 
@@ -93,11 +89,9 @@ export const updateUserProfile = asyncHandler(async (req, res) => {
     if (dateOfBirth !== undefined) {
       user.dateOfBirth = dateOfBirth || null;
     }
-
     if (anniversary !== undefined) {
       user.anniversary = anniversary || null;
     }
-
     if (gender !== undefined) {
       user.gender = gender || null;
     }
@@ -108,16 +102,13 @@ export const updateUserProfile = asyncHandler(async (req, res) => {
     // Remove password from response
     const userResponse = user.toObject();
     delete userResponse.password;
-
-    logger.info(`User profile updated: ${user._id}`, {
-      updatedFields: { name, email, phone, dateOfBirth, anniversary, gender }
-    });
-
     return successResponse(res, 200, 'Profile updated successfully', {
       user: userResponse
     });
   } catch (error) {
-    logger.error(`Error updating user profile: ${error.message}`, { error: error.stack });
+    logger.error(`Error updating user profile: ${error.message}`, {
+      error: error.stack
+    });
     return errorResponse(res, 500, 'Failed to update profile');
   }
 });
@@ -131,9 +122,7 @@ export const uploadProfileImage = asyncHandler(async (req, res) => {
     if (!req.file) {
       return errorResponse(res, 400, 'No image file provided');
     }
-
     const user = await User.findById(req.user._id);
-
     if (!user) {
       return errorResponse(res, 404, 'User not found');
     }
@@ -143,26 +132,27 @@ export const uploadProfileImage = asyncHandler(async (req, res) => {
     const result = await uploadToCloudinary(req.file.buffer, {
       folder,
       resource_type: 'image',
-      transformation: [
-        { width: 400, height: 400, crop: 'fill', gravity: 'face' },
-        { quality: 'auto' }
-      ]
+      transformation: [{
+        width: 400,
+        height: 400,
+        crop: 'fill',
+        gravity: 'face'
+      }, {
+        quality: 'auto'
+      }]
     });
 
     // Update user profile image
     user.profileImage = result.secure_url;
     await user.save();
-
-    logger.info(`Profile image uploaded for user: ${user._id}`, {
-      imageUrl: result.secure_url
-    });
-
     return successResponse(res, 200, 'Profile image uploaded successfully', {
       profileImage: result.secure_url,
       publicId: result.public_id
     });
   } catch (error) {
-    logger.error(`Error uploading profile image: ${error.message}`, { error: error.stack });
+    logger.error(`Error uploading profile image: ${error.message}`, {
+      error: error.stack
+    });
     return errorResponse(res, 500, 'Failed to upload profile image');
   }
 });
@@ -194,7 +184,6 @@ export const updateUserLocation = asyncHandler(async (req, res) => {
     if (!latitude || !longitude) {
       return errorResponse(res, 400, 'Latitude and longitude are required');
     }
-
     const latNum = parseFloat(latitude);
     const lngNum = parseFloat(longitude);
 
@@ -210,16 +199,14 @@ export const updateUserLocation = asyncHandler(async (req, res) => {
     if (lngNum < -180 || lngNum > 180) {
       return errorResponse(res, 400, 'Longitude must be between -180 and 180');
     }
-
     const user = await User.findById(req.user._id);
-
     if (!user) {
       return errorResponse(res, 404, 'User not found');
     }
 
     // Throttling: Ignore updates if they occur within 5 seconds of the last update
     const lastUpdate = user.currentLocation?.lastUpdated;
-    if (lastUpdate && (new Date() - new Date(lastUpdate)) < 5000) {
+    if (lastUpdate && new Date() - new Date(lastUpdate) < 5000) {
       return successResponse(res, 200, 'Location update throttled', {
         location: user.currentLocation,
         message: 'Rate limit: Update skipped'
@@ -261,26 +248,16 @@ export const updateUserLocation = asyncHandler(async (req, res) => {
 
     // Save to database
     await user.save();
-
-    logger.info(`User live location updated: ${user._id}`, {
-      latitude: latNum,
-      longitude: lngNum,
-      city: user.currentLocation.city,
-      area: user.currentLocation.area,
-      formattedAddress: user.currentLocation.formattedAddress,
-      accuracy: user.currentLocation.accuracy,
-      timestamp: user.currentLocation.lastUpdated
-    });
-
     const userResponse = user.toObject();
     delete userResponse.password;
-
     return successResponse(res, 200, 'Location updated successfully', {
       location: user.currentLocation,
       message: 'Live location stored in database'
     });
   } catch (error) {
-    logger.error(`Error updating user location: ${error.message}`, { error: error.stack });
+    logger.error(`Error updating user location: ${error.message}`, {
+      error: error.stack
+    });
     return errorResponse(res, 500, 'Failed to update location');
   }
 });
@@ -291,14 +268,10 @@ export const updateUserLocation = asyncHandler(async (req, res) => {
  */
 export const getUserLocation = asyncHandler(async (req, res) => {
   try {
-    const user = await User.findById(req.user._id)
-      .select('currentLocation')
-      .lean();
-
+    const user = await User.findById(req.user._id).select('currentLocation').lean();
     if (!user) {
       return errorResponse(res, 404, 'User not found');
     }
-
     return successResponse(res, 200, 'Location retrieved successfully', {
       location: user.currentLocation || null
     });
@@ -314,10 +287,7 @@ export const getUserLocation = asyncHandler(async (req, res) => {
  */
 export const getUserAddresses = asyncHandler(async (req, res) => {
   try {
-    const user = await User.findById(req.user._id)
-      .select('addresses')
-      .lean();
-
+    const user = await User.findById(req.user._id).select('addresses').lean();
     if (!user) {
       return errorResponse(res, 404, 'User not found');
     }
@@ -327,7 +297,6 @@ export const getUserAddresses = asyncHandler(async (req, res) => {
       ...addr,
       id: addr._id ? addr._id.toString() : null
     }));
-
     return successResponse(res, 200, 'Addresses retrieved successfully', {
       addresses
     });
@@ -343,14 +312,21 @@ export const getUserAddresses = asyncHandler(async (req, res) => {
  */
 export const addUserAddress = asyncHandler(async (req, res) => {
   try {
-    const { label, street, additionalDetails, city, state, zipCode, latitude, longitude, isDefault } = req.body;
-
+    const {
+      label,
+      street,
+      additionalDetails,
+      city,
+      state,
+      zipCode,
+      latitude,
+      longitude,
+      isDefault
+    } = req.body;
     if (!street || !city || !state) {
       return errorResponse(res, 400, 'Street, city, and state are required');
     }
-
     const user = await User.findById(req.user._id);
-
     if (!user) {
       return errorResponse(res, 404, 'User not found');
     }
@@ -395,16 +371,13 @@ export const addUserAddress = asyncHandler(async (req, res) => {
       ...addedAddress.toObject(),
       id: addedAddress._id.toString()
     };
-
-    logger.info(`Address added for user: ${user._id}`, {
-      addressId: addressResponse.id
-    });
-
     return successResponse(res, 201, 'Address added successfully', {
       address: addressResponse
     });
   } catch (error) {
-    logger.error(`Error adding address: ${error.message}`, { error: error.stack });
+    logger.error(`Error adding address: ${error.message}`, {
+      error: error.stack
+    });
     return errorResponse(res, 500, 'Failed to add address');
   }
 });
@@ -415,15 +388,24 @@ export const addUserAddress = asyncHandler(async (req, res) => {
  */
 export const updateUserAddress = asyncHandler(async (req, res) => {
   try {
-    const { id } = req.params;
-    const { label, street, additionalDetails, city, state, zipCode, latitude, longitude, isDefault } = req.body;
-
+    const {
+      id
+    } = req.params;
+    const {
+      label,
+      street,
+      additionalDetails,
+      city,
+      state,
+      zipCode,
+      latitude,
+      longitude,
+      isDefault
+    } = req.body;
     const user = await User.findById(req.user._id);
-
     if (!user) {
       return errorResponse(res, 404, 'User not found');
     }
-
     const address = user.addresses.id(id);
     if (!address) {
       return errorResponse(res, 404, 'Address not found');
@@ -462,23 +444,18 @@ export const updateUserAddress = asyncHandler(async (req, res) => {
       }
       address.isDefault = false;
     }
-
     await user.save();
-
     const addressResponse = {
       ...address.toObject(),
       id: address._id.toString()
     };
-
-    logger.info(`Address updated for user: ${user._id}`, {
-      addressId: id
-    });
-
     return successResponse(res, 200, 'Address updated successfully', {
       address: addressResponse
     });
   } catch (error) {
-    logger.error(`Error updating address: ${error.message}`, { error: error.stack });
+    logger.error(`Error updating address: ${error.message}`, {
+      error: error.stack
+    });
     return errorResponse(res, 500, 'Failed to update address');
   }
 });
@@ -489,19 +466,17 @@ export const updateUserAddress = asyncHandler(async (req, res) => {
  */
 export const deleteUserAddress = asyncHandler(async (req, res) => {
   try {
-    const { id } = req.params;
-
+    const {
+      id
+    } = req.params;
     const user = await User.findById(req.user._id);
-
     if (!user) {
       return errorResponse(res, 404, 'User not found');
     }
-
     const address = user.addresses.id(id);
     if (!address) {
       return errorResponse(res, 404, 'Address not found');
     }
-
     const wasDefault = address.isDefault;
 
     // Remove address
@@ -511,17 +486,12 @@ export const deleteUserAddress = asyncHandler(async (req, res) => {
     if (wasDefault && user.addresses.length > 0) {
       user.addresses[0].isDefault = true;
     }
-
     await user.save();
-
-    logger.info(`Address deleted for user: ${user._id}`, {
-      addressId: id
-    });
-
     return successResponse(res, 200, 'Address deleted successfully');
   } catch (error) {
-    logger.error(`Error deleting address: ${error.message}`, { error: error.stack });
+    logger.error(`Error deleting address: ${error.message}`, {
+      error: error.stack
+    });
     return errorResponse(res, 500, 'Failed to delete address');
   }
 });
-

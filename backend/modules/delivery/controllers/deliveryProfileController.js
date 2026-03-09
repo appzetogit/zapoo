@@ -4,15 +4,12 @@ import Delivery from '../models/Delivery.js';
 import { validate } from '../../../shared/middleware/validate.js';
 import Joi from 'joi';
 import winston from 'winston';
-
 const logger = winston.createLogger({
   level: 'info',
   format: winston.format.json(),
-  transports: [
-    new winston.transports.Console({
-      format: winston.format.simple()
-    })
-  ]
+  transports: [new winston.transports.Console({
+    format: winston.format.simple()
+  })]
 });
 
 /**
@@ -24,14 +21,10 @@ export const getProfile = asyncHandler(async (req, res) => {
     const delivery = req.delivery; // From authenticate middleware
 
     // Populate related fields if needed
-    const profile = await Delivery.findById(delivery._id)
-      .select('-password -refreshToken')
-      .lean();
-
+    const profile = await Delivery.findById(delivery._id).select('-password -refreshToken').lean();
     if (!profile) {
       return errorResponse(res, 404, 'Delivery partner not found');
     }
-
     return successResponse(res, 200, 'Profile retrieved successfully', {
       profile
     });
@@ -77,20 +70,23 @@ const updateProfileSchema = Joi.object({
     }).optional()
   }).optional()
 });
-
 export const updateProfile = asyncHandler(async (req, res) => {
   try {
     const delivery = req.delivery;
     const updateData = req.body;
 
     // Validate input
-    const { error } = updateProfileSchema.validate(updateData);
+    const {
+      error
+    } = updateProfileSchema.validate(updateData);
     if (error) {
       return errorResponse(res, 400, error.details[0].message);
     }
 
     // Handle nested documents.bankDetails update properly
-    const setData = { ...updateData };
+    const setData = {
+      ...updateData
+    };
     if (updateData.documents?.bankDetails) {
       // Merge bankDetails with existing documents
       setData['documents.bankDetails'] = {
@@ -102,32 +98,25 @@ export const updateProfile = asyncHandler(async (req, res) => {
     }
 
     // Update profile
-    const updatedDelivery = await Delivery.findByIdAndUpdate(
-      delivery._id,
-      { $set: setData },
-      { new: true, runValidators: true }
-    ).select('-password -refreshToken');
-
+    const updatedDelivery = await Delivery.findByIdAndUpdate(delivery._id, {
+      $set: setData
+    }, {
+      new: true,
+      runValidators: true
+    }).select('-password -refreshToken');
     if (!updatedDelivery) {
       return errorResponse(res, 404, 'Delivery partner not found');
     }
-
-    logger.info('Profile updated successfully', {
-      deliveryId: updatedDelivery.deliveryId || updatedDelivery._id,
-      updatedFields: Object.keys(updateData)
-    });
-
     return successResponse(res, 200, 'Profile updated successfully', {
       profile: updatedDelivery
     });
   } catch (error) {
     logger.error(`Error updating delivery profile: ${error.message}`);
-    
+
     // Handle duplicate email error
     if (error.code === 11000) {
       return errorResponse(res, 400, 'Email already exists');
     }
-    
     return errorResponse(res, 500, 'Failed to update profile');
   }
 });
@@ -139,7 +128,6 @@ export const updateProfile = asyncHandler(async (req, res) => {
 export const reverify = asyncHandler(async (req, res) => {
   try {
     const delivery = req.delivery;
-
     if (delivery.status !== 'blocked') {
       return errorResponse(res, 400, 'Only rejected delivery partners can resubmit for verification');
     }
@@ -150,13 +138,7 @@ export const reverify = asyncHandler(async (req, res) => {
     delivery.rejectionReason = undefined;
     delivery.rejectedAt = undefined;
     delivery.rejectedBy = undefined;
-
     await delivery.save();
-
-    logger.info(`Delivery partner resubmitted for verification: ${delivery._id}`, {
-      deliveryId: delivery.deliveryId
-    });
-
     return successResponse(res, 200, 'Request resubmitted for verification successfully', {
       profile: {
         _id: delivery._id.toString(),
@@ -169,4 +151,3 @@ export const reverify = asyncHandler(async (req, res) => {
     return errorResponse(res, 500, 'Failed to resubmit for verification');
   }
 });
-

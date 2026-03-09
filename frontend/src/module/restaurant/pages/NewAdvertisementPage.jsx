@@ -1,155 +1,141 @@
-import { useState, useEffect, useMemo } from "react"
-import { motion } from "framer-motion"
-import { useNavigate } from "react-router-dom"
-import {
-  ArrowLeft,
-  Calendar,
-  Upload,
-  Layers,
-  Info,
-  CheckCircle2,
-  Loader2,
-  MapPin,
-  Tag,
-  AlertCircle,
-} from "lucide-react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
-import { Card, CardContent } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { toast } from "sonner"
-import { marketingAPI } from "@/lib/api"
-import BottomNavbar from "../components/BottomNavbar"
-
+import { useState, useEffect, useMemo } from "react";
+import { motion } from "framer-motion";
+import { useNavigate } from "react-router-dom";
+import { ArrowLeft, Calendar, Upload, Layers, Info, CheckCircle2, Loader2, MapPin, Tag, AlertCircle } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
+import { marketingAPI } from "@/lib/api";
+import BottomNavbar from "../components/BottomNavbar";
 export default function NewAdvertisementPage() {
-  const navigate = useNavigate()
-
-  const [loading, setLoading] = useState(false)
-  const [myZone, setMyZone] = useState(null)
-  const [zoneLoading, setZoneLoading] = useState(true)
-  const [zoneError, setZoneError] = useState(null)
-  const [dateError, setDateError] = useState("")
-  const [conflictError, setConflictError] = useState(null)
-
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
+  const [myZone, setMyZone] = useState(null);
+  const [zoneLoading, setZoneLoading] = useState(true);
+  const [zoneError, setZoneError] = useState(null);
+  const [dateError, setDateError] = useState("");
+  const [conflictError, setConflictError] = useState(null);
   const [formData, setFormData] = useState({
     title: "",
     description: "",
     startDate: "",
     endDate: "",
-    redirectTarget: "menu",
-  })
-
+    redirectTarget: "menu"
+  });
   const tomorrowStr = () => {
-    const d = new Date()
-    d.setDate(d.getDate() + 1)
-    const yyyy = d.getFullYear()
-    const mm = String(d.getMonth() + 1).padStart(2, '0')
-    const dd = String(d.getDate()).padStart(2, '0')
-    return `${yyyy}-${mm}-${dd}`
-  }
-
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  };
   const validateDates = (startDate, endDate) => {
-    const tomorrow = tomorrowStr()
-    if (startDate && startDate < tomorrow) return "Campaigns must be requested at least one day in advance."
-    if (endDate && endDate < tomorrow) return "End date cannot be in the past."
-    if (startDate && endDate && endDate < startDate) return "End date cannot be before start date."
-    return ""
-  }
-
-  const handleStartDateChange = (e) => {
-    const val = e.target.value
+    const tomorrow = tomorrowStr();
+    if (startDate && startDate < tomorrow) return "Campaigns must be requested at least one day in advance.";
+    if (endDate && endDate < tomorrow) return "End date cannot be in the past.";
+    if (startDate && endDate && endDate < startDate) return "End date cannot be before start date.";
+    return "";
+  };
+  const handleStartDateChange = e => {
+    const val = e.target.value;
     // Always store the value so the user can type through day/month/year freely
-    setFormData(f => ({ ...f, startDate: val }))
+    setFormData(f => ({
+      ...f,
+      startDate: val
+    }));
 
     // Only validate once the year part is fully typed (4 digits, >= current year)
     if (val && val.length === 10) {
-      const year = parseInt(val.split('-')[0], 10)
+      const year = parseInt(val.split('-')[0], 10);
       if (year >= new Date().getFullYear()) {
-        const err = validateDates(val, formData.endDate)
-        if (err) { toast.error(err); setDateError(err) }
-        else setDateError("")
+        const err = validateDates(val, formData.endDate);
+        if (err) {
+          toast.error(err);
+          setDateError(err);
+        } else setDateError("");
       } else {
-        setDateError("") // year still being typed, clear any old error
+        setDateError(""); // year still being typed, clear any old error
       }
     } else {
-      setDateError("")
+      setDateError("");
     }
-  }
-
-  const handleEndDateChange = (e) => {
-    const val = e.target.value
+  };
+  const handleEndDateChange = e => {
+    const val = e.target.value;
     // Always store the value so the user can type through day/month/year freely
-    setFormData(f => ({ ...f, endDate: val }))
+    setFormData(f => ({
+      ...f,
+      endDate: val
+    }));
 
     // Only validate once the year part is fully typed (4 digits, >= current year)
     if (val && val.length === 10) {
-      const year = parseInt(val.split('-')[0], 10)
+      const year = parseInt(val.split('-')[0], 10);
       if (year >= new Date().getFullYear()) {
-        const err = validateDates(formData.startDate, val)
-        if (err) { toast.error(err); setDateError(err) }
-        else setDateError("")
+        const err = validateDates(formData.startDate, val);
+        if (err) {
+          toast.error(err);
+          setDateError(err);
+        } else setDateError("");
       } else {
-        setDateError("") // year still being typed, clear any old error
+        setDateError(""); // year still being typed, clear any old error
       }
     } else {
-      setDateError("")
+      setDateError("");
     }
-  }
+  };
 
   // Fetch the restaurant's own zone automatically
   useEffect(() => {
     const fetchMyZone = async () => {
       try {
-        const res = await marketingAPI.getMyZone()
-        setMyZone(res.data.data)
+        const res = await marketingAPI.getMyZone();
+        setMyZone(res.data.data);
       } catch (error) {
-        const msg = error.response?.data?.message || "Failed to fetch your zone info"
-        setZoneError(msg)
-        toast.error(msg)
+        const msg = error.response?.data?.message || "Failed to fetch your zone info";
+        setZoneError(msg);
+        toast.error(msg);
       } finally {
-        setZoneLoading(false)
+        setZoneLoading(false);
       }
-    }
-    fetchMyZone()
-  }, [])
-
+    };
+    fetchMyZone();
+  }, []);
   const calculateDays = () => {
-    if (!formData.startDate || !formData.endDate) return 0
-    const start = new Date(formData.startDate)
-    const end = new Date(formData.endDate)
-    const diffDays = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1
-    return diffDays > 0 ? diffDays : 0
-  }
-
+    if (!formData.startDate || !formData.endDate) return 0;
+    const start = new Date(formData.startDate);
+    const end = new Date(formData.endDate);
+    const diffDays = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+    return diffDays > 0 ? diffDays : 0;
+  };
   const totalPrice = useMemo(() => {
-    if (!myZone) return 0
-    const days = calculateDays()
-    if (days <= 0) return 0
-    return myZone.pricePerDay * days
-  }, [myZone, formData.startDate, formData.endDate])
-
+    if (!myZone) return 0;
+    const days = calculateDays();
+    if (days <= 0) return 0;
+    return myZone.pricePerDay * days;
+  }, [myZone, formData.startDate, formData.endDate]);
   const handleSubmit = async () => {
     if (!formData.title || !formData.startDate || !formData.endDate) {
-      toast.error("Please fill all required fields")
-      return
+      toast.error("Please fill all required fields");
+      return;
     }
     if (!myZone) {
-      toast.error("Zone information not available. Please try again.")
-      return
+      toast.error("Zone information not available. Please try again.");
+      return;
     }
-
     if (dateError) {
-      toast.error(dateError)
-      return
+      toast.error(dateError);
+      return;
     }
-
-    const days = calculateDays()
+    const days = calculateDays();
     if (days <= 0) {
-      toast.error("Please select a valid date range (at least 1 day)")
-      return
+      toast.error("Please select a valid date range (at least 1 day)");
+      return;
     }
-
-    setLoading(true)
+    setLoading(true);
     try {
       const payload = {
         title: formData.title,
@@ -158,30 +144,23 @@ export default function NewAdvertisementPage() {
         endDate: formData.endDate,
         redirectTarget: formData.redirectTarget,
         targetZones: [myZone._id] // Auto-submit the restaurant's own zone
-      }
-
-      console.log('🚀 [NewAdvertisement] Submitting payload:', payload);
-
-      await marketingAPI.createAdRequest(payload)
-
-      toast.success("Ad request submitted for review!")
-      navigate("/restaurant/advertisements")
+      };
+      await marketingAPI.createAdRequest(payload);
+      toast.success("Ad request submitted for review!");
+      navigate("/restaurant/advertisements");
     } catch (error) {
       if (error.response?.status === 409) {
-        setConflictError(error.response.data.message)
+        setConflictError(error.response.data.message);
       } else {
-        toast.error(error.response?.data?.message || "Something went wrong")
+        toast.error(error.response?.data?.message || "Something went wrong");
       }
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
-
-  const days = calculateDays()
-  const canSubmit = !loading && myZone && formData.title && days > 0 && !dateError
-
-  return (
-    <div className="min-h-screen bg-[#fef9f5] pb-32">
+  };
+  const days = calculateDays();
+  const canSubmit = !loading && myZone && formData.title && days > 0 && !dateError;
+  return <div className="min-h-screen bg-[#fef9f5] pb-32">
       {/* Header */}
       <div className="bg-white border-b border-gray-100 px-4 py-4 sticky top-0 z-50 flex items-center gap-4">
         <button onClick={() => navigate(-1)} className="p-2 hover:bg-blue-50 rounded-full transition-colors">
@@ -207,13 +186,10 @@ export default function NewAdvertisementPage() {
                     {formData.title.length}/50
                   </span>
                 </div>
-                <Input
-                  placeholder="e.g. Weekend Feast Special"
-                  value={formData.title}
-                  maxLength={50}
-                  onChange={e => setFormData(f => ({ ...f, title: e.target.value }))}
-                  className="font-semibold text-lg border-gray-100 focus:border-orange-200 focus:ring-orange-100 h-12"
-                />
+                <Input placeholder="e.g. Weekend Feast Special" value={formData.title} maxLength={50} onChange={e => setFormData(f => ({
+                ...f,
+                title: e.target.value
+              }))} className="font-semibold text-lg border-gray-100 focus:border-orange-200 focus:ring-orange-100 h-12" />
               </div>
 
               <div>
@@ -223,13 +199,10 @@ export default function NewAdvertisementPage() {
                     {formData.description.length}/200
                   </span>
                 </div>
-                <textarea
-                  placeholder="Short catchy description to attract customers..."
-                  value={formData.description}
-                  maxLength={200}
-                  onChange={e => setFormData(f => ({ ...f, description: e.target.value }))}
-                  className="w-full text-sm text-gray-600 border border-gray-100 rounded-lg focus:border-orange-200 focus:ring-orange-100 resize-none p-3 bg-gray-50/30 min-h-[80px]"
-                />
+                <textarea placeholder="Short catchy description to attract customers..." value={formData.description} maxLength={200} onChange={e => setFormData(f => ({
+                ...f,
+                description: e.target.value
+              }))} className="w-full text-sm text-gray-600 border border-gray-100 rounded-lg focus:border-orange-200 focus:ring-orange-100 resize-none p-3 bg-gray-50/30 min-h-[80px]" />
               </div>
             </CardContent>
           </Card>
@@ -242,22 +215,19 @@ export default function NewAdvertisementPage() {
             <h2>Ad Placement Zone</h2>
           </div>
 
-          {zoneLoading ? (
-            <div className="h-20 bg-gray-100 animate-pulse rounded-xl" />
-          ) : zoneError ? (
-            <div className="bg-red-50 border border-red-100 rounded-xl p-4 flex gap-3">
+          {zoneLoading ? <div className="h-20 bg-gray-100 animate-pulse rounded-xl" /> : zoneError ? <div className="bg-red-50 border border-red-100 rounded-xl p-4 flex gap-3">
               <Info className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
               <div>
                 <p className="text-sm font-bold text-red-800">Zone Not Assigned</p>
                 <p className="text-xs text-red-600 mt-1">{zoneError}</p>
               </div>
-            </div>
-          ) : myZone ? (
-            <motion.div
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="bg-white rounded-xl border-2 border-blue-400 p-4 flex items-center gap-4 shadow-sm"
-            >
+            </div> : myZone ? <motion.div initial={{
+          opacity: 0,
+          y: 8
+        }} animate={{
+          opacity: 1,
+          y: 0
+        }} className="bg-white rounded-xl border-2 border-blue-400 p-4 flex items-center gap-4 shadow-sm">
               <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center shrink-0">
                 <MapPin className="w-6 h-6 text-[#3B82F6]" />
               </div>
@@ -280,8 +250,7 @@ export default function NewAdvertisementPage() {
                 <p className="text-[10px] text-gray-400 uppercase font-bold">Auto-selected</p>
                 <p className="text-xs text-gray-500 mt-0.5">Your restaurant's zone</p>
               </div>
-            </motion.div>
-          ) : null}
+            </motion.div> : null}
 
           <p className="text-xs text-gray-400 px-1">
             Your ad will be shown to customers browsing restaurants in your zone.
@@ -300,46 +269,33 @@ export default function NewAdvertisementPage() {
                 <div>
                   <label className="text-[10px] uppercase font-bold text-gray-500 ml-1">Start Date</label>
                   <div className="relative mt-1">
-                    <Input
-                      type="date"
-                      value={formData.startDate}
-                      onChange={handleStartDateChange}
-                      min={tomorrowStr()}
-                      className="pl-10"
-                    />
+                    <Input type="date" value={formData.startDate} onChange={handleStartDateChange} min={tomorrowStr()} className="pl-10" />
                     <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                   </div>
                 </div>
                 <div>
                   <label className="text-[10px] uppercase font-bold text-gray-500 ml-1">End Date</label>
                   <div className="relative mt-1">
-                    <Input
-                      type="date"
-                      value={formData.endDate}
-                      onChange={handleEndDateChange}
-                      min={formData.startDate || tomorrowStr()}
-                      className="pl-10"
-                    />
+                    <Input type="date" value={formData.endDate} onChange={handleEndDateChange} min={formData.startDate || tomorrowStr()} className="pl-10" />
                     <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                   </div>
                 </div>
               </div>
 
               {/* Date error alert */}
-              {dateError && (
-                <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
+              {dateError && <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
                   <Info className="w-4 h-4 shrink-0 text-red-500" />
                   <span>{dateError}</span>
-                </div>
-              )}
+                </div>}
 
               {/* Duration summary */}
-              {days > 0 && myZone && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  className="bg-blue-50 rounded-lg p-3 flex items-center justify-between"
-                >
+              {days > 0 && myZone && <motion.div initial={{
+              opacity: 0,
+              height: 0
+            }} animate={{
+              opacity: 1,
+              height: "auto"
+            }} className="bg-blue-50 rounded-lg p-3 flex items-center justify-between">
                   <div className="text-sm text-gray-700">
                     <span className="font-bold text-blue-700">{days} day{days > 1 ? 's' : ''}</span>
                     <span className="text-gray-500"> × ₹{myZone.pricePerDay}/day</span>
@@ -347,8 +303,7 @@ export default function NewAdvertisementPage() {
                   <div className="text-base font-black text-gray-900">
                     = ₹{totalPrice}
                   </div>
-                </motion.div>
-              )}
+                </motion.div>}
             </CardContent>
           </Card>
         </section>
@@ -366,11 +321,7 @@ export default function NewAdvertisementPage() {
               {totalPrice}
             </div>
           </div>
-          <Button
-            disabled={loading || !myZone}
-            onClick={handleSubmit}
-            className="bg-[#3B82F6] hover:bg-blue-700 text-white px-8 h-12 rounded-xl font-bold text-lg shadow-lg shadow-blue-100 transition-all flex-1 sm:flex-none disabled:opacity-50"
-          >
+          <Button disabled={loading || !myZone} onClick={handleSubmit} className="bg-[#3B82F6] hover:bg-blue-700 text-white px-8 h-12 rounded-xl font-bold text-lg shadow-lg shadow-blue-100 transition-all flex-1 sm:flex-none disabled:opacity-50">
             {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Request Review'}
           </Button>
         </div>
@@ -407,17 +358,12 @@ export default function NewAdvertisementPage() {
             </div>
 
             <DialogFooter className="sm:justify-center">
-              <Button
-                type="button"
-                className="w-full bg-gray-900 hover:bg-gray-800 text-white font-bold h-9 text-sm rounded-lg transition-all"
-                onClick={() => setConflictError(null)}
-              >
+              <Button type="button" className="w-full bg-gray-900 hover:bg-gray-800 text-white font-bold h-9 text-sm rounded-lg transition-all" onClick={() => setConflictError(null)}>
                 Understood, I'll fix it
               </Button>
             </DialogFooter>
           </div>
         </DialogContent>
       </Dialog>
-    </div>
-  )
+    </div>;
 }

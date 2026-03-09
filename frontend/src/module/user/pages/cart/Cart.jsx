@@ -1,23 +1,21 @@
-import { useState, useEffect, useRef, useMemo } from "react"
-import { Link, useNavigate } from "react-router-dom"
-import { Plus, Minus, ArrowLeft, ChevronRight, Clock, MapPin, Phone, FileText, Utensils, Tag, Percent, Truck, Leaf, Share2, ChevronUp, ChevronDown, X, Check, Settings, CreditCard, Wallet, Building2, Sparkles } from "lucide-react"
-import { motion, AnimatePresence } from "framer-motion"
-import confetti from "canvas-confetti"
-
-import AnimatedPage from "../../components/AnimatedPage"
-import { Button } from "@/components/ui/button"
-import { useCart } from "../../context/CartContext"
-import { useProfile } from "../../context/ProfileContext"
-import { useOrders } from "../../context/OrdersContext"
-import { useLocation as useUserLocation } from "../../hooks/useLocation"
-import { useZone } from "../../hooks/useZone"
-import { orderAPI, restaurantAPI, adminAPI, userAPI, API_ENDPOINTS } from "@/lib/api"
-import { useLocationSelector } from "../../components/UserLayout"
-import { API_BASE_URL } from "@/lib/api/config"
-import { initRazorpayPayment } from "@/lib/utils/razorpay"
-import { toast } from "sonner"
-import { getCompanyNameAsync } from "@/lib/utils/businessSettings"
-
+import { useState, useEffect, useRef, useMemo } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { Plus, Minus, ArrowLeft, ChevronRight, Clock, MapPin, Phone, FileText, Utensils, Tag, Percent, Truck, Leaf, Share2, ChevronUp, ChevronDown, X, Check, Settings, CreditCard, Wallet, Building2, Sparkles } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import confetti from "canvas-confetti";
+import AnimatedPage from "../../components/AnimatedPage";
+import { Button } from "@/components/ui/button";
+import { useCart } from "../../context/CartContext";
+import { useProfile } from "../../context/ProfileContext";
+import { useOrders } from "../../context/OrdersContext";
+import { useLocation as useUserLocation } from "../../hooks/useLocation";
+import { useZone } from "../../hooks/useZone";
+import { orderAPI, restaurantAPI, adminAPI, userAPI, API_ENDPOINTS } from "@/lib/api";
+import { useLocationSelector } from "../../components/UserLayout";
+import { API_BASE_URL } from "@/lib/api/config";
+import { initRazorpayPayment } from "@/lib/utils/razorpay";
+import { toast } from "sonner";
+import { getCompanyNameAsync } from "@/lib/utils/businessSettings";
 
 // Removed hardcoded suggested items - now fetching approved addons from backend
 // Coupons will be fetched from backend based on items in cart
@@ -27,36 +25,33 @@ import { getCompanyNameAsync } from "@/lib/utils/businessSettings"
  * @param {Object} address - Address object with street, additionalDetails, city, state, zipCode, or formattedAddress
  * @returns {String} Formatted address string
  */
-const formatFullAddress = (address) => {
-  if (!address) return ""
+const formatFullAddress = address => {
+  if (!address) return "";
 
   // Priority 1: Use formattedAddress if available (for live location addresses)
   if (address.formattedAddress && address.formattedAddress !== "Select location") {
-    return address.formattedAddress
+    return address.formattedAddress;
   }
 
   // Priority 2: Build address from parts
-  const addressParts = []
-  if (address.street) addressParts.push(address.street)
-  if (address.additionalDetails) addressParts.push(address.additionalDetails)
-  if (address.city) addressParts.push(address.city)
-  if (address.state) addressParts.push(address.state)
-  if (address.zipCode) addressParts.push(address.zipCode)
-
+  const addressParts = [];
+  if (address.street) addressParts.push(address.street);
+  if (address.additionalDetails) addressParts.push(address.additionalDetails);
+  if (address.city) addressParts.push(address.city);
+  if (address.state) addressParts.push(address.state);
+  if (address.zipCode) addressParts.push(address.zipCode);
   if (addressParts.length > 0) {
-    return addressParts.join(', ')
+    return addressParts.join(', ');
   }
 
   // Priority 3: Use address field if available
   if (address.address && address.address !== "Select location") {
-    return address.address
+    return address.address;
   }
-
-  return ""
-}
-
+  return "";
+};
 export default function Cart() {
-  const navigate = useNavigate()
+  const navigate = useNavigate();
 
   // Defensive check: Ensure CartProvider is available
   let cartContext;
@@ -65,186 +60,184 @@ export default function Cart() {
   } catch (error) {
     console.error('❌ CartProvider not found. Make sure Cart component is rendered within UserLayout.');
     // Return early with error message
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#f5f5f5] dark:bg-[#0a0a0a]">
+    return <div className="min-h-screen flex items-center justify-center bg-[#f5f5f5] dark:bg-[#0a0a0a]">
         <div className="text-center p-8">
           <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">Cart Error</h2>
           <p className="text-gray-600 dark:text-gray-400">
             Cart functionality is not available. Please refresh the page.
           </p>
-          <button
-            onClick={() => navigate('/')}
-            className="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
-          >
+          <button onClick={() => navigate('/')} className="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
             Go to Home
           </button>
         </div>
-      </div>
-    );
+      </div>;
   }
+  const {
+    cart,
+    updateQuantity,
+    addToCart,
+    getCartCount,
+    clearCart,
+    cleanCartForRestaurant
+  } = cartContext;
+  const {
+    getDefaultAddress,
+    getDefaultPaymentMethod,
+    addresses,
+    paymentMethods,
+    userProfile
+  } = useProfile();
+  const {
+    createOrder
+  } = useOrders();
+  const {
+    location: currentLocation
+  } = useUserLocation(); // Get live location address
+  const {
+    zoneId
+  } = useZone(currentLocation); // Get user's zone
 
-  const { cart, updateQuantity, addToCart, getCartCount, clearCart, cleanCartForRestaurant } = cartContext;
-  const { getDefaultAddress, getDefaultPaymentMethod, addresses, paymentMethods, userProfile } = useProfile()
-  const { createOrder } = useOrders()
-  const { location: currentLocation } = useUserLocation() // Get live location address
-  const { zoneId } = useZone(currentLocation) // Get user's zone
-
-  const [showCoupons, setShowCoupons] = useState(false)
-  const [appliedCoupon, setAppliedCoupon] = useState(null)
-  const [couponCode, setCouponCode] = useState("")
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState("razorpay") // razorpay | cash | wallet
-  const [walletBalance, setWalletBalance] = useState(0)
-  const [isLoadingWallet, setIsLoadingWallet] = useState(false)
-  const [deliveryFleet, setDeliveryFleet] = useState("standard")
-  const [showFleetOptions, setShowFleetOptions] = useState(false)
-  const [note, setNote] = useState("")
-  const [showNoteInput, setShowNoteInput] = useState(false)
-  const [sendCutlery, setSendCutlery] = useState(true)
-  const [isPlacingOrder, setIsPlacingOrder] = useState(false)
-  const [showBillDetails, setShowBillDetails] = useState(false)
-  const [showPlacingOrder, setShowPlacingOrder] = useState(false)
-  const [orderProgress, setOrderProgress] = useState(0)
-  const [showOrderSuccess, setShowOrderSuccess] = useState(false)
-  const [placedOrderId, setPlacedOrderId] = useState(null)
-
-  const { openLocationSelector } = useLocationSelector()
+  const [showCoupons, setShowCoupons] = useState(false);
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [couponCode, setCouponCode] = useState("");
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState("razorpay"); // razorpay | cash | wallet
+  const [walletBalance, setWalletBalance] = useState(0);
+  const [isLoadingWallet, setIsLoadingWallet] = useState(false);
+  const [deliveryFleet, setDeliveryFleet] = useState("standard");
+  const [showFleetOptions, setShowFleetOptions] = useState(false);
+  const [note, setNote] = useState("");
+  const [showNoteInput, setShowNoteInput] = useState(false);
+  const [sendCutlery, setSendCutlery] = useState(true);
+  const [isPlacingOrder, setIsPlacingOrder] = useState(false);
+  const [showBillDetails, setShowBillDetails] = useState(false);
+  const [showPlacingOrder, setShowPlacingOrder] = useState(false);
+  const [orderProgress, setOrderProgress] = useState(0);
+  const [showOrderSuccess, setShowOrderSuccess] = useState(false);
+  const [placedOrderId, setPlacedOrderId] = useState(null);
+  const {
+    openLocationSelector
+  } = useLocationSelector();
 
   // Restaurant and pricing state
-  const [restaurantData, setRestaurantData] = useState(null)
-  const [loadingRestaurant, setLoadingRestaurant] = useState(false)
-  const [pricing, setPricing] = useState(null)
-  const [loadingPricing, setLoadingPricing] = useState(false)
+  const [restaurantData, setRestaurantData] = useState(null);
+  const [loadingRestaurant, setLoadingRestaurant] = useState(false);
+  const [pricing, setPricing] = useState(null);
+  const [loadingPricing, setLoadingPricing] = useState(false);
 
   // Addons state
-  const [addons, setAddons] = useState([])
-  const [loadingAddons, setLoadingAddons] = useState(false)
+  const [addons, setAddons] = useState([]);
+  const [loadingAddons, setLoadingAddons] = useState(false);
 
   // Coupons state - fetched from backend
-  const [availableCoupons, setAvailableCoupons] = useState([])
-  const [loadingCoupons, setLoadingCoupons] = useState(false)
+  const [availableCoupons, setAvailableCoupons] = useState([]);
+  const [loadingCoupons, setLoadingCoupons] = useState(false);
 
   // Fee settings from database (used as fallback if pricing not available)
   const [feeSettings, setFeeSettings] = useState({
     deliveryFee: 25,
     freeDeliveryThreshold: 149,
     platformFee: 5,
-    gstRate: 5,
-  })
-
-
-  const cartCount = getCartCount()
-  const savedAddress = getDefaultAddress()
+    gstRate: 5
+  });
+  const cartCount = getCartCount();
+  const savedAddress = getDefaultAddress();
   // Priority: Use live location if available, otherwise use saved address
-  const defaultAddress = currentLocation?.formattedAddress && currentLocation.formattedAddress !== "Select location"
-    ? {
-      ...savedAddress,
-      formattedAddress: currentLocation.formattedAddress,
-      address: currentLocation.address || currentLocation.formattedAddress,
-      street: currentLocation.street || currentLocation.address,
-      city: currentLocation.city,
-      state: currentLocation.state,
-      zipCode: currentLocation.postalCode,
-      area: currentLocation.area,
-      location: currentLocation.latitude && currentLocation.longitude ? {
-        coordinates: [currentLocation.longitude, currentLocation.latitude]
-      } : savedAddress?.location
-    }
-    : savedAddress
-  const defaultPayment = getDefaultPaymentMethod()
+  const defaultAddress = currentLocation?.formattedAddress && currentLocation.formattedAddress !== "Select location" ? {
+    ...savedAddress,
+    formattedAddress: currentLocation.formattedAddress,
+    address: currentLocation.address || currentLocation.formattedAddress,
+    street: currentLocation.street || currentLocation.address,
+    city: currentLocation.city,
+    state: currentLocation.state,
+    zipCode: currentLocation.postalCode,
+    area: currentLocation.area,
+    location: currentLocation.latitude && currentLocation.longitude ? {
+      coordinates: [currentLocation.longitude, currentLocation.latitude]
+    } : savedAddress?.location
+  } : savedAddress;
+  const defaultPayment = getDefaultPaymentMethod();
 
   // Get restaurant ID from cart or restaurant data
   // Priority: restaurantData > cart[0].restaurantId
   // DO NOT use cart[0].restaurant as slug fallback - it creates wrong slugs
-  const restaurantId = cart.length > 0
-    ? (restaurantData?._id || restaurantData?.restaurantId || cart[0]?.restaurantId || null)
-    : null
+  const restaurantId = cart.length > 0 ? restaurantData?._id || restaurantData?.restaurantId || cart[0]?.restaurantId || null : null;
 
   // Stable restaurant ID for addons fetch (memoized to prevent dependency array issues)
   // Prefer restaurantData IDs (more reliable) over slug from cart
   const restaurantIdForAddons = useMemo(() => {
     // Only use restaurantData if it's loaded, otherwise wait
     if (restaurantData) {
-      return restaurantData._id || restaurantData.restaurantId || null
+      return restaurantData._id || restaurantData.restaurantId || null;
     }
     // If restaurantData is not loaded yet, return null to wait
-    return null
-  }, [restaurantData])
-
-
+    return null;
+  }, [restaurantData]);
 
   // Lock body scroll and scroll to top when any full-screen modal opens
   useEffect(() => {
     if (showPlacingOrder || showOrderSuccess) {
       // Lock body scroll
-      document.body.style.overflow = 'hidden'
-      document.body.style.position = 'fixed'
-      document.body.style.width = '100%'
-      document.body.style.top = `-${window.scrollY}px`
+      document.body.style.overflow = 'hidden';
+      document.body.style.position = 'fixed';
+      document.body.style.width = '100%';
+      document.body.style.top = `-${window.scrollY}px`;
 
       // Scroll window to top
-      window.scrollTo({ top: 0, behavior: 'instant' })
+      window.scrollTo({
+        top: 0,
+        behavior: 'instant'
+      });
     } else {
       // Restore body scroll
-      const scrollY = document.body.style.top
-      document.body.style.overflow = ''
-      document.body.style.position = ''
-      document.body.style.width = ''
-      document.body.style.top = ''
+      const scrollY = document.body.style.top;
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
+      document.body.style.top = '';
       if (scrollY) {
-        window.scrollTo(0, parseInt(scrollY || '0') * -1)
+        window.scrollTo(0, parseInt(scrollY || '0') * -1);
       }
     }
-
     return () => {
       // Cleanup on unmount
-      document.body.style.overflow = ''
-      document.body.style.position = ''
-      document.body.style.width = ''
-      document.body.style.top = ''
-    }
-  }, [showPlacingOrder, showOrderSuccess])
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
+      document.body.style.top = '';
+    };
+  }, [showPlacingOrder, showOrderSuccess]);
 
   // Fetch restaurant data when cart has items
   useEffect(() => {
     const fetchRestaurantData = async () => {
       if (cart.length === 0) {
-        setRestaurantData(null)
-        return
+        setRestaurantData(null);
+        return;
       }
 
       // If we already have restaurantData, don't fetch again
       if (restaurantData) {
-        return
+        return;
       }
-
-      setLoadingRestaurant(true)
+      setLoadingRestaurant(true);
 
       // Strategy 1: Try using restaurantId from cart if available
       if (cart[0]?.restaurantId) {
         try {
           const cartRestaurantId = cart[0].restaurantId;
           const cartRestaurantName = cart[0].restaurant;
-
-          console.log("🔄 Fetching restaurant data by restaurantId from cart:", cartRestaurantId)
-          const response = await restaurantAPI.getRestaurantById(cartRestaurantId)
-          const data = response?.data?.data?.restaurant || response?.data?.restaurant
-
+          const response = await restaurantAPI.getRestaurantById(cartRestaurantId);
+          const data = response?.data?.data?.restaurant || response?.data?.restaurant;
           if (data) {
             // CRITICAL: Validate that fetched restaurant matches cart items
             const fetchedRestaurantId = data.restaurantId || data._id?.toString();
             const fetchedRestaurantName = data.name;
 
             // Check if restaurantId matches
-            const restaurantIdMatches =
-              fetchedRestaurantId === cartRestaurantId ||
-              data._id?.toString() === cartRestaurantId ||
-              data.restaurantId === cartRestaurantId;
+            const restaurantIdMatches = fetchedRestaurantId === cartRestaurantId || data._id?.toString() === cartRestaurantId || data.restaurantId === cartRestaurantId;
 
             // Check if restaurant name matches (if available in cart)
-            const restaurantNameMatches =
-              !cartRestaurantName ||
-              fetchedRestaurantName?.toLowerCase().trim() === cartRestaurantName.toLowerCase().trim();
-
+            const restaurantNameMatches = !cartRestaurantName || fetchedRestaurantName?.toLowerCase().trim() === cartRestaurantName.toLowerCase().trim();
             if (!restaurantIdMatches) {
               console.error('❌ CRITICAL: Fetched restaurant ID does not match cart restaurantId!', {
                 cartRestaurantId: cartRestaurantId,
@@ -258,7 +251,6 @@ export default function Cart() {
               setLoadingRestaurant(false);
               return;
             }
-
             if (!restaurantNameMatches) {
               console.warn('⚠️ WARNING: Restaurant name mismatch:', {
                 cartRestaurantName: cartRestaurantName,
@@ -266,50 +258,33 @@ export default function Cart() {
               });
               // Still proceed but log warning
             }
-
-            console.log("✅ Restaurant data loaded from cart restaurantId:", {
-              _id: data._id,
-              restaurantId: data.restaurantId,
-              name: data.name,
-              cartRestaurantId: cartRestaurantId,
-              cartRestaurantName: cartRestaurantName
-            })
-            setRestaurantData(data)
-            setLoadingRestaurant(false)
-            return
+            setRestaurantData(data);
+            setLoadingRestaurant(false);
+            return;
           }
         } catch (error) {
-          console.warn("⚠️ Failed to fetch by cart restaurantId, trying fallback...", error)
+          console.warn("⚠️ Failed to fetch by cart restaurantId, trying fallback...", error);
         }
       }
 
       // Strategy 2: If no restaurantId in cart, search by restaurant name
       if (cart[0]?.restaurant && !restaurantData) {
         try {
-          console.log("🔍 Searching restaurant by name:", cart[0].restaurant)
-          const searchResponse = await restaurantAPI.getRestaurants({ limit: 100 })
-          const restaurants = searchResponse?.data?.data?.restaurants || searchResponse?.data?.data || []
-          console.log("📋 Fetched", restaurants.length, "restaurants for name search")
-
+          const searchResponse = await restaurantAPI.getRestaurants({
+            limit: 100
+          });
+          const restaurants = searchResponse?.data?.data?.restaurants || searchResponse?.data?.data || [];
           // Try exact match first
-          let matchingRestaurant = restaurants.find(r =>
-            r.name?.toLowerCase().trim() === cart[0].restaurant?.toLowerCase().trim()
-          )
+          let matchingRestaurant = restaurants.find(r => r.name?.toLowerCase().trim() === cart[0].restaurant?.toLowerCase().trim());
 
           // If no exact match, try partial match
           if (!matchingRestaurant) {
-            console.log("🔍 No exact match, trying partial match...")
-            matchingRestaurant = restaurants.find(r =>
-              r.name?.toLowerCase().includes(cart[0].restaurant?.toLowerCase().trim()) ||
-              cart[0].restaurant?.toLowerCase().trim().includes(r.name?.toLowerCase())
-            )
+            matchingRestaurant = restaurants.find(r => r.name?.toLowerCase().includes(cart[0].restaurant?.toLowerCase().trim()) || cart[0].restaurant?.toLowerCase().trim().includes(r.name?.toLowerCase()));
           }
-
           if (matchingRestaurant) {
             // CRITICAL: Validate that the found restaurant matches cart items
             const cartRestaurantName = cart[0]?.restaurant?.toLowerCase().trim();
             const foundRestaurantName = matchingRestaurant.name?.toLowerCase().trim();
-
             if (cartRestaurantName && foundRestaurantName && cartRestaurantName !== foundRestaurantName) {
               console.error("❌ CRITICAL: Restaurant name mismatch!", {
                 cartRestaurantName: cart[0]?.restaurant,
@@ -321,86 +296,45 @@ export default function Cart() {
               setLoadingRestaurant(false);
               return;
             }
-
-            console.log("✅ Found restaurant by name:", {
-              name: matchingRestaurant.name,
-              _id: matchingRestaurant._id,
-              restaurantId: matchingRestaurant.restaurantId,
-              slug: matchingRestaurant.slug,
-              cartRestaurantName: cart[0]?.restaurant
-            })
-            setRestaurantData(matchingRestaurant)
-            setLoadingRestaurant(false)
-            return
+            setRestaurantData(matchingRestaurant);
+            setLoadingRestaurant(false);
+            return;
           } else {
-            console.warn("⚠️ Restaurant not found even by name search. Searched in", restaurants.length, "restaurants")
-            if (restaurants.length > 0) {
-              console.log("📋 Available restaurant names:", restaurants.map(r => r.name).slice(0, 10))
-            }
+            console.warn("⚠️ Restaurant not found even by name search. Searched in", restaurants.length, "restaurants");
+            if (restaurants.length > 0) {}
           }
         } catch (searchError) {
-          console.warn("⚠️ Error searching restaurants by name:", searchError)
+          console.warn("⚠️ Error searching restaurants by name:", searchError);
         }
       }
 
       // If all strategies fail, set to null
-      setRestaurantData(null)
-      setLoadingRestaurant(false)
-    }
-
-    fetchRestaurantData()
-  }, [cart.length, cart[0]?.restaurantId, cart[0]?.restaurant])
+      setRestaurantData(null);
+      setLoadingRestaurant(false);
+    };
+    fetchRestaurantData();
+  }, [cart.length, cart[0]?.restaurantId, cart[0]?.restaurant]);
 
   // Fetch approved addons for the restaurant
   useEffect(() => {
-    const fetchAddonsWithId = async (idToUse) => {
-
-      console.log("🔍 Addons fetch - Using ID:", {
-        restaurantData: restaurantData ? {
-          _id: restaurantData._id,
-          restaurantId: restaurantData.restaurantId,
-          name: restaurantData.name
-        } : 'Not loaded',
-        cartRestaurantId: restaurantId,
-        idToUse: idToUse
-      })
-
+    const fetchAddonsWithId = async idToUse => {
       // Convert to string for validation
-      const idString = String(idToUse)
-      console.log("🔍 Restaurant ID string:", idString, "Type:", typeof idString, "Length:", idString.length)
-
+      const idString = String(idToUse);
       // Validate ID format (should be ObjectId or restaurantId format)
-      const isValidIdFormat = /^[a-zA-Z0-9\-_]+$/.test(idString) && idString.length >= 3
-
+      const isValidIdFormat = /^[a-zA-Z0-9\-_]+$/.test(idString) && idString.length >= 3;
       if (!isValidIdFormat) {
-        console.warn("⚠️ Restaurant ID format invalid:", idString)
-        setAddons([])
-        return
+        console.warn("⚠️ Restaurant ID format invalid:", idString);
+        setAddons([]);
+        return;
       }
-
       try {
-        setLoadingAddons(true)
-        console.log("🚀 Fetching addons for restaurant ID:", idString)
-        const response = await restaurantAPI.getAddonsByRestaurantId(idString)
-        console.log("✅ Addons API response received:", response?.data)
-        console.log("📦 Response structure:", {
-          success: response?.data?.success,
-          data: response?.data?.data,
-          addons: response?.data?.data?.addons,
-          directAddons: response?.data?.addons
-        })
-
-        const data = response?.data?.data?.addons || response?.data?.addons || []
-        console.log("📊 Fetched addons count:", data.length)
-        console.log("📋 Fetched addons data:", JSON.stringify(data, null, 2))
-
+        setLoadingAddons(true);
+        const response = await restaurantAPI.getAddonsByRestaurantId(idString);
+        const data = response?.data?.data?.addons || response?.data?.addons || [];
         if (data.length === 0) {
-          console.warn("⚠️ No addons returned from API. Response:", response?.data)
-        } else {
-          console.log("✅ Successfully fetched", data.length, "addons:", data.map(a => a.name))
-        }
-
-        setAddons(data)
+          console.warn("⚠️ No addons returned from API. Response:", response?.data);
+        } else {}
+        setAddons(data);
       } catch (error) {
         // Log error for debugging
         console.error("❌ Addons fetch error:", {
@@ -409,87 +343,73 @@ export default function Cart() {
           message: error.message,
           url: error.config?.url,
           data: error.response?.data
-        })
+        });
         // Silently handle network errors and 404 errors
         // Network errors (ERR_NETWORK) happen when backend is not running - this is OK for development
         // 404 errors mean restaurant might not have addons or restaurant not found - also OK
         if (error.code !== 'ERR_NETWORK' && error.response?.status !== 404) {
-          console.error("Error fetching addons:", error)
+          console.error("Error fetching addons:", error);
         }
         // Continue with cart even if addons fetch fails
-        setAddons([])
+        setAddons([]);
       } finally {
-        setLoadingAddons(false)
+        setLoadingAddons(false);
       }
-    }
-
+    };
     const fetchAddons = async () => {
       if (cart.length === 0) {
-        setAddons([])
-        return
+        setAddons([]);
+        return;
       }
 
       // Wait for restaurantData to be loaded (including fallback search)
       if (loadingRestaurant) {
-        console.log("⏳ Waiting for restaurantData to load (including fallback search)...")
-        return
+        return;
       }
 
       // Must have restaurantData to fetch addons
       if (!restaurantData) {
-        console.warn("⚠️ No restaurantData available for addons fetch")
-        setAddons([])
-        return
+        console.warn("⚠️ No restaurantData available for addons fetch");
+        setAddons([]);
+        return;
       }
 
       // Use restaurantData ID (most reliable)
-      const idToUse = restaurantData._id || restaurantData.restaurantId
+      const idToUse = restaurantData._id || restaurantData.restaurantId;
       if (!idToUse) {
-        console.warn("⚠️ No valid restaurant ID in restaurantData")
-        setAddons([])
-        return
+        console.warn("⚠️ No valid restaurant ID in restaurantData");
+        setAddons([]);
+        return;
       }
-
-      console.log("✅ Using restaurantData ID for addons:", idToUse)
-      fetchAddonsWithId(idToUse)
-    }
-
-    fetchAddons()
-  }, [restaurantData, cart.length, loadingRestaurant])
+      fetchAddonsWithId(idToUse);
+    };
+    fetchAddons();
+  }, [restaurantData, cart.length, loadingRestaurant]);
 
   // Fetch coupons for items in cart
   useEffect(() => {
     const fetchCouponsForCartItems = async () => {
       if (cart.length === 0 || !restaurantId) {
-        setAvailableCoupons([])
-        return
+        setAvailableCoupons([]);
+        return;
       }
-
-      console.log(`[CART-COUPONS] Fetching coupons for ${cart.length} items in cart`)
-      setLoadingCoupons(true)
-
-      const allCoupons = []
-      const uniqueCouponCodes = new Set()
+      setLoadingCoupons(true);
+      const allCoupons = [];
+      const uniqueCouponCodes = new Set();
 
       // Fetch coupons for each item in cart
       for (const cartItem of cart) {
         if (!cartItem.id) {
-          console.log(`[CART-COUPONS] Skipping item without id:`, cartItem)
-          continue
+          continue;
         }
-
         try {
-          console.log(`[CART-COUPONS] Fetching coupons for itemId: ${cartItem.id}, name: ${cartItem.name}`)
-          const response = await restaurantAPI.getCouponsByItemIdPublic(restaurantId, cartItem.id)
-
+          const response = await restaurantAPI.getCouponsByItemIdPublic(restaurantId, cartItem.id);
           if (response?.data?.success && response?.data?.data?.coupons) {
-            const coupons = response.data.data.coupons
-            console.log(`[CART-COUPONS] Found ${coupons.length} coupons for item ${cartItem.id}`)
-
+            const coupons = response.data.data.coupons;
             // Add coupons, avoiding duplicates
             coupons.forEach(coupon => {
               if (!uniqueCouponCodes.has(coupon.couponCode)) {
-                uniqueCouponCodes.add(coupon.couponCode)
+                uniqueCouponCodes.add(coupon.couponCode);
                 // Convert backend coupon format to frontend format
                 allCoupons.push({
                   code: coupon.couponCode,
@@ -500,151 +420,143 @@ export default function Cart() {
                   originalPrice: coupon.originalPrice,
                   discountedPrice: coupon.discountedPrice,
                   itemId: cartItem.id,
-                  itemName: cartItem.name,
-                })
+                  itemName: cartItem.name
+                });
               }
-            })
+            });
           }
         } catch (error) {
-          console.error(`[CART-COUPONS] Error fetching coupons for item ${cartItem.id}:`, error)
+          console.error(`[CART-COUPONS] Error fetching coupons for item ${cartItem.id}:`, error);
         }
       }
-
-      console.log(`[CART-COUPONS] Total unique coupons found: ${allCoupons.length}`, allCoupons)
-      setAvailableCoupons(allCoupons)
-      setLoadingCoupons(false)
-    }
-
-    fetchCouponsForCartItems()
-  }, [cart, restaurantId])
+      setAvailableCoupons(allCoupons);
+      setLoadingCoupons(false);
+    };
+    fetchCouponsForCartItems();
+  }, [cart, restaurantId]);
 
   // Calculate pricing from backend whenever cart, address, or coupon changes
   useEffect(() => {
     const calculatePricing = async () => {
       if (cart.length === 0 || !defaultAddress) {
-        setPricing(null)
-        return
+        setPricing(null);
+        return;
       }
-
       try {
-        setLoadingPricing(true)
+        setLoadingPricing(true);
         const items = cart.map(item => ({
           itemId: item.id,
           name: item.name,
-          price: item.price, // Price should already be in INR
+          price: item.price,
+          // Price should already be in INR
           quantity: item.quantity || 1,
           image: item.image,
           description: item.description,
           isVeg: item.isVeg !== false
-        }))
-
+        }));
         const response = await orderAPI.calculateOrder({
           items,
           restaurantId: restaurantData?.restaurantId || restaurantData?._id || restaurantId || null,
           deliveryAddress: defaultAddress,
           couponCode: appliedCoupon?.code || couponCode || null,
           deliveryFleet: deliveryFleet || 'standard'
-        })
-
+        });
         if (response?.data?.success && response?.data?.data?.pricing) {
-          setPricing(response.data.data.pricing)
+          setPricing(response.data.data.pricing);
 
           // Update applied coupon if backend returns one
           if (response.data.data.pricing.appliedCoupon && !appliedCoupon) {
-            const coupon = availableCoupons.find(c => c.code === response.data.data.pricing.appliedCoupon.code)
+            const coupon = availableCoupons.find(c => c.code === response.data.data.pricing.appliedCoupon.code);
             if (coupon) {
-              setAppliedCoupon(coupon)
+              setAppliedCoupon(coupon);
             }
           }
         }
       } catch (error) {
         // Network errors or 404 errors - silently handle, fallback to frontend calculation
         if (error.code !== 'ERR_NETWORK' && error.response?.status !== 404) {
-          console.error("Error calculating pricing:", error)
+          console.error("Error calculating pricing:", error);
         }
         // Fallback to frontend calculation if backend fails
-        setPricing(null)
+        setPricing(null);
       } finally {
-        setLoadingPricing(false)
+        setLoadingPricing(false);
       }
-    }
-
-    calculatePricing()
-  }, [cart, defaultAddress, appliedCoupon, couponCode, deliveryFleet, restaurantId])
+    };
+    calculatePricing();
+  }, [cart, defaultAddress, appliedCoupon, couponCode, deliveryFleet, restaurantId]);
 
   // Fetch wallet balance
   useEffect(() => {
     const fetchWalletBalance = async () => {
       try {
-        setIsLoadingWallet(true)
-        const response = await userAPI.getWallet()
+        setIsLoadingWallet(true);
+        const response = await userAPI.getWallet();
         if (response?.data?.success && response?.data?.data?.wallet) {
-          setWalletBalance(response.data.data.wallet.balance || 0)
+          setWalletBalance(response.data.data.wallet.balance || 0);
         }
       } catch (error) {
-        console.error("Error fetching wallet balance:", error)
-        setWalletBalance(0)
+        console.error("Error fetching wallet balance:", error);
+        setWalletBalance(0);
       } finally {
-        setIsLoadingWallet(false)
+        setIsLoadingWallet(false);
       }
-    }
-    fetchWalletBalance()
-  }, [])
+    };
+    fetchWalletBalance();
+  }, []);
 
   // Fetch fee settings on mount
   useEffect(() => {
     const fetchFeeSettings = async () => {
       try {
-        const response = await adminAPI.getPublicFeeSettings()
+        const response = await adminAPI.getPublicFeeSettings();
         if (response.data.success && response.data.data.feeSettings) {
           setFeeSettings({
             deliveryFee: response.data.data.feeSettings.deliveryFee || 25,
             freeDeliveryThreshold: response.data.data.feeSettings.freeDeliveryThreshold || 149,
             platformFee: response.data.data.feeSettings.platformFee || 5,
-            gstRate: response.data.data.feeSettings.gstRate || 5,
-          })
+            gstRate: response.data.data.feeSettings.gstRate || 5
+          });
         }
       } catch (error) {
-        console.error('Error fetching fee settings:', error)
+        console.error('Error fetching fee settings:', error);
         // Keep default values on error
       }
-    }
-    fetchFeeSettings()
-  }, [])
+    };
+    fetchFeeSettings();
+  }, []);
 
   // Use backend pricing if available, otherwise fallback to database settings
-  const subtotal = pricing?.subtotal || cart.reduce((sum, item) => sum + (item.price || 0) * (item.quantity || 1), 0)
-  const deliveryFee = pricing?.deliveryFee ?? (subtotal >= feeSettings.freeDeliveryThreshold || appliedCoupon?.freeDelivery ? 0 : feeSettings.deliveryFee)
-  const platformFee = pricing?.platformFee || feeSettings.platformFee
-  const gstCharges = pricing?.tax || Math.round(subtotal * (feeSettings.gstRate / 100))
-  const discount = pricing?.discount || (appliedCoupon ? Math.min(appliedCoupon.discount, subtotal * 0.5) : 0)
-  const totalBeforeDiscount = subtotal + deliveryFee + platformFee + gstCharges
-  const total = pricing?.total || (totalBeforeDiscount - discount)
-  const savings = pricing?.savings || (discount + (subtotal > 500 ? 32 : 0))
+  const subtotal = pricing?.subtotal || cart.reduce((sum, item) => sum + (item.price || 0) * (item.quantity || 1), 0);
+  const deliveryFee = pricing?.deliveryFee ?? (subtotal >= feeSettings.freeDeliveryThreshold || appliedCoupon?.freeDelivery ? 0 : feeSettings.deliveryFee);
+  const platformFee = pricing?.platformFee || feeSettings.platformFee;
+  const gstCharges = pricing?.tax || Math.round(subtotal * (feeSettings.gstRate / 100));
+  const discount = pricing?.discount || (appliedCoupon ? Math.min(appliedCoupon.discount, subtotal * 0.5) : 0);
+  const totalBeforeDiscount = subtotal + deliveryFee + platformFee + gstCharges;
+  const total = pricing?.total || totalBeforeDiscount - discount;
+  const savings = pricing?.savings || discount + (subtotal > 500 ? 32 : 0);
 
   // Restaurant name from data or cart
-  const restaurantName = restaurantData?.name || cart[0]?.restaurant || "Restaurant"
+  const restaurantName = restaurantData?.name || cart[0]?.restaurant || "Restaurant";
 
   // Handler to select address by label (Home, Office, Other)
-  const handleSelectAddressByLabel = async (label) => {
+  const handleSelectAddressByLabel = async label => {
     try {
       // Find address with matching label
-      const address = addresses.find(addr => addr.label === label)
-
+      const address = addresses.find(addr => addr.label === label);
       if (!address) {
         // Instead of error, open selector with this label
-        openLocationSelector(label)
-        return
+        openLocationSelector(label);
+        return;
       }
 
       // Get coordinates from address location
-      const coordinates = address.location?.coordinates || []
-      const longitude = coordinates[0]
-      const latitude = coordinates[1]
-
+      const coordinates = address.location?.coordinates || [];
+      const longitude = coordinates[0];
+      const latitude = coordinates[1];
       if (!latitude || !longitude) {
-        toast.error(`Invalid coordinates for ${label} address`)
-        return
+        toast.error(`Invalid coordinates for ${label} address`);
+        return;
       }
 
       // Update location in backend
@@ -655,10 +567,8 @@ export default function Cart() {
         city: address.city,
         state: address.state,
         area: address.additionalDetails || "",
-        formattedAddress: address.additionalDetails
-          ? `${address.additionalDetails}, ${address.street}, ${address.city}, ${address.state}${address.zipCode ? ` ${address.zipCode}` : ''}`
-          : `${address.street}, ${address.city}, ${address.state}${address.zipCode ? ` ${address.zipCode}` : ''}`
-      })
+        formattedAddress: address.additionalDetails ? `${address.additionalDetails}, ${address.street}, ${address.city}, ${address.state}${address.zipCode ? ` ${address.zipCode}` : ''}` : `${address.street}, ${address.city}, ${address.state}${address.zipCode ? ` ${address.zipCode}` : ''}`
+      });
 
       // Update the location in localStorage
       const locationData = {
@@ -669,27 +579,23 @@ export default function Cart() {
         zipCode: address.zipCode,
         latitude,
         longitude,
-        formattedAddress: address.additionalDetails
-          ? `${address.additionalDetails}, ${address.street}, ${address.city}, ${address.state}${address.zipCode ? ` ${address.zipCode}` : ''}`
-          : `${address.street}, ${address.city}, ${address.state}${address.zipCode ? ` ${address.zipCode}` : ''}`
-      }
-      localStorage.setItem("userLocation", JSON.stringify(locationData))
-
-      toast.success(`${label} address selected!`)
+        formattedAddress: address.additionalDetails ? `${address.additionalDetails}, ${address.street}, ${address.city}, ${address.state}${address.zipCode ? ` ${address.zipCode}` : ''}` : `${address.street}, ${address.city}, ${address.state}${address.zipCode ? ` ${address.zipCode}` : ''}`
+      };
+      localStorage.setItem("userLocation", JSON.stringify(locationData));
+      toast.success(`${label} address selected!`);
 
       // Force page reload to update location
-      window.location.reload()
+      window.location.reload();
     } catch (error) {
-      console.error(`Error selecting ${label} address:`, error)
-      toast.error(`Failed to select ${label} address. Please try again.`)
+      console.error(`Error selecting ${label} address:`, error);
+      toast.error(`Failed to select ${label} address. Please try again.`);
     }
-  }
-
-  const handleApplyCoupon = async (coupon) => {
+  };
+  const handleApplyCoupon = async coupon => {
     if (subtotal >= coupon.minOrder) {
-      setAppliedCoupon(coupon)
-      setCouponCode(coupon.code)
-      setShowCoupons(false)
+      setAppliedCoupon(coupon);
+      setCouponCode(coupon.code);
+      setShowCoupons(false);
 
       // Recalculate pricing with new coupon
       if (cart.length > 0 && defaultAddress) {
@@ -702,30 +608,26 @@ export default function Cart() {
             image: item.image,
             description: item.description,
             isVeg: item.isVeg !== false
-          }))
-
+          }));
           const response = await orderAPI.calculateOrder({
             items,
             restaurantId: restaurantData?.restaurantId || restaurantData?._id || restaurantId || null,
             deliveryAddress: defaultAddress,
             couponCode: coupon.code,
             deliveryFleet: deliveryFleet || 'standard'
-          })
-
+          });
           if (response?.data?.success && response?.data?.data?.pricing) {
-            setPricing(response.data.data.pricing)
+            setPricing(response.data.data.pricing);
           }
         } catch (error) {
-          console.error("Error recalculating pricing:", error)
+          console.error("Error recalculating pricing:", error);
         }
       }
     }
-  }
-
-
+  };
   const handleRemoveCoupon = async () => {
-    setAppliedCoupon(null)
-    setCouponCode("")
+    setAppliedCoupon(null);
+    setCouponCode("");
 
     // Recalculate pricing without coupon
     if (cart.length > 0 && defaultAddress) {
@@ -738,47 +640,36 @@ export default function Cart() {
           image: item.image,
           description: item.description,
           isVeg: item.isVeg !== false
-        }))
-
+        }));
         const response = await orderAPI.calculateOrder({
           items,
           restaurantId: restaurantData?.restaurantId || restaurantData?._id || restaurantId || null,
           deliveryAddress: defaultAddress,
           couponCode: null,
           deliveryFleet: deliveryFleet || 'standard'
-        })
-
+        });
         if (response?.data?.success && response?.data?.data?.pricing) {
-          setPricing(response.data.data.pricing)
+          setPricing(response.data.data.pricing);
         }
       } catch (error) {
-        console.error("Error recalculating pricing:", error)
+        console.error("Error recalculating pricing:", error);
       }
     }
-  }
-
-
+  };
   const handlePlaceOrder = async () => {
     if (!defaultAddress) {
-      alert("Please add a delivery address")
-      return
+      alert("Please add a delivery address");
+      return;
     }
-
     if (cart.length === 0) {
-      alert("Your cart is empty")
-      return
+      alert("Your cart is empty");
+      return;
     }
-
-    setIsPlacingOrder(true)
+    setIsPlacingOrder(true);
 
     // Use API_BASE_URL from config (supports both dev and production)
 
     try {
-      console.log("🛒 Starting order placement process...")
-      console.log("📦 Cart items:", cart.map(item => ({ id: item.id, name: item.name, quantity: item.quantity, price: item.price })))
-      console.log("💰 Applied coupon:", appliedCoupon?.code || "None")
-      console.log("📍 Delivery address:", defaultAddress?.label || defaultAddress?.city)
-
       // Ensure couponCode is included in pricing
       const orderPricing = pricing || {
         subtotal,
@@ -805,21 +696,13 @@ export default function Cart() {
         image: item.image || "",
         description: item.description || "",
         isVeg: item.isVeg !== false
-      }))
-
-      console.log("📋 Order items to send:", orderItems)
-      console.log("💵 Order pricing:", orderPricing)
-
+      }));
       // Check API base URL before making request (for debugging)
       const fullUrl = `${API_BASE_URL}${API_ENDPOINTS.ORDER.CREATE}`;
-      console.log("🌐 Making request to:", fullUrl)
-      console.log("🔑 Authentication token present:", !!localStorage.getItem('accessToken') || !!localStorage.getItem('user_accessToken'))
-
       // CRITICAL: Validate restaurant ID before placing order
       // Ensure we're using the correct restaurant from restaurantData (most reliable)
       const finalRestaurantId = restaurantData?.restaurantId || restaurantData?._id || null;
       const finalRestaurantName = restaurantData?.name || null;
-
       if (!finalRestaurantId) {
         console.error('❌ CRITICAL: Cannot place order - Restaurant ID is missing!');
         console.error('📋 Debug info:', {
@@ -843,15 +726,9 @@ export default function Cart() {
       }
 
       // CRITICAL: Validate that ALL cart items belong to the SAME restaurant
-      const cartRestaurantIds = cart
-        .map(item => item.restaurantId)
-        .filter(Boolean)
-        .map(id => String(id).trim()); // Normalize to string and trim
+      const cartRestaurantIds = cart.map(item => item.restaurantId).filter(Boolean).map(id => String(id).trim()); // Normalize to string and trim
 
-      const cartRestaurantNames = cart
-        .map(item => item.restaurant)
-        .filter(Boolean)
-        .map(name => name.trim().toLowerCase()); // Normalize names
+      const cartRestaurantNames = cart.map(item => item.restaurant).filter(Boolean).map(name => name.trim().toLowerCase()); // Normalize names
 
       // Get unique values (after normalization)
       const uniqueRestaurantIds = [...new Set(cartRestaurantIds)];
@@ -874,7 +751,6 @@ export default function Cart() {
 
         // Automatically clean cart to keep items from the restaurant matching restaurantData
         if (finalRestaurantId && finalRestaurantName) {
-          console.log('🧹 Auto-cleaning cart to keep items from:', finalRestaurantName);
           cleanCartForRestaurant(finalRestaurantId, finalRestaurantName);
           toast.error('Cart contained items from different restaurants. Items from other restaurants have been removed.');
         } else {
@@ -882,14 +758,12 @@ export default function Cart() {
           const firstRestaurantId = cart[0]?.restaurantId;
           const firstRestaurantName = cart[0]?.restaurant;
           if (firstRestaurantId && firstRestaurantName) {
-            console.log('🧹 Auto-cleaning cart to keep items from first restaurant:', firstRestaurantName);
             cleanCartForRestaurant(firstRestaurantId, firstRestaurantName);
             toast.error('Cart contained items from different restaurants. Items from other restaurants have been removed.');
           } else {
             toast.error('Cart contains items from different restaurants. Please clear cart and try again.');
           }
         }
-
         setIsPlacingOrder(false);
         return;
       }
@@ -910,11 +784,7 @@ export default function Cart() {
         const cartRestaurantId = cartRestaurantIds[0];
 
         // Check if cart restaurantId matches restaurantData
-        const restaurantIdMatches =
-          cartRestaurantId === finalRestaurantId ||
-          cartRestaurantId === restaurantData?._id?.toString() ||
-          cartRestaurantId === restaurantData?.restaurantId;
-
+        const restaurantIdMatches = cartRestaurantId === finalRestaurantId || cartRestaurantId === restaurantData?._id?.toString() || cartRestaurantId === restaurantData?.restaurantId;
         if (!restaurantIdMatches) {
           console.error('❌ CRITICAL ERROR: Cart restaurantId does not match restaurantData!', {
             cartRestaurantId: cartRestaurantId,
@@ -945,21 +815,10 @@ export default function Cart() {
       }
 
       // Log order details for debugging
-      console.log('✅ Order validation passed - Placing order with restaurant:', {
-        restaurantId: finalRestaurantId,
-        restaurantName: finalRestaurantName,
-        restaurantDataId: restaurantData?._id,
-        restaurantDataRestaurantId: restaurantData?.restaurantId,
-        cartRestaurantId: cartRestaurantIds[0],
-        cartRestaurantName: cartRestaurantNames[0],
-        cartItemCount: cart.length
-      });
 
       // FINAL VALIDATION: Double-check restaurantId before sending to backend
       const cartRestaurantId = cart[0]?.restaurantId;
-      if (cartRestaurantId && cartRestaurantId !== finalRestaurantId &&
-        cartRestaurantId !== restaurantData?._id?.toString() &&
-        cartRestaurantId !== restaurantData?.restaurantId) {
+      if (cartRestaurantId && cartRestaurantId !== finalRestaurantId && cartRestaurantId !== restaurantData?._id?.toString() && cartRestaurantId !== restaurantData?.restaurantId) {
         console.error('❌ CRITICAL: Final validation failed - restaurantId mismatch!', {
           cartRestaurantId: cartRestaurantId,
           finalRestaurantId: finalRestaurantId,
@@ -972,7 +831,6 @@ export default function Cart() {
         setIsPlacingOrder(false);
         return;
       }
-
       const orderPayload = {
         items: orderItems,
         address: defaultAddress,
@@ -986,91 +844,72 @@ export default function Cart() {
         zoneId: zoneId // CRITICAL: Pass zoneId for strict zone validation
       };
       // Log final order details (including paymentMethod for COD debugging)
-      console.log('📤 FINAL: Sending order to backend with:', {
-        restaurantId: finalRestaurantId,
-        restaurantName: finalRestaurantName,
-        itemCount: orderItems.length,
-        totalAmount: orderPricing.total,
-        paymentMethod: orderPayload.paymentMethod
-      });
 
       // Check wallet balance if wallet payment selected
       if (selectedPaymentMethod === "wallet" && walletBalance < total) {
-        toast.error(`Insufficient wallet balance. Required: ₹${total.toFixed(0)}, Available: ₹${walletBalance.toFixed(0)}`)
-        setIsPlacingOrder(false)
-        return
+        toast.error(`Insufficient wallet balance. Required: ₹${total.toFixed(0)}, Available: ₹${walletBalance.toFixed(0)}`);
+        setIsPlacingOrder(false);
+        return;
       }
 
       // Create order in backend
-      const orderResponse = await orderAPI.createOrder(orderPayload)
-
-      console.log("✅ Order created successfully:", orderResponse.data)
-
-      const { order, razorpay } = orderResponse.data.data
+      const orderResponse = await orderAPI.createOrder(orderPayload);
+      const {
+        order,
+        razorpay
+      } = orderResponse.data.data;
 
       // Cash flow: order placed without online payment
       if (selectedPaymentMethod === "cash") {
-        toast.success("Order placed with Cash on Delivery")
-        setPlacedOrderId(order?.orderId || order?.id || null)
-        setShowOrderSuccess(true)
-        clearCart()
-        setIsPlacingOrder(false)
-        return
+        toast.success("Order placed with Cash on Delivery");
+        setPlacedOrderId(order?.orderId || order?.id || null);
+        setShowOrderSuccess(true);
+        clearCart();
+        setIsPlacingOrder(false);
+        return;
       }
 
       // Wallet flow: order placed with wallet payment (already processed in backend)
       if (selectedPaymentMethod === "wallet") {
-        toast.success("Order placed with Wallet payment")
-        setPlacedOrderId(order?.orderId || order?.id || null)
-        setShowOrderSuccess(true)
-        clearCart()
-        setIsPlacingOrder(false)
+        toast.success("Order placed with Wallet payment");
+        setPlacedOrderId(order?.orderId || order?.id || null);
+        setShowOrderSuccess(true);
+        clearCart();
+        setIsPlacingOrder(false);
         // Refresh wallet balance
         try {
-          const walletResponse = await userAPI.getWallet()
+          const walletResponse = await userAPI.getWallet();
           if (walletResponse?.data?.success && walletResponse?.data?.data?.wallet) {
-            setWalletBalance(walletResponse.data.data.wallet.balance || 0)
+            setWalletBalance(walletResponse.data.data.wallet.balance || 0);
           }
         } catch (error) {
-          console.error("Error refreshing wallet balance:", error)
+          console.error("Error refreshing wallet balance:", error);
         }
-        return
+        return;
       }
-
       if (!razorpay || !razorpay.orderId || !razorpay.key) {
-        console.error("❌ Razorpay initialization failed:", { razorpay, order })
-        throw new Error(razorpay ? "Razorpay payment gateway is not configured. Please contact support." : "Failed to initialize payment")
+        console.error("❌ Razorpay initialization failed:", {
+          razorpay,
+          order
+        });
+        throw new Error(razorpay ? "Razorpay payment gateway is not configured. Please contact support." : "Failed to initialize payment");
       }
-
-      console.log("💳 Razorpay order created:", {
-        orderId: razorpay.orderId,
-        amount: razorpay.amount,
-        currency: razorpay.currency,
-        keyPresent: !!razorpay.key
-      })
-
       // Get user info for Razorpay prefill
-      const userInfo = userProfile || {}
-      const userPhone = userInfo.phone || defaultAddress?.phone || ""
-      const userEmail = userInfo.email || ""
-      const userName = userInfo.name || ""
+      const userInfo = userProfile || {};
+      const userPhone = userInfo.phone || defaultAddress?.phone || "";
+      const userEmail = userInfo.email || "";
+      const userName = userInfo.name || "";
 
       // Format phone number (remove non-digits, take last 10 digits)
-      const formattedPhone = userPhone.replace(/\D/g, "").slice(-10)
-
-      console.log("👤 User info for payment:", {
-        name: userName,
-        email: userEmail,
-        phone: formattedPhone
-      })
-
+      const formattedPhone = userPhone.replace(/\D/g, "").slice(-10);
       // Get company name for Razorpay
-      const companyName = await getCompanyNameAsync()
+      const companyName = await getCompanyNameAsync();
 
       // Initialize Razorpay payment
       await initRazorpayPayment({
         key: razorpay.key,
-        amount: razorpay.amount, // Already in paise from backend
+        amount: razorpay.amount,
+        // Already in paise from backend
         currency: razorpay.currency || 'INR',
         order_id: razorpay.orderId,
         name: companyName,
@@ -1085,74 +924,53 @@ export default function Cart() {
           userId: userInfo.id || "",
           restaurantId: restaurantId || "unknown"
         },
-        handler: async (response) => {
+        handler: async response => {
           try {
-            console.log("✅ Payment successful, verifying...", {
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_payment_id: response.razorpay_payment_id
-            })
-
             // Verify payment with backend
             const verifyResponse = await orderAPI.verifyPayment({
               orderId: order.id,
               razorpayOrderId: response.razorpay_order_id,
               razorpayPaymentId: response.razorpay_payment_id,
               razorpaySignature: response.razorpay_signature
-            })
-
-            console.log("✅ Payment verification response:", verifyResponse.data)
-
+            });
             if (verifyResponse.data.success) {
               // Payment successful
-              console.log("🎉 Order placed successfully:", {
-                orderId: order.orderId,
-                paymentId: verifyResponse.data.data?.payment?.paymentId
-              })
-              setPlacedOrderId(order.orderId)
-              setShowOrderSuccess(true)
-              clearCart()
-              setIsPlacingOrder(false)
+
+              setPlacedOrderId(order.orderId);
+              setShowOrderSuccess(true);
+              clearCart();
+              setIsPlacingOrder(false);
             } else {
-              throw new Error(verifyResponse.data.message || "Payment verification failed")
+              throw new Error(verifyResponse.data.message || "Payment verification failed");
             }
           } catch (error) {
-            console.error("❌ Payment verification error:", error)
-            const errorMessage = error?.response?.data?.message || error?.message || "Payment verification failed. Please contact support."
-            alert(errorMessage)
-            setIsPlacingOrder(false)
+            console.error("❌ Payment verification error:", error);
+            const errorMessage = error?.response?.data?.message || error?.message || "Payment verification failed. Please contact support.";
+            alert(errorMessage);
+            setIsPlacingOrder(false);
           }
         },
-        onError: (error) => {
-          console.error("❌ Razorpay payment error:", error)
+        onError: error => {
+          console.error("❌ Razorpay payment error:", error);
           // Don't show alert for user cancellation
           if (error?.code !== 'PAYMENT_CANCELLED' && error?.message !== 'PAYMENT_CANCELLED') {
-            const errorMessage = error?.description || error?.message || "Payment failed. Please try again."
-            alert(errorMessage)
+            const errorMessage = error?.description || error?.message || "Payment failed. Please try again.";
+            alert(errorMessage);
           }
-          setIsPlacingOrder(false)
+          setIsPlacingOrder(false);
         },
         onClose: () => {
-          console.log("⚠️ Payment modal closed by user")
-          setIsPlacingOrder(false)
+          setIsPlacingOrder(false);
         }
-      })
+      });
     } catch (error) {
-      console.error("❌ Order creation error:", error)
-
-      let errorMessage = "Failed to create order. Please try again."
+      console.error("❌ Order creation error:", error);
+      let errorMessage = "Failed to create order. Please try again.";
 
       // Handle network errors
       if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
         const backendUrl = API_BASE_URL.replace('/api', '');
-        errorMessage = `Network Error: Cannot connect to backend server.\n\n` +
-          `Expected backend URL: ${backendUrl}\n\n` +
-          `Please check:\n` +
-          `1. Backend server is running\n` +
-          `2. Backend is accessible at ${backendUrl}\n` +
-          `3. Check browser console (F12) for more details\n\n` +
-          `If backend is not running, start it with:\n` +
-          `cd appzetofood/backend && npm start`
-
+        errorMessage = `Network Error: Cannot connect to backend server.\n\n` + `Expected backend URL: ${backendUrl}\n\n` + `Please check:\n` + `1. Backend server is running\n` + `2. Backend is accessible at ${backendUrl}\n` + `3. Check browser console (F12) for more details\n\n` + `If backend is not running, start it with:\n` + `cd appzetofood/backend && npm start`;
         console.error("🔴 Network Error Details:", {
           code: error.code,
           message: error.message,
@@ -1164,54 +982,50 @@ export default function Cart() {
           },
           backendUrl: backendUrl,
           apiBaseUrl: API_BASE_URL
-        })
+        });
 
         // Try to test backend connectivity
         try {
-          fetch(backendUrl + '/health', { method: 'GET', signal: AbortSignal.timeout(5000) })
-            .then(response => {
-              if (response.ok) {
-                console.log("✅ Backend health check passed - server is running")
-              } else {
-                console.warn("⚠️ Backend health check returned:", response.status)
-              }
-            })
-            .catch(fetchError => {
-              console.error("❌ Backend health check failed:", fetchError.message)
-              console.error("💡 Make sure backend server is running at:", backendUrl)
-            })
+          fetch(backendUrl + '/health', {
+            method: 'GET',
+            signal: AbortSignal.timeout(5000)
+          }).then(response => {
+            if (response.ok) {} else {
+              console.warn("⚠️ Backend health check returned:", response.status);
+            }
+          }).catch(fetchError => {
+            console.error("❌ Backend health check failed:", fetchError.message);
+            console.error("💡 Make sure backend server is running at:", backendUrl);
+          });
         } catch (fetchTestError) {
-          console.error("❌ Could not test backend connectivity:", fetchTestError.message)
+          console.error("❌ Could not test backend connectivity:", fetchTestError.message);
         }
       }
       // Handle timeout errors
       else if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
-        errorMessage = "Request timed out. The server is taking too long to respond. Please try again."
+        errorMessage = "Request timed out. The server is taking too long to respond. Please try again.";
       }
       // Handle other axios errors
       else if (error.response) {
         // Server responded with error status
-        errorMessage = error.response.data?.message || `Server error: ${error.response.status}`
+        errorMessage = error.response.data?.message || `Server error: ${error.response.status}`;
       }
       // Handle other errors
       else if (error.message) {
-        errorMessage = error.message
+        errorMessage = error.message;
       }
-
-      alert(errorMessage)
-      setIsPlacingOrder(false)
+      alert(errorMessage);
+      setIsPlacingOrder(false);
     }
-  }
-
+  };
   const handleGoToOrders = () => {
-    setShowOrderSuccess(false)
-    navigate(`/user/orders/${placedOrderId}?confirmed=true`)
-  }
+    setShowOrderSuccess(false);
+    navigate(`/user/orders/${placedOrderId}?confirmed=true`);
+  };
 
   // Empty cart state - but don't show if order success or placing order modal is active
   if (cart.length === 0 && !showOrderSuccess && !showPlacingOrder) {
-    return (
-      <AnimatedPage className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a]">
+    return <AnimatedPage className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a]">
         <div className="bg-white dark:bg-[#1a1a1a] border-b dark:border-gray-800 sticky top-0 z-10">
           <div className="flex items-center gap-3 px-4 py-3">
             <Link onClick={() => navigate(-1)}>
@@ -1232,12 +1046,9 @@ export default function Cart() {
             <Button className="bg-[#FF5200] hover:opacity-90 text-white">Browse Restaurants</Button>
           </Link>
         </div>
-      </AnimatedPage>
-    )
+      </AnimatedPage>;
   }
-
-  return (
-    <div className="relative min-h-screen bg-white dark:bg-[#0a0a0a]">
+  return <div className="relative min-h-screen bg-white dark:bg-[#0a0a0a]">
       {/* Header - Sticky at top */}
       <div className="bg-white dark:bg-[#1a1a1a] border-b dark:border-gray-800 sticky top-0 z-20 flex-shrink-0">
         <div className="max-w-7xl mx-auto">
@@ -1252,7 +1063,7 @@ export default function Cart() {
                 <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400">{restaurantName}</p>
                 <p className="text-sm md:text-base font-medium text-gray-800 dark:text-white truncate">
                   {restaurantData?.estimatedDeliveryTime || "10-15 mins"} to <span className="font-semibold">Location</span>
-                  <span className="text-gray-400 dark:text-gray-500 ml-1 text-xs md:text-sm">{defaultAddress ? (formatFullAddress(defaultAddress) || defaultAddress?.formattedAddress || defaultAddress?.address || defaultAddress?.city || "Select address") : "Select address"}</span>
+                  <span className="text-gray-400 dark:text-gray-500 ml-1 text-xs md:text-sm">{defaultAddress ? formatFullAddress(defaultAddress) || defaultAddress?.formattedAddress || defaultAddress?.address || defaultAddress?.city || "Select address" : "Select address"}</span>
                 </p>
               </div>
             </div>
@@ -1266,15 +1077,13 @@ export default function Cart() {
       {/* Scrollable Content Area */}
       <div className="flex-1 overflow-y-auto overflow-x-hidden pb-24 md:pb-32">
         {/* Savings Banner */}
-        {savings > 0 && (
-          <div className="bg-blue-100 dark:bg-blue-900/20 px-4 md:px-6 py-2 md:py-3 flex-shrink-0">
+        {savings > 0 && <div className="bg-blue-100 dark:bg-blue-900/20 px-4 md:px-6 py-2 md:py-3 flex-shrink-0">
             <div className="max-w-7xl mx-auto">
               <p className="text-sm md:text-base font-medium text-blue-800 dark:text-blue-200">
                 🎉 You saved ₹{savings} on this order
               </p>
             </div>
-          </div>
-        )}
+          </div>}
 
         <div className="max-w-7xl mx-auto">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 px-4 md:px-6 py-4 md:py-6">
@@ -1283,8 +1092,7 @@ export default function Cart() {
               {/* Cart Items */}
               <div className="bg-white dark:bg-[#1a1a1a] px-4 md:px-6 py-3 md:py-4 rounded-lg md:rounded-xl">
                 <div className="space-y-3 md:space-y-4">
-                  {cart.map((item) => (
-                    <div key={item.id} className="flex items-start gap-3 md:gap-4">
+                  {cart.map(item => <div key={item.id} className="flex items-start gap-3 md:gap-4">
                       {/* Veg/Non-veg indicator */}
                       <div className={`w-4 h-4 md:w-5 md:h-5 border-2 ${item.isVeg !== false ? 'border-green-600' : 'border-red-600'} flex items-center justify-center mt-1 flex-shrink-0`}>
                         <div className={`w-2 h-2 md:w-2.5 md:h-2.5 rounded-full ${item.isVeg !== false ? 'bg-green-600' : 'bg-red-600'}`} />
@@ -1300,19 +1108,13 @@ export default function Cart() {
                       <div className="flex items-center gap-3 md:gap-4">
                         {/* Quantity controls */}
                         <div className="flex items-center border border-[#FF5200] dark:border-[#FF5200] rounded">
-                          <button
-                            className="px-2 md:px-3 py-1 text-[#FF5200] dark:text-[#FF5200] hover:bg-[#FF5200]/10 dark:hover:bg-[#FF5200]/20"
-                            onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                          >
+                          <button className="px-2 md:px-3 py-1 text-[#FF5200] dark:text-[#FF5200] hover:bg-[#FF5200]/10 dark:hover:bg-[#FF5200]/20" onClick={() => updateQuantity(item.id, item.quantity - 1)}>
                             <Minus className="h-3 w-3 md:h-4 md:w-4" />
                           </button>
                           <span className="px-2 md:px-3 text-sm md:text-base font-semibold text-[#FF5200] dark:text-[#FF5200] min-w-[20px] md:min-w-[24px] text-center">
                             {item.quantity}
                           </span>
-                          <button
-                            className="px-2 md:px-3 py-1 text-[#FF5200] dark:text-[#FF5200] hover:bg-[#FF5200]/10 dark:hover:bg-[#FF5200]/20"
-                            onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                          >
+                          <button className="px-2 md:px-3 py-1 text-[#FF5200] dark:text-[#FF5200] hover:bg-[#FF5200]/10 dark:hover:bg-[#FF5200]/20" onClick={() => updateQuantity(item.id, item.quantity + 1)}>
                             <Plus className="h-3 w-3 md:h-4 md:w-4" />
                           </button>
                         </div>
@@ -1321,15 +1123,11 @@ export default function Cart() {
                           ₹{((item.price || 0) * (item.quantity || 1)).toFixed(0)}
                         </p>
                       </div>
-                    </div>
-                  ))}
+                    </div>)}
                 </div>
 
                 {/* Add more items */}
-                <button
-                  onClick={() => navigate(-1)}
-                  className="flex items-center gap-2 mt-4 md:mt-6 text-[#FF5200] dark:text-[#FF5200]"
-                >
+                <button onClick={() => navigate(-1)} className="flex items-center gap-2 mt-4 md:mt-6 text-[#FF5200] dark:text-[#FF5200]">
                   <Plus className="h-4 w-4 md:h-5 md:w-5" />
                   <span className="text-sm md:text-base font-medium">Add more items</span>
                 </button>
@@ -1338,122 +1136,86 @@ export default function Cart() {
 
               {/* Note & Cutlery */}
               <div className="bg-white dark:bg-[#1a1a1a] px-4 md:px-6 py-3 md:py-4 rounded-lg md:rounded-xl flex flex-col sm:flex-row gap-2 md:gap-3">
-                <button
-                  onClick={() => setShowNoteInput(!showNoteInput)}
-                  className="flex-1 flex items-center gap-2 px-3 md:px-4 py-2 md:py-3 border border-gray-200 dark:border-gray-700 rounded-lg md:rounded-xl text-sm md:text-base text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
-                >
+                <button onClick={() => setShowNoteInput(!showNoteInput)} className="flex-1 flex items-center gap-2 px-3 md:px-4 py-2 md:py-3 border border-gray-200 dark:border-gray-700 rounded-lg md:rounded-xl text-sm md:text-base text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800">
                   <FileText className="h-4 w-4 md:h-5 md:w-5" />
                   <span className="truncate">{note || "Add a note for the restaurant"}</span>
                 </button>
-                <button
-                  onClick={() => setSendCutlery(!sendCutlery)}
-                  className={`flex items-center gap-2 px-3 md:px-4 py-2 md:py-3 border rounded-lg md:rounded-xl text-sm md:text-base ${sendCutlery ? 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300' : 'border-[#FF5200] dark:border-[#FF5200] text-[#FF5200] dark:text-[#FF5200] bg-[#FF5200]/10 dark:bg-[#FF5200]/20'}`}
-                >
+                <button onClick={() => setSendCutlery(!sendCutlery)} className={`flex items-center gap-2 px-3 md:px-4 py-2 md:py-3 border rounded-lg md:rounded-xl text-sm md:text-base ${sendCutlery ? 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300' : 'border-[#FF5200] dark:border-[#FF5200] text-[#FF5200] dark:text-[#FF5200] bg-[#FF5200]/10 dark:bg-[#FF5200]/20'}`}>
                   <Utensils className="h-4 w-4 md:h-5 md:w-5" />
                   <span className="whitespace-nowrap">{sendCutlery ? "Don't send cutlery" : "No cutlery"}</span>
                 </button>
               </div>
 
               {/* Note Input */}
-              {showNoteInput && (
-                <div className="bg-white dark:bg-[#1a1a1a] px-4 md:px-6 py-3 md:py-4 rounded-lg md:rounded-xl">
-                  <textarea
-                    value={note}
-                    onChange={(e) => setNote(e.target.value)}
-                    placeholder="Add cooking instructions, allergies, etc."
-                    className="w-full border border-gray-200 dark:border-gray-700 rounded-lg md:rounded-xl p-3 md:p-4 text-sm md:text-base resize-none h-20 md:h-24 focus:outline-none focus:border-[#FF5200] dark:focus:border-[#FF5200] bg-white dark:bg-[#0a0a0a] text-gray-900 dark:text-gray-100"
-                  />
-                </div>
-              )}
+              {showNoteInput && <div className="bg-white dark:bg-[#1a1a1a] px-4 md:px-6 py-3 md:py-4 rounded-lg md:rounded-xl">
+                  <textarea value={note} onChange={e => setNote(e.target.value)} placeholder="Add cooking instructions, allergies, etc." className="w-full border border-gray-200 dark:border-gray-700 rounded-lg md:rounded-xl p-3 md:p-4 text-sm md:text-base resize-none h-20 md:h-24 focus:outline-none focus:border-[#FF5200] dark:focus:border-[#FF5200] bg-white dark:bg-[#0a0a0a] text-gray-900 dark:text-gray-100" />
+                </div>}
 
               {/* Complete your meal section - Approved Addons */}
-              {addons.length > 0 && (
-                <div className="bg-white dark:bg-[#1a1a1a] px-4 md:px-6 py-3 md:py-4 rounded-lg md:rounded-xl">
+              {addons.length > 0 && <div className="bg-white dark:bg-[#1a1a1a] px-4 md:px-6 py-3 md:py-4 rounded-lg md:rounded-xl">
                   <div className="flex items-center gap-2 md:gap-3 mb-3 md:mb-4">
                     <div className="w-6 h-6 md:w-8 md:h-8 bg-gray-100 dark:bg-gray-800 rounded flex items-center justify-center">
                       <span className="text-xs md:text-base">🍽️</span>
                     </div>
                     <span className="text-sm md:text-base font-semibold text-gray-800 dark:text-gray-200">Complete your meal with</span>
                   </div>
-                  {loadingAddons ? (
-                    <div className="flex gap-3 md:gap-4 overflow-x-auto pb-2 -mx-4 md:-mx-6 px-4 md:px-6 scrollbar-hide">
-                      {[1, 2, 3].map((i) => (
-                        <div key={i} className="flex-shrink-0 w-28 md:w-36 animate-pulse">
+                  {loadingAddons ? <div className="flex gap-3 md:gap-4 overflow-x-auto pb-2 -mx-4 md:-mx-6 px-4 md:px-6 scrollbar-hide">
+                      {[1, 2, 3].map(i => <div key={i} className="flex-shrink-0 w-28 md:w-36 animate-pulse">
                           <div className="w-full h-28 md:h-36 bg-gray-200 dark:bg-gray-700 rounded-lg md:rounded-xl" />
                           <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded mt-2" />
                           <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded mt-1 w-2/3" />
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="flex gap-3 md:gap-4 overflow-x-auto pb-2 -mx-4 md:-mx-6 px-4 md:px-6 scrollbar-hide">
-                      {addons.map((addon) => (
-                        <div key={addon.id} className="flex-shrink-0 w-28 md:w-36">
+                        </div>)}
+                    </div> : <div className="flex gap-3 md:gap-4 overflow-x-auto pb-2 -mx-4 md:-mx-6 px-4 md:px-6 scrollbar-hide">
+                      {addons.map(addon => <div key={addon.id} className="flex-shrink-0 w-28 md:w-36">
                           <div className="relative bg-gray-100 dark:bg-gray-800 rounded-lg md:rounded-xl overflow-hidden">
-                            <img
-                              src={addon.image || (addon.images && addon.images[0]) || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200&h=200&fit=crop"}
-                              alt={addon.name}
-                              className="w-full h-28 md:h-36 object-cover rounded-lg md:rounded-xl"
-                              onError={(e) => {
-                                e.target.onerror = null
-                                e.target.src = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200&h=200&fit=crop"
-                              }}
-                            />
+                            <img src={addon.image || addon.images && addon.images[0] || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200&h=200&fit=crop"} alt={addon.name} className="w-full h-28 md:h-36 object-cover rounded-lg md:rounded-xl" onError={e => {
+                      e.target.onerror = null;
+                      e.target.src = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200&h=200&fit=crop";
+                    }} />
                             <div className="absolute top-1 md:top-2 left-1 md:left-2">
                               <div className="w-3.5 h-3.5 md:w-4 md:h-4 bg-white border border-green-600 flex items-center justify-center rounded">
                                 <div className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-green-600" />
                               </div>
                             </div>
-                            <button
-                              onClick={() => {
-                                // Use restaurant info from existing cart items to ensure format consistency
-                                const cartRestaurantId = cart[0]?.restaurantId || restaurantId;
-                                const cartRestaurantName = cart[0]?.restaurant || restaurantName;
-
-                                if (!cartRestaurantId || !cartRestaurantName) {
-                                  console.error('❌ Cannot add addon: Missing restaurant information', {
-                                    cartRestaurantId,
-                                    cartRestaurantName,
-                                    restaurantId,
-                                    restaurantName,
-                                    cartItem: cart[0]
-                                  });
-                                  toast.error('Restaurant information is missing. Please refresh the page.');
-                                  return;
-                                }
-
-                                addToCart({
-                                  id: addon.id,
-                                  name: addon.name,
-                                  price: addon.price,
-                                  image: addon.image || (addon.images && addon.images[0]) || "",
-                                  description: addon.description || "",
-                                  isVeg: true,
-                                  restaurant: cartRestaurantName,
-                                  restaurantId: cartRestaurantId
-                                });
-                              }}
-                              className="absolute bottom-1 md:bottom-2 right-1 md:right-2 w-6 h-6 md:w-7 md:h-7 bg-white border border-red-600 rounded flex items-center justify-center shadow-sm hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                            >
+                            <button onClick={() => {
+                      // Use restaurant info from existing cart items to ensure format consistency
+                      const cartRestaurantId = cart[0]?.restaurantId || restaurantId;
+                      const cartRestaurantName = cart[0]?.restaurant || restaurantName;
+                      if (!cartRestaurantId || !cartRestaurantName) {
+                        console.error('❌ Cannot add addon: Missing restaurant information', {
+                          cartRestaurantId,
+                          cartRestaurantName,
+                          restaurantId,
+                          restaurantName,
+                          cartItem: cart[0]
+                        });
+                        toast.error('Restaurant information is missing. Please refresh the page.');
+                        return;
+                      }
+                      addToCart({
+                        id: addon.id,
+                        name: addon.name,
+                        price: addon.price,
+                        image: addon.image || addon.images && addon.images[0] || "",
+                        description: addon.description || "",
+                        isVeg: true,
+                        restaurant: cartRestaurantName,
+                        restaurantId: cartRestaurantId
+                      });
+                    }} className="absolute bottom-1 md:bottom-2 right-1 md:right-2 w-6 h-6 md:w-7 md:h-7 bg-white border border-red-600 rounded flex items-center justify-center shadow-sm hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
                               <Plus className="h-3.5 w-3.5 md:h-4 md:w-4 text-red-600" />
                             </button>
                           </div>
                           <p className="text-xs md:text-sm font-medium text-gray-800 dark:text-gray-200 mt-1.5 md:mt-2 line-clamp-2 leading-tight">{addon.name}</p>
-                          {addon.description && (
-                            <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-1">{addon.description}</p>
-                          )}
+                          {addon.description && <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-1">{addon.description}</p>}
                           <p className="text-xs md:text-sm text-gray-800 dark:text-gray-200 font-semibold mt-0.5">₹{addon.price}</p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
+                        </div>)}
+                    </div>}
+                </div>}
 
               {/* Coupon Section */}
               <div className="bg-white dark:bg-[#1a1a1a] px-4 md:px-6 py-3 md:py-4 rounded-lg md:rounded-xl">
-                {appliedCoupon ? (
-                  <div className="flex items-center justify-between bg-[#FF5200]/10 dark:bg-[#FF5200]/20 border border-[#FF5200]/30 dark:border-[#FF5200]/30 rounded-lg md:rounded-xl p-3 md:p-4">
+                {appliedCoupon ? <div className="flex items-center justify-between bg-[#FF5200]/10 dark:bg-[#FF5200]/20 border border-[#FF5200]/30 dark:border-[#FF5200]/30 rounded-lg md:rounded-xl p-3 md:p-4">
                     <div className="flex items-center gap-2 md:gap-3">
                       <Tag className="h-4 w-4 md:h-5 md:w-5 text-[#FF5200] dark:text-[#FF5200]" />
                       <div>
@@ -1462,14 +1224,10 @@ export default function Cart() {
                       </div>
                     </div>
                     <button onClick={handleRemoveCoupon} className="text-gray-500 dark:text-gray-400 text-xs md:text-sm font-medium">Remove</button>
-                  </div>
-                ) : loadingCoupons ? (
-                  <div className="flex items-center gap-2 md:gap-3">
+                  </div> : loadingCoupons ? <div className="flex items-center gap-2 md:gap-3">
                     <Percent className="h-4 w-4 md:h-5 md:w-5 text-gray-600 dark:text-gray-400" />
                     <p className="text-sm md:text-base text-gray-500 dark:text-gray-400">Loading coupons...</p>
-                  </div>
-                ) : availableCoupons.length > 0 ? (
-                  <div>
+                  </div> : availableCoupons.length > 0 ? <div>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2 md:gap-3">
                         <Percent className="h-4 w-4 md:h-5 md:w-5 text-gray-600 dark:text-gray-400" />
@@ -1477,53 +1235,32 @@ export default function Cart() {
                           <p className="text-sm md:text-base font-medium text-gray-800 dark:text-gray-200">
                             Save ₹{availableCoupons[0].discount} with '{availableCoupons[0].code}'
                           </p>
-                          {availableCoupons.length > 1 && (
-                            <button onClick={() => setShowCoupons(!showCoupons)} className="text-xs md:text-sm text-blue-600 dark:text-blue-400 font-medium">
+                          {availableCoupons.length > 1 && <button onClick={() => setShowCoupons(!showCoupons)} className="text-xs md:text-sm text-blue-600 dark:text-blue-400 font-medium">
                               View all coupons →
-                            </button>
-                          )}
+                            </button>}
                         </div>
                       </div>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-7 md:h-8 text-xs md:text-sm border-[#FF5200] dark:border-[#FF5200] text-[#FF5200] dark:text-[#FF5200] hover:bg-[#FF5200]/10 dark:hover:bg-[#FF5200]/20"
-                        onClick={() => handleApplyCoupon(availableCoupons[0])}
-                        disabled={subtotal < availableCoupons[0].minOrder}
-                      >
+                      <Button size="sm" variant="outline" className="h-7 md:h-8 text-xs md:text-sm border-[#FF5200] dark:border-[#FF5200] text-[#FF5200] dark:text-[#FF5200] hover:bg-[#FF5200]/10 dark:hover:bg-[#FF5200]/20" onClick={() => handleApplyCoupon(availableCoupons[0])} disabled={subtotal < availableCoupons[0].minOrder}>
                         {subtotal < availableCoupons[0].minOrder ? `Min ₹${availableCoupons[0].minOrder}` : 'APPLY'}
                       </Button>
                     </div>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2 md:gap-3">
+                  </div> : <div className="flex items-center gap-2 md:gap-3">
                     <Percent className="h-4 w-4 md:h-5 md:w-5 text-gray-600 dark:text-gray-400" />
                     <p className="text-sm md:text-base text-gray-500 dark:text-gray-400">No coupons available</p>
-                  </div>
-                )}
+                  </div>}
 
                 {/* Coupons List */}
-                {showCoupons && !appliedCoupon && availableCoupons.length > 0 && (
-                  <div className="mt-3 md:mt-4 space-y-2 md:space-y-3 border-t dark:border-gray-700 pt-3 md:pt-4">
-                    {availableCoupons.map((coupon) => (
-                      <div key={coupon.code} className="flex items-center justify-between py-2 md:py-3 border-b border-dashed dark:border-gray-700 last:border-0">
+                {showCoupons && !appliedCoupon && availableCoupons.length > 0 && <div className="mt-3 md:mt-4 space-y-2 md:space-y-3 border-t dark:border-gray-700 pt-3 md:pt-4">
+                    {availableCoupons.map(coupon => <div key={coupon.code} className="flex items-center justify-between py-2 md:py-3 border-b border-dashed dark:border-gray-700 last:border-0">
                         <div>
                           <p className="text-sm md:text-base font-medium text-gray-800 dark:text-gray-200">{coupon.code}</p>
                           <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400">{coupon.description}</p>
                         </div>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-6 md:h-7 text-xs md:text-sm border-[#FF5200] dark:border-[#FF5200] text-[#FF5200] dark:text-[#FF5200] hover:bg-[#FF5200]/10 dark:hover:bg-[#FF5200]/20"
-                          onClick={() => handleApplyCoupon(coupon)}
-                          disabled={subtotal < coupon.minOrder}
-                        >
+                        <Button size="sm" variant="outline" className="h-6 md:h-7 text-xs md:text-sm border-[#FF5200] dark:border-[#FF5200] text-[#FF5200] dark:text-[#FF5200] hover:bg-[#FF5200]/10 dark:hover:bg-[#FF5200]/20" onClick={() => handleApplyCoupon(coupon)} disabled={subtotal < coupon.minOrder}>
                           {subtotal < coupon.minOrder ? `Min ₹${coupon.minOrder}` : 'APPLY'}
                         </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                      </div>)}
+                  </div>}
               </div>
 
               {/* Delivery Time */}
@@ -1538,10 +1275,7 @@ export default function Cart() {
 
               {/* Delivery Fleet Type */}
               <div className="bg-white dark:bg-[#1a1a1a] px-4 md:px-6 py-3 md:py-4 rounded-lg md:rounded-xl">
-                <button
-                  onClick={() => setShowFleetOptions(!showFleetOptions)}
-                  className="flex items-center justify-between w-full"
-                >
+                <button onClick={() => setShowFleetOptions(!showFleetOptions)} className="flex items-center justify-between w-full">
                   <div className="flex items-center gap-3 md:gap-4">
                     <Truck className="h-4 w-4 md:h-5 md:w-5 text-gray-500 dark:text-gray-400" />
                     <span className="text-sm md:text-base text-gray-800 dark:text-gray-200">Choose delivery fleet type</span>
@@ -1549,12 +1283,8 @@ export default function Cart() {
                   {showFleetOptions ? <ChevronUp className="h-4 w-4 md:h-5 md:w-5 text-gray-400" /> : <ChevronDown className="h-4 w-4 md:h-5 md:w-5 text-gray-400" />}
                 </button>
 
-                {showFleetOptions && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 mt-3 md:mt-4">
-                    <button
-                      onClick={() => setDeliveryFleet("standard")}
-                      className={`p-3 md:p-4 rounded-lg md:rounded-xl border-2 text-left transition-colors ${deliveryFleet === "standard" ? "border-[#FF5200] dark:border-[#FF5200] bg-[#FF5200]/10 dark:bg-[#FF5200]/20" : "border-gray-200 dark:border-gray-700"}`}
-                    >
+                {showFleetOptions && <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 mt-3 md:mt-4">
+                    <button onClick={() => setDeliveryFleet("standard")} className={`p-3 md:p-4 rounded-lg md:rounded-xl border-2 text-left transition-colors ${deliveryFleet === "standard" ? "border-[#FF5200] dark:border-[#FF5200] bg-[#FF5200]/10 dark:bg-[#FF5200]/20" : "border-gray-200 dark:border-gray-700"}`}>
                       <div className="flex items-center justify-between mb-1 md:mb-2">
                         <span className="text-sm md:text-base font-semibold text-gray-800 dark:text-gray-200">Standard Fleet</span>
                         <div className="w-8 h-8 md:w-10 md:h-10 bg-orange-100 dark:bg-orange-900/20 rounded-full flex items-center justify-center">
@@ -1563,10 +1293,7 @@ export default function Cart() {
                       </div>
                       <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400">Our standard food delivery experience</p>
                     </button>
-                    <button
-                      onClick={() => setDeliveryFleet("veg")}
-                      className={`p-3 md:p-4 rounded-lg md:rounded-xl border-2 text-left transition-colors ${deliveryFleet === "veg" ? "border-[#FF5200] dark:border-[#FF5200] bg-[#FF5200]/10 dark:bg-[#FF5200]/20" : "border-gray-200 dark:border-gray-700"}`}
-                    >
+                    <button onClick={() => setDeliveryFleet("veg")} className={`p-3 md:p-4 rounded-lg md:rounded-xl border-2 text-left transition-colors ${deliveryFleet === "veg" ? "border-[#FF5200] dark:border-[#FF5200] bg-[#FF5200]/10 dark:bg-[#FF5200]/20" : "border-gray-200 dark:border-gray-700"}`}>
                       <div className="flex items-center justify-between mb-1 md:mb-2">
                         <span className="text-sm md:text-base font-semibold text-gray-800 dark:text-gray-200">Special Veg-only Fleet</span>
                         <div className="w-8 h-8 md:w-10 md:h-10 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center">
@@ -1575,15 +1302,11 @@ export default function Cart() {
                       </div>
                       <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400">Fleet delivering only from Pure Veg restaurants</p>
                     </button>
-                  </div>
-                )}
+                  </div>}
               </div>
 
               <div className="bg-white dark:bg-[#1a1a1a] px-4 md:px-6 py-3 md:py-4 rounded-lg md:rounded-xl">
-                <div
-                  onClick={() => openLocationSelector()}
-                  className="flex items-center justify-between w-full text-left cursor-pointer hover:bg-gray-50/50 dark:hover:bg-white/5 transition-colors rounded-lg"
-                >
+                <div onClick={() => openLocationSelector()} className="flex items-center justify-between w-full text-left cursor-pointer hover:bg-gray-50/50 dark:hover:bg-white/5 transition-colors rounded-lg">
                   <div className="flex items-center gap-3 md:gap-4 flex-1">
                     <MapPin className="h-4 w-4 md:h-5 md:w-5 text-gray-500 dark:text-gray-400" />
                     <div className="flex-1">
@@ -1591,29 +1314,20 @@ export default function Cart() {
                         Delivery at <span className="font-semibold">Location</span>
                       </p>
                       <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400 line-clamp-2">
-                        {defaultAddress ? (formatFullAddress(defaultAddress) || defaultAddress?.formattedAddress || defaultAddress?.address || "Add delivery address") : "Add delivery address"}
+                        {defaultAddress ? formatFullAddress(defaultAddress) || defaultAddress?.formattedAddress || defaultAddress?.address || "Add delivery address" : "Add delivery address"}
                       </p>
                       {/* Address Selection Buttons */}
                       <div className="flex gap-2 mt-2">
-                        {["Home", "Office", "Other"].map((label) => {
-                          const isSelected = defaultAddress?.label?.toLowerCase() === label.toLowerCase()
-                          return (
-                            <button
-                              key={label}
-                              onClick={(e) => {
-                                e.preventDefault()
-                                e.stopPropagation()
-                                handleSelectAddressByLabel(label)
-                              }}
-                              className={`text-xs md:text-sm px-2 md:px-3 py-1 md:py-1.5 rounded-md border transition-colors ${isSelected
-                                ? 'border-[#FF5200] bg-orange-50 dark:bg-orange-900/20 text-[#FF5200] font-medium'
-                                : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600'
-                                }`}
-                            >
+                        {["Home", "Office", "Other"].map(label => {
+                        const isSelected = defaultAddress?.label?.toLowerCase() === label.toLowerCase();
+                        return <button key={label} onClick={e => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleSelectAddressByLabel(label);
+                        }} className={`text-xs md:text-sm px-2 md:px-3 py-1 md:py-1.5 rounded-md border transition-colors ${isSelected ? 'border-[#FF5200] bg-orange-50 dark:bg-orange-900/20 text-[#FF5200] font-medium' : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600'}`}>
                               {label}
-                            </button>
-                          )
-                        })}
+                            </button>;
+                      })}
                       </div>
                     </div>
                   </div>
@@ -1636,10 +1350,7 @@ export default function Cart() {
 
               {/* Bill Details */}
               <div className="bg-white dark:bg-[#1a1a1a] px-4 md:px-6 py-3 md:py-4 rounded-lg md:rounded-xl">
-                <button
-                  onClick={() => setShowBillDetails(!showBillDetails)}
-                  className="flex items-center justify-between w-full"
-                >
+                <button onClick={() => setShowBillDetails(!showBillDetails)} className="flex items-center justify-between w-full">
                   <div className="flex items-center gap-3 md:gap-4">
                     <FileText className="h-4 w-4 md:h-5 md:w-5 text-gray-500 dark:text-gray-400" />
                     <div className="text-left">
@@ -1647,9 +1358,7 @@ export default function Cart() {
                         <span className="text-sm md:text-base text-gray-800 dark:text-gray-200">Total Bill</span>
                         <span className="text-sm md:text-base text-gray-400 dark:text-gray-500 line-through">₹{totalBeforeDiscount.toFixed(0)}</span>
                         <span className="text-sm md:text-base font-semibold text-gray-800 dark:text-gray-200">₹{total.toFixed(0)}</span>
-                        {savings > 0 && (
-                          <span className="text-xs md:text-sm bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 px-1.5 md:px-2 py-0.5 rounded font-medium">You saved ₹{savings}</span>
-                        )}
+                        {savings > 0 && <span className="text-xs md:text-sm bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 px-1.5 md:px-2 py-0.5 rounded font-medium">You saved ₹{savings}</span>}
                       </div>
                       <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400">Incl. taxes and charges</p>
                     </div>
@@ -1657,8 +1366,7 @@ export default function Cart() {
                   <ChevronRight className="h-4 w-4 md:h-5 md:w-5 text-gray-400" />
                 </button>
 
-                {showBillDetails && (
-                  <div className="mt-3 md:mt-4 pt-3 md:pt-4 border-t border-dashed dark:border-gray-700 space-y-2 md:space-y-3">
+                {showBillDetails && <div className="mt-3 md:mt-4 pt-3 md:pt-4 border-t border-dashed dark:border-gray-700 space-y-2 md:space-y-3">
                     <div className="flex justify-between text-sm md:text-base">
                       <span className="text-gray-600 dark:text-gray-400">Item Total</span>
                       <span className="text-gray-800 dark:text-gray-200">₹{subtotal.toFixed(0)}</span>
@@ -1677,18 +1385,15 @@ export default function Cart() {
                       <span className="text-gray-600 dark:text-gray-400">GST and Restaurant Charges</span>
                       <span className="text-gray-800 dark:text-gray-200">₹{gstCharges}</span>
                     </div>
-                    {discount > 0 && (
-                      <div className="flex justify-between text-sm md:text-base text-red-600 dark:text-red-400">
+                    {discount > 0 && <div className="flex justify-between text-sm md:text-base text-red-600 dark:text-red-400">
                         <span>Coupon Discount</span>
                         <span>-₹{discount}</span>
-                      </div>
-                    )}
+                      </div>}
                     <div className="flex justify-between text-sm md:text-base font-semibold pt-2 md:pt-3 border-t dark:border-gray-700">
                       <span>To Pay</span>
                       <span>₹{total.toFixed(0)}</span>
                     </div>
-                  </div>
-                )}
+                  </div>}
               </div>
 
             </div>
@@ -1718,12 +1423,10 @@ export default function Cart() {
                       <span className="text-gray-600 dark:text-gray-400">GST</span>
                       <span className="text-gray-800 dark:text-gray-200">₹{gstCharges}</span>
                     </div>
-                    {discount > 0 && (
-                      <div className="flex justify-between text-sm md:text-base text-red-600 dark:text-red-400">
+                    {discount > 0 && <div className="flex justify-between text-sm md:text-base text-red-600 dark:text-red-400">
                         <span>Discount</span>
                         <span>-₹{discount}</span>
-                      </div>
-                    )}
+                      </div>}
                     <div className="flex justify-between text-base md:text-lg font-bold pt-3 md:pt-4 border-t dark:border-gray-700">
                       <span>Total</span>
                       <span className="text-green-600 dark:text-green-400">₹{total.toFixed(0)}</span>
@@ -1750,21 +1453,13 @@ export default function Cart() {
                       PAY USING
                     </p>
                     <p className="text-sm md:text-base font-medium text-gray-800 dark:text-gray-200">
-                      {selectedPaymentMethod === "razorpay"
-                        ? "Razorpay"
-                        : selectedPaymentMethod === "wallet"
-                          ? "Wallet"
-                          : "Cash on Delivery"}
+                      {selectedPaymentMethod === "razorpay" ? "Razorpay" : selectedPaymentMethod === "wallet" ? "Wallet" : "Cash on Delivery"}
                     </p>
                   </div>
                 </div>
 
                 <div className="relative">
-                  <select
-                    value={selectedPaymentMethod}
-                    onChange={(e) => setSelectedPaymentMethod(e.target.value)}
-                    className="appearance-none bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200 rounded-lg px-3 py-2 pr-9 text-sm md:text-base focus:outline-none focus:ring-2 focus:ring-green-500/40"
-                  >
+                  <select value={selectedPaymentMethod} onChange={e => setSelectedPaymentMethod(e.target.value)} className="appearance-none bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200 rounded-lg px-3 py-2 pr-9 text-sm md:text-base focus:outline-none focus:ring-2 focus:ring-green-500/40">
                     <option value="razorpay">Razorpay</option>
                     <option value="wallet">Wallet {walletBalance > 0 ? `(₹${walletBalance.toFixed(0)})` : ''}</option>
                     <option value="cash">COD</option>
@@ -1773,28 +1468,13 @@ export default function Cart() {
                 </div>
               </div>
 
-              <Button
-                size="lg"
-                onClick={handlePlaceOrder}
-                disabled={isPlacingOrder || (selectedPaymentMethod === "wallet" && walletBalance < total)}
-                className="w-full bg-green-700 hover:bg-green-800 dark:bg-green-600 dark:hover:bg-green-700 text-white px-6 md:px-10 h-14 md:h-16 rounded-lg md:rounded-xl text-base md:text-lg font-bold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {(selectedPaymentMethod === "razorpay" || selectedPaymentMethod === "wallet") && (
-                  <div className="text-left mr-3 md:mr-4">
+              <Button size="lg" onClick={handlePlaceOrder} disabled={isPlacingOrder || selectedPaymentMethod === "wallet" && walletBalance < total} className="w-full bg-green-700 hover:bg-green-800 dark:bg-green-600 dark:hover:bg-green-700 text-white px-6 md:px-10 h-14 md:h-16 rounded-lg md:rounded-xl text-base md:text-lg font-bold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed">
+                {(selectedPaymentMethod === "razorpay" || selectedPaymentMethod === "wallet") && <div className="text-left mr-3 md:mr-4">
                     <p className="text-sm md:text-base opacity-90">₹{total.toFixed(0)}</p>
                     <p className="text-xs md:text-sm opacity-75">TOTAL</p>
-                  </div>
-                )}
+                  </div>}
                 <span className="font-bold text-base md:text-lg">
-                  {isPlacingOrder
-                    ? "Processing..."
-                    : selectedPaymentMethod === "razorpay"
-                      ? "Select Payment"
-                      : selectedPaymentMethod === "wallet"
-                        ? walletBalance >= total
-                          ? "Place Order"
-                          : "Insufficient Balance"
-                        : "Place Order"}
+                  {isPlacingOrder ? "Processing..." : selectedPaymentMethod === "razorpay" ? "Select Payment" : selectedPaymentMethod === "wallet" ? walletBalance >= total ? "Place Order" : "Insufficient Balance" : "Place Order"}
                 </span>
                 <ChevronRight className="h-5 w-5 md:h-6 md:w-6 ml-2" />
               </Button>
@@ -1804,16 +1484,14 @@ export default function Cart() {
       </div>
 
       {/* Placing Order Modal */}
-      {showPlacingOrder && (
-        <div className="fixed inset-0 z-[60] h-screen w-screen overflow-hidden">
+      {showPlacingOrder && <div className="fixed inset-0 z-[60] h-screen w-screen overflow-hidden">
           {/* Backdrop */}
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
 
           {/* Modal Sheet */}
-          <div
-            className="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-2xl overflow-hidden"
-            style={{ animation: 'slideUpModal 0.4s cubic-bezier(0.16, 1, 0.3, 1)' }}
-          >
+          <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-2xl overflow-hidden" style={{
+        animation: 'slideUpModal 0.4s cubic-bezier(0.16, 1, 0.3, 1)'
+      }}>
             <div className="px-6 py-8">
               {/* Title */}
               <h2 className="text-2xl font-bold text-gray-900 mb-6">Placing your order</h2>
@@ -1825,11 +1503,7 @@ export default function Cart() {
                 </div>
                 <div>
                   <p className="text-lg font-semibold text-gray-900">
-                    {selectedPaymentMethod === "razorpay"
-                      ? `Pay ₹${total.toFixed(2)} online (Razorpay)`
-                      : selectedPaymentMethod === "wallet"
-                        ? `Pay ₹${total.toFixed(2)} from Wallet`
-                        : `Pay on delivery (COD)`}
+                    {selectedPaymentMethod === "razorpay" ? `Pay ₹${total.toFixed(2)} online (Razorpay)` : selectedPaymentMethod === "wallet" ? `Pay ₹${total.toFixed(2)} from Wallet` : `Pay on delivery (COD)`}
                   </p>
                 </div>
               </div>
@@ -1845,10 +1519,10 @@ export default function Cart() {
                 <div>
                   <p className="text-lg font-semibold text-gray-900">Delivering to Location</p>
                   <p className="text-sm text-gray-600 mt-1">
-                    {defaultAddress ? (formatFullAddress(defaultAddress) || defaultAddress?.formattedAddress || defaultAddress?.address || "Address") : "Add address"}
+                    {defaultAddress ? formatFullAddress(defaultAddress) || defaultAddress?.formattedAddress || defaultAddress?.address || "Address" : "Add address"}
                   </p>
                   <p className="text-sm text-gray-500">
-                    {defaultAddress ? (formatFullAddress(defaultAddress) || "Address") : "Address"}
+                    {defaultAddress ? formatFullAddress(defaultAddress) || "Address" : "Address"}
                   </p>
                 </div>
               </div>
@@ -1856,119 +1530,125 @@ export default function Cart() {
               {/* Progress Bar */}
               <div className="relative mb-6">
                 <div className="h-2.5 bg-gray-200 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-gradient-to-r from-green-500 to-green-600 rounded-full transition-all duration-100 ease-linear"
-                    style={{
-                      width: `${orderProgress}%`,
-                      boxShadow: '0 0 10px rgba(34, 197, 94, 0.5)'
-                    }}
-                  />
+                  <div className="h-full bg-gradient-to-r from-green-500 to-green-600 rounded-full transition-all duration-100 ease-linear" style={{
+                width: `${orderProgress}%`,
+                boxShadow: '0 0 10px rgba(34, 197, 94, 0.5)'
+              }} />
                 </div>
                 {/* Animated shimmer effect */}
-                <div
-                  className="absolute inset-0 h-2.5 rounded-full overflow-hidden pointer-events-none"
-                  style={{
-                    background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent)',
-                    animation: 'shimmer 1.5s infinite',
-                    width: `${orderProgress}%`
-                  }}
-                />
+                <div className="absolute inset-0 h-2.5 rounded-full overflow-hidden pointer-events-none" style={{
+              background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent)',
+              animation: 'shimmer 1.5s infinite',
+              width: `${orderProgress}%`
+            }} />
               </div>
 
               {/* Cancel Button */}
-              <button
-                onClick={() => {
-                  setShowPlacingOrder(false)
-                  setIsPlacingOrder(false)
-                }}
-                className="w-full text-right"
-              >
+              <button onClick={() => {
+            setShowPlacingOrder(false);
+            setIsPlacingOrder(false);
+          }} className="w-full text-right">
                 <span className="text-green-600 font-semibold text-base hover:text-green-700 transition-colors">
                   CANCEL
                 </span>
               </button>
             </div>
           </div>
-        </div>
-      )}
+        </div>}
 
       {/* Order Success Celebration Page */}
       <AnimatePresence>
-        {showOrderSuccess && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] bg-gradient-to-br from-indigo-100 via-white to-emerald-100 flex flex-col items-center justify-center h-screen w-screen overflow-hidden"
-          >
+        {showOrderSuccess && <motion.div initial={{
+        opacity: 0
+      }} animate={{
+        opacity: 1
+      }} exit={{
+        opacity: 0
+      }} className="fixed inset-0 z-[100] bg-gradient-to-br from-indigo-100 via-white to-emerald-100 flex flex-col items-center justify-center h-screen w-screen overflow-hidden">
             {/* Decorative Floating Elements */}
             <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-200/30 rounded-full blur-[100px] animate-pulse" />
             <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-emerald-200/30 rounded-full blur-[100px] animate-pulse" />
 
             {/* Confetti Background */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none">
-              {[...Array(50)].map((_, i) => (
-                <motion.div
-                  key={i}
-                  initial={{ y: -20, x: Math.random() * 100 + "%", rotate: 0 }}
-                  animate={{
-                    y: "110vh",
-                    rotate: 360,
-                    x: (Math.random() * 100 - 10) + "%"
-                  }}
-                  transition={{
-                    duration: 2 + Math.random() * 2,
-                    repeat: Infinity,
-                    ease: "linear",
-                    delay: Math.random() * 5
-                  }}
-                  className="absolute w-2 h-4 rounded-sm"
-                  style={{
-                    backgroundColor: ['#22c55e', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6'][Math.floor(Math.random() * 7)],
-                  }}
-                />
-              ))}
+              {[...Array(50)].map((_, i) => <motion.div key={i} initial={{
+            y: -20,
+            x: Math.random() * 100 + "%",
+            rotate: 0
+          }} animate={{
+            y: "110vh",
+            rotate: 360,
+            x: Math.random() * 100 - 10 + "%"
+          }} transition={{
+            duration: 2 + Math.random() * 2,
+            repeat: Infinity,
+            ease: "linear",
+            delay: Math.random() * 5
+          }} className="absolute w-2 h-4 rounded-sm" style={{
+            backgroundColor: ['#22c55e', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6'][Math.floor(Math.random() * 7)]
+          }} />)}
             </div>
 
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 30 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              transition={{ type: "spring", damping: 20, stiffness: 100, delay: 0.1 }}
-              className="relative z-10 w-[92%] max-w-lg bg-white/70 backdrop-blur-3xl border border-white/50 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.1)] p-8 md:p-12 rounded-[2.5rem] md:rounded-[3.5rem] flex flex-col items-center text-center"
-            >
+            <motion.div initial={{
+          opacity: 0,
+          scale: 0.9,
+          y: 30
+        }} animate={{
+          opacity: 1,
+          scale: 1,
+          y: 0
+        }} transition={{
+          type: "spring",
+          damping: 20,
+          stiffness: 100,
+          delay: 0.1
+        }} className="relative z-10 w-[92%] max-w-lg bg-white/70 backdrop-blur-3xl border border-white/50 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.1)] p-8 md:p-12 rounded-[2.5rem] md:rounded-[3.5rem] flex flex-col items-center text-center">
               {/* Success Tick Circle */}
               <div className="relative mb-8 md:mb-10">
-                <motion.div
-                  initial={{ scale: 0, rotate: -45 }}
-                  animate={{ scale: 1, rotate: 0 }}
-                  transition={{ type: "spring", damping: 12, stiffness: 200, delay: 0.3 }}
-                  className="w-24 h-24 md:w-32 md:h-32 bg-gradient-to-tr from-emerald-500 to-green-400 rounded-full flex items-center justify-center shadow-[0_20px_40px_-10px_rgba(34,197,94,0.4)] relative z-10"
-                >
+                <motion.div initial={{
+              scale: 0,
+              rotate: -45
+            }} animate={{
+              scale: 1,
+              rotate: 0
+            }} transition={{
+              type: "spring",
+              damping: 12,
+              stiffness: 200,
+              delay: 0.3
+            }} className="w-24 h-24 md:w-32 md:h-32 bg-gradient-to-tr from-emerald-500 to-green-400 rounded-full flex items-center justify-center shadow-[0_20px_40px_-10px_rgba(34,197,94,0.4)] relative z-10">
                   <Check className="w-12 h-12 md:w-16 md:h-16 text-white stroke-[3.5px]" />
                 </motion.div>
 
                 {/* Animated Rings */}
-                {[...Array(3)].map((_, i) => (
-                  <motion.div
-                    key={i}
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: [0, 0.4, 0], scale: [1, 1.6, 2.2] }}
-                    transition={{ duration: 2.5, repeat: Infinity, delay: 0.5 + (i * 0.8) }}
-                    className="absolute inset-0 border-2 border-green-400 rounded-full"
-                  />
-                ))}
+                {[...Array(3)].map((_, i) => <motion.div key={i} initial={{
+              opacity: 0,
+              scale: 0.8
+            }} animate={{
+              opacity: [0, 0.4, 0],
+              scale: [1, 1.6, 2.2]
+            }} transition={{
+              duration: 2.5,
+              repeat: Infinity,
+              delay: 0.5 + i * 0.8
+            }} className="absolute inset-0 border-2 border-green-400 rounded-full" />)}
 
                 {/* Sparkling dots */}
-                {[...Array(8)].map((_, i) => (
-                  <motion.div
-                    key={i}
-                    initial={{ opacity: 0, scale: 0 }}
-                    animate={{ opacity: [0, 1, 0], scale: [0, 1, 0], y: [-20, -100], x: (i % 2 === 0 ? 40 : -40) }}
-                    transition={{ duration: 1, repeat: Infinity, delay: i * 0.2 }}
-                    className="absolute top-1/2 left-1/2 w-2 h-2 bg-yellow-400 rounded-full"
-                    style={{ transform: `rotate(${i * 45}deg)` }}
-                  />
-                ))}
+                {[...Array(8)].map((_, i) => <motion.div key={i} initial={{
+              opacity: 0,
+              scale: 0
+            }} animate={{
+              opacity: [0, 1, 0],
+              scale: [0, 1, 0],
+              y: [-20, -100],
+              x: i % 2 === 0 ? 40 : -40
+            }} transition={{
+              duration: 1,
+              repeat: Infinity,
+              delay: i * 0.2
+            }} className="absolute top-1/2 left-1/2 w-2 h-2 bg-yellow-400 rounded-full" style={{
+              transform: `rotate(${i * 45}deg)`
+            }} />)}
               </div>
 
               {/* Order Placed Message (Merged) */}
@@ -1984,12 +1664,15 @@ export default function Cart() {
               </div>
 
               {/* Order Details Preview Card */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.6 }}
-                className="w-full bg-white/60 rounded-3xl p-5 mb-8 md:mb-10 border border-white/50 flex items-center justify-between shadow-sm"
-              >
+              <motion.div initial={{
+            opacity: 0,
+            y: 20
+          }} animate={{
+            opacity: 1,
+            y: 0
+          }} transition={{
+            delay: 0.6
+          }} className="w-full bg-white/60 rounded-3xl p-5 mb-8 md:mb-10 border border-white/50 flex items-center justify-between shadow-sm">
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 bg-indigo-100 rounded-2xl flex items-center justify-center">
                     <MapPin className="w-6 h-6 text-indigo-600" />
@@ -2013,22 +1696,26 @@ export default function Cart() {
                 </div>
               </motion.div>
 
-              <motion.button
-                whileHover={{ scale: 1.02, backgroundColor: "rgba(17, 24, 39, 1)" }}
-                whileTap={{ scale: 0.98 }}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.7 }}
-                onClick={handleGoToOrders}
-                className="w-full h-16 md:h-20 bg-gray-900 text-white rounded-[1.5rem] md:rounded-[2rem] font-black text-lg md:text-xl shadow-[0_20px_40px_-10px_rgba(0,0,0,0.2)] hover:shadow-gray-300 transition-all flex items-center justify-center gap-3 group"
-              >
+              <motion.button whileHover={{
+            scale: 1.02,
+            backgroundColor: "rgba(17, 24, 39, 1)"
+          }} whileTap={{
+            scale: 0.98
+          }} initial={{
+            opacity: 0,
+            y: 20
+          }} animate={{
+            opacity: 1,
+            y: 0
+          }} transition={{
+            delay: 0.7
+          }} onClick={handleGoToOrders} className="w-full h-16 md:h-20 bg-gray-900 text-white rounded-[1.5rem] md:rounded-[2rem] font-black text-lg md:text-xl shadow-[0_20px_40px_-10px_rgba(0,0,0,0.2)] hover:shadow-gray-300 transition-all flex items-center justify-center gap-3 group">
                 Track Your Order
                 <ChevronRight className="w-6 h-6 group-hover:translate-x-1.5 transition-transform" />
               </motion.button>
 
             </motion.div>
-          </motion.div>
-        )}
+          </motion.div>}
       </AnimatePresence>
 
       {/* Animation Styles */}
@@ -2217,6 +1904,5 @@ export default function Cart() {
           stroke-dashoffset: 0;
         }
       `}</style>
-    </div>
-  )
+    </div>;
 }

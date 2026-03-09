@@ -1,7 +1,6 @@
 import Restaurant from '../models/Restaurant.js';
 import Menu from '../models/Menu.js';
 import Zone from '../../admin/models/Zone.js';
-
 import Tier from '../../admin/models/Tier.js';
 import { successResponse, errorResponse } from '../../../shared/utils/response.js';
 import { uploadToCloudinary, deleteFromCloudinary } from '../../../shared/utils/cloudinaryService.js';
@@ -18,21 +17,16 @@ import mongoose from 'mongoose';
  */
 function isPointInZone(lat, lng, zoneCoordinates) {
   if (!zoneCoordinates || zoneCoordinates.length < 3) return false;
-
   let inside = false;
   for (let i = 0, j = zoneCoordinates.length - 1; i < zoneCoordinates.length; j = i++) {
     const coordI = zoneCoordinates[i];
     const coordJ = zoneCoordinates[j];
-
-    const xi = typeof coordI === 'object' ? (coordI.latitude || coordI.lat) : null;
-    const yi = typeof coordI === 'object' ? (coordI.longitude || coordI.lng) : null;
-    const xj = typeof coordJ === 'object' ? (coordJ.latitude || coordJ.lat) : null;
-    const yj = typeof coordJ === 'object' ? (coordJ.longitude || coordJ.lng) : null;
-
+    const xi = typeof coordI === 'object' ? coordI.latitude || coordI.lat : null;
+    const yi = typeof coordI === 'object' ? coordI.longitude || coordI.lng : null;
+    const xj = typeof coordJ === 'object' ? coordJ.latitude || coordJ.lat : null;
+    const yj = typeof coordJ === 'object' ? coordJ.longitude || coordJ.lng : null;
     if (xi === null || yi === null || xj === null || yj === null) continue;
-
-    const intersect = ((yi > lng) !== (yj > lng)) &&
-      (lat < (xj - xi) * (lng - yi) / (yj - yi) + xi);
+    const intersect = yi > lng !== yj > lng && lat < (xj - xi) * (lng - yi) / (yj - yi) + xi;
     if (intersect) inside = !inside;
   }
   return inside;
@@ -47,22 +41,18 @@ function isPointInZone(lat, lng, zoneCoordinates) {
  */
 function isRestaurantInAnyZone(restaurantLat, restaurantLng, activeZones) {
   if (!restaurantLat || !restaurantLng) return false;
-
   for (const zone of activeZones) {
     if (!zone.coordinates || zone.coordinates.length < 3) continue;
-
     let isInZone = false;
     if (typeof zone.containsPoint === 'function') {
       isInZone = zone.containsPoint(restaurantLat, restaurantLng);
     } else {
       isInZone = isPointInZone(restaurantLat, restaurantLng, zone.coordinates);
     }
-
     if (isInZone) {
       return true;
     }
   }
-
   return false;
 }
 
@@ -75,22 +65,18 @@ function isRestaurantInAnyZone(restaurantLat, restaurantLng, activeZones) {
  */
 function getRestaurantZoneId(restaurantLat, restaurantLng, activeZones) {
   if (!restaurantLat || !restaurantLng) return null;
-
   for (const zone of activeZones) {
     if (!zone.coordinates || zone.coordinates.length < 3) continue;
-
     let isInZone = false;
     if (typeof zone.containsPoint === 'function') {
       isInZone = zone.containsPoint(restaurantLat, restaurantLng);
     } else {
       isInZone = isPointInZone(restaurantLat, restaurantLng, zone.coordinates);
     }
-
     if (isInZone) {
       return zone._id.toString();
     }
   }
-
   return null;
 }
 
@@ -121,91 +107,132 @@ export const getRestaurants = async (req, res) => {
     }
 
     // Build query
-    const query = { isActive: true };
+    const query = {
+      isActive: true
+    };
 
     // Cuisine filter
     if (cuisine) {
-      query.cuisines = { $in: [new RegExp(cuisine, 'i')] };
+      query.cuisines = {
+        $in: [new RegExp(cuisine, 'i')]
+      };
     }
 
     // Rating filter
     if (minRating) {
-      query.rating = { $gte: parseFloat(minRating) };
+      query.rating = {
+        $gte: parseFloat(minRating)
+      };
     }
 
     // Trust filters (top-rated = 4.5+, trusted = 4.0+ with high totalRatings)
     if (req.query.topRated === 'true') {
-      query.rating = { $gte: 4.5 };
+      query.rating = {
+        $gte: 4.5
+      };
     } else if (req.query.trusted === 'true') {
-      query.rating = { $gte: 4.0 };
-      query.totalRatings = { $gte: 100 }; // At least 100 ratings to be "trusted"
+      query.rating = {
+        $gte: 4.0
+      };
+      query.totalRatings = {
+        $gte: 100
+      }; // At least 100 ratings to be "trusted"
     }
 
     // Delivery time filter (estimatedDeliveryTime contains time in format "25-30 mins")
     if (maxDeliveryTime) {
       const maxTime = parseInt(maxDeliveryTime);
-      query.$or = [
-        { estimatedDeliveryTime: { $regex: new RegExp(`(\\d+)-?\\d*\\s*mins?`, 'i') } }
-      ];
+      query.$or = [{
+        estimatedDeliveryTime: {
+          $regex: new RegExp(`(\\d+)-?\\d*\\s*mins?`, 'i')
+        }
+      }];
       // We'll filter this in application logic since it's a string field
     }
 
     // Distance filter (distance is stored as string like "1.2 km")
     if (maxDistance) {
       const maxDist = parseFloat(maxDistance);
-      query.$or = [
-        { distance: { $regex: new RegExp(`\\d+\\.?\\d*\\s*km`, 'i') } }
-      ];
+      query.$or = [{
+        distance: {
+          $regex: new RegExp(`\\d+\\.?\\d*\\s*km`, 'i')
+        }
+      }];
       // We'll filter this in application logic since it's a string field
     }
 
     // Price range filter
     if (maxPrice) {
-      const priceMap = { 200: ['$'], 500: ['$', '$$'] };
+      const priceMap = {
+        200: ['$'],
+        500: ['$', '$$']
+      };
       if (priceMap[maxPrice]) {
-        query.priceRange = { $in: priceMap[maxPrice] };
+        query.priceRange = {
+          $in: priceMap[maxPrice]
+        };
       }
     }
 
     // Offers filter
     if (hasOffers === 'true') {
-      query.$or = [
-        { offer: { $exists: true, $ne: null, $ne: '' } },
-        { featuredPrice: { $exists: true } }
-      ];
+      query.$or = [{
+        offer: {
+          $exists: true,
+          $ne: null,
+          $ne: ''
+        }
+      }, {
+        featuredPrice: {
+          $exists: true
+        }
+      }];
     }
 
     // Build sort object
-    let sortObj = { createdAt: -1 }; // Default: Latest first
+    let sortObj = {
+      createdAt: -1
+    }; // Default: Latest first
 
     if (sortBy) {
       switch (sortBy) {
         case 'price-low':
-          sortObj = { priceRange: 1, rating: -1 }; // $ < $$ < $$$, then by rating
+          sortObj = {
+            priceRange: 1,
+            rating: -1
+          }; // $ < $$ < $$$, then by rating
           break;
         case 'price-high':
-          sortObj = { priceRange: -1, rating: -1 }; // $$$$ > $$$ > $$ > $, then by rating
+          sortObj = {
+            priceRange: -1,
+            rating: -1
+          }; // $$$$ > $$$ > $$ > $, then by rating
           break;
         case 'rating-high':
-          sortObj = { rating: -1, totalRatings: -1 }; // Highest rating first
+          sortObj = {
+            rating: -1,
+            totalRatings: -1
+          }; // Highest rating first
           break;
         case 'rating-low':
-          sortObj = { rating: 1, totalRatings: -1 }; // Lowest rating first
+          sortObj = {
+            rating: 1,
+            totalRatings: -1
+          }; // Lowest rating first
           break;
         case 'relevance':
         default:
-          sortObj = { rating: -1, totalRatings: -1, createdAt: -1 }; // Relevance: high rating + recent
+          sortObj = {
+            rating: -1,
+            totalRatings: -1,
+            createdAt: -1
+          }; // Relevance: high rating + recent
           break;
       }
     }
 
     // Fetch restaurants - Show ALL restaurants regardless of zone
-    let restaurants = await Restaurant.find(query)
-      .select('-owner -createdAt -updatedAt -password')
-      .sort(sortObj)
-      .limit(parseInt(limit))
-      .skip(parseInt(offset))
-      .lean();
+    let restaurants = await Restaurant.find(query).select('-owner -createdAt -updatedAt -password').sort(sortObj).limit(parseInt(limit)).skip(parseInt(offset)).lean();
 
     // Note: We show all restaurants regardless of zone. Zone-based filtering is removed.
     // Users in any zone will see all restaurants.
@@ -219,7 +246,6 @@ export const getRestaurants = async (req, res) => {
         return timeMatch && parseInt(timeMatch[1]) <= maxTime;
       });
     }
-
     if (maxDistance) {
       const maxDist = parseFloat(maxDistance);
       restaurants = restaurants.filter(r => {
@@ -230,11 +256,11 @@ export const getRestaurants = async (req, res) => {
     }
 
     // Get total count (before filtering by string fields)
-    const totalQuery = { ...query };
+    const totalQuery = {
+      ...query
+    };
     delete totalQuery.$or; // Remove $or for count
     const total = await Restaurant.countDocuments(totalQuery);
-
-
     return successResponse(res, 200, 'Restaurants retrieved successfully', {
       restaurants,
       total: restaurants.length,
@@ -257,35 +283,33 @@ export const getRestaurants = async (req, res) => {
 // Get restaurant by ID or slug
 export const getRestaurantById = async (req, res) => {
   try {
-    const { id } = req.params;
+    const {
+      id
+    } = req.params;
 
     // Build query conditions - only include _id if it's a valid ObjectId
     const queryConditions = {
-      isActive: true,
+      isActive: true
     };
-
-    const orConditions = [
-      { restaurantId: id },
-      { slug: id },
-    ];
+    const orConditions = [{
+      restaurantId: id
+    }, {
+      slug: id
+    }];
 
     // Only add _id condition if the id is a valid ObjectId
     if (mongoose.Types.ObjectId.isValid(id) && id.length === 24) {
-      orConditions.push({ _id: new mongoose.Types.ObjectId(id) });
+      orConditions.push({
+        _id: new mongoose.Types.ObjectId(id)
+      });
     }
-
     queryConditions.$or = orConditions;
-
-    const restaurant = await Restaurant.findOne(queryConditions)
-      .select('-owner -createdAt -updatedAt')
-      .lean();
-
+    const restaurant = await Restaurant.findOne(queryConditions).select('-owner -createdAt -updatedAt').lean();
     if (!restaurant) {
       return errorResponse(res, 404, 'Restaurant not found');
     }
-
     return successResponse(res, 200, 'Restaurant retrieved successfully', {
-      restaurant,
+      restaurant
     });
   } catch (error) {
     console.error('Error fetching restaurant:', error);
@@ -297,16 +321,12 @@ export const getRestaurantById = async (req, res) => {
 export const getRestaurantByOwner = async (req, res) => {
   try {
     const restaurantId = req.restaurant._id;
-
-    const restaurant = await Restaurant.findById(restaurantId)
-      .lean();
-
+    const restaurant = await Restaurant.findById(restaurantId).lean();
     if (!restaurant) {
       return errorResponse(res, 404, 'Restaurant not found');
     }
-
     return successResponse(res, 200, 'Restaurant retrieved successfully', {
-      restaurant,
+      restaurant
     });
   } catch (error) {
     console.error('Error fetching restaurant:', error);
@@ -317,8 +337,11 @@ export const getRestaurantByOwner = async (req, res) => {
 // Create/Update restaurant from onboarding data
 export const createRestaurantFromOnboarding = async (onboardingData, restaurantId) => {
   try {
-    const { step1, step2, step4 } = onboardingData;
-
+    const {
+      step1,
+      step2,
+      step4
+    } = onboardingData;
     if (!step1 || !step2) {
       throw new Error('Incomplete onboarding data: Missing step1 or step2');
     }
@@ -330,32 +353,37 @@ export const createRestaurantFromOnboarding = async (onboardingData, restaurantI
 
     // Find existing restaurant
     const existing = await Restaurant.findById(restaurantId);
-
     if (!existing) {
       throw new Error('Restaurant not found');
     }
 
     // Generate slug from restaurant name
-    let baseSlug = step1.restaurantName
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/(^-|-$)/g, '');
+    let baseSlug = step1.restaurantName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
     // Check if slug needs to be unique (if it's different from existing)
     let slug = baseSlug;
     if (existing.slug !== baseSlug) {
       // Check if the new slug already exists for another restaurant
-      const existingBySlug = await Restaurant.findOne({ slug: baseSlug, _id: { $ne: existing._id } });
+      const existingBySlug = await Restaurant.findOne({
+        slug: baseSlug,
+        _id: {
+          $ne: existing._id
+        }
+      });
       if (existingBySlug) {
         // Make slug unique by appending a number
         let counter = 1;
         let uniqueSlug = `${baseSlug}-${counter}`;
-        while (await Restaurant.findOne({ slug: uniqueSlug, _id: { $ne: existing._id } })) {
+        while (await Restaurant.findOne({
+          slug: uniqueSlug,
+          _id: {
+            $ne: existing._id
+          }
+        })) {
           counter++;
           uniqueSlug = `${baseSlug}-${counter}`;
         }
         slug = uniqueSlug;
-        console.log(`Slug already exists, using unique slug: ${slug}`);
       }
     } else {
       slug = existing.slug; // Keep existing slug
@@ -398,7 +426,6 @@ export const createRestaurantFromOnboarding = async (onboardingData, restaurantI
       if (step4.featuredPrice !== undefined) existing.featuredPrice = step4.featuredPrice;
       if (step4.offer) existing.offer = step4.offer;
     }
-
     existing.isActive = true; // Ensure it's active
     existing.isAcceptingOrders = true; // Ensure it's accepting orders
 
@@ -409,25 +436,22 @@ export const createRestaurantFromOnboarding = async (onboardingData, restaurantI
         // Slug conflict - try to make it unique
         let counter = 1;
         let uniqueSlug = `${slug}-${counter}`;
-        while (await Restaurant.findOne({ slug: uniqueSlug, _id: { $ne: existing._id } })) {
+        while (await Restaurant.findOne({
+          slug: uniqueSlug,
+          _id: {
+            $ne: existing._id
+          }
+        })) {
           counter++;
           uniqueSlug = `${slug}-${counter}`;
         }
         existing.slug = uniqueSlug;
         await existing.save();
-        console.log(`Updated slug to unique value: ${uniqueSlug}`);
       } else {
         throw saveError;
       }
     }
-    console.log('✅ Restaurant updated successfully:', {
-      restaurantId: existing.restaurantId,
-      _id: existing._id,
-      name: existing.name,
-      isActive: existing.isActive,
-    });
     return existing;
-
   } catch (error) {
     console.error('Error creating restaurant from onboarding:', error);
     console.error('Error stack:', error.stack);
@@ -435,7 +459,7 @@ export const createRestaurantFromOnboarding = async (onboardingData, restaurantI
       hasStep1: !!onboardingData?.step1,
       hasStep2: !!onboardingData?.step2,
       step1Keys: onboardingData?.step1 ? Object.keys(onboardingData.step1) : [],
-      step2Keys: onboardingData?.step2 ? Object.keys(onboardingData.step2) : [],
+      step2Keys: onboardingData?.step2 ? Object.keys(onboardingData.step2) : []
     });
     throw error;
   }
@@ -448,14 +472,21 @@ export const createRestaurantFromOnboarding = async (onboardingData, restaurantI
 export const updateRestaurantProfile = asyncHandler(async (req, res) => {
   try {
     const restaurantId = req.restaurant._id;
-    const { profileImage, menuImages, name, cuisines, location, ownerName, ownerEmail, ownerPhone, deliveryRange } = req.body;
-
+    const {
+      profileImage,
+      menuImages,
+      name,
+      cuisines,
+      location,
+      ownerName,
+      ownerEmail,
+      ownerPhone,
+      deliveryRange
+    } = req.body;
     const restaurant = await Restaurant.findById(restaurantId);
-
     if (!restaurant) {
       return errorResponse(res, 404, 'Restaurant not found');
     }
-
     const updateData = {};
 
     // Update profile image if provided
@@ -473,18 +504,25 @@ export const updateRestaurantProfile = asyncHandler(async (req, res) => {
       updateData.name = name;
       // Regenerate slug if name changed
       if (name !== restaurant.name) {
-        let baseSlug = name
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, '-')
-          .replace(/(^-|-$)/g, '');
+        let baseSlug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
         // Check if slug already exists for another restaurant
         let slug = baseSlug;
-        const existingBySlug = await Restaurant.findOne({ slug: baseSlug, _id: { $ne: restaurantId } });
+        const existingBySlug = await Restaurant.findOne({
+          slug: baseSlug,
+          _id: {
+            $ne: restaurantId
+          }
+        });
         if (existingBySlug) {
           let counter = 1;
           let uniqueSlug = `${baseSlug}-${counter}`;
-          while (await Restaurant.findOne({ slug: uniqueSlug, _id: { $ne: restaurantId } })) {
+          while (await Restaurant.findOne({
+            slug: uniqueSlug,
+            _id: {
+              $ne: restaurantId
+            }
+          })) {
             counter++;
             uniqueSlug = `${baseSlug}-${counter}`;
           }
@@ -511,7 +549,6 @@ export const updateRestaurantProfile = asyncHandler(async (req, res) => {
         if (!location.longitude) location.longitude = location.coordinates[0];
         if (!location.latitude) location.latitude = location.coordinates[1];
       }
-
       updateData.location = location;
     }
 
@@ -532,7 +569,6 @@ export const updateRestaurantProfile = asyncHandler(async (req, res) => {
     // Update restaurant
     Object.assign(restaurant, updateData);
     await restaurant.save();
-
     return successResponse(res, 200, 'Restaurant profile updated successfully', {
       restaurant: {
         id: restaurant._id,
@@ -546,7 +582,7 @@ export const updateRestaurantProfile = asyncHandler(async (req, res) => {
         ownerName: restaurant.ownerName,
         ownerEmail: restaurant.ownerEmail,
         ownerPhone: restaurant.ownerPhone,
-        deliveryRange: restaurant.deliveryRange,
+        deliveryRange: restaurant.deliveryRange
       }
     });
   } catch (error) {
@@ -567,10 +603,8 @@ export const uploadProfileImage = asyncHandler(async (req, res) => {
 
     // Initialize Cloudinary if not already initialized
     await initializeCloudinary();
-
     const restaurantId = req.restaurant._id;
     const restaurant = await Restaurant.findById(restaurantId);
-
     if (!restaurant) {
       return errorResponse(res, 404, 'Restaurant not found');
     }
@@ -580,10 +614,14 @@ export const uploadProfileImage = asyncHandler(async (req, res) => {
     const result = await uploadToCloudinary(req.file.buffer, {
       folder,
       resource_type: 'image',
-      transformation: [
-        { width: 800, height: 800, crop: 'fill', gravity: 'auto' },
-        { quality: 'auto' }
-      ]
+      transformation: [{
+        width: 800,
+        height: 800,
+        crop: 'fill',
+        gravity: 'auto'
+      }, {
+        quality: 'auto'
+      }]
     });
 
     // Update restaurant profile image
@@ -592,7 +630,6 @@ export const uploadProfileImage = asyncHandler(async (req, res) => {
       publicId: result.public_id
     };
     await restaurant.save();
-
     return successResponse(res, 200, 'Profile image uploaded successfully', {
       profileImage: restaurant.profileImage
     });
@@ -631,31 +668,24 @@ export const uploadMenuImage = asyncHandler(async (req, res) => {
 
     // Initialize Cloudinary if not already initialized
     await initializeCloudinary();
-
     const restaurantId = req.restaurant._id;
     const restaurant = await Restaurant.findById(restaurantId);
-
     if (!restaurant) {
       return errorResponse(res, 404, 'Restaurant not found');
     }
-
-    console.log('📤 Uploading menu image to Cloudinary:', {
-      fileName: req.file.originalname,
-      mimeType: req.file.mimetype,
-      size: req.file.size,
-      bufferSize: req.file.buffer.length,
-      restaurantId: restaurantId.toString()
-    });
-
     // Upload to Cloudinary
     const folder = 'appzeto/restaurant/menu';
     const result = await uploadToCloudinary(req.file.buffer, {
       folder,
       resource_type: 'image',
-      transformation: [
-        { width: 1200, height: 800, crop: 'fill', gravity: 'auto' },
-        { quality: 'auto' }
-      ]
+      transformation: [{
+        width: 1200,
+        height: 800,
+        crop: 'fill',
+        gravity: 'auto'
+      }, {
+        quality: 'auto'
+      }]
     });
 
     // Replace first menu image (main banner) or add if none exists
@@ -668,7 +698,6 @@ export const uploadMenuImage = asyncHandler(async (req, res) => {
       url: result.secure_url,
       publicId: result.public_id
     };
-
     if (restaurant.menuImages.length > 0) {
       // Replace the first image (main banner)
       restaurant.menuImages[0] = newMenuImage;
@@ -676,9 +705,7 @@ export const uploadMenuImage = asyncHandler(async (req, res) => {
       // Add as first image if array is empty
       restaurant.menuImages.push(newMenuImage);
     }
-
     await restaurant.save();
-
     return successResponse(res, 200, 'Menu image uploaded successfully', {
       menuImage: {
         url: result.secure_url,
@@ -706,7 +733,6 @@ export const uploadMenuImage = asyncHandler(async (req, res) => {
     } else if (error.http_code) {
       errorMessage += `: Cloudinary error (${error.http_code})`;
     }
-
     return errorResponse(res, 500, errorMessage);
   }
 });
@@ -717,40 +743,33 @@ export const uploadMenuImage = asyncHandler(async (req, res) => {
  */
 export const getDeliveryPricingConfig = asyncHandler(async (req, res) => {
   try {
-    const restaurant = await Restaurant.findById(req.restaurant._id)
-      .select('deliveryPricingConfig zoneId')
-      .lean();
-
+    const restaurant = await Restaurant.findById(req.restaurant._id).select('deliveryPricingConfig zoneId').lean();
     if (!restaurant) {
       return errorResponse(res, 404, 'Restaurant not found');
     }
-
     let distanceSlabs = [];
     let tier = null;
     if (restaurant.zoneId) {
       const zone = await Zone.findById(restaurant.zoneId).select('tierId').lean();
       if (zone?.tierId) {
         tier = await Tier.findById(zone.tierId).select('name deliveryPricing.distanceSlabs').lean();
-        distanceSlabs = Array.isArray(tier?.deliveryPricing?.distanceSlabs)
-          ? tier.deliveryPricing.distanceSlabs
-          : [];
+        distanceSlabs = Array.isArray(tier?.deliveryPricing?.distanceSlabs) ? tier.deliveryPricing.distanceSlabs : [];
       }
     }
-
     if (!distanceSlabs.length) {
       distanceSlabs = [];
     }
-
     return successResponse(res, 200, 'Delivery pricing config fetched successfully', {
       deliveryPricingConfig: restaurant.deliveryPricingConfig || {
         isEnabled: false,
         orderValueSlabs: [],
         customerDeliveryRates: [],
-        lastUpdatedAt: null,
+        lastUpdatedAt: null
       },
-      tier: tier
-        ? { id: tier._id, name: tier.name }
-        : null,
+      tier: tier ? {
+        id: tier._id,
+        name: tier.name
+      } : null,
       distanceSlabs
     });
   } catch (error) {
@@ -765,35 +784,31 @@ export const getDeliveryPricingConfig = asyncHandler(async (req, res) => {
  */
 export const updateDeliveryPricingConfig = asyncHandler(async (req, res) => {
   try {
-    const { isEnabled, orderValueSlabs, customerDeliveryRates } = req.body;
-
+    const {
+      isEnabled,
+      orderValueSlabs,
+      customerDeliveryRates
+    } = req.body;
     const restaurant = await Restaurant.findById(req.restaurant._id);
     if (!restaurant) {
       return errorResponse(res, 404, 'Restaurant not found');
     }
-
     let distanceSlabs = [];
     if (restaurant.zoneId) {
       const zone = await Zone.findById(restaurant.zoneId).select('tierId').lean();
       if (zone?.tierId) {
         const tier = await Tier.findById(zone.tierId).select('deliveryPricing.distanceSlabs').lean();
-        distanceSlabs = Array.isArray(tier?.deliveryPricing?.distanceSlabs)
-          ? tier.deliveryPricing.distanceSlabs
-          : [];
+        distanceSlabs = Array.isArray(tier?.deliveryPricing?.distanceSlabs) ? tier.deliveryPricing.distanceSlabs : [];
       }
     }
-
     if (!distanceSlabs.length) {
       distanceSlabs = [];
     }
-
     const activeDistanceSlabs = (distanceSlabs || []).filter(s => s.isActive !== false);
     const activeDistanceSlabIds = new Set(activeDistanceSlabs.map(s => String(s._id)));
-
     if (!Array.isArray(orderValueSlabs) || orderValueSlabs.length === 0) {
       return errorResponse(res, 400, 'orderValueSlabs must be a non-empty array');
     }
-
     for (const slab of orderValueSlabs) {
       if (!slab._id) {
         return errorResponse(res, 400, 'Each order value slab must include an _id for rate mapping');
@@ -805,30 +820,20 @@ export const updateDeliveryPricingConfig = asyncHandler(async (req, res) => {
         return errorResponse(res, 400, 'Each order value slab maxOrderValue must be greater than minOrderValue (or null)');
       }
     }
-
     if (!Array.isArray(customerDeliveryRates)) {
       return errorResponse(res, 400, 'customerDeliveryRates must be an array');
     }
-
     const normalizedOrderValueSlabs = orderValueSlabs.map(slab => ({
       _id: slab._id,
       label: slab.label || '',
       minOrderValue: Number(slab.minOrderValue),
-      maxOrderValue: slab.maxOrderValue === null || slab.maxOrderValue === undefined ? null : Number(slab.maxOrderValue),
+      maxOrderValue: slab.maxOrderValue === null || slab.maxOrderValue === undefined ? null : Number(slab.maxOrderValue)
     }));
-
-    const orderValueSlabIds = new Set(
-      normalizedOrderValueSlabs
-        .map((slab) => slab._id)
-        .filter(Boolean)
-        .map((id) => String(id))
-    );
-
+    const orderValueSlabIds = new Set(normalizedOrderValueSlabs.map(slab => slab._id).filter(Boolean).map(id => String(id)));
     for (const rate of customerDeliveryRates) {
       const distanceSlabId = String(rate.distanceSlabId || '');
       const orderValueSlabId = String(rate.orderValueSlabId || '');
       const perKmRate = Number(rate.perKmRate);
-
       if (!distanceSlabId || !activeDistanceSlabIds.has(distanceSlabId)) {
         return errorResponse(res, 400, `Invalid distanceSlabId: ${distanceSlabId || '(empty)'}`);
       }
@@ -839,7 +844,6 @@ export const updateDeliveryPricingConfig = asyncHandler(async (req, res) => {
         return errorResponse(res, 400, 'Each delivery rate must have perKmRate >= 0');
       }
     }
-
     restaurant.deliveryPricingConfig = {
       isEnabled: isEnabled !== false,
       orderValueSlabs: normalizedOrderValueSlabs,
@@ -847,13 +851,11 @@ export const updateDeliveryPricingConfig = asyncHandler(async (req, res) => {
         _id: rate._id,
         distanceSlabId: String(rate.distanceSlabId),
         orderValueSlabId: String(rate.orderValueSlabId),
-        perKmRate: Number(rate.perKmRate),
+        perKmRate: Number(rate.perKmRate)
       })),
-      lastUpdatedAt: new Date(),
+      lastUpdatedAt: new Date()
     };
-
     await restaurant.save();
-
     return successResponse(res, 200, 'Delivery pricing config updated successfully', {
       deliveryPricingConfig: restaurant.deliveryPricingConfig
     });
@@ -870,22 +872,20 @@ export const updateDeliveryPricingConfig = asyncHandler(async (req, res) => {
 export const updateDeliveryStatus = asyncHandler(async (req, res) => {
   try {
     const restaurantId = req.restaurant._id;
-    const { isAcceptingOrders } = req.body;
-
+    const {
+      isAcceptingOrders
+    } = req.body;
     if (typeof isAcceptingOrders !== 'boolean') {
       return errorResponse(res, 400, 'isAcceptingOrders must be a boolean value');
     }
-
-    const restaurant = await Restaurant.findByIdAndUpdate(
-      restaurantId,
-      { isAcceptingOrders },
-      { new: true }
-    ).select('-password');
-
+    const restaurant = await Restaurant.findByIdAndUpdate(restaurantId, {
+      isAcceptingOrders
+    }, {
+      new: true
+    }).select('-password');
     if (!restaurant) {
       return errorResponse(res, 404, 'Restaurant not found');
     }
-
     return successResponse(res, 200, 'Delivery status updated successfully', {
       restaurant: {
         id: restaurant._id,
@@ -906,7 +906,6 @@ export const deleteRestaurantAccount = asyncHandler(async (req, res) => {
   try {
     const restaurantId = req.restaurant._id;
     const restaurant = await Restaurant.findById(restaurantId);
-
     if (!restaurant) {
       return errorResponse(res, 404, 'Restaurant not found');
     }
@@ -943,12 +942,6 @@ export const deleteRestaurantAccount = asyncHandler(async (req, res) => {
 
     // Delete the restaurant from database
     await Restaurant.findByIdAndDelete(restaurantId);
-
-    console.log(`Restaurant account deleted: ${restaurantId}`, {
-      restaurantId: restaurant.restaurantId,
-      name: restaurant.name
-    });
-
     return successResponse(res, 200, 'Restaurant account deleted successfully');
   } catch (error) {
     console.error('Error deleting restaurant account:', error);
@@ -959,7 +952,9 @@ export const deleteRestaurantAccount = asyncHandler(async (req, res) => {
 // Get restaurants with dishes under ₹250
 export const getRestaurantsWithDishesUnder250 = async (req, res) => {
   try {
-    const { zoneId } = req.query; // User's zone ID (optional - if provided, filters by zone)
+    const {
+      zoneId
+    } = req.query; // User's zone ID (optional - if provided, filters by zone)
 
     // Optional: Zone-based filtering - if zoneId is provided, validate and filter by zone
     let userZone = null;
@@ -970,18 +965,17 @@ export const getRestaurantsWithDishesUnder250 = async (req, res) => {
         return errorResponse(res, 400, 'Invalid or inactive zone. Please detect your zone again.');
       }
     }
-
     const MAX_PRICE = 250;
 
     // Helper function to calculate final price after discount
-    const getFinalPrice = (item) => {
+    const getFinalPrice = item => {
       // price is typically the current/discounted price
       // If discount exists, calculate from originalPrice, otherwise use price directly
       if (item.originalPrice && item.discountAmount && item.discountAmount > 0) {
         // Calculate discounted price from originalPrice
         let discountedPrice = item.originalPrice;
         if (item.discountType === 'Percent') {
-          discountedPrice = item.originalPrice - (item.originalPrice * item.discountAmount / 100);
+          discountedPrice = item.originalPrice - item.originalPrice * item.discountAmount / 100;
         } else if (item.discountType === 'Fixed') {
           discountedPrice = item.originalPrice - item.discountAmount;
         }
@@ -992,7 +986,7 @@ export const getRestaurantsWithDishesUnder250 = async (req, res) => {
     };
 
     // Helper function to filter items under ₹250
-    const filterItemsUnder250 = (items) => {
+    const filterItemsUnder250 = items => {
       return items.filter(item => {
         if (item.isAvailable === false) return false;
         const finalPrice = getFinalPrice(item);
@@ -1001,21 +995,19 @@ export const getRestaurantsWithDishesUnder250 = async (req, res) => {
     };
 
     // Helper function to process a single restaurant
-    const processRestaurant = async (restaurant) => {
+    const processRestaurant = async restaurant => {
       try {
         // Get menu for this restaurant
         const menu = await Menu.findOne({
           restaurant: restaurant._id,
           isActive: true
         }).lean();
-
         if (!menu || !menu.sections || menu.sections.length === 0) {
           return null; // Skip restaurants without menus
         }
 
         // Collect all dishes under ₹250 from all sections
         const dishesUnder250 = [];
-
         menu.sections.forEach(section => {
           if (section.isEnabled === false) return;
 
@@ -1048,9 +1040,7 @@ export const getRestaurantsWithDishesUnder250 = async (req, res) => {
             totalRatings: restaurant.totalRatings || 0,
             deliveryTime: restaurant.estimatedDeliveryTime || "25-30 mins",
             distance: restaurant.distance || "1.2 km",
-            cuisine: restaurant.cuisines && restaurant.cuisines.length > 0
-              ? restaurant.cuisines.join(' • ')
-              : "Multi-cuisine",
+            cuisine: restaurant.cuisines && restaurant.cuisines.length > 0 ? restaurant.cuisines.join(' • ') : "Multi-cuisine",
             price: restaurant.priceRange || "$$",
             image: restaurant.profileImage?.url || restaurant.menuImages?.[0]?.url || "",
             menuItems: dishesUnder250.map(item => ({
@@ -1060,9 +1050,9 @@ export const getRestaurantsWithDishesUnder250 = async (req, res) => {
               originalPrice: item.originalPrice || item.price,
               image: item.image || (item.images && item.images.length > 0 ? item.images[0] : ""),
               isVeg: item.foodType === 'Veg',
-              bestPrice: item.discountAmount > 0 || (item.originalPrice && item.originalPrice > getFinalPrice(item)),
+              bestPrice: item.discountAmount > 0 || item.originalPrice && item.originalPrice > getFinalPrice(item),
               description: item.description || "",
-              category: item.category || item.sectionName || "",
+              category: item.category || item.sectionName || ""
             }))
           };
         }
@@ -1074,10 +1064,9 @@ export const getRestaurantsWithDishesUnder250 = async (req, res) => {
     };
 
     // Get all active restaurants - Show ALL restaurants regardless of zone
-    let restaurants = await Restaurant.find({ isActive: true })
-      .select('-owner -createdAt -updatedAt')
-      .lean()
-      .limit(100); // Limit to first 100 restaurants for performance
+    let restaurants = await Restaurant.find({
+      isActive: true
+    }).select('-owner -createdAt -updatedAt').lean().limit(100); // Limit to first 100 restaurants for performance
 
     // Note: We show all restaurants regardless of zone. Zone-based filtering is removed.
     // Users in any zone will see all restaurants.
@@ -1085,7 +1074,6 @@ export const getRestaurantsWithDishesUnder250 = async (req, res) => {
     // Process restaurants in parallel (batch processing for better performance)
     const batchSize = 10; // Process 10 restaurants at a time
     const restaurantsWithDishes = [];
-
     for (let i = 0; i < restaurants.length; i += batchSize) {
       const batch = restaurants.slice(i, i + batchSize);
       const results = await Promise.all(batch.map(processRestaurant));
@@ -1099,10 +1087,9 @@ export const getRestaurantsWithDishesUnder250 = async (req, res) => {
       }
       return b.menuItems.length - a.menuItems.length;
     });
-
     return successResponse(res, 200, 'Restaurants with dishes under ₹250 retrieved successfully', {
       restaurants: restaurantsWithDishes,
-      total: restaurantsWithDishes.length,
+      total: restaurantsWithDishes.length
     });
   } catch (error) {
     console.error('Error fetching restaurants with dishes under ₹250:', error);

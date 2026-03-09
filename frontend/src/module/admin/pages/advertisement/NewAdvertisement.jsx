@@ -1,12 +1,11 @@
-import { useState, useRef } from "react"
-import { Upload, Heart, Star, Calendar, CheckCircle2, X } from "lucide-react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { useState, useRef } from "react";
+import { Upload, Heart, Star, Calendar, CheckCircle2, X } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 // Using placeholders for advertisement images
-const profilePlaceholder = "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=400&h=400&fit=crop"
-const coverPlaceholder = "https://images.unsplash.com/photo-1559339352-11d035aa65de?w=1200&h=400&fit=crop"
-
+const profilePlaceholder = "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=400&h=400&fit=crop";
+const coverPlaceholder = "https://images.unsplash.com/photo-1559339352-11d035aa65de?w=1200&h=400&fit=crop";
 export default function NewAdvertisement() {
-  const [activeLanguage, setActiveLanguage] = useState("default")
+  const [activeLanguage, setActiveLanguage] = useState("default");
   const [formData, setFormData] = useState({
     title: "",
     shortDescription: "",
@@ -15,154 +14,148 @@ export default function NewAdvertisement() {
     advertisementType: "Restaurant Promotion",
     validity: "",
     showReview: true,
-    showRatings: true,
-  })
-  const [profileImage, setProfileImage] = useState(null)
-  const [coverImage, setCoverImage] = useState(null)
-  const [profilePreview, setProfilePreview] = useState(null)
-  const [coverPreview, setCoverPreview] = useState(null)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [showSuccessDialog, setShowSuccessDialog] = useState(false)
-  const [formErrors, setFormErrors] = useState({})
-  const profileInputRef = useRef(null)
-  const coverInputRef = useRef(null)
-
-  const languageTabs = [
-    { key: "default", label: "Default" },
-    { key: "en", label: "English(EN)" },
-    { key: "bn", label: "Bengali - বাংলা(BN)" },
-    { key: "ar", label: "Arabic - العربية (AR)" },
-    { key: "es", label: "Spanish - español(ES)" },
-  ]
-
+    showRatings: true
+  });
+  const [profileImage, setProfileImage] = useState(null);
+  const [coverImage, setCoverImage] = useState(null);
+  const [profilePreview, setProfilePreview] = useState(null);
+  const [coverPreview, setCoverPreview] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+  const [formErrors, setFormErrors] = useState({});
+  const profileInputRef = useRef(null);
+  const coverInputRef = useRef(null);
+  const languageTabs = [{
+    key: "default",
+    label: "Default"
+  }, {
+    key: "en",
+    label: "English(EN)"
+  }, {
+    key: "bn",
+    label: "Bengali - বাংলা(BN)"
+  }, {
+    key: "ar",
+    label: "Arabic - العربية (AR)"
+  }, {
+    key: "es",
+    label: "Spanish - español(ES)"
+  }];
   const handleInputChange = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
     if (formErrors[field]) {
       setFormErrors(prev => {
-        const newErrors = { ...prev }
-        delete newErrors[field]
-        return newErrors
-      })
+        const newErrors = {
+          ...prev
+        };
+        delete newErrors[field];
+        return newErrors;
+      });
     }
-  }
-
+  };
   const handleFileUpload = (type, file) => {
-    const maxSize = 2 * 1024 * 1024 // 2MB
-    const allowedTypes = ["image/png", "image/jpeg", "image/jpg", "image/webp"]
-
+    const maxSize = 2 * 1024 * 1024; // 2MB
+    const allowedTypes = ["image/png", "image/jpeg", "image/jpg", "image/webp"];
     if (!allowedTypes.includes(file.type)) {
       setFormErrors(prev => ({
         ...prev,
         [type]: "Invalid file type. Please upload PNG, JPG, JPEG, or WEBP."
-      }))
-      return
+      }));
+      return;
     }
-
     if (file.size > maxSize) {
       setFormErrors(prev => ({
         ...prev,
         [type]: "File size exceeds 2MB limit."
-      }))
-      return
+      }));
+      return;
     }
-
-    const reader = new FileReader()
+    const reader = new FileReader();
     reader.onloadend = () => {
       if (type === "profileImage") {
-        setProfileImage(file)
-        setProfilePreview(reader.result)
+        setProfileImage(file);
+        setProfilePreview(reader.result);
       } else {
-        setCoverImage(file)
-        setCoverPreview(reader.result)
+        setCoverImage(file);
+        setCoverPreview(reader.result);
       }
-    }
-    reader.readAsDataURL(file)
-
+    };
+    reader.readAsDataURL(file);
     if (formErrors[type]) {
       setFormErrors(prev => {
-        const newErrors = { ...prev }
-        delete newErrors[type]
-        return newErrors
-      })
+        const newErrors = {
+          ...prev
+        };
+        delete newErrors[type];
+        return newErrors;
+      });
     }
-  }
-
-  const handleRemoveImage = (type) => {
+  };
+  const handleRemoveImage = type => {
     if (type === "profileImage") {
-      setProfileImage(null)
-      setProfilePreview(null)
+      setProfileImage(null);
+      setProfilePreview(null);
       if (profileInputRef.current) {
-        profileInputRef.current.value = ""
+        profileInputRef.current.value = "";
       }
     } else {
-      setCoverImage(null)
-      setCoverPreview(null)
+      setCoverImage(null);
+      setCoverPreview(null);
       if (coverInputRef.current) {
-        coverInputRef.current.value = ""
+        coverInputRef.current.value = "";
       }
     }
-  }
-
+  };
   const validateForm = () => {
-    const errors = {}
-
+    const errors = {};
     if (!formData.title.trim()) {
-      errors.title = "Advertisement title is required"
+      errors.title = "Advertisement title is required";
     }
-
     if (!formData.restaurant) {
-      errors.restaurant = "Restaurant selection is required"
+      errors.restaurant = "Restaurant selection is required";
     }
-
     if (!formData.validity) {
-      errors.validity = "Validity date is required"
+      errors.validity = "Validity date is required";
     } else {
-      const validityDate = new Date(formData.validity)
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
+      const validityDate = new Date(formData.validity);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
       if (validityDate < today) {
-        errors.validity = "Validity date must be today or later"
+        errors.validity = "Validity date must be today or later";
       }
     }
-
-    setFormErrors(errors)
-    return Object.keys(errors).length === 0
-  }
-
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setFormErrors({})
-
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+  const handleSubmit = async e => {
+    e.preventDefault();
+    setFormErrors({});
     if (!validateForm()) {
-      return
+      return;
     }
-
-    setIsSubmitting(true)
-
+    setIsSubmitting(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
       // Here you would typically send the data to your API
-      console.log("Form submitted:", {
-        ...formData,
-        profileImage,
-        coverImage
-      })
 
-      setShowSuccessDialog(true)
-
+      setShowSuccessDialog(true);
       setTimeout(() => {
-        handleReset()
-        setShowSuccessDialog(false)
-      }, 3000)
+        handleReset();
+        setShowSuccessDialog(false);
+      }, 3000);
     } catch (error) {
-      console.error("Error submitting form:", error)
-      setFormErrors({ submit: "Failed to create advertisement. Please try again." })
+      console.error("Error submitting form:", error);
+      setFormErrors({
+        submit: "Failed to create advertisement. Please try again."
+      });
     } finally {
-      setIsSubmitting(false)
+      setIsSubmitting(false);
     }
-  }
-
+  };
   const handleReset = () => {
     setFormData({
       title: "",
@@ -172,23 +165,21 @@ export default function NewAdvertisement() {
       advertisementType: "Restaurant Promotion",
       validity: "",
       showReview: true,
-      showRatings: true,
-    })
-    setProfileImage(null)
-    setCoverImage(null)
-    setProfilePreview(null)
-    setCoverPreview(null)
-    setFormErrors({})
+      showRatings: true
+    });
+    setProfileImage(null);
+    setCoverImage(null);
+    setProfilePreview(null);
+    setCoverPreview(null);
+    setFormErrors({});
     if (profileInputRef.current) {
-      profileInputRef.current.value = ""
+      profileInputRef.current.value = "";
     }
     if (coverInputRef.current) {
-      coverInputRef.current.value = ""
+      coverInputRef.current.value = "";
     }
-  }
-
-  return (
-    <div className="p-4 lg:p-6 bg-slate-50 min-h-screen">
+  };
+  return <div className="p-4 lg:p-6 bg-slate-50 min-h-screen">
       <div className="max-w-7xl mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Form Section */}
@@ -198,18 +189,9 @@ export default function NewAdvertisement() {
 
               {/* Language Tabs */}
               <div className="flex items-center gap-2 border-b border-slate-200 mb-6">
-                {languageTabs.map((tab) => (
-                  <button
-                    key={tab.key}
-                    onClick={() => setActiveLanguage(tab.key)}
-                    className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeLanguage === tab.key
-                        ? "border-blue-600 text-blue-600"
-                        : "border-transparent text-slate-600 hover:text-slate-900"
-                      }`}
-                  >
+                {languageTabs.map(tab => <button key={tab.key} onClick={() => setActiveLanguage(tab.key)} className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeLanguage === tab.key ? "border-blue-600 text-blue-600" : "border-transparent text-slate-600 hover:text-slate-900"}`}>
                     {tab.label}
-                  </button>
-                ))}
+                  </button>)}
               </div>
 
               <form onSubmit={handleSubmit}>
@@ -218,30 +200,15 @@ export default function NewAdvertisement() {
                     <label className="block text-sm font-semibold text-slate-700 mb-2">
                       Advertisement Title ({activeLanguage === "default" ? "Default" : languageTabs.find(t => t.key === activeLanguage)?.label}) <span className="text-red-500">*</span>
                     </label>
-                    <input
-                      type="text"
-                      value={formData.title}
-                      onChange={(e) => handleInputChange("title", e.target.value)}
-                      placeholder="Exclusive Offer"
-                      className={`w-full px-4 py-2.5 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm ${formErrors.title ? "border-red-500" : "border-slate-300"
-                        }`}
-                    />
-                    {formErrors.title && (
-                      <p className="text-xs text-red-500 mt-1">{formErrors.title}</p>
-                    )}
+                    <input type="text" value={formData.title} onChange={e => handleInputChange("title", e.target.value)} placeholder="Exclusive Offer" className={`w-full px-4 py-2.5 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm ${formErrors.title ? "border-red-500" : "border-slate-300"}`} />
+                    {formErrors.title && <p className="text-xs text-red-500 mt-1">{formErrors.title}</p>}
                   </div>
 
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-2">
                       Short Description ({activeLanguage === "default" ? "Default" : languageTabs.find(t => t.key === activeLanguage)?.label})
                     </label>
-                    <input
-                      type="text"
-                      value={formData.shortDescription}
-                      onChange={(e) => handleInputChange("shortDescription", e.target.value)}
-                      placeholder="Get Discount"
-                      className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                    />
+                    <input type="text" value={formData.shortDescription} onChange={e => handleInputChange("shortDescription", e.target.value)} placeholder="Get Discount" className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm" />
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -249,30 +216,19 @@ export default function NewAdvertisement() {
                       <label className="block text-sm font-semibold text-slate-700 mb-2">
                         Select Restaurant <span className="text-red-500">*</span>
                       </label>
-                      <select
-                        value={formData.restaurant}
-                        onChange={(e) => handleInputChange("restaurant", e.target.value)}
-                        className={`w-full px-4 py-2.5 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm ${formErrors.restaurant ? "border-red-500" : "border-slate-300"
-                          }`}
-                      >
+                      <select value={formData.restaurant} onChange={e => handleInputChange("restaurant", e.target.value)} className={`w-full px-4 py-2.5 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm ${formErrors.restaurant ? "border-red-500" : "border-slate-300"}`}>
                         <option value="">Select Restaurant</option>
                         <option value="cafe-monarch">Café Monarch</option>
                         <option value="hungry-puppets">Hungry Puppets</option>
                       </select>
-                      {formErrors.restaurant && (
-                        <p className="text-xs text-red-500 mt-1">{formErrors.restaurant}</p>
-                      )}
+                      {formErrors.restaurant && <p className="text-xs text-red-500 mt-1">{formErrors.restaurant}</p>}
                     </div>
 
                     <div>
                       <label className="block text-sm font-semibold text-slate-700 mb-2">
                         Select Priority
                       </label>
-                      <select
-                        value={formData.priority}
-                        onChange={(e) => handleInputChange("priority", e.target.value)}
-                        className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                      >
+                      <select value={formData.priority} onChange={e => handleInputChange("priority", e.target.value)} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm">
                         <option value="Priority">Priority</option>
                         <option value="High">High</option>
                         <option value="Normal">Normal</option>
@@ -285,11 +241,7 @@ export default function NewAdvertisement() {
                     <label className="block text-sm font-semibold text-slate-700 mb-2">
                       Advertisement Type
                     </label>
-                    <select
-                      value={formData.advertisementType}
-                      onChange={(e) => handleInputChange("advertisementType", e.target.value)}
-                      className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                    >
+                    <select value={formData.advertisementType} onChange={e => handleInputChange("advertisementType", e.target.value)} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm">
                       <option value="Restaurant Promotion">Restaurant Promotion</option>
                       <option value="Video promotion">Video promotion</option>
                     </select>
@@ -300,18 +252,10 @@ export default function NewAdvertisement() {
                       Validity <span className="text-red-500">*</span>
                     </label>
                     <div className="relative">
-                      <input
-                        type="date"
-                        value={formData.validity}
-                        onChange={(e) => handleInputChange("validity", e.target.value)}
-                        className={`w-full px-4 py-2.5 pr-10 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm ${formErrors.validity ? "border-red-500" : "border-slate-300"
-                          }`}
-                      />
+                      <input type="date" value={formData.validity} onChange={e => handleInputChange("validity", e.target.value)} className={`w-full px-4 py-2.5 pr-10 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm ${formErrors.validity ? "border-red-500" : "border-slate-300"}`} />
                       <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                     </div>
-                    {formErrors.validity && (
-                      <p className="text-xs text-red-500 mt-1">{formErrors.validity}</p>
-                    )}
+                    {formErrors.validity && <p className="text-xs text-red-500 mt-1">{formErrors.validity}</p>}
                   </div>
 
                   <div>
@@ -320,21 +264,11 @@ export default function NewAdvertisement() {
                     </label>
                     <div className="flex items-center gap-6">
                       <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={formData.showReview}
-                          onChange={(e) => handleInputChange("showReview", e.target.checked)}
-                          className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
-                        />
+                        <input type="checkbox" checked={formData.showReview} onChange={e => handleInputChange("showReview", e.target.checked)} className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500" />
                         <span className="text-sm text-slate-700">Review</span>
                       </label>
                       <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={formData.showRatings}
-                          onChange={(e) => handleInputChange("showRatings", e.target.checked)}
-                          className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
-                        />
+                        <input type="checkbox" checked={formData.showRatings} onChange={e => handleInputChange("showRatings", e.target.checked)} className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500" />
                         <span className="text-sm text-slate-700">Rating</span>
                       </label>
                     </div>
@@ -350,124 +284,61 @@ export default function NewAdvertisement() {
                         <label className="block text-sm font-medium text-slate-600 mb-2">
                           Profile Image (Ratio - 1:1)
                         </label>
-                        <input
-                          ref={profileInputRef}
-                          type="file"
-                          accept="image/png,image/jpeg,image/jpg,image/webp"
-                          onChange={(e) => {
-                            if (e.target.files && e.target.files[0]) {
-                              handleFileUpload("profileImage", e.target.files[0])
-                            }
-                          }}
-                          className="hidden"
-                        />
-                        {profilePreview ? (
-                          <div className="relative border-2 border-slate-300 rounded-lg overflow-hidden">
-                            <img
-                              src={profilePreview}
-                              alt="Profile preview"
-                              className="w-full h-48 object-cover"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveImage("profileImage")}
-                              className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
-                            >
+                        <input ref={profileInputRef} type="file" accept="image/png,image/jpeg,image/jpg,image/webp" onChange={e => {
+                        if (e.target.files && e.target.files[0]) {
+                          handleFileUpload("profileImage", e.target.files[0]);
+                        }
+                      }} className="hidden" />
+                        {profilePreview ? <div className="relative border-2 border-slate-300 rounded-lg overflow-hidden">
+                            <img src={profilePreview} alt="Profile preview" className="w-full h-48 object-cover" />
+                            <button type="button" onClick={() => handleRemoveImage("profileImage")} className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors">
                               <X className="w-4 h-4" />
                             </button>
-                          </div>
-                        ) : (
-                          <div
-                            onClick={() => profileInputRef.current?.click()}
-                            className={`border-2 border-dashed rounded-lg p-6 text-center hover:border-blue-500 transition-colors cursor-pointer ${formErrors.profileImage ? "border-red-500" : "border-slate-300"
-                              }`}
-                          >
+                          </div> : <div onClick={() => profileInputRef.current?.click()} className={`border-2 border-dashed rounded-lg p-6 text-center hover:border-blue-500 transition-colors cursor-pointer ${formErrors.profileImage ? "border-red-500" : "border-slate-300"}`}>
                             <Upload className="w-8 h-8 text-slate-400 mx-auto mb-2" />
                             <p className="text-sm font-medium text-blue-600 mb-1">Click to Upload Profile Image</p>
                             <p className="text-xs text-slate-500">Supports: PNG, JPG, JPEG, WEBP Maximum 2 MB</p>
-                          </div>
-                        )}
-                        {formErrors.profileImage && (
-                          <p className="text-xs text-red-500 mt-1">{formErrors.profileImage}</p>
-                        )}
+                          </div>}
+                        {formErrors.profileImage && <p className="text-xs text-red-500 mt-1">{formErrors.profileImage}</p>}
                       </div>
 
                       <div>
                         <label className="block text-sm font-medium text-slate-600 mb-2">
                           Upload Cover (Ratio - 2:1)
                         </label>
-                        <input
-                          ref={coverInputRef}
-                          type="file"
-                          accept="image/png,image/jpeg,image/jpg,image/webp"
-                          onChange={(e) => {
-                            if (e.target.files && e.target.files[0]) {
-                              handleFileUpload("coverImage", e.target.files[0])
-                            }
-                          }}
-                          className="hidden"
-                        />
-                        {coverPreview ? (
-                          <div className="relative border-2 border-slate-300 rounded-lg overflow-hidden">
-                            <img
-                              src={coverPreview}
-                              alt="Cover preview"
-                              className="w-full h-48 object-cover"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveImage("coverImage")}
-                              className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
-                            >
+                        <input ref={coverInputRef} type="file" accept="image/png,image/jpeg,image/jpg,image/webp" onChange={e => {
+                        if (e.target.files && e.target.files[0]) {
+                          handleFileUpload("coverImage", e.target.files[0]);
+                        }
+                      }} className="hidden" />
+                        {coverPreview ? <div className="relative border-2 border-slate-300 rounded-lg overflow-hidden">
+                            <img src={coverPreview} alt="Cover preview" className="w-full h-48 object-cover" />
+                            <button type="button" onClick={() => handleRemoveImage("coverImage")} className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors">
                               <X className="w-4 h-4" />
                             </button>
-                          </div>
-                        ) : (
-                          <div
-                            onClick={() => coverInputRef.current?.click()}
-                            className={`border-2 border-dashed rounded-lg p-6 text-center hover:border-blue-500 transition-colors cursor-pointer ${formErrors.coverImage ? "border-red-500" : "border-slate-300"
-                              }`}
-                          >
+                          </div> : <div onClick={() => coverInputRef.current?.click()} className={`border-2 border-dashed rounded-lg p-6 text-center hover:border-blue-500 transition-colors cursor-pointer ${formErrors.coverImage ? "border-red-500" : "border-slate-300"}`}>
                             <Upload className="w-8 h-8 text-slate-400 mx-auto mb-2" />
                             <p className="text-sm font-medium text-blue-600 mb-1">Click to Upload Cover Image</p>
                             <p className="text-xs text-slate-500">Supports: PNG, JPG, JPEG, WEBP Maximum 2 MB</p>
-                          </div>
-                        )}
-                        {formErrors.coverImage && (
-                          <p className="text-xs text-red-500 mt-1">{formErrors.coverImage}</p>
-                        )}
+                          </div>}
+                        {formErrors.coverImage && <p className="text-xs text-red-500 mt-1">{formErrors.coverImage}</p>}
                       </div>
                     </div>
                   </div>
 
                   <div className="flex items-center justify-end gap-4">
-                    {formErrors.submit && (
-                      <p className="text-sm text-red-500 mr-auto">{formErrors.submit}</p>
-                    )}
-                    <button
-                      type="button"
-                      onClick={handleReset}
-                      disabled={isSubmitting}
-                      className="px-6 py-2.5 text-sm font-medium rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
+                    {formErrors.submit && <p className="text-sm text-red-500 mr-auto">{formErrors.submit}</p>}
+                    <button type="button" onClick={handleReset} disabled={isSubmitting} className="px-6 py-2.5 text-sm font-medium rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
                       Reset
                     </button>
-                    <button
-                      type="submit"
-                      disabled={isSubmitting}
-                      className="px-6 py-2.5 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                    >
-                      {isSubmitting ? (
-                        <>
+                    <button type="submit" disabled={isSubmitting} className="px-6 py-2.5 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+                      {isSubmitting ? <>
                           <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                           </svg>
                           Submitting...
-                        </>
-                      ) : (
-                        "Submit"
-                      )}
+                        </> : "Submit"}
                     </button>
                   </div>
                 </div>
@@ -480,47 +351,23 @@ export default function NewAdvertisement() {
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 sticky top-6">
               <h2 className="text-lg font-semibold text-slate-900 mb-4">Advertisement Preview</h2>
               <div className="border-2 border-slate-200 rounded-lg overflow-hidden">
-                <div className="relative bg-gradient-to-br from-slate-50 to-slate-100" style={{ aspectRatio: "2/1" }}>
+                <div className="relative bg-gradient-to-br from-slate-50 to-slate-100" style={{
+                aspectRatio: "2/1"
+              }}>
                   {/* Cover Image Area */}
                   <div className="absolute inset-0">
-                    {coverPreview ? (
-                      <img
-                        src={coverPreview}
-                        alt="Cover"
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <img
-                        src={coverPlaceholder}
-                        alt="Cover"
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          e.target.style.display = "none"
-                        }}
-                      />
-                    )}
+                    {coverPreview ? <img src={coverPreview} alt="Cover" className="w-full h-full object-cover" /> : <img src={coverPlaceholder} alt="Cover" className="w-full h-full object-cover" onError={e => {
+                    e.target.style.display = "none";
+                  }} />}
                   </div>
 
                   {/* Content Overlay */}
                   <div className="absolute inset-0 p-4 flex flex-col justify-between">
                     <div className="flex items-start justify-between">
                       <div className="w-16 h-16 rounded-full bg-white border-2 border-white shadow-md overflow-hidden">
-                        {profilePreview ? (
-                          <img
-                            src={profilePreview}
-                            alt="Profile"
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <img
-                            src={profilePlaceholder}
-                            alt="Profile"
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              e.target.style.display = "none"
-                            }}
-                          />
-                        )}
+                        {profilePreview ? <img src={profilePreview} alt="Profile" className="w-full h-full object-cover" /> : <img src={profilePlaceholder} alt="Profile" className="w-full h-full object-cover" onError={e => {
+                        e.target.style.display = "none";
+                      }} />}
                       </div>
                       <button className="p-2 rounded-full bg-white/80 hover:bg-white transition-colors">
                         <Heart className="w-4 h-4 text-red-500" />
@@ -534,12 +381,10 @@ export default function NewAdvertisement() {
                       <p className="text-xs text-slate-600 mb-2">
                         {formData.shortDescription || "Description"}
                       </p>
-                      {formData.showRatings && (
-                        <div className="flex items-center gap-1">
+                      {formData.showRatings && <div className="flex items-center gap-1">
                           <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
                           <span className="text-xs font-medium text-slate-900">4.7 (25+)</span>
-                        </div>
-                      )}
+                        </div>}
                     </div>
                   </div>
                 </div>
@@ -570,16 +415,12 @@ export default function NewAdvertisement() {
               </DialogDescription>
             </DialogHeader>
             <div className="mt-8">
-              <button
-                onClick={() => setShowSuccessDialog(false)}
-                className="w-full py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-all shadow-lg shadow-slate-200"
-              >
+              <button onClick={() => setShowSuccessDialog(false)} className="w-full py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-all shadow-lg shadow-slate-200">
                 GOT IT
               </button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
-    </div>
-  )
+    </div>;
 }

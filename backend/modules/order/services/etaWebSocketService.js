@@ -32,7 +32,6 @@ class ETAWebSocketService {
         console.warn('Socket.IO not initialized, skipping ETA update');
         return;
       }
-
       const order = await Order.findById(orderId).lean();
       if (!order) {
         console.error('Order not found for ETA update:', orderId);
@@ -62,18 +61,12 @@ class ETAWebSocketService {
       }
 
       // Emit to restaurant room
-      io.of('/restaurant')
-        .to(`restaurant:${order.restaurantId}`)
-        .emit('ETA_UPDATED', etaUpdate);
+      io.of('/restaurant').to(`restaurant:${order.restaurantId}`).emit('ETA_UPDATED', etaUpdate);
 
       // Emit to delivery partner if assigned
       if (order.deliveryPartnerId) {
-        io.of('/delivery')
-          .to(`delivery:${order.deliveryPartnerId}`)
-          .emit('ETA_UPDATED', etaUpdate);
+        io.of('/delivery').to(`delivery:${order.deliveryPartnerId}`).emit('ETA_UPDATED', etaUpdate);
       }
-
-      console.log(`📡 ETA update emitted for order ${order.orderId}:`, etaUpdate.eta.formatted);
     } catch (error) {
       console.error('Error emitting ETA update:', error);
     }
@@ -88,10 +81,8 @@ class ETAWebSocketService {
     try {
       const io = await this.getIOInstance();
       if (!io) return;
-
       const order = await Order.findById(orderId).lean();
       if (!order) return;
-
       const eventData = {
         orderId: order.orderId,
         orderMongoId: order._id.toString(),
@@ -107,8 +98,6 @@ class ETAWebSocketService {
       if (order.userId) {
         io.to(`user:${order.userId}`).emit('RIDER_ASSIGNED', eventData);
       }
-
-      console.log(`📡 Rider assigned event emitted for order ${order.orderId}`);
     } catch (error) {
       console.error('Error emitting rider assigned event:', error);
     }
@@ -122,23 +111,17 @@ class ETAWebSocketService {
     try {
       const io = await this.getIOInstance();
       if (!io) return;
-
       const order = await Order.findById(orderId).lean();
       if (!order) return;
-
       const eventData = {
         orderId: order.orderId,
         orderMongoId: order._id.toString(),
         timestamp: new Date()
       };
-
       io.to(`order:${order.orderId}`).emit('PICKED_UP', eventData);
-      
       if (order.userId) {
         io.to(`user:${order.userId}`).emit('PICKED_UP', eventData);
       }
-
-      console.log(`📡 Picked up event emitted for order ${order.orderId}`);
     } catch (error) {
       console.error('Error emitting picked up event:', error);
     }
@@ -153,24 +136,18 @@ class ETAWebSocketService {
     try {
       const io = await this.getIOInstance();
       if (!io) return;
-
       const order = await Order.findById(orderId).lean();
       if (!order) return;
-
       const eventData = {
         orderId: order.orderId,
         orderMongoId: order._id.toString(),
         distanceToDrop,
         timestamp: new Date()
       };
-
       io.to(`order:${order.orderId}`).emit('NEARBY', eventData);
-      
       if (order.userId) {
         io.to(`user:${order.userId}`).emit('NEARBY', eventData);
       }
-
-      console.log(`📡 Nearby event emitted for order ${order.orderId}, distance: ${distanceToDrop}km`);
     } catch (error) {
       console.error('Error emitting nearby event:', error);
     }
@@ -192,7 +169,7 @@ class ETAWebSocketService {
 
         // Get live ETA
         const liveETA = await etaCalculationService.getLiveETA(orderId);
-        
+
         // Emit update
         await this.emitETAUpdate(orderId, liveETA);
       } catch (error) {
@@ -206,7 +183,6 @@ class ETAWebSocketService {
       this.updateIntervals = new Map();
     }
     this.updateIntervals.set(orderId, intervalId);
-
     return intervalId;
   }
 
@@ -221,6 +197,4 @@ class ETAWebSocketService {
     }
   }
 }
-
 export default new ETAWebSocketService();
-

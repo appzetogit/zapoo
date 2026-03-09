@@ -8,26 +8,39 @@ const __dirname = path.dirname(__filename);
 
 // Read the RTDB service account key from environment variable
 let serviceAccount = null;
-try {
-    if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-        serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-    } else {
-        // Fallback to file for local development if env not set
-        const serviceAccountPath = path.join(__dirname, 'firebase-service-account.json');
-        if (fs.existsSync(serviceAccountPath)) {
-            serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
+
+const loadServiceAccount = () => {
+    if (serviceAccount) return serviceAccount;
+
+    try {
+        if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+            // Check if string contains escaped newlines
+            let saString = process.env.FIREBASE_SERVICE_ACCOUNT;
+            if (saString.includes('\\n')) {
+                // Keep the backslashes for now as JSON.parse will handle them if it's a valid JSON string
+                // But sometimes multi-line strings in .env are tricky.
+            }
+            serviceAccount = JSON.parse(saString);
+        } else {
+            // Fallback to file for local development if env not set
+            const serviceAccountPath = path.join(__dirname, 'firebase-service-account.json');
+            if (fs.existsSync(serviceAccountPath)) {
+                serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
+            }
         }
+    } catch (err) {
+        console.warn('⚠️ Firebase service account could not be loaded from env or file:', err.message);
     }
-} catch (err) {
-    console.warn('⚠️ Firebase service account could not be loaded from env or file.');
-}
+    return serviceAccount;
+};
 
 // Named app for RTDB — completely separate from the default Auth app (zomato-607fa)
 const RTDB_APP_NAME = 'zapoo-rtdb';
 let db;
 
 export const initializeFirebaseRealtime = () => {
-    if (!serviceAccount) {
+    const sa = loadServiceAccount();
+    if (!sa) {
         console.warn('⚠️ Firebase Realtime Database skipped: service account not available.');
         return null;
     }
@@ -37,7 +50,7 @@ export const initializeFirebaseRealtime = () => {
         const existingApp = admin.apps.find(a => a?.name === RTDB_APP_NAME);
         const rtdbApp = existingApp || admin.initializeApp(
             {
-                credential: admin.credential.cert(serviceAccount),
+                credential: admin.credential.cert(sa),
                 // Asia-southeast1 regional URL (your project lives here)
                 databaseURL: process.env.FIREBASE_DATABASE_URL || 'https://zapoo-d23ea-default-rtdb.asia-southeast1.firebasedatabase.app'
             },

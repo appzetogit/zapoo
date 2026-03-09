@@ -2,6 +2,7 @@ import { useLocation } from "react-router-dom"
 import { useEffect, useState } from "react"
 import BottomNavigation from "./BottomNavigation"
 import { getUnreadDeliveryNotificationCount } from "../utils/deliveryNotifications"
+import { useFCMNotification } from "@/hooks/useFCMNotification"
 
 export default function DeliveryLayout({
   children,
@@ -14,6 +15,9 @@ export default function DeliveryLayout({
   const [requestBadgeCount, setRequestBadgeCount] = useState(() =>
     getUnreadDeliveryNotificationCount()
   )
+
+  const isLoggedIn = localStorage.getItem("delivery_authenticated") === "true" || !!localStorage.getItem("delivery_accessToken")
+  useFCMNotification({ isLoggedIn, role: 'delivery' })
 
   // Update badge count when location changes
   useEffect(() => {

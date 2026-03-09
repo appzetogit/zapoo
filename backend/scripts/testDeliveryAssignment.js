@@ -13,7 +13,6 @@ import Restaurant from '../modules/restaurant/models/Restaurant.js';
 import Delivery from '../modules/delivery/models/Delivery.js';
 import { assignOrderToDeliveryBoy } from '../modules/order/services/deliveryAssignmentService.js';
 import { notifyDeliveryBoyNewOrder } from '../modules/order/services/deliveryNotificationService.js';
-
 dotenv.config();
 
 // Colors for console output
@@ -25,13 +24,9 @@ const colors = {
   yellow: '\x1b[33m',
   blue: '\x1b[34m',
   magenta: '\x1b[35m',
-  cyan: '\x1b[36m',
+  cyan: '\x1b[36m'
 };
-
-function log(message, color = 'reset') {
-  console.log(`${colors[color]}${message}${colors.reset}`);
-}
-
+function log(message, color = 'reset') {}
 async function testDeliveryAssignment() {
   try {
     log('\n🧪 Starting Delivery Assignment Test...\n', 'cyan');
@@ -43,11 +38,9 @@ async function testDeliveryAssignment() {
 
     // Step 1: Check for restaurants
     log('📋 Step 1: Checking restaurants...', 'yellow');
-    const restaurants = await Restaurant.find({ isActive: true })
-      .select('_id name location restaurantId')
-      .limit(5)
-      .lean();
-    
+    const restaurants = await Restaurant.find({
+      isActive: true
+    }).select('_id name location restaurantId').limit(5).lean();
     if (restaurants.length === 0) {
       log('❌ No active restaurants found', 'red');
       return;
@@ -62,62 +55,48 @@ async function testDeliveryAssignment() {
     log('\n📋 Step 2: Checking delivery partners...', 'yellow');
     const deliveryPartners = await Delivery.find({
       'availability.isOnline': true,
-      status: { $in: ['approved', 'active'] },
+      status: {
+        $in: ['approved', 'active']
+      },
       isActive: true
-    })
-      .select('_id name phone availability.isOnline availability.currentLocation status isActive')
-      .limit(10)
-      .lean();
-
+    }).select('_id name phone availability.isOnline availability.currentLocation status isActive').limit(10).lean();
     if (deliveryPartners.length === 0) {
       log('❌ No online delivery partners found', 'red');
       log('💡 Checking all delivery partners...', 'yellow');
-      const allPartners = await Delivery.find({})
-        .select('_id name availability.isOnline status isActive availability.currentLocation')
-        .limit(10)
-        .lean();
-      
+      const allPartners = await Delivery.find({}).select('_id name availability.isOnline status isActive availability.currentLocation').limit(10).lean();
       log(`📊 Total delivery partners: ${allPartners.length}`, 'blue');
       allPartners.forEach(partner => {
-        const hasLocation = partner.availability?.currentLocation?.coordinates && 
-                           partner.availability.currentLocation.coordinates.length === 2;
+        const hasLocation = partner.availability?.currentLocation?.coordinates && partner.availability.currentLocation.coordinates.length === 2;
         log(`   - ${partner.name} (ID: ${partner._id})`, 'blue');
-        log(`     Online: ${partner.availability?.isOnline ? '✅' : '❌'} | Status: ${partner.status} | Active: ${partner.isActive ? '✅' : '❌'} | Location: ${hasLocation ? '✅' : '❌'}`, 
-            partner.availability?.isOnline && partner.isActive && hasLocation ? 'green' : 'red');
+        log(`     Online: ${partner.availability?.isOnline ? '✅' : '❌'} | Status: ${partner.status} | Active: ${partner.isActive ? '✅' : '❌'} | Location: ${hasLocation ? '✅' : '❌'}`, partner.availability?.isOnline && partner.isActive && hasLocation ? 'green' : 'red');
       });
       return;
     }
     log(`✅ Found ${deliveryPartners.length} online delivery partner(s)`, 'green');
     deliveryPartners.forEach(dp => {
-      const hasLocation = dp.availability?.currentLocation?.coordinates && 
-                         dp.availability.currentLocation.coordinates.length === 2;
+      const hasLocation = dp.availability?.currentLocation?.coordinates && dp.availability.currentLocation.coordinates.length === 2;
       const [lng, lat] = dp.availability?.currentLocation?.coordinates || [0, 0];
-      log(`   - ${dp.name} (ID: ${dp._id}) - Phone: ${dp.phone} - Location: ${hasLocation ? `✅ (${lat}, ${lng})` : '❌'}`, 
-          hasLocation ? 'green' : 'red');
+      log(`   - ${dp.name} (ID: ${dp._id}) - Phone: ${dp.phone} - Location: ${hasLocation ? `✅ (${lat}, ${lng})` : '❌'}`, hasLocation ? 'green' : 'red');
     });
 
     // Step 3: Check for preparing orders without delivery partner
     log('\n📋 Step 3: Checking orders needing assignment...', 'yellow');
     const unassignedOrders = await Order.find({
       status: 'preparing',
-      deliveryPartnerId: { $exists: false }
-    })
-      .populate('restaurantId', 'name location')
-      .populate('userId', 'name phone')
-      .limit(5)
-      .lean();
-
+      deliveryPartnerId: {
+        $exists: false
+      }
+    }).populate('restaurantId', 'name location').populate('userId', 'name phone').limit(5).lean();
     if (unassignedOrders.length === 0) {
       log('ℹ️ No unassigned preparing orders found', 'blue');
       log('💡 Creating a test order scenario...', 'yellow');
-      
+
       // Use first restaurant
       const testRestaurant = restaurants[0];
       if (!testRestaurant.location?.coordinates) {
         log('❌ Test restaurant has no location', 'red');
         return;
       }
-
       log(`📝 Simulating order assignment for restaurant: ${testRestaurant.name}`, 'blue');
       const [restaurantLng, restaurantLat] = testRestaurant.location.coordinates;
       log(`📍 Restaurant location: ${restaurantLat}, ${restaurantLng}`, 'blue');
@@ -129,14 +108,8 @@ async function testDeliveryAssignment() {
         restaurantId: testRestaurant._id.toString(),
         status: 'preparing'
       };
-
       log('\n🔄 Testing delivery assignment...', 'yellow');
-      const assignmentResult = await assignOrderToDeliveryBoy(
-        testOrder,
-        restaurantLat,
-        restaurantLng
-      );
-
+      const assignmentResult = await assignOrderToDeliveryBoy(testOrder, restaurantLat, restaurantLng);
       if (assignmentResult && assignmentResult.deliveryPartnerId) {
         log(`✅ Assignment successful!`, 'green');
         log(`   Delivery Partner ID: ${assignmentResult.deliveryPartnerId}`, 'green');
@@ -151,24 +124,17 @@ async function testDeliveryAssignment() {
         log(`\n📦 Order: ${order.orderId}`, 'cyan');
         log(`   Restaurant: ${order.restaurantId?.name || 'N/A'}`, 'blue');
         log(`   Customer: ${order.userId?.name || 'N/A'}`, 'blue');
-        
         const restaurant = order.restaurantId;
         if (!restaurant?.location?.coordinates) {
           log('   ❌ Restaurant has no location', 'red');
           continue;
         }
-
         const [restaurantLng, restaurantLat] = restaurant.location.coordinates;
         log(`   📍 Restaurant location: ${restaurantLat}, ${restaurantLng}`, 'blue');
 
         // Test assignment
         log('   🔄 Testing assignment...', 'yellow');
-        const assignmentResult = await assignOrderToDeliveryBoy(
-          order,
-          restaurantLat,
-          restaurantLng
-        );
-
+        const assignmentResult = await assignOrderToDeliveryBoy(order, restaurantLat, restaurantLng);
         if (assignmentResult && assignmentResult.deliveryPartnerId) {
           log(`   ✅ Assignment successful!`, 'green');
           log(`      Delivery Partner: ${assignmentResult.deliveryPartnerName}`, 'green');
@@ -190,10 +156,8 @@ async function testDeliveryAssignment() {
     if (deliveryPartners.length > 0 && unassignedOrders.length > 0) {
       const testOrder = unassignedOrders[0];
       const testDeliveryPartner = deliveryPartners[0];
-      
       log(`📦 Testing notification for order: ${testOrder.orderId}`, 'blue');
       log(`🚴 To delivery partner: ${testDeliveryPartner.name} (${testDeliveryPartner._id})`, 'blue');
-      
       try {
         await notifyDeliveryBoyNewOrder(testOrder, testDeliveryPartner._id.toString());
         log('✅ Notification sent successfully', 'green');
@@ -210,7 +174,6 @@ async function testDeliveryAssignment() {
     log(`   Restaurants: ${restaurants.length}`, 'blue');
     log(`   Online Delivery Partners: ${deliveryPartners.length}`, deliveryPartners.length > 0 ? 'green' : 'red');
     log(`   Unassigned Orders: ${unassignedOrders.length}`, 'blue');
-    
     if (deliveryPartners.length === 0) {
       log('\n⚠️ ISSUE FOUND: No online delivery partners!', 'yellow');
       log('💡 Solutions:', 'yellow');
@@ -219,13 +182,10 @@ async function testDeliveryAssignment() {
       log('   3. Ensure delivery partners have valid location data', 'yellow');
       log('   4. Delivery partners need to open the app and go online', 'yellow');
     }
-
     if (restaurants.length === 0) {
       log('\n⚠️ ISSUE FOUND: No active restaurants!', 'yellow');
     }
-
     log('\n✅ Test completed!\n', 'green');
-
   } catch (error) {
     log(`\n❌ Test failed with error: ${error.message}`, 'red');
     console.error(error);
@@ -241,4 +201,3 @@ async function testDeliveryAssignment() {
 
 // Run the test
 testDeliveryAssignment();
-

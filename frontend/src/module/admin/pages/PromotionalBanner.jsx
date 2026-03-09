@@ -1,28 +1,31 @@
-import { useState } from "react"
-import { Edit, Upload, Info } from "lucide-react"
+import { useState } from "react";
+import { Edit, Upload, Info } from "lucide-react";
 // Using placeholder for promotional banner
-const bannerPreview = "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=1200&h=400&fit=crop"
-
+const bannerPreview = "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=1200&h=400&fit=crop";
 export default function PromotionalBanner() {
-  const [activeLanguage, setActiveLanguage] = useState("default")
-  const [title, setTitle] = useState("Promotional")
-
-  const languageTabs = [
-    { key: "default", label: "Default" },
-    { key: "en", label: "English(EN)" },
-    { key: "bn", label: "Bengali - বাংলা(BN)" },
-    { key: "ar", label: "Arabic - العربية (AR)" },
-    { key: "es", label: "Spanish - español(ES)" },
-  ]
-
-  const handleSubmit = (e) => {
-    e.preventDefault()
-    console.log("Banner saved:", { title })
-    alert("Promotional banner saved successfully!")
-  }
-
-  return (
-    <div className="p-4 lg:p-6 bg-slate-50 min-h-screen">
+  const [activeLanguage, setActiveLanguage] = useState("default");
+  const [title, setTitle] = useState("Promotional");
+  const languageTabs = [{
+    key: "default",
+    label: "Default"
+  }, {
+    key: "en",
+    label: "English(EN)"
+  }, {
+    key: "bn",
+    label: "Bengali - বাংলা(BN)"
+  }, {
+    key: "ar",
+    label: "Arabic - العربية (AR)"
+  }, {
+    key: "es",
+    label: "Spanish - español(ES)"
+  }];
+  const handleSubmit = e => {
+    e.preventDefault();
+    alert("Promotional banner saved successfully!");
+  };
+  return <div className="p-4 lg:p-6 bg-slate-50 min-h-screen">
       <div className="max-w-5xl mx-auto">
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
           {/* Header */}
@@ -33,19 +36,9 @@ export default function PromotionalBanner() {
 
           {/* Language Tabs */}
           <div className="flex items-center gap-2 border-b border-slate-200 mb-6">
-            {languageTabs.map((tab) => (
-              <button
-                key={tab.key}
-                onClick={() => setActiveLanguage(tab.key)}
-                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                  activeLanguage === tab.key
-                    ? "border-blue-600 text-blue-600"
-                    : "border-transparent text-slate-600 hover:text-slate-900"
-                }`}
-              >
+            {languageTabs.map(tab => <button key={tab.key} onClick={() => setActiveLanguage(tab.key)} className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeLanguage === tab.key ? "border-blue-600 text-blue-600" : "border-transparent text-slate-600 hover:text-slate-900"}`}>
                 {tab.label}
-              </button>
-            ))}
+              </button>)}
           </div>
 
           <form onSubmit={handleSubmit}>
@@ -54,12 +47,7 @@ export default function PromotionalBanner() {
               <label className="block text-sm font-semibold text-slate-700 mb-2">
                 Title ({activeLanguage === "default" ? "Default" : languageTabs.find(t => t.key === activeLanguage)?.label})
               </label>
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-              />
+              <input type="text" value={title} onChange={e => setTitle(e.target.value)} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm" />
             </div>
 
             {/* Upload Banner Section */}
@@ -71,21 +59,19 @@ export default function PromotionalBanner() {
 
               {/* Banner Preview */}
               <div className="border-2 border-slate-200 rounded-lg overflow-hidden mb-4">
-                <div className="relative w-full" style={{ aspectRatio: "5/1", minHeight: "200px" }}>
+                <div className="relative w-full" style={{
+                aspectRatio: "5/1",
+                minHeight: "200px"
+              }}>
                   <div className="absolute inset-0 bg-gradient-to-r from-slate-800 to-slate-900 flex items-center justify-center">
                     <div className="text-white text-center px-8">
                       <p className="text-2xl font-bold mb-2">Fresh Flavors Delivered Right to You</p>
                     </div>
                   </div>
                   <div className="absolute right-0 top-0 bottom-0 w-1/2">
-                    <img
-                      src={bannerPreview}
-                      alt="Banner preview"
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        e.target.style.display = "none"
-                      }}
-                    />
+                    <img src={bannerPreview} alt="Banner preview" className="w-full h-full object-cover" onError={e => {
+                    e.target.style.display = "none";
+                  }} />
                   </div>
                 </div>
               </div>
@@ -108,16 +94,12 @@ export default function PromotionalBanner() {
 
             {/* Save Button */}
             <div className="flex items-center justify-end">
-              <button
-                type="submit"
-                className="px-6 py-2.5 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-all shadow-md"
-              >
+              <button type="submit" className="px-6 py-2.5 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-all shadow-md">
                 Save
               </button>
             </div>
           </form>
         </div>
       </div>
-    </div>
-  )
+    </div>;
 }

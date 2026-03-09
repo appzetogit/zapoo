@@ -18,15 +18,15 @@ export async function processAutoRejectOrders() {
     const validPendingOrders = await Order.find({
       status: 'pending'
     }).lean();
-
     if (validPendingOrders.length === 0) {
-      return { processed: 0, message: 'No pending orders to check' };
+      return {
+        processed: 0,
+        message: 'No pending orders to check'
+      };
     }
-
     const now = new Date();
     let processedCount = 0;
     const rejectedOrders = [];
-
     for (const order of validPendingOrders) {
       const orderCreatedAt = new Date(order.createdAt);
       const elapsedMs = now - orderCreatedAt;
@@ -50,25 +50,16 @@ export async function processAutoRejectOrders() {
           currentOrder.cancellationReason = 'Order not accepted within time limit. Restaurant did not respond in time.';
           currentOrder.cancelledBy = 'restaurant';
           currentOrder.cancelledAt = now;
-
           await currentOrder.save();
-
           rejectedOrders.push({
             orderId: currentOrder.orderId,
             elapsedSeconds: Math.floor(elapsedMs / 1000)
           });
           processedCount++;
-
-          console.log(`✅ Order ${currentOrder.orderId} automatically rejected (elapsed: ${Math.floor(elapsedMs / 1000)}s >= ${ACCEPT_TIME_LIMIT_SECONDS}s)`);
-
           // Calculate refund amount but don't process automatically
           // Admin will process refund manually via refund button
           try {
-            await calculateCancellationRefund(
-              currentOrder._id,
-              'Order not accepted within time limit. Restaurant did not respond in time.'
-            );
-            console.log(`✅ Cancellation refund calculated for order ${currentOrder.orderId} - awaiting admin approval`);
+            await calculateCancellationRefund(currentOrder._id, 'Order not accepted within time limit. Restaurant did not respond in time.');
           } catch (refundError) {
             console.error(`❌ Error calculating cancellation refund for order ${currentOrder.orderId}:`, refundError);
             // Don't fail order cancellation if refund calculation fails
@@ -85,15 +76,15 @@ export async function processAutoRejectOrders() {
         }
       }
     }
-
     return {
       processed: processedCount,
-      message: processedCount > 0
-        ? `Auto-rejected ${processedCount} order(s) that were not accepted within ${ACCEPT_TIME_LIMIT_SECONDS} seconds`
-        : 'No orders to auto-reject'
+      message: processedCount > 0 ? `Auto-rejected ${processedCount} order(s) that were not accepted within ${ACCEPT_TIME_LIMIT_SECONDS} seconds` : 'No orders to auto-reject'
     };
   } catch (error) {
     console.error('❌ Error processing auto-reject orders:', error);
-    return { processed: 0, message: `Error: ${error.message}` };
+    return {
+      processed: 0,
+      message: `Error: ${error.message}`
+    };
   }
 }

@@ -14,6 +14,7 @@ import { authenticate } from '../../auth/middleware/auth.js';
 import { uploadMiddleware } from '../../../shared/utils/cloudinaryService.js';
 import userWalletRoutes from './userWalletRoutes.js';
 import complaintRoutes from './complaintRoutes.js';
+import DeviceToken from '../../notification/models/DeviceToken.js';
 
 const router = express.Router();
 
@@ -54,19 +55,42 @@ router.post('/fcm-token', async (req, res) => {
 
     const User = (await import('../../auth/models/User.js')).default;
     // Keep legacy token array for backward compatibility and also store platform-specific token.
-    await User.findByIdAndUpdate(
-      req.user._id,
-      {
-        $addToSet: { fcmTokens: normalizedToken },
-        $set: { [tokenField]: normalizedToken },
-      }
-    );
+    await User.findByIdAndUpdate(req.user._id, {
+      $addToSet: { fcmTokens: normalizedToken },
+      $set: { [tokenField]: normalizedToken },
+    });
 
     // If over 10 tokens, trim oldest
     const user = await User.findById(req.user._id).select('fcmTokens');
     if (user.fcmTokens.length > 10) {
       user.fcmTokens = user.fcmTokens.slice(-10);
       await user.save();
+    }
+
+    // Also persist into unified DeviceToken collection for cross-platform broadcasts
+    try {
+      await DeviceToken.findOneAndUpdate(
+        { deviceToken: normalizedToken },
+        {
+          userId: req.user._id,
+          role: 'user',
+          platform: normalizedPlatform === 'mobile' ? 'mobile' : 'web',
+          isActive: true
+        },
+        { upsert: true, new: true }
+      );
+
+      // Enforce a soft limit on number of active tokens per user
+      const count = await DeviceToken.countDocuments({ userId: req.user._id, role: 'user' });
+      if (count > 5) {
+        const oldest = await DeviceToken.find({ userId: req.user._id, role: 'user' })
+          .sort({ createdAt: 1 })
+          .limit(count - 5);
+        await DeviceToken.deleteMany({ _id: { $in: oldest.map(t => t._id) } });
+      }
+    } catch (deviceErr) {
+      // Do not fail the main request if DeviceToken write fails
+      console.warn('[FCM] Failed to write DeviceToken record:', deviceErr.message);
     }
     return res.json({
       success: true,

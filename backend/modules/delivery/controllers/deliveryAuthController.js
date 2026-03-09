@@ -4,15 +4,12 @@ import jwtService from '../../auth/services/jwtService.js';
 import { successResponse, errorResponse } from '../../../shared/utils/response.js';
 import { asyncHandler } from '../../../shared/middleware/asyncHandler.js';
 import winston from 'winston';
-
 const logger = winston.createLogger({
   level: 'info',
   format: winston.format.json(),
-  transports: [
-    new winston.transports.Console({
-      format: winston.format.simple()
-    })
-  ]
+  transports: [new winston.transports.Console({
+    format: winston.format.simple()
+  })]
 });
 
 /**
@@ -20,7 +17,10 @@ const logger = winston.createLogger({
  * POST /api/delivery/auth/send-otp
  */
 export const sendOTP = asyncHandler(async (req, res) => {
-  const { phone, purpose = 'login' } = req.body;
+  const {
+    phone,
+    purpose = 'login'
+  } = req.body;
 
   // Validate phone number
   if (!phone) {
@@ -32,7 +32,6 @@ export const sendOTP = asyncHandler(async (req, res) => {
   if (!phoneRegex.test(phone)) {
     return errorResponse(res, 400, 'Invalid phone number format');
   }
-
   try {
     const result = await otpService.generateAndSendOTP(phone, purpose, null);
     return successResponse(res, 200, result.message, {
@@ -50,7 +49,12 @@ export const sendOTP = asyncHandler(async (req, res) => {
  * POST /api/delivery/auth/verify-otp
  */
 export const verifyOTP = asyncHandler(async (req, res) => {
-  const { phone, otp, purpose = 'login', name } = req.body;
+  const {
+    phone,
+    otp,
+    purpose = 'login',
+    name
+  } = req.body;
 
   // Validate inputs
   if (!phone || !otp) {
@@ -59,16 +63,15 @@ export const verifyOTP = asyncHandler(async (req, res) => {
 
   // Normalize name - convert null/undefined to empty string for optional field
   const normalizedName = name && typeof name === 'string' ? name.trim() : null;
-
   try {
     let delivery;
     const identifier = phone;
-
     if (purpose === 'register') {
       // Registration flow
       // Check if delivery boy already exists
-      delivery = await Delivery.findOne({ phone });
-
+      delivery = await Delivery.findOne({
+        phone
+      });
       if (delivery) {
         return errorResponse(res, 400, 'Delivery boy already exists with this phone number. Please login.');
       }
@@ -80,27 +83,23 @@ export const verifyOTP = asyncHandler(async (req, res) => {
 
       // Verify OTP before creating delivery boy
       await otpService.verifyOTP(phone, otp, purpose, null);
-
       const deliveryData = {
         name: normalizedName,
         phone,
         phoneVerified: true,
         signupMethod: 'phone',
-        status: 'pending', // New delivery boys start as pending approval
+        status: 'pending',
+        // New delivery boys start as pending approval
         isActive: true // Allow login to see verification message
       };
-
       try {
         delivery = await Delivery.create(deliveryData);
-        logger.info(`New delivery boy registered: ${delivery._id}`, { 
-          phone, 
-          deliveryId: delivery._id,
-          deliveryIdField: delivery.deliveryId
-        });
       } catch (createError) {
         // Handle duplicate key error
         if (createError.code === 11000) {
-          delivery = await Delivery.findOne({ phone });
+          delivery = await Delivery.findOne({
+            phone
+          });
           if (!delivery) {
             throw createError;
           }
@@ -111,38 +110,35 @@ export const verifyOTP = asyncHandler(async (req, res) => {
       }
     } else {
       // Login (with optional auto-registration)
-      delivery = await Delivery.findOne({ phone });
+      delivery = await Delivery.findOne({
+        phone
+      });
 
       // Verify OTP first (before creating user)
       await otpService.verifyOTP(phone, otp, purpose, null);
-
       if (!delivery) {
         // New user - create minimal record for signup flow
         // Use provided name or placeholder
         const deliveryData = {
-          name: normalizedName || 'Delivery Partner', // Placeholder if not provided
+          name: normalizedName || 'Delivery Partner',
+          // Placeholder if not provided
           phone,
           phoneVerified: true,
           signupMethod: 'phone',
-          status: 'pending', // New delivery boys start as pending approval
+          status: 'pending',
+          // New delivery boys start as pending approval
           isActive: true // Allow login to see verification message
         };
-
         try {
           delivery = await Delivery.create(deliveryData);
-          logger.info(`New delivery boy created for signup: ${delivery._id}`, { 
-            phone, 
-            deliveryId: delivery._id,
-            deliveryIdField: delivery.deliveryId,
-            hasName: !!normalizedName
-          });
         } catch (createError) {
           if (createError.code === 11000) {
-            delivery = await Delivery.findOne({ phone });
+            delivery = await Delivery.findOne({
+              phone
+            });
             if (!delivery) {
               throw createError;
             }
-            logger.info(`Delivery boy found after duplicate key error: ${delivery._id}`);
           } else {
             throw createError;
           }
@@ -156,14 +152,7 @@ export const verifyOTP = asyncHandler(async (req, res) => {
       }
 
       // Check if signup needs to be completed (missing required fields)
-      const needsSignup = !delivery.location?.city || 
-                         !delivery.vehicle?.number || 
-                         !delivery.documents?.pan?.number ||
-                         !delivery.documents?.aadhar?.number ||
-                         !delivery.documents?.aadhar?.document ||
-                         !delivery.documents?.pan?.document ||
-                         !delivery.documents?.drivingLicense?.document;
-
+      const needsSignup = !delivery.location?.city || !delivery.vehicle?.number || !delivery.documents?.pan?.number || !delivery.documents?.aadhar?.number || !delivery.documents?.aadhar?.document || !delivery.documents?.pan?.document || !delivery.documents?.drivingLicense?.document;
       if (needsSignup) {
         // Generate tokens for signup flow
         const tokens = jwtService.generateTokens({
@@ -183,7 +172,6 @@ export const verifyOTP = asyncHandler(async (req, res) => {
           sameSite: 'strict',
           maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
         });
-
         return successResponse(res, 200, 'OTP verified. Please complete your profile.', {
           accessToken: tokens.accessToken,
           refreshToken: tokens.refreshToken,
@@ -243,7 +231,8 @@ export const verifyOTP = asyncHandler(async (req, res) => {
         profileImage: delivery.profileImage,
         isActive: delivery.isActive,
         status: delivery.status,
-        rejectionReason: delivery.rejectionReason || null, // Include rejection reason for blocked accounts
+        rejectionReason: delivery.rejectionReason || null,
+        // Include rejection reason for blocked accounts
         metrics: delivery.metrics,
         earnings: delivery.earnings
       }
@@ -261,11 +250,9 @@ export const verifyOTP = asyncHandler(async (req, res) => {
 export const refreshToken = asyncHandler(async (req, res) => {
   // Get refresh token from cookie or header
   const refreshToken = req.cookies?.refreshToken || req.headers['x-refresh-token'];
-
   if (!refreshToken) {
     return errorResponse(res, 401, 'Refresh token not found');
   }
-
   try {
     // Verify refresh token
     const decoded = jwtService.verifyRefreshToken(refreshToken);
@@ -277,7 +264,6 @@ export const refreshToken = asyncHandler(async (req, res) => {
 
     // Get delivery boy from database and verify refresh token matches
     const delivery = await Delivery.findById(decoded.userId).select('+refreshToken');
-
     if (!delivery || !delivery.isActive) {
       return errorResponse(res, 401, 'Delivery boy not found or inactive');
     }
@@ -293,7 +279,6 @@ export const refreshToken = asyncHandler(async (req, res) => {
       role: 'delivery',
       email: delivery.email || delivery.phone || delivery.deliveryId
     });
-
     return successResponse(res, 200, 'Token refreshed successfully', {
       accessToken
     });
@@ -320,7 +305,6 @@ export const logout = asyncHandler(async (req, res) => {
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict'
   });
-
   return successResponse(res, 200, 'Logged out successfully');
 });
 
@@ -354,4 +338,3 @@ export const getCurrentDelivery = asyncHandler(async (req, res) => {
     }
   });
 });
-

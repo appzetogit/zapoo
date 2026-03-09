@@ -4,7 +4,7 @@ import AnimatedPage from "../../components/AnimatedPage"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { useState } from "react"
-import { authAPI } from "@/lib/api"
+import { authAPI, notificationAPI } from "@/lib/api"
 import { firebaseAuth } from "@/lib/firebase"
 
 export default function Logout() {
@@ -19,6 +19,14 @@ export default function Logout() {
     try {
       // Call backend logout API to invalidate refresh token
       try {
+        // Remove FCM token before standard logout
+        const savedToken = localStorage.getItem(`fcm_token_registered_user_VAL`);
+        if (savedToken) {
+          console.log("[Logout] Removing FCM token for user...");
+          await notificationAPI.removeToken(savedToken);
+          localStorage.removeItem(`fcm_token_registered_user_VAL`);
+          localStorage.removeItem(`fcm_token_registered_user`);
+        }
         await authAPI.logout()
       } catch (apiError) {
         // Continue with logout even if API call fails (network issues, etc.)
@@ -55,7 +63,7 @@ export default function Logout() {
     } catch (err) {
       // Even if there's an error, we should still clear local data and logout
       console.error("Error during logout:", err)
-      
+
       // Clear local data anyway
       localStorage.removeItem("accessToken")
       localStorage.removeItem("user_authenticated")
@@ -64,7 +72,7 @@ export default function Logout() {
       window.dispatchEvent(new Event("userAuthChanged"))
 
       setError("An error occurred during logout, but you have been signed out locally.")
-      
+
       // Still navigate after showing error
       setTimeout(() => {
         navigate("/user/auth/sign-in", { replace: true })

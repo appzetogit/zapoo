@@ -10,15 +10,12 @@ import winston from 'winston';
 import { createOrder as createRazorpayOrder } from '../../payment/services/razorpayService.js';
 import { verifyPayment } from '../../payment/services/razorpayService.js';
 import { getRazorpayCredentials } from '../../../shared/utils/envService.js';
-
 const logger = winston.createLogger({
   level: 'info',
   format: winston.format.json(),
-  transports: [
-    new winston.transports.Console({
-      format: winston.format.simple()
-    })
-  ]
+  transports: [new winston.transports.Console({
+    format: winston.format.simple()
+  })]
 });
 
 /**
@@ -31,8 +28,9 @@ export const getWallet = asyncHandler(async (req, res) => {
     const delivery = req.delivery;
 
     // Find or create wallet for this delivery partner
-    let wallet = await DeliveryWallet.findOne({ deliveryId: delivery._id });
-
+    let wallet = await DeliveryWallet.findOne({
+      deliveryId: delivery._id
+    });
     if (!wallet) {
       // Create wallet if doesn't exist
       wallet = await DeliveryWallet.create({
@@ -45,9 +43,7 @@ export const getWallet = asyncHandler(async (req, res) => {
     }
 
     // Calculate pending withdrawals
-    const pendingWithdrawals = wallet.transactions
-      .filter(t => t.type === 'withdrawal' && t.status === 'Pending')
-      .reduce((sum, t) => sum + t.amount, 0);
+    const pendingWithdrawals = wallet.transactions.filter(t => t.type === 'withdrawal' && t.status === 'Pending').reduce((sum, t) => sum + t.amount, 0);
 
     // Global cash limit and withdrawal limit (same for all delivery partners)
     let totalCashLimit = 0;
@@ -71,63 +67,60 @@ export const getWallet = asyncHandler(async (req, res) => {
     let codCollectedTotal = 0;
     try {
       const deliveryIdStr = delivery._id?.toString?.() || String(delivery._id);
-      const codAgg = await Order.aggregate([
-        {
-          $match: {
-            $expr: {
-              $and: [
-                // deliveryPartnerId matches current delivery (handles ObjectId or string)
-                {
-                  $eq: [
-                    { $toString: { $ifNull: ['$deliveryPartnerId', ''] } },
-                    deliveryIdStr
-                  ]
-                },
-                // COD / Cash payment method (handles casing + some legacy values)
-                {
-                  $in: [
-                    {
-                      $toLower: {
-                        $ifNull: ['$payment.method', '']
-                      }
-                    },
-                    ['cash', 'cod', 'cash on delivery']
-                  ]
-                },
-                // Delivered status can be in status or deliveryState fields
-                {
-                  $or: [
-                    {
-                      $eq: [
-                        { $toLower: { $ifNull: ['$status', ''] } },
-                        'delivered'
-                      ]
-                    },
-                    {
-                      $eq: [
-                        { $toLower: { $ifNull: ['$deliveryState.status', ''] } },
-                        'delivered'
-                      ]
-                    },
-                    {
-                      $eq: [
-                        { $toLower: { $ifNull: ['$deliveryState.currentPhase', ''] } },
-                        'completed'
-                      ]
-                    }
-                  ]
+      const codAgg = await Order.aggregate([{
+        $match: {
+          $expr: {
+            $and: [
+            // deliveryPartnerId matches current delivery (handles ObjectId or string)
+            {
+              $eq: [{
+                $toString: {
+                  $ifNull: ['$deliveryPartnerId', '']
                 }
-              ]
-            }
-          }
-        },
-        {
-          $group: {
-            _id: null,
-            total: { $sum: { $ifNull: ['$pricing.total', 0] } }
+              }, deliveryIdStr]
+            },
+            // COD / Cash payment method (handles casing + some legacy values)
+            {
+              $in: [{
+                $toLower: {
+                  $ifNull: ['$payment.method', '']
+                }
+              }, ['cash', 'cod', 'cash on delivery']]
+            },
+            // Delivered status can be in status or deliveryState fields
+            {
+              $or: [{
+                $eq: [{
+                  $toLower: {
+                    $ifNull: ['$status', '']
+                  }
+                }, 'delivered']
+              }, {
+                $eq: [{
+                  $toLower: {
+                    $ifNull: ['$deliveryState.status', '']
+                  }
+                }, 'delivered']
+              }, {
+                $eq: [{
+                  $toLower: {
+                    $ifNull: ['$deliveryState.currentPhase', '']
+                  }
+                }, 'completed']
+              }]
+            }]
           }
         }
-      ]);
+      }, {
+        $group: {
+          _id: null,
+          total: {
+            $sum: {
+              $ifNull: ['$pricing.total', 0]
+            }
+          }
+        }
+      }]);
       codCollectedTotal = Number(codAgg?.[0]?.total) || 0;
     } catch (e) {
       console.warn('⚠️ Failed to compute COD cash in hand from orders:', e?.message || e);
@@ -140,8 +133,7 @@ export const getWallet = asyncHandler(async (req, res) => {
 
     // Get all transactions (sorted by date, newest first)
     // Frontend needs all transactions to calculate weekly earnings and orders
-    const allTransactions = wallet.transactions
-      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    const allTransactions = wallet.transactions.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
     // Get recent transactions (last 10) for display purposes
     const recentTransactions = allTransactions.slice(0, 10);
@@ -164,7 +156,6 @@ export const getWallet = asyncHandler(async (req, res) => {
     // Calculate bonus amount from transactions for logging
     const bonusTransactions = transactions.filter(t => t.type === 'bonus' && t.status === 'Completed');
     const totalBonus = bonusTransactions.reduce((sum, t) => sum + (t.amount || 0), 0);
-    
     const walletData = {
       totalBalance: wallet.totalBalance || 0,
       cashInHand: cashInHandForLimit,
@@ -204,10 +195,15 @@ export const getWallet = asyncHandler(async (req, res) => {
 export const getTransactions = asyncHandler(async (req, res) => {
   try {
     const delivery = req.delivery;
-    const { type, status, page = 1, limit = 20 } = req.query;
-
-    let wallet = await DeliveryWallet.findOne({ deliveryId: delivery._id });
-
+    const {
+      type,
+      status,
+      page = 1,
+      limit = 20
+    } = req.query;
+    let wallet = await DeliveryWallet.findOne({
+      deliveryId: delivery._id
+    });
     if (!wallet) {
       return successResponse(res, 200, 'No transactions found', {
         transactions: [],
@@ -222,11 +218,9 @@ export const getTransactions = asyncHandler(async (req, res) => {
 
     // Filter transactions
     let transactions = wallet.transactions || [];
-
     if (type) {
       transactions = transactions.filter(t => t.type === type);
     }
-
     if (status) {
       transactions = transactions.filter(t => t.status === status);
     }
@@ -238,7 +232,6 @@ export const getTransactions = asyncHandler(async (req, res) => {
     const total = transactions.length;
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const paginatedTransactions = transactions.slice(skip, skip + parseInt(limit));
-
     return successResponse(res, 200, 'Transactions retrieved successfully', {
       transactions: paginatedTransactions.map(t => ({
         id: t._id,
@@ -296,14 +289,20 @@ const createWithdrawalSchema = Joi.object({
     then: Joi.required()
   }).optional()
 });
-
 export const createWithdrawalRequest = asyncHandler(async (req, res) => {
   try {
     const delivery = req.delivery;
-    const { amount, paymentMethod, bankDetails, upiId } = req.body;
+    const {
+      amount,
+      paymentMethod,
+      bankDetails,
+      upiId
+    } = req.body;
 
     // Validation
-    const { error: validationError } = createWithdrawalSchema.validate(req.body);
+    const {
+      error: validationError
+    } = createWithdrawalSchema.validate(req.body);
     if (validationError) {
       return errorResponse(res, 400, validationError.details[0].message);
     }
@@ -317,7 +316,7 @@ export const createWithdrawalRequest = asyncHandler(async (req, res) => {
       const settings = await BusinessSettings.getSettings();
       const wl = Number(settings?.deliveryWithdrawalLimit);
       if (Number.isFinite(wl) && wl >= 0) minWithdrawalAmount = wl;
-    } catch (e) { /* keep default */ }
+    } catch (e) {/* keep default */}
     if (amount < minWithdrawalAmount) {
       return errorResponse(res, 400, `Minimum withdrawal amount is ₹${minWithdrawalAmount}`);
     }
@@ -352,10 +351,8 @@ export const createWithdrawalRequest = asyncHandler(async (req, res) => {
     if (!transactionId) {
       return errorResponse(res, 500, 'Failed to create withdrawal: transaction id missing');
     }
-
     const deliveryName = delivery.name || 'Delivery Partner';
     const deliveryIdString = delivery.deliveryId || delivery._id?.toString?.() || 'N/A';
-
     const withdrawalRequest = await DeliveryWithdrawalRequest.create({
       deliveryId: delivery._id,
       amount,
@@ -368,15 +365,6 @@ export const createWithdrawalRequest = asyncHandler(async (req, res) => {
       deliveryName,
       deliveryIdString
     });
-
-    logger.info(`Withdrawal request created for delivery: ${delivery._id}`, {
-      deliveryId: delivery.deliveryId,
-      amount,
-      paymentMethod,
-      transactionId,
-      requestId: withdrawalRequest._id
-    });
-
     return successResponse(res, 201, 'Withdrawal request created successfully', {
       request: {
         id: withdrawalRequest._id,
@@ -415,14 +403,20 @@ const addEarningSchema = Joi.object({
   description: Joi.string().optional(),
   paymentCollected: Joi.boolean().default(false)
 });
-
 export const addEarning = asyncHandler(async (req, res) => {
   try {
     const delivery = req.delivery;
-    const { amount, orderId, description, paymentCollected = false } = req.body;
+    const {
+      amount,
+      orderId,
+      description,
+      paymentCollected = false
+    } = req.body;
 
     // Validation
-    const { error: validationError } = addEarningSchema.validate(req.body);
+    const {
+      error: validationError
+    } = addEarningSchema.validate(req.body);
     if (validationError) {
       return errorResponse(res, 400, validationError.details[0].message);
     }
@@ -433,7 +427,6 @@ export const addEarning = asyncHandler(async (req, res) => {
       deliveryPartnerId: delivery._id,
       status: 'delivered'
     });
-
     if (!order) {
       return errorResponse(res, 404, 'Order not found or not delivered');
     }
@@ -442,10 +435,7 @@ export const addEarning = asyncHandler(async (req, res) => {
     let wallet = await DeliveryWallet.findOrCreateByDeliveryId(delivery._id);
 
     // Check if transaction already exists for this order
-    const existingTransaction = wallet.transactions.find(
-      t => t.orderId && t.orderId.toString() === orderId.toString() && t.type === 'payment'
-    );
-
+    const existingTransaction = wallet.transactions.find(t => t.orderId && t.orderId.toString() === orderId.toString() && t.type === 'payment');
     if (existingTransaction) {
       return errorResponse(res, 400, 'Earning already added for this order');
     }
@@ -459,16 +449,7 @@ export const addEarning = asyncHandler(async (req, res) => {
       orderId: orderId,
       paymentCollected: paymentCollected
     });
-
     await wallet.save();
-
-    logger.info(`Earning added for delivery: ${delivery._id}`, {
-      deliveryId: delivery.deliveryId,
-      orderId,
-      amount,
-      transactionId: transaction._id
-    });
-
     return successResponse(res, 201, 'Earning added successfully', {
       transaction: {
         id: transaction._id,
@@ -498,14 +479,18 @@ const collectPaymentSchema = Joi.object({
   orderId: Joi.string().required(),
   amount: Joi.number().positive().optional()
 });
-
 export const collectPayment = asyncHandler(async (req, res) => {
   try {
     const delivery = req.delivery;
-    const { orderId, amount } = req.body;
+    const {
+      orderId,
+      amount
+    } = req.body;
 
     // Validation
-    const { error: validationError } = collectPaymentSchema.validate(req.body);
+    const {
+      error: validationError
+    } = collectPaymentSchema.validate(req.body);
     if (validationError) {
       return errorResponse(res, 400, validationError.details[0].message);
     }
@@ -515,14 +500,14 @@ export const collectPayment = asyncHandler(async (req, res) => {
       _id: orderId,
       deliveryPartnerId: delivery._id
     });
-
     if (!order) {
       return errorResponse(res, 404, 'Order not found');
     }
 
     // Find wallet
-    const wallet = await DeliveryWallet.findOne({ deliveryId: delivery._id });
-
+    const wallet = await DeliveryWallet.findOne({
+      deliveryId: delivery._id
+    });
     if (!wallet) {
       return errorResponse(res, 404, 'Wallet not found');
     }
@@ -531,13 +516,6 @@ export const collectPayment = asyncHandler(async (req, res) => {
     try {
       const transaction = wallet.collectPayment(orderId, amount);
       await wallet.save();
-
-      logger.info(`Payment collected for delivery: ${delivery._id}`, {
-        deliveryId: delivery.deliveryId,
-        orderId,
-        amount: amount || transaction.amount
-      });
-
       return successResponse(res, 200, 'Payment collected successfully', {
         transaction: {
           id: transaction._id,
@@ -579,7 +557,6 @@ export const claimJoiningBonus = asyncHandler(async (req, res) => {
       deliveryPartnerId: delivery._id,
       status: 'delivered'
     });
-
     if (completedOrders < 1) {
       return errorResponse(res, 400, 'Complete at least 1 order to unlock joining bonus');
     }
@@ -605,13 +582,6 @@ export const claimJoiningBonus = asyncHandler(async (req, res) => {
     wallet.joiningBonusClaimed = true;
     wallet.joiningBonusAmount = bonusAmount;
     await wallet.save();
-
-    logger.info(`Joining bonus claimed for delivery: ${delivery._id}`, {
-      deliveryId: delivery.deliveryId,
-      bonusAmount,
-      transactionId: transaction._id
-    });
-
     return successResponse(res, 200, 'Joining bonus claimed successfully', {
       bonusAmount,
       transaction: {
@@ -642,10 +612,13 @@ export const claimJoiningBonus = asyncHandler(async (req, res) => {
 export const getWalletStats = asyncHandler(async (req, res) => {
   try {
     const delivery = req.delivery;
-    const { period = 'week' } = req.query; // today, week, month, year
+    const {
+      period = 'week'
+    } = req.query; // today, week, month, year
 
-    const wallet = await DeliveryWallet.findOne({ deliveryId: delivery._id });
-
+    const wallet = await DeliveryWallet.findOne({
+      deliveryId: delivery._id
+    });
     if (!wallet) {
       return successResponse(res, 200, 'No wallet statistics available', {
         earnings: 0,
@@ -658,7 +631,6 @@ export const getWalletStats = asyncHandler(async (req, res) => {
     // Calculate date range
     const now = new Date();
     let startDate = new Date();
-
     switch (period) {
       case 'today':
         startDate.setHours(0, 0, 0, 0);
@@ -687,16 +659,9 @@ export const getWalletStats = asyncHandler(async (req, res) => {
     });
 
     // Calculate statistics
-    const earnings = periodTransactions
-      .filter(t => (t.type === 'payment' || t.type === 'bonus') && t.status === 'Completed')
-      .reduce((sum, t) => sum + t.amount, 0);
-
-    const withdrawals = periodTransactions
-      .filter(t => t.type === 'withdrawal' && t.status === 'Completed')
-      .reduce((sum, t) => sum + t.amount, 0);
-
+    const earnings = periodTransactions.filter(t => (t.type === 'payment' || t.type === 'bonus') && t.status === 'Completed').reduce((sum, t) => sum + t.amount, 0);
+    const withdrawals = periodTransactions.filter(t => t.type === 'withdrawal' && t.status === 'Completed').reduce((sum, t) => sum + t.amount, 0);
     const transactions = periodTransactions.length;
-
     return successResponse(res, 200, 'Wallet statistics retrieved successfully', {
       earnings,
       withdrawals,
@@ -710,7 +675,6 @@ export const getWalletStats = asyncHandler(async (req, res) => {
     return errorResponse(res, 500, 'Failed to fetch wallet statistics');
   }
 });
-
 const createDepositOrderSchema = Joi.object({
   amount: Joi.number().positive().required()
 });
@@ -725,7 +689,9 @@ export const createDepositOrder = asyncHandler(async (req, res) => {
   if (!delivery?._id) {
     return errorResponse(res, 401, 'Delivery authentication required');
   }
-  const { error: ve } = createDepositOrderSchema.validate(req.body || {});
+  const {
+    error: ve
+  } = createDepositOrderSchema.validate(req.body || {});
   if (ve) {
     return errorResponse(res, 400, ve.details[0].message || 'Amount is required');
   }
@@ -736,7 +702,6 @@ export const createDepositOrder = asyncHandler(async (req, res) => {
   if (amount > 500000) {
     return errorResponse(res, 400, 'Maximum deposit amount is ₹5,00,000');
   }
-
   let credentials;
   try {
     credentials = await getRazorpayCredentials();
@@ -747,7 +712,6 @@ export const createDepositOrder = asyncHandler(async (req, res) => {
   if (!credentials?.keyId || !credentials?.keySecret || !credentials.keyId.trim() || !credentials.keySecret.trim()) {
     return errorResponse(res, 500, 'Payment gateway credentials are missing. Please configure Razorpay in admin.');
   }
-
   const receipt = `dl_dep_${delivery._id.toString().slice(-8)}_${Date.now().toString().slice(-8)}`;
   let razorpayOrder;
   try {
@@ -755,7 +719,11 @@ export const createDepositOrder = asyncHandler(async (req, res) => {
       amount: Math.round(amount * 100),
       currency: 'INR',
       receipt,
-      notes: { deliveryId: delivery._id.toString(), type: 'cash_limit_deposit', amount: String(amount) }
+      notes: {
+        deliveryId: delivery._id.toString(),
+        type: 'cash_limit_deposit',
+        amount: String(amount)
+      }
     });
   } catch (e) {
     logger.error('Razorpay create order error:', e);
@@ -764,7 +732,6 @@ export const createDepositOrder = asyncHandler(async (req, res) => {
   if (!razorpayOrder?.id) {
     return errorResponse(res, 500, 'Failed to create payment order');
   }
-
   return successResponse(res, 201, 'Order created', {
     razorpay: {
       orderId: razorpayOrder.id,
@@ -775,7 +742,6 @@ export const createDepositOrder = asyncHandler(async (req, res) => {
     amount
   });
 });
-
 const verifyDepositSchema = Joi.object({
   razorpay_order_id: Joi.string().required(),
   razorpay_payment_id: Joi.string().required(),
@@ -792,36 +758,36 @@ export const verifyDepositPayment = asyncHandler(async (req, res) => {
   if (!delivery?._id) {
     return errorResponse(res, 401, 'Delivery authentication required');
   }
-  const { error: ve } = verifyDepositSchema.validate(req.body || {});
+  const {
+    error: ve
+  } = verifyDepositSchema.validate(req.body || {});
   if (ve) {
     return errorResponse(res, 400, ve.details[0].message || 'Invalid payload');
   }
-  const { razorpay_order_id, razorpay_payment_id, razorpay_signature, amount } = req.body;
+  const {
+    razorpay_order_id,
+    razorpay_payment_id,
+    razorpay_signature,
+    amount
+  } = req.body;
   const amt = Number(amount);
-
   const isValid = await verifyPayment(razorpay_order_id, razorpay_payment_id, razorpay_signature);
   if (!isValid) {
     return errorResponse(res, 400, 'Invalid payment signature');
   }
-
   const wallet = await DeliveryWallet.findOrCreateByDeliveryId(delivery._id);
   const cashInHand = Number(wallet.cashInHand) || 0;
   if (cashInHand < amt) {
     return errorResponse(res, 400, `Insufficient cash in hand (₹${cashInHand.toFixed(2)}). Deposit amount cannot exceed cash in hand.`);
   }
-
-  const pid = (t) => (t.metadata?.get ? t.metadata.get('razorpayPaymentId') : t.metadata?.razorpayPaymentId);
-  const existing = (wallet.transactions || []).find(
-    t => t.type === 'deposit' && pid(t) === razorpay_payment_id
-  );
+  const pid = t => t.metadata?.get ? t.metadata.get('razorpayPaymentId') : t.metadata?.razorpayPaymentId;
+  const existing = (wallet.transactions || []).find(t => t.type === 'deposit' && pid(t) === razorpay_payment_id);
   if (existing) {
     return errorResponse(res, 400, 'Payment already processed');
   }
-
   const meta = new Map();
   meta.set('razorpayOrderId', razorpay_order_id);
   meta.set('razorpayPaymentId', razorpay_payment_id);
-
   wallet.addTransaction({
     amount: amt,
     type: 'deposit',
@@ -833,7 +799,6 @@ export const verifyDepositPayment = asyncHandler(async (req, res) => {
   });
   wallet.markModified('transactions');
   await wallet.save();
-
   let limit = 0;
   try {
     const settings = await BusinessSettings.getSettings();
@@ -841,11 +806,9 @@ export const verifyDepositPayment = asyncHandler(async (req, res) => {
   } catch (_) {}
   const cashInHandNow = Math.max(0, Number(wallet.cashInHand) || 0);
   const availableCashLimit = Math.max(0, limit - cashInHandNow);
-
   return successResponse(res, 200, 'Deposit successful', {
     amount: amt,
     cashInHand: cashInHandNow,
     availableCashLimit
   });
 });
-

@@ -96,7 +96,7 @@ export default function HubGrowth() {
               <ChevronRight className="w-5 h-5 text-blue-600 shrink-0" />
             </motion.div>
 
-            {/* Subscription Plan card */}
+            {/* Subscription Plan card 
             <motion.div
               whileTap={{ scale: 0.98 }}
               onClick={() => navigate("/restaurant/subscription")}
@@ -124,6 +124,7 @@ export default function HubGrowth() {
               </div>
               <ChevronRight className="w-5 h-5 text-blue-600 shrink-0" />
             </motion.div>
+            */}
 
           </div>
         </div>

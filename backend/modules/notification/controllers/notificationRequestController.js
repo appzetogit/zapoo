@@ -13,60 +13,56 @@ import admin from 'firebase-admin';
  * Enforces the admin-configured daily limit per restaurant.
  */
 export const submitNotificationRequest = asyncHandler(async (req, res) => {
-    const restaurantId = req.restaurant._id;
-    const { title, description, imageUrl } = req.body;
-
-    if (!title || !description) {
-        return errorResponse(res, 400, 'Title and description are required');
+  const restaurantId = req.restaurant._id;
+  const {
+    title,
+    description,
+    imageUrl
+  } = req.body;
+  if (!title || !description) {
+    return errorResponse(res, 400, 'Title and description are required');
+  }
+  const settings = await BusinessSettings.getSettings();
+  const dailyLimit = settings.restaurantNotificationDailyLimit ?? 2;
+  const startOfDay = new Date();
+  startOfDay.setHours(0, 0, 0, 0);
+  const endOfDay = new Date();
+  endOfDay.setHours(23, 59, 59, 999);
+  const todayCount = await NotificationRequest.countDocuments({
+    restaurantId,
+    createdAt: {
+      $gte: startOfDay,
+      $lte: endOfDay
     }
-
-    const settings = await BusinessSettings.getSettings();
-    const dailyLimit = settings.restaurantNotificationDailyLimit ?? 2;
-
-    const startOfDay = new Date();
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date();
-    endOfDay.setHours(23, 59, 59, 999);
-
-    const todayCount = await NotificationRequest.countDocuments({
-        restaurantId,
-        createdAt: { $gte: startOfDay, $lte: endOfDay },
+  });
+  if (todayCount >= dailyLimit) {
+    return errorResponse(res, 429, `Daily limit reached (${dailyLimit} requests/day). Resets at midnight.`, {
+      todayCount,
+      dailyLimit
     });
-
-    if (todayCount >= dailyLimit) {
-        return errorResponse(
-            res,
-            429,
-            `Daily limit reached (${dailyLimit} requests/day). Resets at midnight.`,
-            { todayCount, dailyLimit }
-        );
+  }
+  const existingPending = await NotificationRequest.findOne({
+    restaurantId,
+    status: 'pending'
+  });
+  if (existingPending) {
+    return errorResponse(res, 400, 'You already have a pending request. Wait for admin review before submitting another.');
+  }
+  const request = await NotificationRequest.create({
+    restaurantId,
+    title: title.trim(),
+    description: description.trim(),
+    imageUrl: imageUrl || null
+  });
+  const remaining = dailyLimit - (todayCount + 1);
+  return successResponse(res, 201, 'Notification request submitted successfully', {
+    request,
+    quota: {
+      used: todayCount + 1,
+      limit: dailyLimit,
+      remaining
     }
-
-    const existingPending = await NotificationRequest.findOne({
-        restaurantId,
-        status: 'pending',
-    });
-
-    if (existingPending) {
-        return errorResponse(
-            res,
-            400,
-            'You already have a pending request. Wait for admin review before submitting another.'
-        );
-    }
-
-    const request = await NotificationRequest.create({
-        restaurantId,
-        title: title.trim(),
-        description: description.trim(),
-        imageUrl: imageUrl || null,
-    });
-
-    const remaining = dailyLimit - (todayCount + 1);
-    return successResponse(res, 201, 'Notification request submitted successfully', {
-        request,
-        quota: { used: todayCount + 1, limit: dailyLimit, remaining },
-    });
+  });
 });
 
 /**
@@ -74,32 +70,32 @@ export const submitNotificationRequest = asyncHandler(async (req, res) => {
  * Restaurant fetches its own requests (all time).
  */
 export const getMyNotificationRequests = asyncHandler(async (req, res) => {
-    const restaurantId = req.restaurant._id;
-
-    const settings = await BusinessSettings.getSettings();
-    const dailyLimit = settings.restaurantNotificationDailyLimit ?? 2;
-
-    const startOfDay = new Date();
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date();
-    endOfDay.setHours(23, 59, 59, 999);
-
-    const [requests, todayCount] = await Promise.all([
-        NotificationRequest.find({ restaurantId }).sort({ createdAt: -1 }).lean(),
-        NotificationRequest.countDocuments({
-            restaurantId,
-            createdAt: { $gte: startOfDay, $lte: endOfDay },
-        }),
-    ]);
-
-    return successResponse(res, 200, 'Notification requests fetched', {
-        requests,
-        quota: {
-            used: todayCount,
-            limit: dailyLimit,
-            remaining: Math.max(0, dailyLimit - todayCount),
-        },
-    });
+  const restaurantId = req.restaurant._id;
+  const settings = await BusinessSettings.getSettings();
+  const dailyLimit = settings.restaurantNotificationDailyLimit ?? 2;
+  const startOfDay = new Date();
+  startOfDay.setHours(0, 0, 0, 0);
+  const endOfDay = new Date();
+  endOfDay.setHours(23, 59, 59, 999);
+  const [requests, todayCount] = await Promise.all([NotificationRequest.find({
+    restaurantId
+  }).sort({
+    createdAt: -1
+  }).lean(), NotificationRequest.countDocuments({
+    restaurantId,
+    createdAt: {
+      $gte: startOfDay,
+      $lte: endOfDay
+    }
+  })]);
+  return successResponse(res, 200, 'Notification requests fetched', {
+    requests,
+    quota: {
+      used: todayCount,
+      limit: dailyLimit,
+      remaining: Math.max(0, dailyLimit - todayCount)
+    }
+  });
 });
 
 /**
@@ -108,34 +104,28 @@ export const getMyNotificationRequests = asyncHandler(async (req, res) => {
  * Query: ?status=pending|approved|rejected
  */
 export const adminGetAllRequests = asyncHandler(async (req, res) => {
-    const { status, page = 1, limit = 20 } = req.query;
-
-    const query = {};
-    if (status && ['pending', 'approved', 'rejected'].includes(status)) {
-        query.status = status;
+  const {
+    status,
+    page = 1,
+    limit = 20
+  } = req.query;
+  const query = {};
+  if (status && ['pending', 'approved', 'rejected'].includes(status)) {
+    query.status = status;
+  }
+  const skip = (parseInt(page) - 1) * parseInt(limit);
+  const [requests, total] = await Promise.all([NotificationRequest.find(query).populate('restaurantId', 'name restaurantId email phone').sort({
+    createdAt: -1
+  }).skip(skip).limit(parseInt(limit)).lean(), NotificationRequest.countDocuments(query)]);
+  return successResponse(res, 200, 'Requests fetched', {
+    requests,
+    pagination: {
+      total,
+      page: parseInt(page),
+      limit: parseInt(limit),
+      totalPages: Math.ceil(total / parseInt(limit))
     }
-
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-
-    const [requests, total] = await Promise.all([
-        NotificationRequest.find(query)
-            .populate('restaurantId', 'name restaurantId email phone')
-            .sort({ createdAt: -1 })
-            .skip(skip)
-            .limit(parseInt(limit))
-            .lean(),
-        NotificationRequest.countDocuments(query),
-    ]);
-
-    return successResponse(res, 200, 'Requests fetched', {
-        requests,
-        pagination: {
-            total,
-            page: parseInt(page),
-            limit: parseInt(limit),
-            totalPages: Math.ceil(total / parseInt(limit)),
-        },
-    });
+  });
 });
 
 /**
@@ -144,173 +134,168 @@ export const adminGetAllRequests = asyncHandler(async (req, res) => {
  * Creates a Notification in MongoDB and sends only to users in restaurant range.
  */
 export const adminApproveRequest = asyncHandler(async (req, res) => {
-    const { id } = req.params;
-    const adminId = req.user._id;
-
-    const titleOverride = req.body.title;
-    const descriptionOverride = req.body.description;
-
-    const request = await NotificationRequest.findById(id);
-    if (!request) return errorResponse(res, 404, 'Notification request not found');
-
-    if (request.status !== 'pending') {
-        return errorResponse(res, 400, `Request already processed (status: ${request.status})`);
-    }
-
-    const notification = await Notification.create({
-        title: (titleOverride || request.title).trim(),
-        description: (descriptionOverride || request.description).trim(),
-        imageUrl: request.imageUrl,
-        target: 'all_users',
-        sourceType: 'restaurant_request',
-        restaurantId: request.restaurantId,
-    });
-
-    const restaurant = await Restaurant.findById(request.restaurantId)
-        .select('name location deliveryRange')
-        .lean();
-
-    const restaurantCoords = restaurant?.location?.coordinates;
-    const hasValidRestaurantCoords =
-        Array.isArray(restaurantCoords) &&
-        restaurantCoords.length >= 2 &&
-        Number.isFinite(restaurantCoords[0]) &&
-        Number.isFinite(restaurantCoords[1]) &&
-        !(restaurantCoords[0] === 0 && restaurantCoords[1] === 0);
-
-    const targetRangeKm = Number(restaurant?.deliveryRange) > 0 ? Number(restaurant.deliveryRange) : 5;
-
-    const userFilter = {
-        role: 'user',
-        isActive: true,
-        $or: [
-            { fcmTokens: { $exists: true, $not: { $size: 0 } } },
-            { fcmTokenWeb: { $exists: true, $nin: [null, ''] } },
-            { fcmTokenMobile: { $exists: true, $nin: [null, ''] } },
-        ],
-    };
-
-    if (hasValidRestaurantCoords) {
-        userFilter['currentLocation.location'] = {
-            $nearSphere: {
-                $geometry: { type: 'Point', coordinates: restaurantCoords },
-                $maxDistance: Math.round(targetRangeKm * 1000),
-            },
-        };
-    } else {
-        console.warn(
-            `[Notification] Restaurant ${request.restaurantId} has invalid coordinates. Sending without range filter.`
-        );
-    }
-
-    const usersWithTokens = await User.find(
-        userFilter,
-        { _id: 1, fcmTokens: 1, fcmTokenWeb: 1, fcmTokenMobile: 1 }
-    ).lean();
-
-    const recipientUserIds = usersWithTokens
-        .map((u) => u._id?.toString())
-        .filter(Boolean);
-
-    const tokenSet = new Set();
-    for (const user of usersWithTokens) {
-        const rawTokens = [
-            ...(Array.isArray(user.fcmTokens) ? user.fcmTokens : []),
-            user.fcmTokenWeb,
-            user.fcmTokenMobile,
-        ];
-        for (const rawToken of rawTokens) {
-            if (!rawToken || typeof rawToken !== 'string') continue;
-            const token = rawToken.trim();
-            if (token) tokenSet.add(token);
+  const {
+    id
+  } = req.params;
+  const adminId = req.user._id;
+  const titleOverride = req.body.title;
+  const descriptionOverride = req.body.description;
+  const request = await NotificationRequest.findById(id);
+  if (!request) return errorResponse(res, 404, 'Notification request not found');
+  if (request.status !== 'pending') {
+    return errorResponse(res, 400, `Request already processed (status: ${request.status})`);
+  }
+  const notification = await Notification.create({
+    title: (titleOverride || request.title).trim(),
+    description: (descriptionOverride || request.description).trim(),
+    imageUrl: request.imageUrl,
+    target: 'all_users',
+    sourceType: 'restaurant_request',
+    restaurantId: request.restaurantId
+  });
+  const restaurant = await Restaurant.findById(request.restaurantId).select('name location deliveryRange').lean();
+  const restaurantCoords = restaurant?.location?.coordinates;
+  const hasValidRestaurantCoords = Array.isArray(restaurantCoords) && restaurantCoords.length >= 2 && Number.isFinite(restaurantCoords[0]) && Number.isFinite(restaurantCoords[1]) && !(restaurantCoords[0] === 0 && restaurantCoords[1] === 0);
+  const targetRangeKm = Number(restaurant?.deliveryRange) > 0 ? Number(restaurant.deliveryRange) : 5;
+  const userFilter = {
+    role: 'user',
+    isActive: true,
+    $or: [{
+      fcmTokens: {
+        $exists: true,
+        $not: {
+          $size: 0
         }
-    }
-
-    const allTokens = Array.from(tokenSet);
-
-    request.status = 'approved';
-    request.reviewedAt = new Date();
-    request.reviewedBy = adminId;
-    request.sentNotificationId = notification._id;
-    await request.save();
-
-    try {
-        if (allTokens.length > 0) {
-            const rtdbApp = admin.apps.find((a) => a?.name === 'zapoo-rtdb');
-            if (!rtdbApp) {
-                console.warn('[FCM] Firebase app zapoo-rtdb is not initialized. Skipping push.');
-            } else {
-                const BATCH_SIZE = 500;
-                const invalidTokens = new Set();
-
-                for (let i = 0; i < allTokens.length; i += BATCH_SIZE) {
-                    const batch = allTokens.slice(i, i + BATCH_SIZE);
-                    const fcmMessage = {
-                        tokens: batch,
-                        notification: {
-                            title: notification.title,
-                            body: notification.description,
-                            ...(notification.imageUrl ? { image: notification.imageUrl } : {}),
-                        },
-                        data: {
-                            notificationId: notification._id.toString(),
-                            target: 'user',
-                            clickUrl: '/',
-                            ...(notification.imageUrl ? { imageUrl: notification.imageUrl } : {}),
-                        },
-                    };
-
-                    const response = await rtdbApp.messaging().sendEachForMulticast(fcmMessage);
-                    console.log(`FCM batch sent ${response.successCount}/${batch.length}`);
-
-                    response.responses.forEach((result, index) => {
-                        if (result.success || !result.error) return;
-                        const code = result.error.code || '';
-                        if (
-                            code.includes('registration-token-not-registered') ||
-                            code.includes('invalid-registration-token')
-                        ) {
-                            invalidTokens.add(batch[index]);
-                        }
-                    });
-                }
-
-                if (invalidTokens.size > 0) {
-                    const staleTokens = Array.from(invalidTokens);
-                    await Promise.all([
-                        User.updateMany(
-                            { fcmTokens: { $in: staleTokens } },
-                            { $pull: { fcmTokens: { $in: staleTokens } } }
-                        ),
-                        User.updateMany(
-                            { fcmTokenWeb: { $in: staleTokens } },
-                            { $unset: { fcmTokenWeb: '' } }
-                        ),
-                        User.updateMany(
-                            { fcmTokenMobile: { $in: staleTokens } },
-                            { $unset: { fcmTokenMobile: '' } }
-                        ),
-                    ]);
-                    console.log(`[FCM] Cleaned ${staleTokens.length} invalid tokens`);
-                }
-            }
-        } else {
-            console.log('[FCM] No registered FCM tokens found for matching users.');
-        }
-    } catch (fcmErr) {
-        console.error('FCM push failed:', fcmErr.message);
-    }
-
-    return successResponse(res, 200, 'Request approved and notification sent', {
-        request,
-        notification,
-        audience: {
-            usersInRange: recipientUserIds.length,
-            tokensTargeted: allTokens.length,
-            rangeKm: hasValidRestaurantCoords ? targetRangeKm : null,
-            usedRangeFilter: hasValidRestaurantCoords,
+      }
+    }, {
+      fcmTokenWeb: {
+        $exists: true,
+        $nin: [null, '']
+      }
+    }, {
+      fcmTokenMobile: {
+        $exists: true,
+        $nin: [null, '']
+      }
+    }]
+  };
+  if (hasValidRestaurantCoords) {
+    userFilter['currentLocation.location'] = {
+      $nearSphere: {
+        $geometry: {
+          type: 'Point',
+          coordinates: restaurantCoords
         },
-    });
+        $maxDistance: Math.round(targetRangeKm * 1000)
+      }
+    };
+  } else {
+    console.warn(`[Notification] Restaurant ${request.restaurantId} has invalid coordinates. Sending without range filter.`);
+  }
+  const usersWithTokens = await User.find(userFilter, {
+    _id: 1,
+    fcmTokens: 1,
+    fcmTokenWeb: 1,
+    fcmTokenMobile: 1
+  }).lean();
+  const recipientUserIds = usersWithTokens.map(u => u._id?.toString()).filter(Boolean);
+  const tokenSet = new Set();
+  for (const user of usersWithTokens) {
+    const rawTokens = [...(Array.isArray(user.fcmTokens) ? user.fcmTokens : []), user.fcmTokenWeb, user.fcmTokenMobile];
+    for (const rawToken of rawTokens) {
+      if (!rawToken || typeof rawToken !== 'string') continue;
+      const token = rawToken.trim();
+      if (token) tokenSet.add(token);
+    }
+  }
+  const allTokens = Array.from(tokenSet);
+  request.status = 'approved';
+  request.reviewedAt = new Date();
+  request.reviewedBy = adminId;
+  request.sentNotificationId = notification._id;
+  await request.save();
+  try {
+    if (allTokens.length > 0) {
+      const rtdbApp = admin.apps.find(a => a?.name === 'zapoo-rtdb');
+      if (!rtdbApp) {
+        console.warn('[FCM] Firebase app zapoo-rtdb is not initialized. Skipping push.');
+      } else {
+        const BATCH_SIZE = 500;
+        const invalidTokens = new Set();
+        for (let i = 0; i < allTokens.length; i += BATCH_SIZE) {
+          const batch = allTokens.slice(i, i + BATCH_SIZE);
+          const fcmMessage = {
+            tokens: batch,
+            notification: {
+              title: notification.title,
+              body: notification.description,
+              ...(notification.imageUrl ? {
+                image: notification.imageUrl
+              } : {})
+            },
+            data: {
+              notificationId: notification._id.toString(),
+              target: 'user',
+              clickUrl: '/',
+              ...(notification.imageUrl ? {
+                imageUrl: notification.imageUrl
+              } : {})
+            }
+          };
+          const response = await rtdbApp.messaging().sendEachForMulticast(fcmMessage);
+          response.responses.forEach((result, index) => {
+            if (result.success || !result.error) return;
+            const code = result.error.code || '';
+            if (code.includes('registration-token-not-registered') || code.includes('invalid-registration-token')) {
+              invalidTokens.add(batch[index]);
+            }
+          });
+        }
+        if (invalidTokens.size > 0) {
+          const staleTokens = Array.from(invalidTokens);
+          await Promise.all([User.updateMany({
+            fcmTokens: {
+              $in: staleTokens
+            }
+          }, {
+            $pull: {
+              fcmTokens: {
+                $in: staleTokens
+              }
+            }
+          }), User.updateMany({
+            fcmTokenWeb: {
+              $in: staleTokens
+            }
+          }, {
+            $unset: {
+              fcmTokenWeb: ''
+            }
+          }), User.updateMany({
+            fcmTokenMobile: {
+              $in: staleTokens
+            }
+          }, {
+            $unset: {
+              fcmTokenMobile: ''
+            }
+          })]);
+        }
+      }
+    } else {}
+  } catch (fcmErr) {
+    console.error('FCM push failed:', fcmErr.message);
+  }
+  return successResponse(res, 200, 'Request approved and notification sent', {
+    request,
+    notification,
+    audience: {
+      usersInRange: recipientUserIds.length,
+      tokensTargeted: allTokens.length,
+      rangeKm: hasValidRestaurantCoords ? targetRangeKm : null,
+      usedRangeFilter: hasValidRestaurantCoords
+    }
+  });
 });
 
 /**
@@ -318,32 +303,32 @@ export const adminApproveRequest = asyncHandler(async (req, res) => {
  * Admin silently rejects a request. No reason given to restaurant.
  */
 export const adminRejectRequest = asyncHandler(async (req, res) => {
-    const { id } = req.params;
-    const adminId = req.user._id;
-
-    const request = await NotificationRequest.findById(id);
-    if (!request) return errorResponse(res, 404, 'Notification request not found');
-
-    if (request.status !== 'pending') {
-        return errorResponse(res, 400, `Request already processed (status: ${request.status})`);
-    }
-
-    request.status = 'rejected';
-    request.reviewedAt = new Date();
-    request.reviewedBy = adminId;
-    await request.save();
-
-    return successResponse(res, 200, 'Request rejected', { request });
+  const {
+    id
+  } = req.params;
+  const adminId = req.user._id;
+  const request = await NotificationRequest.findById(id);
+  if (!request) return errorResponse(res, 404, 'Notification request not found');
+  if (request.status !== 'pending') {
+    return errorResponse(res, 400, `Request already processed (status: ${request.status})`);
+  }
+  request.status = 'rejected';
+  request.reviewedAt = new Date();
+  request.reviewedBy = adminId;
+  await request.save();
+  return successResponse(res, 200, 'Request rejected', {
+    request
+  });
 });
 
 /**
  * GET /api/admin/notification-settings
  */
 export const getNotificationSettings = asyncHandler(async (req, res) => {
-    const settings = await BusinessSettings.getSettings();
-    return successResponse(res, 200, 'Settings fetched', {
-        restaurantNotificationDailyLimit: settings.restaurantNotificationDailyLimit ?? 2,
-    });
+  const settings = await BusinessSettings.getSettings();
+  return successResponse(res, 200, 'Settings fetched', {
+    restaurantNotificationDailyLimit: settings.restaurantNotificationDailyLimit ?? 2
+  });
 });
 
 /**
@@ -351,24 +336,19 @@ export const getNotificationSettings = asyncHandler(async (req, res) => {
  * Body: { restaurantNotificationDailyLimit: number }
  */
 export const updateNotificationSettings = asyncHandler(async (req, res) => {
-    const { restaurantNotificationDailyLimit } = req.body;
-
-    if (
-        restaurantNotificationDailyLimit === undefined ||
-        typeof restaurantNotificationDailyLimit !== 'number' ||
-        restaurantNotificationDailyLimit < 0
-    ) {
-        return errorResponse(res, 400, 'restaurantNotificationDailyLimit must be a non-negative number');
-    }
-
-    const settings = await BusinessSettings.getSettings();
-    settings.restaurantNotificationDailyLimit = restaurantNotificationDailyLimit;
-    settings.updatedBy = req.user._id;
-    await settings.save();
-
-    return successResponse(res, 200, 'Settings updated', {
-        restaurantNotificationDailyLimit: settings.restaurantNotificationDailyLimit,
-    });
+  const {
+    restaurantNotificationDailyLimit
+  } = req.body;
+  if (restaurantNotificationDailyLimit === undefined || typeof restaurantNotificationDailyLimit !== 'number' || restaurantNotificationDailyLimit < 0) {
+    return errorResponse(res, 400, 'restaurantNotificationDailyLimit must be a non-negative number');
+  }
+  const settings = await BusinessSettings.getSettings();
+  settings.restaurantNotificationDailyLimit = restaurantNotificationDailyLimit;
+  settings.updatedBy = req.user._id;
+  await settings.save();
+  return successResponse(res, 200, 'Settings updated', {
+    restaurantNotificationDailyLimit: settings.restaurantNotificationDailyLimit
+  });
 });
 
 /**
@@ -376,13 +356,13 @@ export const updateNotificationSettings = asyncHandler(async (req, res) => {
  * Users fetch all active notifications (used as initial load / fallback).
  */
 export const getUserNotifications = asyncHandler(async (req, res) => {
-    const notifications = await Notification.find({
-        target: 'all_users',
-        isActive: true,
-    })
-        .sort({ sentAt: -1 })
-        .limit(50)
-        .lean();
-
-    return successResponse(res, 200, 'Notifications fetched', { notifications });
+  const notifications = await Notification.find({
+    target: 'all_users',
+    isActive: true
+  }).sort({
+    sentAt: -1
+  }).limit(50).lean();
+  return successResponse(res, 200, 'Notifications fetched', {
+    notifications
+  });
 });

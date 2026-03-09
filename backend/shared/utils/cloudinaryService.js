@@ -8,26 +8,16 @@ const storage = multer.memoryStorage();
 // Generic file filter for common image/video mime types
 const fileFilter = (req, file, cb) => {
   const allowedMimeTypes = [
-    // images
-    'image/jpeg',
-    'image/png',
-    'image/webp',
-    'image/gif',
-    'image/svg+xml',
-    // videos
-    'video/mp4',
-    'video/quicktime',
-    'video/x-msvideo',
-    'video/x-matroska'
-  ];
-
+  // images
+  'image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml',
+  // videos
+  'video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/x-matroska'];
   if (allowedMimeTypes.includes(file.mimetype)) {
     cb(null, true);
   } else {
     cb(new Error('Unsupported file type. Please upload an image or video.'));
   }
 };
-
 export const uploadMiddleware = multer({
   storage,
   fileFilter,
@@ -49,7 +39,6 @@ export function uploadToCloudinary(buffer, options = {}) {
       if (!buffer || !Buffer.isBuffer(buffer)) {
         return reject(new Error('Invalid buffer provided'));
       }
-
       if (buffer.length === 0) {
         return reject(new Error('Empty buffer provided'));
       }
@@ -66,44 +55,29 @@ export function uploadToCloudinary(buffer, options = {}) {
           uploadOptions[key] = options[key];
         }
       });
-
-      console.log('📤 Cloudinary upload options:', {
-        folder: uploadOptions.folder,
-        resource_type: uploadOptions.resource_type,
-        bufferSize: buffer.length
-      });
-
       // Use upload_stream method which is more efficient for buffers
       // Create a readable stream from buffer
       const stream = Readable.from(buffer);
 
       // Create upload stream
-      const uploadStream = cloudinary.uploader.upload_stream(
-        uploadOptions,
-        (error, result) => {
-          if (error) {
-            console.error('❌ Cloudinary upload error:', {
-              message: error.message,
-              http_code: error.http_code,
-              name: error.name,
-              stack: error.stack
-            });
-            return reject(error);
-          }
-          if (!result) {
-            return reject(new Error('Upload failed: No result returned from Cloudinary'));
-          }
-          console.log('✅ Cloudinary upload successful:', {
-            publicId: result.public_id,
-            url: result.secure_url,
-            resourceType: result.resource_type
+      const uploadStream = cloudinary.uploader.upload_stream(uploadOptions, (error, result) => {
+        if (error) {
+          console.error('❌ Cloudinary upload error:', {
+            message: error.message,
+            http_code: error.http_code,
+            name: error.name,
+            stack: error.stack
           });
-          resolve(result);
+          return reject(error);
         }
-      );
+        if (!result) {
+          return reject(new Error('Upload failed: No result returned from Cloudinary'));
+        }
+        resolve(result);
+      });
 
       // Handle stream errors
-      uploadStream.on('error', (streamError) => {
+      uploadStream.on('error', streamError => {
         console.error('❌ Cloudinary upload stream error event:', streamError);
         reject(streamError);
       });
@@ -130,4 +104,3 @@ export function deleteFromCloudinary(publicId) {
     });
   });
 }
-

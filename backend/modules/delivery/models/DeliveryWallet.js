@@ -39,7 +39,8 @@ const transactionSchema = new mongoose.Schema({
     type: Map,
     of: mongoose.Schema.Types.Mixed
   },
-  processedAt: Date, // When transaction was processed
+  processedAt: Date,
+  // When transaction was processed
   processedBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Admin',
@@ -157,10 +158,18 @@ const deliveryWalletSchema = new mongoose.Schema({
 // Indexes
 // deliveryWalletSchema.index({ deliveryId: 1 }, { unique: true }); // Removed duplicate index
 // deliveryWalletSchema.index({ 'transactions.orderId': 1 });
-deliveryWalletSchema.index({ 'transactions.status': 1 });
-deliveryWalletSchema.index({ 'transactions.type': 1 });
-deliveryWalletSchema.index({ 'transactions.createdAt': -1 });
-deliveryWalletSchema.index({ lastTransactionAt: -1 });
+deliveryWalletSchema.index({
+  'transactions.status': 1
+});
+deliveryWalletSchema.index({
+  'transactions.type': 1
+});
+deliveryWalletSchema.index({
+  'transactions.createdAt': -1
+});
+deliveryWalletSchema.index({
+  lastTransactionAt: -1
+});
 
 // Virtual for pocket balance (totalBalance - cashInHand)
 deliveryWalletSchema.virtual('pocketBalance').get(function () {
@@ -169,9 +178,7 @@ deliveryWalletSchema.virtual('pocketBalance').get(function () {
 
 // Virtual for pending withdrawals
 deliveryWalletSchema.virtual('pendingWithdrawals').get(function () {
-  return this.transactions
-    .filter(t => t.type === 'withdrawal' && t.status === 'Pending')
-    .reduce((sum, t) => sum + t.amount, 0);
+  return this.transactions.filter(t => t.type === 'withdrawal' && t.status === 'Pending').reduce((sum, t) => sum + t.amount, 0);
 });
 
 // Method to add transaction and update balances
@@ -180,7 +187,6 @@ deliveryWalletSchema.methods.addTransaction = function (transactionData) {
     ...transactionData,
     createdAt: new Date()
   };
-
   this.transactions.push(transaction);
 
   // Update balances based on transaction type and status
@@ -191,14 +197,7 @@ deliveryWalletSchema.methods.addTransaction = function (transactionData) {
       this.totalEarned += transaction.amount;
 
       // Log bonus/earning_addon transaction for debugging
-      if (transaction.type === 'bonus' || transaction.type === 'earning_addon') {
-        console.log(`💰 ${transaction.type.toUpperCase()} TRANSACTION ADDED:`, {
-          amount: transaction.amount,
-          oldBalance: oldBalance,
-          newBalance: this.totalBalance,
-          walletId: this._id
-        });
-      }
+      if (transaction.type === 'bonus' || transaction.type === 'earning_addon') {}
 
       // If payment is collected (COD), add to cash in hand
       if (transaction.paymentCollected) {
@@ -219,9 +218,7 @@ deliveryWalletSchema.methods.addTransaction = function (transactionData) {
       this.cashInHand = Math.max(0, (this.cashInHand || 0) - transaction.amount);
     }
   }
-
   this.lastTransactionAt = new Date();
-
   return transaction;
 };
 
@@ -231,13 +228,10 @@ deliveryWalletSchema.methods.updateTransactionStatus = function (transactionId, 
   if (!transaction) {
     throw new Error('Transaction not found');
   }
-
   const oldStatus = transaction.status;
   const oldAmount = transaction.amount;
-
   transaction.status = status;
   transaction.processedAt = new Date();
-
   if (status === 'Failed' && failureReason) {
     transaction.failureReason = failureReason;
   }
@@ -247,14 +241,12 @@ deliveryWalletSchema.methods.updateTransactionStatus = function (transactionId, 
     if (transaction.type === 'payment' || transaction.type === 'bonus' || transaction.type === 'refund' || transaction.type === 'earning_addon') {
       this.totalBalance += oldAmount;
       this.totalEarned += oldAmount;
-
       if (transaction.paymentCollected) {
         this.cashInHand += oldAmount;
       }
     } else if (transaction.type === 'withdrawal') {
       this.totalBalance -= oldAmount;
       this.totalWithdrawn += oldAmount;
-
       if (transaction.paymentCollected) {
         this.cashInHand = Math.max(0, this.cashInHand - oldAmount);
       }
@@ -269,7 +261,6 @@ deliveryWalletSchema.methods.updateTransactionStatus = function (transactionId, 
     if (transaction.type === 'payment' || transaction.type === 'bonus' || transaction.type === 'refund' || transaction.type === 'earning_addon') {
       this.totalBalance = Math.max(0, this.totalBalance - oldAmount);
       this.totalEarned = Math.max(0, this.totalEarned - oldAmount);
-
       if (transaction.paymentCollected) {
         this.cashInHand = Math.max(0, this.cashInHand - oldAmount);
       }
@@ -280,35 +271,28 @@ deliveryWalletSchema.methods.updateTransactionStatus = function (transactionId, 
       this.cashInHand = (this.cashInHand || 0) + oldAmount;
     }
   }
-
   return transaction;
 };
 
 // Method to collect payment (mark payment as collected and update cashInHand)
 deliveryWalletSchema.methods.collectPayment = function (orderId, amount) {
-  const paymentTransaction = this.transactions.find(
-    t => t.orderId && t.orderId.toString() === orderId.toString() &&
-      t.type === 'payment' && t.status === 'Completed'
-  );
-
+  const paymentTransaction = this.transactions.find(t => t.orderId && t.orderId.toString() === orderId.toString() && t.type === 'payment' && t.status === 'Completed');
   if (!paymentTransaction) {
     throw new Error('Payment transaction not found for this order');
   }
-
   if (paymentTransaction.paymentCollected) {
     throw new Error('Payment already collected');
   }
-
   paymentTransaction.paymentCollected = true;
   this.cashInHand += amount || paymentTransaction.amount;
-
   return paymentTransaction;
 };
 
 // Static method to get wallet by delivery ID or create if doesn't exist
 deliveryWalletSchema.statics.findOrCreateByDeliveryId = async function (deliveryId) {
-  let wallet = await this.findOne({ deliveryId });
-
+  let wallet = await this.findOne({
+    deliveryId
+  });
   if (!wallet) {
     wallet = await this.create({
       deliveryId,
@@ -318,9 +302,6 @@ deliveryWalletSchema.statics.findOrCreateByDeliveryId = async function (delivery
       totalEarned: 0
     });
   }
-
   return wallet;
 };
-
 export default mongoose.model('DeliveryWallet', deliveryWalletSchema);
-

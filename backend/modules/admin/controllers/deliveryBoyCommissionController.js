@@ -10,7 +10,7 @@ import mongoose from 'mongoose';
  */
 export const getCommissionRules = asyncHandler(async (req, res) => {
   try {
-    const { 
+    const {
       status,
       search,
       page = 1,
@@ -27,17 +27,21 @@ export const getCommissionRules = asyncHandler(async (req, res) => {
 
     // Search filter
     if (search) {
-      query.$or = [
-        { name: { $regex: search, $options: 'i' } }
-      ];
-      
+      query.$or = [{
+        name: {
+          $regex: search,
+          $options: 'i'
+        }
+      }];
+
       // Also search by distance if it's a number
       const searchNumber = parseFloat(search);
       if (!isNaN(searchNumber)) {
-        query.$or.push(
-          { minDistance: searchNumber },
-          { maxDistance: searchNumber }
-        );
+        query.$or.push({
+          minDistance: searchNumber
+        }, {
+          maxDistance: searchNumber
+        });
       }
     }
 
@@ -49,20 +53,16 @@ export const getCommissionRules = asyncHandler(async (req, res) => {
     const total = await DeliveryBoyCommission.countDocuments(query);
 
     // Get commission rules sorted by minDistance
-    const commissions = await DeliveryBoyCommission.find(query)
-      .populate('createdBy', 'name email')
-      .populate('updatedBy', 'name email')
-      .sort({ minDistance: 1, createdAt: -1 })
-      .skip(skip)
-      .limit(limitNum)
-      .lean();
+    const commissions = await DeliveryBoyCommission.find(query).populate('createdBy', 'name email').populate('updatedBy', 'name email').sort({
+      minDistance: 1,
+      createdAt: -1
+    }).skip(skip).limit(limitNum).lean();
 
     // Add serial numbers
     const commissionsWithSl = commissions.map((commission, index) => ({
       ...commission,
       sl: skip + index + 1
     }));
-
     return successResponse(res, 200, 'Commission rules retrieved successfully', {
       commissions: commissionsWithSl,
       pagination: {
@@ -84,22 +84,19 @@ export const getCommissionRules = asyncHandler(async (req, res) => {
  */
 export const getCommissionRuleById = asyncHandler(async (req, res) => {
   try {
-    const { id } = req.params;
-
+    const {
+      id
+    } = req.params;
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return errorResponse(res, 400, 'Invalid commission rule ID');
     }
-
-    const commission = await DeliveryBoyCommission.findById(id)
-      .populate('createdBy', 'name email')
-      .populate('updatedBy', 'name email')
-      .lean();
-
+    const commission = await DeliveryBoyCommission.findById(id).populate('createdBy', 'name email').populate('updatedBy', 'name email').lean();
     if (!commission) {
       return errorResponse(res, 404, 'Commission rule not found');
     }
-
-    return successResponse(res, 200, 'Commission rule retrieved successfully', { commission });
+    return successResponse(res, 200, 'Commission rule retrieved successfully', {
+      commission
+    });
   } catch (error) {
     console.error('Error fetching commission rule:', error);
     return errorResponse(res, 500, 'Failed to fetch commission rule');
@@ -112,16 +109,25 @@ export const getCommissionRuleById = asyncHandler(async (req, res) => {
  */
 export const createCommissionRule = asyncHandler(async (req, res) => {
   try {
-    const { name, minDistance, maxDistance, commissionPerKm, basePayout, status } = req.body;
-    
+    const {
+      name,
+      minDistance,
+      maxDistance,
+      commissionPerKm,
+      basePayout,
+      status
+    } = req.body;
+
     // Check if admin is authenticated
     if (!req.admin || !req.admin._id) {
-      console.error('Admin authentication missing:', { hasAdmin: !!req.admin, hasId: !!req.admin?._id });
+      console.error('Admin authentication missing:', {
+        hasAdmin: !!req.admin,
+        hasId: !!req.admin?._id
+      });
       return errorResponse(res, 401, 'Admin authentication required');
     }
-    
     const adminId = req.admin._id;
-    
+
     // Validate adminId is a valid ObjectId
     if (!mongoose.Types.ObjectId.isValid(adminId)) {
       console.error('Invalid admin ID:', adminId);
@@ -132,51 +138,35 @@ export const createCommissionRule = asyncHandler(async (req, res) => {
     if (!name || !name.trim()) {
       return errorResponse(res, 400, 'Name is required');
     }
-
     if (minDistance === undefined || minDistance < 0) {
       return errorResponse(res, 400, 'Minimum distance must be 0 or greater');
     }
-
     if (maxDistance !== null && maxDistance !== undefined) {
       if (maxDistance <= minDistance) {
         return errorResponse(res, 400, 'Maximum distance must be greater than minimum distance');
       }
     }
-
     if (commissionPerKm === undefined || commissionPerKm === null || commissionPerKm < 0) {
       return errorResponse(res, 400, 'Commission per km must be 0 or greater');
     }
-
     if (basePayout === undefined || basePayout < 0) {
       return errorResponse(res, 400, 'Base payout must be 0 or greater');
     }
 
     // Check for overlapping ranges
-    const existingRules = await DeliveryBoyCommission.find({ status: true });
+    const existingRules = await DeliveryBoyCommission.find({
+      status: true
+    });
     const newMinDist = parseFloat(minDistance);
     const newMaxDist = maxDistance === null || maxDistance === undefined ? null : parseFloat(maxDistance);
-
-    console.log('Checking for overlaps:', {
-      newRange: { min: newMinDist, max: newMaxDist },
-      existingRulesCount: existingRules.length
-    });
-
     for (const rule of existingRules) {
       const ruleMin = parseFloat(rule.minDistance);
       const ruleMax = rule.maxDistance === null ? null : parseFloat(rule.maxDistance);
-
-      console.log('Comparing with rule:', {
-        name: rule.name,
-        ruleRange: { min: ruleMin, max: ruleMax },
-        newRange: { min: newMinDist, max: newMaxDist }
-      });
-
       // Check for overlap - two ranges overlap if they share any common distance
       // Range A: [newMinDist, newMaxDist] (or [newMinDist, Infinity) if newMaxDist is null)
       // Range B: [ruleMin, ruleMax] (or [ruleMin, Infinity) if ruleMax is null)
-      
+
       let overlaps = false;
-      
       if (newMaxDist === null && ruleMax === null) {
         // Both are unlimited - they overlap if min distances are compatible
         overlaps = true; // Both cover everything from their min, so they overlap
@@ -193,26 +183,10 @@ export const createCommissionRule = asyncHandler(async (req, res) => {
         // So we use <= for one side to allow exact boundaries
         overlaps = newMinDist < ruleMax && ruleMin < newMaxDist;
       }
-
       if (overlaps) {
-        const ruleRangeStr = ruleMax === null 
-          ? `${ruleMin}km - Unlimited` 
-          : `${ruleMin}km - ${ruleMax}km`;
-        const newRangeStr = newMaxDist === null 
-          ? `${newMinDist}km - Unlimited` 
-          : `${newMinDist}km - ${newMaxDist}km`;
-        
-        console.log('Overlap detected!', {
-          existingRule: rule.name,
-          existingRange: ruleRangeStr,
-          newRange: newRangeStr
-        });
-        
-        return errorResponse(
-          res,
-          400,
-          `Distance range overlaps with existing rule "${rule.name}" (${ruleRangeStr}). Your range: ${newRangeStr}`
-        );
+        const ruleRangeStr = ruleMax === null ? `${ruleMin}km - Unlimited` : `${ruleMin}km - ${ruleMax}km`;
+        const newRangeStr = newMaxDist === null ? `${newMinDist}km - Unlimited` : `${newMinDist}km - ${newMaxDist}km`;
+        return errorResponse(res, 400, `Distance range overlaps with existing rule "${rule.name}" (${ruleRangeStr}). Your range: ${newRangeStr}`);
       }
     }
 
@@ -226,17 +200,9 @@ export const createCommissionRule = asyncHandler(async (req, res) => {
       status: status !== undefined ? status : true,
       createdBy: new mongoose.Types.ObjectId(adminId)
     };
-    
-    console.log('Creating commission with data:', {
-      ...commissionData,
-      createdBy: commissionData.createdBy.toString()
-    });
-    
     const commission = new DeliveryBoyCommission(commissionData);
-
     try {
       await commission.save();
-      console.log('Commission saved successfully:', commission._id);
     } catch (saveError) {
       console.error('Error saving commission to database:', saveError);
       console.error('Save error details:', {
@@ -251,17 +217,15 @@ export const createCommissionRule = asyncHandler(async (req, res) => {
     // Try to populate, but handle errors gracefully
     let populatedCommission;
     try {
-      populatedCommission = await DeliveryBoyCommission.findById(commission._id)
-        .populate('createdBy', 'name email')
-        .populate('updatedBy', 'name email')
-        .lean();
+      populatedCommission = await DeliveryBoyCommission.findById(commission._id).populate('createdBy', 'name email').populate('updatedBy', 'name email').lean();
     } catch (populateError) {
       console.warn('Error populating commission:', populateError);
       // If populate fails, return the commission without populated fields
       populatedCommission = commission.toObject ? commission.toObject() : commission;
     }
-
-    return successResponse(res, 201, 'Commission rule created successfully', { commission: populatedCommission });
+    return successResponse(res, 201, 'Commission rule created successfully', {
+      commission: populatedCommission
+    });
   } catch (error) {
     console.error('❌ Error creating commission rule:', error);
     console.error('Error name:', error.name);
@@ -269,32 +233,33 @@ export const createCommissionRule = asyncHandler(async (req, res) => {
     console.error('Error stack:', error.stack);
     console.error('Request body:', JSON.stringify(req.body, null, 2));
     console.error('Admin ID:', req.admin?._id);
-    console.error('Admin object:', req.admin ? { _id: req.admin._id, name: req.admin.name, email: req.admin.email } : 'null');
-    
+    console.error('Admin object:', req.admin ? {
+      _id: req.admin._id,
+      name: req.admin.name,
+      email: req.admin.email
+    } : 'null');
+
     // Handle validation errors
     if (error.name === 'ValidationError') {
       const validationErrors = Object.values(error.errors).map(e => e.message).join(', ');
       console.error('Validation errors:', validationErrors);
       return errorResponse(res, 400, `Validation error: ${validationErrors}`);
     }
-    
+
     // Handle duplicate key errors
     if (error.code === 11000) {
       console.error('Duplicate key error:', error.keyPattern);
       return errorResponse(res, 400, 'A commission rule with this name already exists');
     }
-    
+
     // Handle cast errors
     if (error.name === 'CastError') {
       console.error('Cast error:', error.path, error.value);
       return errorResponse(res, 400, `Invalid value for ${error.path}: ${error.value}`);
     }
-    
+
     // Generic error - return detailed message in development
-    const errorMsg = process.env.NODE_ENV === 'development' 
-      ? `Failed to create commission rule: ${error.message}` 
-      : 'Failed to create commission rule. Please check server logs for details.';
-    
+    const errorMsg = process.env.NODE_ENV === 'development' ? `Failed to create commission rule: ${error.message}` : 'Failed to create commission rule. Please check server logs for details.';
     console.error('Returning error response:', errorMsg);
     return errorResponse(res, 500, errorMsg);
   }
@@ -306,14 +271,21 @@ export const createCommissionRule = asyncHandler(async (req, res) => {
  */
 export const updateCommissionRule = asyncHandler(async (req, res) => {
   try {
-    const { id } = req.params;
-    const { name, minDistance, maxDistance, commissionPerKm, basePayout, status } = req.body;
+    const {
+      id
+    } = req.params;
+    const {
+      name,
+      minDistance,
+      maxDistance,
+      commissionPerKm,
+      basePayout,
+      status
+    } = req.body;
     const adminId = req.admin._id;
-
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return errorResponse(res, 400, 'Invalid commission rule ID');
     }
-
     const commission = await DeliveryBoyCommission.findById(id);
     if (!commission) {
       return errorResponse(res, 404, 'Commission rule not found');
@@ -323,41 +295,34 @@ export const updateCommissionRule = asyncHandler(async (req, res) => {
     if (name !== undefined && !name.trim()) {
       return errorResponse(res, 400, 'Name cannot be empty');
     }
-
     const newMinDist = minDistance !== undefined ? parseFloat(minDistance) : commission.minDistance;
-    const newMaxDist = maxDistance !== undefined 
-      ? (maxDistance === null ? null : parseFloat(maxDistance))
-      : commission.maxDistance;
-
+    const newMaxDist = maxDistance !== undefined ? maxDistance === null ? null : parseFloat(maxDistance) : commission.maxDistance;
     if (minDistance !== undefined && newMinDist < 0) {
       return errorResponse(res, 400, 'Minimum distance must be 0 or greater');
     }
-
     if (maxDistance !== undefined && newMaxDist !== null && newMaxDist <= newMinDist) {
       return errorResponse(res, 400, 'Maximum distance must be greater than minimum distance');
     }
-
     if (commissionPerKm !== undefined && commissionPerKm < 0) {
       return errorResponse(res, 400, 'Commission per km must be 0 or greater');
     }
-
     if (basePayout !== undefined && basePayout < 0) {
       return errorResponse(res, 400, 'Base payout must be 0 or greater');
     }
 
     // Check for overlapping ranges (excluding current rule)
-    const existingRules = await DeliveryBoyCommission.find({ 
+    const existingRules = await DeliveryBoyCommission.find({
       status: true,
-      _id: { $ne: id }
+      _id: {
+        $ne: id
+      }
     });
-
     for (const rule of existingRules) {
       const ruleMin = parseFloat(rule.minDistance);
       const ruleMax = rule.maxDistance === null ? null : parseFloat(rule.maxDistance);
 
       // Check for overlap - two ranges overlap if they share any common distance
       let overlaps = false;
-      
       if (newMaxDist === null && ruleMax === null) {
         // Both are unlimited - they overlap if min distances are compatible
         overlaps = true;
@@ -372,20 +337,10 @@ export const updateCommissionRule = asyncHandler(async (req, res) => {
         // Ranges overlap if: newMinDist < ruleMax && ruleMin < newMaxDist
         overlaps = newMinDist < ruleMax && ruleMin < newMaxDist;
       }
-
       if (overlaps) {
-        const ruleRangeStr = ruleMax === null 
-          ? `${ruleMin}km - Unlimited` 
-          : `${ruleMin}km - ${ruleMax}km`;
-        const newRangeStr = newMaxDist === null 
-          ? `${newMinDist}km - Unlimited` 
-          : `${newMinDist}km - ${newMaxDist}km`;
-        
-        return errorResponse(
-          res,
-          400,
-          `Distance range overlaps with existing rule "${rule.name}" (${ruleRangeStr}). Your range: ${newRangeStr}`
-        );
+        const ruleRangeStr = ruleMax === null ? `${ruleMin}km - Unlimited` : `${ruleMin}km - ${ruleMax}km`;
+        const newRangeStr = newMaxDist === null ? `${newMinDist}km - Unlimited` : `${newMinDist}km - ${newMaxDist}km`;
+        return errorResponse(res, 400, `Distance range overlaps with existing rule "${rule.name}" (${ruleRangeStr}). Your range: ${newRangeStr}`);
       }
     }
 
@@ -397,15 +352,11 @@ export const updateCommissionRule = asyncHandler(async (req, res) => {
     if (basePayout !== undefined) commission.basePayout = parseFloat(basePayout);
     if (status !== undefined) commission.status = status;
     commission.updatedBy = adminId;
-
     await commission.save();
-
-    const populatedCommission = await DeliveryBoyCommission.findById(commission._id)
-      .populate('createdBy', 'name email')
-      .populate('updatedBy', 'name email')
-      .lean();
-
-    return successResponse(res, 200, 'Commission rule updated successfully', { commission: populatedCommission });
+    const populatedCommission = await DeliveryBoyCommission.findById(commission._id).populate('createdBy', 'name email').populate('updatedBy', 'name email').lean();
+    return successResponse(res, 200, 'Commission rule updated successfully', {
+      commission: populatedCommission
+    });
   } catch (error) {
     console.error('Error updating commission rule:', error);
     if (error.name === 'ValidationError') {
@@ -421,19 +372,17 @@ export const updateCommissionRule = asyncHandler(async (req, res) => {
  */
 export const deleteCommissionRule = asyncHandler(async (req, res) => {
   try {
-    const { id } = req.params;
-
+    const {
+      id
+    } = req.params;
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return errorResponse(res, 400, 'Invalid commission rule ID');
     }
-
     const commission = await DeliveryBoyCommission.findById(id);
     if (!commission) {
       return errorResponse(res, 404, 'Commission rule not found');
     }
-
     await DeliveryBoyCommission.findByIdAndDelete(id);
-
     return successResponse(res, 200, 'Commission rule deleted successfully');
   } catch (error) {
     console.error('Error deleting commission rule:', error);
@@ -447,29 +396,27 @@ export const deleteCommissionRule = asyncHandler(async (req, res) => {
  */
 export const toggleCommissionRuleStatus = asyncHandler(async (req, res) => {
   try {
-    const { id } = req.params;
-    const { status } = req.body;
+    const {
+      id
+    } = req.params;
+    const {
+      status
+    } = req.body;
     const adminId = req.admin._id;
-
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return errorResponse(res, 400, 'Invalid commission rule ID');
     }
-
     const commission = await DeliveryBoyCommission.findById(id);
     if (!commission) {
       return errorResponse(res, 404, 'Commission rule not found');
     }
-
     commission.status = status !== undefined ? status : !commission.status;
     commission.updatedBy = adminId;
     await commission.save();
-
-    const populatedCommission = await DeliveryBoyCommission.findById(commission._id)
-      .populate('createdBy', 'name email')
-      .populate('updatedBy', 'name email')
-      .lean();
-
-    return successResponse(res, 200, 'Commission rule status updated successfully', { commission: populatedCommission });
+    const populatedCommission = await DeliveryBoyCommission.findById(commission._id).populate('createdBy', 'name email').populate('updatedBy', 'name email').lean();
+    return successResponse(res, 200, 'Commission rule status updated successfully', {
+      commission: populatedCommission
+    });
   } catch (error) {
     console.error('Error toggling commission rule status:', error);
     return errorResponse(res, 500, 'Failed to update commission rule status');
@@ -482,18 +429,16 @@ export const toggleCommissionRuleStatus = asyncHandler(async (req, res) => {
  */
 export const calculateCommission = asyncHandler(async (req, res) => {
   try {
-    const { distance } = req.body;
-
+    const {
+      distance
+    } = req.body;
     if (distance === undefined || distance < 0) {
       return errorResponse(res, 400, 'Valid distance is required');
     }
-
     const result = await DeliveryBoyCommission.calculateCommission(parseFloat(distance));
-
     return successResponse(res, 200, 'Commission calculated successfully', result);
   } catch (error) {
     console.error('Error calculating commission:', error);
     return errorResponse(res, 500, error.message || 'Failed to calculate commission');
   }
 });
-
