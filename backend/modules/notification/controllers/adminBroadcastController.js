@@ -3,6 +3,7 @@ import { successResponse, errorResponse } from '../../../shared/utils/response.j
 import Notification from '../models/Notification.js';
 import DeviceToken from '../models/DeviceToken.js';
 import { sendPushNotification } from '../utils/pushNotificationHelper.js';
+import { uploadToCloudinary } from '../../../shared/utils/cloudinaryService.js';
 
 /**
  * Broadcast notification to specific roles or all users.
@@ -20,10 +21,24 @@ export const broadcastNotification = asyncHandler(async (req, res) => {
   const {
     title,
     body,
-    imageUrl,
     targetRole = 'all',
     data = {}
   } = req.body;
+
+  // Handle image upload with Cloudinary fallback
+  let imageUrl = req.body.imageUrl;
+  if (req.file) {
+    try {
+      const result = await uploadToCloudinary(req.file.buffer, {
+        folder: 'appzeto/notifications',
+        resource_type: 'image'
+      });
+      imageUrl = result.secure_url;
+    } catch (uploadError) {
+      console.error('[Broadcast] Image upload failed:', uploadError);
+      // Continue without image or handle error as needed
+    }
+  }
 
   if (!title || !body) {
     return errorResponse(res, 400, 'Title and Body are required');
@@ -112,4 +127,47 @@ export const broadcastNotification = asyncHandler(async (req, res) => {
     sentCount: tokens.length,
     notificationId: notification._id
   });
+});
+
+/**
+ * GET /api/admin/notifications/broadcast/history
+ * Fetch all broadcast history for admin.
+ */
+export const getBroadcastHistory = asyncHandler(async (req, res) => {
+  const { page = 1, limit = 50 } = req.query;
+  const skip = (parseInt(page) - 1) * parseInt(limit);
+
+  const [notifications, total] = await Promise.all([
+    Notification.find({})
+      .sort({ sentAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit))
+      .lean(),
+    Notification.countDocuments({})
+  ]);
+
+  return successResponse(res, 200, 'Notification history fetched', {
+    notifications,
+    pagination: {
+      total,
+      page: parseInt(page),
+      limit: parseInt(limit),
+      totalPages: Math.ceil(total / parseInt(limit))
+    }
+  });
+});
+
+/**
+ * DELETE /api/admin/notifications/broadcast/:id
+ * Delete a specific notification record.
+ */
+export const deleteNotification = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  const notification = await Notification.findByIdAndDelete(id);
+  if (!notification) {
+    return errorResponse(res, 404, 'Notification not found');
+  }
+
+  return successResponse(res, 200, 'Notification deleted successfully');
 });

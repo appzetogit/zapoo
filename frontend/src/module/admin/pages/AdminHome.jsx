@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
@@ -6,6 +7,7 @@ import { Activity, ArrowUpRight, ShoppingBag, CreditCard, Truck, Receipt, Dollar
 import zapooLogo from "@/assets/zapoo_logo.png";
 import { adminAPI } from "@/lib/api";
 export default function AdminHome() {
+  const navigate = useNavigate();
   const [selectedTier, setSelectedTier] = useState("all");
   const [selectedPeriod, setSelectedPeriod] = useState("overall");
   const [isLoading, setIsLoading] = useState(true);
@@ -146,99 +148,115 @@ export default function AdminHome() {
   }));
   const activityFeed = [];
   return <div className="px-4 pb-10 lg:px-6 pt-4">
-      <div className="relative overflow-hidden rounded-3xl border border-neutral-200 bg-white shadow-[0_30px_120px_-60px_rgba(0,0,0,0.28)]">
-        {isLoading && <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/70 backdrop-blur-sm">
-            <div className="flex items-center gap-3 rounded-full bg-white px-4 py-2 text-sm text-neutral-700 ring-1 ring-neutral-200">
-              <span className="h-3 w-3 animate-ping rounded-full bg-neutral-800/70" />
-              Updating metrics...
-            </div>
-          </div>}
-
-        <div className="flex flex-col gap-4 border-b border-neutral-200 bg-linear-to-br from-white via-neutral-50 to-neutral-100 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-center gap-4">
-            <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-neutral-500">Admin Overview</p>
-              <h1 className="text-2xl font-semibold text-neutral-900">Operations Command</h1>
-            </div>
-
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <Select value={selectedTier} onValueChange={setSelectedTier}>
-              <SelectTrigger className="min-w-[160px] border-neutral-300 bg-white text-neutral-900">
-                <SelectValue placeholder="All Tiers" />
-              </SelectTrigger>
-              <SelectContent className="border-neutral-200 bg-white text-neutral-900">
-                <SelectItem value="all">All Tiers</SelectItem>
-                {tiers.map(tier => <SelectItem key={tier._id} value={tier._id}>
-                    {tier.name}
-                  </SelectItem>)}
-              </SelectContent>
-            </Select>
-            <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-              <SelectTrigger className="min-w-[140px] border-neutral-300 bg-white text-neutral-900">
-                <SelectValue placeholder="Overall" />
-              </SelectTrigger>
-              <SelectContent className="border-neutral-200 bg-white text-neutral-900">
-                <SelectItem value="overall">Overall</SelectItem>
-                <SelectItem value="today">Today</SelectItem>
-                <SelectItem value="week">This week</SelectItem>
-                <SelectItem value="month">This month</SelectItem>
-                <SelectItem value="year">This year</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+    <div className="relative overflow-hidden rounded-3xl border border-neutral-200 bg-white shadow-[0_30px_120px_-60px_rgba(0,0,0,0.28)]">
+      {isLoading && <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/70 backdrop-blur-sm">
+        <div className="flex items-center gap-3 rounded-full bg-white px-4 py-2 text-sm text-neutral-700 ring-1 ring-neutral-200">
+          <span className="h-3 w-3 animate-ping rounded-full bg-neutral-800/70" />
+          Updating metrics...
         </div>
+      </div>}
 
-        <div className="space-y-6 px-6 py-6">
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <MetricCard title="Gross revenue" value={`₹${revenueTotal.toLocaleString("en-IN")}`} helper="Rolling 12 months" icon={<ShoppingBag className="h-5 w-5 text-emerald-600" />} accent="bg-emerald-200/40" />
-            <MetricCard title="Commission earned" value={`₹${commissionTotal.toLocaleString("en-IN")}`} helper="Restaurant commission" icon={<ArrowUpRight className="h-5 w-5 text-indigo-600" />} accent="bg-indigo-200/40" />
-            <MetricCard title="Orders processed" value={ordersTotal.toLocaleString("en-IN")} helper="Fulfilled & billed" icon={<Activity className="h-5 w-5 text-amber-600" />} accent="bg-amber-200/40" />
-            <MetricCard title="Platform fee" value={`₹${platformFeeTotal.toLocaleString("en-IN")}`} helper="Total platform fees" icon={<CreditCard className="h-5 w-5 text-purple-600" />} accent="bg-purple-200/40" />
-            <MetricCard title="Delivery fee" value={`₹${deliveryFeeTotal.toLocaleString("en-IN")}`} helper="Total delivery fees" icon={<Truck className="h-5 w-5 text-blue-600" />} accent="bg-blue-200/40" />
-            <MetricCard title="GST" value={`₹${gstTotal.toLocaleString("en-IN")}`} helper="Total GST collected" icon={<Receipt className="h-5 w-5 text-orange-600" />} accent="bg-orange-200/40" />
-            <MetricCard title="Recommended Item fees" value={`₹${recommendedItemFeeTotal.toLocaleString("en-IN")}`} helper="Total recommended fees" icon={<Plus className="h-5 w-5 text-pink-600" />} accent="bg-pink-200/40" />
-            <MetricCard title="Total revenue" value={`₹${totalAdminEarnings.toLocaleString("en-IN", {
+      <div className="flex flex-col gap-4 border-b border-neutral-200 bg-linear-to-br from-white via-neutral-50 to-neutral-100 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex items-center gap-4">
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em] text-neutral-500">Admin Overview</p>
+            <h1 className="text-2xl font-semibold text-neutral-900">Operations Command</h1>
+          </div>
+
+        </div>
+        <div className="flex flex-wrap gap-3">
+          <Select value={selectedTier} onValueChange={setSelectedTier}>
+            <SelectTrigger className="min-w-[160px] border-neutral-300 bg-white text-neutral-900">
+              <SelectValue placeholder="All Tiers" />
+            </SelectTrigger>
+            <SelectContent className="border-neutral-200 bg-white text-neutral-900">
+              <SelectItem value="all">All Tiers</SelectItem>
+              {tiers.map(tier => <SelectItem key={tier._id} value={tier._id}>
+                {tier.name}
+              </SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
+            <SelectTrigger className="min-w-[140px] border-neutral-300 bg-white text-neutral-900">
+              <SelectValue placeholder="Overall" />
+            </SelectTrigger>
+            <SelectContent className="border-neutral-200 bg-white text-neutral-900">
+              <SelectItem value="overall">Overall</SelectItem>
+              <SelectItem value="today">Today</SelectItem>
+              <SelectItem value="week">This week</SelectItem>
+              <SelectItem value="month">This month</SelectItem>
+              <SelectItem value="year">This year</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <div className="space-y-6 px-6 py-6">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <MetricCard title="Gross revenue" value={`₹${revenueTotal.toLocaleString("en-IN")}`} helper="Rolling 12 months" icon={<ShoppingBag className="h-5 w-5 text-emerald-600" />} accent="bg-emerald-200/40" onClick={() => navigate("/admin/transaction-report")} />
+          <MetricCard title="Commission earned" value={`₹${commissionTotal.toLocaleString("en-IN")}`} helper="Restaurant commission" icon={<ArrowUpRight className="h-5 w-5 text-indigo-600" />} accent="bg-indigo-200/40" onClick={() => navigate("/admin/transaction-report")} />
+          <MetricCard title="Orders processed" value={ordersTotal.toLocaleString("en-IN")} helper="Fulfilled & billed" icon={<Activity className="h-5 w-5 text-amber-600" />} accent="bg-amber-200/40" onClick={() => navigate("/admin/orders/all")} />
+          <MetricCard title="Platform fee" value={`₹${platformFeeTotal.toLocaleString("en-IN")}`} helper="Total platform fees" icon={<CreditCard className="h-5 w-5 text-purple-600" />} accent="bg-purple-200/40" onClick={() => navigate("/admin/transaction-report")} />
+          <MetricCard title="Delivery fee" value={`₹${deliveryFeeTotal.toLocaleString("en-IN")}`} helper="Total delivery fees" icon={<Truck className="h-5 w-5 text-blue-600" />} accent="bg-blue-200/40" onClick={() => navigate("/admin/transaction-report")} />
+          <MetricCard title="GST" value={`₹${gstTotal.toLocaleString("en-IN")}`} helper="Total GST collected" icon={<Receipt className="h-5 w-5 text-orange-600" />} accent="bg-orange-200/40" onClick={() => navigate("/admin/tax-report")} />
+          <MetricCard title="Recommended Item fees" value={`₹${recommendedItemFeeTotal.toLocaleString("en-IN")}`} helper="Total recommended fees" icon={<Plus className="h-5 w-5 text-pink-600" />} accent="bg-pink-200/40" onClick={() => navigate("/admin/transaction-report")} />
+          <MetricCard title="Total revenue" value={`₹${totalAdminEarnings.toLocaleString("en-IN", {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2
-          })}`} helper={`Commission ₹${commissionTotal.toFixed(2)} + Platform ₹${platformFeeTotal.toFixed(2)} + Delivery ₹${deliveryFeeTotal.toFixed(2)} + GST ₹${gstTotal.toFixed(2)} + Rec ₹${recommendedItemFeeTotal.toFixed(2)}`} icon={<DollarSign className="h-5 w-5 text-green-600" />} accent="bg-green-200/40" />
-            <MetricCard title="Total restaurants" value={totalRestaurants.toLocaleString("en-IN")} helper="All registered restaurants" icon={<Store className="h-5 w-5 text-blue-600" />} accent="bg-blue-200/40" />
-            <MetricCard title="Restaurant request pending" value={pendingRestaurantRequests.toLocaleString("en-IN")} helper="Awaiting approval" icon={<UserCheck className="h-5 w-5 text-orange-600" />} accent="bg-orange-200/40" />
-            <MetricCard title="Total delivery boy" value={totalDeliveryBoys.toLocaleString("en-IN")} helper="All delivery partners" icon={<Truck className="h-5 w-5 text-indigo-600" />} accent="bg-indigo-200/40" />
-            <MetricCard title="Delivery boy request pending" value={pendingDeliveryBoyRequests.toLocaleString("en-IN")} helper="Awaiting verification" icon={<Clock className="h-5 w-5 text-yellow-600" />} accent="bg-yellow-200/40" />
-            <MetricCard title="Total foods" value={totalFoods.toLocaleString("en-IN")} helper="Active menu items" icon={<Package className="h-5 w-5 text-purple-600" />} accent="bg-purple-200/40" />
-            <MetricCard title="Total addons" value={totalAddons.toLocaleString("en-IN")} helper="Active addon items" icon={<Plus className="h-5 w-5 text-pink-600" />} accent="bg-pink-200/40" />
-            <MetricCard title="Total customers" value={totalCustomers.toLocaleString("en-IN")} helper="Registered users" icon={<UserCircle className="h-5 w-5 text-cyan-600" />} accent="bg-cyan-200/40" />
-            <MetricCard title="Pending orders" value={pendingOrders.toLocaleString("en-IN")} helper="Orders awaiting processing" icon={<Clock className="h-5 w-5 text-red-600" />} accent="bg-red-200/40" />
-            <MetricCard title="Completed orders" value={completedOrders.toLocaleString("en-IN")} helper="Successfully delivered" icon={<CheckCircle className="h-5 w-5 text-emerald-600" />} accent="bg-emerald-200/40" />
-          </div>
+          })}`} helper={`Commission ₹${commissionTotal.toFixed(2)} + Platform ₹${platformFeeTotal.toFixed(2)} + Delivery ₹${deliveryFeeTotal.toFixed(2)} + GST ₹${gstTotal.toFixed(2)} + Rec ₹${recommendedItemFeeTotal.toFixed(2)}`} icon={<DollarSign className="h-5 w-5 text-green-600" />} accent="bg-green-200/40" onClick={() => navigate("/admin/transaction-report")} />
+          <MetricCard title="Total restaurants" value={totalRestaurants.toLocaleString("en-IN")} helper="All registered restaurants" icon={<Store className="h-5 w-5 text-blue-600" />} accent="bg-blue-200/40" onClick={() => navigate("/admin/restaurants")} />
+          <MetricCard title="Restaurant request pending" value={pendingRestaurantRequests.toLocaleString("en-IN")} helper="Awaiting approval" icon={<UserCheck className="h-5 w-5 text-orange-600" />} accent="bg-orange-200/40" onClick={() => navigate("/admin/restaurants/joining-request")} />
+          <MetricCard title="Total delivery boy" value={totalDeliveryBoys.toLocaleString("en-IN")} helper="All delivery partners" icon={<Truck className="h-5 w-5 text-indigo-600" />} accent="bg-indigo-200/40" onClick={() => navigate("/admin/delivery-partners")} />
+          <MetricCard title="Delivery boy request pending" value={pendingDeliveryBoyRequests.toLocaleString("en-IN")} helper="Awaiting verification" icon={<Clock className="h-5 w-5 text-yellow-600" />} accent="bg-yellow-200/40" onClick={() => navigate("/admin/delivery-partners/join-request")} />
+          <MetricCard title="Total foods" value={totalFoods.toLocaleString("en-IN")} helper="Active menu items" icon={<Package className="h-5 w-5 text-purple-600" />} accent="bg-purple-200/40" onClick={() => navigate("/admin/foods")} />
+          <MetricCard title="Total addons" value={totalAddons.toLocaleString("en-IN")} helper="Active addon items" icon={<Plus className="h-5 w-5 text-pink-600" />} accent="bg-pink-200/40" onClick={() => navigate("/admin/addons")} />
+          <MetricCard title="Total customers" value={totalCustomers.toLocaleString("en-IN")} helper="Registered users" icon={<UserCircle className="h-5 w-5 text-cyan-600" />} accent="bg-cyan-200/40" onClick={() => navigate("/admin/customers")} />
+          <MetricCard title="Pending orders" value={pendingOrders.toLocaleString("en-IN")} helper="Orders awaiting processing" icon={<Clock className="h-5 w-5 text-red-600" />} accent="bg-red-200/40" onClick={() => navigate("/admin/orders/pending")} />
+          <MetricCard title="Completed orders" value={completedOrders.toLocaleString("en-IN")} helper="Successfully delivered" icon={<CheckCircle className="h-5 w-5 text-emerald-600" />} accent="bg-emerald-200/40" onClick={() => navigate("/admin/orders/delivered")} />
 
-          <div className="grid gap-4 lg:grid-cols-3">
-            <Card className="lg:col-span-2 border-neutral-200 bg-white">
-              <CardHeader className="flex flex-col gap-2 border-b border-neutral-200 pb-4">
-                <CardTitle className="text-lg text-neutral-900">Revenue trajectory</CardTitle>
-                <p className="text-sm text-neutral-500">
-                  Commission and gross revenue with monthly order volume
-                </p>
-              </CardHeader>
-              <CardContent className="pt-4">
-                <div className="h-80">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={monthlyData}>
-                      <defs>
-                        <linearGradient id="revFill" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.25} />
-                          <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0} />
-                        </linearGradient>
-                        <linearGradient id="comFill" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#a855f7" stopOpacity={0.25} />
-                          <stop offset="95%" stopColor="#a855f7" stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                      <XAxis dataKey="month" stroke="#6b7280" />
-                      <YAxis stroke="#6b7280" />
-                      <Tooltip contentStyle={{
+          {/* Subscription Plans Stats */}
+          {console.log('Sub Stats:', dashboardData?.subscriptionStats)}
+          {(dashboardData?.subscriptionStats || []).map((plan) => (
+            <MetricCard
+              key={plan._id}
+              title={`${plan.name} Plan`}
+              value={plan.count.toLocaleString("en-IN")}
+              helper="Active subscribers"
+              icon={<CreditCard className="h-5 w-5 text-indigo-600" />}
+              accent="bg-indigo-100/40"
+              onClick={() => navigate("/admin/subscription/plans")}
+            />
+          ))}
+        </div>
+
+
+
+        <div className="grid gap-4 lg:grid-cols-3">
+          <Card className="lg:col-span-2 border-neutral-200 bg-white">
+            <CardHeader className="flex flex-col gap-2 border-b border-neutral-200 pb-4">
+              <CardTitle className="text-lg text-neutral-900">Revenue trajectory</CardTitle>
+              <p className="text-sm text-neutral-500">
+                Commission and gross revenue with monthly order volume
+              </p>
+            </CardHeader>
+            <CardContent className="pt-4">
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={monthlyData}>
+                    <defs>
+                      <linearGradient id="revFill" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.25} />
+                        <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0} />
+                      </linearGradient>
+                      <linearGradient id="comFill" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#a855f7" stopOpacity={0.25} />
+                        <stop offset="95%" stopColor="#a855f7" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <XAxis dataKey="month" stroke="#6b7280" />
+                    <YAxis stroke="#6b7280" />
+                    <Tooltip contentStyle={{
                       background: "#ffffff",
                       border: "1px solid #e5e7eb",
                       borderRadius: 12
@@ -247,34 +265,34 @@ export default function AdminHome() {
                     }} itemStyle={{
                       color: "#111827"
                     }} />
-                      <Legend />
-                      <Area type="monotone" dataKey="revenue" stroke="#0ea5e9" fillOpacity={1} fill="url(#revFill)" name="Gross revenue" />
-                      <Area type="monotone" dataKey="commission" stroke="#a855f7" fillOpacity={1} fill="url(#comFill)" name="Commission" />
-                      <Bar dataKey="orders" fill="#ef4444" radius={[6, 6, 0, 0]} name="Orders" barSize={10} />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
+                    <Legend />
+                    <Area type="monotone" dataKey="revenue" stroke="#0ea5e9" fillOpacity={1} fill="url(#revFill)" name="Gross revenue" />
+                    <Area type="monotone" dataKey="commission" stroke="#a855f7" fillOpacity={1} fill="url(#comFill)" name="Commission" />
+                    <Bar dataKey="orders" fill="#ef4444" radius={[6, 6, 0, 0]} name="Orders" barSize={10} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
 
-            <Card className="border-neutral-200 bg-white">
-              <CardHeader className="flex items-center justify-between border-b border-neutral-200 pb-4">
-                <div>
-                  <CardTitle className="text-lg text-neutral-900">Order mix</CardTitle>
-                  <p className="text-sm text-neutral-500">Distribution by state</p>
-                </div>
-                <span className="rounded-full bg-neutral-100 px-3 py-1 text-xs text-neutral-700">
-                  {orderStats.reduce((s, o) => s + o.value, 0)} orders
-                </span>
-              </CardHeader>
-              <CardContent className="pt-4">
-                <div className="h-72">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie data={pieData} dataKey="value" nameKey="name" innerRadius={60} outerRadius={90} paddingAngle={4}>
-                        {pieData.map((entry, index) => <Cell key={index} fill={entry.fill} stroke="none" />)}
-                      </Pie>
-                      <Tooltip contentStyle={{
+          <Card className="border-neutral-200 bg-white">
+            <CardHeader className="flex items-center justify-between border-b border-neutral-200 pb-4">
+              <div>
+                <CardTitle className="text-lg text-neutral-900">Order mix</CardTitle>
+                <p className="text-sm text-neutral-500">Distribution by state</p>
+              </div>
+              <span className="rounded-full bg-neutral-100 px-3 py-1 text-xs text-neutral-700">
+                {orderStats.reduce((s, o) => s + o.value, 0)} orders
+              </span>
+            </CardHeader>
+            <CardContent className="pt-4">
+              <div className="h-72">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={pieData} dataKey="value" nameKey="name" innerRadius={60} outerRadius={90} paddingAngle={4}>
+                      {pieData.map((entry, index) => <Cell key={index} fill={entry.fill} stroke="none" />)}
+                    </Pie>
+                    <Tooltip contentStyle={{
                       background: "#ffffff",
                       border: "1px solid #e5e7eb",
                       borderRadius: 12
@@ -283,54 +301,58 @@ export default function AdminHome() {
                     }} itemStyle={{
                       color: "#111827"
                     }} />
-                      <Legend formatter={value => <span style={{
+                    <Legend formatter={value => <span style={{
                       color: "#111827",
                       fontSize: 12
                     }}>{value}</span>} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-                <div className="mt-3 grid grid-cols-2 gap-3">
-                  {orderStats.map(item => <div key={item.label} className="flex items-center justify-between rounded-xl border border-neutral-200 bg-white px-3 py-2">
-                      <div className="flex items-center gap-2">
-                        <span className="h-2.5 w-2.5 rounded-full" style={{
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-3">
+                {orderStats.map(item => <div key={item.label} className="flex items-center justify-between rounded-xl border border-neutral-200 bg-white px-3 py-2">
+                  <div className="flex items-center gap-2">
+                    <span className="h-2.5 w-2.5 rounded-full" style={{
                       background: item.color
                     }} />
-                        <p className="text-sm text-neutral-800">{item.label}</p>
-                      </div>
-                      <p className="text-sm font-semibold text-neutral-900">{item.value}</p>
-                    </div>)}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-
-
+                    <p className="text-sm text-neutral-800">{item.label}</p>
+                  </div>
+                  <p className="text-sm font-semibold text-neutral-900">{item.value}</p>
+                </div>)}
+              </div>
+            </CardContent>
+          </Card>
         </div>
+
+
+
       </div>
-    </div>;
+    </div>
+  </div>;
 }
 function MetricCard({
   title,
   value,
   helper,
   icon,
-  accent
+  accent,
+  onClick
 }) {
-  return <Card className="overflow-hidden border-neutral-200 bg-white p-0">
-      <CardContent className="relative flex flex-col gap-2 px-4 pb-4 pt-4">
-        <div className={`absolute inset-0 ${accent} `} />
-        <div className="relative flex items-center justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-[0.18em] text-neutral-500">{title}</p>
-            <p className="text-2xl font-semibold text-neutral-900">{value}</p>
-            <p className="text-xs text-neutral-500">{helper}</p>
-          </div>
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-neutral-100 ring-1 ring-neutral-200">
-            {icon}
-          </div>
+  return <Card
+    className={`overflow-hidden border-neutral-200 bg-white p-0 transition-all duration-200 ${onClick ? 'cursor-pointer hover:shadow-md hover:scale-[1.02] active:scale-[0.98]' : ''}`}
+    onClick={onClick}
+  >
+    <CardContent className="relative flex flex-col gap-2 px-4 pb-4 pt-4">
+      <div className={`absolute inset-0 ${accent} `} />
+      <div className="relative flex items-center justify-between">
+        <div>
+          <p className="text-xs uppercase tracking-[0.18em] text-neutral-500">{title}</p>
+          <p className="text-2xl font-semibold text-neutral-900">{value}</p>
+          <p className="text-xs text-neutral-500">{helper}</p>
         </div>
-      </CardContent>
-    </Card>;
+        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white shadow-sm ring-1 ring-neutral-200 transition-transform group-hover:scale-110">
+          {icon}
+        </div>
+      </div>
+    </CardContent>
+  </Card>;
 }

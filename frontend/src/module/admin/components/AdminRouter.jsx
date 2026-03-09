@@ -183,7 +183,7 @@ export default function AdminRouter() {
           <Route path="food-approval" element={<FoodApproval />} />
           {/* Restaurants */}
           <Route path="restaurants" element={<RestaurantsList />} />
-          <Route path="restaurants/add" element={<AddRestaurant />} />
+          {/* <Route path="restaurants/add" element={<AddRestaurant />} /> */}
           <Route path="restaurants/joining-request" element={<JoiningRequest />} />
 
           <Route path="restaurants/complaints" element={<RestaurantComplaints />} />

@@ -117,12 +117,15 @@ export default function RestaurantReport() {
   const activeFiltersCount = (filters.zone !== "All Zones" ? 1 : 0) + (filters.all !== "All" ? 1 : 0) + (filters.type !== "All types" ? 1 : 0) + (filters.time !== "All Time" ? 1 : 0)
 
   const renderStars = (rating, reviews) => {
-    if (rating === 0) {
-      return "★0"
+    if (!rating || rating === 0) {
+      return "★ 0 (0 reviews)"
     }
-    const fullStars = Math.floor(rating)
-    const hasHalfStar = rating % 1 !== 0
-    return "★".repeat(fullStars) + (hasHalfStar ? "½" : "") + "☆".repeat(5 - Math.ceil(rating)) + ` (${reviews})`
+    const safeRating = Math.min(5, Math.max(0, rating))
+    const fullStars = Math.floor(safeRating)
+    const hasHalfStar = safeRating % 1 !== 0
+    const emptyStars = Math.max(0, 5 - Math.ceil(safeRating))
+
+    return "★".repeat(fullStars) + (hasHalfStar ? "½" : "") + "☆".repeat(emptyStars) + ` (${reviews || 0})`
   }
 
   if (loading) {
@@ -393,7 +396,7 @@ export default function RestaurantReport() {
                               />
                             ) : (
                               <div className="w-full h-full bg-slate-300 flex items-center justify-center text-xs text-slate-600 font-semibold">
-                                {restaurant.restaurantName.charAt(0).toUpperCase()}
+                                {restaurant.restaurantName ? restaurant.restaurantName.charAt(0).toUpperCase() : "?"}
                               </div>
                             )}
                           </div>
@@ -413,15 +416,15 @@ export default function RestaurantReport() {
                         <span className="text-sm text-slate-700">{restaurant.totalDiscountGiven}</span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`text-sm font-medium ${restaurant.totalAdminCommission.startsWith('₹-') || restaurant.totalAdminCommission.startsWith('-₹')
-                            ? 'text-red-600'
-                            : 'text-slate-900'
+                        <span className={`text-sm font-medium ${(restaurant.totalAdminCommission && typeof restaurant.totalAdminCommission === 'string' && (restaurant.totalAdminCommission.startsWith('₹-') || restaurant.totalAdminCommission.startsWith('-₹')))
+                          ? 'text-red-600'
+                          : 'text-slate-900'
                           }`}>
-                          {restaurant.totalAdminCommission}
+                          {restaurant.totalAdminCommission || '₹0.00'}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-sm text-slate-700">{restaurant.totalVATTAX}</span>
+                        <span className="text-sm text-slate-700">{restaurant.totalVATTAX || '₹0.00'}</span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="text-sm text-slate-700">{renderStars(restaurant.averageRatings, restaurant.reviews)}</span>

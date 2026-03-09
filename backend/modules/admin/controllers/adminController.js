@@ -6,6 +6,7 @@ import AdminCommission from "../models/AdminCommission.js";
 import OrderSettlement from "../../order/models/OrderSettlement.js";
 import AdminWallet from "../models/AdminWallet.js";
 import Zone from "../models/Zone.js";
+import SubscriptionPlan from "../models/SubscriptionPlan.js";
 import { successResponse, errorResponse } from "../../../shared/utils/response.js";
 import { asyncHandler } from "../../../shared/middleware/asyncHandler.js";
 import { normalizePhoneNumber } from "../../../shared/utils/phoneUtils.js";
@@ -336,6 +337,32 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
         role: null
       }]
     });
+
+    // Get Subscription Plan Stats
+    const allPlans = await SubscriptionPlan.find({ isActive: true }).lean();
+    const subscriptionStats = [];
+
+    for (const plan of allPlans) {
+      const planFilter = {
+        ...restaurantFilter,
+        "subscription.planId": plan._id,
+        "subscription.status": "active"
+      };
+
+      if (startDate) {
+        planFilter["subscription.startDate"] = {
+          $gte: startDate
+        };
+      }
+
+      const count = await Restaurant.countDocuments(planFilter);
+      subscriptionStats.push({
+        _id: plan._id,
+        name: plan.name,
+        count: count
+      });
+    }
+
     const pendingOrders = orderStatusMap.pending || 0;
     const completedOrders = orderStatusMap.delivered || 0;
 
@@ -474,7 +501,8 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
       orderStats: {
         pending: pendingOrders,
         completed: completedOrders
-      }
+      },
+      subscriptionStats: subscriptionStats
     });
   } catch (error) {
     logger.error(`Error fetching dashboard stats: ${error.message}`);

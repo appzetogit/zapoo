@@ -20,7 +20,7 @@ export default function FoodReport() {
 
   const filteredFoods = useMemo(() => {
     let result = [...foods]
-    
+
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim()
       result = result.filter(food =>
@@ -91,12 +91,15 @@ export default function FoodReport() {
   const activeFiltersCount = (filters.zone !== "All Zones" ? 1 : 0) + (filters.restaurant !== "All restaurants" ? 1 : 0) + (filters.category !== "All Categories" ? 1 : 0) + (filters.type !== "All types" ? 1 : 0) + (filters.time !== "All Time" ? 1 : 0)
 
   const renderStars = (rating, reviews) => {
-    if (rating === 0) {
-      return "★0"
+    if (!rating || rating === 0) {
+      return "★ 0 (0 reviews)"
     }
-    const fullStars = Math.floor(rating)
-    const hasHalfStar = rating % 1 !== 0
-    return "★".repeat(fullStars) + (hasHalfStar ? "½" : "") + "☆".repeat(5 - Math.ceil(rating)) + ` (${reviews})`
+    const safeRating = Math.min(5, Math.max(0, rating))
+    const fullStars = Math.floor(safeRating)
+    const hasHalfStar = safeRating % 1 !== 0
+    const emptyStars = Math.max(0, 5 - Math.ceil(safeRating))
+
+    return "★".repeat(fullStars) + (hasHalfStar ? "½" : "") + "☆".repeat(emptyStars) + ` (${reviews || 0})`
   }
 
   const maxChartValue = Math.max(...yearlySalesData.chartData.map(d => d.amount))
@@ -203,17 +206,16 @@ export default function FoodReport() {
               </div>
 
               <div className="flex items-end gap-2">
-                <button 
+                <button
                   onClick={handleResetFilters}
                   className="px-6 py-2.5 text-sm font-medium rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition-all"
                 >
                   Reset
                 </button>
-                <button 
+                <button
                   onClick={handleFilterApply}
-                  className={`px-6 py-2.5 text-sm font-medium rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition-all flex items-center gap-2 relative ${
-                    activeFiltersCount > 0 ? "ring-2 ring-blue-300" : ""
-                  }`}
+                  className={`px-6 py-2.5 text-sm font-medium rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition-all flex items-center gap-2 relative ${activeFiltersCount > 0 ? "ring-2 ring-blue-300" : ""
+                    }`}
                 >
                   <Filter className="w-4 h-4" />
                   Filter
@@ -244,7 +246,7 @@ export default function FoodReport() {
               </button>
             </div>
           </div>
-          
+
           {/* Bar Chart */}
           <div className="relative pl-12 pb-8">
             {/* Y-axis labels */}
@@ -255,12 +257,12 @@ export default function FoodReport() {
               <span>16000</span>
               <span>0</span>
             </div>
-            
+
             {/* Y-axis label */}
             <div className="absolute -left-10 top-1/2 -translate-y-1/2 -rotate-90 text-xs text-slate-600 whitespace-nowrap">
               $(Currency)
             </div>
-            
+
             {/* Chart Area */}
             <div className="relative">
               {/* Grid lines */}
@@ -269,7 +271,7 @@ export default function FoodReport() {
                   <div key={i} className="border-t border-slate-200"></div>
                 ))}
               </div>
-              
+
               {/* Bars */}
               <div className="flex items-end justify-between gap-4 h-64 relative z-10">
                 {yearlySalesData.chartData.map((data) => {
@@ -279,8 +281,8 @@ export default function FoodReport() {
                       <div className="w-full flex items-end justify-center h-full">
                         <div
                           className="w-5 bg-blue-400 rounded-t transition-all hover:bg-blue-500"
-                          style={{ 
-                            height: `${height}px`, 
+                          style={{
+                            height: `${height}px`,
                             minHeight: height > 0 ? '4px' : '0'
                           }}
                           title={`${data.year}: $${data.amount.toLocaleString()}`}
@@ -290,7 +292,7 @@ export default function FoodReport() {
                   )
                 })}
               </div>
-              
+
               {/* X-axis labels */}
               <div className="flex justify-between gap-4 mt-2">
                 {yearlySalesData.chartData.map((data) => (
@@ -301,7 +303,7 @@ export default function FoodReport() {
               </div>
             </div>
           </div>
-          
+
           {/* Legend */}
           <div className="flex items-center gap-2 mt-6">
             <div className="w-4 h-4 bg-blue-400 rounded"></div>
@@ -355,7 +357,7 @@ export default function FoodReport() {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-              <button 
+              <button
                 onClick={() => setIsSettingsOpen(true)}
                 className="p-2.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 transition-all"
               >

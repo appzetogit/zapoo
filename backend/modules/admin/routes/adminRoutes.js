@@ -216,7 +216,11 @@ import zoneRoutes from "./zoneRoutes.js";
 import tierRoutes from "./tierRoutes.js";
 import { authenticateAdmin } from "../middleware/adminAuth.js";
 import { uploadMiddleware } from "../../../shared/utils/cloudinaryService.js";
-import { broadcastNotification } from "../../notification/controllers/adminBroadcastController.js";
+import {
+  broadcastNotification,
+  getBroadcastHistory,
+  deleteNotification
+} from "../../notification/controllers/adminBroadcastController.js";
 
 const router = express.Router();
 
@@ -252,7 +256,9 @@ router.put("/profile", updateAdminProfile);
 
 // Push Notifications (FCM Broadcast)
 // POST /api/admin/notifications/broadcast
-router.post("/notifications/broadcast", broadcastNotification);
+router.post("/notifications/broadcast", uploadMiddleware.single("image"), broadcastNotification);
+router.get("/notifications/broadcast/history", getBroadcastHistory);
+router.delete("/notifications/broadcast/:id", deleteNotification);
 
 // Settings Management
 router.put("/settings/change-password", changeAdminPassword);

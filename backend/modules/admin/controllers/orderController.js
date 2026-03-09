@@ -1321,7 +1321,7 @@ export const getRestaurantReport = asyncHandler(async (req, res) => {
     }
 
     // Sort by restaurant name
-    filteredReports.sort((a, b) => a.restaurantName.localeCompare(b.restaurantName));
+    filteredReports.sort((a, b) => (a.restaurantName || '').localeCompare(b.restaurantName || ''));
 
     // Add serial numbers
     filteredReports = filteredReports.map((report, index) => ({
@@ -1602,7 +1602,7 @@ export const processRefund = asyncHandler(async (req, res) => {
             }
           }]
         }).select('_id orderId status').limit(5).lean();
-        if (similarOrders.length > 0) {}
+        if (similarOrders.length > 0) { }
       } catch (debugError) {
         console.error('Error searching for similar orders:', debugError.message);
       }
