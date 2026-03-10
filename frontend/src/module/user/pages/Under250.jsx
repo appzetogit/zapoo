@@ -156,13 +156,18 @@ export default function Under250() {
     fetchBanners()
   }, [])
 
-  // Fetch restaurants with dishes under ₹250 from backend
+  // Fetch restaurants with dishes under ₹250 from backend (filtered by deliveryRange when location available)
   useEffect(() => {
     const fetchRestaurantsUnder250 = async () => {
       try {
         setLoadingRestaurants(true)
-        // Optional: Add zoneId if available (for sorting/filtering, but show all restaurants)
-        const response = await restaurantAPI.getRestaurantsUnder250(zoneId)
+        const params = {}
+        if (zoneId) params.zoneId = zoneId
+        if (location?.latitude != null && location?.longitude != null) {
+          params.latitude = location.latitude
+          params.longitude = location.longitude
+        }
+        const response = await restaurantAPI.getRestaurantsUnder250(params)
         if (response.data.success && response.data.data.restaurants) {
           setUnder250Restaurants(response.data.data.restaurants)
         } else {
@@ -177,7 +182,7 @@ export default function Under250() {
     }
 
     fetchRestaurantsUnder250()
-  }, [zoneId, isOutOfService])
+  }, [zoneId, isOutOfService, location?.latitude, location?.longitude])
 
   // Fetch categories from admin API
   useEffect(() => {

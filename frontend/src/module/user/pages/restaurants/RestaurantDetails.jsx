@@ -83,6 +83,7 @@ export default function RestaurantDetails() {
   const [restaurant, setRestaurant] = useState(null);
   const [loadingRestaurant, setLoadingRestaurant] = useState(true);
   const [restaurantError, setRestaurantError] = useState(null);
+  const [outOfRange, setOutOfRange] = useState(false); // true when user is beyond restaurant's deliveryRange
   const fetchedRestaurantRef = useRef(false); // Track if restaurant has been fetched for current slug
 
   // Fetch restaurant data from API
@@ -99,14 +100,24 @@ export default function RestaurantDetails() {
           return;
         }
       }
+      let response;
+      let apiRestaurant;
       try {
         setLoadingRestaurant(true);
         setRestaurantError(null);
-        // Fetch restaurant directly from restaurantAPI
+        setOutOfRange(false);
+        const coordParams = {};
+        if (userLocation?.latitude != null && userLocation?.longitude != null) {
+          coordParams.latitude = userLocation.latitude;
+          coordParams.longitude = userLocation.longitude;
+        }
+        // Fetch restaurant directly from restaurantAPI (pass coords for outOfRange check)
         try {
-          response = await restaurantAPI.getRestaurantById(slug);
-          if (response.data && response.data.success && response.data.data) {
-            apiRestaurant = response.data.data;
+          response = await restaurantAPI.getRestaurantById(slug, coordParams);
+          const data = response.data?.data;
+          if (response.data && response.data.success && data) {
+            apiRestaurant = data.restaurant ?? data;
+            setOutOfRange(Boolean(data.outOfRange));
           }
         } catch (lookupError) {
           // Only search if zoneId is available
@@ -117,14 +128,20 @@ export default function RestaurantDetails() {
               limit: 100,
               zoneId: zoneId
             };
+            if (userLocation?.latitude != null && userLocation?.longitude != null) {
+              searchParams.latitude = userLocation.latitude;
+              searchParams.longitude = userLocation.longitude;
+            }
             const searchResponse = await restaurantAPI.getRestaurants(searchParams);
             const restaurants = searchResponse?.data?.data?.restaurants || searchResponse?.data?.data || [];
             const restaurantName = slug.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
             const matchingRestaurant = restaurants.find(r => r.slug === slug || r.name?.toLowerCase().replace(/\s+/g, '-') === slug.toLowerCase() || r.name?.toLowerCase() === restaurantName.toLowerCase());
             if (matchingRestaurant) {
-              const fullResponse = await restaurantAPI.getRestaurantById(matchingRestaurant._id || matchingRestaurant.restaurantId);
-              if (fullResponse.data && fullResponse.data.success && fullResponse.data.data) {
-                apiRestaurant = fullResponse.data.data;
+              const fullResponse = await restaurantAPI.getRestaurantById(matchingRestaurant._id || matchingRestaurant.restaurantId, coordParams);
+              const fullData = fullResponse.data?.data;
+              if (fullResponse.data && fullResponse.data.success && fullData) {
+                apiRestaurant = fullData.restaurant ?? fullData;
+                setOutOfRange(Boolean(fullData.outOfRange));
               }
             }
           }
@@ -607,6 +624,11 @@ export default function RestaurantDetails() {
     // CRITICAL: Check if user is in service zone or restaurant is available
     if (isOutOfService) {
       toast.error('You are outside the service zone. Please select a location within the service area.');
+      return;
+    }
+
+    if (outOfRange) {
+      toast.error('This restaurant does not deliver to your current address. Change your delivery location to order.');
       return;
     }
 
@@ -1185,9 +1207,17 @@ export default function RestaurantDetails() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 lg:px-10 xl:px-12 py-4 sm:py-5 md:py-6 lg:py-8 space-y-3 md:space-y-4 lg:space-y-5 pb-0">
           {/* Restaurant Name and Rating */}
           <div className="flex items-start justify-between">
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{restaurant?.name || "Unknown Restaurant"}</h1>
-              <Info className="h-5 w-5 text-gray-400" />
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-2">
+                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{restaurant?.name || "Unknown Restaurant"}</h1>
+                <Info className="h-5 w-5 text-gray-400" />
+              </div>
+              {outOfRange && (
+                <Badge variant="secondary" className="w-fit flex items-center gap-1 px-2 py-0.5 bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200 border border-amber-300 dark:border-amber-700">
+                  <AlertCircle className="h-3.5 w-3.5" />
+                  Out of delivery range — change address to order
+                </Badge>
+              )}
             </div>
             <div className="flex flex-col items-end">
               <Badge className="bg-green-500 text-white mb-1 flex items-center gap-1 px-2 py-1">
@@ -1622,10 +1652,17 @@ export default function RestaurantDetails() {
 
       {/* Menu Button - Sticky at page bottom right (hidden when filter or menu sheet open) */}
       {!showFilterSheet && !showMenuSheet && !showMenuOptionsSheet && <div className="sticky dark:bg-[#1a1a1a] bottom-4 flex justify-end px-4 z-50 mt-auto">
-          <Button className="bg-gray-800 hover:bg-gray-900 text-white flex items-center gap-2 shadow-lg px-6 py-2.5 rounded-lg" size="lg" onClick={() => setShowMenuSheet(true)}>
-            <Utensils className="h-5 w-5" />
-            Menu
-          </Button>
+          {outOfRange ? (
+            <Button className="bg-amber-600 hover:bg-amber-700 text-white flex items-center gap-2 shadow-lg px-6 py-2.5 rounded-lg cursor-not-allowed" size="lg" disabled>
+              <AlertCircle className="h-5 w-5" />
+              Out of delivery range
+            </Button>
+          ) : (
+            <Button className="bg-gray-800 hover:bg-gray-900 text-white flex items-center gap-2 shadow-lg px-6 py-2.5 rounded-lg" size="lg" onClick={() => setShowMenuSheet(true)}>
+              <Utensils className="h-5 w-5" />
+              Menu
+            </Button>
+          )}
         </div>}
 
       {/* Menu Categories Bottom Sheet - Rendered via Portal */}

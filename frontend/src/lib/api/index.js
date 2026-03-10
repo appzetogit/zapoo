@@ -567,15 +567,15 @@ export const restaurantAPI = {
     return apiClient.get(API_ENDPOINTS.RESTAURANT.LIST, { params });
   },
 
-  // Get restaurants with dishes under ₹250
-  getRestaurantsUnder250: (zoneId) => {
-    const params = zoneId ? { zoneId } : {};
-    return apiClient.get(API_ENDPOINTS.RESTAURANT.UNDER_250, { params });
+  // Get restaurants with dishes under ₹250. Pass { zoneId, latitude, longitude } for zone and deliveryRange filtering.
+  getRestaurantsUnder250: (params = {}) => {
+    const query = typeof params === 'string' ? { zoneId: params } : params;
+    return apiClient.get(API_ENDPOINTS.RESTAURANT.UNDER_250, { params: query });
   },
 
-  // Get restaurant by ID or slug
-  getRestaurantById: (id) => {
-    return apiClient.get(API_ENDPOINTS.RESTAURANT.BY_ID.replace(":id", id));
+  // Get restaurant by ID or slug. Pass { latitude, longitude } to get outOfRange flag when user is beyond deliveryRange.
+  getRestaurantById: (id, params = {}) => {
+    return apiClient.get(API_ENDPOINTS.RESTAURANT.BY_ID.replace(":id", id), { params });
   },
   // Get coupons for item (public - for user cart)
   getCouponsByItemIdPublic: (restaurantId, itemId) => {

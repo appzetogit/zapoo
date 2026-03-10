@@ -323,7 +323,7 @@ export const getActiveAdsByZone = async (req, res) => {
         startDate: { $lte: now },
         endDate: { $gte: now }
       })
-        .populate('restaurant', 'name logo address')
+        .populate('restaurant', 'name logo address location deliveryRange')
         .limit(20)
         .lean(),
       ChallengeBanner.find({
@@ -358,9 +358,24 @@ export const getActiveAdsByZone = async (req, res) => {
       });
     }
 
+    // Filter paid ads by restaurant deliveryRange when user coordinates provided
+    let paidAdsInRange = paidAds;
+    if (userLat != null && userLng != null && Number.isFinite(userLat) && Number.isFinite(userLng)) {
+      paidAdsInRange = paidAds.filter(ad => {
+        const rest = ad.restaurant;
+        if (!rest) return false;
+        const lat = rest.location?.latitude ?? rest.location?.coordinates?.[1];
+        const lng = rest.location?.longitude ?? rest.location?.coordinates?.[0];
+        if (lat == null || lng == null) return true;
+        const rangeKm = rest.deliveryRange ?? 5;
+        const dist = calculateDistance([lng, lat], [userLng, userLat]);
+        return dist <= rangeKm;
+      });
+    }
+
     const zone = await Zone.findById(zoneId).populate('tierId');
     const maxBanners = zone?.tierId?.maxBanners ?? 5;
-    const selectedPaid = paidAds.slice(0, maxBanners);
+    const selectedPaid = paidAdsInRange.slice(0, maxBanners);
     const combined = [...selectedPaid, ...challengeAds].slice(0, 20);
 
     res.status(200).json({ success: true, data: combined });

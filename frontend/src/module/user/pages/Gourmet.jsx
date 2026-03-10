@@ -4,6 +4,7 @@ import { ArrowLeft, Star, Clock, Bookmark, BadgePercent, Loader2 } from "lucide-
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { heroBannerAPI } from "@/lib/api"
+import { useLocation } from "../hooks/useLocation"
 import { toast } from "sonner"
 
 // Import banner
@@ -11,18 +12,24 @@ import gourmetBanner from "@/assets/groumetpagebanner.png"
 
 export default function Gourmet() {
   const navigate = useNavigate()
+  const { location } = useLocation()
   const [favorites, setFavorites] = useState(new Set())
   const [gourmetRestaurants, setGourmetRestaurants] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
-  // Fetch Gourmet restaurants from API
+  // Fetch Gourmet restaurants from API (filtered by deliveryRange when location available)
   useEffect(() => {
     const fetchGourmetRestaurants = async () => {
       try {
         setLoading(true)
         setError(null)
-        const response = await heroBannerAPI.getGourmetRestaurants()
+        const params = {}
+        if (location?.latitude != null && location?.longitude != null) {
+          params.latitude = location.latitude
+          params.longitude = location.longitude
+        }
+        const response = await heroBannerAPI.getGourmetRestaurants(params)
         const data = response?.data?.data
 
         if (data && data.restaurants) {
@@ -42,7 +49,7 @@ export default function Gourmet() {
     }
 
     fetchGourmetRestaurants()
-  }, [])
+  }, [location?.latitude, location?.longitude])
 
   const toggleFavorite = (id) => {
     setFavorites(prev => {

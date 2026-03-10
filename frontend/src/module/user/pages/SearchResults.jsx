@@ -177,10 +177,11 @@ export default function SearchResults() {
     const fetchRestaurants = async () => {
       try {
         setLoadingRestaurants(true);
-        // Optional: Add zoneId if available (for sorting/filtering, but show all restaurants)
         const params = {};
-        if (zoneId) {
-          params.zoneId = zoneId;
+        if (zoneId) params.zoneId = zoneId;
+        if (location?.latitude != null && location?.longitude != null) {
+          params.latitude = location.latitude;
+          params.longitude = location.longitude;
         }
         const response = await restaurantAPI.getRestaurants(params);
         if (response.data && response.data.success && response.data.data && response.data.data.restaurants) {

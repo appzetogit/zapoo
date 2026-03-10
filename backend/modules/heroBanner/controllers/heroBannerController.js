@@ -12,16 +12,40 @@ import { calculateDistance } from '../../order/services/orderCalculationService.
 
 /**
  * Get all active hero banners (public endpoint)
+ * Optional query: latitude, longitude — when provided, only banners with at least one linked restaurant within its deliveryRange are returned.
  */
 export const getHeroBanners = async (req, res) => {
   try {
+    const { latitude, longitude } = req.query;
+    const userLat = latitude != null ? parseFloat(latitude) : null;
+    const userLng = longitude != null ? parseFloat(longitude) : null;
+
     const banners = await HeroBanner.find({ isActive: true })
       .sort({ order: 1, createdAt: -1 })
-      .populate('linkedRestaurants', 'name slug restaurantId profileImage rating estimatedDeliveryTime distance')
+      .populate('linkedRestaurants', 'name slug restaurantId profileImage rating estimatedDeliveryTime distance location deliveryRange')
       .lean();
 
+    let filteredBanners = banners;
+    if (userLat != null && userLng != null && Number.isFinite(userLat) && Number.isFinite(userLng)) {
+      filteredBanners = banners.filter(banner => {
+        const restaurants = banner.linkedRestaurants || [];
+        if (restaurants.length === 0) return true;
+        return restaurants.some(rest => {
+          const resLocation = rest?.location;
+          const resLat = resLocation?.latitude ?? resLocation?.coordinates?.[1];
+          const resLng = resLocation?.longitude ?? resLocation?.coordinates?.[0];
+          if (resLat != null && resLng != null) {
+            const dist = calculateDistance([resLng, resLat], [userLng, userLat]);
+            const range = rest.deliveryRange ?? 5;
+            return dist <= range;
+          }
+          return true;
+        });
+      });
+    }
+
     return successResponse(res, 200, 'Hero banners retrieved successfully', {
-      banners: banners.map(b => ({
+      banners: filteredBanners.map(b => ({
         ...b,
         imageUrl: b.image?.url || b.imageUrl || b // Handle different image formats
       }))

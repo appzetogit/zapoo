@@ -7,6 +7,7 @@ import { uploadToCloudinary, deleteFromCloudinary } from '../../../shared/utils/
 import { initializeCloudinary } from '../../../config/cloudinary.js';
 import asyncHandler from '../../../shared/middleware/asyncHandler.js';
 import mongoose from 'mongoose';
+import { calculateDistance } from '../../order/services/orderCalculationService.js';
 
 /**
  * Check if a point is within a zone polygon using ray casting algorithm
@@ -93,8 +94,12 @@ export const getRestaurants = async (req, res) => {
       maxDistance,
       maxPrice,
       hasOffers,
-      zoneId // User's zone ID (optional - if provided, filters by zone)
+      zoneId, // User's zone ID (optional - if provided, filters by zone)
+      latitude,
+      longitude
     } = req.query;
+    const userLat = latitude != null ? parseFloat(latitude) : null;
+    const userLng = longitude != null ? parseFloat(longitude) : null;
 
     // Optional: Zone-based filtering - if zoneId is provided, validate and filter by zone
     let userZone = null;
@@ -255,6 +260,19 @@ export const getRestaurants = async (req, res) => {
       });
     }
 
+    // Filter by deliveryRange when user coordinates provided
+    if (userLat != null && userLng != null && Number.isFinite(userLat) && Number.isFinite(userLng)) {
+      restaurants = restaurants.filter(r => {
+        const resLocation = r.location;
+        const resLat = resLocation?.latitude ?? resLocation?.coordinates?.[1];
+        const resLng = resLocation?.longitude ?? resLocation?.coordinates?.[0];
+        if (resLat == null || resLng == null) return true;
+        const dist = calculateDistance([resLng, resLat], [userLng, userLat]);
+        const rangeKm = r.deliveryRange ?? 5;
+        return dist <= rangeKm;
+      });
+    }
+
     // Get total count (before filtering by string fields)
     const totalQuery = {
       ...query
@@ -281,11 +299,13 @@ export const getRestaurants = async (req, res) => {
 };
 
 // Get restaurant by ID or slug
+// Optional query: latitude, longitude — when provided and user is beyond deliveryRange, response includes outOfRange: true
 export const getRestaurantById = async (req, res) => {
   try {
-    const {
-      id
-    } = req.params;
+    const { id } = req.params;
+    const { latitude, longitude } = req.query;
+    const userLat = latitude != null ? parseFloat(latitude) : null;
+    const userLng = longitude != null ? parseFloat(longitude) : null;
 
     // Build query conditions - only include _id if it's a valid ObjectId
     const queryConditions = {
@@ -308,8 +328,22 @@ export const getRestaurantById = async (req, res) => {
     if (!restaurant) {
       return errorResponse(res, 404, 'Restaurant not found');
     }
+
+    let outOfRange = false;
+    if (userLat != null && userLng != null && Number.isFinite(userLat) && Number.isFinite(userLng)) {
+      const resLocation = restaurant.location;
+      const resLat = resLocation?.latitude ?? resLocation?.coordinates?.[1];
+      const resLng = resLocation?.longitude ?? resLocation?.coordinates?.[0];
+      if (resLat != null && resLng != null) {
+        const dist = calculateDistance([resLng, resLat], [userLng, userLat]);
+        const rangeKm = restaurant.deliveryRange ?? 5;
+        outOfRange = dist > rangeKm;
+      }
+    }
+
     return successResponse(res, 200, 'Restaurant retrieved successfully', {
-      restaurant
+      restaurant,
+      outOfRange
     });
   } catch (error) {
     console.error('Error fetching restaurant:', error);
@@ -953,8 +987,12 @@ export const deleteRestaurantAccount = asyncHandler(async (req, res) => {
 export const getRestaurantsWithDishesUnder250 = async (req, res) => {
   try {
     const {
-      zoneId
-    } = req.query; // User's zone ID (optional - if provided, filters by zone)
+      zoneId,
+      latitude,
+      longitude
+    } = req.query; // User's zone ID (optional); latitude/longitude for deliveryRange filter
+    const userLat = latitude != null ? parseFloat(latitude) : null;
+    const userLng = longitude != null ? parseFloat(longitude) : null;
 
     // Optional: Zone-based filtering - if zoneId is provided, validate and filter by zone
     let userZone = null;
@@ -1068,8 +1106,18 @@ export const getRestaurantsWithDishesUnder250 = async (req, res) => {
       isActive: true
     }).select('-owner -createdAt -updatedAt').lean().limit(100); // Limit to first 100 restaurants for performance
 
-    // Note: We show all restaurants regardless of zone. Zone-based filtering is removed.
-    // Users in any zone will see all restaurants.
+    // Filter by deliveryRange when user coordinates provided
+    if (userLat != null && userLng != null && Number.isFinite(userLat) && Number.isFinite(userLng)) {
+      restaurants = restaurants.filter(r => {
+        const resLocation = r.location;
+        const resLat = resLocation?.latitude ?? resLocation?.coordinates?.[1];
+        const resLng = resLocation?.longitude ?? resLocation?.coordinates?.[0];
+        if (resLat == null || resLng == null) return true;
+        const dist = calculateDistance([resLng, resLat], [userLng, userLat]);
+        const rangeKm = r.deliveryRange ?? 5;
+        return dist <= rangeKm;
+      });
+    }
 
     // Process restaurants in parallel (batch processing for better performance)
     const batchSize = 10; // Process 10 restaurants at a time

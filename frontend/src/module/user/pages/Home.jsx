@@ -230,30 +230,6 @@ export default function Home() {
     };
   }, [showVegModePopup]);
 
-  // Fetch hero banners from API
-  useEffect(() => {
-    const fetchHeroBanners = async () => {
-      try {
-        setLoadingBanners(true);
-        const response = await api.get('/hero-banners/public');
-        if (response.data.success && response.data.data.banners) {
-          const banners = response.data.data.banners;
-          setHeroBannersData(banners);
-          // Extract image URLs for display
-          setHeroBannerImages(banners.map(b => b.imageUrl || b));
-        }
-      } catch (error) {
-        console.error('Error fetching hero banners:', error);
-        // Fallback to empty array if API fails
-        setHeroBannerImages([]);
-        setHeroBannersData([]);
-      } finally {
-        setLoadingBanners(false);
-      }
-    };
-    fetchHeroBanners();
-  }, []);
-
   // Fetch real categories from backend API
   useEffect(() => {
     const fetchRealCategories = async () => {
@@ -309,25 +285,6 @@ export default function Home() {
       }
     };
     fetchLandingConfig();
-  }, []);
-
-  // Fetch Top 10 restaurants
-  useEffect(() => {
-    const fetchTop10 = async () => {
-      try {
-        setLoadingTop10(true);
-        const response = await api.get('/hero-banners/top-10/public');
-        if (response.data.success && response.data.data) {
-          setTop10Restaurants(response.data.data.restaurants || []);
-        }
-      } catch (error) {
-        console.error('Error fetching Top 10 restaurants:', error);
-        setTop10Restaurants([]);
-      } finally {
-        setLoadingTop10(false);
-      }
-    };
-    fetchTop10();
   }, []);
 
   // Auto-cycle hero banner images
@@ -501,6 +458,57 @@ export default function Home() {
   const [showManageCollections, setShowManageCollections] = useState(false);
   const [selectedRestaurantSlug, setSelectedRestaurantSlug] = useState(null);
 
+  // Fetch hero banners from API (filtered by deliveryRange when location available)
+  useEffect(() => {
+    const fetchHeroBanners = async () => {
+      try {
+        setLoadingBanners(true);
+        const params = {};
+        if (location?.latitude != null && location?.longitude != null) {
+          params.latitude = location.latitude;
+          params.longitude = location.longitude;
+        }
+        const response = await api.get('/hero-banners/public', { params });
+        if (response.data.success && response.data.data.banners) {
+          const banners = response.data.data.banners;
+          setHeroBannersData(banners);
+          setHeroBannerImages(banners.map(b => b.imageUrl || b));
+        }
+      } catch (error) {
+        console.error('Error fetching hero banners:', error);
+        setHeroBannerImages([]);
+        setHeroBannersData([]);
+      } finally {
+        setLoadingBanners(false);
+      }
+    };
+    fetchHeroBanners();
+  }, [location?.latitude, location?.longitude]);
+
+  // Fetch Top 10 restaurants (filtered by deliveryRange when location available)
+  useEffect(() => {
+    const fetchTop10 = async () => {
+      try {
+        setLoadingTop10(true);
+        const params = {};
+        if (location?.latitude != null && location?.longitude != null) {
+          params.latitude = location.latitude;
+          params.longitude = location.longitude;
+        }
+        const response = await api.get('/hero-banners/top-10/public', { params });
+        if (response.data.success && response.data.data) {
+          setTop10Restaurants(response.data.data.restaurants || []);
+        }
+      } catch (error) {
+        console.error('Error fetching Top 10 restaurants:', error);
+        setTop10Restaurants([]);
+      } finally {
+        setLoadingTop10(false);
+      }
+    };
+    fetchTop10();
+  }, [location?.latitude, location?.longitude]);
+
   // Memoize cartCount to prevent recalculation on every render - use cart directly
   const cartCount = useMemo(() => cart.reduce((total, item) => total + (item.quantity || 0), 0), [cart]);
   const cityName = location?.city || "Select";
@@ -633,6 +641,11 @@ export default function Home() {
       // Optional: Add zoneId if available (for sorting/filtering, but show all restaurants)
       if (zoneId) {
         params.zoneId = zoneId;
+      }
+      // Pass user coordinates so backend can filter by deliveryRange
+      if (location?.latitude != null && location?.longitude != null) {
+        params.latitude = location.latitude;
+        params.longitude = location.longitude;
       }
       // Note: We show all restaurants regardless of zone, but apply grayscale styling if user is out of service
 

@@ -4,6 +4,7 @@ import { ArrowLeft, Star, Clock, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { restaurantAPI } from "@/lib/api"
+import { useLocation } from "../hooks/useLocation"
 import { toast } from "sonner"
 
 // Import banner image
@@ -11,18 +12,24 @@ import offerBanner from "@/assets/offerpagebanner.png"
 
 export default function Offers() {
   const navigate = useNavigate()
+  const { location } = useLocation()
   const [offers, setOffers] = useState([])
   const [groupedOffers, setGroupedOffers] = useState({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
-  // Fetch offers from API
+  // Fetch offers from API (filtered by deliveryRange when location available)
   useEffect(() => {
     const fetchOffers = async () => {
       try {
         setLoading(true)
         setError(null)
-        const response = await restaurantAPI.getPublicOffers()
+        const params = {}
+        if (location?.latitude != null && location?.longitude != null) {
+          params.latitude = location.latitude
+          params.longitude = location.longitude
+        }
+        const response = await restaurantAPI.getPublicOffers(params)
         const data = response?.data?.data
         
         if (data) {
@@ -41,7 +48,7 @@ export default function Offers() {
     }
 
     fetchOffers()
-  }, [])
+  }, [location?.latitude, location?.longitude])
 
   return (
     <div className="min-h-screen bg-white dark:bg-[#0a0a0a]">
