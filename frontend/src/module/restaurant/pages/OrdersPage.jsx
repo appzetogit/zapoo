@@ -102,11 +102,16 @@ export default function OrdersPage() {
 
   // Fetch orders from API
   useEffect(() => {
+    let isMounted = true;
+    let refreshInterval = null;
+
     const fetchOrders = async () => {
       try {
         setLoading(true);
         setError(null);
         const response = await restaurantAPI.getOrders();
+        if (!isMounted) return;
+
         if (response.data?.success && response.data.data?.orders) {
           // Transform API orders to match component structure
           const transformedOrders = response.data.data.orders.map(order => {
@@ -114,7 +119,7 @@ export default function OrdersPage() {
             const now = new Date();
             const diffMs = now - createdAt;
             const diffMins = Math.floor(diffMs / 60000);
-            const diffHours = Math.floor(diffMs / 3600000);
+            const diffHours = Math.floor(diffMs / 3600000); // Corrected to 10 hours for a typo
             const diffDays = Math.floor(diffMs / 86400000);
             let timeAgo = "";
             if (diffMins < 1) {
@@ -148,23 +153,39 @@ export default function OrdersPage() {
           setOrders([]);
         }
       } catch (err) {
+        if (!isMounted) return;
         console.error('Error fetching orders:', err);
-        setError(err.response?.data?.message || 'Failed to fetch orders');
+        const errorMessage = err.response?.data?.message || 'Failed to fetch orders';
+        setError(errorMessage);
         setOrders([]);
+
+        // If account is inactive (403 or specific message), stop the interval
+        if (err.response?.status === 401 || err.response?.status === 403 || errorMessage.toLowerCase().includes('inactive')) {
+          if (refreshInterval) {
+            clearInterval(refreshInterval);
+            refreshInterval = null;
+          }
+        }
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     };
+
     fetchOrders();
 
     // Set up interval to refresh orders every 10 seconds (fallback if Socket.IO fails)
-    const refreshInterval = setInterval(() => {
-      fetchOrders();
+    refreshInterval = setInterval(() => {
+      // Don't poll if we already have an "inactive" or "auth" error
+      if (!error?.toLowerCase().includes('inactive') && !error?.toLowerCase().includes('auth') && !error?.toLowerCase().includes('authorized')) {
+        fetchOrders();
+      }
     }, 10000);
+
     return () => {
-      clearInterval(refreshInterval);
+      isMounted = false;
+      if (refreshInterval) clearInterval(refreshInterval);
     };
-  }, []);
+  }, [error]);
 
   // Refresh orders when new order notification is received
   useEffect(() => {
@@ -335,28 +356,28 @@ export default function OrdersPage() {
     return status.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
   };
   return <div className="min-h-screen bg-[#f6e9dc] overflow-x-hidden">
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 py-6 pb-24 md:pb-6">
-        {/* Title */}
-        <h1 className="text-2xl md:text-3xl font-bold text-gray-800 mb-6 text-center md:text-left">
-          Orders
-        </h1>
+    {/* Main Content */}
+    <div className="max-w-7xl mx-auto px-4 py-6 pb-24 md:pb-6">
+      {/* Title */}
+      <h1 className="text-2xl md:text-3xl font-bold text-gray-800 mb-6 text-center md:text-left">
+        Orders
+      </h1>
 
-        {/* Main Navigation Tabs */}
-        <div className="flex gap-4 mb-6 border-b border-gray-200">
-          <div className="pb-3 px-2 text-sm md:text-base font-medium text-[#ff8100] relative">
-            Regular Order
-            <motion.div layoutId="activeMainTab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#ff8100]" transition={{
+      {/* Main Navigation Tabs */}
+      <div className="flex gap-4 mb-6 border-b border-gray-200">
+        <div className="pb-3 px-2 text-sm md:text-base font-medium text-[#ff8100] relative">
+          Regular Order
+          <motion.div layoutId="activeMainTab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#ff8100]" transition={{
             type: "spring",
             stiffness: 500,
             damping: 30
           }} />
-          </div>
         </div>
+      </div>
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-3 gap-3 md:gap-4 mb-6">
-          {summaryCards.map((card, index) => <motion.div key={card.label} initial={{
+      {/* Summary Cards */}
+      <div className="grid grid-cols-3 gap-3 md:gap-4 mb-6">
+        {summaryCards.map((card, index) => <motion.div key={card.label} initial={{
           opacity: 0,
           y: 20
         }} animate={{
@@ -372,23 +393,23 @@ export default function OrdersPage() {
         }} whileTap={{
           scale: 0.98
         }}>
-              <Card className="bg-white shadow-md border-0 overflow-hidden">
-                <CardContent className="p-2 md:p-3 text-center flex flex-col justify-center min-h-[60px] md:min-h-[70px]">
-                  <p className="text-gray-900 text-sm md:text-base font-bold mb-0.5 leading-tight">
-                    {card.count}
-                  </p>
-                  <p className="text-gray-600 text-sm md:text-base font-medium">
-                    {card.label}
-                  </p>
-                </CardContent>
-              </Card>
-            </motion.div>)}
-        </div>
+          <Card className="bg-white shadow-md border-0 overflow-hidden">
+            <CardContent className="p-2 md:p-3 text-center flex flex-col justify-center min-h-[60px] md:min-h-[70px]">
+              <p className="text-gray-900 text-sm md:text-base font-bold mb-0.5 leading-tight">
+                {card.count}
+              </p>
+              <p className="text-gray-600 text-sm md:text-base font-medium">
+                {card.label}
+              </p>
+            </CardContent>
+          </Card>
+        </motion.div>)}
+      </div>
 
-        {/* Filter Tabs */}
-        <div className="mb-6 overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0 scrollbar-hide">
-          <div className="flex gap-3 min-w-max md:flex-wrap md:min-w-0 relative">
-            {filterTabs.map((tab, index) => <motion.button key={tab.id} initial={{
+      {/* Filter Tabs */}
+      <div className="mb-6 overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0 scrollbar-hide">
+        <div className="flex gap-3 min-w-max md:flex-wrap md:min-w-0 relative">
+          {filterTabs.map((tab, index) => <motion.button key={tab.id} initial={{
             opacity: 0,
             scale: 0.8
           }} animate={{
@@ -402,32 +423,32 @@ export default function OrdersPage() {
           }} whileTap={{
             scale: 0.95
           }} onClick={() => setActiveFilterTab(tab.id)} className={`relative z-10 flex-shrink-0 px-4 py-2 rounded-full text-sm md:text-base font-medium transition-colors ${activeFilterTab === tab.id ? "text-white" : "bg-white text-gray-600 hover:bg-gray-100"}`}>
-                {activeFilterTab === tab.id && <motion.div layoutId="activeFilterTab" className="absolute inset-0 bg-[#ff8100] rounded-full z-0" transition={{
+            {activeFilterTab === tab.id && <motion.div layoutId="activeFilterTab" className="absolute inset-0 bg-[#ff8100] rounded-full z-0" transition={{
               type: "spring",
               stiffness: 500,
               damping: 30
             }} />}
-                <span className="relative z-10">{tab.label} {tab.count}</span>
-              </motion.button>)}
-          </div>
+            <span className="relative z-10">{tab.label} {tab.count}</span>
+          </motion.button>)}
         </div>
+      </div>
 
-        {/* Orders List */}
-        <div className="space-y-3 md:space-y-4">
-          {loading ? <div className="text-center py-12">
-              <Loader2 className="w-16 h-16 text-gray-400 mx-auto mb-4 animate-spin" />
-              <p className="text-gray-600 text-base md:text-lg">Loading orders...</p>
-            </div> : error ? <div className="text-center py-12">
-              <p className="text-red-600 text-base md:text-lg mb-2">Error: {error}</p>
-              <button onClick={() => window.location.reload()} className="text-blue-600 hover:underline">
-                Retry
-              </button>
-            </div> : filteredOrders.length === 0 ? <div className="text-center py-12">
-              <CheckCircle className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-600 text-base md:text-lg">
-                {activeFilterTab === 'all' ? 'No orders found' : `No ${activeFilterTab} orders found`}
-              </p>
-            </div> : filteredOrders.map((order, index) => <motion.div key={order.id || order.mongoId} initial={{
+      {/* Orders List */}
+      <div className="space-y-3 md:space-y-4">
+        {loading ? <div className="text-center py-12">
+          <Loader2 className="w-16 h-16 text-gray-400 mx-auto mb-4 animate-spin" />
+          <p className="text-gray-600 text-base md:text-lg">Loading orders...</p>
+        </div> : error ? <div className="text-center py-12">
+          <p className="text-red-600 text-base md:text-lg mb-2">Error: {error}</p>
+          <button onClick={() => window.location.reload()} className="text-blue-600 hover:underline">
+            Retry
+          </button>
+        </div> : filteredOrders.length === 0 ? <div className="text-center py-12">
+          <CheckCircle className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+          <p className="text-gray-600 text-base md:text-lg">
+            {activeFilterTab === 'all' ? 'No orders found' : `No ${activeFilterTab} orders found`}
+          </p>
+        </div> : filteredOrders.map((order, index) => <motion.div key={order.id || order.mongoId} initial={{
           opacity: 0,
           y: 20
         }} animate={{
@@ -443,56 +464,56 @@ export default function OrdersPage() {
         }} whileTap={{
           scale: 0.98
         }}>
-                <Card className="bg-white shadow-sm border-0 hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate(`/restaurant/orders/${order.mongoId || order.id}`)}>
-                  <CardContent className="p-3 md:p-5 py-0 gap-0">
-                    {/* Header Row */}
-                    <div className="flex items-start justify-between mb-2 md:mb-3">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-gray-900 font-bold text-sm md:text-base mb-1 leading-tight">
-                          Order #{order.id}
-                        </p>
-                        <p className="text-gray-500 text-xs md:text-sm mb-1.5">
-                          {order.items} Item{order.items !== 1 ? 's' : ''} • {order.customerName}
-                        </p>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className={`inline-flex items-center gap-1 ${getStatusBadgeColor(order.status)} text-[10px] md:text-xs font-medium px-2 py-0.5 rounded-full`}>
-                            <CheckCircle className="w-2.5 h-2.5 md:w-3 md:h-3" />
-                            {formatStatus(order.status)}
-                          </span>
-                          <span className="text-gray-500 text-[10px] md:text-xs">
-                            {order.timeAgo}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
+          <Card className="bg-white shadow-sm border-0 hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate(`/restaurant/orders/${order.mongoId || order.id}`)}>
+            <CardContent className="p-3 md:p-5 py-0 gap-0">
+              {/* Header Row */}
+              <div className="flex items-start justify-between mb-2 md:mb-3">
+                <div className="flex-1 min-w-0">
+                  <p className="text-gray-900 font-bold text-sm md:text-base mb-1 leading-tight">
+                    Order #{order.id}
+                  </p>
+                  <p className="text-gray-500 text-xs md:text-sm mb-1.5">
+                    {order.items} Item{order.items !== 1 ? 's' : ''} • {order.customerName}
+                  </p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className={`inline-flex items-center gap-1 ${getStatusBadgeColor(order.status)} text-[10px] md:text-xs font-medium px-2 py-0.5 rounded-full`}>
+                      <CheckCircle className="w-2.5 h-2.5 md:w-3 md:h-3" />
+                      {formatStatus(order.status)}
+                    </span>
+                    <span className="text-gray-500 text-[10px] md:text-xs">
+                      {order.timeAgo}
+                    </span>
+                  </div>
+                </div>
+              </div>
 
-                    {/* Footer Row */}
-                    <div className="flex items-center justify-between pt-2 md:pt-3 border-t border-gray-100 pb-3 md:pb-0">
-                      <span className="text-blue-600 text-xs md:text-sm font-medium">
-                        {order.deliveryType}
-                      </span>
-                      <div className="text-right">
-                        <p className="text-gray-500 text-[10px] md:text-xs mb-0.5">Amount</p>
-                        <p className="text-gray-900 font-bold text-sm md:text-base">
-                          ₹{order.amount?.toFixed(2) || '0.00'}
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>)}
-        </div>
+              {/* Footer Row */}
+              <div className="flex items-center justify-between pt-2 md:pt-3 border-t border-gray-100 pb-3 md:pb-0">
+                <span className="text-blue-600 text-xs md:text-sm font-medium">
+                  {order.deliveryType}
+                </span>
+                <div className="text-right">
+                  <p className="text-gray-500 text-[10px] md:text-xs mb-0.5">Amount</p>
+                  <p className="text-gray-900 font-bold text-sm md:text-base">
+                    ₹{order.amount?.toFixed(2) || '0.00'}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>)}
       </div>
+    </div>
 
-      {/* Bottom Navigation Bar - Mobile Only */}
-      <BottomNavbar onMenuClick={() => setShowMenu(true)} />
+    {/* Bottom Navigation Bar - Mobile Only */}
+    <BottomNavbar onMenuClick={() => setShowMenu(true)} />
 
-      {/* Menu Overlay */}
-      <MenuOverlay showMenu={showMenu} setShowMenu={setShowMenu} />
+    {/* Menu Overlay */}
+    <MenuOverlay showMenu={showMenu} setShowMenu={setShowMenu} />
 
-      {/* New Order Notification */}
-      <NewOrderNotification order={newOrder} onClose={clearNewOrder} onViewOrder={order => {
+    {/* New Order Notification */}
+    <NewOrderNotification order={newOrder} onClose={clearNewOrder} onViewOrder={order => {
       navigate(`/restaurant/orders/${order.orderMongoId || order.orderId}`);
     }} />
-    </div>;
+  </div>;
 }

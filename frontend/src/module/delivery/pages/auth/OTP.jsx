@@ -100,7 +100,7 @@ export default function DeliveryOTP() {
     }
 
     // Auto-submit when all 6 digits are entered and we are in OTP step
-    if (!showNameInput && newOtp.every(digit => digit !== "") && newOtp.length === 6) {
+    if (!showNameInput && newOtp.every(digit => digit !== "") && newOtp.length === 6 && !isLoading) {
       handleVerify(newOtp.join(""));
     }
   };
@@ -158,6 +158,7 @@ export default function DeliveryOTP() {
     inputRefs.current[digits.length]?.focus();
   };
   const handleVerify = async (otpValue = null) => {
+    if (isLoading) return;
     if (showNameInput) {
       // In name collection step, ignore OTP auto-submit
       return;
@@ -272,6 +273,7 @@ export default function DeliveryOTP() {
     }
   };
   const handleSubmitName = async () => {
+    if (isLoading) return;
     const trimmedName = name.trim();
     if (!trimmedName) {
       setNameError("Name is required");
@@ -410,83 +412,83 @@ export default function DeliveryOTP() {
     return null;
   }
   return <AnimatedPage className="min-h-screen bg-white flex flex-col">
-      {/* Header */}
-      <div className="relative flex items-center justify-center py-4 px-4 border-b border-gray-200">
-        <button onClick={() => navigate("/delivery/sign-in")} className="absolute left-4 top-1/2 -translate-y-1/2" aria-label="Go back">
-          <ArrowLeft className="h-5 w-5 text-black" />
-        </button>
-        <h1 className="text-lg font-bold text-black">OTP Verification</h1>
-      </div>
+    {/* Header */}
+    <div className="relative flex items-center justify-center py-4 px-4 border-b border-gray-200">
+      <button onClick={() => navigate("/delivery/sign-in")} className="absolute left-4 top-1/2 -translate-y-1/2" aria-label="Go back">
+        <ArrowLeft className="h-5 w-5 text-black" />
+      </button>
+      <h1 className="text-lg font-bold text-black">OTP Verification</h1>
+    </div>
 
-      {/* Main Content */}
-      <div className="flex flex-col justify-center px-6 pt-8 pb-12">
-        <div className="max-w-md mx-auto w-full space-y-8">
-          {/* Message */}
-          <div className="text-center space-y-2">
-            <p className="text-base text-black">
-              {showNameInput ? "You're almost done! Please tell us your name to complete registration." : "We have sent a verification code to"}
-            </p>
-            {!showNameInput && <p className="text-base text-black font-medium">
-                {getPhoneNumber()}
-              </p>}
+    {/* Main Content */}
+    <div className="flex flex-col justify-center px-6 pt-8 pb-12">
+      <div className="max-w-md mx-auto w-full space-y-8">
+        {/* Message */}
+        <div className="text-center space-y-2">
+          <p className="text-base text-black">
+            {showNameInput ? "You're almost done! Please tell us your name to complete registration." : "We have sent a verification code to"}
+          </p>
+          {!showNameInput && <p className="text-base text-black font-medium">
+            {getPhoneNumber()}
+          </p>}
+        </div>
+
+        {/* Error message */}
+        {error && <p className="text-sm text-red-500 text-center">
+          {error}
+        </p>}
+
+        {/* OTP Input Fields */}
+        {!showNameInput && <>
+          <div className="flex justify-center gap-2">
+            {otp.map((digit, index) => <Input key={index} ref={el => inputRefs.current[index] = el} type="text" inputMode="numeric" maxLength={1} value={digit} onChange={e => handleChange(index, e.target.value)} onKeyDown={e => handleKeyDown(index, e)} onPaste={index === 0 ? handlePaste : undefined} disabled={isLoading} autoComplete="off" autoFocus={false} className="w-12 h-12 text-center text-lg font-semibold p-0 border border-[#DC2626] rounded-md focus-visible:ring-0 focus-visible:border-[#DC2626] bg-white" />)}
           </div>
 
-          {/* Error message */}
-          {error && <p className="text-sm text-red-500 text-center">
-              {error}
-            </p>}
+          {/* Resend Section */}
+          <div className="text-center space-y-1">
+            <p className="text-sm text-black">
+              Didn't get the OTP?
+            </p>
+            {resendTimer > 0 ? <p className="text-sm text-gray-500">
+              Resend SMS in {resendTimer}s
+            </p> : <button type="button" onClick={handleResend} disabled={isLoading} className="text-sm text-gray-500 hover:text-gray-700 disabled:opacity-50">
+              Resend SMS
+            </button>}
+          </div>
+        </>}
 
-          {/* OTP Input Fields */}
-          {!showNameInput && <>
-              <div className="flex justify-center gap-2">
-                {otp.map((digit, index) => <Input key={index} ref={el => inputRefs.current[index] = el} type="text" inputMode="numeric" maxLength={1} value={digit} onChange={e => handleChange(index, e.target.value)} onKeyDown={e => handleKeyDown(index, e)} onPaste={index === 0 ? handlePaste : undefined} disabled={isLoading} autoComplete="off" autoFocus={false} className="w-12 h-12 text-center text-lg font-semibold p-0 border border-[#DC2626] rounded-md focus-visible:ring-0 focus-visible:border-[#DC2626] bg-white" />)}
-              </div>
-
-              {/* Resend Section */}
-              <div className="text-center space-y-1">
-                <p className="text-sm text-black">
-                  Didn't get the OTP?
-                </p>
-                {resendTimer > 0 ? <p className="text-sm text-gray-500">
-                    Resend SMS in {resendTimer}s
-                  </p> : <button type="button" onClick={handleResend} disabled={isLoading} className="text-sm text-gray-500 hover:text-gray-700 disabled:opacity-50">
-                    Resend SMS
-                  </button>}
-              </div>
-            </>}
-
-          {/* Name Input (shown only after OTP verified and user is new) */}
-          {showNameInput && <div className="space-y-3">
-              <div className="space-y-1">
-                <label className="block text-sm font-medium text-black text-left">
-                  Full name
-                </label>
-                <Input type="text" value={name} onChange={e => {
+        {/* Name Input (shown only after OTP verified and user is new) */}
+        {showNameInput && <div className="space-y-3">
+          <div className="space-y-1">
+            <label className="block text-sm font-medium text-black text-left">
+              Full name
+            </label>
+            <Input type="text" value={name} onChange={e => {
               setName(e.target.value);
               if (nameError) setNameError("");
             }} disabled={isLoading} placeholder="Enter your name" className={`h-11 border ${nameError ? "border-red-500" : "border-gray-300"}`} />
-                {nameError && <p className="text-xs text-red-500 text-left">
-                    {nameError}
-                  </p>}
-              </div>
+            {nameError && <p className="text-xs text-red-500 text-left">
+              {nameError}
+            </p>}
+          </div>
 
-              <Button onClick={handleSubmitName} disabled={isLoading} className="w-full h-11 bg-[#DC2626] hover:bg-[#C52222] text-white font-semibold">
-                {isLoading ? "Continuing..." : "Continue"}
-              </Button>
-            </div>}
+          <Button onClick={handleSubmitName} disabled={isLoading} className="w-full h-11 bg-[#DC2626] hover:bg-[#C52222] text-white font-semibold">
+            {isLoading ? "Continuing..." : "Continue"}
+          </Button>
+        </div>}
 
-          {/* Loading Spinner */}
-          {isLoading && !showNameInput && <div className="flex justify-center pt-4">
-              <Loader2 className="h-6 w-6 text-[#DC2626] animate-spin" />
-            </div>}
-        </div>
+        {/* Loading Spinner */}
+        {isLoading && !showNameInput && <div className="flex justify-center pt-4">
+          <Loader2 className="h-6 w-6 text-[#DC2626] animate-spin" />
+        </div>}
       </div>
+    </div>
 
-      {/* Go back to login methods */}
-      <div className="pt-4 mt-auto px-6 text-center pb-8">
-        <button type="button" onClick={() => navigate("/delivery/sign-in")} className="text-sm text-[#DC2626] hover:underline">
-          Go back to login methods
-        </button>
-      </div>
-    </AnimatedPage>;
+    {/* Go back to login methods */}
+    <div className="pt-4 mt-auto px-6 text-center pb-8">
+      <button type="button" onClick={() => navigate("/delivery/sign-in")} className="text-sm text-[#DC2626] hover:underline">
+        Go back to login methods
+      </button>
+    </div>
+  </AnimatedPage>;
 }

@@ -906,14 +906,14 @@ export default function HubMenu() {
     }
   };
   return <div className="h-screen bg-gray-50 flex flex-col overflow-hidden">
-      {/* Header */}
-      <div className="sticky top-0 z-40 bg-white ">
-        <div className="">
-          {/* Top bar with Menu title and icons */}
-          <div className="px-4 py-3 flex items-center justify-between">
-            <div className="relative h-8 flex items-center flex-1 min-w-0 pr-3">
-              <AnimatePresence mode="wait">
-                {!isScrolled ? <motion.h1 key="menu" initial={{
+    {/* Header */}
+    <div className="sticky top-0 z-40 bg-white ">
+      <div className="">
+        {/* Top bar with Menu title and icons */}
+        <div className="px-4 py-3 flex items-center justify-between">
+          <div className="relative h-8 flex items-center flex-1 min-w-0 pr-3">
+            <AnimatePresence mode="wait">
+              {!isScrolled ? <motion.h1 key="menu" initial={{
                 opacity: 0,
                 y: -10
               }} animate={{
@@ -926,8 +926,8 @@ export default function HubMenu() {
                 duration: 0.3,
                 ease: "easeInOut"
               }} className="text-2xl font-bold text-gray-900 absolute">
-                    Menu
-                  </motion.h1> : <motion.h1 key="restaurant" initial={{
+                Menu
+              </motion.h1> : <motion.h1 key="restaurant" initial={{
                 opacity: 0,
                 y: -10
               }} animate={{
@@ -940,29 +940,29 @@ export default function HubMenu() {
                 duration: 0.3,
                 ease: "easeInOut"
               }} className="text-lg font-bold text-gray-900 absolute truncate max-w-full" title={restaurantName}>
-                    {restaurantName.length > 25 ? `${restaurantName.substring(0, 25)}...` : restaurantName}
-                  </motion.h1>}
-              </AnimatePresence>
-            </div>
-            <div className="flex items-center gap-3 shrink-0">
-              <button onClick={() => {
+                {restaurantName.length > 25 ? `${restaurantName.substring(0, 25)}...` : restaurantName}
+              </motion.h1>}
+            </AnimatePresence>
+          </div>
+          <div className="flex items-center gap-3 shrink-0">
+            <button onClick={() => {
               fetchMenu(true);
               toast.success('Menu refreshed');
             }} className="p-2 rounded-full hover:bg-gray-100 transition-colors" title="Refresh menu">
-                <RefreshCw className="w-5 h-5 text-gray-700" />
-              </button>
-              <button onClick={() => setIsSearchOpen(true)} className="p-2 rounded-full hover:bg-gray-100 transition-colors">
-                <Search className="w-5 h-5 text-gray-700" />
-              </button>
-              <button className="p-2 ml-1 hover:bg-gray-100 rounded-full transition-colors" onClick={() => navigate("/restaurant/explore")}>
-                <Menu className="w-5 h-5 text-gray-700" />
-              </button>
-            </div>
+              <RefreshCw className="w-5 h-5 text-gray-700" />
+            </button>
+            <button onClick={() => setIsSearchOpen(true)} className="p-2 rounded-full hover:bg-gray-100 transition-colors">
+              <Search className="w-5 h-5 text-gray-700" />
+            </button>
+            <button className="p-2 ml-1 hover:bg-gray-100 rounded-full transition-colors" onClick={() => navigate("/restaurant/explore")}>
+              <Menu className="w-5 h-5 text-gray-700" />
+            </button>
           </div>
+        </div>
 
-          {/* Restaurant name and expertise */}
-          <AnimatePresence>
-            {!isScrolled && <motion.div initial={{
+        {/* Restaurant name and expertise */}
+        <AnimatePresence>
+          {!isScrolled && <motion.div initial={{
             opacity: 1,
             height: "auto"
           }} animate={{
@@ -975,199 +975,212 @@ export default function HubMenu() {
             duration: 0.3,
             ease: "easeInOut"
           }} className="mb-3 px-4 py-1 overflow-hidden">
-                <h2 className="text-lg font-bold text-gray-900">{restaurantName}</h2>
-                <p className="text-sm text-gray-600">{restaurantExpertise}</p>
-              </motion.div>}
-          </AnimatePresence>
+            <h2 className="text-lg font-bold text-gray-900">{restaurantName}</h2>
+            <p className="text-sm text-gray-600">{restaurantExpertise}</p>
+          </motion.div>}
+        </AnimatePresence>
 
-          {/* Horizontally scrollable filters */}
-          <div className="flex pl-4 relative items-center gap-2 overflow-x-auto pb-2" ref={scrollContainerRef} style={{
+        {/* Horizontally scrollable filters */}
+        <div className="flex pl-4 relative items-center gap-2 overflow-x-auto pb-2" ref={scrollContainerRef} style={{
           scrollbarWidth: 'none',
           msOverflowStyle: 'none'
         }}>
-            <style>{`
+          <style>{`
               .scrollbar-hide::-webkit-scrollbar {
                 display: none;
               }
             `}</style>
-            {activeFilter && <button onClick={() => {
+          {activeFilter && <button onClick={() => {
             setActiveFilter(null);
             setSelectedFilter(null);
           }} className="flex items-center gap-2 px-2 py-1 text-semibold border-2 border-gray-300 rounded-md text-sm font-medium whitespace-nowrap shrink-0 bg-white text-gray-900">
-                <X className="w-3 h-3" />
-                <span>Clear</span>
-              </button>}
-            {quickFilters.map(filter => <button key={filter.id} onClick={() => handleFilterSelect(filter.id)} className={`flex items-center gap-2 px-2 py-1 text-semibold border-2 rounded-md text-sm font-medium whitespace-nowrap shrink-0 ${activeFilter === filter.id ? "bg-[#3B82F6] text-white border-[#3B82F6]" : "bg-white border-gray-200 text-gray-900"}`}>
-                <span>{filter.label}</span>
-                <span className="bg-red-100 border-2 border-red-400 text-red-400 text-xs  font-bold p-0.5 py-0.25 rounded-sm">
-                  {filter.count}
-                </span>
-              </button>)}
-            <button onClick={() => setIsFilterOpen(true)} className="sticky right-0 z-10 bg-[#3B82F6] p-2 text-white border-2 border-[#3B82F6] flex items-center gap-2 px-2 py-1 text-semibold rounded-l-lg text-sm font-medium whitespace-nowrap">
-              <SlidersHorizontal className="w-4 h-4" />
-              <span>Filter</span>
-            </button>
-          </div>
+            <X className="w-3 h-3" />
+            <span>Clear</span>
+          </button>}
+          {quickFilters.map(filter => <button key={filter.id} onClick={() => handleFilterSelect(filter.id)} className={`flex items-center gap-2 px-2 py-1 text-semibold border-2 rounded-md text-sm font-medium whitespace-nowrap shrink-0 ${activeFilter === filter.id ? "bg-[#3B82F6] text-white border-[#3B82F6]" : "bg-white border-gray-200 text-gray-900"}`}>
+            <span>{filter.label}</span>
+            <span className="bg-red-100 border-2 border-red-400 text-red-400 text-xs  font-bold p-0.5 py-0.25 rounded-sm">
+              {filter.count}
+            </span>
+          </button>)}
+          <button onClick={() => setIsFilterOpen(true)} className="sticky right-0 z-10 bg-[#3B82F6] p-2 text-white border-2 border-[#3B82F6] flex items-center gap-2 px-2 py-1 text-semibold rounded-l-lg text-sm font-medium whitespace-nowrap">
+            <SlidersHorizontal className="w-4 h-4" />
+            <span>Filter</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Tabs */}
+    </div>
+
+    <div className="flex items-center gap-2 p-0.5 mt-2 w-auto mx-4 bg-gray-200 rounded-md">
+      <button onClick={() => setActiveTab("all")} className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${activeTab === "all" ? "bg-[#3B82F6] text-white" : " text-gray-600"}`}>
+        All items
+      </button>
+      <button onClick={() => setActiveTab("add-ons")} className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${activeTab === "add-ons" ? "bg-[#3B82F6] text-white" : " text-gray-600"}`}>
+        Add-ons
+      </button>
+    </div>
+    {/* Content */}
+    <div className="flex-1 space-y-4 pt-8 pb-24 overflow-y-auto">
+      {activeTab === "add-ons" ? <div className="px-4">
+        {/* Add Add-on Button */}
+        <div className="mb-6">
+          <button onClick={() => setIsAddAddonModalOpen(true)} className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-[#3B82F6] hover:bg-blue-700 text-white rounded-lg font-medium transition-colors">
+            <Plus className="h-5 w-5" />
+            <span>Add Add-on</span>
+          </button>
         </div>
 
-        {/* Tabs */}
-      </div>
-
-      <div className="flex items-center gap-2 p-0.5 mt-2 w-auto mx-4 bg-gray-200 rounded-md">
-        <button onClick={() => setActiveTab("all")} className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${activeTab === "all" ? "bg-[#3B82F6] text-white" : " text-gray-600"}`}>
-          All items
-        </button>
-        <button onClick={() => setActiveTab("add-ons")} className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${activeTab === "add-ons" ? "bg-[#3B82F6] text-white" : " text-gray-600"}`}>
-          Add-ons
-        </button>
-      </div>
-      {/* Content */}
-      <div className="flex-1 space-y-4 pt-8 pb-24 overflow-y-auto">
-        {activeTab === "add-ons" ? <div className="px-4">
-            {/* Add Add-on Button */}
-            <div className="mb-6">
-              <button onClick={() => setIsAddAddonModalOpen(true)} className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-[#3B82F6] hover:bg-blue-700 text-white rounded-lg font-medium transition-colors">
-                <Plus className="h-5 w-5" />
-                <span>Add Add-on</span>
-              </button>
-            </div>
-
-            {/* Add-ons List */}
-            {loadingAddons ? <div className="flex items-center justify-center py-20">
-                <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
-              </div> : addons.length === 0 ? <div className="flex flex-col items-center justify-center py-20 px-4">
-                <div className="text-center">
-                  <p className="text-lg font-medium text-gray-500">No add-ons available</p>
-                  <p className="text-sm text-gray-400 mt-2">Add-ons will appear here when you create them</p>
+        {/* Add-ons List */}
+        {loadingAddons ? <div className="flex items-center justify-center py-20">
+          <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+        </div> : addons.length === 0 ? <div className="flex flex-col items-center justify-center py-20 px-4">
+          <div className="text-center">
+            <p className="text-lg font-medium text-gray-500">No add-ons available</p>
+            <p className="text-sm text-gray-400 mt-2">Add-ons will appear here when you create them</p>
+          </div>
+        </div> : <div className="space-y-4">
+          {addons.map(addon => <div key={addon.id} className="bg-white rounded-lg border border-gray-200 p-4">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-2">
+                  <h3 className="text-base font-semibold text-gray-900">{addon.name}</h3>
+                  {addon.approvalStatus === 'pending' && <span className="px-2 py-0.5 text-xs font-medium bg-yellow-100 text-yellow-800 rounded">Pending</span>}
+                  {addon.approvalStatus === 'approved' && <span className="px-2 py-0.5 text-xs font-medium bg-green-100 text-green-800 rounded">Approved</span>}
+                  {addon.approvalStatus === 'rejected' && <span className="px-2 py-0.5 text-xs font-medium bg-red-100 text-red-800 rounded">Rejected</span>}
                 </div>
-              </div> : <div className="space-y-4">
-                {addons.map(addon => <div key={addon.id} className="bg-white rounded-lg border border-gray-200 p-4">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <h3 className="text-base font-semibold text-gray-900">{addon.name}</h3>
-                          {addon.approvalStatus === 'pending' && <span className="px-2 py-0.5 text-xs font-medium bg-yellow-100 text-yellow-800 rounded">Pending</span>}
-                          {addon.approvalStatus === 'approved' && <span className="px-2 py-0.5 text-xs font-medium bg-green-100 text-green-800 rounded">Approved</span>}
-                          {addon.approvalStatus === 'rejected' && <span className="px-2 py-0.5 text-xs font-medium bg-red-100 text-red-800 rounded">Rejected</span>}
-                        </div>
-                        {addon.description && <p className="text-sm text-gray-600 mb-2">{addon.description}</p>}
-                        <p className="text-base font-bold text-gray-900">₹{addon.price}</p>
-                        {addon.rejectionReason && <p className="text-xs text-red-600 mt-1">Reason: {addon.rejectionReason}</p>}
-                      </div>
-                      <div className="flex items-start gap-2">
-                        {addon.images && addon.images.length > 0 && addon.images[0] && <img src={addon.images[0]} alt={addon.name} className="w-20 h-20 object-cover rounded-lg" onError={e => {
+                {addon.description && <p className="text-sm text-gray-600 mb-2">{addon.description}</p>}
+                <p className="text-base font-bold text-gray-900">₹{addon.price}</p>
+                {addon.rejectionReason && <p className="text-xs text-red-600 mt-1">Reason: {addon.rejectionReason}</p>}
+              </div>
+              <div className="flex items-start gap-2">
+                {addon.images && addon.images.length > 0 && addon.images[0] && <img src={addon.images[0]} alt={addon.name} className="w-20 h-20 object-cover rounded-lg" onError={e => {
                   e.target.style.display = 'none';
                 }} />}
-                        <div className="flex flex-col gap-2">
-                          <button onClick={() => handleEditAddon(addon)} className="p-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 transition-colors" title="Edit add-on">
-                            <Edit className="h-4 w-4" />
-                          </button>
-                          <button onClick={() => handleDeleteAddon(addon)} className="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors" title="Delete add-on">
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>)}
-              </div>}
-          </div> : <div className="px-4 space-y-4">
-            {filteredMenuGroups.map(group => {
+                <div className="flex flex-col gap-2">
+                  <button onClick={() => handleEditAddon(addon)} className="p-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 transition-colors" title="Edit add-on">
+                    <Edit className="h-4 w-4" />
+                  </button>
+                  <button onClick={() => handleDeleteAddon(addon)} className="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors" title="Delete add-on">
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>)}
+        </div>}
+      </div> : <div className="px-4 space-y-4">
+        {filteredMenuGroups.map(group => {
           const isExpanded = expandedGroups.has(group.id);
           const itemCount = group.items.length;
           const enabledItems = group.items.filter(item => item.isAvailable).length;
           return <div key={group.id} id={`group-${group.id}`} className="bg-white rounded-lg overflow-hidden">
-                  {/* Group Header */}
-                  <div className="py-3 flex items-center justify-between px-4">
-                    <div className="flex items-center gap-3 flex-1">
-                      <div className="w-1 h-6 bg-red-500 rounded-r-full" />
-                      <h3 className="text-base font-bold text-gray-900">
-                        {group.name} ({enabledItems})
-                      </h3>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button type="button" onClick={e => {
+            {/* Group Header */}
+            <div className="py-3 flex items-center justify-between px-4">
+              <div className="flex items-center gap-3 flex-1">
+                <div className="w-1 h-6 bg-red-500 rounded-r-full" />
+                <h3 className="text-base font-bold text-gray-900">
+                  {group.name} ({enabledItems})
+                </h3>
+              </div>
+              <div className="flex items-center gap-2">
+                <button type="button" onClick={e => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  navigate('/restaurant/hub-menu/item/new', {
+                    state: {
+                      category: group.name,
+                      groupId: group.id
+                    }
+                  });
+                }} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-[#3B82F6] rounded-full text-[11px] font-extrabold border border-blue-100 hover:bg-blue-100 transition-colors shadow-sm">
+                  <Plus className="w-3 h-3" />
+                  <span>ADD ITEM</span>
+                </button>
+                <button type="button" onClick={e => {
                   e.preventDefault();
                   e.stopPropagation();
                   toggleGroup(group.id);
                 }} className="p-1 rounded-full hover:bg-gray-100 transition-colors z-10 relative" aria-label={isExpanded ? "Collapse section" : "Expand section"}>
-                        {isExpanded ? <ChevronUp className="w-5 h-5 text-gray-600" /> : <ChevronDown className="w-5 h-5 text-gray-600" />}
-                      </button>
-                      <button type="button" onClick={e => {
+                  {isExpanded ? <ChevronUp className="w-5 h-5 text-gray-600" /> : <ChevronDown className="w-5 h-5 text-gray-600" />}
+                </button>
+                <button type="button" onClick={e => {
                   e.preventDefault();
                   e.stopPropagation();
                   handleOpenCategoryOptions(group);
                 }} className="p-1 rounded-full hover:bg-gray-100 transition-colors z-10 relative" aria-label="Category options">
-                        <MoreVertical className="w-5 h-5 text-gray-600" />
-                      </button>
+                  <MoreVertical className="w-5 h-5 text-gray-600" />
+                </button>
+              </div>
+            </div>
+
+            {isExpanded && <div className="p-4 space-y-2">
+              {/* Items */}
+              <div className="space-y-4">
+                {group.items.map(item => <div key={item.id} className="border-b border-gray-100 pb-4 last:border-0 last:pb-0">
+                  <div className="flex items-start gap-3">
+                    {/* Left: Veg/Non-veg icon, name, price */}
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className={`w-4 h-4 rounded-sm border-2 shrink-0 flex items-center justify-center ${item.foodType === "Veg" ? "bg-green-50 border-green-600" : "bg-red-50 border-red-600"}`}>
+                          <div className={`w-2 h-2 rounded-full ${item.foodType === "Veg" ? "bg-green-600" : "bg-red-600"}`} />
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <h5 className="text-base font-bold text-gray-900">{item.name}</h5>
+                        {/* Approval Status Tag */}
+                        {item.approvalStatus && <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${item.approvalStatus === 'approved' ? 'bg-green-100 text-green-700 border border-green-300' : item.approvalStatus === 'rejected' ? 'bg-red-100 text-red-700 border border-red-300' : 'bg-yellow-100 text-yellow-700 border border-yellow-300'}`}>
+                          {item.approvalStatus === 'approved' ? 'Approved' : item.approvalStatus === 'rejected' ? 'Rejected' : 'Pending'}
+                        </span>}
+                      </div>
+                      <p className="text-sm font-medium text-gray-700 mb-3">₹{item.price}</p>
+                    </div>
+
+                    {/* Right: Image */}
+                    <div className="relative">
+                      <img src={item.image} alt={item.name} className="w-20 h-20 rounded-lg object-cover" />
+                      <div className="absolute bottom-1 right-1 bg-black/60 rounded-full p-1">
+                        <div className="flex items-center gap-1">
+                          <Camera className="w-3 h-3 text-white" />
+                          <span className="text-white text-xs font-semibold">{item.photoCount}</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
-                  {isExpanded && <div className="p-4 space-y-2">
-                      {/* Items */}
-                      <div className="space-y-4">
-                        {group.items.map(item => <div key={item.id} className="border-b border-gray-100 pb-4 last:border-0 last:pb-0">
-                            <div className="flex items-start gap-3">
-                              {/* Left: Veg/Non-veg icon, name, price */}
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-2">
-                                  <div className={`w-4 h-4 rounded-sm border-2 shrink-0 flex items-center justify-center ${item.foodType === "Veg" ? "bg-green-50 border-green-600" : "bg-red-50 border-red-600"}`}>
-                                    <div className={`w-2 h-2 rounded-full ${item.foodType === "Veg" ? "bg-green-600" : "bg-red-600"}`} />
-                                  </div>
-                                </div>
-                                <div className="flex items-center gap-2 mb-1">
-                                  <h5 className="text-base font-bold text-gray-900">{item.name}</h5>
-                                  {/* Approval Status Tag */}
-                                  {item.approvalStatus && <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${item.approvalStatus === 'approved' ? 'bg-green-100 text-green-700 border border-green-300' : item.approvalStatus === 'rejected' ? 'bg-red-100 text-red-700 border border-red-300' : 'bg-yellow-100 text-yellow-700 border border-yellow-300'}`}>
-                                      {item.approvalStatus === 'approved' ? 'Approved' : item.approvalStatus === 'rejected' ? 'Rejected' : 'Pending'}
-                                    </span>}
-                                </div>
-                                <p className="text-sm font-medium text-gray-700 mb-3">₹{item.price}</p>
-                              </div>
-
-                              {/* Right: Image */}
-                              <div className="relative">
-                                <img src={item.image} alt={item.name} className="w-20 h-20 rounded-lg object-cover" />
-                                <div className="absolute bottom-1 right-1 bg-black/60 rounded-full p-1">
-                                  <div className="flex items-center gap-1">
-                                    <Camera className="w-3 h-3 text-white" />
-                                    <span className="text-white text-xs font-semibold">{item.photoCount}</span>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Action buttons - below image */}
-                            <div className="flex items-center justify-center gap-3 mt-4">
-                              <button onClick={() => navigate(`/restaurant/hub-menu/item/${item.id}`, {
+                  {/* Action buttons - below image */}
+                  <div className="flex items-center justify-center gap-3 mt-4">
+                    <button onClick={() => navigate(`/restaurant/hub-menu/item/${item.id}`, {
                       state: {
                         item,
                         groupId: group.id
                       }
                     })} className="flex items-center gap-1.5 bg-transparent text-gray-700 text-sm font-medium">
-                                <Edit className="w-3.5 h-3.5" />
-                                <span>Edit</span>
-                              </button>
-                            </div>
-                          </div>)}
-                      </div>
+                      <Edit className="w-3.5 h-3.5" />
+                      <span>Edit</span>
+                    </button>
+                  </div>
+                </div>)}
+              </div>
 
-                    </div>}
-                </div>;
+            </div>}
+          </div>;
         })}
-          </div>}
-      </div>
+      </div>}
+    </div>
 
-      {/* Filter Popup */}
-      <AnimatePresence>
-        {isFilterOpen && <>
-            <motion.div initial={{
+    {/* Filter Popup */}
+    <AnimatePresence>
+      {isFilterOpen && <>
+        <motion.div initial={{
           opacity: 0
         }} animate={{
           opacity: 1
         }} exit={{
           opacity: 0
         }} onClick={() => setIsFilterOpen(false)} className="fixed inset-0 bg-black/50 z-[100]" />
-            <motion.div initial={{
+        <motion.div initial={{
           y: "100%"
         }} animate={{
           y: 0
@@ -1178,51 +1191,51 @@ export default function HubMenu() {
           damping: 30,
           stiffness: 300
         }} className="fixed bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-2xl z-[100] max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
-              <div className="flex items-center justify-between px-4 py-4 border-b border-gray-200">
-                <h2 className="text-lg font-bold text-gray-900">Filters</h2>
-                <button onClick={() => setIsFilterOpen(false)} className="p-1 rounded-full hover:bg-gray-100">
-                  <X className="w-5 h-5 text-gray-600" />
-                </button>
-              </div>
-              <div className="flex-1 overflow-y-auto px-4 py-4">
-                <div className="space-y-1">
-                  {filterOptions.map((filter, index) => <label key={filter.id} className="flex items-center justify-between py-3 cursor-pointer border-b border-gray-100 last:border-0">
-                      <span className="text-sm font-medium text-gray-900">
-                        {filter.label} ({filter.count})
-                      </span>
-                      <input type="radio" name="filter" value={filter.id} checked={activeFilter === filter.id} onChange={() => handleFilterSelect(filter.id)} className="w-5 h-5 text-[#3B82F6] border-gray-400 focus:ring-[#3B82F6]" style={{
+          <div className="flex items-center justify-between px-4 py-4 border-b border-gray-200">
+            <h2 className="text-lg font-bold text-gray-900">Filters</h2>
+            <button onClick={() => setIsFilterOpen(false)} className="p-1 rounded-full hover:bg-gray-100">
+              <X className="w-5 h-5 text-gray-600" />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto px-4 py-4">
+            <div className="space-y-1">
+              {filterOptions.map((filter, index) => <label key={filter.id} className="flex items-center justify-between py-3 cursor-pointer border-b border-gray-100 last:border-0">
+                <span className="text-sm font-medium text-gray-900">
+                  {filter.label} ({filter.count})
+                </span>
+                <input type="radio" name="filter" value={filter.id} checked={activeFilter === filter.id} onChange={() => handleFilterSelect(filter.id)} className="w-5 h-5 text-[#3B82F6] border-gray-400 focus:ring-[#3B82F6]" style={{
                   accentColor: "#3B82F6"
                 }} />
-                    </label>)}
-                </div>
-              </div>
-              <div className="px-4 py-4 border-t border-gray-200 space-y-2">
-                {activeFilter && <button onClick={() => {
+              </label>)}
+            </div>
+          </div>
+          <div className="px-4 py-4 border-t border-gray-200 space-y-2">
+            {activeFilter && <button onClick={() => {
               setActiveFilter(null);
               setSelectedFilter(null);
               setIsFilterOpen(false);
             }} className="w-full py-2 rounded-lg font-medium text-sm bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors">
-                    Clear filter
-                  </button>}
-                <button onClick={() => setIsFilterOpen(false)} className="w-full py-3 rounded-lg font-semibold text-sm bg-[#3B82F6] text-white hover:bg-blue-700 transition-colors">
-                  Confirm
-                </button>
-              </div>
-            </motion.div>
-          </>}
-      </AnimatePresence>
+              Clear filter
+            </button>}
+            <button onClick={() => setIsFilterOpen(false)} className="w-full py-3 rounded-lg font-semibold text-sm bg-[#3B82F6] text-white hover:bg-blue-700 transition-colors">
+              Confirm
+            </button>
+          </div>
+        </motion.div>
+      </>}
+    </AnimatePresence>
 
-      {/* Add Popup */}
-      <AnimatePresence>
-        {isAddPopupOpen && <>
-            <motion.div initial={{
+    {/* Add Popup */}
+    <AnimatePresence>
+      {isAddPopupOpen && <>
+        <motion.div initial={{
           opacity: 0
         }} animate={{
           opacity: 1
         }} exit={{
           opacity: 0
-        }} onClick={() => setIsAddPopupOpen(false)} className="fixed inset-0 bg-black/50 z-[70]" />
-            <motion.div initial={{
+        }} onClick={() => setIsAddPopupOpen(false)} className="fixed inset-0 bg-black/50 z-[90]" />
+        <motion.div initial={{
           y: "100%"
         }} animate={{
           y: 0
@@ -1232,51 +1245,95 @@ export default function HubMenu() {
           type: "spring",
           damping: 30,
           stiffness: 300
-        }} className="fixed bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-2xl z-[100]" onClick={e => e.stopPropagation()}>
-              <div className="px-4 py-4 border-b border-gray-200">
-                <h2 className="text-lg font-bold text-gray-900 text-center">Add item</h2>
-              </div>
-              <div className="px-4 py-4 space-y-2">
-                <button onClick={() => {
-              navigate(`/restaurant/hub-menu/item/new`);
-            }} className="w-full py-3 px-4 text-left rounded-lg hover:bg-gray-50 transition-colors">
-                  <span className="text-sm font-medium text-gray-900">Add item</span>
-                </button>
-              </div>
-            </motion.div>
-          </>}
-      </AnimatePresence>
+        }} className="fixed bottom-0 left-0 right-0 bg-white rounded-t-[32px] shadow-2xl z-[100] max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
+          <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mt-3" />
+          <div className="flex items-center justify-between px-6 py-6 border-b border-gray-50">
+            <h2 className="text-xl font-extrabold text-gray-900">Add to Menu</h2>
+            <button onClick={() => setIsAddPopupOpen(false)} className="p-2 rounded-full bg-gray-50 hover:bg-gray-100 transition-all">
+              <X className="w-6 h-6 text-gray-400" />
+            </button>
+          </div>
 
-      {/* Availability Popup */}
-      <div>
-        {isAvailabilityPopupOpen && <>
-            <motion.div initial={{
+          <div className="flex-1 overflow-y-auto px-6 py-6 pb-24">
+            <div className="space-y-4">
+              {/* Add Item Option */}
+              <button onClick={() => {
+                setIsAddPopupOpen(false);
+                navigate("/restaurant/hub-menu/item/new");
+              }} className="w-full flex items-center gap-4 p-5 rounded-2xl bg-blue-50/50 border-2 border-blue-100 hover:bg-blue-100 transition-all group">
+                <div className="w-14 h-14 rounded-2xl bg-blue-600 flex items-center justify-center text-white shadow-lg shadow-blue-200 group-hover:scale-105 transition-transform">
+                  <Plus className="w-8 h-8" strokeWidth={2.5} />
+                </div>
+                <div className="flex-1 text-left">
+                  <span className="block text-lg font-bold text-gray-900">Add Item</span>
+                  <span className="text-sm text-blue-600/70 font-medium">Create a new dish or food item</span>
+                </div>
+              </button>
+
+              {/* Add Category Option */}
+              <button onClick={() => {
+                setIsAddPopupOpen(false);
+                setIsAddCategoryPopupOpen(true);
+              }} className="w-full flex items-center gap-4 p-5 rounded-2xl bg-red-50/50 border-2 border-red-100 hover:bg-red-100 transition-all group">
+                <div className="w-14 h-14 rounded-2xl bg-red-500 flex items-center justify-center text-white shadow-lg shadow-red-200 group-hover:scale-105 transition-transform">
+                  <Utensils className="w-7 h-7" />
+                </div>
+                <div className="flex-1 text-left">
+                  <span className="block text-lg font-bold text-gray-900">Add Category</span>
+                  <span className="text-sm text-red-500/70 font-medium">Create a new section for your menu</span>
+                </div>
+              </button>
+
+              {/* Add Add-on Option */}
+              <button onClick={() => {
+                setIsAddPopupOpen(false);
+                setActiveTab("add-ons");
+                setIsAddAddonModalOpen(true);
+              }} className="w-full flex items-center gap-4 p-5 rounded-2xl bg-green-50/50 border-2 border-green-100 hover:bg-green-100 transition-all group">
+                <div className="w-14 h-14 rounded-2xl bg-green-500 flex items-center justify-center text-white shadow-lg shadow-green-200 group-hover:scale-105 transition-transform">
+                  <Plus className="w-8 h-8" />
+                </div>
+                <div className="flex-1 text-left">
+                  <span className="block text-lg font-bold text-gray-900">Add Add-on</span>
+                  <span className="text-sm text-green-600/70 font-medium">Create custom extras or modifiers</span>
+                </div>
+              </button>
+            </div>
+          </div>
+        </motion.div>
+      </>}
+    </AnimatePresence>
+
+    {/* Availability Popup */}
+    <div>
+      {isAvailabilityPopupOpen && <>
+        <motion.div initial={{
           opacity: 0
         }} animate={{
           opacity: 1
         }} exit={{
           opacity: 0
         }} className="fixed inset-0 bg-white z-[9999]">
-              {/* Header */}
-              <div className="px-4 py-4 border-b border-gray-200 flex items-center gap-3">
-                <button onClick={() => {
+          {/* Header */}
+          <div className="px-4 py-4 border-b border-gray-200 flex items-center gap-3">
+            <button onClick={() => {
               setIsAvailabilityPopupOpen(false);
               setAvailabilityReason(null);
               setCustomDateTime('');
               setSwitchingOffTarget(null);
             }} className="p-1 rounded-full hover:bg-gray-100">
-                  <ArrowLeft className="w-5 h-5 text-gray-700" />
-                </button>
-                <h2 className="text-xl font-bold text-gray-900">When will this be available?</h2>
-              </div>
+              <ArrowLeft className="w-5 h-5 text-gray-700" />
+            </button>
+            <h2 className="text-xl font-bold text-gray-900">When will this be available?</h2>
+          </div>
 
-              {/* Content */}
-              <div className="flex-1 overflow-y-auto px-4 py-6">
-                {/* Auto turn-on after section */}
-                <div className="mb-6">
-                  <h3 className="text-base font-bold text-gray-900 mb-4">Auto turn-on after</h3>
-                  <div className="space-y-4">
-                    {[{
+          {/* Content */}
+          <div className="flex-1 overflow-y-auto px-4 py-6">
+            {/* Auto turn-on after section */}
+            <div className="mb-6">
+              <h3 className="text-base font-bold text-gray-900 mb-4">Auto turn-on after</h3>
+              <div className="space-y-4">
+                {[{
                   id: "2-hours",
                   label: "2 Hours"
                 }, {
@@ -1289,80 +1346,80 @@ export default function HubMenu() {
                   id: "custom",
                   label: "Custom date & time (upto 7 days)"
                 }].map(option => <div key={option.id}>
-                        <label className="flex items-center gap-3 cursor-pointer py-2">
-                          <input type="radio" name="availability" value={option.id} checked={availabilityReason === option.id} onChange={() => setAvailabilityReason(option.id)} className="w-5 h-5 text-[#3B82F6] border-gray-400 focus:ring-[#3B82F6]" style={{
+                  <label className="flex items-center gap-3 cursor-pointer py-2">
+                    <input type="radio" name="availability" value={option.id} checked={availabilityReason === option.id} onChange={() => setAvailabilityReason(option.id)} className="w-5 h-5 text-[#3B82F6] border-gray-400 focus:ring-[#3B82F6]" style={{
                       accentColor: "#3B82F6"
                     }} />
-                          <span className="text-sm font-medium text-gray-900">{option.label}</span>
-                        </label>
-                        {option.id === "custom" && availabilityReason === "custom" && <div className="ml-8 mt-2 mb-4">
-                            <input type="datetime-local" value={customDateTime} onChange={e => setCustomDateTime(e.target.value)} min={new Date().toISOString().slice(0, 16)} max={new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3B82F6] focus:border-[#3B82F6]" required />
-                          </div>}
-                      </div>)}
-                  </div>
-                </div>
+                    <span className="text-sm font-medium text-gray-900">{option.label}</span>
+                  </label>
+                  {option.id === "custom" && availabilityReason === "custom" && <div className="ml-8 mt-2 mb-4">
+                    <input type="datetime-local" value={customDateTime} onChange={e => setCustomDateTime(e.target.value)} min={new Date().toISOString().slice(0, 16)} max={new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3B82F6] focus:border-[#3B82F6]" required />
+                  </div>}
+                </div>)}
+              </div>
+            </div>
 
-                {/* Divider */}
-                <div className="border-t border-gray-200 my-6" />
+            {/* Divider */}
+            <div className="border-t border-gray-200 my-6" />
 
-                {/* Manually turn on section */}
-                <div>
-                  <h3 className="text-base font-bold text-gray-900 mb-4">Manually turn on</h3>
-                  <div className="space-y-4">
-                    <label className="flex items-center gap-3 cursor-pointer py-2">
-                      <input type="radio" name="availability" value="manual" checked={availabilityReason === "manual"} onChange={() => setAvailabilityReason("manual")} className="w-5 h-5 text-[#3B82F6] border-gray-400 focus:ring-[#3B82F6]" style={{
+            {/* Manually turn on section */}
+            <div>
+              <h3 className="text-base font-bold text-gray-900 mb-4">Manually turn on</h3>
+              <div className="space-y-4">
+                <label className="flex items-center gap-3 cursor-pointer py-2">
+                  <input type="radio" name="availability" value="manual" checked={availabilityReason === "manual"} onChange={() => setAvailabilityReason("manual")} className="w-5 h-5 text-[#3B82F6] border-gray-400 focus:ring-[#3B82F6]" style={{
                     accentColor: "#3B82F6"
                   }} />
-                      <span className="text-sm font-medium text-gray-900">I will turn it on myself</span>
-                    </label>
-                    <p className="text-xs text-gray-500 ml-8">
-                      This item will not be visible to customers on the Zomato app till you switch it on.
-                    </p>
-                  </div>
-                </div>
+                  <span className="text-sm font-medium text-gray-900">I will turn it on myself</span>
+                </label>
+                <p className="text-xs text-gray-500 ml-8">
+                  This item will not be visible to customers on the Zomato app till you switch it on.
+                </p>
               </div>
+            </div>
+          </div>
 
-              {/* Footer */}
-              <div className="px-4 py-4 border-t border-gray-200">
-                <button onClick={handleAvailabilityConfirm} disabled={!availabilityReason || isScheduling || availabilityReason === 'custom' && !customDateTime} className={`w-full py-3 rounded-lg font-semibold text-sm transition-colors ${availabilityReason && !isScheduling && (availabilityReason !== 'custom' || customDateTime) ? "bg-[#3B82F6] text-white hover:bg-blue-700" : "bg-gray-300 text-gray-500 cursor-not-allowed"}`}>
-                  {isScheduling ? 'Scheduling...' : 'Confirm'}
-                </button>
-              </div>
-            </motion.div>
-          </>}
-      </div>
+          {/* Footer */}
+          <div className="px-4 py-4 border-t border-gray-200">
+            <button onClick={handleAvailabilityConfirm} disabled={!availabilityReason || isScheduling || availabilityReason === 'custom' && !customDateTime} className={`w-full py-3 rounded-lg font-semibold text-sm transition-colors ${availabilityReason && !isScheduling && (availabilityReason !== 'custom' || customDateTime) ? "bg-[#3B82F6] text-white hover:bg-blue-700" : "bg-gray-300 text-gray-500 cursor-not-allowed"}`}>
+              {isScheduling ? 'Scheduling...' : 'Confirm'}
+            </button>
+          </div>
+        </motion.div>
+      </>}
+    </div>
 
-      {/* Sticky Bottom Right Buttons */}
-      <div className="fixed right-4 bottom-28 z-[60] flex flex-col gap-1">
-        {/* ADD Button */}
+    {/* Sticky Bottom Right Buttons */}
+    <div className="fixed right-4 bottom-28 z-[60] flex flex-col gap-1">
+      {/* ADD Button */}
 
-        {activeTab !== "add-ons" && <motion.button whileTap={{
+      {activeTab !== "add-ons" && <motion.button whileTap={{
         scale: 0.96
       }} onClick={() => setIsAddPopupOpen(true)} className="px-4 py-2 border bg-[#3B82F6] text-white border-[#3B82F6] rounded-lg text-sm font-bold">
-            + ADD
-          </motion.button>}
+        + ADD
+      </motion.button>}
 
-        {/* Menu Button */}
-        {activeTab !== "add-ons" && <>
-            <motion.button type="button" whileTap={{
+      {/* Menu Button */}
+      {activeTab !== "add-ons" && <>
+        <motion.button type="button" whileTap={{
           scale: 0.96
         }} onClick={() => setIsMenuOpen(prev => !prev)} className="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-800 bg-white text-sm font-medium shadow-sm">
-              <span className="w-5 h-5 flex items-center justify-center">
-                {isMenuOpen ? <X className="w-4 h-4 text-gray-900" /> : <Utensils className="w-4 h-4 text-gray-900" />}
-              </span>
-              <span>{isMenuOpen ? "Close" : "Menu"}</span>
-            </motion.button>
+          <span className="w-5 h-5 flex items-center justify-center">
+            {isMenuOpen ? <X className="w-4 h-4 text-gray-900" /> : <Utensils className="w-4 h-4 text-gray-900" />}
+          </span>
+          <span>{isMenuOpen ? "Close" : "Menu"}</span>
+        </motion.button>
 
-            <AnimatePresence>
-              {isMenuOpen && <>
-                  <motion.div className="fixed inset-0 bg-black/40 z-[60]" initial={{
+        <AnimatePresence>
+          {isMenuOpen && <>
+            <motion.div className="fixed inset-0 bg-black/40 z-[60]" initial={{
               opacity: 0
             }} animate={{
               opacity: 1
             }} exit={{
               opacity: 0
             }} onClick={() => setIsMenuOpen(false)} />
-                  <motion.div initial={{
+            <motion.div initial={{
               opacity: 0,
               y: 20
             }} animate={{
@@ -1374,49 +1431,49 @@ export default function HubMenu() {
             }} transition={{
               duration: 0.2
             }} className="fixed right-4 bottom-40 z-[60] w-[60vw] max-w-sm h-[45vh] bg-white rounded-3xl shadow-lg overflow-hidden">
-                    <div className="h-full flex flex-col">
-                      <div className="px-4 pt-4 pb-2">
-                        <p className="text-sm font-semibold text-gray-900">Menu</p>
-                      </div>
-                      <div className="h-px bg-gray-200 mx-4" />
-                      <div className="flex-1 overflow-y-auto px-4 py-2 space-y-1">
-                        {menuData.map((category, index) => {
+              <div className="h-full flex flex-col">
+                <div className="px-4 pt-4 pb-2">
+                  <p className="text-sm font-semibold text-gray-900">Menu</p>
+                </div>
+                <div className="h-px bg-gray-200 mx-4" />
+                <div className="flex-1 overflow-y-auto px-4 py-2 space-y-1">
+                  {menuData.map((category, index) => {
                     const itemCount = category.items.filter(item => item.isAvailable).length;
                     const isLast = index === menuData.length - 1;
                     return <button key={category.id} type="button" onClick={() => {
                       setIsMenuOpen(false);
                       setTimeout(() => scrollToCategory(category.id), 200);
                     }} className="w-full text-left py-3 focus:outline-none">
-                              <div className="flex items-center justify-between">
-                                <span className="text-sm font-medium text-gray-900">
-                                  {category.name}
-                                </span>
-                                <span className="min-w-[28px] h-7 rounded-full border border-gray-300 flex items-center justify-center text-xs text-gray-800">
-                                  {itemCount}
-                                </span>
-                              </div>
-                              {!isLast && <div className="mt-3 border-t border-dashed border-gray-200" />}
-                            </button>;
-                  })}
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-gray-900">
+                          {category.name}
+                        </span>
+                        <span className="min-w-[28px] h-7 rounded-full border border-gray-300 flex items-center justify-center text-xs text-gray-800">
+                          {itemCount}
+                        </span>
                       </div>
-                    </div>
-                  </motion.div>
-                </>}
-            </AnimatePresence>
+                      {!isLast && <div className="mt-3 border-t border-dashed border-gray-200" />}
+                    </button>;
+                  })}
+                </div>
+              </div>
+            </motion.div>
           </>}
-      </div>
+        </AnimatePresence>
+      </>}
+    </div>
 
-      {/* Category Options Popup */}
-      <AnimatePresence>
-        {isCategoryOptionsOpen && selectedCategory && <>
-            <motion.div initial={{
+    {/* Category Options Popup */}
+    <AnimatePresence>
+      {isCategoryOptionsOpen && selectedCategory && <>
+        <motion.div initial={{
           opacity: 0
         }} animate={{
           opacity: 1
         }} exit={{
           opacity: 0
         }} onClick={() => setIsCategoryOptionsOpen(false)} className="fixed inset-0 bg-black/50 z-[70]" />
-            <motion.div initial={{
+        <motion.div initial={{
           y: "100%"
         }} animate={{
           y: 0
@@ -1427,32 +1484,32 @@ export default function HubMenu() {
           damping: 30,
           stiffness: 300
         }} className="fixed bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-2xl z-[70] max-h-[50vh] flex flex-col" onClick={e => e.stopPropagation()}>
-              <div className="flex items-center justify-between px-4 py-4 border-b border-gray-200">
-                <h2 className="text-lg font-bold text-gray-900">{selectedCategory.name}</h2>
-                <button onClick={() => setIsCategoryOptionsOpen(false)} className="p-1 rounded-full hover:bg-gray-100">
-                  <X className="w-5 h-5 text-gray-600" />
-                </button>
-              </div>
-              <div className="flex-1 overflow-y-auto px-4 py-4">
-                <div className="space-y-2">
-                  <button onClick={handleEditCategory} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left text-sm font-medium text-gray-900 bg-gray-50 hover:bg-gray-100 transition-colors">
-                    <Edit className="w-5 h-5 text-gray-600" />
-                    <span>Edit category name</span>
-                  </button>
-                  <button onClick={handleDeleteCategory} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left text-sm font-medium text-red-600 bg-gray-50 hover:bg-red-50 transition-colors">
-                    <Trash2 className="w-5 h-5 text-red-600" />
-                    <span>Delete category</span>
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          </>}
-      </AnimatePresence>
+          <div className="flex items-center justify-between px-4 py-4 border-b border-gray-200">
+            <h2 className="text-lg font-bold text-gray-900">{selectedCategory.name}</h2>
+            <button onClick={() => setIsCategoryOptionsOpen(false)} className="p-1 rounded-full hover:bg-gray-100">
+              <X className="w-5 h-5 text-gray-600" />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto px-4 py-4">
+            <div className="space-y-2">
+              <button onClick={handleEditCategory} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left text-sm font-medium text-gray-900 bg-gray-50 hover:bg-gray-100 transition-colors">
+                <Edit className="w-5 h-5 text-gray-600" />
+                <span>Edit category name</span>
+              </button>
+              <button onClick={handleDeleteCategory} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left text-sm font-medium text-red-600 bg-gray-50 hover:bg-red-50 transition-colors">
+                <Trash2 className="w-5 h-5 text-red-600" />
+                <span>Delete category</span>
+              </button>
+            </div>
+          </div>
+        </motion.div>
+      </>}
+    </AnimatePresence>
 
-      {/* Edit Category Name Popup */}
-      <AnimatePresence>
-        {isEditCategoryOpen && <>
-            <motion.div initial={{
+    {/* Edit Category Name Popup */}
+    <AnimatePresence>
+      {isEditCategoryOpen && <>
+        <motion.div initial={{
           opacity: 0
         }} animate={{
           opacity: 1
@@ -1463,7 +1520,7 @@ export default function HubMenu() {
           setEditCategoryName("");
           setSelectedCategory(null);
         }} className="fixed inset-0 bg-black/50 z-[70]" />
-            <motion.div initial={{
+        <motion.div initial={{
           y: "100%"
         }} animate={{
           y: 0
@@ -1474,46 +1531,46 @@ export default function HubMenu() {
           damping: 30,
           stiffness: 300
         }} className="fixed bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-2xl z-[70] max-h-[40vh] flex flex-col" onClick={e => e.stopPropagation()}>
-              <div className="flex items-center justify-between px-4 py-4 border-b border-gray-200">
-                <h2 className="text-lg font-bold text-gray-900">Edit category name</h2>
-                <button onClick={() => {
+          <div className="flex items-center justify-between px-4 py-4 border-b border-gray-200">
+            <h2 className="text-lg font-bold text-gray-900">Edit category name</h2>
+            <button onClick={() => {
               setIsEditCategoryOpen(false);
               setEditCategoryName("");
               setSelectedCategory(null);
             }} className="p-1 rounded-full hover:bg-gray-100">
-                  <X className="w-5 h-5 text-gray-600" />
-                </button>
+              <X className="w-5 h-5 text-gray-600" />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto px-4 py-4">
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-900 mb-2">
+                  Category name
+                </label>
+                <input type="text" value={editCategoryName} onChange={e => setEditCategoryName(e.target.value)} placeholder="Enter category name" className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" autoFocus />
               </div>
-              <div className="flex-1 overflow-y-auto px-4 py-4">
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-900 mb-2">
-                      Category name
-                    </label>
-                    <input type="text" value={editCategoryName} onChange={e => setEditCategoryName(e.target.value)} placeholder="Enter category name" className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" autoFocus />
-                  </div>
-                  <div className="flex gap-3 pt-2">
-                    <button onClick={() => {
+              <div className="flex gap-3 pt-2">
+                <button onClick={() => {
                   setIsEditCategoryOpen(false);
                   setEditCategoryName("");
                   setSelectedCategory(null);
                 }} className="flex-1 py-3 px-4 border border-gray-300 rounded-lg text-sm font-semibold text-gray-900 bg-white hover:bg-gray-50 transition-colors">
-                      Cancel
-                    </button>
-                    <button onClick={handleSaveCategoryName} disabled={!editCategoryName.trim()} className={`flex-1 py-3 px-4 rounded-lg text-sm font-semibold transition-colors ${editCategoryName.trim() ? "bg-[#3B82F6] text-white hover:bg-blue-700" : "bg-gray-300 text-gray-500 cursor-not-allowed"}`}>
-                      Save
-                    </button>
-                  </div>
-                </div>
+                  Cancel
+                </button>
+                <button onClick={handleSaveCategoryName} disabled={!editCategoryName.trim()} className={`flex-1 py-3 px-4 rounded-lg text-sm font-semibold transition-colors ${editCategoryName.trim() ? "bg-[#3B82F6] text-white hover:bg-blue-700" : "bg-gray-300 text-gray-500 cursor-not-allowed"}`}>
+                  Save
+                </button>
               </div>
-            </motion.div>
-          </>}
-      </AnimatePresence>
+            </div>
+          </div>
+        </motion.div>
+      </>}
+    </AnimatePresence>
 
-      {/* Add Sub-Category Popup */}
-      <AnimatePresence>
-        {isAddSubCategoryOpen && <>
-            <motion.div initial={{
+    {/* Add Sub-Category Popup */}
+    <AnimatePresence>
+      {isAddSubCategoryOpen && <>
+        <motion.div initial={{
           opacity: 0
         }} animate={{
           opacity: 1
@@ -1524,7 +1581,7 @@ export default function HubMenu() {
           setSubCategoryName("");
           setSelectedGroupForSubCategory(null);
         }} className="fixed inset-0 bg-black/50 z-[70]" />
-            <motion.div initial={{
+        <motion.div initial={{
           y: "100%"
         }} animate={{
           y: 0
@@ -1535,44 +1592,44 @@ export default function HubMenu() {
           damping: 30,
           stiffness: 300
         }} className="fixed bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-2xl z-[70] max-h-[40vh] flex flex-col" onClick={e => e.stopPropagation()}>
-              <div className="flex items-center justify-between px-4 py-4 border-b border-gray-200">
-                <h2 className="text-lg font-bold text-gray-900">Add sub-category</h2>
-                <button onClick={() => {
+          <div className="flex items-center justify-between px-4 py-4 border-b border-gray-200">
+            <h2 className="text-lg font-bold text-gray-900">Add sub-category</h2>
+            <button onClick={() => {
               setIsAddSubCategoryOpen(false);
               setSubCategoryName("");
               setSelectedGroupForSubCategory(null);
             }} className="p-1 rounded-full hover:bg-gray-100">
-                  <X className="w-5 h-5 text-gray-600" />
-                </button>
-              </div>
-              <div className="flex-1 overflow-y-auto px-4 py-4">
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-900 mb-2">
-                      Sub-category name
-                    </label>
-                    <input type="text" value={subCategoryName} onChange={e => setSubCategoryName(e.target.value)} onKeyPress={e => {
+              <X className="w-5 h-5 text-gray-600" />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto px-4 py-4">
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-900 mb-2">
+                  Sub-category name
+                </label>
+                <input type="text" value={subCategoryName} onChange={e => setSubCategoryName(e.target.value)} onKeyPress={e => {
                   if (e.key === 'Enter' && subCategoryName.trim()) {
                     handleContinueSubCategory();
                   }
                 }} placeholder="Enter sub-category name" className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" autoFocus />
-                    {selectedGroupForSubCategory && <p className="text-xs text-gray-500 mt-2">
-                        Category: <span className="font-medium">{selectedGroupForSubCategory.name}</span>
-                      </p>}
-                  </div>
-                  <button onClick={handleContinueSubCategory} disabled={!subCategoryName.trim()} className={`w-full py-3 px-4 rounded-lg text-sm font-semibold transition-colors ${subCategoryName.trim() ? "bg-[#3B82F6] text-white hover:bg-blue-700" : "bg-gray-300 text-gray-500 cursor-not-allowed"}`}>
-                    Continue
-                  </button>
-                </div>
+                {selectedGroupForSubCategory && <p className="text-xs text-gray-500 mt-2">
+                  Category: <span className="font-medium">{selectedGroupForSubCategory.name}</span>
+                </p>}
               </div>
-            </motion.div>
-          </>}
-      </AnimatePresence>
+              <button onClick={handleContinueSubCategory} disabled={!subCategoryName.trim()} className={`w-full py-3 px-4 rounded-lg text-sm font-semibold transition-colors ${subCategoryName.trim() ? "bg-[#3B82F6] text-white hover:bg-blue-700" : "bg-gray-300 text-gray-500 cursor-not-allowed"}`}>
+                Continue
+              </button>
+            </div>
+          </div>
+        </motion.div>
+      </>}
+    </AnimatePresence>
 
-      {/* Add Category Popup */}
-      <AnimatePresence>
-        {isAddCategoryPopupOpen && <>
-            <motion.div initial={{
+    {/* Add Category Popup */}
+    <AnimatePresence>
+      {isAddCategoryPopupOpen && <>
+        <motion.div initial={{
           opacity: 0
         }} animate={{
           opacity: 1
@@ -1582,7 +1639,7 @@ export default function HubMenu() {
           setIsAddCategoryPopupOpen(false);
           setNewCategoryName("");
         }} className="fixed inset-0 bg-black/50 z-[70]" />
-            <motion.div initial={{
+        <motion.div initial={{
           y: "100%"
         }} animate={{
           y: 0
@@ -1593,40 +1650,40 @@ export default function HubMenu() {
           damping: 30,
           stiffness: 300
         }} className="fixed bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-2xl z-[70] max-h-[40vh] flex flex-col" onClick={e => e.stopPropagation()}>
-              <div className="flex items-center justify-between px-4 py-4 border-b border-gray-200">
-                <h2 className="text-lg font-bold text-gray-900">Add category</h2>
-                <button onClick={() => {
+          <div className="flex items-center justify-between px-4 py-4 border-b border-gray-200">
+            <h2 className="text-lg font-bold text-gray-900">Add category</h2>
+            <button onClick={() => {
               setIsAddCategoryPopupOpen(false);
               setNewCategoryName("");
             }} className="p-1 rounded-full hover:bg-gray-100">
-                  <X className="w-5 h-5 text-gray-600" />
-                </button>
-              </div>
-              <div className="flex-1 overflow-y-auto px-4 py-4">
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-900 mb-2">
-                      Category name
-                    </label>
-                    <input type="text" value={newCategoryName} onChange={e => setNewCategoryName(e.target.value)} onKeyPress={e => {
+              <X className="w-5 h-5 text-gray-600" />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto px-4 py-4">
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-900 mb-2">
+                  Category name
+                </label>
+                <input type="text" value={newCategoryName} onChange={e => setNewCategoryName(e.target.value)} onKeyPress={e => {
                   if (e.key === 'Enter' && newCategoryName.trim()) {
                     handleContinueAddCategory();
                   }
                 }} placeholder="Enter category name" className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" autoFocus />
-                  </div>
-                  <button onClick={handleContinueAddCategory} disabled={!newCategoryName.trim()} className={`w-full py-3 px-4 rounded-lg text-sm font-semibold transition-colors ${newCategoryName.trim() ? "bg-[#3B82F6] text-white hover:bg-blue-700" : "bg-gray-300 text-gray-500 cursor-not-allowed"}`}>
-                    Continue
-                  </button>
-                </div>
               </div>
-            </motion.div>
-          </>}
-      </AnimatePresence>
+              <button onClick={handleContinueAddCategory} disabled={!newCategoryName.trim()} className={`w-full py-3 px-4 rounded-lg text-sm font-semibold transition-colors ${newCategoryName.trim() ? "bg-[#3B82F6] text-white hover:bg-blue-700" : "bg-gray-300 text-gray-500 cursor-not-allowed"}`}>
+                Continue
+              </button>
+            </div>
+          </div>
+        </motion.div>
+      </>}
+    </AnimatePresence>
 
-      {/* Search Popup */}
-      <AnimatePresence>
-        {isSearchOpen && <>
-            <motion.div initial={{
+    {/* Search Popup */}
+    <AnimatePresence>
+      {isSearchOpen && <>
+        <motion.div initial={{
           opacity: 0
         }} animate={{
           opacity: 1
@@ -1636,7 +1693,7 @@ export default function HubMenu() {
           setIsSearchOpen(false);
           setSearchQuery("");
         }} className="fixed inset-0 bg-black/50 z-[70]" />
-            <motion.div initial={{
+        <motion.div initial={{
           y: "100%"
         }} animate={{
           y: 0
@@ -1647,32 +1704,32 @@ export default function HubMenu() {
           damping: 30,
           stiffness: 300
         }} className="fixed bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-2xl z-[70] max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
-              <div className="flex items-center justify-between px-4 py-4 border-b border-gray-200">
-                <h2 className="text-lg font-bold text-gray-900">Search Menu</h2>
-                <button onClick={() => {
+          <div className="flex items-center justify-between px-4 py-4 border-b border-gray-200">
+            <h2 className="text-lg font-bold text-gray-900">Search Menu</h2>
+            <button onClick={() => {
               setIsSearchOpen(false);
               setSearchQuery("");
             }} className="p-1 rounded-full hover:bg-gray-100">
-                  <X className="w-5 h-5 text-gray-600" />
-                </button>
-              </div>
-              <div className="px-4 py-4 border-b border-gray-200">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search for food items..." className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" autoFocus />
-                  {searchQuery && <button onClick={() => setSearchQuery("")} className="absolute right-3 top-1/2 transform -translate-y-1/2 p-1 rounded-full hover:bg-gray-100">
-                      <X className="w-4 h-4 text-gray-600" />
-                    </button>}
-                </div>
-              </div>
-              <div className="flex-1 overflow-y-auto px-4 py-4">
-                {searchQuery.trim() ? filteredMenuGroups.length > 0 ? <div className="space-y-4">
-                      {filteredMenuGroups.map(group => <div key={group.id} className="space-y-3">
-                          <h3 className="text-sm font-bold text-gray-900 uppercase">
-                            {group.name} ({group.items.length})
-                          </h3>
-                          <div className="space-y-3">
-                            {group.items.map(item => <div key={item.id} onClick={() => {
+              <X className="w-5 h-5 text-gray-600" />
+            </button>
+          </div>
+          <div className="px-4 py-4 border-b border-gray-200">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search for food items..." className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" autoFocus />
+              {searchQuery && <button onClick={() => setSearchQuery("")} className="absolute right-3 top-1/2 transform -translate-y-1/2 p-1 rounded-full hover:bg-gray-100">
+                <X className="w-4 h-4 text-gray-600" />
+              </button>}
+            </div>
+          </div>
+          <div className="flex-1 overflow-y-auto px-4 py-4">
+            {searchQuery.trim() ? filteredMenuGroups.length > 0 ? <div className="space-y-4">
+              {filteredMenuGroups.map(group => <div key={group.id} className="space-y-3">
+                <h3 className="text-sm font-bold text-gray-900 uppercase">
+                  {group.name} ({group.items.length})
+                </h3>
+                <div className="space-y-3">
+                  {group.items.map(item => <div key={item.id} onClick={() => {
                     setIsSearchOpen(false);
                     navigate(`/restaurant/hub-menu/item/${item.id}`, {
                       state: {
@@ -1681,58 +1738,58 @@ export default function HubMenu() {
                       }
                     });
                   }} className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer transition-colors">
-                                <img src={item.image} alt={item.name} className="w-16 h-16 rounded-lg object-cover" />
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <div className={`w-4 h-4 rounded-sm border-2 shrink-0 flex items-center justify-center ${item.foodType === "Veg" ? "bg-green-50 border-green-600" : "bg-red-50 border-red-600"}`}>
-                                      <div className={`w-2 h-2 rounded-full ${item.foodType === "Veg" ? "bg-green-600" : "bg-red-600"}`} />
-                                    </div>
-                                    <h4 className="text-sm font-bold text-gray-900 truncate">
-                                      {item.name}
-                                    </h4>
-                                  </div>
-                                  <p className="text-sm font-medium text-gray-700">₹{item.price}</p>
-                                  {!item.isAvailable && <span className="text-xs text-red-600 font-medium">Out of stock</span>}
-                                </div>
-                              </div>)}
-                          </div>
-                        </div>)}
-                    </div> : <div className="flex flex-col items-center justify-center py-20 px-4">
-                      <div className="text-center">
-                        <p className="text-lg font-medium text-gray-500">No items found</p>
-                        <p className="text-sm text-gray-400 mt-2">
-                          Try searching with different keywords
-                        </p>
+                    <img src={item.image} alt={item.name} className="w-16 h-16 rounded-lg object-cover" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <div className={`w-4 h-4 rounded-sm border-2 shrink-0 flex items-center justify-center ${item.foodType === "Veg" ? "bg-green-50 border-green-600" : "bg-red-50 border-red-600"}`}>
+                          <div className={`w-2 h-2 rounded-full ${item.foodType === "Veg" ? "bg-green-600" : "bg-red-600"}`} />
+                        </div>
+                        <h4 className="text-sm font-bold text-gray-900 truncate">
+                          {item.name}
+                        </h4>
                       </div>
-                    </div> : <div className="flex flex-col items-center justify-center py-20 px-4">
-                    <div className="text-center">
-                      <Search className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                      <p className="text-lg font-medium text-gray-500">Start searching</p>
-                      <p className="text-sm text-gray-400 mt-2">
-                        Type to search for food items by name or category
-                      </p>
+                      <p className="text-sm font-medium text-gray-700">₹{item.price}</p>
+                      {!item.isAvailable && <span className="text-xs text-red-600 font-medium">Out of stock</span>}
                     </div>
-                  </div>}
+                  </div>)}
+                </div>
+              </div>)}
+            </div> : <div className="flex flex-col items-center justify-center py-20 px-4">
+              <div className="text-center">
+                <p className="text-lg font-medium text-gray-500">No items found</p>
+                <p className="text-sm text-gray-400 mt-2">
+                  Try searching with different keywords
+                </p>
               </div>
-              {searchQuery.trim() && filteredMenuGroups.length > 0 && <div className="px-4 py-3 border-t border-gray-200">
-                  <button onClick={() => setIsSearchOpen(false)} className="w-full py-3 rounded-lg font-semibold text-sm bg-[#3B82F6] text-white hover:bg-blue-700 transition-colors">
-                    View Results ({filteredMenuGroups.reduce((acc, group) => acc + group.items.length, 0)} items)
-                  </button>
-                </div>}
-            </motion.div>
-          </>}
-      </AnimatePresence>
+            </div> : <div className="flex flex-col items-center justify-center py-20 px-4">
+              <div className="text-center">
+                <Search className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                <p className="text-lg font-medium text-gray-500">Start searching</p>
+                <p className="text-sm text-gray-400 mt-2">
+                  Type to search for food items by name or category
+                </p>
+              </div>
+            </div>}
+          </div>
+          {searchQuery.trim() && filteredMenuGroups.length > 0 && <div className="px-4 py-3 border-t border-gray-200">
+            <button onClick={() => setIsSearchOpen(false)} className="w-full py-3 rounded-lg font-semibold text-sm bg-[#3B82F6] text-white hover:bg-blue-700 transition-colors">
+              View Results ({filteredMenuGroups.reduce((acc, group) => acc + group.items.length, 0)} items)
+            </button>
+          </div>}
+        </motion.div>
+      </>}
+    </AnimatePresence>
 
-      {/* Add Add-on Modal */}
-      <AnimatePresence>
-        {isAddAddonModalOpen && <motion.div initial={{
+    {/* Add Add-on Modal */}
+    <AnimatePresence>
+      {isAddAddonModalOpen && <motion.div initial={{
         opacity: 0
       }} animate={{
         opacity: 1
       }} exit={{
         opacity: 0
       }} className="fixed inset-0 z-[70] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setIsAddAddonModalOpen(false)}>
-            <motion.div initial={{
+        <motion.div initial={{
           scale: 0.9,
           opacity: 0
         }} animate={{
@@ -1742,86 +1799,86 @@ export default function HubMenu() {
           scale: 0.9,
           opacity: 0
         }} className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-              {/* Modal Header */}
-              <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10">
-                <h2 className="text-xl font-bold text-gray-900">
-                  {editingAddon ? 'Edit Add-on' : 'Add New Add-on'}
-                </h2>
-                <button onClick={() => setIsAddAddonModalOpen(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-                  <X className="h-5 w-5 text-gray-600" />
-                </button>
-              </div>
+          {/* Modal Header */}
+          <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10">
+            <h2 className="text-xl font-bold text-gray-900">
+              {editingAddon ? 'Edit Add-on' : 'Add New Add-on'}
+            </h2>
+            <button onClick={() => setIsAddAddonModalOpen(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+              <X className="h-5 w-5 text-gray-600" />
+            </button>
+          </div>
 
-              {/* Modal Content */}
-              <div className="p-6 space-y-4">
-                {/* Name Field */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Add-on Name <span className="text-red-500">*</span>
-                  </label>
-                  <input type="text" value={addonName} onChange={e => setAddonName(e.target.value)} placeholder="e.g., Coke, Chips, Sauce" className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3B82F6] focus:border-transparent" />
-                </div>
+          {/* Modal Content */}
+          <div className="p-6 space-y-4">
+            {/* Name Field */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Add-on Name <span className="text-red-500">*</span>
+              </label>
+              <input type="text" value={addonName} onChange={e => setAddonName(e.target.value)} placeholder="e.g., Coke, Chips, Sauce" className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3B82F6] focus:border-transparent" />
+            </div>
 
-                {/* Description Field */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Description
-                  </label>
-                  <textarea value={addonDescription} onChange={e => setAddonDescription(e.target.value)} placeholder="Describe the add-on..." rows={3} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3B82F6] focus:border-transparent resize-none" />
-                </div>
+            {/* Description Field */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Description
+              </label>
+              <textarea value={addonDescription} onChange={e => setAddonDescription(e.target.value)} placeholder="Describe the add-on..." rows={3} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3B82F6] focus:border-transparent resize-none" />
+            </div>
 
-                {/* Price Field */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Price (₹) <span className="text-red-500">*</span>
-                  </label>
-                  <input type="number" value={addonPrice} onChange={e => setAddonPrice(e.target.value)} placeholder="0.00" min="0" step="0.01" className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3B82F6] focus:border-transparent" />
-                </div>
+            {/* Price Field */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Price (₹) <span className="text-red-500">*</span>
+              </label>
+              <input type="number" value={addonPrice} onChange={e => setAddonPrice(e.target.value)} placeholder="0.00" min="0" step="0.01" className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3B82F6] focus:border-transparent" />
+            </div>
 
-                {/* Images Section */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Images
-                  </label>
+            {/* Images Section */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Images
+              </label>
 
-                  {/* Image Preview Grid */}
-                  {addonImages.length > 0 && <div className="grid grid-cols-3 gap-3 mb-3">
-                      {addonImages.map((img, index) => <div key={index} className="relative group">
-                          {img && <img src={img} alt={`Add-on ${index + 1}`} className="w-full h-24 object-cover rounded-lg border border-gray-200" onError={e => {
+              {/* Image Preview Grid */}
+              {addonImages.length > 0 && <div className="grid grid-cols-3 gap-3 mb-3">
+                {addonImages.map((img, index) => <div key={index} className="relative group">
+                  {img && <img src={img} alt={`Add-on ${index + 1}`} className="w-full h-24 object-cover rounded-lg border border-gray-200" onError={e => {
                     e.target.style.display = 'none';
                   }} />}
-                          <button onClick={() => handleAddonImageDelete(index)} className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
-                            <X className="h-4 w-4" />
-                          </button>
-                        </div>)}
-                    </div>}
+                  <button onClick={() => handleAddonImageDelete(index)} className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>)}
+              </div>}
 
-                  {/* Add Image Button */}
-                  <input ref={addonFileInputRef} type="file" accept="image/*" multiple onChange={handleAddonImageAdd} className="hidden" id="addon-image-upload" />
-                  <label htmlFor="addon-image-upload" className="flex items-center justify-center gap-2 px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-[#3B82F6] hover:bg-blue-50 transition-colors">
-                    <Camera className="h-5 w-5 text-gray-500" />
-                    <span className="text-sm font-medium text-gray-700">Add Images</span>
-                  </label>
-                  <p className="text-xs text-gray-500 mt-1">Add multiple images (PNG, JPG, WEBP - max 5MB each)</p>
-                </div>
-              </div>
+              {/* Add Image Button */}
+              <input ref={addonFileInputRef} type="file" accept="image/*" multiple onChange={handleAddonImageAdd} className="hidden" id="addon-image-upload" />
+              <label htmlFor="addon-image-upload" className="flex items-center justify-center gap-2 px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-[#3B82F6] hover:bg-blue-50 transition-colors">
+                <Camera className="h-5 w-5 text-gray-500" />
+                <span className="text-sm font-medium text-gray-700">Add Images</span>
+              </label>
+              <p className="text-xs text-gray-500 mt-1">Add multiple images (PNG, JPG, WEBP - max 5MB each)</p>
+            </div>
+          </div>
 
-              {/* Modal Footer */}
-              <div className="sticky bottom-0 bg-white border-t border-gray-200 px-6 py-4 flex items-center gap-3">
-                <button onClick={() => setIsAddAddonModalOpen(false)} className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium">
-                  Cancel
-                </button>
-                <button onClick={handleSaveAddon} disabled={!addonName.trim() || !addonPrice || uploadingAddonImages} className="flex-1 px-4 py-2 bg-[#3B82F6] text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors font-medium flex items-center justify-center gap-2">
-                  {uploadingAddonImages ? <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      <span>Uploading...</span>
-                    </> : <span>{editingAddon ? 'Update Add-on' : 'Add Add-on'}</span>}
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>}
-      </AnimatePresence>
+          {/* Modal Footer */}
+          <div className="sticky bottom-0 bg-white border-t border-gray-200 px-6 py-4 flex items-center gap-3">
+            <button onClick={() => setIsAddAddonModalOpen(false)} className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium">
+              Cancel
+            </button>
+            <button onClick={handleSaveAddon} disabled={!addonName.trim() || !addonPrice || uploadingAddonImages} className="flex-1 px-4 py-2 bg-[#3B82F6] text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors font-medium flex items-center justify-center gap-2">
+              {uploadingAddonImages ? <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Uploading...</span>
+              </> : <span>{editingAddon ? 'Update Add-on' : 'Add Add-on'}</span>}
+            </button>
+          </div>
+        </motion.div>
+      </motion.div>}
+    </AnimatePresence>
 
-      <BottomNavOrders />
-    </div>;
+    <BottomNavOrders />
+  </div>;
 }

@@ -98,7 +98,7 @@ export default function OTP() {
     }
 
     // Auto-submit when all 6 digits are entered and we are in OTP step
-    if (!showNameInput && newOtp.every((digit) => digit !== "") && newOtp.length === 6) {
+    if (!showNameInput && newOtp.every((digit) => digit !== "") && newOtp.length === 6 && !isLoading) {
       handleVerify(newOtp.join(""))
     }
   }
@@ -159,6 +159,7 @@ export default function OTP() {
   }
 
   const handleVerify = async (otpValue = null) => {
+    if (isLoading) return
     if (showNameInput) {
       // In name collection step, ignore OTP auto-submit
       return
@@ -228,6 +229,7 @@ export default function OTP() {
   }
 
   const handleSubmitName = async () => {
+    if (isLoading) return
     const trimmedName = name.trim()
     if (!trimmedName) {
       setNameError("Name is required")

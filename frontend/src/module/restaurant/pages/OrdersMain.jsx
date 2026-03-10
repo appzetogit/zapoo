@@ -109,24 +109,24 @@ function CompletedOrders({
   }, []);
   if (loading) {
     return <div className="pt-4 pb-6">
-        <div className="flex items-baseline justify-between mb-3">
-          <h2 className="text-base font-semibold text-[#3B82F6]">Completed orders</h2>
-          <Loader2 className="w-4 h-4 animate-spin text-gray-500" />
-        </div>
-        <div className="text-center py-8 text-gray-500 text-sm">Loading...</div>
-      </div>;
+      <div className="flex items-baseline justify-between mb-3">
+        <h2 className="text-base font-semibold text-[#3B82F6]">Completed orders</h2>
+        <Loader2 className="w-4 h-4 animate-spin text-gray-500" />
+      </div>
+      <div className="text-center py-8 text-gray-500 text-sm">Loading...</div>
+    </div>;
   }
   return <div className="pt-4 pb-6">
-      <div className="flex items-baseline justify-between mb-3">
-        <h2 className="text-base font-semibold text-[#3B82F6]">
-          Completed orders
-        </h2>
-        <span className="text-xs text-gray-500">{orders.length} total</span>
-      </div>
-      {orders.length === 0 ? <div className="text-center py-8 text-gray-500 text-sm">
-          No completed orders yet
-        </div> : <div>
-          {orders.map(order => {
+    <div className="flex items-baseline justify-between mb-3">
+      <h2 className="text-base font-semibold text-[#3B82F6]">
+        Completed orders
+      </h2>
+      <span className="text-xs text-gray-500">{orders.length} total</span>
+    </div>
+    {orders.length === 0 ? <div className="text-center py-8 text-gray-500 text-sm">
+      No completed orders yet
+    </div> : <div>
+      {orders.map(order => {
         const deliveredDate = order.deliveredAt ? new Date(order.deliveredAt).toLocaleDateString('en-US', {
           month: 'short',
           day: 'numeric',
@@ -135,7 +135,7 @@ function CompletedOrders({
           minute: '2-digit'
         }) : 'N/A';
         return <div key={order.orderId || order.mongoId} className="w-full bg-white rounded-2xl p-4 mb-3 border border-gray-200">
-                <button type="button" onClick={() => onSelectOrder?.({
+          <button type="button" onClick={() => onSelectOrder?.({
             orderId: order.orderId,
             status: 'Delivered',
             customerName: order.customerName,
@@ -144,61 +144,61 @@ function CompletedOrders({
             timePlaced: deliveredDate,
             itemsSummary: order.itemsSummary
           })} className="w-full text-left flex gap-3 items-stretch">
-                  <div className="h-20 w-20 rounded-xl overflow-hidden bg-gray-100 flex items-center justify-center flex-shrink-0 my-auto">
-                    {order.photoUrl ? <img src={order.photoUrl} alt={order.photoAlt} className="h-full w-full object-cover" /> : <div className="h-full w-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center px-2">
-                        <span className="text-[11px] font-medium text-gray-500 text-center leading-tight">
-                          {order.photoAlt}
-                        </span>
-                      </div>}
-                  </div>
+            <div className="h-20 w-20 rounded-xl overflow-hidden bg-gray-100 flex items-center justify-center flex-shrink-0 my-auto">
+              {order.photoUrl ? <img src={order.photoUrl} alt={order.photoAlt} className="h-full w-full object-cover" /> : <div className="h-full w-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center px-2">
+                <span className="text-[11px] font-medium text-gray-500 text-center leading-tight">
+                  {order.photoAlt}
+                </span>
+              </div>}
+            </div>
 
-                  <div className="flex-1 flex flex-col justify-between min-h-[80px]">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <p className="text-sm font-semibold text-black leading-tight">
-                          Order #{order.orderId}
-                        </p>
-                        <p className="text-[11px] text-gray-500 mt-1">
-                          {order.customerName}
-                        </p>
-                      </div>
+            <div className="flex-1 flex flex-col justify-between min-h-[80px]">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="text-sm font-semibold text-black leading-tight">
+                    Order #{order.orderId}
+                  </p>
+                  <p className="text-[11px] text-gray-500 mt-1">
+                    {order.customerName}
+                  </p>
+                </div>
 
-                      <div className="flex flex-col items-end gap-1">
-                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium border border-green-500 text-green-600">
-                          <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
-                          Delivered
-                        </span>
-                        <span className="text-[11px] text-gray-500 text-right">
-                          {deliveredDate}
-                        </span>
-                      </div>
-                    </div>
+                <div className="flex flex-col items-end gap-1">
+                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium border border-green-500 text-green-600">
+                    <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
+                    Delivered
+                  </span>
+                  <span className="text-[11px] text-gray-500 text-right">
+                    {deliveredDate}
+                  </span>
+                </div>
+              </div>
 
-                    <div className="mt-2">
-                      <p className="text-xs text-gray-600 line-clamp-1">
-                        {order.itemsSummary}
-                      </p>
-                    </div>
+              <div className="mt-2">
+                <p className="text-xs text-gray-600 line-clamp-1">
+                  {order.itemsSummary}
+                </p>
+              </div>
 
-                    <div className="mt-2 flex items-end justify-between gap-2">
-                      <div className="flex flex-col gap-1">
-                        <p className="text-[11px] text-gray-500">
-                          {order.type}
-                        </p>
-                      </div>
-                      <div className="flex items-baseline gap-1">
-                        <span className="text-[11px] text-gray-500">Amount</span>
-                        <span className="text-xs font-medium text-black">
-                          ₹{order.amount.toFixed(2)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </button>
-              </div>;
+              <div className="mt-2 flex items-end justify-between gap-2">
+                <div className="flex flex-col gap-1">
+                  <p className="text-[11px] text-gray-500">
+                    {order.type}
+                  </p>
+                </div>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-[11px] text-gray-500">Amount</span>
+                  <span className="text-xs font-medium text-black">
+                    ₹{order.amount.toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </button>
+        </div>;
       })}
-        </div>}
-    </div>;
+    </div>}
+  </div>;
 }
 
 // Cancelled Orders List Component
@@ -277,24 +277,24 @@ function CancelledOrders({
   }, []);
   if (loading) {
     return <div className="pt-4 pb-6">
-        <div className="flex items-baseline justify-between mb-3">
-          <h2 className="text-base font-semibold text-[#3B82F6]">Cancelled orders</h2>
-          <Loader2 className="w-4 h-4 animate-spin text-gray-500" />
-        </div>
-        <div className="text-center py-8 text-gray-500 text-sm">Loading...</div>
-      </div>;
+      <div className="flex items-baseline justify-between mb-3">
+        <h2 className="text-base font-semibold text-[#3B82F6]">Cancelled orders</h2>
+        <Loader2 className="w-4 h-4 animate-spin text-gray-500" />
+      </div>
+      <div className="text-center py-8 text-gray-500 text-sm">Loading...</div>
+    </div>;
   }
   return <div className="pt-4 pb-6">
-      <div className="flex items-baseline justify-between mb-3">
-        <h2 className="text-base font-semibold text-[#3B82F6]">
-          Cancelled orders
-        </h2>
-        <span className="text-xs text-gray-500">{orders.length} total</span>
-      </div>
-      {orders.length === 0 ? <div className="text-center py-8 text-gray-500 text-sm">
-          No cancelled orders yet
-        </div> : <div>
-          {orders.map(order => {
+    <div className="flex items-baseline justify-between mb-3">
+      <h2 className="text-base font-semibold text-[#3B82F6]">
+        Cancelled orders
+      </h2>
+      <span className="text-xs text-gray-500">{orders.length} total</span>
+    </div>
+    {orders.length === 0 ? <div className="text-center py-8 text-gray-500 text-sm">
+      No cancelled orders yet
+    </div> : <div>
+      {orders.map(order => {
         const cancelledDate = order.cancelledAt ? new Date(order.cancelledAt).toLocaleDateString('en-US', {
           month: 'short',
           day: 'numeric',
@@ -304,7 +304,7 @@ function CancelledOrders({
         }) : 'N/A';
         const cancelledByText = order.cancelledBy === 'user' ? 'Cancelled by User' : order.cancelledBy === 'restaurant' ? 'Cancelled by Restaurant' : 'Cancelled';
         return <div key={order.orderId || order.mongoId} className="w-full bg-white rounded-2xl p-4 mb-3 border border-gray-200">
-                <button type="button" onClick={() => onSelectOrder?.({
+          <button type="button" onClick={() => onSelectOrder?.({
             orderId: order.orderId,
             status: 'Cancelled',
             customerName: order.customerName,
@@ -313,64 +313,64 @@ function CancelledOrders({
             timePlaced: cancelledDate,
             itemsSummary: order.itemsSummary
           })} className="w-full text-left flex gap-3 items-stretch">
-                  <div className="h-20 w-20 rounded-xl overflow-hidden bg-gray-100 flex items-center justify-center flex-shrink-0 my-auto">
-                    {order.photoUrl ? <img src={order.photoUrl} alt={order.photoAlt} className="h-full w-full object-cover" /> : <div className="h-full w-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center px-2">
-                        <span className="text-[11px] font-medium text-gray-500 text-center leading-tight">
-                          {order.photoAlt}
-                        </span>
-                      </div>}
-                  </div>
+            <div className="h-20 w-20 rounded-xl overflow-hidden bg-gray-100 flex items-center justify-center flex-shrink-0 my-auto">
+              {order.photoUrl ? <img src={order.photoUrl} alt={order.photoAlt} className="h-full w-full object-cover" /> : <div className="h-full w-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center px-2">
+                <span className="text-[11px] font-medium text-gray-500 text-center leading-tight">
+                  {order.photoAlt}
+                </span>
+              </div>}
+            </div>
 
-                  <div className="flex-1 flex flex-col justify-between min-h-[80px]">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <p className="text-sm font-semibold text-black leading-tight">
-                          Order #{order.orderId}
-                        </p>
-                        <p className="text-[11px] text-gray-500 mt-1">
-                          {order.customerName}
-                        </p>
-                      </div>
+            <div className="flex-1 flex flex-col justify-between min-h-[80px]">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="text-sm font-semibold text-black leading-tight">
+                    Order #{order.orderId}
+                  </p>
+                  <p className="text-[11px] text-gray-500 mt-1">
+                    {order.customerName}
+                  </p>
+                </div>
 
-                      <div className="flex flex-col items-end gap-1">
-                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium border ${order.cancelledBy === 'user' ? 'border-blue-500 text-blue-600' : 'border-red-500 text-red-600'}`}>
-                          <span className={`h-1.5 w-1.5 rounded-full ${order.cancelledBy === 'user' ? 'bg-blue-500' : 'bg-red-500'}`} />
-                          {cancelledByText}
-                        </span>
-                        <span className="text-[11px] text-gray-500 text-right">
-                          {cancelledDate}
-                        </span>
-                      </div>
-                    </div>
+                <div className="flex flex-col items-end gap-1">
+                  <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium border ${order.cancelledBy === 'user' ? 'border-blue-500 text-blue-600' : 'border-red-500 text-red-600'}`}>
+                    <span className={`h-1.5 w-1.5 rounded-full ${order.cancelledBy === 'user' ? 'bg-blue-500' : 'bg-red-500'}`} />
+                    {cancelledByText}
+                  </span>
+                  <span className="text-[11px] text-gray-500 text-right">
+                    {cancelledDate}
+                  </span>
+                </div>
+              </div>
 
-                    <div className="mt-2">
-                      <p className="text-xs text-gray-600 line-clamp-1">
-                        {order.itemsSummary}
-                      </p>
-                      {order.cancellationReason && <p className="text-[10px] text-red-600 mt-1 line-clamp-1">
-                          Reason: {order.cancellationReason}
-                        </p>}
-                    </div>
+              <div className="mt-2">
+                <p className="text-xs text-gray-600 line-clamp-1">
+                  {order.itemsSummary}
+                </p>
+                {order.cancellationReason && <p className="text-[10px] text-red-600 mt-1 line-clamp-1">
+                  Reason: {order.cancellationReason}
+                </p>}
+              </div>
 
-                    <div className="mt-2 flex items-end justify-between gap-2">
-                      <div className="flex flex-col gap-1">
-                        <p className="text-[11px] text-gray-500">
-                          {order.type}
-                        </p>
-                      </div>
-                      <div className="flex items-baseline gap-1">
-                        <span className="text-[11px] text-gray-500">Amount</span>
-                        <span className="text-xs font-medium text-black">
-                          ₹{order.amount.toFixed(2)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </button>
-              </div>;
+              <div className="mt-2 flex items-end justify-between gap-2">
+                <div className="flex flex-col gap-1">
+                  <p className="text-[11px] text-gray-500">
+                    {order.type}
+                  </p>
+                </div>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-[11px] text-gray-500">Amount</span>
+                  <span className="text-xs font-medium text-black">
+                    ₹{order.amount.toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </button>
+        </div>;
       })}
-        </div>}
-    </div>;
+    </div>}
+  </div>;
 }
 export default function OrdersMain() {
   const navigate = useNavigate();
@@ -561,8 +561,8 @@ export default function OrdersMain() {
   // Check for confirmed orders that haven't been shown in popup yet (fallback if Socket.IO fails)
   useEffect(() => {
     const checkConfirmedOrders = async () => {
-      // Skip if popup is already showing or Socket.IO order exists
-      if (showNewOrderPopupRef.current || newOrderRef.current) return;
+      // Skip if popup is already showing or Socket.IO order exists or if restaurant is not active
+      if (showNewOrderPopupRef.current || newOrderRef.current || !restaurantStatus.isActive) return;
       try {
         const response = await restaurantAPI.getOrders();
         if (response.data?.success && response.data.data?.orders) {
@@ -612,14 +612,14 @@ export default function OrdersMain() {
     // Check immediately on mount
     checkConfirmedOrders();
     return () => clearInterval(interval);
-  }, []); // Empty dependency array - check runs independently
+  }, [restaurantStatus.isActive]); // Add isActive as dependency to re-run when status changes
 
   // Play audio when popup opens
   useEffect(() => {
     if (showNewOrderPopup && !isMuted) {
       if (audioRef.current) {
         audioRef.current.loop = true;
-        audioRef.current.play().catch(err => {});
+        audioRef.current.play().catch(err => { });
       }
     } else if (audioRef.current) {
       audioRef.current.pause();
@@ -759,7 +759,7 @@ export default function OrdersMain() {
       if (!isMuted) {
         audioRef.current.pause();
       } else {
-        audioRef.current.play().catch(err => {});
+        audioRef.current.play().catch(err => { });
       }
     }
   };
@@ -1005,6 +1005,12 @@ export default function OrdersMain() {
     setIsSheetOpen(true);
   };
   const renderContent = () => {
+    // If restaurant is not active but onboarding is complete, don't show order lists
+    // This prevents frequent 401 API errors from polling within these components
+    if (!restaurantStatus.isActive && restaurantStatus.onboarding?.completedSteps === 4) {
+      return null;
+    }
+
     switch (activeFilter) {
       case "preparing":
         return <PreparingOrders onSelectOrder={handleSelectOrder} onCancel={handleCancelClick} />;
@@ -1023,27 +1029,27 @@ export default function OrdersMain() {
     }
   };
   return <div className="min-h-screen bg-gray-100 flex flex-col">
-      {/* Subscription renewal reminder popup */}
-      <SubscriptionRenewalPopup />
+    {/* Subscription renewal reminder popup */}
+    <SubscriptionRenewalPopup />
 
-      {/* Restaurant Navbar - Sticky at top */}
-      <div className="sticky top-0 z-50 bg-white">
-        <RestaurantNavbar showNotifications={false} />
-      </div>
+    {/* Restaurant Navbar - Sticky at top */}
+    <div className="sticky top-0 z-50 bg-white">
+      <RestaurantNavbar showNotifications={false} />
+    </div>
 
-      {/* Top Filter Bar - Sticky below navbar */}
-      <div className="sticky top-[50px] z-40 pb-2 bg-gray-100">
-        <div ref={filterBarRef} className="flex gap-2 overflow-x-auto scrollbar-hide bg-transparent rounded-full px-3 py-2 mt-2" style={{
+    {/* Top Filter Bar - Sticky below navbar */}
+    <div className="sticky top-[50px] z-40 pb-2 bg-gray-100">
+      <div ref={filterBarRef} className="flex gap-2 overflow-x-auto scrollbar-hide bg-transparent rounded-full px-3 py-2 mt-2" style={{
         scrollbarWidth: 'none',
         msOverflowStyle: 'none',
         WebkitOverflowScrolling: 'touch'
       }}>
-          <style>{`
+        <style>{`
             .scrollbar-hide::-webkit-scrollbar {
               display: none;
             }
           `}</style>
-          {filterTabs.map((tab, index) => {
+        {filterTabs.map((tab, index) => {
           const isActive = activeFilter === tab.id;
           return <motion.button key={tab.id} onClick={() => {
             if (!isTransitioning) {
@@ -1061,19 +1067,19 @@ export default function OrdersMain() {
           }} whileTap={{
             scale: 0.95
           }}>
-                {isActive && <motion.div layoutId="activeFilterBackground" className="absolute inset-0 bg-[#3B82F6] rounded-full -z-10" initial={false} transition={{
+            {isActive && <motion.div layoutId="activeFilterBackground" className="absolute inset-0 bg-[#3B82F6] rounded-full -z-10" initial={false} transition={{
               type: "spring",
               stiffness: 500,
               damping: 30
             }} />}
-                <span className="relative z-10">{tab.label}</span>
-              </motion.button>;
+            <span className="relative z-10">{tab.label}</span>
+          </motion.button>;
         })}
-        </div>
       </div>
+    </div>
 
-      {/* Content Area - Scrollable */}
-      <div ref={contentRef} className="flex-1 overflow-y-auto px-4 pb-24 content-scroll" onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd} onMouseDown={e => {
+    {/* Content Area - Scrollable */}
+    <div ref={contentRef} className="flex-1 overflow-y-auto px-4 pb-24 content-scroll" onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd} onMouseDown={e => {
       mouseStartX.current = e.clientX;
       mouseEndX.current = e.clientX;
       isMouseDown.current = true;
@@ -1120,7 +1126,7 @@ export default function OrdersMain() {
       isMouseDown.current = false;
       isSwiping.current = false;
     }}>
-        <style>{`
+      <style>{`
           .content-scroll::-webkit-scrollbar {
             display: none;
           }
@@ -1139,8 +1145,8 @@ export default function OrdersMain() {
           }
         `}</style>
 
-        {/* Verification Pending Card - Show if onboarding is complete (all 4 steps) and restaurant is not active */}
-        {!restaurantStatus.isLoading && !restaurantStatus.isActive && restaurantStatus.onboarding?.completedSteps === 4 && <motion.div initial={{
+      {/* Verification Pending Card - Show if onboarding is complete (all 4 steps) and restaurant is not active */}
+      {!restaurantStatus.isLoading && !restaurantStatus.isActive && restaurantStatus.onboarding?.completedSteps === 4 && <motion.div initial={{
         opacity: 0,
         y: 20
       }} animate={{
@@ -1150,40 +1156,40 @@ export default function OrdersMain() {
         duration: 0.3,
         delay: 0.1
       }} className={`mt-4 mb-4 rounded-2xl shadow-sm px-6 py-4 ${restaurantStatus.rejectionReason ? 'bg-white border border-red-200' : 'bg-white border border-yellow-200'}`}>
-              {restaurantStatus.rejectionReason ? <>
-                  <div className="flex items-start gap-3 mb-3">
-                    <div className="flex-shrink-0 rounded-full p-2 bg-red-100">
-                      <AlertCircle className="w-5 h-5 text-red-600" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-lg font-bold text-red-600 mb-2">Denied Verification</h3>
-                      <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-3">
-                        <p className="text-xs font-semibold text-red-800 mb-2">Reason for Rejection:</p>
-                        <div className="text-xs text-red-700 space-y-1">
-                          {restaurantStatus.rejectionReason.split('\n').filter(line => line.trim()).length > 1 ? <ul className="space-y-1 list-disc list-inside">
-                              {restaurantStatus.rejectionReason.split('\n').map((point, index) => point.trim() && <li key={index}>{point.trim()}</li>)}
-                            </ul> : <p className="text-red-700">{restaurantStatus.rejectionReason}</p>}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <p className="text-sm text-gray-700 mb-3">
-                    Please correct the above issues and click "Reverify" to resubmit your request for approval.
-                  </p>
-                  <button onClick={handleReverify} disabled={isReverifying} className="w-full px-6 py-2.5 bg-blue-600 text-white rounded-lg font-semibold text-sm hover:bg-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
-                    {isReverifying ? <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Submitting...
-                      </> : "Reverify"}
-                  </button>
-                </> : <>
-                  <h3 className="text-lg font-bold text-gray-900 mb-1">Verification Done in 24 Hours</h3>
-                  <p className="text-sm text-gray-600">Your account is under verification. You'll be notified once approved.</p>
-                </>}
-            </motion.div>}
+        {restaurantStatus.rejectionReason ? <>
+          <div className="flex items-start gap-3 mb-3">
+            <div className="flex-shrink-0 rounded-full p-2 bg-red-100">
+              <AlertCircle className="w-5 h-5 text-red-600" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="text-lg font-bold text-red-600 mb-2">Denied Verification</h3>
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-3">
+                <p className="text-xs font-semibold text-red-800 mb-2">Reason for Rejection:</p>
+                <div className="text-xs text-red-700 space-y-1">
+                  {restaurantStatus.rejectionReason.split('\n').filter(line => line.trim()).length > 1 ? <ul className="space-y-1 list-disc list-inside">
+                    {restaurantStatus.rejectionReason.split('\n').map((point, index) => point.trim() && <li key={index}>{point.trim()}</li>)}
+                  </ul> : <p className="text-red-700">{restaurantStatus.rejectionReason}</p>}
+                </div>
+              </div>
+            </div>
+          </div>
+          <p className="text-sm text-gray-700 mb-3">
+            Please correct the above issues and click "Reverify" to resubmit your request for approval.
+          </p>
+          <button onClick={handleReverify} disabled={isReverifying} className="w-full px-6 py-2.5 bg-blue-600 text-white rounded-lg font-semibold text-sm hover:bg-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+            {isReverifying ? <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Submitting...
+            </> : "Reverify"}
+          </button>
+        </> : <>
+          <h3 className="text-lg font-bold text-gray-900 mb-1">Verification Done in 24 Hours</h3>
+          <p className="text-sm text-gray-600">Your account is under verification. You'll be notified once approved.</p>
+        </>}
+      </motion.div>}
 
-        <AnimatePresence mode="wait">
-          <motion.div key={activeFilter} initial={{
+      <AnimatePresence mode="wait">
+        <motion.div key={activeFilter} initial={{
           opacity: 0,
           x: 20
         }} animate={{
@@ -1195,25 +1201,25 @@ export default function OrdersMain() {
         }} transition={{
           duration: 0.3
         }}>
-            {renderContent()}
-          </motion.div>
-        </AnimatePresence>
-      </div>
+          {renderContent()}
+        </motion.div>
+      </AnimatePresence>
+    </div>
 
-      {/* Audio element */}
-      <audio ref={audioRef} src={notificationSound} />
+    {/* Audio element */}
+    <audio ref={audioRef} src={notificationSound} />
 
-      {/* New Order Popup */}
-      <AnimatePresence>
-        {showNewOrderPopup && <>
-            <motion.div className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-4" initial={{
+    {/* New Order Popup */}
+    <AnimatePresence>
+      {showNewOrderPopup && <>
+        <motion.div className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-4" initial={{
           opacity: 0
         }} animate={{
           opacity: 1
         }} exit={{
           opacity: 0
         }}>
-              <motion.div className="w-[95%] max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden" initial={{
+          <motion.div className="w-[95%] max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden" initial={{
             scale: 0.9,
             opacity: 0
           }} animate={{
@@ -1227,60 +1233,60 @@ export default function OrdersMain() {
             damping: 25,
             stiffness: 300
           }} onClick={e => e.stopPropagation()}>
-                {/* Header */}
-                <div className="px-6 py-5 bg-white border-b border-gray-100 flex items-center justify-between">
-                  <div>
-                    <h3 className="text-xl font-extrabold text-gray-900 tracking-tight">
-                      {(popupOrder || newOrder)?.orderId || '#Order'}
-                    </h3>
-                    <p className="text-[13px] text-gray-500 font-semibold mt-0.5">
-                      {(popupOrder || newOrder)?.restaurantName || 'Restaurant'}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <button onClick={handlePrint} className="p-1.5 hover:bg-gray-50 rounded-lg transition-colors group" aria-label="Print">
-                      <Printer className="w-[20px] h-[20px] text-gray-700 group-hover:text-black" />
-                    </button>
-                    <button onClick={toggleMute} className="p-1.5 hover:bg-gray-50 rounded-lg transition-colors group" aria-label={isMuted ? "Unmute" : "Mute"}>
-                      {isMuted ? <VolumeX className="w-[20px] h-[20px] text-gray-700 group-hover:text-black" /> : <Volume2 className="w-[20px] h-[20px] text-gray-700 group-hover:text-black" />}
-                    </button>
-                  </div>
-                </div>
+            {/* Header */}
+            <div className="px-6 py-5 bg-white border-b border-gray-100 flex items-center justify-between">
+              <div>
+                <h3 className="text-xl font-extrabold text-gray-900 tracking-tight">
+                  {(popupOrder || newOrder)?.orderId || '#Order'}
+                </h3>
+                <p className="text-[13px] text-gray-500 font-semibold mt-0.5">
+                  {(popupOrder || newOrder)?.restaurantName || 'Restaurant'}
+                </p>
+              </div>
+              <div className="flex items-center gap-4">
+                <button onClick={handlePrint} className="p-1.5 hover:bg-gray-50 rounded-lg transition-colors group" aria-label="Print">
+                  <Printer className="w-[20px] h-[20px] text-gray-700 group-hover:text-black" />
+                </button>
+                <button onClick={toggleMute} className="p-1.5 hover:bg-gray-50 rounded-lg transition-colors group" aria-label={isMuted ? "Unmute" : "Mute"}>
+                  {isMuted ? <VolumeX className="w-[20px] h-[20px] text-gray-700 group-hover:text-black" /> : <Volume2 className="w-[20px] h-[20px] text-gray-700 group-hover:text-black" />}
+                </button>
+              </div>
+            </div>
 
-                {/* Content */}
-                <div className="px-6 py-5 max-h-[70vh] overflow-y-auto custom-scrollbar">
-                  {/* Item Summary and Date */}
-                  <div className="mb-6">
-                    <h4 className="text-[16px] font-extrabold text-gray-900 tracking-tight">
-                      {(popupOrder || newOrder)?.items?.[0]?.name || 'New Order'}
-                    </h4>
-                    <p className="text-[13px] text-gray-500 font-medium mt-1">
-                      {(popupOrder || newOrder)?.createdAt ? new Date((popupOrder || newOrder).createdAt).toLocaleString('en-GB', {
+            {/* Content */}
+            <div className="px-6 py-5 max-h-[70vh] overflow-y-auto custom-scrollbar">
+              {/* Item Summary and Date */}
+              <div className="mb-6">
+                <h4 className="text-[16px] font-extrabold text-gray-900 tracking-tight">
+                  {(popupOrder || newOrder)?.items?.[0]?.name || 'New Order'}
+                </h4>
+                <p className="text-[13px] text-gray-500 font-medium mt-1">
+                  {(popupOrder || newOrder)?.createdAt ? new Date((popupOrder || newOrder).createdAt).toLocaleString('en-GB', {
                     day: 'numeric',
                     month: 'short',
                     hour: '2-digit',
                     minute: '2-digit'
                   }).replace(',', '') : 'Just now'}
-                    </p>
+                </p>
+              </div>
+
+              {/* Details Accordion */}
+              <div className="mb-2">
+                <button onClick={() => setIsDetailsExpanded(!isDetailsExpanded)} className="w-full flex items-center justify-between py-3.5 group">
+                  <div className="flex items-center gap-3">
+                    <svg className="w-5 h-5 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <span className="text-sm font-bold text-gray-900">Details</span>
+                    <span className="text-[13px] font-medium text-gray-500">
+                      {(popupOrder || newOrder)?.items?.length || 0} item{(popupOrder || newOrder)?.items?.length !== 1 ? 's' : ''}
+                    </span>
                   </div>
+                  <ChevronDown className={`w-4 h-4 text-gray-400 group-hover:text-gray-600 transition-transform duration-300 ${isDetailsExpanded ? 'rotate-180' : ''}`} />
+                </button>
 
-                  {/* Details Accordion */}
-                  <div className="mb-2">
-                    <button onClick={() => setIsDetailsExpanded(!isDetailsExpanded)} className="w-full flex items-center justify-between py-3.5 group">
-                      <div className="flex items-center gap-3">
-                        <svg className="w-5 h-5 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                        <span className="text-sm font-bold text-gray-900">Details</span>
-                        <span className="text-[13px] font-medium text-gray-500">
-                          {(popupOrder || newOrder)?.items?.length || 0} item{(popupOrder || newOrder)?.items?.length !== 1 ? 's' : ''}
-                        </span>
-                      </div>
-                      <ChevronDown className={`w-4 h-4 text-gray-400 group-hover:text-gray-600 transition-transform duration-300 ${isDetailsExpanded ? 'rotate-180' : ''}`} />
-                    </button>
-
-                    <AnimatePresence>
-                      {isDetailsExpanded && <motion.div initial={{
+                <AnimatePresence>
+                  {isDetailsExpanded && <motion.div initial={{
                     height: 0,
                     opacity: 0
                   }} animate={{
@@ -1293,82 +1299,82 @@ export default function OrdersMain() {
                     duration: 0.25,
                     ease: "easeInOut"
                   }} className="overflow-hidden">
-                          <div className="pb-5 space-y-4 pt-1">
-                            {(popupOrder || newOrder)?.items?.map((item, index) => <div key={index} className="flex items-center justify-between px-1">
-                                <div className="flex items-center gap-3">
-                                  <div className={`w-2 h-2 rounded-full shrink-0 ${item.isVeg !== false ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                                  <p className="text-[14px] font-bold text-gray-900">
-                                    {item.quantity} x {item.name}
-                                  </p>
-                                </div>
-                                <p className="text-[14px] font-bold text-gray-900">
-                                  ₹{item.price * item.quantity}
-                                </p>
-                              </div>) || <p className="text-sm text-gray-500">No items</p>}
-                          </div>
-                        </motion.div>}
-                    </AnimatePresence>
-                  </div>
-
-                  {/* Send cutlery */}
-                  <div className="mb-6 p-4 bg-gray-50/70 rounded-xl border border-gray-100 flex items-center gap-3 mt-2">
-                    <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-                    </svg>
-                    <span className="text-[14px] font-bold text-gray-600">Send cutlery</span>
-                  </div>
-
-                  {/* Total bill */}
-                  <div className="mb-6 flex items-center justify-between py-5 border-y border-gray-100">
-                    <div className="flex items-center gap-3">
-                      <svg className="w-5 h-5 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" />
-                      </svg>
-                      <span className="text-[15px] font-extrabold text-gray-900">Total bill</span>
+                    <div className="pb-5 space-y-4 pt-1">
+                      {(popupOrder || newOrder)?.items?.map((item, index) => <div key={index} className="flex items-center justify-between px-1">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-2 h-2 rounded-full shrink-0 ${item.isVeg !== false ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                          <p className="text-[14px] font-bold text-gray-900">
+                            {item.quantity} x {item.name}
+                          </p>
+                        </div>
+                        <p className="text-[14px] font-bold text-gray-900">
+                          ₹{item.price * item.quantity}
+                        </p>
+                      </div>) || <p className="text-sm text-gray-500">No items</p>}
                     </div>
-                    <span className="text-[18px] font-extrabold text-gray-950">
-                      ₹{(popupOrder || newOrder)?.total || 0}
-                    </span>
-                  </div>
+                  </motion.div>}
+                </AnimatePresence>
+              </div>
 
-                  {/* Payment method */}
-                  <div className="mb-6 flex items-center justify-between px-1">
-                    <span className="text-[14px] font-semibold text-gray-500">Payment</span>
-                    {(() => {
+              {/* Send cutlery */}
+              <div className="mb-6 p-4 bg-gray-50/70 rounded-xl border border-gray-100 flex items-center gap-3 mt-2">
+                <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+                <span className="text-[14px] font-bold text-gray-600">Send cutlery</span>
+              </div>
+
+              {/* Total bill */}
+              <div className="mb-6 flex items-center justify-between py-5 border-y border-gray-100">
+                <div className="flex items-center gap-3">
+                  <svg className="w-5 h-5 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" />
+                  </svg>
+                  <span className="text-[15px] font-extrabold text-gray-900">Total bill</span>
+                </div>
+                <span className="text-[18px] font-extrabold text-gray-950">
+                  ₹{(popupOrder || newOrder)?.total || 0}
+                </span>
+              </div>
+
+              {/* Payment method */}
+              <div className="mb-6 flex items-center justify-between px-1">
+                <span className="text-[14px] font-semibold text-gray-500">Payment</span>
+                {(() => {
                   const raw = (popupOrder || newOrder)?.paymentMethod ?? (popupOrder || newOrder)?.payment?.method;
                   const m = raw != null ? String(raw).toLowerCase().trim() : '';
                   const isCod = m === 'cash' || m === 'cod' || m === 'cash on delivery';
                   return <span className={`text-[14px] font-extrabold ${isCod ? 'text-amber-600' : 'text-green-600'}`}>
-                          {isCod ? 'Cash on Delivery' : 'Online'}
-                        </span>;
+                    {isCod ? 'Cash on Delivery' : 'Online'}
+                  </span>;
                 })()}
-                  </div>
+              </div>
 
-                  {/* Preparation time */}
-                  <div className="mb-7 flex items-center justify-between px-1">
-                    <span className="text-[14px] font-semibold text-gray-500">Preparation time</span>
-                    <div className="flex items-center gap-4">
-                      <button onClick={() => setPrepTime(Math.max(1, prepTime - 1))} className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-full transition-all">
-                        <Minus className="w-4 h-4 text-gray-700" />
-                      </button>
-                      <span className="text-[15px] font-extrabold text-gray-950 min-w-[65px] text-center">
-                        {prepTime} mins
-                      </span>
-                      <button onClick={() => setPrepTime(prepTime + 1)} className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-full transition-all">
-                        <Plus className="w-4 h-4 text-gray-700" />
-                      </button>
-                    </div>
-                  </div>
+              {/* Preparation time */}
+              <div className="mb-7 flex items-center justify-between px-1">
+                <span className="text-[14px] font-semibold text-gray-500">Preparation time</span>
+                <div className="flex items-center gap-4">
+                  <button onClick={() => setPrepTime(Math.max(1, prepTime - 1))} className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-full transition-all">
+                    <Minus className="w-4 h-4 text-gray-700" />
+                  </button>
+                  <span className="text-[15px] font-extrabold text-gray-950 min-w-[65px] text-center">
+                    {prepTime} mins
+                  </span>
+                  <button onClick={() => setPrepTime(prepTime + 1)} className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-full transition-all">
+                    <Plus className="w-4 h-4 text-gray-700" />
+                  </button>
+                </div>
+              </div>
 
-                  {/* Accept and Reject buttons */}
-                  <div className="space-y-4 px-1">
-                    <div className="relative rounded-xl overflow-hidden shadow-lg shadow-blue-100">
-                      <button onClick={handleAcceptOrder} className="w-full bg-[#1A68FF] text-white py-4 font-extrabold text-[15px] hover:bg-blue-600 transition-colors flex items-center justify-center gap-2 relative z-10">
-                        Accept ({formatTime(countdown)})
-                      </button>
-                      {/* Accept Loading Bar at bottom (matching screenshot style) */}
-                      <div className="absolute bottom-0 left-0 h-1.5 bg-black/20 w-full z-20">
-                        <motion.div className="h-full bg-black/40" initial={{
+              {/* Accept and Reject buttons */}
+              <div className="space-y-4 px-1">
+                <div className="relative rounded-xl overflow-hidden shadow-lg shadow-blue-100">
+                  <button onClick={handleAcceptOrder} className="w-full bg-[#1A68FF] text-white py-4 font-extrabold text-[15px] hover:bg-blue-600 transition-colors flex items-center justify-center gap-2 relative z-10">
+                    Accept ({formatTime(countdown)})
+                  </button>
+                  {/* Accept Loading Bar at bottom (matching screenshot style) */}
+                  <div className="absolute bottom-0 left-0 h-1.5 bg-black/20 w-full z-20">
+                    <motion.div className="h-full bg-black/40" initial={{
                       width: "100%"
                     }} animate={{
                       width: `${countdown / 240 * 100}%`
@@ -1376,37 +1382,37 @@ export default function OrdersMain() {
                       duration: 1,
                       ease: "linear"
                     }} />
-                      </div>
-                    </div>
-
-                    <button onClick={handleRejectClick} className="w-full bg-white border border-red-500 text-red-600 py-3.5 rounded-xl font-extrabold text-[15px] hover:bg-red-50 transition-colors">
-                      Reject Order
-                    </button>
-                  </div>
-
-                  {/* Need Help Link */}
-                  <div className="mt-8 pb-2">
-                    <button className="text-[14px] font-bold text-gray-600 hover:text-gray-900 transition-colors underline underline-offset-4 mx-auto block decoration-gray-300 hover:decoration-gray-900">
-                      Need help with this order?
-                    </button>
                   </div>
                 </div>
-              </motion.div>
-            </motion.div>
-          </>}
-      </AnimatePresence>
 
-      {/* Reject Order Popup */}
-      <AnimatePresence>
-        {showRejectPopup && <>
-            <motion.div className="fixed inset-0 z-[70] bg-black/60 flex items-center justify-center p-4" initial={{
+                <button onClick={handleRejectClick} className="w-full bg-white border border-red-500 text-red-600 py-3.5 rounded-xl font-extrabold text-[15px] hover:bg-red-50 transition-colors">
+                  Reject Order
+                </button>
+              </div>
+
+              {/* Need Help Link */}
+              <div className="mt-8 pb-2">
+                <button className="text-[14px] font-bold text-gray-600 hover:text-gray-900 transition-colors underline underline-offset-4 mx-auto block decoration-gray-300 hover:decoration-gray-900">
+                  Need help with this order?
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        </motion.div>
+      </>}
+    </AnimatePresence>
+
+    {/* Reject Order Popup */}
+    <AnimatePresence>
+      {showRejectPopup && <>
+        <motion.div className="fixed inset-0 z-[70] bg-black/60 flex items-center justify-center p-4" initial={{
           opacity: 0
         }} animate={{
           opacity: 1
         }} exit={{
           opacity: 0
         }} onClick={handleRejectCancel}>
-              <motion.div className="w-[95%] max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden" initial={{
+          <motion.div className="w-[95%] max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden" initial={{
             scale: 0.9,
             opacity: 0
           }} animate={{
@@ -1420,57 +1426,57 @@ export default function OrdersMain() {
             damping: 25,
             stiffness: 300
           }} onClick={e => e.stopPropagation()}>
-                {/* Header */}
-                <div className="px-4 py-4 border-b border-gray-200">
-                  <h3 className="text-lg font-bold text-gray-900">
-                    Reject Order {(popupOrder || newOrder)?.orderId || '#Order'}
-                  </h3>
-                  <p className="text-sm text-gray-500 mt-1">Please select a reason for rejecting this order</p>
-                </div>
+            {/* Header */}
+            <div className="px-4 py-4 border-b border-gray-200">
+              <h3 className="text-lg font-bold text-gray-900">
+                Reject Order {(popupOrder || newOrder)?.orderId || '#Order'}
+              </h3>
+              <p className="text-sm text-gray-500 mt-1">Please select a reason for rejecting this order</p>
+            </div>
 
-                {/* Content */}
-                <div className="px-4 py-4 max-h-[60vh] overflow-y-auto">
-                  <div className="space-y-2">
-                    {rejectReasons.map(reason => <button key={reason} onClick={() => setRejectReason(reason)} className={`w-full text-left p-4 rounded-lg border-2 transition-all ${rejectReason === reason ? "border-[#3B82F6] bg-blue-50" : "border-gray-200 bg-white hover:border-gray-300"}`}>
-                        <div className="flex items-center justify-between">
-                          <span className={`text-sm font-medium ${rejectReason === reason ? "text-[#3B82F6]" : "text-gray-900"}`}>
-                            {reason}
-                          </span>
-                          {rejectReason === reason && <div className="w-5 h-5 rounded-full bg-[#3B82F6] flex items-center justify-center">
-                              <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                              </svg>
-                            </div>}
-                        </div>
-                      </button>)}
+            {/* Content */}
+            <div className="px-4 py-4 max-h-[60vh] overflow-y-auto">
+              <div className="space-y-2">
+                {rejectReasons.map(reason => <button key={reason} onClick={() => setRejectReason(reason)} className={`w-full text-left p-4 rounded-lg border-2 transition-all ${rejectReason === reason ? "border-[#3B82F6] bg-blue-50" : "border-gray-200 bg-white hover:border-gray-300"}`}>
+                  <div className="flex items-center justify-between">
+                    <span className={`text-sm font-medium ${rejectReason === reason ? "text-[#3B82F6]" : "text-gray-900"}`}>
+                      {reason}
+                    </span>
+                    {rejectReason === reason && <div className="w-5 h-5 rounded-full bg-[#3B82F6] flex items-center justify-center">
+                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>}
                   </div>
-                </div>
+                </button>)}
+              </div>
+            </div>
 
-                {/* Footer */}
-                <div className="px-4 py-4 bg-gray-50 border-t border-gray-200 flex gap-3">
-                  <button onClick={handleRejectCancel} className="flex-1 bg-white border-2 border-gray-300 text-gray-700 py-3 rounded-lg font-semibold text-sm hover:bg-gray-50 transition-colors">
-                    Cancel
-                  </button>
-                  <button onClick={handleRejectConfirm} disabled={!rejectReason} className={`flex-1 py-3 rounded-lg font-semibold text-sm transition-colors ${rejectReason ? "!bg-[#3B82F6] !text-white" : "bg-gray-200 text-gray-400 cursor-not-allowed"}`}>
-                    Confirm Rejection
-                  </button>
-                </div>
-              </motion.div>
-            </motion.div>
-          </>}
-      </AnimatePresence>
+            {/* Footer */}
+            <div className="px-4 py-4 bg-gray-50 border-t border-gray-200 flex gap-3">
+              <button onClick={handleRejectCancel} className="flex-1 bg-white border-2 border-gray-300 text-gray-700 py-3 rounded-lg font-semibold text-sm hover:bg-gray-50 transition-colors">
+                Cancel
+              </button>
+              <button onClick={handleRejectConfirm} disabled={!rejectReason} className={`flex-1 py-3 rounded-lg font-semibold text-sm transition-colors ${rejectReason ? "!bg-[#3B82F6] !text-white" : "bg-gray-200 text-gray-400 cursor-not-allowed"}`}>
+                Confirm Rejection
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      </>}
+    </AnimatePresence>
 
-      {/* Cancel Order Popup */}
-      <AnimatePresence>
-        {showCancelPopup && orderToCancel && <>
-            <motion.div className="fixed inset-0 z-[70] bg-black/60 flex items-center justify-center p-4" initial={{
+    {/* Cancel Order Popup */}
+    <AnimatePresence>
+      {showCancelPopup && orderToCancel && <>
+        <motion.div className="fixed inset-0 z-[70] bg-black/60 flex items-center justify-center p-4" initial={{
           opacity: 0
         }} animate={{
           opacity: 1
         }} exit={{
           opacity: 0
         }} onClick={handleCancelPopupClose}>
-              <motion.div className="w-[95%] max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden" initial={{
+          <motion.div className="w-[95%] max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden" initial={{
             scale: 0.9,
             opacity: 0
           }} animate={{
@@ -1484,56 +1490,56 @@ export default function OrdersMain() {
             damping: 25,
             stiffness: 300
           }} onClick={e => e.stopPropagation()}>
-                {/* Header */}
-                <div className="px-4 py-4 border-b border-gray-200">
-                  <h3 className="text-lg font-bold text-gray-900">
-                    Cancel Order {orderToCancel.orderId || '#Order'}
-                  </h3>
-                  <p className="text-sm text-gray-500 mt-1">Please provide a reason for cancelling this order</p>
-                </div>
+            {/* Header */}
+            <div className="px-4 py-4 border-b border-gray-200">
+              <h3 className="text-lg font-bold text-gray-900">
+                Cancel Order {orderToCancel.orderId || '#Order'}
+              </h3>
+              <p className="text-sm text-gray-500 mt-1">Please provide a reason for cancelling this order</p>
+            </div>
 
-                {/* Content */}
-                <div className="px-4 py-4">
-                  <div className="space-y-3">
-                    {rejectReasons.map(reason => <button key={reason} type="button" onClick={() => setCancelReason(reason)} className={`w-full text-left px-4 py-3 rounded-lg border-2 transition-colors ${cancelReason === reason ? "border-red-500 bg-red-50" : "border-gray-200 hover:border-gray-300"}`}>
-                        <div className="flex items-center gap-3">
-                          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${cancelReason === reason ? "border-red-500 bg-red-500" : "border-gray-300"}`}>
-                            {cancelReason === reason && <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                              </svg>}
-                          </div>
-                          <span className={`text-sm font-medium ${cancelReason === reason ? "text-red-700" : "text-gray-700"}`}>
-                            {reason}
-                          </span>
-                        </div>
-                      </button>)}
+            {/* Content */}
+            <div className="px-4 py-4">
+              <div className="space-y-3">
+                {rejectReasons.map(reason => <button key={reason} type="button" onClick={() => setCancelReason(reason)} className={`w-full text-left px-4 py-3 rounded-lg border-2 transition-colors ${cancelReason === reason ? "border-red-500 bg-red-50" : "border-gray-200 hover:border-gray-300"}`}>
+                  <div className="flex items-center gap-3">
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${cancelReason === reason ? "border-red-500 bg-red-500" : "border-gray-300"}`}>
+                      {cancelReason === reason && <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                      </svg>}
+                    </div>
+                    <span className={`text-sm font-medium ${cancelReason === reason ? "text-red-700" : "text-gray-700"}`}>
+                      {reason}
+                    </span>
                   </div>
-                </div>
+                </button>)}
+              </div>
+            </div>
 
-                {/* Footer */}
-                <div className="px-4 py-4 bg-gray-50 border-t border-gray-200 flex gap-3">
-                  <button onClick={handleCancelPopupClose} className="flex-1 bg-white border-2 border-gray-300 text-gray-700 py-3 rounded-lg font-semibold text-sm hover:bg-gray-50 transition-colors">
-                    Cancel
-                  </button>
-                  <button onClick={handleCancelConfirm} disabled={!cancelReason} className={`flex-1 py-3 rounded-lg font-semibold text-sm transition-colors ${cancelReason ? "!bg-red-600 !text-white hover:bg-red-700" : "bg-gray-200 text-gray-400 cursor-not-allowed"}`}>
-                    Confirm Cancellation
-                  </button>
-                </div>
-              </motion.div>
-            </motion.div>
-          </>}
-      </AnimatePresence>
+            {/* Footer */}
+            <div className="px-4 py-4 bg-gray-50 border-t border-gray-200 flex gap-3">
+              <button onClick={handleCancelPopupClose} className="flex-1 bg-white border-2 border-gray-300 text-gray-700 py-3 rounded-lg font-semibold text-sm hover:bg-gray-50 transition-colors">
+                Cancel
+              </button>
+              <button onClick={handleCancelConfirm} disabled={!cancelReason} className={`flex-1 py-3 rounded-lg font-semibold text-sm transition-colors ${cancelReason ? "!bg-red-600 !text-white hover:bg-red-700" : "bg-gray-200 text-gray-400 cursor-not-allowed"}`}>
+                Confirm Cancellation
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      </>}
+    </AnimatePresence>
 
-      {/* Bottom Sheet for Order Details */}
-      <AnimatePresence>
-        {isSheetOpen && selectedOrder && <motion.div className="fixed inset-0 z-[60] bg-black/40 flex items-end justify-center" initial={{
+    {/* Bottom Sheet for Order Details */}
+    <AnimatePresence>
+      {isSheetOpen && selectedOrder && <motion.div className="fixed inset-0 z-[60] bg-black/40 flex items-end justify-center" initial={{
         opacity: 0
       }} animate={{
         opacity: 1
       }} exit={{
         opacity: 0
       }} onClick={() => setIsSheetOpen(false)}>
-            <motion.div className="w-full max-w-md mx-auto bg-white rounded-t-3xl p-4 pb-6 shadow-lg" initial={{
+        <motion.div className="w-full max-w-md mx-auto bg-white rounded-t-3xl p-4 pb-6 shadow-lg" initial={{
           y: 80
         }} animate={{
           y: 0
@@ -1542,62 +1548,62 @@ export default function OrdersMain() {
         }} transition={{
           duration: 0.25
         }} onClick={e => e.stopPropagation()}>
-              {/* Drag handle */}
-              <div className="flex justify-center mb-3">
-                <div className="h-1 w-10 rounded-full bg-gray-300" />
-              </div>
+          {/* Drag handle */}
+          <div className="flex justify-center mb-3">
+            <div className="h-1 w-10 rounded-full bg-gray-300" />
+          </div>
 
-              <div className="flex items-start justify-between gap-2 mb-2">
-                <div>
-                  <p className="text-sm font-semibold text-black">
-                    Order #{selectedOrder.orderId}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    {selectedOrder.customerName}
-                  </p>
-                  <p className="text-[11px] text-gray-500 mt-1">
-                    {selectedOrder.type}
-                    {selectedOrder.tableOrToken ? ` • ${selectedOrder.tableOrToken}` : ""}
-                  </p>
-                </div>
-                <div className="flex flex-col items-end gap-1">
-                  <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium border ${selectedOrder.status === "Ready" ? "border-green-500 text-green-600" : "border-gray-800 text-gray-900"}`}>
-                    <span className={`h-1.5 w-1.5 rounded-full ${selectedOrder.status === "Ready" ? "bg-green-500" : "bg-gray-800"}`} />
-                    {selectedOrder.status}
-                  </span>
-                  <span className="text-[11px] text-gray-500">
-                    {selectedOrder.timePlaced}
-                  </span>
-                </div>
-              </div>
+          <div className="flex items-start justify-between gap-2 mb-2">
+            <div>
+              <p className="text-sm font-semibold text-black">
+                Order #{selectedOrder.orderId}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                {selectedOrder.customerName}
+              </p>
+              <p className="text-[11px] text-gray-500 mt-1">
+                {selectedOrder.type}
+                {selectedOrder.tableOrToken ? ` • ${selectedOrder.tableOrToken}` : ""}
+              </p>
+            </div>
+            <div className="flex flex-col items-end gap-1">
+              <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium border ${selectedOrder.status === "Ready" ? "border-green-500 text-green-600" : "border-gray-800 text-gray-900"}`}>
+                <span className={`h-1.5 w-1.5 rounded-full ${selectedOrder.status === "Ready" ? "bg-green-500" : "bg-gray-800"}`} />
+                {selectedOrder.status}
+              </span>
+              <span className="text-[11px] text-gray-500">
+                {selectedOrder.timePlaced}
+              </span>
+            </div>
+          </div>
 
-              <div className="border-t border-gray-100 my-3" />
+          <div className="border-t border-gray-100 my-3" />
 
-              <div className="mb-3">
-                <p className="text-xs font-medium text-gray-700 mb-1">
-                  Items
-                </p>
-                <p className="text-xs text-gray-600">
-                  {selectedOrder.itemsSummary}
-                </p>
-              </div>
+          <div className="mb-3">
+            <p className="text-xs font-medium text-gray-700 mb-1">
+              Items
+            </p>
+            <p className="text-xs text-gray-600">
+              {selectedOrder.itemsSummary}
+            </p>
+          </div>
 
-              <div className="flex items-center justify-between text-[11px] text-gray-500 mb-4">
-                {/* Hide ETA for ready orders */}
-                {selectedOrder.status !== 'ready' && selectedOrder.eta && <span>ETA: <span className="font-medium text-black">{selectedOrder.eta}</span></span>}
-                <span>Payment: <span className="font-medium text-black">Paid online</span></span>
-              </div>
+          <div className="flex items-center justify-between text-[11px] text-gray-500 mb-4">
+            {/* Hide ETA for ready orders */}
+            {selectedOrder.status !== 'ready' && selectedOrder.eta && <span>ETA: <span className="font-medium text-black">{selectedOrder.eta}</span></span>}
+            <span>Payment: <span className="font-medium text-black">Paid online</span></span>
+          </div>
 
-              <button className="w-full bg-[#3B82F6] text-white py-2.5 rounded-xl text-sm font-medium" onClick={() => setIsSheetOpen(false)}>
-                Close
-              </button>
-            </motion.div>
-          </motion.div>}
-      </AnimatePresence>
+          <button className="w-full bg-[#3B82F6] text-white py-2.5 rounded-xl text-sm font-medium" onClick={() => setIsSheetOpen(false)}>
+            Close
+          </button>
+        </motion.div>
+      </motion.div>}
+    </AnimatePresence>
 
-      {/* Bottom Navigation - Sticky */}
-      <BottomNavOrders />
-    </div>;
+    {/* Bottom Navigation - Sticky */}
+    <BottomNavOrders />
+  </div>;
 }
 
 // Resend Notification Button Component
@@ -1634,14 +1640,14 @@ function ResendNotificationButton({
     }
   };
   return <button type="button" onClick={handleResend} disabled={loading} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-100 text-blue-700 border border-blue-300 hover:bg-blue-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors" title="Resend notification to delivery partners">
-      {loading ? <>
-          <Loader2 className="w-3 h-3 animate-spin" />
-          <span>Sending...</span>
-        </> : <>
-          <Volume2 className="w-3 h-3" />
-          <span>Resend</span>
-        </>}
-    </button>;
+    {loading ? <>
+      <Loader2 className="w-3 h-3 animate-spin" />
+      <span>Sending...</span>
+    </> : <>
+      <Volume2 className="w-3 h-3" />
+      <span>Resend</span>
+    </>}
+  </button>;
 }
 
 // Order Card Component
@@ -1663,8 +1669,8 @@ function OrderCard({
 }) {
   const isReady = status === "Ready";
   return <div className="w-full bg-white rounded-2xl p-4 mb-3 border border-gray-200 hover:border-gray-400 transition-colors relative">
-      {/* Cancel button - only show for preparing orders */}
-      {status === 'preparing' && onCancel && <button type="button" onClick={e => {
+    {/* Cancel button - only show for preparing orders */}
+    {status === 'preparing' && onCancel && <button type="button" onClick={e => {
       e.stopPropagation();
       onCancel({
         orderId,
@@ -1672,9 +1678,9 @@ function OrderCard({
         customerName
       });
     }} className="absolute top-2 right-2 p-1.5 rounded-full bg-red-100 text-red-600 hover:bg-red-200 transition-colors z-10" title="Cancel Order">
-          <X className="w-4 h-4" />
-        </button>}
-      <div onClick={() => onSelect?.({
+      <X className="w-4 h-4" />
+    </button>}
+    <div onClick={() => onSelect?.({
       orderId,
       status,
       customerName,
@@ -1684,73 +1690,73 @@ function OrderCard({
       eta,
       itemsSummary
     })} className="w-full text-left flex gap-3 items-stretch cursor-pointer">
-        {/* Photo */}
-        <div className="h-20 w-20 rounded-xl overflow-hidden bg-gray-100 flex items-center justify-center flex-shrink-0 my-auto">
-          {photoUrl ? <img src={photoUrl} alt={photoAlt} className="h-full w-full object-cover" /> : <div className="h-full w-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center px-2">
-              <span className="text-[11px] font-medium text-gray-500 text-center leading-tight">
-                {photoAlt}
-              </span>
-            </div>}
-        </div>
+      {/* Photo */}
+      <div className="h-20 w-20 rounded-xl overflow-hidden bg-gray-100 flex items-center justify-center flex-shrink-0 my-auto">
+        {photoUrl ? <img src={photoUrl} alt={photoAlt} className="h-full w-full object-cover" /> : <div className="h-full w-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center px-2">
+          <span className="text-[11px] font-medium text-gray-500 text-center leading-tight">
+            {photoAlt}
+          </span>
+        </div>}
+      </div>
 
-        {/* Content */}
-        <div className="flex-1 flex flex-col justify-between min-h-[80px]">
-          {/* Top row */}
-          <div className="flex items-start justify-between gap-2">
-            <div>
-              <p className="text-sm font-semibold text-black leading-tight">
-                Order #{orderId}
-              </p>
-              <p className="text-[11px] text-gray-500 mt-1">
-                {customerName}
-              </p>
-            </div>
-
-            <div className="flex flex-col items-end gap-1">
-              <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium border ${isReady ? "border-green-500 text-green-600" : "border-gray-800 text-gray-900"}`}>
-                <span className={`h-1.5 w-1.5 rounded-full ${isReady ? "bg-green-500" : "bg-gray-800"}`} />
-                {status}
-              </span>
-              <span className="text-[11px] text-gray-500 text-right">
-                {timePlaced}
-              </span>
-            </div>
-          </div>
-
-          {/* Middle row */}
-          <div className="mt-2">
-            <p className="text-xs text-gray-600 line-clamp-1">
-              {itemsSummary}
+      {/* Content */}
+      <div className="flex-1 flex flex-col justify-between min-h-[80px]">
+        {/* Top row */}
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <p className="text-sm font-semibold text-black leading-tight">
+              Order #{orderId}
+            </p>
+            <p className="text-[11px] text-gray-500 mt-1">
+              {customerName}
             </p>
           </div>
 
-          {/* Bottom row */}
-          <div className="mt-2 flex items-end justify-between gap-2">
-            <div className="flex flex-col gap-1">
-              <p className="text-[11px] text-gray-500">
-                {type}
-                {tableOrToken ? ` • ${tableOrToken}` : ""}
-              </p>
-              {/* Delivery Assignment Status - Only show for preparing orders */}
-              {status === 'preparing' && <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${deliveryPartnerId ? 'bg-green-100 text-green-700 border border-green-300' : 'bg-blue-100 text-blue-700 border border-blue-300'}`}>
-                    <span className={`h-1.5 w-1.5 rounded-full ${deliveryPartnerId ? 'bg-green-500' : 'bg-blue-500'}`} />
-                    {deliveryPartnerId ? 'Assigned' : 'Not Assigned'}
-                  </span>
-                  {!deliveryPartnerId && <ResendNotificationButton orderId={orderId} mongoId={mongoId} onSuccess={onSelect} />}
-                </div>}
-            </div>
-            {/* Hide ETA for ready orders */}
-            {status !== 'ready' && eta && <div className="flex items-baseline gap-1">
-                <span className="text-[11px] text-gray-500">ETA</span>
-                <span className="text-xs font-medium text-black">
-                  {eta}
-                </span>
-              </div>}
+          <div className="flex flex-col items-end gap-1">
+            <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium border ${isReady ? "border-green-500 text-green-600" : "border-gray-800 text-gray-900"}`}>
+              <span className={`h-1.5 w-1.5 rounded-full ${isReady ? "bg-green-500" : "bg-gray-800"}`} />
+              {status}
+            </span>
+            <span className="text-[11px] text-gray-500 text-right">
+              {timePlaced}
+            </span>
           </div>
         </div>
+
+        {/* Middle row */}
+        <div className="mt-2">
+          <p className="text-xs text-gray-600 line-clamp-1">
+            {itemsSummary}
+          </p>
+        </div>
+
+        {/* Bottom row */}
+        <div className="mt-2 flex items-end justify-between gap-2">
+          <div className="flex flex-col gap-1">
+            <p className="text-[11px] text-gray-500">
+              {type}
+              {tableOrToken ? ` • ${tableOrToken}` : ""}
+            </p>
+            {/* Delivery Assignment Status - Only show for preparing orders */}
+            {status === 'preparing' && <div className="flex items-center gap-1.5 flex-wrap">
+              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${deliveryPartnerId ? 'bg-green-100 text-green-700 border border-green-300' : 'bg-blue-100 text-blue-700 border border-blue-300'}`}>
+                <span className={`h-1.5 w-1.5 rounded-full ${deliveryPartnerId ? 'bg-green-500' : 'bg-blue-500'}`} />
+                {deliveryPartnerId ? 'Assigned' : 'Not Assigned'}
+              </span>
+              {!deliveryPartnerId && <ResendNotificationButton orderId={orderId} mongoId={mongoId} onSuccess={onSelect} />}
+            </div>}
+          </div>
+          {/* Hide ETA for ready orders */}
+          {status !== 'ready' && eta && <div className="flex items-baseline gap-1">
+            <span className="text-[11px] text-gray-500">ETA</span>
+            <span className="text-xs font-medium text-black">
+              {eta}
+            </span>
+          </div>}
+        </div>
       </div>
-    </div>;
+    </div>
+  </div>;
 }
 
 // Preparing Orders List
@@ -1921,24 +1927,24 @@ function PreparingOrders({
   }, [orders]);
   if (loading) {
     return <div className="pt-4 pb-6">
-        <div className="flex items-baseline justify-between mb-3">
-          <h2 className="text-base font-semibold text-[#3B82F6]">Preparing orders</h2>
-          <Loader2 className="w-4 h-4 animate-spin text-gray-500" />
-        </div>
-        <div className="text-center py-8 text-gray-500 text-sm">Loading...</div>
-      </div>;
+      <div className="flex items-baseline justify-between mb-3">
+        <h2 className="text-base font-semibold text-[#3B82F6]">Preparing orders</h2>
+        <Loader2 className="w-4 h-4 animate-spin text-gray-500" />
+      </div>
+      <div className="text-center py-8 text-gray-500 text-sm">Loading...</div>
+    </div>;
   }
   return <div className="pt-4 pb-6">
-      <div className="flex items-baseline justify-between mb-3">
-        <h2 className="text-base font-semibold text-[#3B82F6]">
-          Preparing orders
-        </h2>
-        <span className="text-xs text-gray-500">{orders.length} active</span>
-      </div>
-      {orders.length === 0 ? <div className="text-center py-8 text-gray-500 text-sm">
-          No orders in preparation
-        </div> : <div>
-          {orders.map(order => {
+    <div className="flex items-baseline justify-between mb-3">
+      <h2 className="text-base font-semibold text-[#3B82F6]">
+        Preparing orders
+      </h2>
+      <span className="text-xs text-gray-500">{orders.length} active</span>
+    </div>
+    {orders.length === 0 ? <div className="text-center py-8 text-gray-500 text-sm">
+      No orders in preparation
+    </div> : <div>
+      {orders.map(order => {
         // Calculate remaining ETA (countdown)
         const elapsedMs = currentTime - order.preparingTimestamp;
         const elapsedMinutes = Math.floor(elapsedMs / 60000);
@@ -1958,8 +1964,8 @@ function PreparingOrders({
         }
         return <OrderCard key={order.orderId || order.mongoId} orderId={order.orderId} mongoId={order.mongoId} status={order.status} customerName={order.customerName} type={order.type} tableOrToken={order.tableOrToken} timePlaced={order.timePlaced} eta={etaDisplay} itemsSummary={order.itemsSummary} photoUrl={order.photoUrl} photoAlt={order.photoAlt} deliveryPartnerId={order.deliveryPartnerId} onSelect={onSelectOrder} onCancel={onCancel} />;
       })}
-        </div>}
-    </div>;
+    </div>}
+  </div>;
 }
 
 // Ready Orders List
@@ -2037,26 +2043,26 @@ function ReadyOrders({
 
   if (loading) {
     return <div className="pt-4 pb-6">
-        <div className="flex items-baseline justify-between mb-3">
-          <h2 className="text-base font-semibold text-[#3B82F6]">Ready for pickup</h2>
-          <Loader2 className="w-4 h-4 animate-spin text-gray-500" />
-        </div>
-        <div className="text-center py-8 text-gray-500 text-sm">Loading...</div>
-      </div>;
+      <div className="flex items-baseline justify-between mb-3">
+        <h2 className="text-base font-semibold text-[#3B82F6]">Ready for pickup</h2>
+        <Loader2 className="w-4 h-4 animate-spin text-gray-500" />
+      </div>
+      <div className="text-center py-8 text-gray-500 text-sm">Loading...</div>
+    </div>;
   }
   return <div className="pt-4 pb-6">
-      <div className="flex items-baseline justify-between mb-3">
-        <h2 className="text-base font-semibold text-[#3B82F6]">
-          Ready for pickup
-        </h2>
-        <span className="text-xs text-gray-500">{orders.length} active</span>
-      </div>
-      {orders.length === 0 ? <div className="text-center py-8 text-gray-500 text-sm">
-          No orders ready for pickup
-        </div> : <div>
-          {orders.map(order => <OrderCard key={order.orderId || order.mongoId} {...order} onSelect={onSelectOrder} />)}
-        </div>}
-    </div>;
+    <div className="flex items-baseline justify-between mb-3">
+      <h2 className="text-base font-semibold text-[#3B82F6]">
+        Ready for pickup
+      </h2>
+      <span className="text-xs text-gray-500">{orders.length} active</span>
+    </div>
+    {orders.length === 0 ? <div className="text-center py-8 text-gray-500 text-sm">
+      No orders ready for pickup
+    </div> : <div>
+      {orders.map(order => <OrderCard key={order.orderId || order.mongoId} {...order} onSelect={onSelectOrder} />)}
+    </div>}
+  </div>;
 }
 
 // Out for Delivery Orders List
@@ -2133,26 +2139,26 @@ const OutForDeliveryOrders = ({
 
   if (loading) {
     return <div className="pt-4 pb-6">
-        <div className="flex items-baseline justify-between mb-3">
-          <h2 className="text-base font-semibold text-[#3B82F6]">Out for delivery</h2>
-          <Loader2 className="w-4 h-4 animate-spin text-gray-500" />
-        </div>
-        <div className="text-center py-8 text-gray-500 text-sm">Loading...</div>
-      </div>;
+      <div className="flex items-baseline justify-between mb-3">
+        <h2 className="text-base font-semibold text-[#3B82F6]">Out for delivery</h2>
+        <Loader2 className="w-4 h-4 animate-spin text-gray-500" />
+      </div>
+      <div className="text-center py-8 text-gray-500 text-sm">Loading...</div>
+    </div>;
   }
   return <div className="pt-4 pb-6">
-      <div className="flex items-baseline justify-between mb-3">
-        <h2 className="text-base font-semibold text-[#3B82F6]">
-          Out for delivery
-        </h2>
-        <span className="text-xs text-gray-500">{orders.length} active</span>
-      </div>
-      {orders.length === 0 ? <div className="text-center py-8 text-gray-500 text-sm">
-          No orders out for delivery
-        </div> : <div>
-          {orders.map(order => <OrderCard key={order.orderId || order.mongoId} {...order} onSelect={onSelectOrder} />)}
-        </div>}
-    </div>;
+    <div className="flex items-baseline justify-between mb-3">
+      <h2 className="text-base font-semibold text-[#3B82F6]">
+        Out for delivery
+      </h2>
+      <span className="text-xs text-gray-500">{orders.length} active</span>
+    </div>
+    {orders.length === 0 ? <div className="text-center py-8 text-gray-500 text-sm">
+      No orders out for delivery
+    </div> : <div>
+      {orders.map(order => <OrderCard key={order.orderId || order.mongoId} {...order} onSelect={onSelectOrder} />)}
+    </div>}
+  </div>;
 };
 
 // Empty State Component
@@ -2160,32 +2166,32 @@ function EmptyState({
   message = "Temporarily closed"
 }) {
   return <div className="flex flex-col items-center justify-center min-h-[60vh] py-12">
-      {/* Store Illustration */}
-      <div className="mb-6">
-        <svg width="200" height="200" viewBox="0 0 200 200" className="text-gray-300" fill="none" xmlns="http://www.w3.org/2000/svg">
-          {/* Storefront */}
-          <rect x="40" y="80" width="120" height="80" stroke="currentColor" strokeWidth="2" fill="white" />
-          {/* Awning */}
-          <path d="M30 80 L100 50 L170 80" stroke="currentColor" strokeWidth="2" fill="white" />
-          {/* Doors */}
-          <rect x="60" y="100" width="30" height="60" stroke="currentColor" strokeWidth="2" fill="white" />
-          <rect x="110" y="100" width="30" height="60" stroke="currentColor" strokeWidth="2" fill="white" />
-          {/* Laptop */}
-          <rect x="70" y="140" width="40" height="25" stroke="currentColor" strokeWidth="1.5" fill="white" />
-          <text x="85" y="155" fontSize="8" fill="currentColor" textAnchor="middle">CLOSED</text>
-          {/* Sign */}
-          <rect x="80" y="170" width="40" height="20" stroke="currentColor" strokeWidth="1.5" fill="white" />
-        </svg>
-      </div>
+    {/* Store Illustration */}
+    <div className="mb-6">
+      <svg width="200" height="200" viewBox="0 0 200 200" className="text-gray-300" fill="none" xmlns="http://www.w3.org/2000/svg">
+        {/* Storefront */}
+        <rect x="40" y="80" width="120" height="80" stroke="currentColor" strokeWidth="2" fill="white" />
+        {/* Awning */}
+        <path d="M30 80 L100 50 L170 80" stroke="currentColor" strokeWidth="2" fill="white" />
+        {/* Doors */}
+        <rect x="60" y="100" width="30" height="60" stroke="currentColor" strokeWidth="2" fill="white" />
+        <rect x="110" y="100" width="30" height="60" stroke="currentColor" strokeWidth="2" fill="white" />
+        {/* Laptop */}
+        <rect x="70" y="140" width="40" height="25" stroke="currentColor" strokeWidth="1.5" fill="white" />
+        <text x="85" y="155" fontSize="8" fill="currentColor" textAnchor="middle">CLOSED</text>
+        {/* Sign */}
+        <rect x="80" y="170" width="40" height="20" stroke="currentColor" strokeWidth="1.5" fill="white" />
+      </svg>
+    </div>
 
-      {/* Message */}
-      <h2 className="text-lg font-semibold text-gray-600 mb-4 text-center">
-        {message}
-      </h2>
+    {/* Message */}
+    <h2 className="text-lg font-semibold text-gray-600 mb-4 text-center">
+      {message}
+    </h2>
 
-      {/* View Status Button */}
-      <button className="bg-[#3B82F6] text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-600 transition-colors">
-        View status
-      </button>
-    </div>;
+    {/* View Status Button */}
+    <button className="bg-[#3B82F6] text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-600 transition-colors">
+      View status
+    </button>
+  </div>;
 }

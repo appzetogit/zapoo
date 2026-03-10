@@ -430,9 +430,9 @@ restaurantSchema.pre("save", async function (next) {
     // Explicitly ensure email is undefined (not null) to prevent MongoDB from indexing it
     // Mongoose will omit undefined fields but will include null fields
     if (this.email === null || this.email === undefined) {
-      // Remove email from the document to prevent it from being saved
-      this.$unset = this.$unset || {};
-      this.$unset.email = "";
+      // Explicitly unset the email field to prevent MongoDB from indexing it
+      // Mongoose will omit undefined fields during save
+      this.set('email', undefined);
     }
   }
 

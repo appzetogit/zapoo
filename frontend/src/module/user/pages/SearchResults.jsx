@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { useSearchParams, Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, Star, Clock, Search, SlidersHorizontal, ChevronDown, Bookmark, BadgePercent, Mic, Loader2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -164,7 +164,35 @@ export default function SearchResults() {
           const itemNameLower = (item.name || '').toLowerCase();
           const itemCategoryLower = (item.category || '').toLowerCase();
           if (keywords.some(keyword => itemNameLower.includes(keyword) || itemCategoryLower.includes(keyword))) {
-            return item.name;
+            const originalPrice = item.originalPrice || item.price || 0;
+            const discountPercent = item.discountPercent || 0;
+            const price = discountPercent > 0 ? Math.round(originalPrice * (1 - discountPercent / 100)) : originalPrice;
+            return {
+              name: item.name,
+              price: price
+            };
+          }
+        }
+      }
+    }
+    return null;
+  };
+
+  // Helper function to find a matching item in menu based on query
+  const findMatchingItemInMenu = (menu, query) => {
+    if (!menu || !menu.sections || !Array.isArray(menu.sections) || !query) return null;
+    const lowerQuery = query.toLowerCase();
+    for (const section of menu.sections) {
+      if (section.items) {
+        for (const item of section.items) {
+          if (item.name?.toLowerCase().includes(lowerQuery) || item.category?.toLowerCase().includes(lowerQuery)) {
+            const originalPrice = item.originalPrice || item.price || 0;
+            const discountPercent = item.discountPercent || 0;
+            const price = discountPercent > 0 ? Math.round(originalPrice * (1 - discountPercent / 100)) : originalPrice;
+            return {
+              name: item.name,
+              price: price
+            };
           }
         }
       }
@@ -187,7 +215,7 @@ export default function SearchResults() {
         if (response.data && response.data.success && response.data.data && response.data.data.restaurants) {
           const restaurantsArray = response.data.data.restaurants;
           // Check if we have actual data or just defaults
-          if (restaurantsArray.length > 0) {}
+          if (restaurantsArray.length > 0) { }
 
           // Helper function to check if value is a default/mock value
           const isDefaultValue = (value, fieldName) => {
@@ -466,7 +494,7 @@ export default function SearchResults() {
     let filtered = [...sourceData];
 
     // Apply search query and category filtering
-    if (query.trim() || selectedCategory && selectedCategory !== 'all') {
+    if (query.trim() || (selectedCategory && selectedCategory !== 'all')) {
       const lowerQuery = query.toLowerCase();
       filtered = filtered.filter(r => {
         const nameMatch = r.name?.toLowerCase().includes(lowerQuery);
@@ -474,7 +502,12 @@ export default function SearchResults() {
         const dishMatch = r.featuredDish?.toLowerCase().includes(lowerQuery);
 
         // Match category
-        const categoryMatch = selectedCategory && selectedCategory !== 'all' && (r.category === selectedCategory || r.hasPaneer && selectedCategory === 'paneer-tikka' || r.menu && checkCategoryInMenu(r.menu, selectedCategory));
+        const categoryMatch = selectedCategory && selectedCategory !== 'all' && (
+          r.category === selectedCategory ||
+          (r.hasPaneer && selectedCategory === 'paneer-tikka') ||
+          (r.menu && checkCategoryInMenu(r.menu, selectedCategory))
+        );
+
         if (query.trim() && selectedCategory && selectedCategory !== 'all') {
           return nameMatch || cuisineMatch || dishMatch || categoryMatch;
         } else if (query.trim()) {
@@ -500,7 +533,52 @@ export default function SearchResults() {
       filtered = filtered.filter(r => r.offer && r.offer.includes('50%'));
     }
     return filtered;
-  }, [query, selectedCategory, activeFilters, restaurantsData, categoryKeywords, loadingCategories]);
+  }, [query, selectedCategory, activeFilters, restaurantsData]);
+
+  // Derived matching dishes across all restaurants
+  const matchingDishes = useMemo(() => {
+    if (!query.trim() && selectedCategory === 'all') return [];
+
+    const lowerQuery = query.toLowerCase();
+    const dishes = [];
+    const categoryKeywordsList = selectedCategory !== 'all' ? categoryKeywords[selectedCategory] || [] : [];
+
+    restaurantsData.forEach(restaurant => {
+      if (restaurant.menu && restaurant.menu.sections) {
+        restaurant.menu.sections.forEach(section => {
+          if (section.items) {
+            section.items.forEach(item => {
+              const itemNameLower = (item.name || '').toLowerCase();
+              const itemCategoryLower = (item.category || '').toLowerCase();
+
+              const queryMatch = lowerQuery && (itemNameLower.includes(lowerQuery) || itemCategoryLower.includes(lowerQuery));
+              const categoryMatch = selectedCategory !== 'all' && categoryKeywordsList.some(kw => itemNameLower.includes(kw) || itemCategoryLower.includes(kw));
+
+              if (queryMatch || categoryMatch) {
+                const originalPrice = item.originalPrice || item.price || 0;
+                const discountPercent = item.discountPercent || 0;
+                const finalPrice = discountPercent > 0 ? Math.round(originalPrice * (1 - discountPercent / 100)) : originalPrice;
+
+                dishes.push({
+                  id: `${restaurant.id}-${item.id || item.name}`,
+                  name: item.name,
+                  image: item.image || restaurant.image,
+                  price: finalPrice,
+                  restaurantName: restaurant.name,
+                  restaurantId: restaurant.id,
+                  restaurantSlug: restaurant.slug,
+                  rating: restaurant.rating,
+                  deliveryTime: restaurant.deliveryTime
+                });
+              }
+            });
+          }
+        });
+      }
+    });
+
+    return dishes;
+  }, [query, selectedCategory, restaurantsData, categoryKeywords]);
   const filteredAllRestaurants = useMemo(() => {
     const sourceData = restaurantsData.length > 0 ? restaurantsData : [];
     let filtered = [...sourceData];
@@ -564,241 +642,265 @@ export default function SearchResults() {
   // Check if should show grayscale (user out of service)
   const shouldShowGrayscale = isOutOfService;
   return <div className={`min-h-screen bg-white dark:bg-[#0a0a0a] ${shouldShowGrayscale ? 'grayscale opacity-75' : ''}`}>
-      {/* Sticky Header */}
-      <div className="sticky top-0 z-20 bg-white dark:bg-[#1a1a1a] shadow-sm">
-        <div className="max-w-7xl mx-auto">
-          {/* Search Bar with Back Button */}
-          <div className="flex items-center gap-2 px-3 sm:px-4 md:px-6 lg:px-8 py-3 md:py-4 border-b border-gray-100 dark:border-gray-800">
-            <button onClick={() => navigate('/user')} className="w-9 h-9 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors flex-shrink-0">
-              <ArrowLeft className="h-5 w-5 text-gray-700 dark:text-gray-300" />
-            </button>
+    {/* Sticky Header */}
+    <div className="sticky top-0 z-20 bg-white dark:bg-[#1a1a1a] shadow-sm">
+      <div className="max-w-7xl mx-auto">
+        {/* Search Bar with Back Button */}
+        <div className="flex items-center gap-2 px-3 sm:px-4 md:px-6 lg:px-8 py-3 md:py-4 border-b border-gray-100 dark:border-gray-800">
+          <button onClick={() => navigate('/user')} className="w-9 h-9 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors flex-shrink-0">
+            <ArrowLeft className="h-5 w-5 text-gray-700 dark:text-gray-300" />
+          </button>
 
-            <form onSubmit={handleSearch} className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500 dark:text-gray-400" />
-              <Input placeholder="Restaurant name or a dish..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-10 pr-10 h-11 rounded-lg border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-[#1a1a1a] focus:bg-white dark:focus:bg-[#2a2a2a] focus:border-gray-500 dark:focus:border-gray-600 text-sm dark:text-white placeholder:text-gray-600 dark:placeholder:text-gray-400" />
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                {searchQuery ? <button type="button" onClick={() => {
+          <form onSubmit={handleSearch} className="flex-1 relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500 dark:text-gray-400" />
+            <Input placeholder="Restaurant name or a dish..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-10 pr-10 h-11 rounded-lg border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-[#1a1a1a] focus:bg-white dark:focus:bg-[#2a2a2a] focus:border-gray-500 dark:focus:border-gray-600 text-sm dark:text-white placeholder:text-gray-600 dark:placeholder:text-gray-400" />
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
+              {searchQuery ? <button type="button" onClick={() => {
                 setSearchQuery("");
                 setSearchParams({});
               }} className="p-1 hover:bg-gray-200 dark:hover:bg-gray-800 rounded-full transition-colors">
-                    <X className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-                  </button> : <button type="button" onClick={handleVoiceSearch} className="p-1 hover:bg-gray-200 dark:hover:bg-gray-800 rounded-full transition-colors">
-                    <Mic className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-                  </button>}
-              </div>
-            </form>
-          </div>
+                <X className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+              </button> : <button type="button" onClick={handleVoiceSearch} className="p-1 hover:bg-gray-200 dark:hover:bg-gray-800 rounded-full transition-colors">
+                <Mic className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+              </button>}
+            </div>
+          </form>
+        </div>
 
-          {/* Browse Category Section */}
-          <div ref={categoryScrollRef} className="flex gap-3 sm:gap-4 lg:gap-5 overflow-x-auto scrollbar-hide px-4 sm:px-6 md:px-8 lg:px-10 py-3 md:py-4 bg-white dark:bg-[#1a1a1a] border-b border-gray-100 dark:border-gray-800" style={{
+        {/* Browse Category Section */}
+        <div ref={categoryScrollRef} className="flex gap-3 sm:gap-4 lg:gap-5 overflow-x-auto scrollbar-hide px-4 sm:px-6 md:px-8 lg:px-10 py-3 md:py-4 bg-white dark:bg-[#1a1a1a] border-b border-gray-100 dark:border-gray-800" style={{
           scrollbarWidth: "none",
           msOverflowStyle: "none"
         }}>
-            {categories.map(cat => {
+          {categories.map(cat => {
             const isSelected = selectedCategory === cat.id;
             return <button key={cat.id} onClick={() => handleCategorySelect(cat.id)} className={`flex flex-col items-center gap-1.5 flex-shrink-0 pb-2 transition-all ${isSelected ? 'border-b-2 border-green-600' : ''}`}>
-                  {cat.image ? <div className={`w-16 h-16 rounded-full overflow-hidden border-2 transition-all ${isSelected ? 'border-green-600 dark:border-green-500 shadow-lg' : 'border-transparent'}`}>
-                      <img src={cat.image} alt={cat.name} className="w-full h-full object-cover" />
-                    </div> : <div className={`w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center border-2 transition-all ${isSelected ? 'border-green-600 dark:border-green-500 shadow-lg bg-green-50 dark:bg-green-900/20' : 'border-transparent'}`}>
-                      <span className="text-xl">🍽️</span>
-                    </div>}
-                  <span className={`text-xs font-medium whitespace-nowrap ${isSelected ? 'text-green-700 dark:text-green-400' : 'text-gray-600 dark:text-gray-400'}`}>
-                    {cat.name}
-                  </span>
-                </button>;
+              {cat.image ? <div className={`w-16 h-16 rounded-full overflow-hidden border-2 transition-all ${isSelected ? 'border-green-600 dark:border-green-500 shadow-lg' : 'border-transparent'}`}>
+                <img src={cat.image} alt={cat.name} className="w-full h-full object-cover" />
+              </div> : <div className={`w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center border-2 transition-all ${isSelected ? 'border-green-600 dark:border-green-500 shadow-lg bg-green-50 dark:bg-green-900/20' : 'border-transparent'}`}>
+                <span className="text-xl">🍽️</span>
+              </div>}
+              <span className={`text-xs font-medium whitespace-nowrap ${isSelected ? 'text-green-700 dark:text-green-400' : 'text-gray-600 dark:text-gray-400'}`}>
+                {cat.name}
+              </span>
+            </button>;
           })}
-          </div>
+        </div>
 
-          {/* Filters */}
-          <div className="flex items-center gap-2 sm:gap-3 lg:gap-4 overflow-x-auto scrollbar-hide px-4 sm:px-6 md:px-8 lg:px-10 py-3 md:py-4 bg-white dark:bg-[#1a1a1a] border-b border-gray-100 dark:border-gray-800" style={{
+        {/* Filters */}
+        <div className="flex items-center gap-2 sm:gap-3 lg:gap-4 overflow-x-auto scrollbar-hide px-4 sm:px-6 md:px-8 lg:px-10 py-3 md:py-4 bg-white dark:bg-[#1a1a1a] border-b border-gray-100 dark:border-gray-800" style={{
           scrollbarWidth: "none",
           msOverflowStyle: "none"
         }}>
-            {/* Filter Button */}
-            <Button variant="outline" className="h-9 px-3 rounded-lg flex items-center gap-1.5 whitespace-nowrap flex-shrink-0 font-medium bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300">
-              <SlidersHorizontal className="h-4 w-4" />
-              <span className="text-sm font-bold text-black dark:text-white">Filters</span>
-              <ChevronDown className="h-3 w-3" />
-            </Button>
+          {/* Filter Button */}
+          <Button variant="outline" className="h-9 px-3 rounded-lg flex items-center gap-1.5 whitespace-nowrap flex-shrink-0 font-medium bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300">
+            <SlidersHorizontal className="h-4 w-4" />
+            <span className="text-sm font-bold text-black dark:text-white">Filters</span>
+            <ChevronDown className="h-3 w-3" />
+          </Button>
 
-            {/* Filter Options */}
-            {filterOptions.map(filter => {
+          {/* Filter Options */}
+          {filterOptions.map(filter => {
             const isActive = activeFilters.has(filter.id);
             return <Button key={filter.id} variant="outline" onClick={() => toggleFilter(filter.id)} className={`h-9 px-3 rounded-lg flex items-center gap-1.5 whitespace-nowrap flex-shrink-0 transition-all font-medium ${isActive ? 'bg-green-600 text-white border-green-600 hover:bg-green-700 dark:bg-green-600 dark:hover:bg-green-700' : 'bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300'}`}>
-                  {filter.hasIcon && filter.id === 'price-match' && <span className={`text-xs ${isActive ? 'text-white' : 'text-green-600 dark:text-green-400'}`}>✓</span>}
-                  {filter.hasIcon && filter.id === 'flat-50-off' && <span className={`text-xs ${isActive ? 'text-white' : 'text-blue-500 dark:text-blue-400'}`}>★</span>}
-                  <span className={`text-sm font-bold ${isActive ? 'text-white' : 'text-black dark:text-white'}`}>{filter.label}</span>
-                </Button>;
+              {filter.hasIcon && filter.id === 'price-match' && <span className={`text-xs ${isActive ? 'text-white' : 'text-green-600 dark:text-green-400'}`}>✓</span>}
+              {filter.hasIcon && filter.id === 'flat-50-off' && <span className={`text-xs ${isActive ? 'text-white' : 'text-blue-500 dark:text-blue-400'}`}>★</span>}
+              <span className={`text-sm font-bold ${isActive ? 'text-white' : 'text-black dark:text-white'}`}>{filter.label}</span>
+            </Button>;
           })}
-          </div>
         </div>
       </div>
+    </div>
 
-      {/* Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 lg:px-10 xl:px-12 py-4 sm:py-6 md:py-8 lg:py-10 space-y-6 md:space-y-8 lg:space-y-10">
-        {/* Loading State */}
-        {loadingRestaurants && <div className="flex items-center justify-center py-20">
-            <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
-            <span className="ml-3 text-gray-600">Loading restaurants...</span>
-          </div>}
+    {/* Content */}
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 lg:px-10 xl:px-12 py-4 sm:py-6 md:py-8 lg:py-10 space-y-6 md:space-y-8 lg:space-y-10">
+      {/* Loading State */}
+      {loadingRestaurants && <div className="flex items-center justify-center py-20">
+        <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+        <span className="ml-3 text-gray-600">Loading restaurants...</span>
+      </div>}
 
-        {/* RECOMMENDED FOR YOU Section */}
-        {!loadingRestaurants && filteredRecommended.length > 0 && <section>
-            <h2 className="text-xs sm:text-sm font-semibold text-gray-400 dark:text-gray-500 tracking-widest uppercase mb-4">
-              RECOMMENDED FOR YOU
-            </h2>
+      {/* DISHES / RECOMMENDED Section */}
+      {!loadingRestaurants && (query.trim() || selectedCategory !== 'all' ? matchingDishes.length > 0 : filteredRecommended.length > 0) && <section>
+        <h2 className="text-xs sm:text-sm font-semibold text-gray-400 dark:text-gray-500 tracking-widest uppercase mb-4">
+          {query.trim() || selectedCategory !== 'all' ? `MATCHING DISHES (${matchingDishes.length})` : 'RECOMMENDED FOR YOU'}
+        </h2>
 
-            {/* Small Restaurant Cards - Horizontal Scroll */}
-            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 gap-3 sm:gap-4 lg:gap-5">
-              {filteredRecommended.slice(0, 6).map(restaurant => {
-            return <Link key={restaurant.id} to={`/user/restaurants/${restaurant.slug || restaurant.name.toLowerCase().replace(/\s+/g, '-')}`} className="block">
-                    <div className={`group ${shouldShowGrayscale ? 'grayscale opacity-75' : ''}`}>
-                      {/* Image Container */}
-                      <div className="relative aspect-square rounded-xl overflow-hidden mb-2 bg-gray-200 dark:bg-gray-800">
-                        {restaurant.image ? <img src={restaurant.image} alt={restaurant.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" onError={e => {
+        {/* Squared Cards Grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4 lg:gap-5">
+          {(query.trim() || selectedCategory !== 'all' ? matchingDishes : filteredRecommended.slice(0, 6)).map(item => {
+            const isDish = !!item.restaurantName;
+            const targetUrl = isDish
+              ? `/user/restaurants/${item.restaurantSlug}`
+              : `/user/restaurants/${item.slug || item.name.toLowerCase().replace(/\s+/g, '-')}`;
+
+            return <Link key={item.id} to={targetUrl} className="block">
+              <div className={`group ${shouldShowGrayscale ? 'grayscale opacity-75' : ''}`}>
+                {/* Image Container */}
+                <div className="relative aspect-square rounded-xl overflow-hidden mb-2 bg-gray-200 dark:bg-gray-800 border border-gray-100 dark:border-gray-800 shadow-sm group-hover:shadow-md transition-shadow">
+                  {item.image ? <img src={item.image} alt={item.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" onError={e => {
                     e.target.style.display = 'none';
                   }} /> : <div className="w-full h-full flex items-center justify-center">
-                            <span className="text-2xl">🍽️</span>
-                          </div>}
-                        {/* Offer Badge - Only show if offer exists */}
-                        {restaurant.offer && <div className="absolute top-1.5 left-1.5 bg-blue-600 text-white text-[10px] font-semibold px-1.5 py-0.5 rounded">
-                            {restaurant.offer}
-                          </div>}
-                      </div>
+                    <span className="text-2xl">🍽️</span>
+                  </div>}
 
-                      {/* Rating Badge - Only show if rating exists */}
-                      {restaurant.rating && <div className="flex items-center gap-1 mb-1">
-                          <div className="bg-green-600 text-white text-[11px] font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5">
-                            {restaurant.rating}
-                            <Star className="h-2.5 w-2.5 fill-white" />
-                          </div>
-                        </div>}
+                  {/* Price Badge for Dishes */}
+                  {isDish && item.price && <div className="absolute bottom-1 right-1 bg-white/90 dark:bg-black/80 backdrop-blur-sm px-1.5 py-0.5 rounded text-[10px] font-bold text-gray-900 dark:text-white border border-gray-100 dark:border-gray-800">
+                    ₹{item.price}
+                  </div>}
 
-                      {/* Restaurant Info */}
-                      <h3 className="font-semibold text-gray-900 dark:text-white text-xs line-clamp-1">
-                        {restaurant.name}
-                      </h3>
-                      {restaurant.deliveryTime && <div className="flex items-center gap-1 text-gray-500 dark:text-gray-400 text-[10px]">
-                          <Clock className="h-2.5 w-2.5" />
-                          <span>{restaurant.deliveryTime}</span>
-                        </div>}
+                  {/* Offer Badge */}
+                  {item.offer && <div className="absolute top-1.5 left-1.5 bg-blue-600 text-white text-[10px] font-semibold px-1.5 py-0.5 rounded">
+                    {item.offer}
+                  </div>}
+                </div>
+
+                {/* Info */}
+                <div className="space-y-0.5">
+                  <h3 className="font-bold text-gray-900 dark:text-white text-xs line-clamp-1 group-hover:text-primary-orange transition-colors">
+                    {item.name}
+                  </h3>
+                  {isDish ? (
+                    <p className="text-[10px] font-medium text-gray-500 dark:text-gray-400 line-clamp-1 flex items-center gap-1">
+                      at <span className="text-gray-700 dark:text-gray-300">{item.restaurantName}</span>
+                    </p>
+                  ) : (
+                    item.deliveryTime && <div className="flex items-center gap-1 text-gray-500 dark:text-gray-400 text-[10px]">
+                      <Clock className="h-2.5 w-2.5" />
+                      <span>{item.deliveryTime}</span>
                     </div>
-                  </Link>;
+                  )}
+                  {!isDish && item.rating && <div className="flex items-center gap-1">
+                    <Star className="h-2 w-2 fill-green-600 text-green-600" />
+                    <span className="text-[10px] font-bold text-green-600">{item.rating}</span>
+                  </div>}
+                </div>
+              </div>
+            </Link>;
           })}
-            </div>
-          </section>}
+        </div>
+      </section>}
 
-        {/* ALL RESTAURANTS Section */}
-        <section>
-          <h2 className="text-xs sm:text-sm font-semibold text-gray-400 dark:text-gray-500 tracking-widest uppercase mb-4">
-            ALL RESTAURANTS
-          </h2>
+      {/* ALL RESTAURANTS Section */}
+      <section>
+        <h2 className="text-xs sm:text-sm font-semibold text-gray-400 dark:text-gray-500 tracking-widest uppercase mb-4">
+          ALL RESTAURANTS
+        </h2>
 
-          {/* Large Restaurant Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-5 lg:gap-6">
-            {filteredAllRestaurants.map(restaurant => {
+        {/* Large Restaurant Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-5 lg:gap-6">
+          {filteredAllRestaurants.map(restaurant => {
             const restaurantSlug = restaurant.name.toLowerCase().replace(/\s+/g, "-");
             const isFavorite = favorites.has(restaurant.id);
             return <Link key={restaurant.id} to={`/user/restaurants/${restaurant.slug || restaurantSlug}`} className="h-full flex">
-                  <Card className={`overflow-hidden cursor-pointer border-0 dark:border-gray-800 group bg-white dark:bg-[#1a1a1a] shadow-md hover:shadow-xl transition-all duration-300 py-0 rounded-md flex flex-col h-full w-full ${shouldShowGrayscale ? 'grayscale opacity-75' : ''}`}>
-                    {/* Image Section */}
-                    <div className="relative h-44 sm:h-52 md:h-60 lg:h-64 xl:h-72 w-full overflow-hidden rounded-t-md flex-shrink-0 bg-gray-200 dark:bg-gray-800">
-                      {restaurant.image ? <img src={restaurant.image} alt={restaurant.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" onError={e => {
+              <Card className={`overflow-hidden cursor-pointer border-0 dark:border-gray-800 group bg-white dark:bg-[#1a1a1a] shadow-md hover:shadow-xl transition-all duration-300 py-0 rounded-md flex flex-col h-full w-full ${shouldShowGrayscale ? 'grayscale opacity-75' : ''}`}>
+                {/* Image Section */}
+                <div className="relative h-44 sm:h-52 md:h-60 lg:h-64 xl:h-72 w-full overflow-hidden rounded-t-md flex-shrink-0 bg-gray-200 dark:bg-gray-800">
+                  {restaurant.image ? <img src={restaurant.image} alt={restaurant.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" onError={e => {
                     e.target.style.display = 'none';
                   }} /> : <div className="w-full h-full flex items-center justify-center bg-gray-200 dark:bg-gray-800">
-                          <span className="text-4xl">🍽️</span>
-                        </div>}
+                    <span className="text-4xl">🍽️</span>
+                  </div>}
 
-                      {/* Featured Dish Badge - Top Left - Only show if data exists */}
-                      {(() => {
+                  {/* Dish/Offer Badge - Top Left */}
+                  {(() => {
                     let displayText = null;
 
-                    // If category is selected and restaurant has menu, show category-specific dish
-                    if (selectedCategory && selectedCategory !== 'all' && restaurant.menu) {
-                      const categoryDish = getCategoryDishFromMenu(restaurant.menu, selectedCategory);
-                      if (categoryDish && restaurant.featuredPrice) {
-                        displayText = `${categoryDish} · ₹${restaurant.featuredPrice}`;
+                    // 1. If query matches a specific dish in this restaurant
+                    if (query.trim() && restaurant.menu) {
+                      const matchedItem = findMatchingItemInMenu(restaurant.menu, query);
+                      if (matchedItem) {
+                        displayText = `${matchedItem.name} · ₹${matchedItem.price}`;
                       }
                     }
 
-                    // Fallback to featured dish
+                    // 2. If category is selected, show matching dish
+                    if (!displayText && selectedCategory && selectedCategory !== 'all' && restaurant.menu) {
+                      const categoryDishInfo = getCategoryDishFromMenu(restaurant.menu, selectedCategory);
+                      if (categoryDishInfo) {
+                        displayText = `${categoryDishInfo.name} · ₹${categoryDishInfo.price}`;
+                      }
+                    }
+
+                    // 3. Fallback to featured dish
                     if (!displayText && restaurant.featuredDish && restaurant.featuredPrice) {
                       displayText = `${restaurant.featuredDish} · ₹${restaurant.featuredPrice}`;
                     }
+
                     return displayText ? <div className="absolute top-3 left-3">
-                            <div className="bg-gray-800/80 backdrop-blur-sm text-white px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium">
-                              {displayText}
-                            </div>
-                          </div> : null;
+                      <div className="bg-gray-800/80 backdrop-blur-sm text-white px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium border border-white/10">
+                        {displayText}
+                      </div>
+                    </div> : null;
                   })()}
 
-                      {/* Ad Badge */}
-                      {restaurant.isAd && <div className="absolute top-3 right-14 bg-black/50 text-white text-[10px] px-2 py-0.5 rounded">
-                          Ad
-                        </div>}
+                  {/* Ad Badge */}
+                  {restaurant.isAd && <div className="absolute top-3 right-14 bg-black/50 text-white text-[10px] px-2 py-0.5 rounded">
+                    Ad
+                  </div>}
 
-                      {/* Bookmark Icon - Top Right */}
-                      <Button variant="ghost" size="icon" className="absolute top-3 right-3 h-9 w-9 bg-white/90 dark:bg-[#1a1a1a]/90 backdrop-blur-sm rounded-lg hover:bg-white dark:hover:bg-[#2a2a2a] transition-colors" onClick={e => {
+                  {/* Bookmark Icon - Top Right */}
+                  <Button variant="ghost" size="icon" className="absolute top-3 right-3 h-9 w-9 bg-white/90 dark:bg-[#1a1a1a]/90 backdrop-blur-sm rounded-lg hover:bg-white dark:hover:bg-[#2a2a2a] transition-colors" onClick={e => {
                     e.preventDefault();
                     e.stopPropagation();
                     toggleFavorite(restaurant.id);
                   }}>
-                        <Bookmark className={`h-5 w-5 ${isFavorite ? "fill-gray-800 dark:fill-gray-200 text-gray-800 dark:text-gray-200" : "text-gray-600 dark:text-gray-400"}`} strokeWidth={2} />
-                      </Button>
+                    <Bookmark className={`h-5 w-5 ${isFavorite ? "fill-gray-800 dark:fill-gray-200 text-gray-800 dark:text-gray-200" : "text-gray-600 dark:text-gray-400"}`} strokeWidth={2} />
+                  </Button>
+                </div>
+
+                {/* Content Section */}
+                <CardContent className="p-3 sm:p-4 lg:p-5 flex flex-col flex-grow">
+                  {/* Restaurant Name & Rating */}
+                  <div className="flex items-start justify-between gap-2 mb-2 lg:mb-3">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 dark:text-white line-clamp-1 lg:line-clamp-2">
+                        {restaurant.name}
+                      </h3>
                     </div>
+                    {restaurant.rating && <div className="flex-shrink-0 bg-green-600 text-white px-2 py-1 lg:px-3 lg:py-1.5 rounded-lg flex items-center gap-1">
+                      <span className="text-sm lg:text-base font-bold">{restaurant.rating}</span>
+                      <Star className="h-3 w-3 lg:h-4 lg:w-4 fill-white text-white" />
+                    </div>}
+                  </div>
 
-                    {/* Content Section */}
-                    <CardContent className="p-3 sm:p-4 lg:p-5 flex flex-col flex-grow">
-                      {/* Restaurant Name & Rating */}
-                      <div className="flex items-start justify-between gap-2 mb-2 lg:mb-3">
-                        <div className="flex-1 min-w-0">
-                          <h3 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 dark:text-white line-clamp-1 lg:line-clamp-2">
-                            {restaurant.name}
-                          </h3>
-                        </div>
-                        {restaurant.rating && <div className="flex-shrink-0 bg-green-600 text-white px-2 py-1 lg:px-3 lg:py-1.5 rounded-lg flex items-center gap-1">
-                            <span className="text-sm lg:text-base font-bold">{restaurant.rating}</span>
-                            <Star className="h-3 w-3 lg:h-4 lg:w-4 fill-white text-white" />
-                          </div>}
-                      </div>
+                  {/* Delivery Time & Distance - Only show if data exists */}
+                  {(restaurant.deliveryTime || restaurant.distance) && <div className="flex items-center gap-1 text-sm lg:text-base text-gray-500 dark:text-gray-400 mb-2 lg:mb-3">
+                    {restaurant.deliveryTime && <>
+                      <Clock className="h-4 w-4 lg:h-5 lg:w-5" strokeWidth={1.5} />
+                      <span className="font-medium">{restaurant.deliveryTime}</span>
+                    </>}
+                    {restaurant.deliveryTime && restaurant.distance && <span className="mx-1">|</span>}
+                    {restaurant.distance && <span className="font-medium">{restaurant.distance}</span>}
+                  </div>}
 
-                      {/* Delivery Time & Distance - Only show if data exists */}
-                      {(restaurant.deliveryTime || restaurant.distance) && <div className="flex items-center gap-1 text-sm lg:text-base text-gray-500 dark:text-gray-400 mb-2 lg:mb-3">
-                          {restaurant.deliveryTime && <>
-                              <Clock className="h-4 w-4 lg:h-5 lg:w-5" strokeWidth={1.5} />
-                              <span className="font-medium">{restaurant.deliveryTime}</span>
-                            </>}
-                          {restaurant.deliveryTime && restaurant.distance && <span className="mx-1">|</span>}
-                          {restaurant.distance && <span className="font-medium">{restaurant.distance}</span>}
-                        </div>}
-
-                      {/* Offer Badge */}
-                      {restaurant.offer && <div className="flex items-center gap-2 text-sm lg:text-base mt-auto">
-                          <BadgePercent className="h-4 w-4 lg:h-5 lg:w-5 text-blue-600 dark:text-blue-400" strokeWidth={2} />
-                          <span className="text-gray-700 dark:text-gray-300 font-medium">{restaurant.offer}</span>
-                        </div>}
-                    </CardContent>
-                  </Card>
-                </Link>;
+                  {/* Offer Badge */}
+                  {restaurant.offer && <div className="flex items-center gap-2 text-sm lg:text-base mt-auto">
+                    <BadgePercent className="h-4 w-4 lg:h-5 lg:w-5 text-blue-600 dark:text-blue-400" strokeWidth={2} />
+                    <span className="text-gray-700 dark:text-gray-300 font-medium">{restaurant.offer}</span>
+                  </div>}
+                </CardContent>
+              </Card>
+            </Link>;
           })}
 
-            {/* Empty State */}
-            {filteredAllRestaurants.length === 0 && <div className="text-center py-12">
-                <p className="text-gray-500 dark:text-gray-400">
-                  {query ? `No restaurants found for "${query}"` : "No restaurants found with selected filters"}
-                </p>
-                <Button variant="outline" className="mt-4 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800" onClick={() => {
+          {/* Empty State */}
+          {filteredAllRestaurants.length === 0 && <div className="text-center py-12">
+            <p className="text-gray-500 dark:text-gray-400">
+              {query ? `No restaurants found for "${query}"` : "No restaurants found with selected filters"}
+            </p>
+            <Button variant="outline" className="mt-4 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800" onClick={() => {
               setActiveFilters(new Set());
               setSearchQuery("");
               setSelectedCategory('all');
               setSearchParams({});
             }}>
-                  Clear all filters
-                </Button>
-              </div>}
-          </div>
-        </section>
-      </div>
-      <StickyCartCard />
-    </div>;
+              Clear all filters
+            </Button>
+          </div>}
+        </div>
+      </section>
+    </div>
+    <StickyCartCard />
+  </div>;
 }

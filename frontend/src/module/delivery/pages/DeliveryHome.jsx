@@ -304,7 +304,7 @@ export default function DeliveryHome() {
         }
         // Suppress console errors temporarily while calling preventDefault
         const originalError = console.error;
-        console.error = () => {}; // Temporarily suppress console.error
+        console.error = () => { }; // Temporarily suppress console.error
         try {
           e.preventDefault();
         } finally {
@@ -684,7 +684,7 @@ export default function DeliveryHome() {
           }
           return prev;
         });
-      } catch {}
+      } catch { }
     }, 1000); // Check every second
 
     return () => {
@@ -761,20 +761,19 @@ export default function DeliveryHome() {
   // Calculate today's gigs count
   const todayGigsCount = bookedGigs.filter(gig => gig.date === todayDateKey).length;
 
-  // Calculate weekly earnings from wallet transactions
-  const weeklyEarnings = walletState?.transactions
-    ?.filter(t => {
-      // Include only completed payment transactions
-      if (t.type !== "payment" || t.status !== "Completed") return false;
-      const now = new Date();
-      const startOfWeek = new Date(now);
-      startOfWeek.setDate(now.getDate() - now.getDay());
-      startOfWeek.setHours(0, 0, 0, 0);
-      const transactionDate = t.date ? new Date(t.date) : (t.createdAt ? new Date(t.createdAt) : null);
-      if (!transactionDate) return false;
-      return transactionDate >= startOfWeek && transactionDate <= now;
-    })
-    .reduce((sum, t) => sum + (t.amount || 0), 0) || 0;
+  // Calculate weekly earnings from wallet transactions (payment + earning_addon bonus)
+  // Include both payment and earning_addon transactions in weekly earnings
+  const weeklyEarnings = walletState?.transactions?.filter(t => {
+    // Include both payment and earning_addon transactions
+    if (t.type !== 'payment' && t.type !== 'earning_addon' || t.status !== 'Completed') return false;
+    const now = new Date();
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - now.getDay());
+    startOfWeek.setHours(0, 0, 0, 0);
+    const transactionDate = t.date ? new Date(t.date) : t.createdAt ? new Date(t.createdAt) : null;
+    if (!transactionDate) return false;
+    return transactionDate >= startOfWeek && transactionDate <= now;
+  }).reduce((sum, t) => sum + (t.amount || 0), 0) || 0;
 
   // Calculate weekly orders count from transactions
   const calculateWeeklyOrders = () => {
@@ -794,6 +793,130 @@ export default function DeliveryHome() {
     }).length;
   };
   const weeklyOrders = calculateWeeklyOrders();
+  // State for active earning addon
+  const [activeEarningAddon, setActiveEarningAddon] = useState(null);
+
+  // Fetch active earning addon offers
+  useEffect(() => {
+    const fetchActiveEarningAddons = async () => {
+      try {
+        const response = await deliveryAPI.getActiveEarningAddons();
+        if (response?.data?.success && response?.data?.data?.activeOffers) {
+          const offers = response.data.data.activeOffers;
+          // Get the first valid active offer (prioritize isValid, then isUpcoming, then any active status)
+          const activeOffer = offers.find(offer => offer.isValid) || offers.find(offer => offer.isUpcoming) || offers.find(offer => offer.status === 'active') || offers[0] || null;
+          setActiveEarningAddon(activeOffer);
+        } else {
+          setActiveEarningAddon(null);
+        }
+      } catch (error) {
+        // Suppress network errors - backend might be down or endpoint not available
+        if (error.code === 'ERR_NETWORK') {
+          // Silently handle network errors - backend might not be running
+          setActiveEarningAddon(null);
+          return;
+        }
+
+        // Skip logging timeout errors (handled by axios interceptor)
+        if (error.code !== 'ECONNABORTED' && !error.message?.includes('timeout')) {
+          // Only log non-network errors
+          if (error.response) {
+            console.error('Error fetching active earning addons:', error.response?.data || error.message);
+          }
+        }
+        setActiveEarningAddon(null);
+      }
+    };
+
+    // Fetch immediately on mount
+    fetchActiveEarningAddons();
+
+    // Refresh every 5 seconds to get latest offers
+    const refreshInterval = setInterval(() => {
+      fetchActiveEarningAddons();
+    }, 5000);
+
+    // Refresh when page becomes visible
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        fetchActiveEarningAddons();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // Also listen for focus events for instant refresh
+    const handleFocus = () => {
+      fetchActiveEarningAddons();
+    };
+    window.addEventListener('focus', handleFocus);
+    return () => {
+      clearInterval(refreshInterval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, []);
+
+  // Calculate bonus earnings from earning_addon transactions (only for active offer)
+  const calculateBonusEarnings = () => {
+    if (!activeEarningAddon || !walletState?.transactions) return 0;
+    const now = new Date();
+    const startDate = activeEarningAddon.startDate ? new Date(activeEarningAddon.startDate) : null;
+    const endDate = activeEarningAddon.endDate ? new Date(activeEarningAddon.endDate) : null;
+    return walletState.transactions.filter(t => {
+      // Only count earning_addon type transactions
+      if (t.type !== 'earning_addon' || t.status !== 'Completed') return false;
+
+      // Filter by date range if offer has dates
+      if (startDate || endDate) {
+        const transactionDate = t.date ? new Date(t.date) : t.createdAt ? new Date(t.createdAt) : null;
+        if (!transactionDate) return false;
+        if (startDate && transactionDate < startDate) return false;
+        if (endDate && transactionDate > endDate) return false;
+      }
+
+      // Check if transaction is related to current offer
+      if (t.metadata?.earningAddonId) {
+        return t.metadata.earningAddonId === activeEarningAddon._id?.toString() || t.metadata.earningAddonId === activeEarningAddon.id?.toString();
+      }
+
+      // If no metadata, include all earning_addon transactions in date range
+      return true;
+    }).reduce((sum, t) => sum + (t.amount || 0), 0);
+  };
+
+  // Earnings Guarantee - Use active earning addon if available, otherwise show 0
+  // When no offer is active, show 0 of 0 and ₹0
+  const earningsGuaranteeTarget = activeEarningAddon?.earningAmount || 0;
+  const earningsGuaranteeOrdersTarget = activeEarningAddon?.requiredOrders || 0;
+  // Only show current orders/earnings if there's an active offer
+  const earningsGuaranteeCurrentOrders = activeEarningAddon ? activeEarningAddon.currentOrders ?? weeklyOrders : 0;
+  // Show only bonus earnings from the offer, not total weekly earnings
+  const earningsGuaranteeCurrentEarnings = activeEarningAddon ? calculateBonusEarnings() : 0;
+  const ordersProgress = earningsGuaranteeOrdersTarget > 0 ? Math.min(earningsGuaranteeCurrentOrders / earningsGuaranteeOrdersTarget, 1) : 0;
+  const earningsProgress = earningsGuaranteeTarget > 0 ? Math.min(earningsGuaranteeCurrentEarnings / earningsGuaranteeTarget, 1) : 0;
+
+  // Get week end date for valid till - use offer end date if available
+  const getWeekEndDate = () => {
+    if (activeEarningAddon?.endDate) {
+      const endDate = new Date(activeEarningAddon.endDate);
+      const day = endDate.getDate();
+      const month = endDate.toLocaleString('en-US', {
+        month: 'short'
+      });
+      return `${day} ${month}`;
+    }
+    const now = new Date();
+    const endOfWeek = new Date(now);
+    endOfWeek.setDate(now.getDate() - now.getDay() + 6); // End of week (Saturday)
+    const day = endOfWeek.getDate();
+    const month = endOfWeek.toLocaleString('en-US', {
+      month: 'short'
+    });
+    return `${day} ${month}`;
+  };
+  const weekEndDate = getWeekEndDate();
+  // Offer is live if it's valid (started) or upcoming (not started yet but active)
+  const isOfferLive = activeEarningAddon?.isValid || activeEarningAddon?.isUpcoming || false;
   // Calculate total hours worked today (prefer store, then calculated; default to 0)
   const calculatedHours = bookedGigs.filter(gig => gig.date === todayDateKey).reduce((total, gig) => total + (gig.totalHours || 0), 0);
   const todayHoursWorked = hasStoreDataForToday && todayData ? todayData.timeOnOrders ?? calculatedHours : calculatedHours;
@@ -921,8 +1044,8 @@ export default function DeliveryHome() {
       const audio = new Audio(soundFile);
 
       // Add load event listener to verify file loads
-      audio.addEventListener('loadeddata', () => {});
-      audio.addEventListener('canplay', () => {});
+      audio.addEventListener('loadeddata', () => { });
+      audio.addEventListener('canplay', () => { });
       audio.volume = 1;
       audio.loop = true; // Loop the sound
 
@@ -1053,7 +1176,7 @@ export default function DeliveryHome() {
           if (audio) {
             alertAudioRef.current = audio;
             // Verify audio is actually playing and ensure it loops
-            audio.addEventListener('playing', () => {});
+            audio.addEventListener('playing', () => { });
 
             // Manually restart if loop doesn't work
             audio.addEventListener('ended', () => {
@@ -1072,7 +1195,7 @@ export default function DeliveryHome() {
             if (!audio.loop) {
               audio.loop = true;
             }
-          } else {}
+          } else { }
         } catch (error) {
           console.error('[NewOrder] ⚠️ Audio failed to play:', error);
         }
@@ -1101,6 +1224,30 @@ export default function DeliveryHome() {
       setCountdownSeconds(300);
     }
   }, [showNewOrderPopup]);
+  // Simulate audio playback for Earnings Guarantee
+  useEffect(() => {
+    if (earningsGuaranteeIsPlaying) {
+      // Simulate audio time progression
+      let time = 0;
+      const interval = setInterval(() => {
+        time += 1;
+        const minutes = Math.floor(time / 60);
+        const seconds = time % 60;
+        setEarningsGuaranteeAudioTime(`${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`);
+
+        // Stop after 10 seconds (simulating audio length)
+        if (time >= 10) {
+          setEarningsGuaranteeIsPlaying(false);
+          clearInterval(interval);
+        }
+      }, 1000);
+      return () => clearInterval(interval);
+    }
+  }, [earningsGuaranteeIsPlaying]);
+  const toggleEarningsGuaranteeAudio = () => {
+    setEarningsGuaranteeIsPlaying(!earningsGuaranteeIsPlaying);
+  };
+
   // Reject reasons for order cancellation
   const rejectReasons = ["Too far from current location", "Vehicle issue", "Personal emergency", "Weather conditions", "Already have too many orders", "Other reason"];
 
@@ -1304,7 +1451,7 @@ export default function DeliveryHome() {
         lastLocationRef.current = smoothedLocation;
 
         // Initialize map if not already initialized (will use this location)
-        if (!window.deliveryMapInstance && window.google && window.google.maps && mapContainerRef.current) {} else if (window.deliveryMapInstance) {
+        if (!window.deliveryMapInstance && window.google && window.google.maps && mapContainerRef.current) { } else if (window.deliveryMapInstance) {
           // Map already initialized - recenter and update marker
           window.deliveryMapInstance.setCenter({
             lat: smoothedLocation[0],
@@ -1363,7 +1510,7 @@ export default function DeliveryHome() {
               });
             }
           }, 3000);
-        } else {}
+        } else { }
       }, {
         enableHighAccuracy: true,
         timeout: 10000,
@@ -1960,11 +2107,11 @@ export default function DeliveryHome() {
               try {
                 // Calculate route immediately with current live location
                 const directionsResult = await calculateRouteWithDirectionsAPI(currentLocation,
-                // Delivery boy's current live location
-                {
-                  lat: restaurantInfo.lat,
-                  lng: restaurantInfo.lng
-                } // Restaurant location
+                  // Delivery boy's current live location
+                  {
+                    lat: restaurantInfo.lat,
+                    lng: restaurantInfo.lng
+                  } // Restaurant location
                 );
                 if (directionsResult) {
                   // Store pickup route distance and time
@@ -2077,7 +2224,7 @@ export default function DeliveryHome() {
                 setShowreachedPickupPopup(true);
                 // Close directions map if open
                 setShowDirectionsMap(false);
-              } else {}
+              } else { }
             }, 500); // Wait 500ms for state to update
 
             // Show route on main map instead of opening full-screen directions map
@@ -2607,8 +2754,8 @@ export default function DeliveryHome() {
 
       setShowOrderDeliveredAnimation(true)
 
-      // API call in background (async, doesn't block popup)
-;
+        // API call in background (async, doesn't block popup)
+        ;
       (async () => {
         // Get order ID - prioritize MongoDB _id over orderId string for API call
         // Backend expects _id (MongoDB ObjectId) in the URL parameter
@@ -2620,7 +2767,7 @@ export default function DeliveryHome() {
             // Use MongoDB _id for API call to avoid ObjectId casting errors
 
             const response = await deliveryAPI.confirmReachedDrop(orderIdForApi);
-            if (response.data?.success) {} else {
+            if (response.data?.success) { } else {
               console.error('❌ Failed to confirm reached drop:', response.data);
               toast.error(response.data?.message || 'Failed to confirm reached drop. Please try again.');
             }
@@ -2775,7 +2922,7 @@ export default function DeliveryHome() {
             console.error('❌ No file data in Flutter response:', result);
             toast.error('Failed to get image from camera');
           }
-        } else {}
+        } else { }
       } else {
         // Fallback to standard file input for web browsers
 
@@ -3055,7 +3202,7 @@ export default function DeliveryHome() {
                     setShowRoutePath(true);
                   }
                 } catch (routeError) {
-                  if (routeError.message?.includes('REQUEST_DENIED') || routeError.message?.includes('not available')) {} else {
+                  if (routeError.message?.includes('REQUEST_DENIED') || routeError.message?.includes('not available')) { } else {
                     console.error('❌ Error calculating route to customer:', routeError);
                   }
                   if (routeData?.coordinates?.length > 0) {
@@ -3844,8 +3991,8 @@ export default function DeliveryHome() {
           setSelectedRestaurant(restaurantData);
           setShowNewOrderPopup(true);
           setCountdownSeconds(300); // Reset countdown to 5 minutes
-        } else {}
-      } else {}
+        } else { }
+      } else { }
     } catch (error) {
       console.error('❌ Error fetching assigned orders:', error);
       // Don't show error to user, just log it
@@ -3994,7 +4141,7 @@ export default function DeliveryHome() {
         if (mapDiv && mapDiv === mapContainerRef.current) {
           return; // Map is already properly attached, no need to re-initialize
         }
-      } catch (error) {}
+      } catch (error) { }
 
       // Store map state safely
       try {
@@ -4241,14 +4388,14 @@ export default function DeliveryHome() {
         // Add error listener for map errors (if available)
         try {
           if (window.google.maps.event) {
-            window.google.maps.event.addListenerOnce(map, 'tilesloaded', () => {});
+            window.google.maps.event.addListenerOnce(map, 'tilesloaded', () => { });
           }
         } catch (eventError) {
           console.warn('⚠️ Could not add map event listeners:', eventError);
         }
 
         // Add error listener for map errors
-        window.google.maps.event.addListenerOnce(map, 'tilesloaded', () => {});
+        window.google.maps.event.addListenerOnce(map, 'tilesloaded', () => { });
 
         // Handle map errors
         window.google.maps.event.addListener(map, 'error', error => {
@@ -4718,7 +4865,7 @@ export default function DeliveryHome() {
         if (window.google.maps.TravelMode.TWO_WHEELER) {
           return await tryRoute(window.google.maps.TravelMode.TWO_WHEELER, 'TWO_WHEELER');
         }
-      } catch (twoWheelerError) {}
+      } catch (twoWheelerError) { }
 
       // Fallback to DRIVING mode
       return await tryRoute(window.google.maps.TravelMode.DRIVING, 'DRIVING');
@@ -4872,30 +5019,30 @@ export default function DeliveryHome() {
       lat: newLat,
       lng: newLng
     }, 500,
-    // 500ms animation duration
-    interpolated => {
-      if (bikeMarkerRef.current) {
-        // Update marker position
-        bikeMarkerRef.current.setPosition({
-          lat: interpolated.lat,
-          lng: interpolated.lng
-        });
-
-        // Update rotation if heading available
-        if (heading !== null && heading !== undefined) {
-          getRotatedBikeIcon(heading).then(rotatedIconUrl => {
-            if (bikeMarkerRef.current) {
-              const currentIcon = bikeMarkerRef.current.getIcon();
-              bikeMarkerRef.current.setIcon({
-                url: rotatedIconUrl,
-                scaledSize: currentIcon?.scaledSize || new window.google.maps.Size(60, 60),
-                anchor: currentIcon?.anchor || new window.google.maps.Point(30, 30)
-              });
-            }
+      // 500ms animation duration
+      interpolated => {
+        if (bikeMarkerRef.current) {
+          // Update marker position
+          bikeMarkerRef.current.setPosition({
+            lat: interpolated.lat,
+            lng: interpolated.lng
           });
+
+          // Update rotation if heading available
+          if (heading !== null && heading !== undefined) {
+            getRotatedBikeIcon(heading).then(rotatedIconUrl => {
+              if (bikeMarkerRef.current) {
+                const currentIcon = bikeMarkerRef.current.getIcon();
+                bikeMarkerRef.current.setIcon({
+                  url: rotatedIconUrl,
+                  scaledSize: currentIcon?.scaledSize || new window.google.maps.Size(60, 60),
+                  anchor: currentIcon?.anchor || new window.google.maps.Point(30, 30)
+                });
+              }
+            });
+          }
         }
-      }
-    });
+      });
     markerAnimationCancelRef.current = cancelAnimation;
     lastRiderPositionRef.current = {
       lat: newLat,
@@ -5208,7 +5355,7 @@ export default function DeliveryHome() {
             }
           }).catch(err => {
             // Handle REQUEST_DENIED gracefully - don't spam console
-            if (err.message?.includes('REQUEST_DENIED') || err.message?.includes('not available')) {} else {
+            if (err.message?.includes('REQUEST_DENIED') || err.message?.includes('not available')) { } else {
               console.warn('⚠️ Route recalculation failed:', err);
             }
           });
@@ -5917,16 +6064,16 @@ export default function DeliveryHome() {
   useEffect(() => {
     // Don't show if popup is already showing, or if order hasn't been accepted yet
     if (showreachedPickupPopup || showNewOrderPopup || showOrderIdConfirmationPopup ||
-    // Don't show if order ID is already being confirmed
-    showReachedDropPopup ||
-    // Don't show if already reached drop
-    showOrderDeliveredAnimation ||
-    // Don't show if order is delivered
-    showCustomerReviewPopup ||
-    // Don't show if showing review popup
-    showPaymentPage ||
-    // Don't show if showing payment page
-    !selectedRestaurant?.lat || !selectedRestaurant?.lng || !riderLocation || riderLocation.length !== 2) {
+      // Don't show if order ID is already being confirmed
+      showReachedDropPopup ||
+      // Don't show if already reached drop
+      showOrderDeliveredAnimation ||
+      // Don't show if order is delivered
+      showCustomerReviewPopup ||
+      // Don't show if showing review popup
+      showPaymentPage ||
+      // Don't show if showing payment page
+      !selectedRestaurant?.lat || !selectedRestaurant?.lng || !riderLocation || riderLocation.length !== 2) {
       return;
     }
 
@@ -6180,14 +6327,14 @@ export default function DeliveryHome() {
     const distanceInMeters = calculateDistanceInMeters(riderPos[0], riderPos[1], selectedRestaurant.customerLat, selectedRestaurant.customerLng);
 
     // Log distance check more frequently for debugging
-    if (distanceInMeters <= 600) {}
+    if (distanceInMeters <= 600) { }
 
     // REMOVED: 500m distance check - Reached Drop popup now shows instantly after Order Picked Up
     // This useEffect is kept for other monitoring but won't trigger Reached Drop popup
     // The popup is now shown directly after Order Picked Up confirmation (see handleOrderIdConfirmTouchEnd)
 
     // Log distance for debugging (but don't show popup based on distance)
-    if (distanceInMeters <= 1000) {}
+    if (distanceInMeters <= 1000) { }
 
     // Live tracking polyline is already updated automatically via watchPosition callback
     // No need to recalculate route here - it's handled in handleOrderIdConfirmTouchEnd
@@ -6924,415 +7071,448 @@ export default function DeliveryHome() {
 
       {/* Carousel - Only show if there are slides */}
       {carouselSlides.length > 0 && <div ref={carouselRef} className="relative overflow-hidden bg-gray-700 cursor-grab active:cursor-grabbing select-none flex-shrink-0" onMouseDown={handleCarouselMouseDown}>
-          <div className="flex transition-transform duration-500 ease-in-out" style={{
-        transform: `translateX(-${currentCarouselSlide * 100}%)`
-      }}>
-            {carouselSlides.map(slide => <div key={slide.id} className="min-w-full">
-                <div className={`${slide.bgColor} px-4 py-3 flex items-center gap-3 min-h-[80px]`}>
-                  {/* Icon */}
-                  <div className="flex-shrink-0">
-                    {slide.icon === "bag" ? <div className="relative">
-                        {/* Delivery Bag Icon - Reduced size */}
-                        <div className="w-12 h-12 bg-black rounded-lg flex items-center justify-center shadow-lg relative">
-                          {/* Bag shape */}
-                          <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                            <path d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                          </svg>
-                        </div>
-                        {/* Shadow */}
-                        <div className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-10 h-1.5 bg-black/30 rounded-full blur-sm"></div>
-                      </div> : <div className="relative w-10 h-10">
-                        {/* Bank/Rupee Icon - Reduced size */}
-                        <div className="w-10 h-10 bg-black rounded-lg flex items-center justify-center relative">
-                          {/* Rupee symbol */}
-                          <svg className="w-12 h-12 text-white absolute" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.31-8.86c-1.77-.45-2.34-.94-2.34-1.67 0-.84.79-1.43 2.1-1.43 1.38 0 1.9.66 1.94 1.64h1.71c-.05-1.34-.87-2.57-2.49-2.97V5H10.9v1.69c-1.51.32-2.72 1.3-2.72 2.81 0 1.79 1.49 2.69 3.66 3.21 1.95.46 2.34 1.15 2.34 1.87 0 .53-.39 1.39-2.1 1.39-1.6 0-2.23-.72-2.32-1.64H8.04c.1 1.7 1.36 2.66 2.86 2.97V19h2.34v-1.67c1.52-.29 2.72-1.16 2.73-2.77-.01-2.2-1.9-2.96-3.66-3.42z" />
-                          </svg>
-                        </div>
-                      </div>}
+        <div className="flex transition-transform duration-500 ease-in-out" style={{
+          transform: `translateX(-${currentCarouselSlide * 100}%)`
+        }}>
+          {carouselSlides.map(slide => <div key={slide.id} className="min-w-full">
+            <div className={`${slide.bgColor} px-4 py-3 flex items-center gap-3 min-h-[80px]`}>
+              {/* Icon */}
+              <div className="flex-shrink-0">
+                {slide.icon === "bag" ? <div className="relative">
+                  {/* Delivery Bag Icon - Reduced size */}
+                  <div className="w-12 h-12 bg-black rounded-lg flex items-center justify-center shadow-lg relative">
+                    {/* Bag shape */}
+                    <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                      <path d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                    </svg>
                   </div>
-
-                  <div className="flex-1">
-                    <h3 className={`${slide.bgColor === "bg-gray-700" || slide.bgColor === "bg-[#DC2626]" ? "text-white" : "text-black"} text-sm font-semibold mb-0.5`}>
-                      {slide.title}
-                    </h3>
-                    <p className={`${slide.bgColor === "bg-gray-700" || slide.bgColor === "bg-[#DC2626]" ? "text-white/90" : "text-black/80"} text-xs`}>
-                      {slide.subtitle}
-                    </p>
+                  {/* Shadow */}
+                  <div className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-10 h-1.5 bg-black/30 rounded-full blur-sm"></div>
+                </div> : <div className="relative w-10 h-10">
+                  {/* Bank/Rupee Icon - Reduced size */}
+                  <div className="w-10 h-10 bg-black rounded-lg flex items-center justify-center relative">
+                    {/* Rupee symbol */}
+                    <svg className="w-12 h-12 text-white absolute" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.31-8.86c-1.77-.45-2.34-.94-2.34-1.67 0-.84.79-1.43 2.1-1.43 1.38 0 1.9.66 1.94 1.64h1.71c-.05-1.34-.87-2.57-2.49-2.97V5H10.9v1.69c-1.51.32-2.72 1.3-2.72 2.81 0 1.79 1.49 2.69 3.66 3.21 1.95.46 2.34 1.15 2.34 1.87 0 .53-.39 1.39-2.1 1.39-1.6 0-2.23-.72-2.32-1.64H8.04c.1 1.7 1.36 2.66 2.86 2.97V19h2.34v-1.67c1.52-.29 2.72-1.16 2.73-2.77-.01-2.2-1.9-2.96-3.66-3.42z" />
+                    </svg>
                   </div>
+                </div>}
+              </div>
 
-                  <button onClick={() => {
-              if (slide.id === 2) {
-                navigate("/delivery/profile/details");
-              }
-            }} className={`px-3 py-1.5 rounded-lg font-medium text-xs transition-colors ${slide.bgColor === "bg-gray-700" ? "bg-gray-600 text-white hover:bg-gray-500" : "bg-white text-[#DC2626] hover:bg-gray-100"}`}>
-                    {slide.buttonText}
-                  </button>
-                </div>
-              </div>)}
-          </div>
+              <div className="flex-1">
+                <h3 className={`${slide.bgColor === "bg-gray-700" || slide.bgColor === "bg-[#DC2626]" ? "text-white" : "text-black"} text-sm font-semibold mb-0.5`}>
+                  {slide.title}
+                </h3>
+                <p className={`${slide.bgColor === "bg-gray-700" || slide.bgColor === "bg-[#DC2626]" ? "text-white/90" : "text-black/80"} text-xs`}>
+                  {slide.subtitle}
+                </p>
+              </div>
 
-          {/* Carousel Indicators */}
-          <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
-            {carouselSlides.map((_, index) => <button key={index} onClick={() => setCurrentCarouselSlide(index)} className={`h-1.5 rounded-full transition-all duration-300 ${index === currentCarouselSlide ? currentCarouselSlide === 0 ? "w-6 bg-white" : "w-6 bg-black" : index === 0 ? "w-1.5 bg-white/50" : "w-1.5 bg-black/30"}`} />)}
-          </div>
-        </div>}
+              <button onClick={() => {
+                if (slide.id === 2) {
+                  navigate("/delivery/profile/details");
+                }
+              }} className={`px-3 py-1.5 rounded-lg font-medium text-xs transition-colors ${slide.bgColor === "bg-gray-700" ? "bg-gray-600 text-white hover:bg-gray-500" : "bg-white text-[#DC2626] hover:bg-gray-100"}`}>
+                {slide.buttonText}
+              </button>
+            </div>
+          </div>)}
+        </div>
+
+        {/* Carousel Indicators */}
+        <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
+          {carouselSlides.map((_, index) => <button key={index} onClick={() => setCurrentCarouselSlide(index)} className={`h-1.5 rounded-full transition-all duration-300 ${index === currentCarouselSlide ? currentCarouselSlide === 0 ? "w-6 bg-white" : "w-6 bg-black" : index === 0 ? "w-1.5 bg-white/50" : "w-1.5 bg-black/30"}`} />)}
+        </div>
+      </div>}
 
 
       {/* Conditional Content Based on Swipe Bar Position */}
       {!showHomeSections ? <>
-          {/* Map View - Shows map with Hotspot or Select drop mode */}
-          <div className="relative flex-1 overflow-hidden pb-16 md:pb-0" style={{
-        minHeight: 0,
-        pointerEvents: 'auto'
-      }}>
-            {/* Google Maps Container */}
-            <div ref={mapContainerRef} className="w-full h-full" style={{
-          height: '100%',
-          width: '100%',
-          backgroundColor: '#e5e7eb',
-          // Light gray background while loading
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          pointerEvents: 'auto',
-          zIndex: 0
-        }} />
+        {/* Map View - Shows map with Hotspot or Select drop mode */}
+        <div className="relative flex-1 overflow-hidden pb-16 md:pb-0" style={{
+          minHeight: 0,
+          pointerEvents: 'auto'
+        }}>
+          {/* Google Maps Container */}
+          <div ref={mapContainerRef} className="w-full h-full" style={{
+            height: '100%',
+            width: '100%',
+            backgroundColor: '#e5e7eb',
+            // Light gray background while loading
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            pointerEvents: 'auto',
+            zIndex: 0
+          }} />
 
-            {/* Loading indicator */}
-            {mapLoading && <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-10">
-                <div className="flex flex-col items-center gap-2">
-                  <div className="text-gray-600 font-medium">Loading map...</div>
-                  <div className="text-xs text-gray-500">Please wait</div>
-                </div>
-              </div>}
+          {/* Loading indicator */}
+          {mapLoading && <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-10">
+            <div className="flex flex-col items-center gap-2">
+              <div className="text-gray-600 font-medium">Loading map...</div>
+              <div className="text-xs text-gray-500">Please wait</div>
+            </div>
+          </div>}
 
-            {/* Map Refresh Overlay - Professional Loading Indicator */}
-            {isRefreshingLocation && <motion.div initial={{
-          opacity: 0
-        }} animate={{
-          opacity: 1
-        }} exit={{
-          opacity: 0
-        }} transition={{
-          duration: 0.2
-        }} className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
-                {/* Loading indicator container */}
-                <motion.div initial={{
-            scale: 0.8,
+          {/* Map Refresh Overlay - Professional Loading Indicator */}
+          {isRefreshingLocation && <motion.div initial={{
             opacity: 0
           }} animate={{
-            scale: 1,
             opacity: 1
           }} exit={{
-            scale: 0.8,
             opacity: 0
           }} transition={{
-            duration: 0.3,
-            ease: [0.4, 0, 0.2, 1]
-          }} className="relative">
-                  {/* Outer pulsing ring */}
-                  <motion.div animate={{
-              scale: [1, 1.3, 1],
-              opacity: [0.6, 0.3, 0.6]
-            }} transition={{
-              duration: 2,
-              repeat: Infinity,
-              ease: [0.4, 0, 0.6, 1],
-              // Smooth ease-in-out
-              type: "tween",
-              times: [0, 0.5, 1]
-            }} className="absolute inset-0 w-20 h-20 bg-blue-500/20 rounded-full" />
-
-                  {/* Middle ring */}
-                  <motion.div animate={{
-              scale: [1, 1.2, 1],
-              opacity: [0.5, 0.2, 0.5]
-            }} transition={{
-              duration: 1.5,
-              repeat: Infinity,
-              ease: [0.4, 0, 0.6, 1],
-              // Smooth ease-in-out
-              type: "tween",
-              delay: 0.3,
-              times: [0, 0.5, 1]
-            }} className="absolute inset-0 w-16 h-16 bg-blue-500/30 rounded-full m-2" />
-
-                  {/* Inner spinner */}
-                  <div className="relative w-12 h-12 bg-white/90 rounded-full flex items-center justify-center shadow-lg">
-                    <motion.div animate={{
-                rotate: 360
-              }} transition={{
-                duration: 1.2,
-                repeat: Infinity,
-                ease: "linear",
-                type: "tween"
-              }} className="w-8 h-8 border-[3px] border-blue-600 border-t-transparent rounded-full" />
-                  </div>
-                </motion.div>
-              </motion.div>}
-
-            {/* Floating Action Button - My Location */}
-            <motion.button onClick={() => {
-          if (navigator.geolocation) {
-            setIsRefreshingLocation(true);
-            navigator.geolocation.getCurrentPosition(position => {
-              // Validate coordinates
-              const latitude = position.coords.latitude;
-              const longitude = position.coords.longitude;
-
-              // Validate coordinates are valid numbers
-              if (typeof latitude !== 'number' || typeof longitude !== 'number' || isNaN(latitude) || isNaN(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
-                console.warn("⚠️ Invalid coordinates received:", {
-                  latitude,
-                  longitude
-                });
-                setIsRefreshingLocation(false);
-                return;
-              }
-              const newLocation = [latitude, longitude]; // [lat, lng] format
-
-              // Calculate heading from previous location
-              let heading = null;
-              if (lastLocationRef.current) {
-                const [prevLat, prevLng] = lastLocationRef.current;
-                heading = calculateHeading(prevLat, prevLng, latitude, longitude);
-              }
-
-              // Save location to localStorage (for refresh handling)
-              localStorage.setItem('deliveryBoyLastLocation', JSON.stringify(newLocation));
-
-              // Update route history
-              if (lastLocationRef.current) {
-                routeHistoryRef.current.push({
-                  lat: latitude,
-                  lng: longitude
-                });
-                if (routeHistoryRef.current.length > 1000) {
-                  routeHistoryRef.current.shift();
-                }
-              } else {
-                routeHistoryRef.current = [{
-                  lat: latitude,
-                  lng: longitude
-                }];
-              }
-
-              // Update bike marker (only if online - blue dot नहीं, bike icon)
-              if (window.deliveryMapInstance) {
-                // Always show bike marker on map (both offline and online)
-                // Center map automatically (Zomato style) unless user is panning
-                createOrUpdateBikeMarker(latitude, longitude, heading, !isUserPanningRef.current);
-                updateRoutePolyline();
-              }
-              setRiderLocation(newLocation);
-              lastLocationRef.current = newLocation;
-              // Stop refreshing animation after a short delay
-              setTimeout(() => {
-                setIsRefreshingLocation(false);
-              }, 800);
-            }, error => {
-              console.error('Error getting location:', error);
-              setIsRefreshingLocation(false);
-            }, {
-              enableHighAccuracy: true,
-              timeout: 10000,
-              maximumAge: 0
-            });
-          }
-        }} className="absolute bottom-44 right-3 w-12 h-12 bg-white rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 transition-colors z-20 overflow-visible" whileTap={{
-          scale: 0.92
-        }} transition={{
-          type: "spring",
-          stiffness: 300,
-          damping: 25,
-          mass: 0.5
-        }}>
-              <div className="relative w-full h-full flex items-center justify-center">
-                {/* Ripple effect */}
-                {isRefreshingLocation && <motion.div className="absolute inset-0 rounded-full bg-blue-500/20" initial={{
-              scale: 0.9,
-              opacity: 0.6
+            duration: 0.2
+          }} className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
+            {/* Loading indicator container */}
+            <motion.div initial={{
+              scale: 0.8,
+              opacity: 0
             }} animate={{
-              scale: [0.9, 1.6, 1.8],
-              opacity: [0.6, 0.3, 0]
+              scale: 1,
+              opacity: 1
+            }} exit={{
+              scale: 0.8,
+              opacity: 0
             }} transition={{
-              duration: 2,
-              repeat: Infinity,
-              ease: [0.25, 0.46, 0.45, 0.94],
-              // Smooth ease-out
-              times: [0, 0.5, 1]
-            }} />}
-
-                {/* Icon with smooth animations */}
-                <motion.div className="relative z-10" animate={{
-              rotate: isRefreshingLocation ? 360 : 0,
-              scale: isRefreshingLocation ? [1, 1.1, 1] : 1
-            }} transition={{
-              rotate: {
+              duration: 0.3,
+              ease: [0.4, 0, 0.2, 1]
+            }} className="relative">
+              {/* Outer pulsing ring */}
+              <motion.div animate={{
+                scale: [1, 1.3, 1],
+                opacity: [0.6, 0.3, 0.6]
+              }} transition={{
                 duration: 2,
-                repeat: isRefreshingLocation ? Infinity : 0,
-                ease: "linear",
-                // Linear for smooth continuous rotation
-                type: "tween"
-              },
-              scale: {
-                duration: 1.5,
-                repeat: isRefreshingLocation ? Infinity : 0,
+                repeat: Infinity,
                 ease: [0.4, 0, 0.6, 1],
                 // Smooth ease-in-out
                 type: "tween",
                 times: [0, 0.5, 1]
-              }
-            }}>
-                  <MapPin className={`w-6 h-6 transition-colors duration-500 ease-in-out ${isRefreshingLocation ? 'text-blue-600' : 'text-gray-700'}`} />
-                </motion.div>
+              }} className="absolute inset-0 w-20 h-20 bg-blue-500/20 rounded-full" />
+
+              {/* Middle ring */}
+              <motion.div animate={{
+                scale: [1, 1.2, 1],
+                opacity: [0.5, 0.2, 0.5]
+              }} transition={{
+                duration: 1.5,
+                repeat: Infinity,
+                ease: [0.4, 0, 0.6, 1],
+                // Smooth ease-in-out
+                type: "tween",
+                delay: 0.3,
+                times: [0, 0.5, 1]
+              }} className="absolute inset-0 w-16 h-16 bg-blue-500/30 rounded-full m-2" />
+
+              {/* Inner spinner */}
+              <div className="relative w-12 h-12 bg-white/90 rounded-full flex items-center justify-center shadow-lg">
+                <motion.div animate={{
+                  rotate: 360
+                }} transition={{
+                  duration: 1.2,
+                  repeat: Infinity,
+                  ease: "linear",
+                  type: "tween"
+                }} className="w-8 h-8 border-[3px] border-blue-600 border-t-transparent rounded-full" />
               </div>
-            </motion.button>
+            </motion.div>
+          </motion.div>}
 
-            {/* Floating Banner - Status Message */}
-            {mapViewMode === "hotspot" && (deliveryStatus === "pending" || deliveryStatus === "blocked") && <motion.div initial={{
-          opacity: 0,
-          y: 20
-        }} animate={{
-          opacity: 1,
-          y: 0
-        }} transition={{
-          delay: 0.2
-        }} className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-white rounded-2xl shadow-sm px-6 py-4 z-20 min-w-[96%] text-center">
-                {deliveryStatus === "pending" ? <>
-                    <h3 className="text-lg font-bold text-gray-900 mb-1">Verification Done in 24 Hours</h3>
-                    <p className="text-sm text-gray-600">Your account is under verification. You'll be notified once approved.</p>
-                  </> : deliveryStatus === "blocked" ? <>
-                    <h3 className="text-lg font-bold text-red-600 mb-2">Denied Verification</h3>
-                    {rejectionReason && <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-3 text-left">
-                        <p className="text-xs font-semibold text-red-800 mb-2">Reason for Rejection:</p>
-                        <div className="text-xs text-red-700 space-y-1">
-                          {rejectionReason.split('\n').filter(line => line.trim()).length > 1 ? <ul className="space-y-1 list-disc list-inside">
-                              {rejectionReason.split('\n').map((point, index) => point.trim() && <li key={index}>{point.trim()}</li>)}
-                            </ul> : <p className="text-red-700">{rejectionReason}</p>}
-                        </div>
-                      </div>}
-                    <p className="text-sm text-gray-700 mb-3">
-                      Please correct the above issues and click "Reverify" to resubmit your request for approval.
-                    </p>
-                    <button onClick={handleReverify} disabled={isReverifying} className="px-6 py-2.5 bg-blue-600 text-white rounded-lg font-semibold text-sm hover:bg-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mx-auto">
-                      {isReverifying ? <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          Submitting...
-                        </> : "Reverify"}
-                    </button>
-                  </> : null}
-              </motion.div>}
+          {/* Floating Action Button - My Location */}
+          <motion.button onClick={() => {
+            if (navigator.geolocation) {
+              setIsRefreshingLocation(true);
+              navigator.geolocation.getCurrentPosition(position => {
+                // Validate coordinates
+                const latitude = position.coords.latitude;
+                const longitude = position.coords.longitude;
 
-            {/* Bottom Swipeable Bar - Can be dragged up to show home sections */}
-            {!showHomeSections && <motion.div ref={swipeBarRef} initial={{
+                // Validate coordinates are valid numbers
+                if (typeof latitude !== 'number' || typeof longitude !== 'number' || isNaN(latitude) || isNaN(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+                  console.warn("⚠️ Invalid coordinates received:", {
+                    latitude,
+                    longitude
+                  });
+                  setIsRefreshingLocation(false);
+                  return;
+                }
+                const newLocation = [latitude, longitude]; // [lat, lng] format
+
+                // Calculate heading from previous location
+                let heading = null;
+                if (lastLocationRef.current) {
+                  const [prevLat, prevLng] = lastLocationRef.current;
+                  heading = calculateHeading(prevLat, prevLng, latitude, longitude);
+                }
+
+                // Save location to localStorage (for refresh handling)
+                localStorage.setItem('deliveryBoyLastLocation', JSON.stringify(newLocation));
+
+                // Update route history
+                if (lastLocationRef.current) {
+                  routeHistoryRef.current.push({
+                    lat: latitude,
+                    lng: longitude
+                  });
+                  if (routeHistoryRef.current.length > 1000) {
+                    routeHistoryRef.current.shift();
+                  }
+                } else {
+                  routeHistoryRef.current = [{
+                    lat: latitude,
+                    lng: longitude
+                  }];
+                }
+
+                // Update bike marker (only if online - blue dot नहीं, bike icon)
+                if (window.deliveryMapInstance) {
+                  // Always show bike marker on map (both offline and online)
+                  // Center map automatically (Zomato style) unless user is panning
+                  createOrUpdateBikeMarker(latitude, longitude, heading, !isUserPanningRef.current);
+                  updateRoutePolyline();
+                }
+                setRiderLocation(newLocation);
+                lastLocationRef.current = newLocation;
+                // Stop refreshing animation after a short delay
+                setTimeout(() => {
+                  setIsRefreshingLocation(false);
+                }, 800);
+              }, error => {
+                console.error('Error getting location:', error);
+                setIsRefreshingLocation(false);
+              }, {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 0
+              });
+            }
+          }} className="absolute bottom-44 right-3 w-12 h-12 bg-white rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 transition-colors z-20 overflow-visible" whileTap={{
+            scale: 0.92
+          }} transition={{
+            type: "spring",
+            stiffness: 300,
+            damping: 25,
+            mass: 0.5
+          }}>
+            <div className="relative w-full h-full flex items-center justify-center">
+              {/* Ripple effect */}
+              {isRefreshingLocation && <motion.div className="absolute inset-0 rounded-full bg-blue-500/20" initial={{
+                scale: 0.9,
+                opacity: 0.6
+              }} animate={{
+                scale: [0.9, 1.6, 1.8],
+                opacity: [0.6, 0.3, 0]
+              }} transition={{
+                duration: 2,
+                repeat: Infinity,
+                ease: [0.25, 0.46, 0.45, 0.94],
+                // Smooth ease-out
+                times: [0, 0.5, 1]
+              }} />}
+
+              {/* Icon with smooth animations */}
+              <motion.div className="relative z-10" animate={{
+                rotate: isRefreshingLocation ? 360 : 0,
+                scale: isRefreshingLocation ? [1, 1.1, 1] : 1
+              }} transition={{
+                rotate: {
+                  duration: 2,
+                  repeat: isRefreshingLocation ? Infinity : 0,
+                  ease: "linear",
+                  // Linear for smooth continuous rotation
+                  type: "tween"
+                },
+                scale: {
+                  duration: 1.5,
+                  repeat: isRefreshingLocation ? Infinity : 0,
+                  ease: [0.4, 0, 0.6, 1],
+                  // Smooth ease-in-out
+                  type: "tween",
+                  times: [0, 0.5, 1]
+                }
+              }}>
+                <MapPin className={`w-6 h-6 transition-colors duration-500 ease-in-out ${isRefreshingLocation ? 'text-blue-600' : 'text-gray-700'}`} />
+              </motion.div>
+            </div>
+          </motion.button>
+
+          {/* Floating Banner - Status Message */}
+          {mapViewMode === "hotspot" && (deliveryStatus === "pending" || deliveryStatus === "blocked") && <motion.div initial={{
+            opacity: 0,
+            y: 20
+          }} animate={{
+            opacity: 1,
+            y: 0
+          }} transition={{
+            delay: 0.2
+          }} className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-white rounded-2xl shadow-sm px-6 py-4 z-20 min-w-[96%] text-center">
+            {deliveryStatus === "pending" ? <>
+              <h3 className="text-lg font-bold text-gray-900 mb-1">Verification Done in 24 Hours</h3>
+              <p className="text-sm text-gray-600">Your account is under verification. You'll be notified once approved.</p>
+            </> : deliveryStatus === "blocked" ? <>
+              <h3 className="text-lg font-bold text-red-600 mb-2">Denied Verification</h3>
+              {rejectionReason && <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-3 text-left">
+                <p className="text-xs font-semibold text-red-800 mb-2">Reason for Rejection:</p>
+                <div className="text-xs text-red-700 space-y-1">
+                  {rejectionReason.split('\n').filter(line => line.trim()).length > 1 ? <ul className="space-y-1 list-disc list-inside">
+                    {rejectionReason.split('\n').map((point, index) => point.trim() && <li key={index}>{point.trim()}</li>)}
+                  </ul> : <p className="text-red-700">{rejectionReason}</p>}
+                </div>
+              </div>}
+              <p className="text-sm text-gray-700 mb-3">
+                Please correct the above issues and click "Reverify" to resubmit your request for approval.
+              </p>
+              <button onClick={handleReverify} disabled={isReverifying} className="px-6 py-2.5 bg-blue-600 text-white rounded-lg font-semibold text-sm hover:bg-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mx-auto">
+                {isReverifying ? <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Submitting...
+                </> : "Reverify"}
+              </button>
+            </> : null}
+          </motion.div>}
+
+          {/* Bottom Swipeable Bar - Can be dragged up to show home sections */}
+          {!showHomeSections && <motion.div ref={swipeBarRef} initial={{
+            y: "100%"
+          }} animate={{
+            y: isDraggingSwipeBar ? `${-swipeBarPosition * (window.innerHeight * 0.8)}px` : 0
+          }} transition={isDraggingSwipeBar ? {
+            duration: 0
+          } : {
+            type: "spring",
+            damping: 30,
+            stiffness: 300
+          }} onTouchStart={handleSwipeBarTouchStart} onTouchMove={handleSwipeBarTouchMove} onTouchEnd={handleSwipeBarTouchEnd} onMouseDown={handleSwipeBarMouseDown} className="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-2xl z-20" style={{
+            touchAction: 'pan-y',
+            pointerEvents: 'auto'
+          }}>
+            {/* Swipe Handle */}
+            <div className="flex flex-col items-center pt-4 pb-2 cursor-grab active:cursor-grabbing" style={{
+              touchAction: 'none'
+            }}>
+              <motion.div className="flex flex-col items-center gap-1" animate={{
+                y: isDraggingSwipeBar ? swipeBarPosition * 5 : 0,
+                opacity: isDraggingSwipeBar ? 0.7 : 1
+              }} transition={{
+                duration: 0.1
+              }}>
+                <button onClick={handleChevronUpClick} className="flex items-center justify-center p-2 -m-2 rounded-full hover:bg-gray-100 active:bg-gray-200 transition-colors" aria-label="Slide up">
+                  <ChevronUp className="!w-12 !h-8 scale-x-150 text-gray-400 -mt-2 font-bold" strokeWidth={3} />
+                </button>
+              </motion.div>
+            </div>
+
+            {/* Content Area - Shows map info when down */}
+            <div className="px-4 pb-6">
+              {mapViewMode === "hotspot" ? <div className="flex flex-col items-center">
+                {/* <h3 className="text-lg font-bold text-gray-900 mb-2">No hotspots are available</h3>
+                       <p className="text-sm text-gray-600 mb-4">Please go online to see hotspots</p> */}
+              </div> : <div className="flex flex-col items-center">
+                {/* <h3 className="text-lg font-bold text-gray-900 mb-2">Select drop location</h3>
+                       <p className="text-sm text-gray-600 mb-4">Choose a drop location on the map</p> */}
+              </div>}
+            </div>
+          </motion.div>}
+        </div>
+      </> : <>
+        {/* Home Sections View - Full screen when swipe bar is dragged up */}
+        <motion.div ref={swipeBarRef} initial={{
           y: "100%"
         }} animate={{
-          y: isDraggingSwipeBar ? `${-swipeBarPosition * (window.innerHeight * 0.8)}px` : 0
+          y: isDraggingSwipeBar ? `${(1 - swipeBarPosition) * (window.innerHeight * 0.8)}px` : 0
+        }} exit={{
+          y: "100%"
         }} transition={isDraggingSwipeBar ? {
           duration: 0
         } : {
           type: "spring",
           damping: 30,
           stiffness: 300
-        }} onTouchStart={handleSwipeBarTouchStart} onTouchMove={handleSwipeBarTouchMove} onTouchEnd={handleSwipeBarTouchEnd} onMouseDown={handleSwipeBarMouseDown} className="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-2xl z-20" style={{
-          touchAction: 'pan-y',
-          pointerEvents: 'auto'
+        }} onTouchStart={handleSwipeBarTouchStart} onTouchMove={handleSwipeBarTouchMove} onTouchEnd={handleSwipeBarTouchEnd} onMouseDown={handleSwipeBarMouseDown} className="relative flex-1 bg-white rounded-t-3xl shadow-2xl overflow-hidden" style={{
+          height: 'calc(100vh - 200px)',
+          touchAction: 'pan-y'
         }}>
-                {/* Swipe Handle */}
-                <div className="flex flex-col items-center pt-4 pb-2 cursor-grab active:cursor-grabbing" style={{
+          {/* Swipe Handle at Top - Can be dragged down to go back to map */}
+          <div className="flex flex-col items-center pt-4 pb-2 cursor-grab active:cursor-grabbing bg-white sticky top-0 z-10" style={{
             touchAction: 'none'
           }}>
-                  <motion.div className="flex flex-col items-center gap-1" animate={{
-              y: isDraggingSwipeBar ? swipeBarPosition * 5 : 0,
+            <motion.div className="flex flex-col items-center gap-1" animate={{
+              y: isDraggingSwipeBar ? -swipeBarPosition * 5 : 0,
               opacity: isDraggingSwipeBar ? 0.7 : 1
             }} transition={{
               duration: 0.1
             }}>
-                    <button onClick={handleChevronUpClick} className="flex items-center justify-center p-2 -m-2 rounded-full hover:bg-gray-100 active:bg-gray-200 transition-colors" aria-label="Slide up">
-                      <ChevronUp className="!w-12 !h-8 scale-x-150 text-gray-400 -mt-2 font-bold" strokeWidth={3} />
-                    </button>
-                  </motion.div>
-                </div>
-
-                {/* Content Area - Shows map info when down */}
-                <div className="px-4 pb-6">
-                  {mapViewMode === "hotspot" ? <div className="flex flex-col items-center">
-                      {/* <h3 className="text-lg font-bold text-gray-900 mb-2">No hotspots are available</h3>
-                       <p className="text-sm text-gray-600 mb-4">Please go online to see hotspots</p> */}
-                    </div> : <div className="flex flex-col items-center">
-                      {/* <h3 className="text-lg font-bold text-gray-900 mb-2">Select drop location</h3>
-                       <p className="text-sm text-gray-600 mb-4">Choose a drop location on the map</p> */}
-                    </div>}
-                </div>
-              </motion.div>}
+              <button onClick={handleChevronDownClick} className="flex items-center justify-center p-2 -m-2 rounded-full hover:bg-gray-100 active:bg-gray-200 transition-colors" aria-label="Slide down">
+                <ChevronDown className="!w-12 !h-8 scale-x-150 text-gray-400 -mt-2 font-bold" strokeWidth={3} />
+              </button>
+            </motion.div>
           </div>
-        </> : <>
-          {/* Home Sections View - Full screen when swipe bar is dragged up */}
-          <motion.div ref={swipeBarRef} initial={{
-        y: "100%"
-      }} animate={{
-        y: isDraggingSwipeBar ? `${(1 - swipeBarPosition) * (window.innerHeight * 0.8)}px` : 0
-      }} exit={{
-        y: "100%"
-      }} transition={isDraggingSwipeBar ? {
-        duration: 0
-      } : {
-        type: "spring",
-        damping: 30,
-        stiffness: 300
-      }} onTouchStart={handleSwipeBarTouchStart} onTouchMove={handleSwipeBarTouchMove} onTouchEnd={handleSwipeBarTouchEnd} onMouseDown={handleSwipeBarMouseDown} className="relative flex-1 bg-white rounded-t-3xl shadow-2xl overflow-hidden" style={{
-        height: 'calc(100vh - 200px)',
-        touchAction: 'pan-y'
-      }}>
-            {/* Swipe Handle at Top - Can be dragged down to go back to map */}
-            <div className="flex flex-col items-center pt-4 pb-2 cursor-grab active:cursor-grabbing bg-white sticky top-0 z-10" style={{
-          touchAction: 'none'
-        }}>
-              <motion.div className="flex flex-col items-center gap-1" animate={{
-            y: isDraggingSwipeBar ? -swipeBarPosition * 5 : 0,
-            opacity: isDraggingSwipeBar ? 0.7 : 1
-          }} transition={{
-            duration: 0.1
-          }}>
-                <button onClick={handleChevronDownClick} className="flex items-center justify-center p-2 -m-2 rounded-full hover:bg-gray-100 active:bg-gray-200 transition-colors" aria-label="Slide down">
-                  <ChevronDown className="!w-12 !h-8 scale-x-150 text-gray-400 -mt-2 font-bold" strokeWidth={3} />
-                </button>
-              </motion.div>
-            </div>
 
-            <div ref={homeSectionsScrollRef} className="px-4 pt-4 pb-16 space-y-4 overflow-y-auto" style={{
-          height: 'calc(100vh - 250px)',
-          touchAction: 'pan-y',
-          // Allow vertical scrolling
-          WebkitOverflowScrolling: 'touch' // Smooth scrolling on iOS
-        }}>
-              {/* Referral Bonus Banner */}
-              <motion.div initial={{
-            opacity: 0,
-            y: -10
-          }} animate={{
-            opacity: 1,
-            y: 0
-          }} transition={{
-            duration: 0.3
-          }} onClick={() => navigate("/delivery/refer-and-earn")} className="w-full rounded-xl p-6 shadow-lg relative overflow-hidden min-h-[70px] cursor-pointer" style={{
-            backgroundImage: `url(${referralBonusBg})`,
-            backgroundSize: '100% 100%',
-            backgroundPosition: 'center',
-            backgroundRepeat: 'no-repeat'
+          <div ref={homeSectionsScrollRef} className="px-4 pt-4 pb-16 space-y-4 overflow-y-auto" style={{
+            height: 'calc(100vh - 250px)',
+            touchAction: 'pan-y',
+            // Allow vertical scrolling
+            WebkitOverflowScrolling: 'touch' // Smooth scrolling on iOS
           }}>
-                <div className="relative z-10">
-                  <div className="text-white text-3xl font-bold mb-1">₹6,000                 <span className="text-white/90 text-base font-medium mb-1">referral bonus</span>
-                  </div>
-                  <div className="text-white/80 text-sm">Refer your friends now</div>
+            {/* Referral Bonus Banner */}
+            <motion.div initial={{
+              opacity: 0,
+              y: -10
+            }} animate={{
+              opacity: 1,
+              y: 0
+            }} transition={{
+              duration: 0.3
+            }} onClick={() => navigate("/delivery/refer-and-earn")} className="w-full rounded-xl p-6 shadow-lg relative overflow-hidden min-h-[70px] cursor-pointer" style={{
+              backgroundImage: `url(${referralBonusBg})`,
+              backgroundSize: '100% 100%',
+              backgroundPosition: 'center',
+              backgroundRepeat: 'no-repeat'
+            }}>
+              <div className="relative z-10">
+                <div className="text-white text-3xl font-bold mb-1">₹6,000                 <span className="text-white/90 text-base font-medium mb-1">referral bonus</span>
                 </div>
-              </motion.div>
+                <div className="text-white/80 text-sm">Refer your friends now</div>
+              </div>
+            </motion.div>
 
-              {/* Unlock Offer Card */}
+            {/* Unlock Offer Card */}
+            <motion.div initial={{
+              opacity: 0,
+              y: -10
+            }} animate={{
+              opacity: 1,
+              y: 0
+            }} transition={{
+              duration: 0.3,
+              delay: 0.1
+            }} className="w-full rounded-xl p-6 shadow-lg bg-black text-white">
+              <div className="flex items-center text-center justify-center gap-2 mb-2">
+                <div className="text-4xl font-bold text-center">₹100</div>
+                <Lock className="w-5 h-5 text-white" />
+              </div>
+              <p className="text-white/90 text-center text-sm mb-4">Complete 1 order to unlock ₹100</p>
+              <div className="flex items-center text-center justify-center gap-2 text-white/70 text-xs mb-4">
+                <Clock className="w-4 h-4" />
+                <span className="text-center">Valid till 10 December 2025</span>
+              </div>
+              <button onClick={() => {
+                if (isOnline) {
+                  goOffline();
+                } else {
+                  // Always show the popup when offline (same as navbar behavior)
+                  setShowBookGigsPopup(true);
+                }
+              }} className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-lg flex items-center justify-center gap-2 transition-colors">
+                <span>Go online</span>
+                <ArrowRight className="w-5 h-5" />
+              </button>
+            </motion.div>
+
+              {/* Earnings Guarantee Card */}
               <motion.div initial={{
             opacity: 0,
             y: -10
@@ -7341,892 +7521,536 @@ export default function DeliveryHome() {
             y: 0
           }} transition={{
             duration: 0.3,
-            delay: 0.1
-          }} className="w-full rounded-xl p-6 shadow-lg bg-black text-white">
-                <div className="flex items-center text-center justify-center gap-2 mb-2">
-                  <div className="text-4xl font-bold text-center">₹100</div>
-                  <Lock className="w-5 h-5 text-white" />
-                </div>
-                <p className="text-white/90 text-center text-sm mb-4">Complete 1 order to unlock ₹100</p>
-                <div className="flex items-center text-center justify-center gap-2 text-white/70 text-xs mb-4">
-                  <Clock className="w-4 h-4" />
-                  <span className="text-center">Valid till 10 December 2025</span>
-                </div>
-                <button onClick={() => {
-              if (isOnline) {
-                goOffline();
-              } else {
-                // Always show the popup when offline (same as navbar behavior)
-                setShowBookGigsPopup(true);
-              }
-            }} className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-lg flex items-center justify-center gap-2 transition-colors">
-                  <span>Go online</span>
-                  <ArrowRight className="w-5 h-5" />
-                </button>
-              </motion.div>
-              {/* Today's Progress Card */}
-              <motion.div initial={{
-            opacity: 0,
-            y: -10
-          }} animate={{
-            opacity: 1,
-            y: 0
-          }} transition={{
-            duration: 0.3,
-            delay: 0.3
+            delay: 0.25
           }} className="w-full rounded-xl overflow-hidden shadow-lg bg-white">
                 {/* Header */}
-                <div className="bg-black px-4 py-3 flex items-center gap-3">
-                  <div className="relative">
-                    <Calendar className="w-5 h-5 text-white" />
-                    <CheckCircle className="w-3 h-3 text-green-500 absolute -top-1 -right-1 bg-white rounded-full" fill="currentColor" />
-                  </div>
-                  <span className="text-white font-semibold">Today's progress</span>
-                </div>
-
-                {/* Content */}
-                <div className="p-4">
-                  {/* Grid Layout - 2x2 */}
-                  <div className="grid grid-cols-2 gap-4">
-                    {/* Top Left - Earnings */}
-                    <button onClick={() => navigate("/delivery/earnings")} className="flex flex-col items-start gap-1 hover:opacity-80 transition-opacity">
-                      <span className="text-2xl font-bold text-gray-900">
-                        {formatCurrency(todayEarnings)}
-                      </span>
-                      <div className="flex items-center gap-1 text-sm text-gray-600">
-                        <span>Earnings</span>
-                        <ArrowRight className="w-4 h-4" />
+                <div className="border-b  border-gray-100">
+                  <div className="flex p-2 px-3 items-center justify-between bg-black">
+                    <div className="flex-1">
+                      <h2 className="text-lg font-bold text-white mb-1">Earnings Guarantee</h2>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-white">Valid till {weekEndDate}</span>
+                        {isOfferLive && <div className="flex items-center gap-1">
+                            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                            <span className="text-sm text-green-600 font-medium">Live</span>
+                          </div>}
                       </div>
-                    </button>
-
-                    {/* Top Right - Trips */}
-                    <button onClick={() => navigate("/delivery/trip-history")} className="flex flex-col items-end gap-1 hover:opacity-80 transition-opacity">
-                      <span className="text-2xl font-bold text-gray-900">
-                        {todayTrips}
-                      </span>
-                      <div className="flex items-center gap-1 text-sm text-gray-600">
-                        <span>Trips</span>
-                        <ArrowRight className="w-4 h-4" />
-                      </div>
-                    </button>
-
-                    {/* Bottom Left - Time on orders */}
-                    <button onClick={() => navigate("/delivery/time-on-orders")} className="flex flex-col items-start gap-1 hover:opacity-80 transition-opacity">
-                      <span className="text-2xl font-bold text-gray-900">
-                        {`${formatHours(todayHoursWorked)} hrs`}
-                      </span>
-                      <div className="flex items-center gap-1 text-sm text-gray-600">
-                        <span>Time on orders</span>
-                        <ArrowRight className="w-4 h-4" />
-                      </div>
-                    </button>
-
-                    {/* Bottom Right - Gigs History */}
-                    <button onClick={() => navigate("/delivery/gig")} className="flex flex-col items-end gap-1 hover:opacity-80 transition-opacity">
-                      <span className="text-2xl font-bold text-gray-900">
-                        {`${todayGigsCount} Gigs`}
-                      </span>
-                      <div className="flex items-center gap-1 text-sm text-gray-600">
-                        <span>History</span>
-                        <ArrowRight className="w-4 h-4" />
-                      </div>
-                    </button>
+                    </div>
+                    {/* Summary Box */}
+                    <div className="bg-black text-white px-4 py-3 rounded-lg text-center min-w-[80px]">
+                      <div className="text-2xl font-bold">₹{earningsGuaranteeTarget.toFixed(0)}</div>
+                      <div className="text-xs text-white/80 mt-1">{earningsGuaranteeOrdersTarget} orders</div>
+                    </div>
                   </div>
                 </div>
-              </motion.div>
-            </div>
-          </motion.div>
-        </>}
 
-      {/* Help Popup */}
-      <BottomPopup isOpen={showHelpPopup} onClose={() => setShowHelpPopup(false)} title="How can we help?" showCloseButton={true} closeOnBackdropClick={true} maxHeight="70vh">
-        <div className="py-2">
-          {helpOptions.map(option => <button key={option.id} onClick={() => handleHelpOptionClick(option)} className="w-full flex items-center gap-4 p-4 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0">
-              {/* Icon */}
-              <div className="shrink-0 w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center">
-                {option.icon === "helpCenter" && <HelpCircle className="w-6 h-6 text-gray-700" />}
-                {option.icon === "ticket" && <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
-                  </svg>}
-                {option.icon === "idCard" && <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2" />
-                  </svg>}
-                {option.icon === "language" && <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
-                  </svg>}
-              </div>
-
-              {/* Text Content */}
-              <div className="flex-1 text-left">
-                <h3 className="text-base font-semibold text-gray-900 mb-1">{option.title}</h3>
-                <p className="text-sm text-gray-600">{option.subtitle}</p>
-              </div>
-
-              {/* Arrow Icon */}
-              <ArrowRight className="w-5 h-5 text-gray-400 shrink-0" />
-            </button>)}
-        </div>
-      </BottomPopup>
-
-      {/* Emergency Help Popup */}
-      <BottomPopup isOpen={showEmergencyPopup} onClose={() => setShowEmergencyPopup(false)} title="Emergency help" showCloseButton={true} closeOnBackdropClick={true} maxHeight="70vh">
-        <div className="py-2">
-          {emergencyOptions.map((option, index) => <button key={option.id} onClick={() => handleEmergencyOptionClick(option)} className="w-full flex items-center gap-4 p-4 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0">
-              {/* Icon */}
-              <div className="shrink-0 w-14 h-14 rounded-lg flex items-center justify-center">
-                {option.icon === "ambulance" && <div className="w-14 h-14 bg-white rounded-lg flex items-center justify-center shadow-sm border border-gray-200 relative overflow-hidden">
-                    {/* Ambulance vehicle */}
-                    <div className="absolute inset-0 bg-blue-500"></div>
-                    {/* Red and blue lights on roof */}
-                    <div className="absolute top-1 left-2 w-2 h-3 bg-red-500 rounded-sm"></div>
-                    <div className="absolute top-1 right-2 w-2 h-3 bg-blue-500 rounded-sm"></div>
-                    {/* Star of Life emblem */}
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 bg-white rounded-full flex items-center justify-center">
-                      <svg className="w-6 h-6 text-blue-600" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M12 2L2 7v10l10 5 10-5V7l-10-5zm0 2.18l8 4v7.64l-8 4-8-4V8.18l8-4z" />
-                        <path d="M12 8L6 11v6l6 3 6-3v-6l-6-3z" />
-                      </svg>
-                    </div>
-                    {/* AMBULANCE text */}
-                    <div className="absolute bottom-1 left-0 right-0 text-[6px] font-bold text-white text-center">AMBULANCE</div>
-                  </div>}
-                {option.icon === "siren" && <div className="w-14 h-14 bg-white rounded-lg flex items-center justify-center shadow-sm border border-gray-200 relative">
-                    {/* Red siren dome */}
-                    <div className="w-10 h-10 bg-red-500 rounded-full flex items-center justify-center relative">
-                      {/* Yellow light rays */}
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="w-12 h-12 border-2 border-yellow-400 rounded-full animate-pulse"></div>
-                      </div>
-                      {/* Phone icon inside */}
-                      <Phone className="w-5 h-5 text-yellow-400 z-10" />
-                    </div>
-                  </div>}
-                {option.icon === "police" && <div className="w-14 h-14 bg-white rounded-lg flex items-center justify-center shadow-sm border border-gray-200">
-                    {/* Police officer bust */}
-                    <div className="relative">
-                      {/* Head */}
-                      <div className="w-10 h-10 bg-gray-300 rounded-full"></div>
-                      {/* Cap */}
-                      <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-8 h-4 bg-amber-700 rounded-t-lg"></div>
-                      {/* Cap peak */}
-                      <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-10 h-1 bg-amber-800"></div>
-                      {/* Mustache */}
-                      <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-6 h-2 bg-gray-800 rounded-full"></div>
-                    </div>
-                  </div>}
-                {option.icon === "insurance" && <div className="w-14 h-14 bg-yellow-400 rounded-lg flex items-center justify-center shadow-sm border border-gray-200 relative">
-                    {/* Card shape */}
-                    <div className="w-12 h-8 bg-white rounded-sm relative">
-                      {/* Red heart and cross on left */}
-                      <div className="absolute left-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
-                        <svg className="w-3 h-3 text-red-500" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                {/* Progress Circles */}
+                <div className="px-6 py-6">
+                  <div className="flex items-center justify-around gap-6">
+                    {/* Orders Progress Circle */}
+                    <motion.div initial={{
+                  scale: 0.8,
+                  opacity: 0
+                }} animate={{
+                  scale: 1,
+                  opacity: 1
+                }} transition={{
+                  delay: 0.4,
+                  duration: 0.5,
+                  type: "spring"
+                }} className="flex flex-col items-center">
+                      <div className="relative w-32 h-32">
+                        <svg className="w-32 h-32 transform -rotate-90" viewBox="0 0 120 120">
+                          {/* Background circle */}
+                          <circle cx="60" cy="60" r="50" fill="none" stroke="#e5e7eb" strokeWidth="8" />
+                          {/* Progress circle */}
+                          <motion.circle cx="60" cy="60" r="50" fill="none" stroke="#000000" strokeWidth="8" strokeLinecap="round" initial={{
+                        pathLength: 0
+                      }} animate={{
+                        pathLength: ordersProgress
+                      }} transition={{
+                        delay: 0.6,
+                        duration: 1,
+                        ease: "easeOut"
+                      }} />
                         </svg>
-                        <div className="w-0.5 h-3 bg-red-500"></div>
-                      </div>
-                    </div>
-                  </div>}
-              </div>
-
-              {/* Text Content */}
-              <div className="flex-1 text-left">
-                <h3 className="text-base font-semibold text-gray-900 mb-1">{option.title}</h3>
-                <p className="text-sm text-gray-600">{option.subtitle}</p>
-              </div>
-
-              {/* Arrow Icon */}
-              <ArrowRight className="w-5 h-5 text-gray-400 flex-shrink-0" />
-            </button>)}
-        </div>
-      </BottomPopup>
-
-      {/* Book Gigs Popup */}
-      <BottomPopup isOpen={showBookGigsPopup} onClose={() => setShowBookGigsPopup(false)} title="Book gigs to go online" showCloseButton={true} closeOnBackdropClick={true} maxHeight="auto">
-        <div className="py-4">
-          {/* Gig Details Card */}
-          <div className="mb-6 rounded-lg overflow-hidden shadow-sm border border-gray-200">
-            {/* Header - Teal background */}
-            <div className="bg-teal-100 px-4 py-3 flex items-center gap-3">
-              <div className="w-8 h-8 bg-teal-600 rounded-full flex items-center justify-center">
-                <span className="text-white font-bold text-sm">g</span>
-              </div>
-              <span className="text-teal-700 font-semibold">Gig details</span>
-            </div>
-
-            {/* Body - White background */}
-            <div className="bg-white px-4 py-4">
-              <p className="text-gray-900 text-sm">Gig booking open in your zone</p>
-            </div>
-          </div>
-
-          {/* Description */}
-          <p className="text-gray-900 text-sm mb-6">
-            Book your Gigs now to go online and start delivering orders
-          </p>
-
-          {/* Book Gigs Button */}
-          <button onClick={() => {
-          setShowBookGigsPopup(false);
-          navigate("/delivery/gig");
-        }} className="w-full bg-black hover:bg-gray-800 text-white font-semibold py-4 rounded-lg transition-colors">
-            Book gigs
-          </button>
-        </div>
-      </BottomPopup>
-
-      {/* New Order Popup with Countdown Timer - Custom Implementation */}
-      <AnimatePresence>
-        {showNewOrderPopup && (newOrder || selectedRestaurant) && isOnline && <>
-            {/* Backdrop */}
-            {!isNewOrderPopupMinimized && <motion.div initial={{
-          opacity: 0
-        }} animate={{
-          opacity: 1
-        }} exit={{
-          opacity: 0
-        }} transition={{
-          duration: 0.2
-        }} className="fixed inset-0 bg-black/50 z-[100]" />}
-
-            {/* Minimized Handle - Show when minimized for swipe up */}
-            {isNewOrderPopupMinimized && <motion.div initial={{
-          y: 100,
-          opacity: 0
-        }} animate={{
-          y: 0,
-          opacity: 1
-        }} exit={{
-          y: 100,
-          opacity: 0
-        }} transition={{
-          duration: 0.3
-        }} className="fixed bottom-0 left-0 right-0 z-[115] flex justify-center pb-2" onTouchStart={handleNewOrderPopupTouchStart} onTouchMove={handleNewOrderPopupTouchMove} onTouchEnd={handleNewOrderPopupTouchEnd} style={{
-          touchAction: 'none'
-        }}>
-                <div className="bg-green-500 rounded-t-2xl px-6 py-3 shadow-lg cursor-grab active:cursor-grabbing">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-1 bg-white/80 rounded-full" />
-                    <span className="text-white text-sm font-semibold">Swipe up to view order</span>
-                    <div className="w-8 h-1 bg-white/80 rounded-full" />
-                  </div>
-                </div>
-              </motion.div>}
-
-            {/* Popup */}
-            <motion.div ref={newOrderPopupRef} initial={{
-          y: "100%"
-        }} animate={{
-          y: isDraggingNewOrderPopup ? newOrderDragY : isNewOrderPopupMinimized ? newOrderPopupRef.current?.offsetHeight || 600 : 0
-        }} transition={isDraggingNewOrderPopup ? {
-          duration: 0
-        } : isNewOrderPopupMinimized ? {
-          duration: 0.3,
-          ease: "easeOut"
-        } // Smooth transition when minimizing
-        : {
-          type: "spring",
-          damping: 30,
-          stiffness: 300
-        }} exit={{
-          y: "100%"
-        }} onTouchStart={handleNewOrderPopupTouchStart} onTouchMove={handleNewOrderPopupTouchMove} onTouchEnd={handleNewOrderPopupTouchEnd} className="fixed bottom-0 left-0 right-0 bg-transparent rounded-t-3xl z-[110] overflow-visible" style={{
-          touchAction: 'none'
-        }}>
-              {/* Swipe Handle */}
-              <div className="flex justify-center pt-4 pb-2 cursor-grab active:cursor-grabbing">
-                <div className="w-12 h-1.5 bg-white/30 rounded-full" />
-              </div>
-
-              {/* Green Countdown Header */}
-              <div className="relative scale-110 mb-0 bg-green-500 rounded-t-3xl overflow-visible">
-                {/* Small countdown badge - positioned at center edge, half above popup */}
-                <div className="absolute left-1/2 -translate-x-1/2 -top-5 z-20">
-                  <div className="relative inline-flex items-center justify-center">
-                    {/* Animated green border around badge - positioned behind badge, wider */}
-                    <svg className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2" style={{
-                  width: 'calc(100% + 10px)',
-                  height: 'calc(100% + 10px)',
-                  zIndex: 35
-                }} viewBox="0 0 200 60" preserveAspectRatio="xMidYMid meet">
-                      <defs>
-                        <linearGradient id="newOrderCountdownGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                          <stop offset="0%" stopColor="#22c55e" stopOpacity="1" />
-                          <stop offset="100%" stopColor="#16a34a" stopOpacity="1" />
-                        </linearGradient>
-                      </defs>
-
-                      {/* Full white border path - rounded rectangle (background) */}
-                      <path d="M 30,5 L 170,5 A 25,25 0 0,1 195,30 L 195,30 A 25,25 0 0,1 170,55 L 30,55 A 25,25 0 0,1 5,30 L 5,30 A 25,25 0 0,1 30,5 Z" fill="none" stroke="white" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" />
-
-                      {/* Animated green progress border - starts from top center, decreases clockwise */}
-                      <motion.path d="M 100,5 L 170,5 A 25,25 0 0,1 195,30 L 195,30 A 25,25 0 0,1 170,55 L 30,55 A 25,25 0 0,1 5,30 L 5,30 A 25,25 0 0,1 30,5 L 100,5" fill="none" stroke="#22c55e" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="450" initial={{
-                    strokeDashoffset: 0
-                  }} animate={{
-                    strokeDashoffset: `${450 * (1 - countdownSeconds / 300)}`
-                  }} transition={{
-                    duration: 1,
-                    ease: "linear"
-                  }} />
-
-                      {/* White segment indicator at top center */}
-                      <rect x="95" y="0" width="10" height="8" fill="white" rx="1" />
-                    </svg>
-
-                    {/* White pill-shaped badge - positioned above SVG */}
-                    <div className="relative bg-white rounded-full px-6 py-2 shadow-lg" style={{
-                  zIndex: 30
-                }}>
-                      <div className="text-sm font-bold text-gray-900">
-                        New order
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* White Content Card */}
-              <div className="bg-white rounded-t-3xl">
-                <div className="p-6">
-                  {/* Estimated Earnings */}
-
-                  <div className="mb-5">
-                    <p className="text-gray-500 text-sm mb-1">Estimated earnings</p>
-                    <p className="text-4xl font-bold text-gray-900 mb-2">
-                      ₹{(() => {
-                    const earnings = newOrder?.estimatedEarnings || selectedRestaurant?.estimatedEarnings || 0;
-                    const fallback = newOrder?.deliveryFee ?? selectedRestaurant?.deliveryFee ?? selectedRestaurant?.amount ?? 0;
-                    let value = 0;
-                    if (earnings) {
-                      if (typeof earnings === 'object') {
-                        // Handle earnings object
-                        if (earnings.totalEarning != null) {
-                          value = Number(earnings.totalEarning) || 0;
-                        } else if (earnings.basePayout != null) {
-                          // If only basePayout is available, use it
-                          value = Number(earnings.basePayout) || 0;
-                        }
-                      } else if (typeof earnings === 'number') {
-                        value = earnings > 0 ? earnings : 0;
-                      }
-                    }
-
-                    // If value is still 0, try fallback
-                    if (value <= 0 && fallback > 0) {
-                      value = Number(fallback);
-                    }
-                    return value > 0 ? value.toFixed(2) : '0.00';
-                  })()}
-                    </p>
-                    {/* Earnings Breakdown */}
-                    {(() => {
-                  const earnings = newOrder?.estimatedEarnings || selectedRestaurant?.estimatedEarnings || 0;
-                  if (typeof earnings === 'object' && earnings.breakdown) {
-                    return <div className="bg-green-50 rounded-lg p-3 mb-2">
-                            <p className="text-green-800 text-xs font-medium mb-1">Earnings Breakdown:</p>
-                            <p className="text-green-700 text-xs">
-                              Base: ₹{earnings.basePayout?.toFixed(0) || '0'}
-                              {earnings.distanceCommission > 0 && <> + Distance ({earnings.distance?.toFixed(1)} km × ₹{earnings.commissionPerKm?.toFixed(0)}/km) = ₹{earnings.distanceCommission?.toFixed(0)}</>}
-                            </p>
-                            {earnings.distance <= earnings.minDistance && earnings.distanceCommission === 0 && <p className="text-green-600 text-xs mt-1">
-                                Note: Distance {earnings.distance?.toFixed(1)} km ≤ {earnings.minDistance} km, per km commission not applicable
-                              </p>}
-                          </div>;
-                  }
-                  return null;
-                })()}
-                    <p className="text-gray-400 text-xs">
-                      Pickup: {newOrder?.pickupDistance || selectedRestaurant?.pickupDistance || '0 km'} | Drop: {newOrder?.deliveryDistance || selectedRestaurant?.dropDistance || '0 km'}
-                    </p>
-                  </div>
-
-                  {/* Order ID */}
-                  <div className="mb-4">
-                    <p className="text-gray-500 text-xs mb-1">Order ID</p>
-                    <p className="text-base font-semibold text-gray-900">
-                      {newOrder?.orderId || selectedRestaurant?.orderId || 'ORD1234567890'}
-                    </p>
-                  </div>
-
-                  {/* Pickup Details */}
-                  <div className="bg-gray-50 rounded-xl p-4 mb-6">
-                    <div className="mb-3">
-                      <span className="bg-gray-200 text-gray-700 text-xs font-medium px-2 py-1 rounded-lg">
-                        Pick up
-                      </span>
-                    </div>
-
-                    <h3 className="text-lg font-bold text-gray-900 mb-1">
-                      {newOrder?.restaurantName || selectedRestaurant?.name || 'Restaurant'}
-                    </h3>
-                    <p className="text-sm text-gray-600 mb-3 leading-relaxed">
-                      {newOrder?.restaurantLocation?.address || selectedRestaurant?.address || 'Address'}
-                    </p>
-
-                    <div className="flex items-center gap-1.5 text-gray-500 text-sm mb-2">
-                      <Clock className="w-4 h-4" />
-                      <span>
-                        {selectedRestaurant?.timeAway && selectedRestaurant.timeAway !== 'Calculating...' ? `${selectedRestaurant.timeAway} away` : newOrder?.pickupDistance && newOrder.pickupDistance !== '0 km' && newOrder.pickupDistance !== 'Calculating...' ? `${calculateTimeAway(newOrder.pickupDistance)} away` : 'Calculating...'}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-1.5 text-gray-500 text-sm">
-                      <MapPin className="w-4 h-4" />
-                      <span>
-                        {selectedRestaurant?.distance && selectedRestaurant.distance !== '0 km' && selectedRestaurant.distance !== 'Calculating...' ? `${selectedRestaurant.distance} away` : newOrder?.pickupDistance && newOrder.pickupDistance !== '0 km' && newOrder.pickupDistance !== 'Calculating...' ? `${newOrder.pickupDistance} away` : 'Calculating...'}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Accept Order Button with Swipe */}
-                  <div className="relative w-full">
-                    <motion.div ref={newOrderAcceptButtonRef} className="relative w-full bg-green-600 rounded-full overflow-hidden shadow-xl" style={{
-                  touchAction: 'pan-x'
-                }} // Prevent vertical scrolling, allow horizontal pan
-                onTouchStart={handleNewOrderAcceptTouchStart} onTouchMove={handleNewOrderAcceptTouchMove} onTouchEnd={handleNewOrderAcceptTouchEnd} whileTap={{
-                  scale: 0.98
-                }}>
-                      {/* Swipe progress background */}
-                      <motion.div className="absolute inset-0 bg-green-500 rounded-full" animate={{
-                    width: `${newOrderAcceptButtonProgress * 100}%`
-                  }} transition={newOrderIsAnimatingToComplete ? {
-                    type: "spring",
-                    stiffness: 200,
-                    damping: 25
-                  } : {
-                    duration: 0
-                  }} />
-
-                      {/* Button content container */}
-                      <div className="relative flex items-center h-[64px] px-1">
-                        {/* Left: Black circle with arrow */}
-                        <motion.div className="w-14 h-14 bg-gray-900 rounded-full flex items-center justify-center shrink-0 relative z-20 shadow-2xl" animate={{
-                      x: newOrderAcceptButtonProgress * (newOrderAcceptButtonRef.current ? newOrderAcceptButtonRef.current.offsetWidth - 56 - 32 : 240)
-                    }} transition={newOrderIsAnimatingToComplete ? {
-                      type: "spring",
-                      stiffness: 300,
-                      damping: 30
-                    } : {
-                      duration: 0
-                    }}>
-                          <ArrowRight className="w-5 h-5 text-white" />
-                        </motion.div>
-
-                        {/* Text - centered and stays visible */}
-                        <div className="absolute inset-0 flex items-center justify-center left-16 right-4 pointer-events-none">
-                          <motion.span className="text-white font-semibold flex items-center justify-center text-center text-base select-none" animate={{
-                        opacity: newOrderAcceptButtonProgress > 0.5 ? Math.max(0.2, 1 - newOrderAcceptButtonProgress * 0.8) : 1,
-                        x: newOrderAcceptButtonProgress > 0.5 ? newOrderAcceptButtonProgress * 15 : 0
-                      }} transition={newOrderIsAnimatingToComplete ? {
-                        type: "spring",
-                        stiffness: 200,
-                        damping: 25
-                      } : {
-                        duration: 0
-                      }}>
-                            {newOrderAcceptButtonProgress > 0.5 ? 'Release to Accept' : 'Accept order'}
-                          </motion.span>
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <span className="text-xl font-bold text-gray-900">{earningsGuaranteeCurrentOrders} of {earningsGuaranteeOrdersTarget || 0}</span>
                         </div>
+                      </div>
+                      <div className="flex items-center gap-2 mt-3">
+                        <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        <span className="text-sm font-medium text-gray-700">Orders</span>
+                      </div>
+                    </motion.div>
+
+                    {/* Earnings Progress Circle */}
+                    <motion.div initial={{
+                  scale: 0.8,
+                  opacity: 0
+                }} animate={{
+                  scale: 1,
+                  opacity: 1
+                }} transition={{
+                  delay: 0.5,
+                  duration: 0.5,
+                  type: "spring"
+                }} className="flex flex-col items-center">
+                      <div className="relative w-32 h-32">
+                        <svg className="w-32 h-32 transform -rotate-90" viewBox="0 0 120 120">
+                          {/* Background circle */}
+                          <circle cx="60" cy="60" r="50" fill="none" stroke="#e5e7eb" strokeWidth="8" />
+                          {/* Progress circle */}
+                          <motion.circle cx="60" cy="60" r="50" fill="none" stroke="#000000" strokeWidth="8" strokeLinecap="round" initial={{
+                        pathLength: 0
+                      }} animate={{
+                        pathLength: earningsProgress
+                      }} transition={{
+                        delay: 0.7,
+                        duration: 1,
+                        ease: "easeOut"
+                      }} />
+                        </svg>
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <span className="text-lg font-bold text-gray-900">₹{earningsGuaranteeCurrentEarnings.toFixed(2)}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 mt-3">
+                        <IndianRupee className="w-5 h-5 text-gray-700" />
+                        <span className="text-sm font-medium text-gray-700">Earnings</span>
                       </div>
                     </motion.div>
                   </div>
                 </div>
-              </div>
-            </motion.div>
-
-            {/* Reject Button - Outside the popup, positioned below */}
-            <motion.div initial={{
-          opacity: 0,
-          y: 20
-        }} animate={{
-          opacity: 1,
-          y: 0
-        }} exit={{
-          opacity: 0,
-          y: 20
-        }} transition={{
-          duration: 0.3,
-          delay: 0.1
-        }} className="fixed top-4 right-4 z-[115]">
-              <button onClick={handleRejectConfirm} className="  bg-black border-2 border-white text-white text-bold px-5 p-2 rounded-full font-semibold text-sm hover:bg-red-50 transition-colors shadow-2xl">
-                Deny
-              </button>
-            </motion.div>
-          </>}
-      </AnimatePresence>
-
-      {/* Reject Order Popup */}
-      <AnimatePresence>
-        {showRejectPopup && <>
-            <motion.div className="fixed inset-0 z-[120] bg-black/60 flex items-center justify-center p-4" initial={{
-          opacity: 0
-        }} animate={{
-          opacity: 1
-        }} exit={{
-          opacity: 0
-        }} onClick={handleRejectCancel}>
-              <motion.div className="w-[90%] max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden" initial={{
-            scale: 0.9,
-            opacity: 0
-          }} animate={{
-            scale: 1,
-            opacity: 1
-          }} exit={{
-            scale: 0.9,
-            opacity: 0
-          }} onClick={e => e.stopPropagation()}>
-                {/* Header */}
-                <div className="px-4 py-4 border-b border-gray-200">
-                  <h3 className="text-lg font-bold text-gray-900">Can't Accept Order</h3>
-                  <p className="text-sm text-gray-500 mt-1">Please select a reason for not accepting this order</p>
-                </div>
-
-                {/* Content */}
-                <div className="px-4 py-4 max-h-[60vh] overflow-y-auto">
-                  <div className="space-y-2">
-                    {rejectReasons.map(reason => <button key={reason} onClick={() => setRejectReason(reason)} className={`w-full text-left p-4 rounded-lg border-2 transition-all ${rejectReason === reason ? "border-black bg-red-50" : "border-gray-200 bg-white hover:border-gray-300"}`}>
-                        <div className="flex items-center justify-between">
-                          <span className={`text-sm font-medium ${rejectReason === reason ? "text-black" : "text-gray-900"}`}>
-                            {reason}
-                          </span>
-                          {rejectReason === reason && <div className="w-5 h-5 rounded-full bg-black flex items-center justify-center">
-                              <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                              </svg>
-                            </div>}
-                        </div>
-                      </button>)}
-                  </div>
-                </div>
-
-                {/* Footer */}
-                <div className="px-4 py-4 bg-gray-50 border-t border-gray-200 flex gap-3">
-                  <button onClick={handleRejectCancel} className="flex-1 bg-white border-2 border-gray-300 text-gray-700 py-3 rounded-lg font-semibold text-sm hover:bg-gray-50 transition-colors">
-                    Cancel
-                  </button>
-                  <button onClick={handleRejectConfirm} disabled={!rejectReason} className={`flex-1 py-3 rounded-lg font-semibold text-sm transition-colors ${rejectReason ? "!bg-black !text-white" : "bg-gray-200 text-gray-400 cursor-not-allowed"}`}>
-                    Confirm
-                  </button>
-                </div>
               </motion.div>
-            </motion.div>
-          </>}
-      </AnimatePresence>
 
-      {/* Directions Map View */}
-      <AnimatePresence>
-        {showDirectionsMap && selectedRestaurant && <motion.div initial={{
-        opacity: 0
-      }} animate={{
-        opacity: 1
+  {/* Today's Progress Card */ }
+  <motion.div initial={{
+    opacity: 0,
+    y: -10
+  }} animate={{
+    opacity: 1,
+    y: 0
+  }} transition={{
+    duration: 0.3,
+    delay: 0.3
+  }} className="w-full rounded-xl overflow-hidden shadow-lg bg-white">
+    {/* Header */}
+    <div className="bg-black px-4 py-3 flex items-center gap-3">
+      <div className="relative">
+        <Calendar className="w-5 h-5 text-white" />
+        <CheckCircle className="w-3 h-3 text-green-500 absolute -top-1 -right-1 bg-white rounded-full" fill="currentColor" />
+      </div>
+      <span className="text-white font-semibold">Today's progress</span>
+    </div>
+
+    {/* Content */}
+    <div className="p-4">
+      {/* Grid Layout - 2x2 */}
+      <div className="grid grid-cols-2 gap-4">
+        {/* Top Left - Earnings */}
+        <button onClick={() => navigate("/delivery/earnings")} className="flex flex-col items-start gap-1 hover:opacity-80 transition-opacity">
+          <span className="text-2xl font-bold text-gray-900">
+            {formatCurrency(todayEarnings)}
+          </span>
+          <div className="flex items-center gap-1 text-sm text-gray-600">
+            <span>Earnings</span>
+            <ArrowRight className="w-4 h-4" />
+          </div>
+        </button>
+
+        {/* Top Right - Trips */}
+        <button onClick={() => navigate("/delivery/trip-history")} className="flex flex-col items-end gap-1 hover:opacity-80 transition-opacity">
+          <span className="text-2xl font-bold text-gray-900">
+            {todayTrips}
+          </span>
+          <div className="flex items-center gap-1 text-sm text-gray-600">
+            <span>Trips</span>
+            <ArrowRight className="w-4 h-4" />
+          </div>
+        </button>
+
+        {/* Bottom Left - Time on orders */}
+        <button onClick={() => navigate("/delivery/time-on-orders")} className="flex flex-col items-start gap-1 hover:opacity-80 transition-opacity">
+          <span className="text-2xl font-bold text-gray-900">
+            {`${formatHours(todayHoursWorked)} hrs`}
+          </span>
+          <div className="flex items-center gap-1 text-sm text-gray-600">
+            <span>Time on orders</span>
+            <ArrowRight className="w-4 h-4" />
+          </div>
+        </button>
+
+        {/* Bottom Right - Gigs History */}
+        <button onClick={() => navigate("/delivery/gig")} className="flex flex-col items-end gap-1 hover:opacity-80 transition-opacity">
+          <span className="text-2xl font-bold text-gray-900">
+            {`${todayGigsCount} Gigs`}
+          </span>
+          <div className="flex items-center gap-1 text-sm text-gray-600">
+            <span>History</span>
+            <ArrowRight className="w-4 h-4" />
+          </div>
+        </button>
+      </div>
+    </div>
+  </motion.div>
+            </div >
+          </motion.div >
+        </>}
+
+{/* Help Popup */ }
+<BottomPopup isOpen={showHelpPopup} onClose={() => setShowHelpPopup(false)} title="How can we help?" showCloseButton={true} closeOnBackdropClick={true} maxHeight="70vh">
+  <div className="py-2">
+    {helpOptions.map(option => <button key={option.id} onClick={() => handleHelpOptionClick(option)} className="w-full flex items-center gap-4 p-4 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0">
+      {/* Icon */}
+      <div className="shrink-0 w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center">
+        {option.icon === "helpCenter" && <HelpCircle className="w-6 h-6 text-gray-700" />}
+        {option.icon === "ticket" && <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
+        </svg>}
+        {option.icon === "idCard" && <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2" />
+        </svg>}
+        {option.icon === "language" && <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
+        </svg>}
+      </div>
+
+      {/* Text Content */}
+      <div className="flex-1 text-left">
+        <h3 className="text-base font-semibold text-gray-900 mb-1">{option.title}</h3>
+        <p className="text-sm text-gray-600">{option.subtitle}</p>
+      </div>
+
+      {/* Arrow Icon */}
+      <ArrowRight className="w-5 h-5 text-gray-400 shrink-0" />
+    </button>)}
+  </div>
+</BottomPopup>
+
+{/* Emergency Help Popup */ }
+<BottomPopup isOpen={showEmergencyPopup} onClose={() => setShowEmergencyPopup(false)} title="Emergency help" showCloseButton={true} closeOnBackdropClick={true} maxHeight="70vh">
+  <div className="py-2">
+    {emergencyOptions.map((option, index) => <button key={option.id} onClick={() => handleEmergencyOptionClick(option)} className="w-full flex items-center gap-4 p-4 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0">
+      {/* Icon */}
+      <div className="shrink-0 w-14 h-14 rounded-lg flex items-center justify-center">
+        {option.icon === "ambulance" && <div className="w-14 h-14 bg-white rounded-lg flex items-center justify-center shadow-sm border border-gray-200 relative overflow-hidden">
+          {/* Ambulance vehicle */}
+          <div className="absolute inset-0 bg-blue-500"></div>
+          {/* Red and blue lights on roof */}
+          <div className="absolute top-1 left-2 w-2 h-3 bg-red-500 rounded-sm"></div>
+          <div className="absolute top-1 right-2 w-2 h-3 bg-blue-500 rounded-sm"></div>
+          {/* Star of Life emblem */}
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 bg-white rounded-full flex items-center justify-center">
+            <svg className="w-6 h-6 text-blue-600" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 2L2 7v10l10 5 10-5V7l-10-5zm0 2.18l8 4v7.64l-8 4-8-4V8.18l8-4z" />
+              <path d="M12 8L6 11v6l6 3 6-3v-6l-6-3z" />
+            </svg>
+          </div>
+          {/* AMBULANCE text */}
+          <div className="absolute bottom-1 left-0 right-0 text-[6px] font-bold text-white text-center">AMBULANCE</div>
+        </div>}
+        {option.icon === "siren" && <div className="w-14 h-14 bg-white rounded-lg flex items-center justify-center shadow-sm border border-gray-200 relative">
+          {/* Red siren dome */}
+          <div className="w-10 h-10 bg-red-500 rounded-full flex items-center justify-center relative">
+            {/* Yellow light rays */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-12 h-12 border-2 border-yellow-400 rounded-full animate-pulse"></div>
+            </div>
+            {/* Phone icon inside */}
+            <Phone className="w-5 h-5 text-yellow-400 z-10" />
+          </div>
+        </div>}
+        {option.icon === "police" && <div className="w-14 h-14 bg-white rounded-lg flex items-center justify-center shadow-sm border border-gray-200">
+          {/* Police officer bust */}
+          <div className="relative">
+            {/* Head */}
+            <div className="w-10 h-10 bg-gray-300 rounded-full"></div>
+            {/* Cap */}
+            <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-8 h-4 bg-amber-700 rounded-t-lg"></div>
+            {/* Cap peak */}
+            <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-10 h-1 bg-amber-800"></div>
+            {/* Mustache */}
+            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-6 h-2 bg-gray-800 rounded-full"></div>
+          </div>
+        </div>}
+        {option.icon === "insurance" && <div className="w-14 h-14 bg-yellow-400 rounded-lg flex items-center justify-center shadow-sm border border-gray-200 relative">
+          {/* Card shape */}
+          <div className="w-12 h-8 bg-white rounded-sm relative">
+            {/* Red heart and cross on left */}
+            <div className="absolute left-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
+              <svg className="w-3 h-3 text-red-500" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+              </svg>
+              <div className="w-0.5 h-3 bg-red-500"></div>
+            </div>
+          </div>
+        </div>}
+      </div>
+
+      {/* Text Content */}
+      <div className="flex-1 text-left">
+        <h3 className="text-base font-semibold text-gray-900 mb-1">{option.title}</h3>
+        <p className="text-sm text-gray-600">{option.subtitle}</p>
+      </div>
+
+      {/* Arrow Icon */}
+      <ArrowRight className="w-5 h-5 text-gray-400 flex-shrink-0" />
+    </button>)}
+  </div>
+</BottomPopup>
+
+{/* Book Gigs Popup */ }
+<BottomPopup isOpen={showBookGigsPopup} onClose={() => setShowBookGigsPopup(false)} title="Book gigs to go online" showCloseButton={true} closeOnBackdropClick={true} maxHeight="auto">
+  <div className="py-4">
+    {/* Gig Details Card */}
+    <div className="mb-6 rounded-lg overflow-hidden shadow-sm border border-gray-200">
+      {/* Header - Teal background */}
+      <div className="bg-teal-100 px-4 py-3 flex items-center gap-3">
+        <div className="w-8 h-8 bg-teal-600 rounded-full flex items-center justify-center">
+          <span className="text-white font-bold text-sm">g</span>
+        </div>
+        <span className="text-teal-700 font-semibold">Gig details</span>
+      </div>
+
+      {/* Body - White background */}
+      <div className="bg-white px-4 py-4">
+        <p className="text-gray-900 text-sm">Gig booking open in your zone</p>
+      </div>
+    </div>
+
+    {/* Description */}
+    <p className="text-gray-900 text-sm mb-6">
+      Book your Gigs now to go online and start delivering orders
+    </p>
+
+    {/* Book Gigs Button */}
+    <button onClick={() => {
+      setShowBookGigsPopup(false);
+      navigate("/delivery/gig");
+    }} className="w-full bg-black hover:bg-gray-800 text-white font-semibold py-4 rounded-lg transition-colors">
+      Book gigs
+    </button>
+  </div>
+</BottomPopup>
+
+{/* New Order Popup with Countdown Timer - Custom Implementation */ }
+<AnimatePresence>
+  {showNewOrderPopup && (newOrder || selectedRestaurant) && isOnline && <>
+    {/* Backdrop */}
+    {!isNewOrderPopupMinimized && <motion.div initial={{
+      opacity: 0
+    }} animate={{
+      opacity: 1
+    }} exit={{
+      opacity: 0
+    }} transition={{
+      duration: 0.2
+    }} className="fixed inset-0 bg-black/50 z-[100]" />}
+
+    {/* Minimized Handle - Show when minimized for swipe up */}
+    {isNewOrderPopupMinimized && <motion.div initial={{
+      y: 100,
+      opacity: 0
+    }} animate={{
+      y: 0,
+      opacity: 1
+    }} exit={{
+      y: 100,
+      opacity: 0
+    }} transition={{
+      duration: 0.3
+    }} className="fixed bottom-0 left-0 right-0 z-[115] flex justify-center pb-2" onTouchStart={handleNewOrderPopupTouchStart} onTouchMove={handleNewOrderPopupTouchMove} onTouchEnd={handleNewOrderPopupTouchEnd} style={{
+      touchAction: 'none'
+    }}>
+      <div className="bg-green-500 rounded-t-2xl px-6 py-3 shadow-lg cursor-grab active:cursor-grabbing">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-1 bg-white/80 rounded-full" />
+          <span className="text-white text-sm font-semibold">Swipe up to view order</span>
+          <div className="w-8 h-1 bg-white/80 rounded-full" />
+        </div>
+      </div>
+    </motion.div>}
+
+    {/* Popup */}
+    <motion.div ref={newOrderPopupRef} initial={{
+      y: "100%"
+    }} animate={{
+      y: isDraggingNewOrderPopup ? newOrderDragY : isNewOrderPopupMinimized ? newOrderPopupRef.current?.offsetHeight || 600 : 0
+    }} transition={isDraggingNewOrderPopup ? {
+      duration: 0
+    } : isNewOrderPopupMinimized ? {
+      duration: 0.3,
+      ease: "easeOut"
+    } // Smooth transition when minimizing
+      : {
+        type: "spring",
+        damping: 30,
+        stiffness: 300
       }} exit={{
-        opacity: 0
-      }} transition={{
-        duration: 0.3
-      }} className="fixed inset-0 z-[120] bg-white">
-            {/* Ola Maps Container for Directions */}
-            <div ref={directionsMapContainerRef} key="directions-map-container" // Fixed key - don't remount on location change
-        style={{
-          height: '100%',
-          width: '100%',
-          zIndex: 1
-        }} />
+        y: "100%"
+      }} onTouchStart={handleNewOrderPopupTouchStart} onTouchMove={handleNewOrderPopupTouchMove} onTouchEnd={handleNewOrderPopupTouchEnd} className="fixed bottom-0 left-0 right-0 bg-transparent rounded-t-3xl z-[110] overflow-visible" style={{
+        touchAction: 'none'
+      }}>
+      {/* Swipe Handle */}
+      <div className="flex justify-center pt-4 pb-2 cursor-grab active:cursor-grabbing">
+        <div className="w-12 h-1.5 bg-white/30 rounded-full" />
+      </div>
 
-            {/* Loading indicator */}
-            {directionsMapLoading && <div className="absolute inset-0 flex items-center justify-center bg-white/50 z-10">
-                <div className="text-gray-600">Loading map...</div>
-              </div>}
-          </motion.div>}
-      </AnimatePresence>
+      {/* Green Countdown Header */}
+      <div className="relative scale-110 mb-0 bg-green-500 rounded-t-3xl overflow-visible">
+        {/* Small countdown badge - positioned at center edge, half above popup */}
+        <div className="absolute left-1/2 -translate-x-1/2 -top-5 z-20">
+          <div className="relative inline-flex items-center justify-center">
+            {/* Animated green border around badge - positioned behind badge, wider */}
+            <svg className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2" style={{
+              width: 'calc(100% + 10px)',
+              height: 'calc(100% + 10px)',
+              zIndex: 35
+            }} viewBox="0 0 200 60" preserveAspectRatio="xMidYMid meet">
+              <defs>
+                <linearGradient id="newOrderCountdownGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="#22c55e" stopOpacity="1" />
+                  <stop offset="100%" stopColor="#16a34a" stopOpacity="1" />
+                </linearGradient>
+              </defs>
 
-      {/* Reached Pickup Popup - shown when order is ready (from order_ready socket) or when rider is within 500m */}
-      {/* Don't show if Order ID confirmation popup is showing */}
-      <BottomPopup isOpen={showreachedPickupPopup && !showOrderIdConfirmationPopup} onClose={() => setShowreachedPickupPopup(false)} showCloseButton={false} closeOnBackdropClick={false} disableSwipeToClose={true} maxHeight="70vh" showHandle={true} showBackdrop={false} backdropBlocksInteraction={false}>
-        <div className="">
-          {/* Pickup Label */}
-          <div className="mb-4">
-            <span className="bg-gray-500 text-white text-xs font-medium px-3 py-1.5 rounded-lg">
-              Pick up
-            </span>
-          </div>
+              {/* Full white border path - rounded rectangle (background) */}
+              <path d="M 30,5 L 170,5 A 25,25 0 0,1 195,30 L 195,30 A 25,25 0 0,1 170,55 L 30,55 A 25,25 0 0,1 5,30 L 5,30 A 25,25 0 0,1 30,5 Z" fill="none" stroke="white" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" />
 
-          {/* Restaurant Info */}
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">
-              {selectedRestaurant?.name || 'Restaurant Name'}
-            </h2>
-            <p className="text-gray-600 mb-2 leading-relaxed">
-              {(() => {
-              const address = selectedRestaurant?.address;
+              {/* Animated green progress border - starts from top center, decreases clockwise */}
+              <motion.path d="M 100,5 L 170,5 A 25,25 0 0,1 195,30 L 195,30 A 25,25 0 0,1 170,55 L 30,55 A 25,25 0 0,1 5,30 L 5,30 A 25,25 0 0,1 30,5 L 100,5" fill="none" stroke="#22c55e" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="450" initial={{
+                strokeDashoffset: 0
+              }} animate={{
+                strokeDashoffset: `${450 * (1 - countdownSeconds / 300)}`
+              }} transition={{
+                duration: 1,
+                ease: "linear"
+              }} />
 
-              // If address is default or missing, try to find it in other fields
-              if (!address || address === 'Restaurant Address' || address === 'Restaurant address') {
-                // Check if address might be in a different field
-                const possibleAddress = selectedRestaurant?.restaurantAddress || selectedRestaurant?.restaurant?.address || selectedRestaurant?.restaurantId?.address || selectedRestaurant?.restaurantId?.location?.formattedAddress || selectedRestaurant?.restaurantId?.location?.address || selectedRestaurant?.location?.address || selectedRestaurant?.location?.formattedAddress;
-                if (possibleAddress && possibleAddress !== 'Restaurant Address' && possibleAddress !== 'Restaurant address') {
-                  return possibleAddress;
-                }
-              }
-              return address && address !== 'Restaurant Address' && address !== 'Restaurant address' ? address : 'Address will be updated...';
-            })()}
-            </p>
-            <p className="text-gray-500 text-sm font-medium">
-              Order ID: {selectedRestaurant?.orderId || 'ORD1234567890'}
-            </p>
-          </div>
+              {/* White segment indicator at top center */}
+              <rect x="95" y="0" width="10" height="8" fill="white" rx="1" />
+            </svg>
 
-          {/* Action Buttons */}
-          <div className="flex gap-3 mb-6">
-            <button onClick={async () => {
-            // Try multiple paths to find restaurant phone number
-            let restaurantPhone = selectedRestaurant?.phone || selectedRestaurant?.restaurantId?.phone || selectedRestaurant?.ownerPhone || selectedRestaurant?.restaurant?.phone || null;
-            // If phone not found in selectedRestaurant, try to fetch order details from backend
-            if (!restaurantPhone && selectedRestaurant?.orderId) {
-              try {
-                const orderId = selectedRestaurant.orderId || selectedRestaurant.id;
-                const response = await deliveryAPI.getOrderDetails(orderId);
-                // Check multiple response formats
-                const order = response.data?.data?.order || response.data?.order || null;
-                if (order) {
-                  // Try all possible paths in the API response
-                  // Restaurant model has both 'phone' and 'ownerPhone' fields
-                  restaurantPhone = order.restaurantId?.phone || order.restaurantId?.ownerPhone || order.restaurant?.phone || order.restaurant?.ownerPhone || order.restaurantId?.contact?.phone || order.restaurantId?.owner?.phone || null;
-                  // If phone found, update selectedRestaurant for future use
-                  if (restaurantPhone && selectedRestaurant) {
-                    setSelectedRestaurant({
-                      ...selectedRestaurant,
-                      phone: restaurantPhone,
-                      ownerPhone: order.restaurantId?.ownerPhone || order.restaurant?.ownerPhone || restaurantPhone
-                    });
-                  }
-
-                  // If still not found, try restaurant API directly
-                  if (!restaurantPhone && order.restaurantId) {
-                    const restaurantId = typeof order.restaurantId === 'string' ? order.restaurantId : order.restaurantId._id || order.restaurantId.id || order.restaurantId.toString();
-                    if (restaurantId) {
-                      try {
-                        const restaurantResponse = await restaurantAPI.getRestaurantById(restaurantId);
-                        if (restaurantResponse.data?.success && restaurantResponse.data.data) {
-                          const restaurant = restaurantResponse.data.data.restaurant || restaurantResponse.data.data;
-                          restaurantPhone = restaurant.phone || restaurant.ownerPhone || restaurant.primaryContactNumber;
-                          if (restaurantPhone) {
-                            setSelectedRestaurant({
-                              ...selectedRestaurant,
-                              phone: restaurantPhone,
-                              ownerPhone: restaurant.ownerPhone || restaurantPhone
-                            });
-                          }
-                        }
-                      } catch (restaurantError) {
-                        console.error('❌ [CALL] Error fetching restaurant by ID:', restaurantError);
-                      }
-                    }
-                  }
-                  if (!restaurantPhone) {
-                    console.warn('⚠️ [CALL] Phone not found in order.restaurantId object:', order.restaurantId);
-                  }
-                } else {
-                  console.warn('⚠️ [CALL] Order details API response format unexpected - order not found in response:', {
-                    responseKeys: Object.keys(response.data || {}),
-                    responseData: response.data
-                  });
-                }
-              } catch (error) {
-                console.error('❌ [CALL] Error fetching order details for phone:', error);
-                console.error('❌ [CALL] Error message:', error.message);
-                console.error('❌ [CALL] Error response:', error.response?.data);
-                console.error('❌ [CALL] Error status:', error.response?.status);
-              }
-            } else if (!selectedRestaurant?.orderId) {
-              console.warn('⚠️ [CALL] Cannot fetch phone - orderId not found in selectedRestaurant:', selectedRestaurant);
-            }
-            if (restaurantPhone) {
-              // Remove any spaces, dashes, or special characters except + and digits
-              const cleanPhone = restaurantPhone.replace(/[^\d+]/g, '');
-              window.location.href = `tel:${cleanPhone}`;
-            } else {
-              toast.error('Restaurant phone number not available. Please contact support.');
-              console.error('❌ Restaurant phone not found in any path:', {
-                selectedRestaurant,
-                hasPhone: !!selectedRestaurant?.phone,
-                hasRestaurantIdPhone: !!selectedRestaurant?.restaurantId?.phone,
-                hasOwnerPhone: !!selectedRestaurant?.ownerPhone,
-                orderId: selectedRestaurant?.orderId
-              });
-            }
-          }} className="flex-1 flex items-center justify-center gap-2 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-              <Phone className="w-5 h-5 text-gray-700" />
-              <span className="text-gray-700 font-medium">Call</span>
-            </button>
-            <button onClick={() => {
-            // Get restaurant location coordinates
-            const restaurantLat = selectedRestaurant?.lat;
-            const restaurantLng = selectedRestaurant?.lng;
-            if (!restaurantLat || !restaurantLng) {
-              toast.error('Restaurant location not available');
-              console.error('❌ Restaurant coordinates not found:', {
-                lat: restaurantLat,
-                lng: restaurantLng,
-                selectedRestaurant
-              });
-              return;
-            }
-            // Detect platform (Android or iOS)
-            const userAgent = navigator.userAgent || navigator.vendor || window.opera;
-            const isAndroid = /android/i.test(userAgent);
-            const isIOS = /iPad|iPhone|iPod/.test(userAgent) && !window.MSStream;
-            let mapsUrl = '';
-            if (isAndroid) {
-              // Android: Use google.navigation: scheme (opens directly in navigation mode)
-              mapsUrl = `google.navigation:q=${restaurantLat},${restaurantLng}&mode=b`;
-
-              // Try to open Google Maps app first
-              window.location.href = mapsUrl;
-
-              // Fallback to web URL after a short delay (in case app is not installed)
-              setTimeout(() => {
-                const webUrl = `https://www.google.com/maps/dir/?api=1&destination=${restaurantLat},${restaurantLng}&travelmode=bicycling`;
-                window.open(webUrl, '_blank');
-              }, 500);
-            } else if (isIOS) {
-              // iOS: Use comgooglemaps:// scheme (opens Google Maps app)
-              mapsUrl = `comgooglemaps://?daddr=${restaurantLat},${restaurantLng}&directionsmode=bicycling`;
-
-              // Try to open Google Maps app first
-              window.location.href = mapsUrl;
-
-              // Fallback to web URL after a short delay (in case app is not installed)
-              setTimeout(() => {
-                const webUrl = `https://maps.google.com/?daddr=${restaurantLat},${restaurantLng}&directionsmode=bicycling`;
-                window.open(webUrl, '_blank');
-              }, 500);
-            } else {
-              // Web/Desktop: Use web URL with navigation
-              mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${restaurantLat},${restaurantLng}&travelmode=bicycling`;
-              window.open(mapsUrl, '_blank');
-            }
-
-            // Show success message
-            toast.success('Opening Google Maps navigation 🗺️', {
-              duration: 2000
-            });
-          }} className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors">
-              <MapPin className="w-5 h-5 text-white" />
-              <span className="text-white font-medium">Map</span>
-            </button>
-          </div>
-
-          {/* Reached Pickup Button with Swipe */}
-          <div className="relative w-full">
-            <motion.div ref={reachedPickupButtonRef} className="relative w-full bg-green-600 rounded-full overflow-hidden shadow-xl" style={{
-            touchAction: 'pan-x'
-          }} // Prevent vertical scrolling, allow horizontal pan
-          onTouchStart={handlereachedPickupTouchStart} onTouchMove={handlereachedPickupTouchMove} onTouchEnd={handlereachedPickupTouchEnd} whileTap={{
-            scale: 0.98
-          }}>
-              {/* Swipe progress background */}
-              <motion.div className="absolute inset-0 bg-green-500 rounded-full" animate={{
-              width: `${reachedPickupButtonProgress * 100}%`
-            }} transition={reachedPickupIsAnimatingToComplete ? {
-              type: "spring",
-              stiffness: 200,
-              damping: 25
-            } : {
-              duration: 0
-            }} />
-
-              {/* Button content container */}
-              <div className="relative flex items-center h-[64px] px-1">
-                {/* Left: Black circle with arrow */}
-                <motion.div className="w-14 h-14 bg-gray-900 rounded-full flex items-center justify-center shrink-0 relative z-20 shadow-2xl" animate={{
-                x: reachedPickupButtonProgress * (reachedPickupButtonRef.current ? reachedPickupButtonRef.current.offsetWidth - 56 - 32 : 240)
-              }} transition={reachedPickupIsAnimatingToComplete ? {
-                type: "spring",
-                stiffness: 300,
-                damping: 30
-              } : {
-                duration: 0
-              }}>
-                  <ArrowRight className="w-5 h-5 text-white" />
-                </motion.div>
-
-                {/* Text - centered and stays visible */}
-                <div className="absolute inset-0 flex items-center justify-center left-16 right-4 pointer-events-none">
-                  <motion.span className="text-white font-semibold flex items-center justify-center text-center text-base select-none" animate={{
-                  opacity: reachedPickupButtonProgress > 0.5 ? Math.max(0.2, 1 - reachedPickupButtonProgress * 0.8) : 1,
-                  x: reachedPickupButtonProgress > 0.5 ? reachedPickupButtonProgress * 15 : 0
-                }} transition={reachedPickupIsAnimatingToComplete ? {
-                  type: "spring",
-                  stiffness: 200,
-                  damping: 25
-                } : {
-                  duration: 0
-                }}>
-                    {reachedPickupButtonProgress > 0.5 ? 'Release to Confirm' : 'Reached Pickup'}
-                  </motion.span>
-                </div>
+            {/* White pill-shaped badge - positioned above SVG */}
+            <div className="relative bg-white rounded-full px-6 py-2 shadow-lg" style={{
+              zIndex: 30
+            }}>
+              <div className="text-sm font-bold text-gray-900">
+                New order
               </div>
-            </motion.div>
+            </div>
           </div>
         </div>
-      </BottomPopup>
+      </div>
 
-      {/* Order ID Confirmation Popup - shown after Reached Pickup swipe is confirmed */}
-      <BottomPopup isOpen={showOrderIdConfirmationPopup} onClose={() => setShowOrderIdConfirmationPopup(false)} showCloseButton={false} closeOnBackdropClick={false} maxHeight="60vh" showHandle={false} showBackdrop={false} backdropBlocksInteraction={false}>
-        <div className="">
-          <div className="text-center mb-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-2">
-              Confirm Order ID
-            </h2>
-            <p className="text-gray-600 text-sm mb-4">
-              Please verify the order ID with the restaurant before pickup
+      {/* White Content Card */}
+      <div className="bg-white rounded-t-3xl">
+        <div className="p-6">
+          {/* Estimated Earnings */}
+
+          <div className="mb-5">
+            <p className="text-gray-500 text-sm mb-1">Estimated earnings</p>
+            <p className="text-4xl font-bold text-gray-900 mb-2">
+              ₹{(() => {
+                const earnings = newOrder?.estimatedEarnings || selectedRestaurant?.estimatedEarnings || 0;
+                const fallback = newOrder?.deliveryFee ?? selectedRestaurant?.deliveryFee ?? selectedRestaurant?.amount ?? 0;
+                let value = 0;
+                if (earnings) {
+                  if (typeof earnings === 'object') {
+                    // Handle earnings object
+                    if (earnings.totalEarning != null) {
+                      value = Number(earnings.totalEarning) || 0;
+                    } else if (earnings.basePayout != null) {
+                      // If only basePayout is available, use it
+                      value = Number(earnings.basePayout) || 0;
+                    }
+                  } else if (typeof earnings === 'number') {
+                    value = earnings > 0 ? earnings : 0;
+                  }
+                }
+
+                // If value is still 0, try fallback
+                if (value <= 0 && fallback > 0) {
+                  value = Number(fallback);
+                }
+                return value > 0 ? value.toFixed(2) : '0.00';
+              })()}
+            </p>
+            {/* Earnings Breakdown */}
+            {(() => {
+              const earnings = newOrder?.estimatedEarnings || selectedRestaurant?.estimatedEarnings || 0;
+              if (typeof earnings === 'object' && earnings.breakdown) {
+                return <div className="bg-green-50 rounded-lg p-3 mb-2">
+                  <p className="text-green-800 text-xs font-medium mb-1">Earnings Breakdown:</p>
+                  <p className="text-green-700 text-xs">
+                    Base: ₹{earnings.basePayout?.toFixed(0) || '0'}
+                    {earnings.distanceCommission > 0 && <> + Distance ({earnings.distance?.toFixed(1)} km × ₹{earnings.commissionPerKm?.toFixed(0)}/km) = ₹{earnings.distanceCommission?.toFixed(0)}</>}
+                  </p>
+                  {earnings.distance <= earnings.minDistance && earnings.distanceCommission === 0 && <p className="text-green-600 text-xs mt-1">
+                    Note: Distance {earnings.distance?.toFixed(1)} km ≤ {earnings.minDistance} km, per km commission not applicable
+                  </p>}
+                </div>;
+              }
+              return null;
+            })()}
+            <p className="text-gray-400 text-xs">
+              Pickup: {newOrder?.pickupDistance || selectedRestaurant?.pickupDistance || '0 km'} | Drop: {newOrder?.deliveryDistance || selectedRestaurant?.dropDistance || '0 km'}
+            </p>
+          </div>
+
+          {/* Order ID */}
+          <div className="mb-4">
+            <p className="text-gray-500 text-xs mb-1">Order ID</p>
+            <p className="text-base font-semibold text-gray-900">
+              {newOrder?.orderId || selectedRestaurant?.orderId || 'ORD1234567890'}
+            </p>
+          </div>
+
+          {/* Pickup Details */}
+          <div className="bg-gray-50 rounded-xl p-4 mb-6">
+            <div className="mb-3">
+              <span className="bg-gray-200 text-gray-700 text-xs font-medium px-2 py-1 rounded-lg">
+                Pick up
+              </span>
+            </div>
+
+            <h3 className="text-lg font-bold text-gray-900 mb-1">
+              {newOrder?.restaurantName || selectedRestaurant?.name || 'Restaurant'}
+            </h3>
+            <p className="text-sm text-gray-600 mb-3 leading-relaxed">
+              {newOrder?.restaurantLocation?.address || selectedRestaurant?.address || 'Address'}
             </p>
 
-            {/* Order ID Display - single line, scroll horizontally if needed */}
-            <div className="bg-gray-50 rounded-xl p-6 mb-6 overflow-hidden">
-              <p className="text-gray-500 text-xs mb-2">Order ID</p>
-              <p className="text-2xl sm:text-3xl font-bold text-gray-900 tracking-wider whitespace-nowrap overflow-x-auto min-w-0">
-                {selectedRestaurant?.orderId || selectedRestaurant?.id || newOrder?.orderId || newOrder?.orderMongoId || 'ORD1234567890'}
-              </p>
+            <div className="flex items-center gap-1.5 text-gray-500 text-sm mb-2">
+              <Clock className="w-4 h-4" />
+              <span>
+                {selectedRestaurant?.timeAway && selectedRestaurant.timeAway !== 'Calculating...' ? `${selectedRestaurant.timeAway} away` : newOrder?.pickupDistance && newOrder.pickupDistance !== '0 km' && newOrder.pickupDistance !== 'Calculating...' ? `${calculateTimeAway(newOrder.pickupDistance)} away` : 'Calculating...'}
+              </span>
             </div>
 
-            {/* Bill Image Upload Section */}
-            <div className="mb-6">
-              <p className="text-gray-600 text-sm mb-3 text-center">
-                {billImageUploaded ? '✅ Bill image uploaded' : 'Please capture bill image'}
-              </p>
-
-              {/* Camera Button */}
-              <div className="flex justify-center mb-4">
-                <button onClick={handleCameraCapture} disabled={isUploadingBill} className={`flex items-center justify-center gap-2 px-6 py-3 rounded-lg transition-colors ${isUploadingBill ? 'bg-gray-400 cursor-not-allowed' : billImageUploaded ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'} text-white font-medium`}>
-                  {isUploadingBill ? <>
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                      <span>Uploading...</span>
-                    </> : billImageUploaded ? <>
-                      <CheckCircle className="w-5 h-5" />
-                      <span>Bill Uploaded</span>
-                    </> : <>
-                      <Camera className="w-5 h-5" />
-                      <span>Capture Bill</span>
-                    </>}
-                </button>
-              </div>
-
-              {/* Hidden file input for camera (sr-only keeps it in DOM for mobile camera) */}
-              <input id="bill-camera-input" ref={cameraInputRef} type="file" accept="image/*" capture="environment" onChange={handleBillImageSelect} className="sr-only" />
+            <div className="flex items-center gap-1.5 text-gray-500 text-sm">
+              <MapPin className="w-4 h-4" />
+              <span>
+                {selectedRestaurant?.distance && selectedRestaurant.distance !== '0 km' && selectedRestaurant.distance !== 'Calculating...' ? `${selectedRestaurant.distance} away` : newOrder?.pickupDistance && newOrder.pickupDistance !== '0 km' && newOrder.pickupDistance !== 'Calculating...' ? `${newOrder.pickupDistance} away` : 'Calculating...'}
+              </span>
             </div>
+          </div>
 
-            {/* Order Picked Up Button with Swipe */}
-            <div className="relative w-full">
-              <motion.div ref={orderIdConfirmButtonRef} className={`relative w-full rounded-full overflow-hidden shadow-xl ${billImageUploaded ? 'bg-green-600' : 'bg-gray-400 cursor-not-allowed'}`} style={{
-              touchAction: billImageUploaded ? 'pan-x' : 'none',
-              opacity: billImageUploaded ? 1 : 0.6
-            }} onTouchStart={billImageUploaded ? handleOrderIdConfirmTouchStart : undefined} onTouchMove={billImageUploaded ? handleOrderIdConfirmTouchMove : undefined} onTouchEnd={billImageUploaded ? handleOrderIdConfirmTouchEnd : undefined} whileTap={billImageUploaded ? {
-              scale: 0.98
-            } : {}}>
-                {/* Swipe progress background */}
-                <motion.div className="absolute inset-0 bg-green-500 rounded-full" animate={{
-                width: `${orderIdConfirmButtonProgress * 100}%`
-              }} transition={orderIdConfirmIsAnimatingToComplete ? {
+          {/* Accept Order Button with Swipe */}
+          <div className="relative w-full">
+            <motion.div ref={newOrderAcceptButtonRef} className="relative w-full bg-green-600 rounded-full overflow-hidden shadow-xl" style={{
+              touchAction: 'pan-x'
+            }} // Prevent vertical scrolling, allow horizontal pan
+              onTouchStart={handleNewOrderAcceptTouchStart} onTouchMove={handleNewOrderAcceptTouchMove} onTouchEnd={handleNewOrderAcceptTouchEnd} whileTap={{
+                scale: 0.98
+              }}>
+              {/* Swipe progress background */}
+              <motion.div className="absolute inset-0 bg-green-500 rounded-full" animate={{
+                width: `${newOrderAcceptButtonProgress * 100}%`
+              }} transition={newOrderIsAnimatingToComplete ? {
                 type: "spring",
                 stiffness: 200,
                 damping: 25
@@ -8234,406 +8058,892 @@ export default function DeliveryHome() {
                 duration: 0
               }} />
 
-                {/* Button content container */}
-                <div className="relative flex items-center h-[64px] px-1">
-                  {/* Left: Black circle with arrow */}
-                  <motion.div className="w-14 h-14 bg-gray-900 rounded-full flex items-center justify-center shrink-0 relative z-20 shadow-2xl" animate={{
-                  x: orderIdConfirmButtonProgress * (orderIdConfirmButtonRef.current ? orderIdConfirmButtonRef.current.offsetWidth - 56 - 32 : 240)
-                }} transition={orderIdConfirmIsAnimatingToComplete ? {
+              {/* Button content container */}
+              <div className="relative flex items-center h-[64px] px-1">
+                {/* Left: Black circle with arrow */}
+                <motion.div className="w-14 h-14 bg-gray-900 rounded-full flex items-center justify-center shrink-0 relative z-20 shadow-2xl" animate={{
+                  x: newOrderAcceptButtonProgress * (newOrderAcceptButtonRef.current ? newOrderAcceptButtonRef.current.offsetWidth - 56 - 32 : 240)
+                }} transition={newOrderIsAnimatingToComplete ? {
                   type: "spring",
                   stiffness: 300,
                   damping: 30
                 } : {
                   duration: 0
                 }}>
-                    <ArrowRight className="w-5 h-5 text-white" />
-                  </motion.div>
+                  <ArrowRight className="w-5 h-5 text-white" />
+                </motion.div>
 
-                  {/* Text - centered and stays visible */}
-                  <div className="absolute inset-0 flex items-center justify-center left-16 right-4 pointer-events-none">
-                    <motion.span className="text-white font-semibold flex items-center justify-center text-center text-base select-none" animate={{
-                    opacity: orderIdConfirmButtonProgress > 0.5 ? Math.max(0.2, 1 - orderIdConfirmButtonProgress * 0.8) : 1,
-                    x: orderIdConfirmButtonProgress > 0.5 ? orderIdConfirmButtonProgress * 15 : 0
-                  }} transition={orderIdConfirmIsAnimatingToComplete ? {
+                {/* Text - centered and stays visible */}
+                <div className="absolute inset-0 flex items-center justify-center left-16 right-4 pointer-events-none">
+                  <motion.span className="text-white font-semibold flex items-center justify-center text-center text-base select-none" animate={{
+                    opacity: newOrderAcceptButtonProgress > 0.5 ? Math.max(0.2, 1 - newOrderAcceptButtonProgress * 0.8) : 1,
+                    x: newOrderAcceptButtonProgress > 0.5 ? newOrderAcceptButtonProgress * 15 : 0
+                  }} transition={newOrderIsAnimatingToComplete ? {
                     type: "spring",
                     stiffness: 200,
                     damping: 25
                   } : {
                     duration: 0
                   }}>
-                      {!billImageUploaded ? 'Upload Bill First' : orderIdConfirmButtonProgress > 0.5 ? 'Release to Confirm' : 'Order Picked Up'}
-                    </motion.span>
-                  </div>
+                    {newOrderAcceptButtonProgress > 0.5 ? 'Release to Accept' : 'Accept order'}
+                  </motion.span>
                 </div>
-              </motion.div>
-            </div>
+              </div>
+            </motion.div>
           </div>
         </div>
-      </BottomPopup>
+      </div>
+    </motion.div>
 
-      {/* Start Navigation Button Card - Show when order is out_for_delivery */}
-      {selectedRestaurant && (selectedRestaurant.orderStatus === 'out_for_delivery' || selectedRestaurant.deliveryPhase === 'en_route_to_delivery') && !showReachedDropPopup && !showOrderDeliveredAnimation && !showCustomerReviewPopup && !showPaymentPage && <div className="fixed bottom-24 left-0 right-0 px-4 z-50">
-            <motion.div initial={{
-        y: 100,
+    {/* Reject Button - Outside the popup, positioned below */}
+    <motion.div initial={{
+      opacity: 0,
+      y: 20
+    }} animate={{
+      opacity: 1,
+      y: 0
+    }} exit={{
+      opacity: 0,
+      y: 20
+    }} transition={{
+      duration: 0.3,
+      delay: 0.1
+    }} className="fixed top-4 right-4 z-[115]">
+      <button onClick={handleRejectConfirm} className="  bg-black border-2 border-white text-white text-bold px-5 p-2 rounded-full font-semibold text-sm hover:bg-red-50 transition-colors shadow-2xl">
+        Deny
+      </button>
+    </motion.div>
+  </>}
+</AnimatePresence>
+
+{/* Reject Order Popup */ }
+<AnimatePresence>
+  {showRejectPopup && <>
+    <motion.div className="fixed inset-0 z-[120] bg-black/60 flex items-center justify-center p-4" initial={{
+      opacity: 0
+    }} animate={{
+      opacity: 1
+    }} exit={{
+      opacity: 0
+    }} onClick={handleRejectCancel}>
+      <motion.div className="w-[90%] max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden" initial={{
+        scale: 0.9,
         opacity: 0
       }} animate={{
-        y: 0,
+        scale: 1,
         opacity: 1
       }} exit={{
-        y: 100,
+        scale: 0.9,
         opacity: 0
-      }} transition={{
-        type: "spring",
-        stiffness: 300,
-        damping: 30
-      }} className="bg-white rounded-2xl shadow-2xl p-5 border border-gray-100">
-              {/* Customer Info */}
-              <div className="mb-4">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-10 h-10 bg-teal-100 rounded-full flex items-center justify-center">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-teal-600">
-                      <polygon points="3 11 22 2 13 21 11 13 3 11"></polygon>
-                    </svg>
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-base font-semibold text-gray-900">
-                      Head to Customer Location
-                    </h3>
-                    <p className="text-sm text-gray-600 mt-0.5">
-                      {selectedRestaurant?.customerName || 'Customer'}
-                    </p>
-                  </div>
-                </div>
-                {selectedRestaurant?.customerAddress && <p className="text-xs text-gray-500 ml-13 truncate">
-                    {selectedRestaurant.customerAddress}
-                  </p>}
+      }} onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div className="px-4 py-4 border-b border-gray-200">
+          <h3 className="text-lg font-bold text-gray-900">Can't Accept Order</h3>
+          <p className="text-sm text-gray-500 mt-1">Please select a reason for not accepting this order</p>
+        </div>
+
+        {/* Content */}
+        <div className="px-4 py-4 max-h-[60vh] overflow-y-auto">
+          <div className="space-y-2">
+            {rejectReasons.map(reason => <button key={reason} onClick={() => setRejectReason(reason)} className={`w-full text-left p-4 rounded-lg border-2 transition-all ${rejectReason === reason ? "border-black bg-red-50" : "border-gray-200 bg-white hover:border-gray-300"}`}>
+              <div className="flex items-center justify-between">
+                <span className={`text-sm font-medium ${rejectReason === reason ? "text-black" : "text-gray-900"}`}>
+                  {reason}
+                </span>
+                {rejectReason === reason && <div className="w-5 h-5 rounded-full bg-black flex items-center justify-center">
+                  <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>}
               </div>
-
-              {/* Start Navigation Button */}
-              <button onClick={handleStartNavigation} className="w-full bg-[#4285F4] hover:bg-[#357ae8] text-white font-bold py-4 px-6 rounded-xl shadow-lg transition-all duration-200 flex items-center justify-center gap-2 active:scale-95">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polygon points="3 11 22 2 13 21 11 13 3 11"></polygon>
-                </svg>
-                <span>START NAVIGATION</span>
-              </button>
-
-              <p className="text-center text-xs text-gray-500 mt-3">
-                Opens Google Maps in Bike Mode 🏍️
-              </p>
-            </motion.div>
-          </div>}
-
-      {/* Reached Drop Popup - shown instantly after Order Picked Up confirmation */}
-      <BottomPopup isOpen={showReachedDropPopup} onClose={() => setShowReachedDropPopup(false)} showCloseButton={false} closeOnBackdropClick={false} maxHeight="70vh" showHandle={true} showBackdrop={false} backdropBlocksInteraction={false}>
-        <div className="">
-          {/* Drop Label */}
-          <div className="mb-4">
-            <span className="bg-teal-600 text-white text-xs font-medium px-3 py-1.5 rounded-lg">
-              Drop
-            </span>
+            </button>)}
           </div>
+        </div>
 
-          {/* Customer Info */}
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">
-              {selectedRestaurant?.customerName || 'Customer Name'}
-            </h2>
-            <p className="text-gray-600 mb-2 leading-relaxed">
-              {selectedRestaurant?.customerAddress || 'Customer Address'}
-            </p>
-            <p className="text-gray-500 text-sm font-medium">
-              Order ID: {selectedRestaurant?.orderId || 'ORD1234567890'}
-            </p>
-          </div>
+        {/* Footer */}
+        <div className="px-4 py-4 bg-gray-50 border-t border-gray-200 flex gap-3">
+          <button onClick={handleRejectCancel} className="flex-1 bg-white border-2 border-gray-300 text-gray-700 py-3 rounded-lg font-semibold text-sm hover:bg-gray-50 transition-colors">
+            Cancel
+          </button>
+          <button onClick={handleRejectConfirm} disabled={!rejectReason} className={`flex-1 py-3 rounded-lg font-semibold text-sm transition-colors ${rejectReason ? "!bg-black !text-white" : "bg-gray-200 text-gray-400 cursor-not-allowed"}`}>
+            Confirm
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  </>}
+</AnimatePresence>
 
-          {/* Action Buttons */}
-          <div className="flex gap-3 mb-6">
-            <button className="flex-1 flex items-center justify-center gap-2 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-              <Phone className="w-5 h-5 text-gray-700" />
-              <span className="text-gray-700 font-medium">Call</span>
-            </button>
-            <button className="flex-1 flex items-center justify-center gap-2 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-              <MapPin className="w-5 h-5 text-gray-700" />
-              <span className="text-gray-700 font-medium">Chat</span>
-            </button>
-            <button className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors">
-              <MapPin className="w-5 h-5 text-white" />
-              <span className="text-white font-medium">Map</span>
-            </button>
-          </div>
+{/* Directions Map View */ }
+<AnimatePresence>
+  {showDirectionsMap && selectedRestaurant && <motion.div initial={{
+    opacity: 0
+  }} animate={{
+    opacity: 1
+  }} exit={{
+    opacity: 0
+  }} transition={{
+    duration: 0.3
+  }} className="fixed inset-0 z-[120] bg-white">
+    {/* Ola Maps Container for Directions */}
+    <div ref={directionsMapContainerRef} key="directions-map-container" // Fixed key - don't remount on location change
+      style={{
+        height: '100%',
+        width: '100%',
+        zIndex: 1
+      }} />
 
-          {/* Reached Drop Button with Swipe */}
-          <div className="relative w-full">
-            <motion.div ref={reachedDropButtonRef} className="relative w-full bg-green-600 rounded-full overflow-hidden shadow-xl" style={{
-            touchAction: 'pan-x'
-          }} // Prevent vertical scrolling, allow horizontal pan
-          onTouchStart={handleReachedDropTouchStart} onTouchMove={handleReachedDropTouchMove} onTouchEnd={handleReachedDropTouchEnd} whileTap={{
-            scale: 0.98
+    {/* Loading indicator */}
+    {directionsMapLoading && <div className="absolute inset-0 flex items-center justify-center bg-white/50 z-10">
+      <div className="text-gray-600">Loading map...</div>
+    </div>}
+  </motion.div>}
+</AnimatePresence>
+
+{/* Reached Pickup Popup - shown when order is ready (from order_ready socket) or when rider is within 500m */ }
+{/* Don't show if Order ID confirmation popup is showing */ }
+<BottomPopup isOpen={showreachedPickupPopup && !showOrderIdConfirmationPopup} onClose={() => setShowreachedPickupPopup(false)} showCloseButton={false} closeOnBackdropClick={false} disableSwipeToClose={true} maxHeight="70vh" showHandle={true} showBackdrop={false} backdropBlocksInteraction={false}>
+  <div className="">
+    {/* Pickup Label */}
+    <div className="mb-4">
+      <span className="bg-gray-500 text-white text-xs font-medium px-3 py-1.5 rounded-lg">
+        Pick up
+      </span>
+    </div>
+
+    {/* Restaurant Info */}
+    <div className="mb-6">
+      <h2 className="text-2xl font-bold text-gray-900 mb-2">
+        {selectedRestaurant?.name || 'Restaurant Name'}
+      </h2>
+      <p className="text-gray-600 mb-2 leading-relaxed">
+        {(() => {
+          const address = selectedRestaurant?.address;
+
+          // If address is default or missing, try to find it in other fields
+          if (!address || address === 'Restaurant Address' || address === 'Restaurant address') {
+            // Check if address might be in a different field
+            const possibleAddress = selectedRestaurant?.restaurantAddress || selectedRestaurant?.restaurant?.address || selectedRestaurant?.restaurantId?.address || selectedRestaurant?.restaurantId?.location?.formattedAddress || selectedRestaurant?.restaurantId?.location?.address || selectedRestaurant?.location?.address || selectedRestaurant?.location?.formattedAddress;
+            if (possibleAddress && possibleAddress !== 'Restaurant Address' && possibleAddress !== 'Restaurant address') {
+              return possibleAddress;
+            }
+          }
+          return address && address !== 'Restaurant Address' && address !== 'Restaurant address' ? address : 'Address will be updated...';
+        })()}
+      </p>
+      <p className="text-gray-500 text-sm font-medium">
+        Order ID: {selectedRestaurant?.orderId || 'ORD1234567890'}
+      </p>
+    </div>
+
+    {/* Action Buttons */}
+    <div className="flex gap-3 mb-6">
+      <button onClick={async () => {
+        // Try multiple paths to find restaurant phone number
+        let restaurantPhone = selectedRestaurant?.phone || selectedRestaurant?.restaurantId?.phone || selectedRestaurant?.ownerPhone || selectedRestaurant?.restaurant?.phone || null;
+        // If phone not found in selectedRestaurant, try to fetch order details from backend
+        if (!restaurantPhone && selectedRestaurant?.orderId) {
+          try {
+            const orderId = selectedRestaurant.orderId || selectedRestaurant.id;
+            const response = await deliveryAPI.getOrderDetails(orderId);
+            // Check multiple response formats
+            const order = response.data?.data?.order || response.data?.order || null;
+            if (order) {
+              // Try all possible paths in the API response
+              // Restaurant model has both 'phone' and 'ownerPhone' fields
+              restaurantPhone = order.restaurantId?.phone || order.restaurantId?.ownerPhone || order.restaurant?.phone || order.restaurant?.ownerPhone || order.restaurantId?.contact?.phone || order.restaurantId?.owner?.phone || null;
+              // If phone found, update selectedRestaurant for future use
+              if (restaurantPhone && selectedRestaurant) {
+                setSelectedRestaurant({
+                  ...selectedRestaurant,
+                  phone: restaurantPhone,
+                  ownerPhone: order.restaurantId?.ownerPhone || order.restaurant?.ownerPhone || restaurantPhone
+                });
+              }
+
+              // If still not found, try restaurant API directly
+              if (!restaurantPhone && order.restaurantId) {
+                const restaurantId = typeof order.restaurantId === 'string' ? order.restaurantId : order.restaurantId._id || order.restaurantId.id || order.restaurantId.toString();
+                if (restaurantId) {
+                  try {
+                    const restaurantResponse = await restaurantAPI.getRestaurantById(restaurantId);
+                    if (restaurantResponse.data?.success && restaurantResponse.data.data) {
+                      const restaurant = restaurantResponse.data.data.restaurant || restaurantResponse.data.data;
+                      restaurantPhone = restaurant.phone || restaurant.ownerPhone || restaurant.primaryContactNumber;
+                      if (restaurantPhone) {
+                        setSelectedRestaurant({
+                          ...selectedRestaurant,
+                          phone: restaurantPhone,
+                          ownerPhone: restaurant.ownerPhone || restaurantPhone
+                        });
+                      }
+                    }
+                  } catch (restaurantError) {
+                    console.error('❌ [CALL] Error fetching restaurant by ID:', restaurantError);
+                  }
+                }
+              }
+              if (!restaurantPhone) {
+                console.warn('⚠️ [CALL] Phone not found in order.restaurantId object:', order.restaurantId);
+              }
+            } else {
+              console.warn('⚠️ [CALL] Order details API response format unexpected - order not found in response:', {
+                responseKeys: Object.keys(response.data || {}),
+                responseData: response.data
+              });
+            }
+          } catch (error) {
+            console.error('❌ [CALL] Error fetching order details for phone:', error);
+            console.error('❌ [CALL] Error message:', error.message);
+            console.error('❌ [CALL] Error response:', error.response?.data);
+            console.error('❌ [CALL] Error status:', error.response?.status);
+          }
+        } else if (!selectedRestaurant?.orderId) {
+          console.warn('⚠️ [CALL] Cannot fetch phone - orderId not found in selectedRestaurant:', selectedRestaurant);
+        }
+        if (restaurantPhone) {
+          // Remove any spaces, dashes, or special characters except + and digits
+          const cleanPhone = restaurantPhone.replace(/[^\d+]/g, '');
+          window.location.href = `tel:${cleanPhone}`;
+        } else {
+          toast.error('Restaurant phone number not available. Please contact support.');
+          console.error('❌ Restaurant phone not found in any path:', {
+            selectedRestaurant,
+            hasPhone: !!selectedRestaurant?.phone,
+            hasRestaurantIdPhone: !!selectedRestaurant?.restaurantId?.phone,
+            hasOwnerPhone: !!selectedRestaurant?.ownerPhone,
+            orderId: selectedRestaurant?.orderId
+          });
+        }
+      }} className="flex-1 flex items-center justify-center gap-2 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+        <Phone className="w-5 h-5 text-gray-700" />
+        <span className="text-gray-700 font-medium">Call</span>
+      </button>
+      <button onClick={() => {
+        // Get restaurant location coordinates
+        const restaurantLat = selectedRestaurant?.lat;
+        const restaurantLng = selectedRestaurant?.lng;
+        if (!restaurantLat || !restaurantLng) {
+          toast.error('Restaurant location not available');
+          console.error('❌ Restaurant coordinates not found:', {
+            lat: restaurantLat,
+            lng: restaurantLng,
+            selectedRestaurant
+          });
+          return;
+        }
+        // Detect platform (Android or iOS)
+        const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+        const isAndroid = /android/i.test(userAgent);
+        const isIOS = /iPad|iPhone|iPod/.test(userAgent) && !window.MSStream;
+        let mapsUrl = '';
+        if (isAndroid) {
+          // Android: Use google.navigation: scheme (opens directly in navigation mode)
+          mapsUrl = `google.navigation:q=${restaurantLat},${restaurantLng}&mode=b`;
+
+          // Try to open Google Maps app first
+          window.location.href = mapsUrl;
+
+          // Fallback to web URL after a short delay (in case app is not installed)
+          setTimeout(() => {
+            const webUrl = `https://www.google.com/maps/dir/?api=1&destination=${restaurantLat},${restaurantLng}&travelmode=bicycling`;
+            window.open(webUrl, '_blank');
+          }, 500);
+        } else if (isIOS) {
+          // iOS: Use comgooglemaps:// scheme (opens Google Maps app)
+          mapsUrl = `comgooglemaps://?daddr=${restaurantLat},${restaurantLng}&directionsmode=bicycling`;
+
+          // Try to open Google Maps app first
+          window.location.href = mapsUrl;
+
+          // Fallback to web URL after a short delay (in case app is not installed)
+          setTimeout(() => {
+            const webUrl = `https://maps.google.com/?daddr=${restaurantLat},${restaurantLng}&directionsmode=bicycling`;
+            window.open(webUrl, '_blank');
+          }, 500);
+        } else {
+          // Web/Desktop: Use web URL with navigation
+          mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${restaurantLat},${restaurantLng}&travelmode=bicycling`;
+          window.open(mapsUrl, '_blank');
+        }
+
+        // Show success message
+        toast.success('Opening Google Maps navigation 🗺️', {
+          duration: 2000
+        });
+      }} className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors">
+        <MapPin className="w-5 h-5 text-white" />
+        <span className="text-white font-medium">Map</span>
+      </button>
+    </div>
+
+    {/* Reached Pickup Button with Swipe */}
+    <div className="relative w-full">
+      <motion.div ref={reachedPickupButtonRef} className="relative w-full bg-green-600 rounded-full overflow-hidden shadow-xl" style={{
+        touchAction: 'pan-x'
+      }} // Prevent vertical scrolling, allow horizontal pan
+        onTouchStart={handlereachedPickupTouchStart} onTouchMove={handlereachedPickupTouchMove} onTouchEnd={handlereachedPickupTouchEnd} whileTap={{
+          scale: 0.98
+        }}>
+        {/* Swipe progress background */}
+        <motion.div className="absolute inset-0 bg-green-500 rounded-full" animate={{
+          width: `${reachedPickupButtonProgress * 100}%`
+        }} transition={reachedPickupIsAnimatingToComplete ? {
+          type: "spring",
+          stiffness: 200,
+          damping: 25
+        } : {
+          duration: 0
+        }} />
+
+        {/* Button content container */}
+        <div className="relative flex items-center h-[64px] px-1">
+          {/* Left: Black circle with arrow */}
+          <motion.div className="w-14 h-14 bg-gray-900 rounded-full flex items-center justify-center shrink-0 relative z-20 shadow-2xl" animate={{
+            x: reachedPickupButtonProgress * (reachedPickupButtonRef.current ? reachedPickupButtonRef.current.offsetWidth - 56 - 32 : 240)
+          }} transition={reachedPickupIsAnimatingToComplete ? {
+            type: "spring",
+            stiffness: 300,
+            damping: 30
+          } : {
+            duration: 0
           }}>
-              {/* Swipe progress background */}
-              <motion.div className="absolute inset-0 bg-green-500 rounded-full" animate={{
-              width: `${reachedDropButtonProgress * 100}%`
+            <ArrowRight className="w-5 h-5 text-white" />
+          </motion.div>
+
+          {/* Text - centered and stays visible */}
+          <div className="absolute inset-0 flex items-center justify-center left-16 right-4 pointer-events-none">
+            <motion.span className="text-white font-semibold flex items-center justify-center text-center text-base select-none" animate={{
+              opacity: reachedPickupButtonProgress > 0.5 ? Math.max(0.2, 1 - reachedPickupButtonProgress * 0.8) : 1,
+              x: reachedPickupButtonProgress > 0.5 ? reachedPickupButtonProgress * 15 : 0
+            }} transition={reachedPickupIsAnimatingToComplete ? {
+              type: "spring",
+              stiffness: 200,
+              damping: 25
+            } : {
+              duration: 0
+            }}>
+              {reachedPickupButtonProgress > 0.5 ? 'Release to Confirm' : 'Reached Pickup'}
+            </motion.span>
+          </div>
+        </div>
+      </motion.div>
+    </div>
+  </div>
+</BottomPopup>
+
+{/* Order ID Confirmation Popup - shown after Reached Pickup swipe is confirmed */ }
+<BottomPopup isOpen={showOrderIdConfirmationPopup} onClose={() => setShowOrderIdConfirmationPopup(false)} showCloseButton={false} closeOnBackdropClick={false} maxHeight="60vh" showHandle={false} showBackdrop={false} backdropBlocksInteraction={false}>
+  <div className="">
+    <div className="text-center mb-6">
+      <h2 className="text-xl font-bold text-gray-900 mb-2">
+        Confirm Order ID
+      </h2>
+      <p className="text-gray-600 text-sm mb-4">
+        Please verify the order ID with the restaurant before pickup
+      </p>
+
+      {/* Order ID Display - single line, scroll horizontally if needed */}
+      <div className="bg-gray-50 rounded-xl p-6 mb-6 overflow-hidden">
+        <p className="text-gray-500 text-xs mb-2">Order ID</p>
+        <p className="text-2xl sm:text-3xl font-bold text-gray-900 tracking-wider whitespace-nowrap overflow-x-auto min-w-0">
+          {selectedRestaurant?.orderId || selectedRestaurant?.id || newOrder?.orderId || newOrder?.orderMongoId || 'ORD1234567890'}
+        </p>
+      </div>
+
+      {/* Bill Image Upload Section */}
+      <div className="mb-6">
+        <p className="text-gray-600 text-sm mb-3 text-center">
+          {billImageUploaded ? '✅ Bill image uploaded' : 'Please capture bill image'}
+        </p>
+
+        {/* Camera Button */}
+        <div className="flex justify-center mb-4">
+          <button onClick={handleCameraCapture} disabled={isUploadingBill} className={`flex items-center justify-center gap-2 px-6 py-3 rounded-lg transition-colors ${isUploadingBill ? 'bg-gray-400 cursor-not-allowed' : billImageUploaded ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'} text-white font-medium`}>
+            {isUploadingBill ? <>
+              <Loader2 className="w-5 h-5 animate-spin" />
+              <span>Uploading...</span>
+            </> : billImageUploaded ? <>
+              <CheckCircle className="w-5 h-5" />
+              <span>Bill Uploaded</span>
+            </> : <>
+              <Camera className="w-5 h-5" />
+              <span>Capture Bill</span>
+            </>}
+          </button>
+        </div>
+
+        {/* Hidden file input for camera (sr-only keeps it in DOM for mobile camera) */}
+        <input id="bill-camera-input" ref={cameraInputRef} type="file" accept="image/*" capture="environment" onChange={handleBillImageSelect} className="sr-only" />
+      </div>
+
+      {/* Order Picked Up Button with Swipe */}
+      <div className="relative w-full">
+        <motion.div ref={orderIdConfirmButtonRef} className={`relative w-full rounded-full overflow-hidden shadow-xl ${billImageUploaded ? 'bg-green-600' : 'bg-gray-400 cursor-not-allowed'}`} style={{
+          touchAction: billImageUploaded ? 'pan-x' : 'none',
+          opacity: billImageUploaded ? 1 : 0.6
+        }} onTouchStart={billImageUploaded ? handleOrderIdConfirmTouchStart : undefined} onTouchMove={billImageUploaded ? handleOrderIdConfirmTouchMove : undefined} onTouchEnd={billImageUploaded ? handleOrderIdConfirmTouchEnd : undefined} whileTap={billImageUploaded ? {
+          scale: 0.98
+        } : {}}>
+          {/* Swipe progress background */}
+          <motion.div className="absolute inset-0 bg-green-500 rounded-full" animate={{
+            width: `${orderIdConfirmButtonProgress * 100}%`
+          }} transition={orderIdConfirmIsAnimatingToComplete ? {
+            type: "spring",
+            stiffness: 200,
+            damping: 25
+          } : {
+            duration: 0
+          }} />
+
+          {/* Button content container */}
+          <div className="relative flex items-center h-[64px] px-1">
+            {/* Left: Black circle with arrow */}
+            <motion.div className="w-14 h-14 bg-gray-900 rounded-full flex items-center justify-center shrink-0 relative z-20 shadow-2xl" animate={{
+              x: orderIdConfirmButtonProgress * (orderIdConfirmButtonRef.current ? orderIdConfirmButtonRef.current.offsetWidth - 56 - 32 : 240)
+            }} transition={orderIdConfirmIsAnimatingToComplete ? {
+              type: "spring",
+              stiffness: 300,
+              damping: 30
+            } : {
+              duration: 0
+            }}>
+              <ArrowRight className="w-5 h-5 text-white" />
+            </motion.div>
+
+            {/* Text - centered and stays visible */}
+            <div className="absolute inset-0 flex items-center justify-center left-16 right-4 pointer-events-none">
+              <motion.span className="text-white font-semibold flex items-center justify-center text-center text-base select-none" animate={{
+                opacity: orderIdConfirmButtonProgress > 0.5 ? Math.max(0.2, 1 - orderIdConfirmButtonProgress * 0.8) : 1,
+                x: orderIdConfirmButtonProgress > 0.5 ? orderIdConfirmButtonProgress * 15 : 0
+              }} transition={orderIdConfirmIsAnimatingToComplete ? {
+                type: "spring",
+                stiffness: 200,
+                damping: 25
+              } : {
+                duration: 0
+              }}>
+                {!billImageUploaded ? 'Upload Bill First' : orderIdConfirmButtonProgress > 0.5 ? 'Release to Confirm' : 'Order Picked Up'}
+              </motion.span>
+            </div>
+          </div>
+        </motion.div>
+      </div>
+    </div>
+  </div>
+</BottomPopup>
+
+{/* Start Navigation Button Card - Show when order is out_for_delivery */ }
+{
+  selectedRestaurant && (selectedRestaurant.orderStatus === 'out_for_delivery' || selectedRestaurant.deliveryPhase === 'en_route_to_delivery') && !showReachedDropPopup && !showOrderDeliveredAnimation && !showCustomerReviewPopup && !showPaymentPage && <div className="fixed bottom-24 left-0 right-0 px-4 z-50">
+    <motion.div initial={{
+      y: 100,
+      opacity: 0
+    }} animate={{
+      y: 0,
+      opacity: 1
+    }} exit={{
+      y: 100,
+      opacity: 0
+    }} transition={{
+      type: "spring",
+      stiffness: 300,
+      damping: 30
+    }} className="bg-white rounded-2xl shadow-2xl p-5 border border-gray-100">
+      {/* Customer Info */}
+      <div className="mb-4">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="w-10 h-10 bg-teal-100 rounded-full flex items-center justify-center">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-teal-600">
+              <polygon points="3 11 22 2 13 21 11 13 3 11"></polygon>
+            </svg>
+          </div>
+          <div className="flex-1">
+            <h3 className="text-base font-semibold text-gray-900">
+              Head to Customer Location
+            </h3>
+            <p className="text-sm text-gray-600 mt-0.5">
+              {selectedRestaurant?.customerName || 'Customer'}
+            </p>
+          </div>
+        </div>
+        {selectedRestaurant?.customerAddress && <p className="text-xs text-gray-500 ml-13 truncate">
+          {selectedRestaurant.customerAddress}
+        </p>}
+      </div>
+
+      {/* Start Navigation Button */}
+      <button onClick={handleStartNavigation} className="w-full bg-[#4285F4] hover:bg-[#357ae8] text-white font-bold py-4 px-6 rounded-xl shadow-lg transition-all duration-200 flex items-center justify-center gap-2 active:scale-95">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <polygon points="3 11 22 2 13 21 11 13 3 11"></polygon>
+        </svg>
+        <span>START NAVIGATION</span>
+      </button>
+
+      <p className="text-center text-xs text-gray-500 mt-3">
+        Opens Google Maps in Bike Mode 🏍️
+      </p>
+    </motion.div>
+  </div>
+}
+
+{/* Reached Drop Popup - shown instantly after Order Picked Up confirmation */ }
+<BottomPopup isOpen={showReachedDropPopup} onClose={() => setShowReachedDropPopup(false)} showCloseButton={false} closeOnBackdropClick={false} maxHeight="70vh" showHandle={true} showBackdrop={false} backdropBlocksInteraction={false}>
+  <div className="">
+    {/* Drop Label */}
+    <div className="mb-4">
+      <span className="bg-teal-600 text-white text-xs font-medium px-3 py-1.5 rounded-lg">
+        Drop
+      </span>
+    </div>
+
+    {/* Customer Info */}
+    <div className="mb-6">
+      <h2 className="text-2xl font-bold text-gray-900 mb-2">
+        {selectedRestaurant?.customerName || 'Customer Name'}
+      </h2>
+      <p className="text-gray-600 mb-2 leading-relaxed">
+        {selectedRestaurant?.customerAddress || 'Customer Address'}
+      </p>
+      <p className="text-gray-500 text-sm font-medium">
+        Order ID: {selectedRestaurant?.orderId || 'ORD1234567890'}
+      </p>
+    </div>
+
+    {/* Action Buttons */}
+    <div className="flex gap-3 mb-6">
+      <button className="flex-1 flex items-center justify-center gap-2 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+        <Phone className="w-5 h-5 text-gray-700" />
+        <span className="text-gray-700 font-medium">Call</span>
+      </button>
+      <button className="flex-1 flex items-center justify-center gap-2 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+        <MapPin className="w-5 h-5 text-gray-700" />
+        <span className="text-gray-700 font-medium">Chat</span>
+      </button>
+      <button className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors">
+        <MapPin className="w-5 h-5 text-white" />
+        <span className="text-white font-medium">Map</span>
+      </button>
+    </div>
+
+    {/* Reached Drop Button with Swipe */}
+    <div className="relative w-full">
+      <motion.div ref={reachedDropButtonRef} className="relative w-full bg-green-600 rounded-full overflow-hidden shadow-xl" style={{
+        touchAction: 'pan-x'
+      }} // Prevent vertical scrolling, allow horizontal pan
+        onTouchStart={handleReachedDropTouchStart} onTouchMove={handleReachedDropTouchMove} onTouchEnd={handleReachedDropTouchEnd} whileTap={{
+          scale: 0.98
+        }}>
+        {/* Swipe progress background */}
+        <motion.div className="absolute inset-0 bg-green-500 rounded-full" animate={{
+          width: `${reachedDropButtonProgress * 100}%`
+        }} transition={reachedDropIsAnimatingToComplete ? {
+          type: "spring",
+          stiffness: 200,
+          damping: 25
+        } : {
+          duration: 0
+        }} />
+
+        {/* Button content container */}
+        <div className="relative flex items-center h-[64px] px-1">
+          {/* Left: Black circle with arrow */}
+          <motion.div className="w-14 h-14 bg-gray-900 rounded-full flex items-center justify-center shrink-0 relative z-20 shadow-2xl" animate={{
+            x: reachedDropButtonProgress * (reachedDropButtonRef.current ? reachedDropButtonRef.current.offsetWidth - 56 - 32 : 240)
+          }} transition={reachedDropIsAnimatingToComplete ? {
+            type: "spring",
+            stiffness: 300,
+            damping: 30
+          } : {
+            duration: 0
+          }}>
+            <ArrowRight className="w-5 h-5 text-white" />
+          </motion.div>
+
+          {/* Text - centered and stays visible */}
+          <div className="absolute inset-0 flex items-center justify-center left-16 right-4 pointer-events-none">
+            <motion.span className="text-white font-semibold flex items-center justify-center text-center text-base select-none" animate={{
+              opacity: reachedDropButtonProgress > 0.5 ? Math.max(0.2, 1 - reachedDropButtonProgress * 0.8) : 1,
+              x: reachedDropButtonProgress > 0.5 ? reachedDropButtonProgress * 15 : 0
             }} transition={reachedDropIsAnimatingToComplete ? {
               type: "spring",
               stiffness: 200,
               damping: 25
             } : {
               duration: 0
-            }} />
-
-              {/* Button content container */}
-              <div className="relative flex items-center h-[64px] px-1">
-                {/* Left: Black circle with arrow */}
-                <motion.div className="w-14 h-14 bg-gray-900 rounded-full flex items-center justify-center shrink-0 relative z-20 shadow-2xl" animate={{
-                x: reachedDropButtonProgress * (reachedDropButtonRef.current ? reachedDropButtonRef.current.offsetWidth - 56 - 32 : 240)
-              }} transition={reachedDropIsAnimatingToComplete ? {
-                type: "spring",
-                stiffness: 300,
-                damping: 30
-              } : {
-                duration: 0
-              }}>
-                  <ArrowRight className="w-5 h-5 text-white" />
-                </motion.div>
-
-                {/* Text - centered and stays visible */}
-                <div className="absolute inset-0 flex items-center justify-center left-16 right-4 pointer-events-none">
-                  <motion.span className="text-white font-semibold flex items-center justify-center text-center text-base select-none" animate={{
-                  opacity: reachedDropButtonProgress > 0.5 ? Math.max(0.2, 1 - reachedDropButtonProgress * 0.8) : 1,
-                  x: reachedDropButtonProgress > 0.5 ? reachedDropButtonProgress * 15 : 0
-                }} transition={reachedDropIsAnimatingToComplete ? {
-                  type: "spring",
-                  stiffness: 200,
-                  damping: 25
-                } : {
-                  duration: 0
-                }}>
-                    {reachedDropButtonProgress > 0.5 ? 'Release to Confirm' : 'Reached Drop'}
-                  </motion.span>
-                </div>
-              </div>
-            </motion.div>
+            }}>
+              {reachedDropButtonProgress > 0.5 ? 'Release to Confirm' : 'Reached Drop'}
+            </motion.span>
           </div>
         </div>
-      </BottomPopup>
+      </motion.div>
+    </div>
+  </div>
+</BottomPopup>
 
-      {/* Order Delivered Bottom Popup - shown instantly after Reached Drop is confirmed */}
-      <BottomPopup isOpen={showOrderDeliveredAnimation} onClose={() => {
-      setShowOrderDeliveredAnimation(false);
-      setShowCustomerReviewPopup(true);
-    }} showCloseButton={false} closeOnBackdropClick={false} maxHeight="80vh" showHandle={true} showBackdrop={false} backdropBlocksInteraction={false}>
-        <div className="">
-          {/* Success Icon and Title */}
-          <div className="text-center mb-6">
-            <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
-            </div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">
-              Great job! Delivery complete 👍
-            </h1>
+{/* Order Delivered Bottom Popup - shown instantly after Reached Drop is confirmed */ }
+<BottomPopup isOpen={showOrderDeliveredAnimation} onClose={() => {
+  setShowOrderDeliveredAnimation(false);
+  setShowCustomerReviewPopup(true);
+}} showCloseButton={false} closeOnBackdropClick={false} maxHeight="80vh" showHandle={true} showBackdrop={false} backdropBlocksInteraction={false}>
+  <div className="">
+    {/* Success Icon and Title */}
+    <div className="text-center mb-6">
+      <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
+        <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+        </svg>
+      </div>
+      <h1 className="text-2xl font-bold text-gray-900 mb-2">
+        Great job! Delivery complete 👍
+      </h1>
+    </div>
+
+    {/* Trip Details */}
+    <div className="bg-gray-50 rounded-xl p-4 mb-6">
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <MapPin className="w-4 h-4 text-gray-600" />
+            <span className="text-gray-600 text-sm">Trip distance</span>
           </div>
-
-          {/* Trip Details */}
-          <div className="bg-gray-50 rounded-xl p-4 mb-6">
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <MapPin className="w-4 h-4 text-gray-600" />
-                  <span className="text-gray-600 text-sm">Trip distance</span>
-                </div>
-                <span className="text-gray-900 font-semibold">
-                  {tripDistance !== null ? tripDistance >= 1000 ? `${(tripDistance / 1000).toFixed(1)} kms` : `${tripDistance.toFixed(0)} m` : selectedRestaurant?.tripDistance || 'Calculating...'}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-gray-600" />
-                  <span className="text-gray-600 text-sm">Trip time</span>
-                </div>
-                <span className="text-gray-900 font-semibold">
-                  {tripTime !== null ? tripTime >= 60 ? `${Math.round(tripTime / 60)} mins` : `${tripTime} secs` : selectedRestaurant?.tripTime || 'Calculating...'}
-                </span>
-              </div>
-            </div>
+          <span className="text-gray-900 font-semibold">
+            {tripDistance !== null ? tripDistance >= 1000 ? `${(tripDistance / 1000).toFixed(1)} kms` : `${tripDistance.toFixed(0)} m` : selectedRestaurant?.tripDistance || 'Calculating...'}
+          </span>
+        </div>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Clock className="w-4 h-4 text-gray-600" />
+            <span className="text-gray-600 text-sm">Trip time</span>
           </div>
+          <span className="text-gray-900 font-semibold">
+            {tripTime !== null ? tripTime >= 60 ? `${Math.round(tripTime / 60)} mins` : `${tripTime} secs` : selectedRestaurant?.tripTime || 'Calculating...'}
+          </span>
+        </div>
+      </div>
+    </div>
 
-          {/* Payment info: Online = amount paid, COD = collect from customer */}
-          {selectedRestaurant?.total != null && (() => {
-          const m = (selectedRestaurant.paymentMethod || '').toLowerCase();
-          const isCod = m === 'cash' || m === 'cod';
-          const total = Number(selectedRestaurant.total) || 0;
-          return <div className={`rounded-xl p-4 mb-6 ${isCod ? 'bg-amber-50 border border-amber-200' : 'bg-emerald-50 border border-emerald-200'}`}>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <IndianRupee className={`w-4 h-4 ${isCod ? 'text-amber-600' : 'text-emerald-600'}`} />
-                    <span className={`text-sm font-medium ${isCod ? 'text-amber-800' : 'text-emerald-800'}`}>
-                      {isCod ? 'Collect from customer (COD)' : 'Amount paid (Online)'}
-                    </span>
-                  </div>
-                  <span className={`text-lg font-bold ${isCod ? 'text-amber-700' : 'text-emerald-700'}`}>
-                    ₹{total.toLocaleString('en-IN', {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2
-                })}
-                  </span>
-                </div>
-              </div>;
-        })()}
+    {/* Payment info: Online = amount paid, COD = collect from customer */}
+    {selectedRestaurant?.total != null && (() => {
+      const m = (selectedRestaurant.paymentMethod || '').toLowerCase();
+      const isCod = m === 'cash' || m === 'cod';
+      const total = Number(selectedRestaurant.total) || 0;
+      return <div className={`rounded-xl p-4 mb-6 ${isCod ? 'bg-amber-50 border border-amber-200' : 'bg-emerald-50 border border-emerald-200'}`}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <IndianRupee className={`w-4 h-4 ${isCod ? 'text-amber-600' : 'text-emerald-600'}`} />
+            <span className={`text-sm font-medium ${isCod ? 'text-amber-800' : 'text-emerald-800'}`}>
+              {isCod ? 'Collect from customer (COD)' : 'Amount paid (Online)'}
+            </span>
+          </div>
+          <span className={`text-lg font-bold ${isCod ? 'text-amber-700' : 'text-emerald-700'}`}>
+            ₹{total.toLocaleString('en-IN', {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2
+            })}
+          </span>
+        </div>
+      </div>;
+    })()}
 
-          {/* Order Delivered Button with Swipe */}
-          <div className="relative w-full">
-            <motion.div ref={orderDeliveredButtonRef} className="relative w-full bg-green-600 rounded-full overflow-hidden shadow-xl" style={{
-            touchAction: 'pan-x'
-          }} // Prevent vertical scrolling, allow horizontal pan
-          onTouchStart={handleOrderDeliveredTouchStart} onTouchMove={handleOrderDeliveredTouchMove} onTouchEnd={handleOrderDeliveredTouchEnd} whileTap={{
-            scale: 0.98
+    {/* Order Delivered Button with Swipe */}
+    <div className="relative w-full">
+      <motion.div ref={orderDeliveredButtonRef} className="relative w-full bg-green-600 rounded-full overflow-hidden shadow-xl" style={{
+        touchAction: 'pan-x'
+      }} // Prevent vertical scrolling, allow horizontal pan
+        onTouchStart={handleOrderDeliveredTouchStart} onTouchMove={handleOrderDeliveredTouchMove} onTouchEnd={handleOrderDeliveredTouchEnd} whileTap={{
+          scale: 0.98
+        }}>
+        {/* Swipe progress background */}
+        <motion.div className="absolute inset-0 bg-green-500 rounded-full" animate={{
+          width: `${orderDeliveredButtonProgress * 100}%`
+        }} transition={orderDeliveredIsAnimatingToComplete ? {
+          type: "spring",
+          stiffness: 200,
+          damping: 25
+        } : {
+          duration: 0
+        }} />
+
+        {/* Button content container */}
+        <div className="relative flex items-center h-[64px] px-1">
+          {/* Left: Black circle with arrow */}
+          <motion.div className="w-14 h-14 bg-gray-900 rounded-full flex items-center justify-center shrink-0 relative z-20 shadow-2xl" animate={{
+            x: orderDeliveredButtonProgress * (orderDeliveredButtonRef.current ? orderDeliveredButtonRef.current.offsetWidth - 56 - 32 : 240)
+          }} transition={orderDeliveredIsAnimatingToComplete ? {
+            type: "spring",
+            stiffness: 300,
+            damping: 30
+          } : {
+            duration: 0
           }}>
-              {/* Swipe progress background */}
-              <motion.div className="absolute inset-0 bg-green-500 rounded-full" animate={{
-              width: `${orderDeliveredButtonProgress * 100}%`
+            <ArrowRight className="w-5 h-5 text-white" />
+          </motion.div>
+
+          {/* Text - centered and stays visible */}
+          <div className="absolute inset-0 flex items-center justify-center left-16 right-4 pointer-events-none">
+            <motion.span className="text-white font-semibold flex items-center justify-center text-center text-base select-none" animate={{
+              opacity: orderDeliveredButtonProgress > 0.5 ? Math.max(0.2, 1 - orderDeliveredButtonProgress * 0.8) : 1,
+              x: orderDeliveredButtonProgress > 0.5 ? orderDeliveredButtonProgress * 15 : 0
             }} transition={orderDeliveredIsAnimatingToComplete ? {
               type: "spring",
               stiffness: 200,
               damping: 25
             } : {
               duration: 0
-            }} />
-
-              {/* Button content container */}
-              <div className="relative flex items-center h-[64px] px-1">
-                {/* Left: Black circle with arrow */}
-                <motion.div className="w-14 h-14 bg-gray-900 rounded-full flex items-center justify-center shrink-0 relative z-20 shadow-2xl" animate={{
-                x: orderDeliveredButtonProgress * (orderDeliveredButtonRef.current ? orderDeliveredButtonRef.current.offsetWidth - 56 - 32 : 240)
-              }} transition={orderDeliveredIsAnimatingToComplete ? {
-                type: "spring",
-                stiffness: 300,
-                damping: 30
-              } : {
-                duration: 0
-              }}>
-                  <ArrowRight className="w-5 h-5 text-white" />
-                </motion.div>
-
-                {/* Text - centered and stays visible */}
-                <div className="absolute inset-0 flex items-center justify-center left-16 right-4 pointer-events-none">
-                  <motion.span className="text-white font-semibold flex items-center justify-center text-center text-base select-none" animate={{
-                  opacity: orderDeliveredButtonProgress > 0.5 ? Math.max(0.2, 1 - orderDeliveredButtonProgress * 0.8) : 1,
-                  x: orderDeliveredButtonProgress > 0.5 ? orderDeliveredButtonProgress * 15 : 0
-                }} transition={orderDeliveredIsAnimatingToComplete ? {
-                  type: "spring",
-                  stiffness: 200,
-                  damping: 25
-                } : {
-                  duration: 0
-                }}>
-                    {orderDeliveredButtonProgress > 0.5 ? 'Release to Confirm' : 'Order Delivered'}
-                  </motion.span>
-                </div>
-              </div>
-            </motion.div>
+            }}>
+              {orderDeliveredButtonProgress > 0.5 ? 'Release to Confirm' : 'Order Delivered'}
+            </motion.span>
           </div>
         </div>
-      </BottomPopup>
+      </motion.div>
+    </div>
+  </div>
+</BottomPopup>
 
-      {/* Customer Review Popup - shown after Order Delivered */}
-      <BottomPopup isOpen={showCustomerReviewPopup} onClose={() => setShowCustomerReviewPopup(false)} showCloseButton={false} closeOnBackdropClick={false} maxHeight="80vh" showHandle={true}>
-        <div className="">
-          <div className="text-center mb-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-2">
-              Rate Your Experience
-            </h2>
-            <p className="text-gray-600 text-sm mb-6">
-              How was your delivery experience?
-            </p>
+{/* Customer Review Popup - shown after Order Delivered */ }
+<BottomPopup isOpen={showCustomerReviewPopup} onClose={() => setShowCustomerReviewPopup(false)} showCloseButton={false} closeOnBackdropClick={false} maxHeight="80vh" showHandle={true}>
+  <div className="">
+    <div className="text-center mb-6">
+      <h2 className="text-xl font-bold text-gray-900 mb-2">
+        Rate Your Experience
+      </h2>
+      <p className="text-gray-600 text-sm mb-6">
+        How was your delivery experience?
+      </p>
 
-            {/* Star Rating */}
-            <div className="flex justify-center gap-2 mb-6">
-              {[1, 2, 3, 4, 5].map(star => <button key={star} onClick={() => setCustomerRating(star)} className="text-4xl transition-transform hover:scale-110">
-                  {star <= customerRating ? <span className="text-yellow-400">★</span> : <span className="text-gray-300">★</span>}
-                </button>)}
-            </div>
+      {/* Star Rating */}
+      <div className="flex justify-center gap-2 mb-6">
+        {[1, 2, 3, 4, 5].map(star => <button key={star} onClick={() => setCustomerRating(star)} className="text-4xl transition-transform hover:scale-110">
+          {star <= customerRating ? <span className="text-yellow-400">★</span> : <span className="text-gray-300">★</span>}
+        </button>)}
+      </div>
 
-            {/* Optional Review Text */}
-            <div className="mb-6">
-              <label className="block text-left text-sm font-medium text-gray-700 mb-2">
-                Review (Optional)
-              </label>
-              <textarea value={customerReviewText} onChange={e => setCustomerReviewText(e.target.value)} placeholder="Share your experience..." className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none" rows={4} />
-            </div>
+      {/* Optional Review Text */}
+      <div className="mb-6">
+        <label className="block text-left text-sm font-medium text-gray-700 mb-2">
+          Review (Optional)
+        </label>
+        <textarea value={customerReviewText} onChange={e => setCustomerReviewText(e.target.value)} placeholder="Share your experience..." className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none" rows={4} />
+      </div>
 
-            {/* Submit Button */}
-            <button onClick={async () => {
-            // Get order ID - use MongoDB _id for API call
-            const orderIdForApi = selectedRestaurant?.id || newOrder?.orderMongoId || newOrder?._id || selectedRestaurant?.orderId || newOrder?.orderId;
+      {/* Submit Button */}
+      <button onClick={async () => {
+        // Get order ID - use MongoDB _id for API call
+        const orderIdForApi = selectedRestaurant?.id || newOrder?.orderMongoId || newOrder?._id || selectedRestaurant?.orderId || newOrder?.orderId;
 
-            // Save review by calling completeDelivery API with rating and review
-            if (orderIdForApi) {
-              try {
-                // Call completeDelivery API with rating and review
-                const response = await deliveryAPI.completeDelivery(orderIdForApi, customerRating > 0 ? customerRating : null, customerReviewText.trim() || '');
-                if (response.data?.success) {
-                  // Get updated earnings from response
-                  // Note: completeDelivery API already adds earnings and COD cash collected to wallet
-                  const earnings = response.data.data?.earnings?.amount || response.data.data?.totalEarning || orderEarnings;
-                  setOrderEarnings(earnings);
-                  // Notify wallet listeners (Pocket balance, Pocket page) so cash collected updates
-                  window.dispatchEvent(new Event('deliveryWalletStateUpdated'));
+        // Save review by calling completeDelivery API with rating and review
+        if (orderIdForApi) {
+          try {
+            // Call completeDelivery API with rating and review
+            const response = await deliveryAPI.completeDelivery(orderIdForApi, customerRating > 0 ? customerRating : null, customerReviewText.trim() || '');
+            if (response.data?.success) {
+              // Get updated earnings from response
+              // Note: completeDelivery API already adds earnings and COD cash collected to wallet
+              const earnings = response.data.data?.earnings?.amount || response.data.data?.totalEarning || orderEarnings;
+              setOrderEarnings(earnings);
+              // Notify wallet listeners (Pocket balance, Pocket page) so cash collected updates
+              window.dispatchEvent(new Event('deliveryWalletStateUpdated'));
 
-                  // Show success message
-                  if (earnings > 0) {
-                    toast.success(`₹${earnings.toFixed(2)} added to your wallet! 💰`);
-                  }
-
-                  // Close review popup and show payment page
-                  setShowCustomerReviewPopup(false);
-                  setShowPaymentPage(true);
-                } else {
-                  console.error('❌ Failed to submit review:', response.data);
-                  toast.error(response.data?.message || 'Failed to submit review. Please try again.');
-                }
-              } catch (error) {
-                console.error('❌ Error submitting review:', error);
-                toast.error('Failed to submit review. Please try again.');
-                // Still show payment page even if review fails
-                setShowCustomerReviewPopup(false);
-                setShowPaymentPage(true);
+              // Show success message
+              if (earnings > 0) {
+                toast.success(`₹${earnings.toFixed(2)} added to your wallet! 💰`);
               }
-            } else {
-              // If no order ID, just show payment page
+
+              // Close review popup and show payment page
               setShowCustomerReviewPopup(false);
               setShowPaymentPage(true);
+            } else {
+              console.error('❌ Failed to submit review:', response.data);
+              toast.error(response.data?.message || 'Failed to submit review. Please try again.');
             }
-          }} className="w-full bg-green-600 text-white py-4 rounded-xl font-semibold text-lg hover:bg-green-700 transition-colors shadow-lg">
-              Submit Review
-            </button>
+          } catch (error) {
+            console.error('❌ Error submitting review:', error);
+            toast.error('Failed to submit review. Please try again.');
+            // Still show payment page even if review fails
+            setShowCustomerReviewPopup(false);
+            setShowPaymentPage(true);
+          }
+        } else {
+          // If no order ID, just show payment page
+          setShowCustomerReviewPopup(false);
+          setShowPaymentPage(true);
+        }
+      }} className="w-full bg-green-600 text-white py-4 rounded-xl font-semibold text-lg hover:bg-green-700 transition-colors shadow-lg">
+        Submit Review
+      </button>
+    </div>
+  </div>
+</BottomPopup>
+
+{/* Payment Page - shown after Customer Review is submitted */ }
+<AnimatePresence>
+  {showPaymentPage && <motion.div initial={{
+    opacity: 0
+  }} animate={{
+    opacity: 1
+  }} exit={{
+    opacity: 0
+  }} transition={{
+    duration: 0.3
+  }} className="fixed inset-0 z-[200] bg-white overflow-y-auto">
+    {/* Header */}
+    <div className="bg-green-500 text-white px-6 py-6">
+      <h1 className="text-2xl font-bold mb-2">Payment</h1>
+      <p className="text-white/90 text-sm">Order ID: {selectedRestaurant?.orderId || 'ORD1234567890'}</p>
+    </div>
+
+    {/* Payment Amount */}
+    <div className="px-6 py-8 text-center bg-gray-50">
+      <p className="text-gray-600 text-sm mb-2">Earnings from this order</p>
+      <p className="text-5xl font-bold text-gray-900">
+        ₹{(() => {
+          if (orderEarnings > 0) {
+            return orderEarnings.toFixed(2);
+          }
+          // Handle estimatedEarnings - can be number or object
+          const earnings = selectedRestaurant?.amount || selectedRestaurant?.estimatedEarnings || 0;
+          if (typeof earnings === 'object' && earnings.totalEarning) {
+            return earnings.totalEarning.toFixed(2);
+          }
+          return typeof earnings === 'number' ? earnings.toFixed(2) : '0.00';
+        })()}
+      </p>
+      <p className="text-green-600 text-sm mt-2">💰 Added to your wallet</p>
+    </div>
+
+    {/* Payment Details */}
+    <div className="px-6 py-6 pb-6 h-full flex flex-col justify-between">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-6">
+        <h3 className="text-lg font-bold text-gray-900 mb-4">Payment Details</h3>
+
+        <div className="space-y-3">
+          <div className="flex justify-between items-center py-2 border-b border-gray-100">
+            <span className="text-gray-600">Trip pay</span>
+            <span className="text-gray-900 font-semibold">₹{(() => {
+              let earnings = 0;
+              if (orderEarnings > 0) {
+                earnings = orderEarnings;
+              } else {
+                const estEarnings = selectedRestaurant?.amount || selectedRestaurant?.estimatedEarnings || 0;
+                if (typeof estEarnings === 'object' && estEarnings.totalEarning) {
+                  earnings = estEarnings.totalEarning;
+                } else if (typeof estEarnings === 'number') {
+                  earnings = estEarnings;
+                }
+              }
+              return (earnings - 5).toFixed(2);
+            })()}</span>
           </div>
-        </div>
-      </BottomPopup>
 
-      {/* Payment Page - shown after Customer Review is submitted */}
-      <AnimatePresence>
-        {showPaymentPage && <motion.div initial={{
-        opacity: 0
-      }} animate={{
-        opacity: 1
-      }} exit={{
-        opacity: 0
-      }} transition={{
-        duration: 0.3
-      }} className="fixed inset-0 z-[200] bg-white overflow-y-auto">
-            {/* Header */}
-            <div className="bg-green-500 text-white px-6 py-6">
-              <h1 className="text-2xl font-bold mb-2">Payment</h1>
-              <p className="text-white/90 text-sm">Order ID: {selectedRestaurant?.orderId || 'ORD1234567890'}</p>
-            </div>
+          <div className="flex justify-between items-center py-2 border-b border-gray-100">
+            <span className="text-gray-600">Long distance return pay</span>
+            <span className="text-gray-900 font-semibold">₹5.00</span>
+          </div>
 
-            {/* Payment Amount */}
-            <div className="px-6 py-8 text-center bg-gray-50">
-              <p className="text-gray-600 text-sm mb-2">Earnings from this order</p>
-              <p className="text-5xl font-bold text-gray-900">
-                ₹{(() => {
+          <div className="flex justify-between items-center py-2">
+            <span className="text-lg font-bold text-gray-900">Total Earnings</span>
+            <span className="text-lg font-bold text-gray-900">₹{(() => {
               if (orderEarnings > 0) {
                 return orderEarnings.toFixed(2);
               }
@@ -8643,96 +8953,51 @@ export default function DeliveryHome() {
                 return earnings.totalEarning.toFixed(2);
               }
               return typeof earnings === 'number' ? earnings.toFixed(2) : '0.00';
-            })()}
-              </p>
-              <p className="text-green-600 text-sm mt-2">💰 Added to your wallet</p>
-            </div>
-
-            {/* Payment Details */}
-            <div className="px-6 py-6 pb-6 h-full flex flex-col justify-between">
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-6">
-                <h3 className="text-lg font-bold text-gray-900 mb-4">Payment Details</h3>
-
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                    <span className="text-gray-600">Trip pay</span>
-                    <span className="text-gray-900 font-semibold">₹{(() => {
-                    let earnings = 0;
-                    if (orderEarnings > 0) {
-                      earnings = orderEarnings;
-                    } else {
-                      const estEarnings = selectedRestaurant?.amount || selectedRestaurant?.estimatedEarnings || 0;
-                      if (typeof estEarnings === 'object' && estEarnings.totalEarning) {
-                        earnings = estEarnings.totalEarning;
-                      } else if (typeof estEarnings === 'number') {
-                        earnings = estEarnings;
-                      }
-                    }
-                    return (earnings - 5).toFixed(2);
-                  })()}</span>
-                  </div>
-
-                  <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                    <span className="text-gray-600">Long distance return pay</span>
-                    <span className="text-gray-900 font-semibold">₹5.00</span>
-                  </div>
-
-                  <div className="flex justify-between items-center py-2">
-                    <span className="text-lg font-bold text-gray-900">Total Earnings</span>
-                    <span className="text-lg font-bold text-gray-900">₹{(() => {
-                    if (orderEarnings > 0) {
-                      return orderEarnings.toFixed(2);
-                    }
-                    // Handle estimatedEarnings - can be number or object
-                    const earnings = selectedRestaurant?.amount || selectedRestaurant?.estimatedEarnings || 0;
-                    if (typeof earnings === 'object' && earnings.totalEarning) {
-                      return earnings.totalEarning.toFixed(2);
-                    }
-                    return typeof earnings === 'number' ? earnings.toFixed(2) : '0.00';
-                  })()}</span>
-                  </div>
-                </div>
-              </div>
+            })()}</span>
+          </div>
+        </div>
+      </div>
 
 
-              {/* Complete Button */}
-              <button onClick={() => {
-            setShowPaymentPage(false);
-            // CRITICAL: Clear all order-related popups and states when completing
-            setShowreachedPickupPopup(false);
-            setShowOrderIdConfirmationPopup(false);
-            setShowReachedDropPopup(false);
-            setShowOrderDeliveredAnimation(false);
-            setShowCustomerReviewPopup(false);
+      {/* Complete Button */}
+      <button onClick={() => {
+        setShowPaymentPage(false);
+        // CRITICAL: Clear all order-related popups and states when completing
+        setShowreachedPickupPopup(false);
+        setShowOrderIdConfirmationPopup(false);
+        setShowReachedDropPopup(false);
+        setShowOrderDeliveredAnimation(false);
+        setShowCustomerReviewPopup(false);
 
-            // Clear selected restaurant/order to prevent showing popups for delivered order
-            setSelectedRestaurant(null);
+        // Clear selected restaurant/order to prevent showing popups for delivered order
+        setSelectedRestaurant(null);
 
-            // CRITICAL: Clear active order from localStorage to prevent it from showing again
-            localStorage.removeItem('deliveryActiveOrder');
-            localStorage.removeItem('activeOrder');
+        // CRITICAL: Clear active order from localStorage to prevent it from showing again
+        localStorage.removeItem('deliveryActiveOrder');
+        localStorage.removeItem('activeOrder');
 
-            // Clear newOrder from notifications hook (if available)
-            if (typeof clearNewOrder === 'function') {
-              clearNewOrder();
-            }
+        // Clear newOrder from notifications hook (if available)
+        if (typeof clearNewOrder === 'function') {
+          clearNewOrder();
+        }
 
-            // Clear accepted orders list when order is completed
-            acceptedOrderIdsRef.current.clear();
-            navigate("/delivery");
-            // Reset states
-            setTimeout(() => {
-              setReachedDropButtonProgress(0);
-              setReachedDropIsAnimatingToComplete(false);
-              setCustomerRating(0);
-              setCustomerReviewText("");
-            }, 500);
-          }} className="w-full sticky bottom-4 bg-black text-white py-4 rounded-xl font-semibold text-lg hover:bg-gray-800 transition-colors shadow-lg ">
-                Complete
-              </button>
-            </div>
-          </motion.div>}
-      </AnimatePresence>
+        // Clear accepted orders list when order is completed
+        acceptedOrderIdsRef.current.clear();
+        navigate("/delivery");
+        // Reset states
+        setTimeout(() => {
+          setReachedDropButtonProgress(0);
+          setReachedDropIsAnimatingToComplete(false);
+          setCustomerRating(0);
+          setCustomerReviewText("");
+        }, 500);
+      }} className="w-full sticky bottom-4 bg-black text-white py-4 rounded-xl font-semibold text-lg hover:bg-gray-800 transition-colors shadow-lg ">
+        Complete
+      </button>
+    </div>
+  </motion.div>}
+</AnimatePresence>
     </div>
   );
+
 }

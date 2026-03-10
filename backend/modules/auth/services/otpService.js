@@ -1,6 +1,7 @@
 import Otp from '../models/Otp.js';
 import smsIndiaHubService from './smsIndiaHubService.js';
 import emailService from './emailService.js';
+import { normalizePhoneNumber } from '../../../shared/utils/phoneUtils.js';
 import winston from 'winston';
 const logger = winston.createLogger({
   level: 'info',
@@ -73,6 +74,9 @@ class OTPService {
       const identifier = phone || email;
       const identifierType = phone ? 'phone' : 'email';
 
+      // Normalize phone if provided
+      const normalizedPhone = phone ? normalizePhoneNumber(phone) : null;
+
       // Check rate limiting (max 3 OTPs per identifier per hour) - using MongoDB
       if (process.env.NODE_ENV === 'production') {
         const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
@@ -98,7 +102,7 @@ class OTPService {
         purpose,
         verified: false
       };
-      if (phone) invalidateQuery.phone = phone;
+      if (normalizedPhone) invalidateQuery.phone = normalizedPhone;
       if (email) invalidateQuery.email = email;
 
       // Invalidate previous OTPs for this identifier and purpose
@@ -113,7 +117,7 @@ class OTPService {
         purpose,
         expiresAt
       };
-      if (phone) otpData.phone = phone;
+      if (normalizedPhone) otpData.phone = normalizedPhone;
       if (email) otpData.email = email;
       const otpRecord = await Otp.create(otpData);
 
@@ -123,7 +127,7 @@ class OTPService {
         if (!isTestPhoneNumber(phone)) {
           // Use SMSIndia Hub for phone OTP
           await smsIndiaHubService.sendOTP(phone, otp, purpose);
-        } else {}
+        } else { }
       } else if (email) {
         // Keep email service as is
         await emailService.sendOTP(email, otp, purpose);
@@ -136,6 +140,7 @@ class OTPService {
         identifierType
       };
     } catch (error) {
+      console.error(`[OTPService] Error generating OTP for ${phone || email}:`, error);
       logger.error(`Error generating OTP: ${error.message}`, {
         phone,
         email,
@@ -162,6 +167,9 @@ class OTPService {
       }
       const identifier = phone || email;
       const identifierType = phone ? 'phone' : 'email';
+
+      // Normalize phone if provided
+      const normalizedPhone = phone ? normalizePhoneNumber(phone) : null;
 
       // Check if this is a test phone number and OTP matches default test OTP
       if (phone && isTestPhoneNumber(phone) && otp === DEFAULT_TEST_OTP) {
@@ -223,7 +231,7 @@ class OTPService {
             $gt: new Date()
           }
         };
-        if (phone) query.phone = phone;
+        if (normalizedPhone) query.phone = normalizedPhone;
         if (email) query.email = email;
         otpRecord = await Otp.findOne(query);
       }
@@ -233,7 +241,7 @@ class OTPService {
           purpose,
           verified: false
         };
-        if (phone) incrementQuery.phone = phone;
+        if (normalizedPhone) incrementQuery.phone = normalizedPhone;
         if (email) incrementQuery.email = email;
         await Otp.updateMany(incrementQuery, {
           $inc: {
@@ -251,11 +259,13 @@ class OTPService {
       // Mark as verified
       otpRecord.verified = true;
       await otpRecord.save();
+      console.log(`[OTPService] OTP verified successfully for ${phone || email}`);
       return {
         success: true,
         message: 'OTP verified successfully'
       };
     } catch (error) {
+      console.error(`[OTPService] Error verifying OTP for ${phone || email}:`, error.message);
       logger.error(`Error verifying OTP: ${error.message}`, {
         phone,
         email,

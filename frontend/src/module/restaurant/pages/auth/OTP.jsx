@@ -82,7 +82,7 @@ export default function RestaurantOTP() {
     }
 
     // Auto-submit when all 6 digits are entered
-    if (newOtp.every(digit => digit !== "") && newOtp.length === 6) {
+    if (newOtp.every(digit => digit !== "") && newOtp.length === 6 && !isLoading) {
       handleVerify(newOtp.join(""));
     }
   };
@@ -138,20 +138,23 @@ export default function RestaurantOTP() {
     }
   };
   const handleVerify = async (otpValue = null) => {
+    if (isLoading) return;
     const code = otpValue || otp.join("");
     if (code.length !== 6) {
       setError("Please enter the complete 6-digit code");
       return;
     }
 
+    setIsLoading(true);
+    setError("");
+
     // For email-based signup, use a two-step UX:
-    // 1) First validate OTP format and show name input
-    // 2) Then, once name is provided, call the backend
-    // For email-based login, skip name input and go directly to verification
+    // ...
     if (contactType === "email" && authData?.isSignUp && !showNameInput) {
       // First step: show name input, don't hit backend yet (only for signups)
       setShowNameInput(true);
       setError("");
+      setIsLoading(false);
       return;
     }
 
@@ -159,12 +162,11 @@ export default function RestaurantOTP() {
     if (showNameInput) {
       if (!name.trim()) {
         setNameError("Please enter your name to continue");
+        setIsLoading(false);
         return;
       }
       setNameError("");
     }
-    setIsLoading(true);
-    setError("");
     try {
       if (!authData) {
         throw new Error("Session expired. Please try logging in again.");
@@ -299,91 +301,91 @@ export default function RestaurantOTP() {
     return null;
   }
   return <div className="max-h-screen h-screen bg-white flex flex-col">
-      {/* Header with Back Button and Title */}
-      <div className="relative flex items-center justify-center py-4 px-4">
-        <button onClick={() => navigate("/restaurant/login")} className="absolute left-4 top-1/2 -translate-y-1/2" aria-label="Go back">
-          <ArrowLeft className="h-5 w-5 text-black" />
-        </button>
-        <h2 className="text-lg font-bold text-black">Verify details</h2>
-      </div>
+    {/* Header with Back Button and Title */}
+    <div className="relative flex items-center justify-center py-4 px-4">
+      <button onClick={() => navigate("/restaurant/login")} className="absolute left-4 top-1/2 -translate-y-1/2" aria-label="Go back">
+        <ArrowLeft className="h-5 w-5 text-black" />
+      </button>
+      <h2 className="text-lg font-bold text-black">Verify details</h2>
+    </div>
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col px-6 overflow-y-auto">
-        <div className="w-full max-w-md mx-auto space-y-8 py-8">
-          {/* Instruction Text */}
-          <div className="text-center">
-            <p className="text-base text-gray-900 leading-relaxed">
-              Enter OTP sent on <span className="font-semibold">{contactInfo}</span>. Do not share OTP with anyone.
-            </p>
-          </div>
+    {/* Main Content */}
+    <div className="flex-1 flex flex-col px-6 overflow-y-auto">
+      <div className="w-full max-w-md mx-auto space-y-8 py-8">
+        {/* Instruction Text */}
+        <div className="text-center">
+          <p className="text-base text-gray-900 leading-relaxed">
+            Enter OTP sent on <span className="font-semibold">{contactInfo}</span>. Do not share OTP with anyone.
+          </p>
+        </div>
 
-          {/* OTP Input Fields - Horizontal Lines */}
-          <div className="flex justify-center gap-4">
-            {otp.map((digit, index) => {
+        {/* OTP Input Fields - Horizontal Lines */}
+        <div className="flex justify-center gap-4">
+          {otp.map((digit, index) => {
             const hasValue = digit !== "";
             const isFocused = focusedIndex === index;
             return <div key={index} className="relative flex flex-col items-center min-w-[48px] py-2" style={{
               minHeight: '60px'
             }}>
-                  {/* Clickable Input Area - Large clickable zone */}
-                  <input ref={el => inputRefs.current[index] = el} type="text" inputMode="numeric" maxLength={1} value={digit || ""} onChange={e => handleChange(index, e.target.value)} onKeyDown={e => handleKeyDown(index, e)} onPaste={index === 0 ? handlePaste : undefined} onFocus={() => setFocusedIndex(index)} onBlur={() => setFocusedIndex(null)} disabled={isLoading} className="absolute inset-0 w-full h-full opacity-0 cursor-text z-20" style={{
+              {/* Clickable Input Area - Large clickable zone */}
+              <input ref={el => inputRefs.current[index] = el} type="text" inputMode="numeric" maxLength={1} value={digit || ""} onChange={e => handleChange(index, e.target.value)} onKeyDown={e => handleKeyDown(index, e)} onPaste={index === 0 ? handlePaste : undefined} onFocus={() => setFocusedIndex(index)} onBlur={() => setFocusedIndex(null)} disabled={isLoading} className="absolute inset-0 w-full h-full opacity-0 cursor-text z-20" style={{
                 minHeight: '60px'
               }} aria-label={`OTP digit ${index + 1}`} />
-                  {/* Digit Display Above Line */}
-                  {hasValue && <div className="absolute top-0 text-2xl font-semibold text-gray-900 pointer-events-none z-10">
-                      {digit}
-                    </div>}
-                  {/* Visual Line Indicator */}
-                  <div className="w-12 relative mt-8">
-                    {hasValue ? <div className="absolute inset-0 bg-blue-600 h-0.5" /> : isFocused ? <div className="absolute inset-0 bg-blue-600 h-0.5" /> : <div className="absolute inset-0 h-0.5 border-b border-dashed border-gray-400" />}
-                  </div>
-                </div>;
+              {/* Digit Display Above Line */}
+              {hasValue && <div className="absolute top-0 text-2xl font-semibold text-gray-900 pointer-events-none z-10">
+                {digit}
+              </div>}
+              {/* Visual Line Indicator */}
+              <div className="w-12 relative mt-8">
+                {hasValue ? <div className="absolute inset-0 bg-blue-600 h-0.5" /> : isFocused ? <div className="absolute inset-0 bg-blue-600 h-0.5" /> : <div className="absolute inset-0 h-0.5 border-b border-dashed border-gray-400" />}
+              </div>
+            </div>;
           })}
-          </div>
+        </div>
 
-          {/* Name input:
+        {/* Name input:
               - Email-based signup (existing behavior)
               - Phone-based login when backend returns needsName=true (auto-registration)
            */}
-          {showNameInput && <div className="mt-6 max-w-sm mx-auto text-left">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                {authData?.method === "phone" ? "Restaurant name" : "Your name"}
-              </label>
-              <input type="text" value={name || ""} onChange={e => {
+        {showNameInput && <div className="mt-6 max-w-sm mx-auto text-left">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            {authData?.method === "phone" ? "Restaurant name" : "Your name"}
+          </label>
+          <input type="text" value={name || ""} onChange={e => {
             setName(e.target.value);
             if (nameError) setNameError("");
           }} placeholder="Enter your full name" className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 ${nameError ? "border-red-500 focus:ring-red-500" : "border-gray-300 focus:ring-blue-500"}`} disabled={isLoading} />
-              <p className="mt-1 text-xs text-gray-500">
-                If you&apos;re new, we&apos;ll use this to create your restaurant account.
-              </p>
-              {nameError && <p className="mt-1 text-xs text-red-600">
-                  {nameError}
-                </p>}
-            </div>}
+          <p className="mt-1 text-xs text-gray-500">
+            If you&apos;re new, we&apos;ll use this to create your restaurant account.
+          </p>
+          {nameError && <p className="mt-1 text-xs text-red-600">
+            {nameError}
+          </p>}
+        </div>}
 
-          {/* Error Message */}
-          {error && <div className="text-center">
-              <p className="text-sm text-red-600">{error}</p>
-            </div>}
+        {/* Error Message */}
+        {error && <div className="text-center">
+          <p className="text-sm text-red-600">{error}</p>
+        </div>}
 
-          {/* Resend OTP Timer */}
-          <div className="text-center">
-            {resendTimer > 0 ? <p className="text-sm text-gray-900">
-                Resend OTP in <span className="font-semibold">{resendTimer} secs</span>
-              </p> : <button type="button" onClick={handleResend} disabled={isLoading} className="text-sm text-blue-600 hover:underline font-medium disabled:opacity-50">
-                Resend OTP
-              </button>}
-          </div>
+        {/* Resend OTP Timer */}
+        <div className="text-center">
+          {resendTimer > 0 ? <p className="text-sm text-gray-900">
+            Resend OTP in <span className="font-semibold">{resendTimer} secs</span>
+          </p> : <button type="button" onClick={handleResend} disabled={isLoading} className="text-sm text-blue-600 hover:underline font-medium disabled:opacity-50">
+            Resend OTP
+          </button>}
         </div>
       </div>
+    </div>
 
-      {/* Bottom Section - Continue Button */}
-      <div className="px-6 pb-8 pt-4">
-        <div className="w-full max-w-md mx-auto">
-          <Button onClick={() => handleVerify()} disabled={isLoading || !isOtpComplete} className={`w-full h-12 rounded-lg font-bold text-base transition-colors ${!isLoading && isOtpComplete ? "bg-blue-600 hover:bg-blue-700 text-white" : "bg-gray-300 text-gray-500 cursor-not-allowed"}`}>
-            {isLoading ? "Verifying..." : "Continue"}
-          </Button>
-        </div>
+    {/* Bottom Section - Continue Button */}
+    <div className="px-6 pb-8 pt-4">
+      <div className="w-full max-w-md mx-auto">
+        <Button onClick={() => handleVerify()} disabled={isLoading || !isOtpComplete} className={`w-full h-12 rounded-lg font-bold text-base transition-colors ${!isLoading && isOtpComplete ? "bg-blue-600 hover:bg-blue-700 text-white" : "bg-gray-300 text-gray-500 cursor-not-allowed"}`}>
+          {isLoading ? "Verifying..." : "Continue"}
+        </Button>
       </div>
-    </div>;
+    </div>
+  </div>;
 }

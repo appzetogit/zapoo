@@ -229,27 +229,58 @@ export default function ItemDetailsPage() {
     fetchItemData();
   }, [id, isNewItem, location.state, defaultCategory]);
 
-  // Fetch categories from restaurant-specific API
+  // Fetch categories from both the dedicated API and existing menu sections
   useEffect(() => {
     const fetchCategories = async () => {
       try {
         setLoadingCategories(true);
-        const response = await restaurantAPI.getCategories();
-        if (response.data.success && response.data.data.categories) {
-          // Format categories for the UI - flat list, no subcategories
-          const formattedCategories = response.data.data.categories.map(cat => ({
-            id: cat._id || cat.id,
-            name: cat.name
+        // Fetch from both sources to ensure we have everything
+        const [catResponse, menuResponse] = await Promise.all([restaurantAPI.getCategories().catch(() => ({
+          data: {
+            success: false
+          }
+        })), restaurantAPI.getMenu().catch(() => ({
+          data: {
+            success: false
+          }
+        }))]);
+        let allCategories = [];
+
+        // 1. Get from existing menu sections (most reliable for what user sees)
+        if (menuResponse.data?.success && menuResponse.data.data?.menu?.sections) {
+          const sectionCategories = menuResponse.data.data.menu.sections.map(sec => ({
+            id: sec.id || sec._id,
+            name: sec.name
           }));
-          setCategories(formattedCategories);
-        } else {
-          // If no categories exist, show empty array (user can add categories)
-          setCategories([]);
+          allCategories = [...sectionCategories];
         }
+
+        // 2. Add from categories API if not already present
+        if (catResponse.data?.success && catResponse.data.data?.categories) {
+          catResponse.data.data.categories.forEach(cat => {
+            if (!allCategories.find(existing => existing.name === cat.name)) {
+              allCategories.push({
+                id: cat._id || cat.id,
+                name: cat.name
+              });
+            }
+          });
+        }
+
+        // 3. Ensure Varieties is there if nothing else (default)
+        if (allCategories.length === 0) {
+          allCategories.push({
+            id: "default",
+            name: "Varieties"
+          });
+        }
+        setCategories(allCategories);
       } catch (error) {
-        console.error('Error fetching restaurant categories:', error);
-        // Show empty array on error - user can add categories
-        setCategories([]);
+        console.error('Error fetching categories:', error);
+        setCategories([{
+          id: "default",
+          name: "Varieties"
+        }]);
       } finally {
         setLoadingCategories(false);
       }
@@ -576,10 +607,10 @@ export default function ItemDetailsPage() {
         photoCount: allImageUrls.length || 1,
         // Additional fields for complete item details
         subCategory: subCategory || "",
-        servesInfo: "",
-        itemSize: "",
-        itemSizeQuantity: "",
-        itemSizeUnit: "piece",
+        servesInfo: servesInfo || "",
+        itemSize: `${itemSizeQuantity} ${itemSizeUnit}`.trim(),
+        itemSizeQuantity: itemSizeQuantity || "",
+        itemSizeUnit: itemSizeUnit || "piece",
         gst: parseFloat(gst) || 0
       };
 
@@ -607,7 +638,7 @@ export default function ItemDetailsPage() {
       const itemSection = sections.find(s => s.items?.some(item => item.id === itemId));
       if (itemSection) {
         const itemInSection = itemSection.items.find(item => item.id === itemId);
-        if (itemInSection) {}
+        if (itemInSection) { }
       }
       const updateResponse = await restaurantAPI.updateMenu({
         sections
@@ -731,7 +762,7 @@ export default function ItemDetailsPage() {
     }
   };
   return <div className="h-screen bg-white flex flex-col overflow-hidden">
-      <style>{`
+    <style>{`
         [data-slot="switch"][data-state="checked"] {
           background-color: #16a34a !important;
         }
@@ -739,26 +770,26 @@ export default function ItemDetailsPage() {
           background-color: #ffffff !important;
         }
       `}</style>
-      {/* Header */}
-      <div className="sticky top-0 z-40 bg-white border-b border-gray-200 flex-shrink-0">
-        <div className="px-4 py-3 flex items-center gap-3">
-          <button onClick={() => navigate(-1)} className="p-1 rounded-full hover:bg-gray-100">
-            <ArrowLeft className="w-5 h-5 text-gray-700" />
-          </button>
-          <h1 className="text-xl font-bold text-gray-900">Item details</h1>
-        </div>
+    {/* Header */}
+    <div className="sticky top-0 z-40 bg-white border-b border-gray-200 flex-shrink-0">
+      <div className="px-4 py-3 flex items-center gap-3">
+        <button onClick={() => navigate(-1)} className="p-1 rounded-full hover:bg-gray-100">
+          <ArrowLeft className="w-5 h-5 text-gray-700" />
+        </button>
+        <h1 className="text-xl font-bold text-gray-900">Item details</h1>
       </div>
+    </div>
 
 
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto pb-24">
-        {/* Image Carousel */}
-        <div className="relative bg-white">
-          {images.length > 0 ? <div className="relative w-full h-80 overflow-hidden bg-gray-100">
-              {/* Image container with swipe support */}
-              <div ref={carouselRef} onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd} className="relative w-full h-full">
-                <AnimatePresence mode="wait" custom={direction}>
-                  <motion.div key={currentImageIndex} custom={direction} initial={{
+    {/* Content */}
+    <div className="flex-1 overflow-y-auto pb-24">
+      {/* Image Carousel */}
+      <div className="relative bg-white">
+        {images.length > 0 ? <div className="relative w-full h-80 overflow-hidden bg-gray-100">
+          {/* Image container with swipe support */}
+          <div ref={carouselRef} onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd} className="relative w-full h-full">
+            <AnimatePresence mode="wait" custom={direction}>
+              <motion.div key={currentImageIndex} custom={direction} initial={{
                 opacity: 0,
                 x: direction > 0 ? 300 : -300
               }} animate={{
@@ -771,142 +802,147 @@ export default function ItemDetailsPage() {
                 duration: 0.3,
                 ease: "easeInOut"
               }} className="absolute inset-0">
-                    {images[currentImageIndex] ? <img src={images[currentImageIndex]} alt={`${itemName} - Image ${currentImageIndex + 1}`} className="w-full h-full object-cover" /> : null}
-                  </motion.div>
-                </AnimatePresence>
+                {images[currentImageIndex] ? <img src={images[currentImageIndex]} alt={`${itemName} - Image ${currentImageIndex + 1}`} className="w-full h-full object-cover" /> : null}
+              </motion.div>
+            </AnimatePresence>
 
-                {/* Navigation arrows */}
-                {images.length > 1 && <>
-                    <button onClick={goToPrevious} className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center shadow-lg hover:bg-white transition-all z-10">
-                      <ChevronLeft className="w-5 h-5 text-gray-900" />
-                    </button>
-                    <button onClick={goToNext} className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center shadow-lg hover:bg-white transition-all z-10">
-                      <ChevronRight className="w-5 h-5 text-gray-900" />
-                    </button>
-                  </>}
+            {/* Navigation arrows */}
+            {images.length > 1 && <>
+              <button onClick={goToPrevious} className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center shadow-lg hover:bg-white transition-all z-10">
+                <ChevronLeft className="w-5 h-5 text-gray-900" />
+              </button>
+              <button onClick={goToNext} className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center shadow-lg hover:bg-white transition-all z-10">
+                <ChevronRight className="w-5 h-5 text-gray-900" />
+              </button>
+            </>}
 
-                {/* Delete image button */}
-                <button onClick={() => handleImageDelete(currentImageIndex)} className="absolute top-4 right-4 w-10 h-10 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center shadow-lg hover:bg-white transition-all z-10">
-                  <Trash2 className="w-5 h-5 text-gray-900" />
-                </button>
+            {/* Delete image button */}
+            <button onClick={() => handleImageDelete(currentImageIndex)} className="absolute top-4 right-4 w-10 h-10 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center shadow-lg hover:bg-white transition-all z-10">
+              <Trash2 className="w-5 h-5 text-gray-900" />
+            </button>
 
-                {/* Image counter */}
-                {images.length > 1 && <div className="absolute top-4 left-4 bg-black/60 backdrop-blur-sm px-3 py-1.5 rounded-full z-10">
-                    <span className="text-white text-xs font-medium">
-                      {currentImageIndex + 1} / {images.length}
-                    </span>
-                  </div>}
-              </div>
+            {/* Image counter */}
+            {images.length > 1 && <div className="absolute top-4 left-4 bg-black/60 backdrop-blur-sm px-3 py-1.5 rounded-full z-10">
+              <span className="text-white text-xs font-medium">
+                {currentImageIndex + 1} / {images.length}
+              </span>
+            </div>}
+          </div>
 
-              {/* Carousel dots */}
-              {images.length > 1 && <div className="flex items-center justify-center gap-2 py-4 bg-white">
-                  {images.map((_, index) => <button key={index} onClick={() => {
+          {/* Carousel dots */}
+          {images.length > 1 && <div className="flex items-center justify-center gap-2 py-4 bg-white">
+            {images.map((_, index) => <button key={index} onClick={() => {
               setDirection(index > currentImageIndex ? 1 : -1);
               setCurrentImageIndex(index);
             }} className={`transition-all duration-300 rounded-full ${index === currentImageIndex ? "w-8 h-2 bg-gray-900" : "w-2 h-2 bg-gray-300 hover:bg-gray-400"}`} />)}
-                </div>}
-            </div> : <div className="relative w-full h-80 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
-              <div className="text-center">
-                <div className="w-20 h-20 bg-white/80 rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg">
-                  <Camera className="w-10 h-10 text-gray-400" />
-                </div>
-                <p className="text-sm font-medium text-gray-600">No images added yet</p>
-                <p className="text-xs text-gray-500 mt-1">Tap the button below to add multiple images</p>
-              </div>
-            </div>}
+          </div>}
+        </div> : <div className="relative w-full h-80 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-20 h-20 bg-white/80 rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg">
+              <Camera className="w-10 h-10 text-gray-400" />
+            </div>
+            <p className="text-sm font-medium text-gray-600">No images added yet</p>
+            <p className="text-xs text-gray-500 mt-1">Tap the button below to add multiple images</p>
+          </div>
+        </div>}
 
-          {/* Add image button - redesigned */}
-          <div className="px-4 py-4 bg-white border-t border-gray-100">
-            <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handleImageAdd} className="hidden" id="image-upload" />
-            <label htmlFor="image-upload" className="flex items-center justify-center gap-2.5 px-6 py-3.5 bg-gradient-to-r from-gray-900 to-gray-800 text-white rounded-xl text-sm font-semibold cursor-pointer hover:from-gray-800 hover:to-gray-700 transition-all shadow-md hover:shadow-lg active:scale-95">
-              <div className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center">
-                <Plus className="w-4 h-4" />
-              </div>
-              <span>Add Images</span>
-            </label>
+        {/* Add image button - redesigned */}
+        <div className="px-4 py-4 bg-white border-t border-gray-100">
+          <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handleImageAdd} className="hidden" id="image-upload" />
+          <label htmlFor="image-upload" className="flex items-center justify-center gap-2.5 px-6 py-3.5 bg-gradient-to-r from-gray-900 to-gray-800 text-white rounded-xl text-sm font-semibold cursor-pointer hover:from-gray-800 hover:to-gray-700 transition-all shadow-md hover:shadow-lg active:scale-95">
+            <div className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center">
+              <Plus className="w-4 h-4" />
+            </div>
+            <span>Add Images</span>
+          </label>
+        </div>
+      </div>
+
+      {/* Form Fields */}
+      <div className="p-4 space-y-3">
+        {/* Category Selector */}
+        <div>
+          <label className="block text-sm font-medium text-gray-900 mb-2">
+            Category
+          </label>
+          <button onClick={() => setIsCategoryPopupOpen(true)} className="w-full px-4 py-3 border border-gray-300 rounded-lg text-left flex items-center justify-between bg-white hover:bg-gray-50 transition-all active:scale-[0.99]">
+            <div className="flex flex-col">
+              <span className="text-sm font-semibold text-gray-900">
+                {category}
+              </span>
+              {subCategory && subCategory !== category && <span className="text-[10px] text-gray-500 uppercase tracking-wider font-bold">
+                {subCategory}
+              </span>}
+            </div>
+            <ChevronDown className="w-5 h-5 text-gray-400" />
+          </button>
+        </div>
+
+        {/* Item Name */}
+        <div>
+          <label className="block text-sm font-medium text-gray-900 mb-2">
+            Item name
+          </label>
+          <div className="relative">
+            <input type="text" value={itemName} onChange={e => setItemName(e.target.value)} maxLength={maxNameLength} className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Enter item name" />
+            <button className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-gray-100">
+              <EditIcon className="w-4 h-4 text-gray-500" />
+            </button>
+          </div>
+          <div className="text-right mt-1">
+            <span className="text-xs text-gray-500">
+              {nameLength} / {maxNameLength}
+            </span>
           </div>
         </div>
 
-        {/* Form Fields */}
-        <div className="p-4 space-y-3">
-          {/* Category Selector */}
-          <div>
-            <label className="block text-sm font-medium text-gray-900 mb-2">
-              Category
-            </label>
-            <button onClick={() => setIsCategoryPopupOpen(true)} className="w-full px-4 py-3 border border-gray-300 rounded-lg text-left flex items-center justify-between bg-white hover:bg-gray-50 transition-colors">
-              <span className="text-sm text-gray-900">
-                {category} ({subCategory})
-              </span>
-              <ChevronDown className="w-5 h-5 text-gray-500" />
+
+        {/* Item Description */}
+        <div>
+          <label className="block text-sm font-medium text-gray-900 mb-2">
+            Item description
+          </label>
+          <div className="relative">
+            <textarea value={itemDescription} onChange={e => setItemDescription(e.target.value)} maxLength={maxDescriptionLength} rows={4} placeholder="Eg: Yummy veg paneer burger with a soft patty, veggies, cheese, and special sauce" className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none" />
+            <button className="absolute right-3 top-3 p-1 rounded-full hover:bg-gray-100">
+              <EditIcon className="w-4 h-4 text-gray-500" />
             </button>
           </div>
-
-          {/* Item Name */}
-          <div>
-            <label className="block text-sm font-medium text-gray-900 mb-2">
-              Item name
-            </label>
-            <div className="relative">
-              <input type="text" value={itemName} onChange={e => setItemName(e.target.value)} maxLength={maxNameLength} className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Enter item name" />
-              <button className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-gray-100">
-                <EditIcon className="w-4 h-4 text-gray-500" />
-              </button>
-            </div>
-            <div className="text-right mt-1">
-              <span className="text-xs text-gray-500">
-                {nameLength} / {maxNameLength}
-              </span>
-            </div>
+          <div className="flex items-center justify-between mt-1">
+            <span className={`text-xs ${descriptionLength < minDescriptionLength ? "text-red-500" : "text-gray-500"}`}>
+              {descriptionLength < minDescriptionLength ? "Min 5 characters required" : ""}
+            </span>
+            <span className="text-xs text-gray-500">
+              {descriptionLength} / {maxDescriptionLength}
+            </span>
           </div>
-
-
-          {/* Item Description */}
-          <div>
-            <label className="block text-sm font-medium text-gray-900 mb-2">
-              Item description
-            </label>
-            <div className="relative">
-              <textarea value={itemDescription} onChange={e => setItemDescription(e.target.value)} maxLength={maxDescriptionLength} rows={4} placeholder="Eg: Yummy veg paneer burger with a soft patty, veggies, cheese, and special sauce" className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none" />
-              <button className="absolute right-3 top-3 p-1 rounded-full hover:bg-gray-100">
-                <EditIcon className="w-4 h-4 text-gray-500" />
-              </button>
-            </div>
-            <div className="flex items-center justify-between mt-1">
-              <span className={`text-xs ${descriptionLength < minDescriptionLength ? "text-red-500" : "text-gray-500"}`}>
-                {descriptionLength < minDescriptionLength ? "Min 5 characters required" : ""}
-              </span>
-              <span className="text-xs text-gray-500">
-                {descriptionLength} / {maxDescriptionLength}
-              </span>
-            </div>
-            {/* Dietary Options */}
-            <div className="flex gap-2 mt-3">
-              <button onClick={() => setFoodType("Veg")} className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${foodType === "Veg" ? "border-green-600 border-2 text-green-600" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}>
-                {foodType === "Veg" && <Check className="w-4 h-4" />}
-                <span>Veg</span>
-              </button>
-              <button onClick={() => setFoodType("Non-Veg")} className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${foodType === "Non-Veg" ? "border-red-600 border-2 text-red-600" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}>
-                {foodType === "Non-Veg" && <Check className="w-4 h-4" />}
-                <span>Non-Veg</span>
-              </button>
-              <button onClick={() => setFoodType("Egg")} className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${foodType === "Egg" ? "border-yellow-600 border-2 text-yellow-600" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}>
-                {foodType === "Egg" && <Check className="w-4 h-4" />}
-                <span>Egg</span>
-              </button>
-            </div>
+          {/* Dietary Options */}
+          <div className="flex gap-2 mt-3">
+            <button onClick={() => setFoodType("Veg")} className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${foodType === "Veg" ? "border-green-600 border-2 text-green-600" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}>
+              {foodType === "Veg" && <Check className="w-4 h-4" />}
+              <span>Veg</span>
+            </button>
+            <button onClick={() => setFoodType("Non-Veg")} className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${foodType === "Non-Veg" ? "border-red-600 border-2 text-red-600" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}>
+              {foodType === "Non-Veg" && <Check className="w-4 h-4" />}
+              <span>Non-Veg</span>
+            </button>
+            <button onClick={() => setFoodType("Egg")} className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${foodType === "Egg" ? "border-yellow-600 border-2 text-yellow-600" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}>
+              {foodType === "Egg" && <Check className="w-4 h-4" />}
+              <span>Egg</span>
+            </button>
           </div>
+        </div>
 
-          {/* Item Price */}
-          <div>
-            <label className="block text-sm font-medium text-gray-900 mb-2">
-              Item price
-            </label>
-            <div className="space-y-3">
+        {/* Item Price */}
+        <div>
+          <label className="block text-sm font-medium text-gray-900 mb-2">
+            Item price
+          </label>
+          <div className="space-y-3">
+            <div className="relative">
+              <label className="block text-xs text-gray-600 mb-1">Base price</label>
               <div className="relative">
-                <label className="block text-xs text-gray-600 mb-1">Base price</label>
-                <div className="relative">
-                  <input type="text" value={basePrice} onChange={e => {
+                <input type="text" value={basePrice} onChange={e => {
                   // Remove rupee symbol and any non-numeric characters except decimal point
                   const value = e.target.value.replace(/[₹\s,]/g, '').replace(/[^0-9.]/g, '');
                   // Allow only one decimal point
@@ -919,28 +955,28 @@ export default function ItemDetailsPage() {
                     e.target.value = e.target.value.replace(/₹\s*/g, '');
                   }
                 }} placeholder="Enter price" className="w-full pl-8 pr-12 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-600">₹</span>
-                  <button className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-gray-100">
-                    <EditIcon className="w-4 h-4 text-gray-500" />
-                  </button>
-                </div>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-600">₹</span>
+                <button className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-gray-100">
+                  <EditIcon className="w-4 h-4 text-gray-500" />
+                </button>
               </div>
+            </div>
 
-              {/* Preparation Time */}
+            {/* Preparation Time */}
+            <div className="relative">
+              <label className="block text-xs text-gray-600 mb-1">Preparation Time</label>
               <div className="relative">
-                <label className="block text-xs text-gray-600 mb-1">Preparation Time</label>
-                <div className="relative">
-                  <select value={preparationTime} onChange={e => setPreparationTime(e.target.value)} className="w-full pl-4 pr-10 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none">
-                    <option value="">Select timing</option>
-                    <option value="10-20 mins">10-20 mins</option>
-                    <option value="20-25 mins">20-25 mins</option>
-                    <option value="25-35 mins">25-35 mins</option>
-                    <option value="35-45 mins">35-45 mins</option>
-                  </select>
-                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 pointer-events-none" />
-                </div>
+                <select value={preparationTime} onChange={e => setPreparationTime(e.target.value)} className="w-full pl-4 pr-10 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none">
+                  <option value="">Select timing</option>
+                  <option value="10-20 mins">10-20 mins</option>
+                  <option value="20-25 mins">20-25 mins</option>
+                  <option value="25-35 mins">25-35 mins</option>
+                  <option value="35-45 mins">35-45 mins</option>
+                </select>
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 pointer-events-none" />
               </div>
-              {/* <div>
+            </div>
+            {/* <div>
                 <label className="block text-xs text-gray-600 mb-1">GST</label>
                 <button
                   onClick={() => setIsGstPopupOpen(true)}
@@ -950,51 +986,51 @@ export default function ItemDetailsPage() {
                   <ChevronDown className="w-5 h-5 text-gray-500" />
                 </button>
                </div> */}
-            </div>
-
           </div>
-
-          {/* In Stock */}
-          <div className="flex items-center justify-between py-3 border-t border-gray-200">
-            <span className="text-sm font-medium text-gray-900">Item Availability</span>
-            <div className="flex items-center gap-2">
-              <Switch checked={isInStock} onCheckedChange={setIsInStock} className="data-[state=unchecked]:bg-gray-300" />
-              <span className="text-sm text-gray-700">In stock</span>
-            </div>
-          </div>
-
-          {/* Special Item Request */}
-          <div className="py-4 border-t border-gray-200">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <h3 className="text-sm font-bold text-gray-900">Special Item Status</h3>
-                {recommendationStatus !== 'none' && <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${recommendationStatus === 'approved' ? 'bg-green-100 text-green-700' : recommendationStatus === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}`}>
-                    {recommendationStatus}
-                  </span>}
-              </div>
-              <Switch checked={isRecommendationRequest} onCheckedChange={setIsRecommendationRequest} disabled={recommendationStatus === 'approved'} className="data-[state=unchecked]:bg-gray-300" />
-            </div>
-            <p className="text-xs text-gray-500">
-              Request to mark this as a "Special Item" to boost its visibility on the menu.
-              {recommendationStatus === 'approved' ? ' This item is currently a Special Item.' : ' This request requires admin approval.'}
-            </p>
-          </div>
-
 
         </div>
-      </div>
 
-      {/* Category Selection Popup */}
-      <AnimatePresence>
-        {isCategoryPopupOpen && <>
-            <motion.div initial={{
+        {/* In Stock */}
+        <div className="flex items-center justify-between py-3 border-t border-gray-200">
+          <span className="text-sm font-medium text-gray-900">Item Availability</span>
+          <div className="flex items-center gap-2">
+            <Switch checked={isInStock} onCheckedChange={setIsInStock} className="data-[state=unchecked]:bg-gray-300" />
+            <span className="text-sm text-gray-700">In stock</span>
+          </div>
+        </div>
+
+        {/* Special Item Request */}
+        <div className="py-4 border-t border-gray-200">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-bold text-gray-900">Special Item Status</h3>
+              {recommendationStatus !== 'none' && <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${recommendationStatus === 'approved' ? 'bg-green-100 text-green-700' : recommendationStatus === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}`}>
+                {recommendationStatus}
+              </span>}
+            </div>
+            <Switch checked={isRecommendationRequest} onCheckedChange={setIsRecommendationRequest} disabled={recommendationStatus === 'approved'} className="data-[state=unchecked]:bg-gray-300" />
+          </div>
+          <p className="text-xs text-gray-500">
+            Request to mark this as a "Special Item" to boost its visibility on the menu.
+            {recommendationStatus === 'approved' ? ' This item is currently a Special Item.' : ' This request requires admin approval.'}
+          </p>
+        </div>
+
+
+      </div>
+    </div>
+
+    {/* Category Selection Popup */}
+    <AnimatePresence>
+      {isCategoryPopupOpen && <>
+        <motion.div initial={{
           opacity: 0
         }} animate={{
           opacity: 1
         }} exit={{
           opacity: 0
         }} onClick={() => setIsCategoryPopupOpen(false)} className="fixed inset-0 bg-black/50 z-50" />
-            <motion.div initial={{
+        <motion.div initial={{
           y: "100%"
         }} animate={{
           y: 0
@@ -1005,46 +1041,46 @@ export default function ItemDetailsPage() {
           damping: 30,
           stiffness: 300
         }} className="fixed bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-2xl z-50 max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
-              <div className="flex items-center justify-between px-4 py-4 border-b border-gray-200">
-                <h2 className="text-lg font-bold text-gray-900">Select category</h2>
-                <div className="flex items-center gap-2">
-                  <button onClick={() => {
+          <div className="flex items-center justify-between px-4 py-4 border-b border-gray-200">
+            <h2 className="text-lg font-bold text-gray-900">Select category</h2>
+            <div className="flex items-center gap-2">
+              <button onClick={() => {
                 setIsCategoryPopupOpen(false);
                 navigate('/restaurant/menu-categories');
               }} className="p-2 rounded-lg bg-black text-white hover:bg-gray-800 transition-colors flex items-center gap-1.5" title="Add Category">
-                    <Plus className="w-4 h-4" />
-                    <span className="text-sm font-medium">Add</span>
-                  </button>
-                  <button onClick={() => setIsCategoryPopupOpen(false)} className="p-1 rounded-full hover:bg-gray-100">
-                    <X className="w-5 h-5 text-gray-600" />
-                  </button>
-                </div>
-              </div>
-              <div className="flex-1 overflow-y-auto p-2">
-                {loadingCategories ? <div className="flex items-center justify-center py-12">
-                    <Loader2 className="w-6 h-6 animate-spin text-gray-600" />
-                  </div> : categories.length === 0 ? <div className="text-center py-12 space-y-4">
-                    <p className="text-sm text-gray-500">No categories available</p>
-                    <button onClick={() => {
+                <Plus className="w-4 h-4" />
+                <span className="text-sm font-medium">Add</span>
+              </button>
+              <button onClick={() => setIsCategoryPopupOpen(false)} className="p-1 rounded-full hover:bg-gray-100">
+                <X className="w-5 h-5 text-gray-600" />
+              </button>
+            </div>
+          </div>
+          <div className="flex-1 overflow-y-auto p-2">
+            {loadingCategories ? <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-6 h-6 animate-spin text-gray-600" />
+            </div> : categories.length === 0 ? <div className="text-center py-12 space-y-4">
+              <p className="text-sm text-gray-500">No categories available</p>
+              <button onClick={() => {
                 setIsCategoryPopupOpen(false);
                 navigate('/restaurant/menu-categories');
               }} className="inline-flex items-center gap-2 px-4 py-2 bg-black text-white rounded-lg font-semibold hover:bg-gray-800 transition-colors">
-                      <Plus className="w-5 h-5" />
-                      Add Category
-                    </button>
-                  </div> : <div className="space-y-2">
-                    {categories.map(cat => <button key={cat.id} onClick={() => handleCategorySelect(cat.id, cat.name)} className={`w-full text-left px-4 py-3 rounded-lg text-sm font-medium transition-colors ${category === cat.name ? "bg-gray-900 text-white" : "bg-gray-50 text-gray-900 hover:bg-gray-100"}`}>
-                        {cat.name}
-                      </button>)}
-                  </div>}
-              </div>
-            </motion.div>
-          </>}
-      </AnimatePresence>
+                <Plus className="w-5 h-5" />
+                Add Category
+              </button>
+            </div> : <div className="space-y-2">
+              {categories.map(cat => <button key={cat.id} onClick={() => handleCategorySelect(cat.id, cat.name)} className={`w-full text-left px-4 py-3 rounded-lg text-sm font-medium transition-colors ${category === cat.name ? "bg-gray-900 text-white" : "bg-gray-50 text-gray-900 hover:bg-gray-100"}`}>
+                {cat.name}
+              </button>)}
+            </div>}
+          </div>
+        </motion.div>
+      </>}
+    </AnimatePresence>
 
 
-      {/* GST Popup */}
-      {/* <AnimatePresence>
+    {/* GST Popup */}
+    {/* <AnimatePresence>
         {isGstPopupOpen && (
           <>
             <motion.div
@@ -1094,19 +1130,19 @@ export default function ItemDetailsPage() {
        </AnimatePresence> */}
 
 
-      {/* Bottom Sticky Buttons */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200  z-40">
-        <div className={`flex gap-3 px-4 py-4 ${isNewItem ? 'justify-end' : ''}`}>
-          {!isNewItem && <button onClick={handleDelete} disabled={isDeleting || uploadingImages} className="flex-1 py-3 px-4 border border-black rounded-lg text-sm font-semibold text-black bg-white hover:bg-gray-50 transition-colors flex items-center justify-center disabled:opacity-50">
-              {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : "Delete"}
-            </button>}
-          <button onClick={handleSave} disabled={uploadingImages || isDeleting} className={`${isNewItem ? 'w-full' : 'flex-1'} py-3 px-4 rounded-lg text-sm font-semibold transition-colors flex items-center justify-center gap-2 ${!uploadingImages && !isDeleting ? "bg-black text-white hover:bg-black" : "bg-gray-300 text-gray-500 cursor-not-allowed"}`}>
-            {uploadingImages ? <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Saving...</span>
-              </> : "Save"}
-          </button>
-        </div>
+    {/* Bottom Sticky Buttons */}
+    <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200  z-40">
+      <div className={`flex gap-3 px-4 py-4 ${isNewItem ? 'justify-end' : ''}`}>
+        {!isNewItem && <button onClick={handleDelete} disabled={isDeleting || uploadingImages} className="flex-1 py-3 px-4 border border-black rounded-lg text-sm font-semibold text-black bg-white hover:bg-gray-50 transition-colors flex items-center justify-center disabled:opacity-50">
+          {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : "Delete"}
+        </button>}
+        <button onClick={handleSave} disabled={uploadingImages || isDeleting} className={`${isNewItem ? 'w-full' : 'flex-1'} py-3 px-4 rounded-lg text-sm font-semibold transition-colors flex items-center justify-center gap-2 ${!uploadingImages && !isDeleting ? "bg-black text-white hover:bg-black" : "bg-gray-300 text-gray-500 cursor-not-allowed"}`}>
+          {uploadingImages ? <>
+            <Loader2 className="w-4 h-4 animate-spin" />
+            <span>Saving...</span>
+          </> : "Save"}
+        </button>
       </div>
-    </div>;
+    </div>
+  </div>;
 }

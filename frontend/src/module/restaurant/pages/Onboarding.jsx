@@ -119,11 +119,11 @@ function TimeSelector({
     }
   };
   return <div className="border border-gray-200 rounded-md px-3 py-2 bg-gray-50/60">
-      <div className="flex items-center gap-2 mb-2">
-        <Clock className="w-4 h-4 text-gray-800" />
-        <span className="text-xs font-medium text-gray-900">{label}</span>
-      </div>
-      <MobileTimePicker value={timeValue} onChange={handleTimeChange} slotProps={{
+    <div className="flex items-center gap-2 mb-2">
+      <Clock className="w-4 h-4 text-gray-800" />
+      <span className="text-xs font-medium text-gray-900">{label}</span>
+    </div>
+    <MobileTimePicker value={timeValue} onChange={handleTimeChange} slotProps={{
       textField: {
         variant: "outlined",
         size: "small",
@@ -150,7 +150,7 @@ function TimeSelector({
         }
       }
     }} format="hh:mm a" />
-    </div>;
+  </div>;
 }
 export default function RestaurantOnboarding() {
   const companyName = useCompanyName();
@@ -552,76 +552,7 @@ export default function RestaurantOnboarding() {
     return errors;
   };
 
-  // Fill dummy data for testing (development mode only)
-  const fillDummyData = () => {
-    if (step === 1) {
-      setStep1({
-        restaurantName: "Test Restaurant",
-        ownerName: "John Doe",
-        ownerEmail: "john.doe@example.com",
-        ownerPhone: "+91 9876543210",
-        primaryContactNumber: "+91 9876543210",
-        location: {
-          addressLine1: "123 Main Street",
-          addressLine2: "Building A, Floor 2",
-          area: "Downtown",
-          city: "Mumbai",
-          landmark: "Near Central Park"
-        }
-      });
-      toast.success("Step 1 filled with dummy data", {
-        duration: 2000
-      });
-    } else if (step === 2) {
-      setStep2({
-        menuImages: [],
-        profileImage: null,
-        cuisines: ["North Indian", "Chinese"],
-        openingTime: "09:00",
-        closingTime: "22:00",
-        openDays: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-      });
-      toast.success("Step 2 filled with dummy data", {
-        duration: 2000
-      });
-    } else if (step === 3) {
-      // Calculate expiry date 1 year from now
-      const expiryDate = new Date();
-      expiryDate.setFullYear(expiryDate.getFullYear() + 1);
-      const expiryDateString = expiryDate.toISOString().split("T")[0];
-      setStep3({
-        panNumber: "ABCDE1234F",
-        nameOnPan: "John Doe",
-        panImage: null,
-        gstRegistered: true,
-        gstNumber: "27ABCDE1234F1Z5",
-        gstLegalName: "Test Restaurant Private Limited",
-        gstAddress: "123 Main Street, Mumbai, Maharashtra 400001",
-        gstImage: null,
-        fssaiNumber: "12345678901234",
-        fssaiExpiry: expiryDateString,
-        fssaiImage: null,
-        accountNumber: "1234567890123",
-        confirmAccountNumber: "1234567890123",
-        ifscCode: "HDFC0001234",
-        accountHolderName: "John Doe",
-        accountType: "savings"
-      });
-      toast.success("Step 3 filled with dummy data", {
-        duration: 2000
-      });
-    } else if (step === 4) {
-      setStep4({
-        estimatedDeliveryTime: "25-30 mins",
-        featuredDish: "Butter Chicken Special",
-        featuredPrice: "249",
-        offer: "Flat ₹50 OFF above ₹199"
-      });
-      toast.success("Step 4 filled with dummy data", {
-        duration: 2000
-      });
-    }
-  };
+
   const handleNext = async () => {
     setError("");
 
@@ -729,7 +660,7 @@ export default function RestaurantOnboarding() {
 
         // After step2, also update restaurant schema with step2 data
         // This ensures data is saved immediately, not just in onboarding subdocument
-        if (response?.data?.data?.restaurant) {}
+        if (response?.data?.data?.restaurant) { }
 
         // Only proceed to step 3 if save was successful
         if (response?.data?.data?.onboarding || response?.data?.data) {
@@ -852,7 +783,7 @@ export default function RestaurantOnboarding() {
           completedSteps: 3
         };
         const response = await api.put("/restaurant/onboarding", payload);
-        if (response?.data?.data?.onboarding) {}
+        if (response?.data?.data?.onboarding) { }
         setStep(4);
       } else if (step === 4) {
         const payload = {
@@ -923,137 +854,137 @@ export default function RestaurantOnboarding() {
     });
   };
   const renderStep1 = () => <div className="space-y-6">
-      <section className="bg-white p-4 sm:p-6 rounded-md">
-        <h2 className="text-lg font-semibold text-blue-600 mb-4">Restaurant information</h2>
-        <p className="text-sm text-gray-600 mb-4">Restaurant name</p>
-        <div className="space-y-3">
-          <div>
-            <Label className="text-xs text-gray-700">Restaurant name*</Label>
-            <Input value={step1.restaurantName || ""} onChange={e => setStep1({
+    <section className="bg-white p-4 sm:p-6 rounded-md">
+      <h2 className="text-lg font-semibold text-blue-600 mb-4">Restaurant information</h2>
+      <p className="text-sm text-gray-600 mb-4">Restaurant name</p>
+      <div className="space-y-3">
+        <div>
+          <Label className="text-xs text-gray-700">Restaurant name*</Label>
+          <Input value={step1.restaurantName || ""} onChange={e => setStep1({
             ...step1,
             restaurantName: e.target.value
           })} className="mt-1 bg-white text-sm text-black placeholder-black" placeholder="Customers will see this name" />
-          </div>
         </div>
-      </section>
+      </div>
+    </section>
 
-      <section className="bg-white p-4 sm:p-6 rounded-md">
-        <h2 className="text-lg font-semibold text-blue-600 mb-4">Owner details</h2>
-        <p className="text-sm text-gray-600 mb-4">
-          These details will be used for all business communications and updates.
-        </p>
-        <div className="space-y-4">
-          <div>
-            <Label className="text-xs text-gray-700">Full name*</Label>
-            <Input value={step1.ownerName || ""} onChange={e => setStep1({
+    <section className="bg-white p-4 sm:p-6 rounded-md">
+      <h2 className="text-lg font-semibold text-blue-600 mb-4">Owner details</h2>
+      <p className="text-sm text-gray-600 mb-4">
+        These details will be used for all business communications and updates.
+      </p>
+      <div className="space-y-4">
+        <div>
+          <Label className="text-xs text-gray-700">Full name*</Label>
+          <Input value={step1.ownerName || ""} onChange={e => setStep1({
             ...step1,
             ownerName: e.target.value
           })} className="mt-1 bg-white text-sm text-black placeholder-black" placeholder="Owner full name" />
-          </div>
-          <div>
-            <Label className="text-xs text-gray-700">Email address*</Label>
-            <Input type="email" value={step1.ownerEmail || ""} onChange={e => setStep1({
+        </div>
+        <div>
+          <Label className="text-xs text-gray-700">Email address*</Label>
+          <Input type="email" value={step1.ownerEmail || ""} onChange={e => setStep1({
             ...step1,
             ownerEmail: e.target.value
           })} className="mt-1 bg-white text-sm text-black placeholder-black" placeholder="owner@example.com" />
-          </div>
-          <div>
-            <Label className="text-xs text-gray-700">Phone number*</Label>
-            <Input value={step1.ownerPhone || ""} onChange={e => setStep1({
+        </div>
+        <div>
+          <Label className="text-xs text-gray-700">Phone number*</Label>
+          <Input value={step1.ownerPhone || ""} onChange={e => setStep1({
             ...step1,
             ownerPhone: e.target.value
           })} className="mt-1 bg-white text-sm text-black placeholder-black" placeholder="+91 98XXXXXX" />
-          </div>
         </div>
-      </section>
+      </div>
+    </section>
 
-      <section className="bg-white p-4 sm:p-6 rounded-md space-y-4">
-        <h2 className="text-lg font-semibold text-blue-600">Restaurant contact & location</h2>
-        <div>
-          <Label className="text-xs text-gray-700">Primary contact number*</Label>
-          <Input value={step1.primaryContactNumber || ""} onChange={e => setStep1({
+    <section className="bg-white p-4 sm:p-6 rounded-md space-y-4">
+      <h2 className="text-lg font-semibold text-blue-600">Restaurant contact & location</h2>
+      <div>
+        <Label className="text-xs text-gray-700">Primary contact number*</Label>
+        <Input value={step1.primaryContactNumber || ""} onChange={e => setStep1({
           ...step1,
           primaryContactNumber: e.target.value
         })} className="mt-1 bg-white text-sm text-black placeholder-black" placeholder="Restaurant's primary contact number" />
-          <p className="text-[11px] text-gray-500 mt-1">
-            Customers, delivery partners and {companyName} may call on this number for order
-            support.
-          </p>
-        </div>
-        <div className="space-y-3">
-          <p className="text-sm text-gray-700">
-            Add your restaurant's location for order pick-up.
-          </p>
-          <Input value={step1.location?.area || ""} onChange={e => setStep1({
+        <p className="text-[11px] text-gray-500 mt-1">
+          Customers, delivery partners and {companyName} may call on this number for order
+          support.
+        </p>
+      </div>
+      <div className="space-y-3">
+        <p className="text-sm text-gray-700">
+          Add your restaurant's location for order pick-up.
+        </p>
+        <Input value={step1.location?.area || ""} onChange={e => setStep1({
           ...step1,
           location: {
             ...step1.location,
             area: e.target.value
           }
         })} className="bg-white text-sm" placeholder="Area / Sector / Locality*" />
-          <Input value={step1.location?.city || ""} onChange={e => setStep1({
+        <Input value={step1.location?.city || ""} onChange={e => setStep1({
           ...step1,
           location: {
             ...step1.location,
             city: e.target.value
           }
         })} className="bg-white text-sm" placeholder="City" />
-          <Input value={step1.location?.addressLine1 || ""} onChange={e => setStep1({
+        <Input value={step1.location?.addressLine1 || ""} onChange={e => setStep1({
           ...step1,
           location: {
             ...step1.location,
             addressLine1: e.target.value
           }
         })} className="bg-white text-sm" placeholder="Shop no. / building no. (optional)" />
-          <Input value={step1.location?.addressLine2 || ""} onChange={e => setStep1({
+        <Input value={step1.location?.addressLine2 || ""} onChange={e => setStep1({
           ...step1,
           location: {
             ...step1.location,
             addressLine2: e.target.value
           }
         })} className="bg-white text-sm" placeholder="Floor / tower (optional)" />
-          <Input value={step1.location?.landmark || ""} onChange={e => setStep1({
+        <Input value={step1.location?.landmark || ""} onChange={e => setStep1({
           ...step1,
           location: {
             ...step1.location,
             landmark: e.target.value
           }
         })} className="bg-white text-sm" placeholder="Nearby landmark (optional)" />
-          <p className="text-[11px] text-gray-500 mt-1">
-            Please ensure that this address is the same as mentioned on your FSSAI license.
-          </p>
-        </div>
-      </section>
-    </div>;
-  const renderStep2 = () => <div className="space-y-6">
-      {/* Images section */}
-      <section className="bg-white p-4 sm:p-6 rounded-md space-y-5">
-        <h2 className="text-lg font-semibold text-blue-600">Menu & photos</h2>
-        <p className="text-xs text-gray-500">
-          Add clear photos of your printed menu and a primary profile image. This helps customers
-          understand what you serve.
+        <p className="text-[11px] text-gray-500 mt-1">
+          Please ensure that this address is the same as mentioned on your FSSAI license.
         </p>
+      </div>
+    </section>
+  </div>;
+  const renderStep2 = () => <div className="space-y-6">
+    {/* Images section */}
+    <section className="bg-white p-4 sm:p-6 rounded-md space-y-5">
+      <h2 className="text-lg font-semibold text-blue-600">Menu & photos</h2>
+      <p className="text-xs text-gray-500">
+        Add clear photos of your printed menu and a primary profile image. This helps customers
+        understand what you serve.
+      </p>
 
-        {/* Menu images */}
-        <div className="space-y-2">
-          <Label className="text-xs font-medium text-gray-700">Menu images</Label>
-          <div className="mt-1 border border-dashed border-gray-300 rounded-md bg-gray-50/70 px-4 py-3 flex items-center justify-between flex-col gap-3">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-md bg-white flex items-center justify-center">
-                <ImageIcon className="w-5 h-5 text-gray-700" />
-              </div>
-              <div className="flex flex-col">
-                <span className="text-xs font-medium text-gray-900">Upload menu images</span>
-                <span className="text-[11px] text-gray-500">
-                  JPG, PNG, WebP • You can select multiple files
-                </span>
-              </div>
+      {/* Menu images */}
+      <div className="space-y-2">
+        <Label className="text-xs font-medium text-gray-700">Menu images</Label>
+        <div className="mt-1 border border-dashed border-gray-300 rounded-md bg-gray-50/70 px-4 py-3 flex items-center justify-between flex-col gap-3">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-md bg-white flex items-center justify-center">
+              <ImageIcon className="w-5 h-5 text-gray-700" />
             </div>
-            <label htmlFor="menuImagesInput" className="inline-flex justify-center items-center gap-1.5 px-3 py-1.5 rounded-sm bg-white text-black  border-black text-xs font-medium cursor-pointer     w-full items-center">
-              <Upload className="w-4.5 h-4.5" />
-              <span>Choose files</span>
-            </label>
-            <input id="menuImagesInput" type="file" multiple accept="image/*" className="hidden" onChange={e => {
+            <div className="flex flex-col">
+              <span className="text-xs font-medium text-gray-900">Upload menu images</span>
+              <span className="text-[11px] text-gray-500">
+                JPG, PNG, WebP • You can select multiple files
+              </span>
+            </div>
+          </div>
+          <label htmlFor="menuImagesInput" className="inline-flex justify-center items-center gap-1.5 px-3 py-1.5 rounded-sm bg-white text-black  border-black text-xs font-medium cursor-pointer     w-full items-center">
+            <Upload className="w-4.5 h-4.5" />
+            <span>Choose files</span>
+          </label>
+          <input id="menuImagesInput" type="file" multiple accept="image/*" className="hidden" onChange={e => {
             const files = Array.from(e.target.files || []);
             if (!files.length) return;
             setStep2(prev => ({
@@ -1063,11 +994,11 @@ export default function RestaurantOnboarding() {
             // Reset input to allow selecting same file again
             e.target.value = '';
           }} />
-          </div>
+        </div>
 
-          {/* Menu image previews */}
-          {!!step2.menuImages.length && <div className="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {step2.menuImages.map((file, idx) => {
+        {/* Menu image previews */}
+        {!!step2.menuImages.length && <div className="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {step2.menuImages.map((file, idx) => {
             // Handle both File objects and URL objects
             let imageUrl = null;
             let imageName = `Image ${idx + 1}`;
@@ -1083,25 +1014,25 @@ export default function RestaurantOnboarding() {
               imageUrl = file;
             }
             return <div key={idx} className="relative aspect-[4/5] rounded-md overflow-hidden bg-gray-100">
-                    {imageUrl ? <img src={imageUrl} alt={`Menu ${idx + 1}`} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-[11px] text-gray-500 px-2 text-center">
-                        Preview unavailable
-                      </div>}
-                    <div className="absolute bottom-0 inset-x-0 bg-black/60 px-2 py-1">
-                      <p className="text-[10px] text-white truncate">
-                        {imageName}
-                      </p>
-                    </div>
-                  </div>;
+              {imageUrl ? <img src={imageUrl} alt={`Menu ${idx + 1}`} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-[11px] text-gray-500 px-2 text-center">
+                Preview unavailable
+              </div>}
+              <div className="absolute bottom-0 inset-x-0 bg-black/60 px-2 py-1">
+                <p className="text-[10px] text-white truncate">
+                  {imageName}
+                </p>
+              </div>
+            </div>;
           })}
-            </div>}
-        </div>
+        </div>}
+      </div>
 
-        {/* Profile image */}
-        <div className="space-y-2">
-          <Label className="text-xs font-medium text-gray-700">Restaurant profile image</Label>
-          <div className="flex items-center gap-4">
-            <div className="h-16 w-16 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden">
-              {step2.profileImage ? (() => {
+      {/* Profile image */}
+      <div className="space-y-2">
+        <Label className="text-xs font-medium text-gray-700">Restaurant profile image</Label>
+        <div className="flex items-center gap-4">
+          <div className="h-16 w-16 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden">
+            {step2.profileImage ? (() => {
               let imageSrc = null;
               if (step2.profileImage instanceof File) {
                 imageSrc = URL.createObjectURL(step2.profileImage);
@@ -1114,23 +1045,23 @@ export default function RestaurantOnboarding() {
               }
               return imageSrc ? <img src={imageSrc} alt="Restaurant profile" className="w-full h-full object-cover" /> : <ImageIcon className="w-6 h-6 text-gray-500" />;
             })() : <ImageIcon className="w-6 h-6 text-gray-500" />}
-            </div>
-            <div className="flex-1 flex-col flex items-center justify-between gap-3">
-              <div className="flex flex-col">
-                <span className="text-xs font-medium text-gray-900">Upload profile image</span>
-                <span className="text-[11px] text-gray-500">
-                  This will be shown on your listing card and restaurant page.
-                </span>
-              </div>
-
+          </div>
+          <div className="flex-1 flex-col flex items-center justify-between gap-3">
+            <div className="flex flex-col">
+              <span className="text-xs font-medium text-gray-900">Upload profile image</span>
+              <span className="text-[11px] text-gray-500">
+                This will be shown on your listing card and restaurant page.
+              </span>
             </div>
 
           </div>
-          <label htmlFor="profileImageInput" className="inline-flex justify-center items-center gap-1.5 px-3 py-1.5 rounded-sm bg-white text-black  border-black text-xs font-medium cursor-pointer     w-full items-center">
-            <Upload className="w-4.5 h-4.5" />
-            <span>Upload</span>
-          </label>
-          <input id="profileImageInput" type="file" accept="image/*" className="hidden" onChange={e => {
+
+        </div>
+        <label htmlFor="profileImageInput" className="inline-flex justify-center items-center gap-1.5 px-3 py-1.5 rounded-sm bg-white text-black  border-black text-xs font-medium cursor-pointer     w-full items-center">
+          <Upload className="w-4.5 h-4.5" />
+          <span>Upload</span>
+        </label>
+        <input id="profileImageInput" type="file" accept="image/*" className="hidden" onChange={e => {
           const file = e.target.files?.[0] || null;
           if (file) {
             setStep2(prev => ({
@@ -1141,148 +1072,148 @@ export default function RestaurantOnboarding() {
           // Reset input to allow selecting same file again
           e.target.value = '';
         }} />
-        </div>
-      </section>
+      </div>
+    </section>
 
-      {/* Operational details */}
-      <section className="bg-white p-4 sm:p-6 rounded-md space-y-5">
-        {/* Cuisines */}
-        <div>
-          <Label className="text-xs text-gray-700">Select cuisines (up to 3)</Label>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {cuisinesOptions.map(cuisine => {
+    {/* Operational details */}
+    <section className="bg-white p-4 sm:p-6 rounded-md space-y-5">
+      {/* Cuisines */}
+      <div>
+        <Label className="text-xs text-gray-700">Select cuisines (up to 3)</Label>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {cuisinesOptions.map(cuisine => {
             const active = step2.cuisines.includes(cuisine);
             return <button key={cuisine} type="button" onClick={() => toggleCuisine(cuisine)} className={`px-3 py-1.5 text-xs rounded-full ${active ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-800"}`}>
-                  {cuisine}
-                </button>;
+              {cuisine}
+            </button>;
           })}
-          </div>
         </div>
+      </div>
 
-        {/* Timings with popover time selectors */}
-        <div className="space-y-3">
-          <Label className="text-xs text-gray-700">Delivery timings</Label>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <TimeSelector label="Opening time" value={step2.openingTime || ""} onChange={val => setStep2({
+      {/* Timings with popover time selectors */}
+      <div className="space-y-3">
+        <Label className="text-xs text-gray-700">Delivery timings</Label>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <TimeSelector label="Opening time" value={step2.openingTime || ""} onChange={val => setStep2({
             ...step2,
             openingTime: val || ""
           })} />
-            <TimeSelector label="Closing time" value={step2.closingTime || ""} onChange={val => setStep2({
+          <TimeSelector label="Closing time" value={step2.closingTime || ""} onChange={val => setStep2({
             ...step2,
             closingTime: val || ""
           })} />
-          </div>
         </div>
+      </div>
 
-        {/* Open days in a calendar-like grid */}
-        <div className="space-y-2">
-          <Label className="text-xs text-gray-700 flex items-center gap-1.5">
-            <CalendarIcon className="w-3.5 h-3.5 text-gray-800" />
-            <span>Open days</span>
-          </Label>
-          <p className="text-[11px] text-gray-500">
-            Select the days your restaurant accepts delivery orders.
-          </p>
-          <div className="mt-1 grid grid-cols-7 gap-1.5 sm:gap-2">
-            {daysOfWeek.map(day => {
+      {/* Open days in a calendar-like grid */}
+      <div className="space-y-2">
+        <Label className="text-xs text-gray-700 flex items-center gap-1.5">
+          <CalendarIcon className="w-3.5 h-3.5 text-gray-800" />
+          <span>Open days</span>
+        </Label>
+        <p className="text-[11px] text-gray-500">
+          Select the days your restaurant accepts delivery orders.
+        </p>
+        <div className="mt-1 grid grid-cols-7 gap-1.5 sm:gap-2">
+          {daysOfWeek.map(day => {
             const active = step2.openDays.includes(day);
             return <button key={day} type="button" onClick={() => toggleDay(day)} className={`aspect-square flex items-center justify-center rounded-md text-[11px] font-medium ${active ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-800"}`}>
-                  {day.charAt(0)}
-                </button>;
+              {day.charAt(0)}
+            </button>;
           })}
-          </div>
         </div>
-      </section>
-    </div>;
+      </div>
+    </section>
+  </div>;
   const renderStep3 = () => <div className="space-y-6">
-      <section className="bg-white p-4 sm:p-6 rounded-md space-y-4">
-        <h2 className="text-lg font-semibold text-blue-600">PAN details</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <Label className="text-xs text-gray-700">PAN number</Label>
-            <Input value={step3.panNumber || ""} onChange={e => setStep3({
+    <section className="bg-white p-4 sm:p-6 rounded-md space-y-4">
+      <h2 className="text-lg font-semibold text-blue-600">PAN details</h2>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <Label className="text-xs text-gray-700">PAN number</Label>
+          <Input value={step3.panNumber || ""} onChange={e => setStep3({
             ...step3,
             panNumber: e.target.value
           })} className="mt-1 bg-white text-sm text-black placeholder-black" />
-          </div>
-          <div>
-            <Label className="text-xs text-gray-700">Name on PAN</Label>
-            <Input value={step3.nameOnPan || ""} onChange={e => setStep3({
+        </div>
+        <div>
+          <Label className="text-xs text-gray-700">Name on PAN</Label>
+          <Input value={step3.nameOnPan || ""} onChange={e => setStep3({
             ...step3,
             nameOnPan: e.target.value
           })} className="mt-1 bg-white text-sm text-black placeholder-black" />
-          </div>
         </div>
-        <div>
-          <Label className="text-xs text-gray-700">PAN image</Label>
-          <Input type="file" accept="image/*" onChange={e => setStep3({
+      </div>
+      <div>
+        <Label className="text-xs text-gray-700">PAN image</Label>
+        <Input type="file" accept="image/*" onChange={e => setStep3({
           ...step3,
           panImage: e.target.files?.[0] || null
         })} className="mt-1 bg-white text-sm text-black placeholder-black" />
-        </div>
-      </section>
+      </div>
+    </section>
 
-      <section className="bg-white p-4 sm:p-6 rounded-md space-y-4">
-        <h2 className="text-lg font-semibold text-blue-600">GST details</h2>
-        <div className="flex gap-4 items-center text-sm">
-          <span className="text-gray-700">GST registered?</span>
-          <button type="button" onClick={() => setStep3({
+    <section className="bg-white p-4 sm:p-6 rounded-md space-y-4">
+      <h2 className="text-lg font-semibold text-blue-600">GST details</h2>
+      <div className="flex gap-4 items-center text-sm">
+        <span className="text-gray-700">GST registered?</span>
+        <button type="button" onClick={() => setStep3({
           ...step3,
           gstRegistered: true
         })} className={`px-3 py-1.5 text-xs rounded-full ${step3.gstRegistered ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-800"}`}>
-            Yes
-          </button>
-          <button type="button" onClick={() => setStep3({
+          Yes
+        </button>
+        <button type="button" onClick={() => setStep3({
           ...step3,
           gstRegistered: false
         })} className={`px-3 py-1.5 text-xs rounded-full ${!step3.gstRegistered ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-800"}`}>
-            No
-          </button>
-        </div>
-        {step3.gstRegistered && <div className="space-y-3">
-            <Input value={step3.gstNumber || ""} onChange={e => setStep3({
+          No
+        </button>
+      </div>
+      {step3.gstRegistered && <div className="space-y-3">
+        <Input value={step3.gstNumber || ""} onChange={e => setStep3({
           ...step3,
           gstNumber: e.target.value
         })} className="bg-white text-sm" placeholder="GST number" />
-            <Input value={step3.gstLegalName || ""} onChange={e => setStep3({
+        <Input value={step3.gstLegalName || ""} onChange={e => setStep3({
           ...step3,
           gstLegalName: e.target.value
         })} className="bg-white text-sm" placeholder="Legal name" />
-            <Input value={step3.gstAddress || ""} onChange={e => setStep3({
+        <Input value={step3.gstAddress || ""} onChange={e => setStep3({
           ...step3,
           gstAddress: e.target.value
         })} className="bg-white text-sm" placeholder="Registered address" />
-            <Input type="file" accept="image/*" onChange={e => setStep3({
+        <Input type="file" accept="image/*" onChange={e => setStep3({
           ...step3,
           gstImage: e.target.files?.[0] || null
         })} className="bg-white text-sm" />
-          </div>}
-      </section>
+      </div>}
+    </section>
 
-      <section className="bg-white p-4 sm:p-6 rounded-md space-y-4">
-        <h2 className="text-lg font-semibold text-blue-600">FSSAI details</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Input value={step3.fssaiNumber || ""} onChange={e => setStep3({
+    <section className="bg-white p-4 sm:p-6 rounded-md space-y-4">
+      <h2 className="text-lg font-semibold text-blue-600">FSSAI details</h2>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Input value={step3.fssaiNumber || ""} onChange={e => setStep3({
           ...step3,
           fssaiNumber: e.target.value
         })} className="bg-white text-sm" placeholder="FSSAI number" />
-          <div>
-            <Label className="text-xs text-gray-700 mb-1 block">FSSAI expiry date</Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <button type="button" className="w-full px-3 py-2 border border-gray-200 rounded-md bg-white text-sm text-left flex items-center justify-between hover:bg-gray-50">
-                  <span className={step3.fssaiExpiry ? "text-gray-900" : "text-gray-500"}>
-                    {step3.fssaiExpiry ? new Date(step3.fssaiExpiry).toLocaleDateString("en-US", {
+        <div>
+          <Label className="text-xs text-gray-700 mb-1 block">FSSAI expiry date</Label>
+          <Popover>
+            <PopoverTrigger asChild>
+              <button type="button" className="w-full px-3 py-2 border border-gray-200 rounded-md bg-white text-sm text-left flex items-center justify-between hover:bg-gray-50">
+                <span className={step3.fssaiExpiry ? "text-gray-900" : "text-gray-500"}>
+                  {step3.fssaiExpiry ? new Date(step3.fssaiExpiry).toLocaleDateString("en-US", {
                     year: "numeric",
                     month: "short",
                     day: "numeric"
                   }) : "Select expiry date"}
-                  </span>
-                  <CalendarIcon className="w-4 h-4 text-gray-500" />
-                </button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar mode="single" selected={step3.fssaiExpiry ? new Date(step3.fssaiExpiry) : undefined} onSelect={date => {
+                </span>
+                <CalendarIcon className="w-4 h-4 text-gray-500" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar mode="single" selected={step3.fssaiExpiry ? new Date(step3.fssaiExpiry) : undefined} onSelect={date => {
                 if (date) {
                   const formattedDate = date.toISOString().split("T")[0];
                   setStep3({
@@ -1291,84 +1222,84 @@ export default function RestaurantOnboarding() {
                   });
                 }
               }} initialFocus className="rounded-md border border-gray-200" />
-              </PopoverContent>
-            </Popover>
-          </div>
+            </PopoverContent>
+          </Popover>
         </div>
-        <Input type="file" accept="image/*" onChange={e => setStep3({
+      </div>
+      <Input type="file" accept="image/*" onChange={e => setStep3({
         ...step3,
         fssaiImage: e.target.files?.[0] || null
       })} className="bg-white text-sm" />
-      </section>
+    </section>
 
-      <section className="bg-white p-4 sm:p-6 rounded-md space-y-4">
-        <h2 className="text-lg font-semibold text-blue-600">Bank account details</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Input value={step3.accountNumber || ""} onChange={e => setStep3({
+    <section className="bg-white p-4 sm:p-6 rounded-md space-y-4">
+      <h2 className="text-lg font-semibold text-blue-600">Bank account details</h2>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Input value={step3.accountNumber || ""} onChange={e => setStep3({
           ...step3,
           accountNumber: e.target.value.trim()
         })} className="bg-white text-sm" placeholder="Account number" />
-          <Input value={step3.confirmAccountNumber || ""} onChange={e => setStep3({
+        <Input value={step3.confirmAccountNumber || ""} onChange={e => setStep3({
           ...step3,
           confirmAccountNumber: e.target.value.trim()
         })} className="bg-white text-sm" placeholder="Re-enter account number" />
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Input value={step3.ifscCode || ""} onChange={e => setStep3({
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Input value={step3.ifscCode || ""} onChange={e => setStep3({
           ...step3,
           ifscCode: e.target.value
         })} className="bg-white text-sm" placeholder="IFSC code" />
-          <Input value={step3.accountType || ""} onChange={e => setStep3({
+        <Input value={step3.accountType || ""} onChange={e => setStep3({
           ...step3,
           accountType: e.target.value
         })} className="bg-white text-sm" placeholder="Account type (savings / current)" />
-        </div>
-        <Input value={step3.accountHolderName || ""} onChange={e => setStep3({
+      </div>
+      <Input value={step3.accountHolderName || ""} onChange={e => setStep3({
         ...step3,
         accountHolderName: e.target.value
       })} className="bg-white text-sm" placeholder="Account holder name" />
-      </section>
-    </div>;
+    </section>
+  </div>;
   const renderStep4 = () => <div className="space-y-6">
-      <section className="bg-white p-4 sm:p-6 rounded-md space-y-4">
-        <h2 className="text-lg font-semibold text-blue-600">Restaurant Display Information</h2>
-        <p className="text-sm text-gray-600">
-          Add information that will be displayed to customers on the home page
-        </p>
+    <section className="bg-white p-4 sm:p-6 rounded-md space-y-4">
+      <h2 className="text-lg font-semibold text-blue-600">Restaurant Display Information</h2>
+      <p className="text-sm text-gray-600">
+        Add information that will be displayed to customers on the home page
+      </p>
 
-        <div>
-          <Label className="text-xs text-gray-700">Estimated Delivery Time*</Label>
-          <Input value={step4.estimatedDeliveryTime || ""} onChange={e => setStep4({
+      <div>
+        <Label className="text-xs text-gray-700">Estimated Delivery Time*</Label>
+        <Input value={step4.estimatedDeliveryTime || ""} onChange={e => setStep4({
           ...step4,
           estimatedDeliveryTime: e.target.value
         })} className="mt-1 bg-white text-sm" placeholder="e.g., 25-30 mins" />
-        </div>
+      </div>
 
-        <div>
-          <Label className="text-xs text-gray-700">Featured Dish Name*</Label>
-          <Input value={step4.featuredDish || ""} onChange={e => setStep4({
+      <div>
+        <Label className="text-xs text-gray-700">Featured Dish Name*</Label>
+        <Input value={step4.featuredDish || ""} onChange={e => setStep4({
           ...step4,
           featuredDish: e.target.value
         })} className="mt-1 bg-white text-sm" placeholder="e.g., Butter Chicken Special" />
-        </div>
+      </div>
 
-        <div>
-          <Label className="text-xs text-gray-700">Featured Dish Price (₹)*</Label>
-          <Input type="number" value={step4.featuredPrice || ""} onChange={e => setStep4({
+      <div>
+        <Label className="text-xs text-gray-700">Featured Dish Price (₹)*</Label>
+        <Input type="number" value={step4.featuredPrice || ""} onChange={e => setStep4({
           ...step4,
           featuredPrice: e.target.value
         })} className="mt-1 bg-white text-sm" placeholder="e.g., 249" min="0" />
-        </div>
+      </div>
 
-        <div>
-          <Label className="text-xs text-gray-700">Special Offer/Promotion*</Label>
-          <Input value={step4.offer || ""} onChange={e => setStep4({
+      <div>
+        <Label className="text-xs text-gray-700">Special Offer/Promotion*</Label>
+        <Input value={step4.offer || ""} onChange={e => setStep4({
           ...step4,
           offer: e.target.value
         })} className="mt-1 bg-white text-sm" placeholder="e.g., Flat ₹50 OFF above ₹199" />
-        </div>
-      </section>
-    </div>;
+      </div>
+    </section>
+  </div>;
   const renderStep = () => {
     if (step === 1) return renderStep1();
     if (step === 2) return renderStep2();
@@ -1376,38 +1307,35 @@ export default function RestaurantOnboarding() {
     return renderStep4();
   };
   return <LocalizationProvider dateAdapter={AdapterDateFns}>
-      <div className="min-h-screen bg-gray-100 flex flex-col">
-        <header className="px-4 py-4 sm:px-6 sm:py-5 bg-white flex items-center justify-between">
-          <div className="text-sm font-semibold text-blue-600">Restaurant onboarding</div>
-          <div className="flex items-center gap-3">
-            {import.meta.env.DEV && <Button onClick={fillDummyData} variant="outline" size="sm" className="text-xs bg-blue-50 border-blue-300 text-blue-700 hover:bg-blue-100 flex items-center gap-1.5" title="Fill with dummy data (Dev only)">
-                <Sparkles className="w-3 h-3" />
-                Fill Dummy
-              </Button>}
-            <div className="text-xs text-gray-600">
-              Step {step} of 4
-            </div>
+    <div className="min-h-screen bg-gray-100 flex flex-col">
+      <header className="px-4 py-4 sm:px-6 sm:py-5 bg-white flex items-center justify-between">
+        <div className="text-sm font-semibold text-blue-600">Restaurant onboarding</div>
+        <div className="flex items-center gap-3">
+
+          <div className="text-xs text-gray-600">
+            Step {step} of 4
           </div>
-        </header>
+        </div>
+      </header>
 
-        <main className="flex-1 px-4 sm:px-6 py-4 space-y-4">
-          {loading ? <p className="text-sm text-gray-600">Loading...</p> : renderStep()}
-        </main>
+      <main className="flex-1 px-4 sm:px-6 py-4 space-y-4">
+        {loading ? <p className="text-sm text-gray-600">Loading...</p> : renderStep()}
+      </main>
 
-        {error && <div className="px-4 sm:px-6 pb-2 text-xs text-red-600">
-            {error}
-          </div>}
+      {error && <div className="px-4 sm:px-6 pb-2 text-xs text-red-600">
+        {error}
+      </div>}
 
-        <footer className="px-4 sm:px-6 py-3 bg-white">
-          <div className="flex justify-between items-center">
-            <Button variant="ghost" disabled={step === 1 || saving} onClick={() => setStep(s => Math.max(1, s - 1))} className="text-sm text-gray-700 bg-transparent">
-              Back
-            </Button>
-            <Button onClick={handleNext} disabled={saving} className="text-sm bg-blue-600 text-white px-6 hover:bg-blue-700">
-              {step === 4 ? saving ? "Saving..." : "Finish" : saving ? "Saving..." : "Continue"}
-            </Button>
-          </div>
-        </footer>
-      </div>
-    </LocalizationProvider>;
+      <footer className="px-4 sm:px-6 py-3 bg-white">
+        <div className="flex justify-between items-center">
+          <Button variant="ghost" disabled={step === 1 || saving} onClick={() => setStep(s => Math.max(1, s - 1))} className="text-sm text-gray-700 bg-transparent">
+            Back
+          </Button>
+          <Button onClick={handleNext} disabled={saving} className="text-sm bg-blue-600 text-white px-6 hover:bg-blue-700">
+            {step === 4 ? saving ? "Saving..." : "Finish" : saving ? "Saving..." : "Continue"}
+          </Button>
+        </div>
+      </footer>
+    </div>
+  </LocalizationProvider>;
 }

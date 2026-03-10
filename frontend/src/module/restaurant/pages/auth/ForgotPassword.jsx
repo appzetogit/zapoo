@@ -67,6 +67,12 @@ export default function RestaurantForgotPassword() {
     if (value && index < 5) {
       inputRefs.current[index + 1]?.focus()
     }
+
+    // Auto-submit when all 6 digits are entered
+    const combinedOtp = newOtp.join("");
+    if (combinedOtp.length === 6 && !isLoading) {
+      handleOtpSubmit({ preventDefault: () => { } }, combinedOtp);
+    }
   }
 
   const handleOtpKeyDown = (index, e) => {
@@ -93,11 +99,12 @@ export default function RestaurantForgotPassword() {
     }
   }
 
-  const handleOtpSubmit = async (e) => {
-    e.preventDefault()
+  const handleOtpSubmit = async (e, otpValue = null) => {
+    if (e && e.preventDefault) e.preventDefault()
+    if (isLoading) return
     setError("")
 
-    const otpCode = otp.join("")
+    const otpCode = otpValue || otp.join("")
     if (otpCode.length !== 6) {
       setError("Please enter the complete OTP")
       return

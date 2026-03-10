@@ -83,6 +83,7 @@ export const sendOTP = asyncHandler(async (req, res) => {
       return errorResponse(res, 400, 'Invalid email format');
     }
   }
+  console.log(`[RestaurantAuth] sendOTP requested:`, { phone, email, purpose });
   try {
     const result = await otpService.generateAndSendOTP(phone || null, purpose, email || null);
     return successResponse(res, 200, result.message, {
@@ -113,6 +114,7 @@ export const verifyOTP = asyncHandler(async (req, res) => {
   if (!phone && !email || !otp) {
     return errorResponse(res, 400, 'Either phone number or email, and OTP are required');
   }
+  console.log(`[RestaurantAuth] verifyOTP requested:`, { phone, email, otp, purpose, name });
   try {
     let restaurant;
     // Normalize phone number if provided
@@ -207,10 +209,9 @@ export const verifyOTP = asyncHandler(async (req, res) => {
               error: createError.message,
               keyPattern: createError.keyPattern
             });
-            // Try to find existing restaurant by phone
-            restaurant = await Restaurant.findOne({
-              phone
-            });
+            // Try to find existing restaurant by phone (using buildPhoneQuery for multiple formats)
+            const findExistingQuery = buildPhoneQuery(normalizedPhone) || { phone: normalizedPhone || phone };
+            restaurant = await Restaurant.findOne(findExistingQuery);
             if (restaurant) {
               return errorResponse(res, 400, `Restaurant already exists with this phone number. Please login.`);
             }
@@ -435,7 +436,7 @@ export const verifyOTP = asyncHandler(async (req, res) => {
                 phone
               };
               restaurant = await Restaurant.findOne(phoneQuery);
-              if (restaurant) {} else {
+              if (restaurant) { } else {
                 // If not found, this is likely a database index issue - ensure email is completely removed
                 // Create a fresh restaurantData object without email field
                 const retryRestaurantData = {
@@ -467,7 +468,7 @@ export const verifyOTP = asyncHandler(async (req, res) => {
                       phone
                     };
                     restaurant = await Restaurant.findOne(phoneQuery);
-                    if (restaurant) {} else {
+                    if (restaurant) { } else {
                       throw new Error(`Failed to create restaurant: ${retryError.message}. Please contact support.`);
                     }
                   } else {
@@ -480,7 +481,7 @@ export const verifyOTP = asyncHandler(async (req, res) => {
               restaurant = await Restaurant.findOne({
                 phone
               });
-              if (restaurant) {} else {
+              if (restaurant) { } else {
                 throw new Error(`Phone number already exists: ${createError.message}`);
               }
             } else if (createError.keyPattern && createError.keyPattern.slug) {
@@ -512,12 +513,10 @@ export const verifyOTP = asyncHandler(async (req, res) => {
               }
             } else {
               // Other duplicate key errors (email, phone)
-              const findQuery = phone ? {
-                phone
-              } : {
-                email
+              const findExistingQuery = normalizedPhone ? buildPhoneQuery(normalizedPhone) : {
+                email: email?.toLowerCase().trim()
               };
-              restaurant = await Restaurant.findOne(findQuery);
+              restaurant = await Restaurant.findOne(findExistingQuery);
               if (!restaurant) {
                 throw createError;
               }

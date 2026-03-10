@@ -527,8 +527,22 @@ apiClient.interceptors.response.use(response => {
       errorMessages = ["An error occurred"];
     }
 
+    // Prevent duplicate toasts for the same message within 10 seconds
+    const toastCache = window._errorToastCache || {};
+    window._errorToastCache = toastCache;
+
     // Show beautiful error toast for each error message
     errorMessages.forEach((errorMessage, index) => {
+      const now = Date.now();
+      const lastShown = toastCache[errorMessage] || 0;
+
+      // If same message shown in last 10 seconds, skip
+      if (now - lastShown < 10000) {
+        return;
+      }
+
+      toastCache[errorMessage] = now;
+
       // Add slight delay for multiple toasts to appear sequentially
       setTimeout(() => {
         toast.error(errorMessage, {

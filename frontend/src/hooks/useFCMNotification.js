@@ -33,7 +33,7 @@ export function useFCMNotification({
     (async () => {
       // Add a small delay for IndexedDB stability (prevents "IDBDatabase is closing" error)
       await new Promise(r => setTimeout(r, 1500));
-      
+
       try {
         // ── 1. Check browser support ────────────────────────────────
         if (!('Notification' in window) || !('serviceWorker' in navigator)) {
@@ -82,6 +82,13 @@ export function useFCMNotification({
 
         console.log(`[FCM] Registering token on backend. Role="${role}", Endpoint="${endpoint}"...`);
         try {
+          // Check if we already failed with 401 recently for this role to prevent spamming
+          const lastFailStatus = sessionStorage.getItem(`fcm_last_fail_status_${role}`);
+          if (lastFailStatus === '401') {
+            console.warn(`[FCM] Skipping registration for role "${role}" due to previous 401. Your account may be inactive.`);
+            return;
+          }
+
           const res = await apiClient.post(endpoint, {
             token,
             platform: 'web',
@@ -90,11 +97,13 @@ export function useFCMNotification({
           console.log(`[FCM] ${endpoint} SUCCESS:`, res?.data);
           localStorage.setItem(`${TOKEN_CACHE_KEY}_${role}_VAL`, token);
           localStorage.setItem(`${TOKEN_CACHE_KEY}_${role}`, String(Date.now()));
+          sessionStorage.removeItem(`fcm_last_fail_status_${role}`);
         } catch (postErr) {
           console.error(`[FCM] Failed to register token at ${endpoint}:`, postErr.response?.data || postErr.message);
           // If 401, it means the user is not authenticated for this module
           if (postErr.response?.status === 401) {
-            console.warn(`[FCM] Authentication failed for role "${role}". Please log in again.`);
+            console.warn(`[FCM] Authentication failed for role "${role}". Please log in again or wait for approval.`);
+            sessionStorage.setItem(`fcm_last_fail_status_${role}`, '401');
           }
         }
 
