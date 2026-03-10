@@ -50,6 +50,13 @@ const deliveryBoyCommissionSchema = new mongoose.Schema(
         message: 'Base payout must be 0 or greater'
       }
     },
+    // Tier key this rule belongs to (e.g. basic / mid / premium)
+    tier: {
+      type: String,
+      default: 'default',
+      index: true,
+      trim: true
+    },
     status: {
       type: Boolean,
       default: true
@@ -92,9 +99,19 @@ deliveryBoyCommissionSchema.methods.isDistanceInRange = function(distance) {
   return true;
 };
 
+// Helper to build the base query for active rules, optionally filtered by tier
+const buildActiveRulesQuery = (tier) => {
+  const query = { status: true };
+  if (tier) {
+    query.tier = tier;
+  }
+  return query;
+};
+
 // Static method to find applicable commission rule for a distance
-deliveryBoyCommissionSchema.statics.findApplicableRule = async function(distance) {
-  const rules = await this.find({ status: true }).sort({ minDistance: 1 });
+// Optionally filters by tier (string); if not provided, uses all active rules.
+deliveryBoyCommissionSchema.statics.findApplicableRule = async function(distance, tier = null) {
+  const rules = await this.find(buildActiveRulesQuery(tier)).sort({ minDistance: 1 });
   
   for (const rule of rules) {
     if (rule.isDistanceInRange(distance)) {
@@ -123,9 +140,10 @@ deliveryBoyCommissionSchema.statics.findApplicableRule = async function(distance
 };
 
 // Static method to calculate commission for a given distance
-deliveryBoyCommissionSchema.statics.calculateCommission = async function(distance) {
+// Optionally filters by tier (string); if not provided, uses all active rules.
+deliveryBoyCommissionSchema.statics.calculateCommission = async function(distance, tier = null) {
   // Get all active rules sorted by minDistance (ascending)
-  const rules = await this.find({ status: true }).sort({ minDistance: 1 });
+  const rules = await this.find(buildActiveRulesQuery(tier)).sort({ minDistance: 1 });
 
   if (!rules || rules.length === 0) {
     throw new Error('No commission rules found');

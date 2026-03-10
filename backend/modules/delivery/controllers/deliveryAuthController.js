@@ -218,6 +218,23 @@ export const verifyOTP = asyncHandler(async (req, res) => {
     await delivery.save();
 
     // Return access token and delivery boy info
+    // Load wallet/earnings from DeliveryWallet as source of truth
+    let walletData = null;
+    try {
+      const { default: DeliveryWallet } = await import('../models/DeliveryWallet.js');
+      const wallet = await DeliveryWallet.findOne({ deliveryId: delivery._id }).lean();
+      if (wallet) {
+        walletData = {
+          totalEarned: wallet.totalEarned || 0,
+          currentBalance: wallet.currentBalance || 0,
+          pendingPayout: wallet.pendingPayout || 0,
+          tips: wallet.tips || 0,
+        };
+      }
+    } catch (e) {
+      walletData = null;
+    }
+
     return successResponse(res, 200, 'Authentication successful', {
       accessToken: tokens.accessToken,
       user: {
@@ -234,7 +251,7 @@ export const verifyOTP = asyncHandler(async (req, res) => {
         rejectionReason: delivery.rejectionReason || null,
         // Include rejection reason for blocked accounts
         metrics: delivery.metrics,
-        earnings: delivery.earnings
+        earnings: walletData || delivery.earnings
       }
     });
   } catch (error) {
@@ -314,6 +331,24 @@ export const logout = asyncHandler(async (req, res) => {
  */
 export const getCurrentDelivery = asyncHandler(async (req, res) => {
   // Delivery boy is attached by authenticate middleware
+
+  // Load wallet/earnings from DeliveryWallet as source of truth
+  let walletData = null;
+  try {
+    const { default: DeliveryWallet } = await import('../models/DeliveryWallet.js');
+    const wallet = await DeliveryWallet.findOne({ deliveryId: req.delivery._id }).lean();
+    if (wallet) {
+      walletData = {
+        totalEarned: wallet.totalEarned || 0,
+        currentBalance: wallet.currentBalance || 0,
+        pendingPayout: wallet.pendingPayout || 0,
+        tips: wallet.tips || 0,
+      };
+    }
+  } catch (e) {
+    walletData = null;
+  }
+
   return successResponse(res, 200, 'Delivery boy retrieved successfully', {
     user: {
       id: req.delivery._id,
@@ -331,8 +366,7 @@ export const getCurrentDelivery = asyncHandler(async (req, res) => {
       documents: req.delivery.documents,
       availability: req.delivery.availability,
       metrics: req.delivery.metrics,
-      earnings: req.delivery.earnings,
-      wallet: req.delivery.wallet,
+      earnings: walletData || req.delivery.earnings,
       level: req.delivery.level,
       lastLogin: req.delivery.lastLogin
     }

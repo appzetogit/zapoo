@@ -129,16 +129,6 @@ const userSchema = new mongoose.Schema({
       default: Date.now
     }
   }],
-  wallet: {
-    balance: {
-      type: Number,
-      default: 0
-    },
-    currency: {
-      type: String,
-      default: 'INR'
-    }
-  },
   goldMembership: {
     isActive: {
       type: Boolean,

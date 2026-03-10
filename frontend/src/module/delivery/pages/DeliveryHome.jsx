@@ -591,7 +591,6 @@ export default function DeliveryHome() {
   const [orderDeliveredIsAnimatingToComplete, setOrderDeliveredIsAnimatingToComplete] = useState(false);
   const orderDeliveredButtonRef = useRef(null);
   // Trip distance and time from Google Maps API
-<<<<<<< HEAD
   const [tripDistance, setTripDistance] = useState(null); // in meters
   const [tripTime, setTripTime] = useState(null); // in seconds
   const pickupRouteDistanceRef = useRef(0); // Distance to pickup in meters
@@ -601,9 +600,6 @@ export default function DeliveryHome() {
   const orderDeliveredSwipeStartX = useRef(0);
   const orderDeliveredSwipeStartY = useRef(0);
   const orderDeliveredIsSwiping = useRef(false);
-  const [earningsGuaranteeIsPlaying, setEarningsGuaranteeIsPlaying] = useState(true);
-  const [earningsGuaranteeAudioTime, setEarningsGuaranteeAudioTime] = useState("00:00");
-  const earningsGuaranteeAudioRef = useRef(null);
   const bottomSheetRef = useRef(null);
   const handleRef = useRef(null);
   const acceptButtonRef = useRef(null);
@@ -613,27 +609,6 @@ export default function DeliveryHome() {
   const acceptButtonSwipeStartY = useRef(0);
   const acceptButtonIsSwiping = useRef(false);
   const autoShowTimerRef = useRef(null);
-=======
-  const [tripDistance, setTripDistance] = useState(null) // in meters
-  const [tripTime, setTripTime] = useState(null) // in seconds
-  const pickupRouteDistanceRef = useRef(0) // Distance to pickup in meters
-  const pickupRouteTimeRef = useRef(0) // Time to pickup in seconds
-  const deliveryRouteDistanceRef = useRef(0) // Distance to delivery in meters
-  const deliveryRouteTimeRef = useRef(0) // Time to delivery in seconds
-  const orderDeliveredSwipeStartX = useRef(0)
-  const orderDeliveredSwipeStartY = useRef(0)
-  const orderDeliveredIsSwiping = useRef(false)
-  const bottomSheetRef = useRef(null)
-  const handleRef = useRef(null)
-  const acceptButtonRef = useRef(null)
-  const swipeStartY = useRef(0)
-  const isSwiping = useRef(false)
-  const acceptButtonSwipeStartX = useRef(0)
-  const acceptButtonSwipeStartY = useRef(0)
-  const acceptButtonIsSwiping = useRef(false)
-  const autoShowTimerRef = useRef(null)
-
->>>>>>> 6bbb4ca (Challenges flow implemented)
   const {
     bookedGigs,
     currentGig,
@@ -786,20 +761,20 @@ export default function DeliveryHome() {
   // Calculate today's gigs count
   const todayGigsCount = bookedGigs.filter(gig => gig.date === todayDateKey).length;
 
-<<<<<<< HEAD
-  // Calculate weekly earnings from wallet transactions (payment + earning_addon bonus)
-  // Include both payment and earning_addon transactions in weekly earnings
-  const weeklyEarnings = walletState?.transactions?.filter(t => {
-    // Include both payment and earning_addon transactions
-    if (t.type !== 'payment' && t.type !== 'earning_addon' || t.status !== 'Completed') return false;
-    const now = new Date();
-    const startOfWeek = new Date(now);
-    startOfWeek.setDate(now.getDate() - now.getDay());
-    startOfWeek.setHours(0, 0, 0, 0);
-    const transactionDate = t.date ? new Date(t.date) : t.createdAt ? new Date(t.createdAt) : null;
-    if (!transactionDate) return false;
-    return transactionDate >= startOfWeek && transactionDate <= now;
-  }).reduce((sum, t) => sum + (t.amount || 0), 0) || 0;
+  // Calculate weekly earnings from wallet transactions
+  const weeklyEarnings = walletState?.transactions
+    ?.filter(t => {
+      // Include only completed payment transactions
+      if (t.type !== "payment" || t.status !== "Completed") return false;
+      const now = new Date();
+      const startOfWeek = new Date(now);
+      startOfWeek.setDate(now.getDate() - now.getDay());
+      startOfWeek.setHours(0, 0, 0, 0);
+      const transactionDate = t.date ? new Date(t.date) : (t.createdAt ? new Date(t.createdAt) : null);
+      if (!transactionDate) return false;
+      return transactionDate >= startOfWeek && transactionDate <= now;
+    })
+    .reduce((sum, t) => sum + (t.amount || 0), 0) || 0;
 
   // Calculate weekly orders count from transactions
   const calculateWeeklyOrders = () => {
@@ -812,156 +787,13 @@ export default function DeliveryHome() {
     startOfWeek.setHours(0, 0, 0, 0);
     return walletState.transactions.filter(t => {
       // Count payment transactions (completed orders)
-      if (t.type !== 'payment' || t.status !== 'Completed') return false;
-      const transactionDate = t.date ? new Date(t.date) : t.createdAt ? new Date(t.createdAt) : null;
+      if (t.type !== "payment" || t.status !== "Completed") return false;
+      const transactionDate = t.date ? new Date(t.date) : (t.createdAt ? new Date(t.createdAt) : null);
       if (!transactionDate) return false;
       return transactionDate >= startOfWeek && transactionDate <= now;
     }).length;
   };
   const weeklyOrders = calculateWeeklyOrders();
-
-  // State for active earning addon
-  const [activeEarningAddon, setActiveEarningAddon] = useState(null);
-
-  // Fetch active earning addon offers
-  useEffect(() => {
-    const fetchActiveEarningAddons = async () => {
-      try {
-        const response = await deliveryAPI.getActiveEarningAddons();
-        if (response?.data?.success && response?.data?.data?.activeOffers) {
-          const offers = response.data.data.activeOffers;
-          // Get the first valid active offer (prioritize isValid, then isUpcoming, then any active status)
-          const activeOffer = offers.find(offer => offer.isValid) || offers.find(offer => offer.isUpcoming) || offers.find(offer => offer.status === 'active') || offers[0] || null;
-          setActiveEarningAddon(activeOffer);
-        } else {
-          setActiveEarningAddon(null);
-        }
-      } catch (error) {
-        // Suppress network errors - backend might be down or endpoint not available
-        if (error.code === 'ERR_NETWORK') {
-          // Silently handle network errors - backend might not be running
-          setActiveEarningAddon(null);
-          return;
-        }
-
-        // Skip logging timeout errors (handled by axios interceptor)
-        if (error.code !== 'ECONNABORTED' && !error.message?.includes('timeout')) {
-          // Only log non-network errors
-          if (error.response) {
-            console.error('Error fetching active earning addons:', error.response?.data || error.message);
-          }
-        }
-        setActiveEarningAddon(null);
-      }
-    };
-
-    // Fetch immediately on mount
-    fetchActiveEarningAddons();
-
-    // Refresh every 5 seconds to get latest offers
-    const refreshInterval = setInterval(() => {
-      fetchActiveEarningAddons();
-    }, 5000);
-
-    // Refresh when page becomes visible
-    const handleVisibilityChange = () => {
-      if (!document.hidden) {
-        fetchActiveEarningAddons();
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    // Also listen for focus events for instant refresh
-    const handleFocus = () => {
-      fetchActiveEarningAddons();
-    };
-    window.addEventListener('focus', handleFocus);
-    return () => {
-      clearInterval(refreshInterval);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('focus', handleFocus);
-    };
-  }, []);
-
-  // Calculate bonus earnings from earning_addon transactions (only for active offer)
-  const calculateBonusEarnings = () => {
-    if (!activeEarningAddon || !walletState?.transactions) return 0;
-    const now = new Date();
-    const startDate = activeEarningAddon.startDate ? new Date(activeEarningAddon.startDate) : null;
-    const endDate = activeEarningAddon.endDate ? new Date(activeEarningAddon.endDate) : null;
-    return walletState.transactions.filter(t => {
-      // Only count earning_addon type transactions
-      if (t.type !== 'earning_addon' || t.status !== 'Completed') return false;
-
-      // Filter by date range if offer has dates
-      if (startDate || endDate) {
-        const transactionDate = t.date ? new Date(t.date) : t.createdAt ? new Date(t.createdAt) : null;
-        if (!transactionDate) return false;
-        if (startDate && transactionDate < startDate) return false;
-        if (endDate && transactionDate > endDate) return false;
-      }
-
-      // Check if transaction is related to current offer
-      if (t.metadata?.earningAddonId) {
-        return t.metadata.earningAddonId === activeEarningAddon._id?.toString() || t.metadata.earningAddonId === activeEarningAddon.id?.toString();
-      }
-
-      // If no metadata, include all earning_addon transactions in date range
-      return true;
-    }).reduce((sum, t) => sum + (t.amount || 0), 0);
-  };
-
-  // Earnings Guarantee - Use active earning addon if available, otherwise show 0
-  // When no offer is active, show 0 of 0 and ₹0
-  const earningsGuaranteeTarget = activeEarningAddon?.earningAmount || 0;
-  const earningsGuaranteeOrdersTarget = activeEarningAddon?.requiredOrders || 0;
-  // Only show current orders/earnings if there's an active offer
-  const earningsGuaranteeCurrentOrders = activeEarningAddon ? activeEarningAddon.currentOrders ?? weeklyOrders : 0;
-  // Show only bonus earnings from the offer, not total weekly earnings
-  const earningsGuaranteeCurrentEarnings = activeEarningAddon ? calculateBonusEarnings() : 0;
-  const ordersProgress = earningsGuaranteeOrdersTarget > 0 ? Math.min(earningsGuaranteeCurrentOrders / earningsGuaranteeOrdersTarget, 1) : 0;
-  const earningsProgress = earningsGuaranteeTarget > 0 ? Math.min(earningsGuaranteeCurrentEarnings / earningsGuaranteeTarget, 1) : 0;
-
-  // Get week end date for valid till - use offer end date if available
-  const getWeekEndDate = () => {
-    if (activeEarningAddon?.endDate) {
-      const endDate = new Date(activeEarningAddon.endDate);
-      const day = endDate.getDate();
-      const month = endDate.toLocaleString('en-US', {
-        month: 'short'
-      });
-      return `${day} ${month}`;
-    }
-    const now = new Date();
-    const endOfWeek = new Date(now);
-    endOfWeek.setDate(now.getDate() - now.getDay() + 6); // End of week (Saturday)
-    const day = endOfWeek.getDate();
-    const month = endOfWeek.toLocaleString('en-US', {
-      month: 'short'
-    });
-    return `${day} ${month}`;
-  };
-  const weekEndDate = getWeekEndDate();
-  // Offer is live if it's valid (started) or upcoming (not started yet but active)
-  const isOfferLive = activeEarningAddon?.isValid || activeEarningAddon?.isUpcoming || false;
-
-=======
-  // Calculate weekly earnings from wallet transactions
-  const weeklyEarnings = walletState?.transactions
-    ?.filter(t => {
-      // Include only completed payment transactions
-      if (t.type !== 'payment' || t.status !== 'Completed') return false
-      const now = new Date()
-      const startOfWeek = new Date(now)
-      startOfWeek.setDate(now.getDate() - now.getDay())
-      startOfWeek.setHours(0, 0, 0, 0)
-      const transactionDate = t.date ? new Date(t.date) : (t.createdAt ? new Date(t.createdAt) : null)
-      if (!transactionDate) return false
-      return transactionDate >= startOfWeek && transactionDate <= now
-    })
-    .reduce((sum, t) => sum + (t.amount || 0), 0) || 0
-
->>>>>>> 6bbb4ca (Challenges flow implemented)
   // Calculate total hours worked today (prefer store, then calculated; default to 0)
   const calculatedHours = bookedGigs.filter(gig => gig.date === todayDateKey).reduce((total, gig) => total + (gig.totalHours || 0), 0);
   const todayHoursWorked = hasStoreDataForToday && todayData ? todayData.timeOnOrders ?? calculatedHours : calculatedHours;
@@ -1269,34 +1101,6 @@ export default function DeliveryHome() {
       setCountdownSeconds(300);
     }
   }, [showNewOrderPopup]);
-
-<<<<<<< HEAD
-  // Simulate audio playback for Earnings Guarantee
-  useEffect(() => {
-    if (earningsGuaranteeIsPlaying) {
-      // Simulate audio time progression
-      let time = 0;
-      const interval = setInterval(() => {
-        time += 1;
-        const minutes = Math.floor(time / 60);
-        const seconds = time % 60;
-        setEarningsGuaranteeAudioTime(`${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`);
-
-        // Stop after 10 seconds (simulating audio length)
-        if (time >= 10) {
-          setEarningsGuaranteeIsPlaying(false);
-          clearInterval(interval);
-        }
-      }, 1000);
-      return () => clearInterval(interval);
-    }
-  }, [earningsGuaranteeIsPlaying]);
-  const toggleEarningsGuaranteeAudio = () => {
-    setEarningsGuaranteeIsPlaying(!earningsGuaranteeIsPlaying);
-  };
-
-=======
->>>>>>> 6bbb4ca (Challenges flow implemented)
   // Reject reasons for order cancellation
   const rejectReasons = ["Too far from current location", "Vehicle issue", "Personal emergency", "Weather conditions", "Already have too many orders", "Other reason"];
 
@@ -7111,9 +6915,10 @@ export default function DeliveryHome() {
   }, [mapLoading, riderLocation]);
 
   // Render normal feed view when offline or no gig booked
-  return <div className="min-h-screen bg-[#f6e9dc] overflow-x-hidden flex flex-col" style={{
-    height: '100vh'
-  }}>
+  return (
+    <div className="min-h-screen bg-[#f6e9dc] overflow-x-hidden flex flex-col" style={{
+      height: "100vh"
+    }}>
       {/* Top Navigation Bar */}
       <FeedNavbar isOnline={isOnline} onToggleOnline={handleToggleOnline} onEmergencyClick={() => setShowEmergencyPopup(true)} onHelpClick={() => setShowHelpPopup(true)} />
 
@@ -7559,125 +7364,6 @@ export default function DeliveryHome() {
                   <ArrowRight className="w-5 h-5" />
                 </button>
               </motion.div>
-<<<<<<< HEAD
-
-
-              {/* Earnings Guarantee Card */}
-              <motion.div initial={{
-            opacity: 0,
-            y: -10
-          }} animate={{
-            opacity: 1,
-            y: 0
-          }} transition={{
-            duration: 0.3,
-            delay: 0.25
-          }} className="w-full rounded-xl overflow-hidden shadow-lg bg-white">
-                {/* Header */}
-                <div className="border-b  border-gray-100">
-                  <div className="flex p-2 px-3 items-center justify-between bg-black">
-                    <div className="flex-1">
-                      <h2 className="text-lg font-bold text-white mb-1">Earnings Guarantee</h2>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm text-white">Valid till {weekEndDate}</span>
-                        {isOfferLive && <div className="flex items-center gap-1">
-                            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                            <span className="text-sm text-green-600 font-medium">Live</span>
-                          </div>}
-                      </div>
-                    </div>
-                    {/* Summary Box */}
-                    <div className="bg-black text-white px-4 py-3 rounded-lg text-center min-w-[80px]">
-                      <div className="text-2xl font-bold">₹{earningsGuaranteeTarget.toFixed(0)}</div>
-                      <div className="text-xs text-white/80 mt-1">{earningsGuaranteeOrdersTarget} orders</div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Progress Circles */}
-                <div className="px-6 py-6">
-                  <div className="flex items-center justify-around gap-6">
-                    {/* Orders Progress Circle */}
-                    <motion.div initial={{
-                  scale: 0.8,
-                  opacity: 0
-                }} animate={{
-                  scale: 1,
-                  opacity: 1
-                }} transition={{
-                  delay: 0.4,
-                  duration: 0.5,
-                  type: "spring"
-                }} className="flex flex-col items-center">
-                      <div className="relative w-32 h-32">
-                        <svg className="w-32 h-32 transform -rotate-90" viewBox="0 0 120 120">
-                          {/* Background circle */}
-                          <circle cx="60" cy="60" r="50" fill="none" stroke="#e5e7eb" strokeWidth="8" />
-                          {/* Progress circle */}
-                          <motion.circle cx="60" cy="60" r="50" fill="none" stroke="#000000" strokeWidth="8" strokeLinecap="round" initial={{
-                        pathLength: 0
-                      }} animate={{
-                        pathLength: ordersProgress
-                      }} transition={{
-                        delay: 0.6,
-                        duration: 1,
-                        ease: "easeOut"
-                      }} />
-                        </svg>
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <span className="text-xl font-bold text-gray-900">{earningsGuaranteeCurrentOrders} of {earningsGuaranteeOrdersTarget || 0}</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 mt-3">
-                        <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                        <span className="text-sm font-medium text-gray-700">Orders</span>
-                      </div>
-                    </motion.div>
-
-                    {/* Earnings Progress Circle */}
-                    <motion.div initial={{
-                  scale: 0.8,
-                  opacity: 0
-                }} animate={{
-                  scale: 1,
-                  opacity: 1
-                }} transition={{
-                  delay: 0.5,
-                  duration: 0.5,
-                  type: "spring"
-                }} className="flex flex-col items-center">
-                      <div className="relative w-32 h-32">
-                        <svg className="w-32 h-32 transform -rotate-90" viewBox="0 0 120 120">
-                          {/* Background circle */}
-                          <circle cx="60" cy="60" r="50" fill="none" stroke="#e5e7eb" strokeWidth="8" />
-                          {/* Progress circle */}
-                          <motion.circle cx="60" cy="60" r="50" fill="none" stroke="#000000" strokeWidth="8" strokeLinecap="round" initial={{
-                        pathLength: 0
-                      }} animate={{
-                        pathLength: earningsProgress
-                      }} transition={{
-                        delay: 0.7,
-                        duration: 1,
-                        ease: "easeOut"
-                      }} />
-                        </svg>
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <span className="text-lg font-bold text-gray-900">₹{earningsGuaranteeCurrentEarnings.toFixed(2)}</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 mt-3">
-                        <IndianRupee className="w-5 h-5 text-gray-700" />
-                        <span className="text-sm font-medium text-gray-700">Earnings</span>
-                      </div>
-                    </motion.div>
-                  </div>
-                </div>
-              </motion.div>
-
-=======
->>>>>>> 6bbb4ca (Challenges flow implemented)
               {/* Today's Progress Card */}
               <motion.div initial={{
             opacity: 0,
@@ -9047,11 +8733,6 @@ export default function DeliveryHome() {
             </div>
           </motion.div>}
       </AnimatePresence>
-<<<<<<< HEAD
-    </div>;
-}
-=======
     </div>
-  )
+  );
 }
->>>>>>> 6bbb4ca (Challenges flow implemented)

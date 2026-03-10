@@ -20,6 +20,7 @@ const locationSchema = new mongoose.Schema({
   city: String,
   state: String,
   landmark: String,
+  // Canonical postal field. Legacy fields pincode/postalCode remain for backward compatibility.
   zipCode: String,
   pincode: String,
   postalCode: String,
@@ -368,11 +369,8 @@ const restaurantSchema = new mongoose.Schema(
   },
 );
 
-// Indexes for authentication
+// Indexes for authentication and geo queries
 restaurantSchema.index({ "location.coordinates": "2dsphere" });
-// restaurantSchema.index({ email: 1 }, { unique: true, sparse: true });
-// restaurantSchema.index({ phone: 1 }, { unique: true, sparse: true });
-// restaurantSchema.index({ googleId: 1 }, { unique: true, sparse: true });
 
 // Hash password before saving
 restaurantSchema.pre("save", async function (next) {
@@ -435,6 +433,31 @@ restaurantSchema.pre("save", async function (next) {
       // Remove email from the document to prevent it from being saved
       this.$unset = this.$unset || {};
       this.$unset.email = "";
+    }
+  }
+
+  // Normalize location postal fields: ensure canonical zipCode is always populated
+  if (this.location) {
+    const loc = this.location;
+    const canonicalZip =
+      loc.zipCode ||
+      loc.pincode ||
+      loc.postalCode ||
+      (Array.isArray(loc.coordinates) && loc.coordinates.length === 2
+        ? loc.zipCode
+        : undefined);
+    if (canonicalZip) {
+      this.location.zipCode = canonicalZip;
+    }
+  }
+
+  // Normalize onboarding.step1 location postal fields if present
+  if (this.onboarding?.step1?.location) {
+    const stepLoc = this.onboarding.step1.location;
+    const canonicalZip =
+      stepLoc.zipCode || stepLoc.pincode || stepLoc.postalCode;
+    if (canonicalZip) {
+      this.onboarding.step1.location.zipCode = canonicalZip;
     }
   }
 

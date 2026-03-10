@@ -602,7 +602,28 @@ export const acceptOrder = asyncHandler(async (req, res) => {
     let estimatedEarnings = null;
     try {
       const DeliveryBoyCommission = (await import('../../admin/models/DeliveryBoyCommission.js')).default;
-      const commissionResult = await DeliveryBoyCommission.calculateCommission(deliveryDistance);
+
+      // Resolve tier name from restaurant zone if available
+      let tierName = null;
+      try {
+        const Zone = (await import('../../admin/models/Zone.js')).default;
+        const Tier = (await import('../../admin/models/Tier.js')).default;
+        const restaurantZoneId = updatedOrder.restaurantId?.zoneId;
+        if (restaurantZoneId) {
+          const zone = await Zone.findById(restaurantZoneId).select('tierId').lean();
+          if (zone?.tierId) {
+            const tier = await Tier.findById(zone.tierId).select('name').lean();
+            tierName = tier?.name || null;
+          }
+        }
+      } catch (tierError) {
+        console.error('Error resolving tier for delivery commission:', tierError.message);
+      }
+
+      const commissionResult = await DeliveryBoyCommission.calculateCommission(
+        deliveryDistance,
+        tierName
+      );
 
       // Validate commission result
       if (!commissionResult || !commissionResult.breakdown || typeof commissionResult.commission !== 'number' || isNaN(commissionResult.commission)) {

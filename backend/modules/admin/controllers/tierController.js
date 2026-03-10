@@ -1,6 +1,7 @@
 import Tier from "../models/Tier.js";
 import Zone from "../models/Zone.js";
 import { errorResponse, successResponse } from "../../../shared/utils/response.js";
+import { syncCommissionRulesForTier } from "../services/deliveryCommissionSyncService.js";
 const normalizeDistanceSlabs = (distanceSlabs = []) => distanceSlabs.map(slab => ({
   _id: slab._id,
   name: String(slab.name || "").trim(),
@@ -116,6 +117,18 @@ export const createTier = async (req, res) => {
       recommendedItemFee: recommendedItemFee || 0,
       platformFee: platformFee || 0
     });
+
+    // Sync delivery commission rules for this tier based on its distance slabs
+    try {
+      await syncCommissionRulesForTier({
+        tierName: tier.name,
+        deliveryPricing: tier.deliveryPricing,
+        adminId: req.admin?._id || null
+      });
+    } catch (syncError) {
+      console.error("Error syncing delivery commission rules for new tier:", syncError);
+    }
+
     return successResponse(res, 201, "Tier created successfully", tier);
   } catch (error) {
     console.error("Error creating tier:", error);
@@ -244,6 +257,17 @@ export const updateTier = async (req, res) => {
       tier.platformFee = Number(platformFee);
     }
     await tier.save();
+
+    // Sync delivery commission rules whenever tier delivery pricing / slabs change
+    try {
+      await syncCommissionRulesForTier({
+        tierName: tier.name,
+        deliveryPricing: tier.deliveryPricing,
+        adminId: req.admin?._id || null
+      });
+    } catch (syncError) {
+      console.error("Error syncing delivery commission rules for updated tier:", syncError);
+    }
 
     // Propagate pricing to non-overridden zones
     if (baseFee !== undefined || freeDeliveryThreshold !== undefined || baseDistance !== undefined || extraKmCharge !== undefined || basePay !== undefined) {

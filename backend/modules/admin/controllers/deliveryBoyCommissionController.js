@@ -6,7 +6,7 @@ import mongoose from 'mongoose';
 /**
  * Get all commission rules
  * GET /api/admin/delivery-boy-commission
- * Query params: status, search, page, limit
+ * Query params: status, search, page, limit, tier
  */
 export const getCommissionRules = asyncHandler(async (req, res) => {
   try {
@@ -14,7 +14,8 @@ export const getCommissionRules = asyncHandler(async (req, res) => {
       status,
       search,
       page = 1,
-      limit = 100
+      limit = 100,
+      tier
     } = req.query;
 
     // Build query
@@ -23,6 +24,11 @@ export const getCommissionRules = asyncHandler(async (req, res) => {
     // Status filter
     if (status !== undefined) {
       query.status = status === 'true' || status === true;
+    }
+
+    // Tier filter
+    if (tier) {
+      query.tier = tier;
     }
 
     // Search filter
@@ -115,7 +121,8 @@ export const createCommissionRule = asyncHandler(async (req, res) => {
       maxDistance,
       commissionPerKm,
       basePayout,
-      status
+      status,
+      tier
     } = req.body;
 
     // Check if admin is authenticated
@@ -153,9 +160,10 @@ export const createCommissionRule = asyncHandler(async (req, res) => {
       return errorResponse(res, 400, 'Base payout must be 0 or greater');
     }
 
-    // Check for overlapping ranges
+    // Check for overlapping ranges (within the same tier, or default if no tier provided)
     const existingRules = await DeliveryBoyCommission.find({
-      status: true
+      status: true,
+      ...(tier ? { tier } : {})
     });
     const newMinDist = parseFloat(minDistance);
     const newMaxDist = maxDistance === null || maxDistance === undefined ? null : parseFloat(maxDistance);
@@ -198,6 +206,7 @@ export const createCommissionRule = asyncHandler(async (req, res) => {
       commissionPerKm: parseFloat(commissionPerKm),
       basePayout: parseFloat(basePayout),
       status: status !== undefined ? status : true,
+      tier: tier || 'default',
       createdBy: new mongoose.Types.ObjectId(adminId)
     };
     const commission = new DeliveryBoyCommission(commissionData);
@@ -280,7 +289,8 @@ export const updateCommissionRule = asyncHandler(async (req, res) => {
       maxDistance,
       commissionPerKm,
       basePayout,
-      status
+      status,
+      tier
     } = req.body;
     const adminId = req.admin._id;
     if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -315,7 +325,8 @@ export const updateCommissionRule = asyncHandler(async (req, res) => {
       status: true,
       _id: {
         $ne: id
-      }
+      },
+      tier: tier !== undefined ? tier : commission.tier || 'default'
     });
     for (const rule of existingRules) {
       const ruleMin = parseFloat(rule.minDistance);
@@ -351,6 +362,7 @@ export const updateCommissionRule = asyncHandler(async (req, res) => {
     if (commissionPerKm !== undefined) commission.commissionPerKm = parseFloat(commissionPerKm);
     if (basePayout !== undefined) commission.basePayout = parseFloat(basePayout);
     if (status !== undefined) commission.status = status;
+    if (tier !== undefined) commission.tier = tier || 'default';
     commission.updatedBy = adminId;
     await commission.save();
     const populatedCommission = await DeliveryBoyCommission.findById(commission._id).populate('createdBy', 'name email').populate('updatedBy', 'name email').lean();

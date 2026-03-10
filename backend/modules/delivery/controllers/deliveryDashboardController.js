@@ -70,12 +70,23 @@ export const getDashboard = asyncHandler(async (req, res) => {
     const joiningBonusClaimed = wallet?.joiningBonusClaimed || false;
     const joiningBonusValidTill = new Date('2025-12-10'); // Valid till 10 December 2025
 
-    // Calculate wallet balance (using new DeliveryWallet model)
+    // Calculate wallet balance (using new DeliveryWallet model only; embedded delivery.earnings is deprecated)
     const walletBalance = wallet?.totalBalance || 0;
-    const totalEarned = wallet?.totalEarned || delivery.earnings?.totalEarned || 0;
-    const currentBalance = wallet?.totalBalance || delivery.earnings?.currentBalance || 0;
-    const pendingPayout = wallet?.transactions?.filter(t => t.type === 'withdrawal' && t.status === 'Pending').reduce((sum, t) => sum + t.amount, 0) || delivery.earnings?.pendingPayout || 0;
-    const tips = wallet?.transactions?.filter(t => t.type === 'payment' && t.description?.toLowerCase().includes('tip')).reduce((sum, t) => sum + t.amount, 0) || delivery.earnings?.tips || 0;
+    const totalEarned = wallet?.totalEarned || 0;
+    const currentBalance = wallet?.totalBalance || 0;
+    const pendingPayout =
+      wallet?.transactions
+        ?.filter(t => t.type === 'withdrawal' && t.status === 'Pending')
+        .reduce((sum, t) => sum + t.amount, 0) || wallet?.pendingPayout || 0;
+    const tips =
+      wallet?.transactions
+        ?.filter(
+          t =>
+            t.type === 'payment' &&
+            typeof t.description === 'string' &&
+            t.description.toLowerCase().includes('tip')
+        )
+        .reduce((sum, t) => sum + t.amount, 0) || wallet?.tips || 0;
 
     // Calculate weekly earnings (last 7 days)
     const sevenDaysAgo = new Date();

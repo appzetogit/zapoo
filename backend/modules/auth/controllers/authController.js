@@ -546,6 +546,28 @@ export const resetPassword = asyncHandler(async (req, res) => {
  */
 export const getCurrentUser = asyncHandler(async (req, res) => {
   // User is attached by authenticate middleware
+  // Wallet is sourced from UserWallet to avoid relying on embedded User.wallet
+  let walletData = {
+    balance: 0,
+    currency: "INR",
+  };
+  try {
+    const { default: UserWallet } = await import("../../user/models/UserWallet.js");
+    const wallet = await UserWallet.findOne({ userId: req.user._id }).lean();
+    if (wallet) {
+      walletData = {
+        balance: wallet.balance || 0,
+        currency: wallet.currency || "INR",
+      };
+    }
+  } catch (e) {
+    // On any error, fall back to zero balance; do not break /me
+    walletData = {
+      balance: 0,
+      currency: "INR",
+    };
+  }
+
   return successResponse(res, 200, "User retrieved successfully", {
     user: {
       id: req.user._id,
@@ -557,12 +579,12 @@ export const getCurrentUser = asyncHandler(async (req, res) => {
       profileImage: req.user.profileImage,
       signupMethod: req.user.signupMethod,
       preferences: req.user.preferences,
-      wallet: req.user.wallet,
+      wallet: walletData,
       // Include additional profile fields
       dateOfBirth: req.user.dateOfBirth,
       anniversary: req.user.anniversary,
-      gender: req.user.gender
-    }
+      gender: req.user.gender,
+    },
   });
 });
 

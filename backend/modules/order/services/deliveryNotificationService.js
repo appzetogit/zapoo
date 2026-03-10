@@ -141,9 +141,29 @@ export async function notifyDeliveryBoyNewOrder(order, deliveryPartnerId) {
       deliveryDistance = calculateDistance(restaurantLat, restaurantLng, customerLat, customerLng);
     }
 
+    // Resolve tier name from restaurant zone if available
+    let tierName = null;
+    try {
+      const Zone = (await import('../../admin/models/Zone.js')).default;
+      const Tier = (await import('../../admin/models/Tier.js')).default;
+      const restaurantZoneId = restaurant?.zoneId;
+      if (restaurantZoneId) {
+        const zone = await Zone.findById(restaurantZoneId).select('tierId').lean();
+        if (zone?.tierId) {
+          const tier = await Tier.findById(zone.tierId).select('name').lean();
+          tierName = tier?.name || null;
+        }
+      }
+    } catch (tierError) {
+      console.error('Error resolving tier for notification earnings:', tierError.message);
+    }
+
     // Calculate estimated earnings; use order's delivery fee as fallback when 0 or distance missing
     const deliveryFeeFromOrder = order.pricing?.deliveryFee ?? 0;
-    let estimatedEarnings = await calculateEstimatedEarnings(deliveryDistance || 0);
+    let estimatedEarnings = await calculateEstimatedEarnings(
+      deliveryDistance || 0,
+      tierName
+    );
     const earnedValue = typeof estimatedEarnings === 'object' ? estimatedEarnings.totalEarning ?? 0 : Number(estimatedEarnings) || 0;
     if (earnedValue <= 0 && deliveryFeeFromOrder > 0) {
       estimatedEarnings = typeof estimatedEarnings === 'object' ? {
@@ -362,7 +382,10 @@ export async function notifyMultipleDeliveryBoys(order, deliveryPartnerIds, phas
     let estimatedEarnings = null;
     const deliveryFeeFromOrder = orderWithUser.pricing?.deliveryFee ?? 0;
     try {
-      estimatedEarnings = await calculateEstimatedEarnings(deliveryDistance);
+      estimatedEarnings = await calculateEstimatedEarnings(
+        deliveryDistance,
+        tierName
+      );
       const earnedValue = typeof estimatedEarnings === 'object' ? estimatedEarnings.totalEarning ?? 0 : Number(estimatedEarnings) || 0;
       // Use deliveryFee as fallback if earnings is 0 or invalid
       if (earnedValue <= 0 && deliveryFeeFromOrder > 0) {
@@ -553,14 +576,17 @@ function calculateDistance(lat1, lng1, lat2, lng2) {
  * Calculate estimated earnings for delivery boy based on admin commission rules
  * Uses DeliveryBoyCommission model to calculate: Base Payout + (Distance × Per Km) if distance > minDistance
  */
-async function calculateEstimatedEarnings(deliveryDistance) {
+async function calculateEstimatedEarnings(deliveryDistance, tierName = null) {
   try {
     const DeliveryBoyCommission = (await import('../../admin/models/DeliveryBoyCommission.js')).default;
 
     // Always use calculateCommission method which handles all cases including distance = 0
     // It will return base payout even if distance is 0
     const deliveryDistanceForCalc = deliveryDistance || 0;
-    const commissionResult = await DeliveryBoyCommission.calculateCommission(deliveryDistanceForCalc);
+    const commissionResult = await DeliveryBoyCommission.calculateCommission(
+      deliveryDistanceForCalc,
+      tierName
+    );
 
     // If distance is 0 or not provided, payout remains 0 (0 km excluded from payout range)
     if (!deliveryDistance || deliveryDistance <= 0) {

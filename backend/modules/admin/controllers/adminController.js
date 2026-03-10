@@ -1030,6 +1030,19 @@ export const getUserById = asyncHandler(async (req, res) => {
       month: "short",
       year: "numeric"
     });
+    // Load wallet from UserWallet as source of truth
+    const { default: UserWallet } = await import("../../user/models/UserWallet.js");
+    const walletDoc = await UserWallet.findOne({ userId: user._id }).lean();
+    const walletData = walletDoc
+      ? {
+          balance: walletDoc.balance || 0,
+          currency: walletDoc.currency || "INR",
+        }
+      : {
+          balance: 0,
+          currency: "INR",
+        };
+
     return successResponse(res, 200, "User retrieved successfully", {
       user: {
         id: user._id.toString(),
@@ -1043,7 +1056,7 @@ export const getUserById = asyncHandler(async (req, res) => {
         isActive: user.isActive !== false,
         addresses: user.addresses || [],
         preferences: user.preferences || {},
-        wallet: user.wallet || {},
+        wallet: walletData,
         dateOfBirth: user.dateOfBirth || null,
         anniversary: user.anniversary || null,
         gender: user.gender || null,

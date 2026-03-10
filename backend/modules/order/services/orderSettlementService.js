@@ -41,7 +41,6 @@ export const calculateOrderSettlement = async (orderId) => {
       throw new Error('Restaurant not found');
     }
 
-    let tierDistanceSlabs = [];
     let tierMeta = null;
     if (restaurant.zoneId) {
       const zone = await Zone.findById(restaurant.zoneId).select('tierId').lean();
@@ -49,9 +48,6 @@ export const calculateOrderSettlement = async (orderId) => {
         const tier = await Tier.findById(zone.tierId).select('name deliveryPricing.distanceSlabs').lean();
         if (tier) {
           tierMeta = { id: tier._id, name: tier.name };
-          tierDistanceSlabs = Array.isArray(tier?.deliveryPricing?.distanceSlabs)
-            ? tier.deliveryPricing.distanceSlabs
-            : [];
         }
       }
     }
@@ -106,7 +102,10 @@ export const calculateOrderSettlement = async (orderId) => {
 
     if (order.deliveryPartnerId && order.assignmentInfo?.distance !== undefined && order.assignmentInfo?.distance !== null) {
       const distance = order.assignmentInfo.distance;
-      const deliveryCommission = await DeliveryBoyCommission.calculateCommission(distance);
+      const deliveryCommission = await DeliveryBoyCommission.calculateCommission(
+        distance,
+        tierMeta?.name || null
+      );
       const surgeMultiplier = order.assignmentInfo?.surgeMultiplier || 1;
       const baseEarning = deliveryCommission.commission;
       const surgeAmount = baseEarning * (surgeMultiplier - 1);

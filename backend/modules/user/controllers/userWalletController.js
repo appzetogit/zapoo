@@ -366,11 +366,6 @@ export const verifyTopupPayment = asyncHandler(async (req, res) => {
     });
     await wallet.save();
 
-    // Update user's wallet balance in User model (for backward compatibility)
-    await User.findByIdAndUpdate(user._id, {
-      'wallet.balance': wallet.balance,
-      'wallet.currency': wallet.currency
-    });
     return successResponse(res, 200, 'Money added to wallet successfully', {
       transaction: {
         id: transaction._id,
@@ -443,11 +438,6 @@ export const addMoney = asyncHandler(async (req, res) => {
     });
     await wallet.save();
 
-    // Update user's wallet balance in User model (for backward compatibility)
-    await User.findByIdAndUpdate(user._id, {
-      'wallet.balance': wallet.balance,
-      'wallet.currency': wallet.currency
-    });
     return successResponse(res, 201, 'Money added to wallet successfully', {
       transaction: {
         id: transaction._id,
@@ -520,11 +510,6 @@ export const deductMoney = asyncHandler(async (req, res) => {
     });
     await wallet.save();
 
-    // Update user's wallet balance in User model (for backward compatibility)
-    await User.findByIdAndUpdate(user._id, {
-      'wallet.balance': wallet.balance,
-      'wallet.currency': wallet.currency
-    });
     return successResponse(res, 200, 'Payment processed successfully', {
       transaction: {
         id: transaction._id,
@@ -595,11 +580,6 @@ export const addRefund = asyncHandler(async (req, res) => {
     });
     await wallet.save();
 
-    // Update user's wallet balance in User model (for backward compatibility)
-    await User.findByIdAndUpdate(user._id, {
-      'wallet.balance': wallet.balance,
-      'wallet.currency': wallet.currency
-    });
     return successResponse(res, 201, 'Refund added to wallet successfully', {
       transaction: {
         id: transaction._id,

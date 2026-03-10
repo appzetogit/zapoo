@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react"
-import { Search, Edit, Trash2, IndianRupee, Settings, Check, Columns, MapPin, Loader2 } from "lucide-react"
+import { Search, Edit, Trash2, IndianRupee, MapPin, Loader2 } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
-import { adminAPI } from "@/lib/api"
+import { adminAPI, tierAPI } from "@/lib/api"
 import { API_BASE_URL } from "@/lib/api/config"
 import { toast } from "sonner"
 
@@ -13,39 +13,61 @@ export default function DeliveryBoyCommission() {
   const [deleting, setDeleting] = useState(false)
   const [isAddEditOpen, setIsAddEditOpen] = useState(false)
   const [isDeleteOpen, setIsDeleteOpen] = useState(false)
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [selectedCommission, setSelectedCommission] = useState(null)
+  const [selectedTier, setSelectedTier] = useState("")
+  const [tiers, setTiers] = useState([])
   const [formData, setFormData] = useState({
-    name: "",
     minDistance: "",
     maxDistance: "",
     commissionPerKm: "",
     basePayout: "",
   })
   const [formErrors, setFormErrors] = useState({})
-  const [visibleColumns, setVisibleColumns] = useState({
+  const [visibleColumns] = useState({
     si: true,
-    name: true,
-    minDistance: true,
-    maxDistance: true,
+    name: true, // will display distance slab label (e.g. 0–4.2 km)
     commissionPerKm: true,
     basePayout: true,
     status: true,
     actions: true,
   })
 
+  const availableTiers = useMemo(() => {
+    const tierSet = new Set()
+    // Add tiers from Tier Management API
+    tiers.forEach((t) => {
+      if (t?.name) tierSet.add(t.name)
+    })
+    // Also add any tiers that exist only in commission rules (fallback)
+    commissions.forEach((c) => {
+      if (c.tier) {
+        tierSet.add(c.tier)
+      }
+    })
+    return Array.from(tierSet)
+  }, [tiers, commissions])
+
   const filteredCommissions = useMemo(() => {
-    if (!searchQuery.trim()) {
-      return commissions
+    // If no tier is selected, don't show any rows
+    if (!selectedTier) {
+      return []
     }
-    
+
+    let baseList = commissions.filter(
+      (commission) => (commission.tier || "default") === selectedTier
+    )
+
+    if (!searchQuery.trim()) {
+      return baseList
+    }
+
     const query = searchQuery.toLowerCase().trim()
-    return commissions.filter(commission =>
+    return baseList.filter(commission =>
       commission.name.toLowerCase().includes(query) ||
       commission.minDistance.toString().includes(query) ||
       (commission.maxDistance !== null && commission.maxDistance.toString().includes(query))
     )
-  }, [commissions, searchQuery])
+  }, [commissions, searchQuery, selectedTier])
 
   // Calculate total commission for a given distance
   const calculateTotalCommission = (commission, distance) => {
@@ -68,10 +90,38 @@ export default function DeliveryBoyCommission() {
     return calculateTotalCommission(commission, midDistance)
   }
 
-  // Fetch commission rules on component mount
+  // Fetch tiers and commission rules on component mount
   useEffect(() => {
-    fetchCommissionRules()
+    const load = async () => {
+      await Promise.all([fetchTiers(), fetchCommissionRules()])
+    }
+    load()
   }, [])
+
+  const fetchTiers = async () => {
+    try {
+      const res = await tierAPI.getAllTiers()
+      if (res?.data?.success && Array.isArray(res.data.data)) {
+        // Sort tiers by rank (ascending) so rank 1 comes first
+        const sortedTiers = [...res.data.data].sort((a, b) => {
+          const rankA = typeof a.rank === "number" ? a.rank : Number.MAX_SAFE_INTEGER
+          const rankB = typeof b.rank === "number" ? b.rank : Number.MAX_SAFE_INTEGER
+          return rankA - rankB
+        })
+        setTiers(sortedTiers)
+
+        // If no tier is currently selected, default to the highest priority (rank 1)
+        if (!selectedTier && sortedTiers.length > 0 && sortedTiers[0].name) {
+          setSelectedTier(sortedTiers[0].name)
+        }
+      } else {
+        setTiers([])
+      }
+    } catch (error) {
+      console.error("Error fetching tiers for DeliveryBoyCommission:", error)
+      setTiers([])
+    }
+  }
 
   const fetchCommissionRules = async () => {
     try {
@@ -94,7 +144,7 @@ export default function DeliveryBoyCommission() {
           ...commission,
           sl: index + 1
         }))
-        setCommissions(commissionsWithSl)
+      setCommissions(commissionsWithSl)
       } else {
         setCommissions([])
       }
@@ -147,7 +197,7 @@ export default function DeliveryBoyCommission() {
 
   const handleAdd = () => {
     setSelectedCommission(null)
-    setFormData({ name: "", minDistance: "", maxDistance: "", commissionPerKm: "", basePayout: "" })
+    setFormData({ minDistance: "", maxDistance: "", commissionPerKm: "", basePayout: "" })
     setFormErrors({})
     setIsAddEditOpen(true)
   }
@@ -155,7 +205,6 @@ export default function DeliveryBoyCommission() {
   const handleEdit = (commission) => {
     setSelectedCommission(commission)
     setFormData({
-      name: commission.name,
       minDistance: commission.minDistance.toString(),
       maxDistance: commission.maxDistance === null ? "" : commission.maxDistance.toString(),
       commissionPerKm: commission.commissionPerKm.toString(),
@@ -172,15 +221,7 @@ export default function DeliveryBoyCommission() {
 
   const confirmDelete = async () => {
     if (!selectedCommission) return
-    
-    // Prevent deletion if it's the only rule - always keep at least one rule
-    if (commissions.length <= 1) {
-      toast.error('Cannot delete the only commission rule. At least one rule must exist.')
-      setIsDeleteOpen(false)
-      setSelectedCommission(null)
-      return
-    }
-    
+
     try {
       setDeleting(true)
       await adminAPI.deleteCommissionRule(selectedCommission._id)
@@ -198,7 +239,6 @@ export default function DeliveryBoyCommission() {
 
   const validateForm = () => {
     const errors = {}
-    if (!formData.name.trim()) errors.name = "Name is required"
     if (!formData.minDistance.trim() || parseFloat(formData.minDistance) < 0) {
       errors.minDistance = "Minimum distance must be 0 or greater"
     }
@@ -208,8 +248,12 @@ export default function DeliveryBoyCommission() {
     if (!formData.commissionPerKm.trim() || parseFloat(formData.commissionPerKm) < 0) {
       errors.commissionPerKm = "Commission per km must be 0 or greater"
     }
-    if (!formData.basePayout.trim() || parseFloat(formData.basePayout) < 0) {
-      errors.basePayout = "Base payout must be 0 or greater"
+    const minDist = parseFloat(formData.minDistance || "0")
+    // Base payout is only required for the base slab starting at 0 km
+    if (minDist === 0) {
+      if (!formData.basePayout.trim() || parseFloat(formData.basePayout) < 0) {
+        errors.basePayout = "Base payout must be 0 or greater for base slab"
+      }
     }
     
     setFormErrors(errors)
@@ -218,16 +262,38 @@ export default function DeliveryBoyCommission() {
 
   const handleSave = async () => {
     if (!validateForm()) return
+    if (!selectedTier) {
+      toast.error("Please select a tier before adding or editing commission rules.")
+      return
+    }
     
     try {
       setSaving(true)
+      const minDistanceNum = parseFloat(formData.minDistance)
+      const maxDistanceNum = formData.maxDistance.trim()
+        ? parseFloat(formData.maxDistance)
+        : null
+
+      // Auto-generate name from effective distance slab (with +0.2km shift)
+      const isFirstSlab = minDistanceNum === 0
+      const effectiveMin = isFirstSlab ? minDistanceNum : minDistanceNum + 0.2
+      const effectiveMax = maxDistanceNum === null ? null : maxDistanceNum + 0.2
+      const autoName =
+        effectiveMax === null
+          ? `${selectedTier.toUpperCase()} ${effectiveMin.toFixed(1)}km+`
+          : `${selectedTier.toUpperCase()} ${effectiveMin.toFixed(1)}-${effectiveMax.toFixed(1)}km`
+
       const commissionData = {
-        name: formData.name.trim(),
-        minDistance: parseFloat(formData.minDistance),
-        maxDistance: formData.maxDistance.trim() ? parseFloat(formData.maxDistance) : null,
+        name: autoName,
+        minDistance: minDistanceNum,
+        maxDistance: maxDistanceNum,
         commissionPerKm: parseFloat(formData.commissionPerKm),
-        basePayout: parseFloat(formData.basePayout),
+        // Only base slab (minDistance === 0) has base payout; others use 0
+        basePayout: minDistanceNum === 0
+          ? parseFloat(formData.basePayout || "0")
+          : 0,
         status: selectedCommission ? selectedCommission.status : true,
+        tier: selectedTier,
       }
       
       if (selectedCommission) {
@@ -253,13 +319,7 @@ export default function DeliveryBoyCommission() {
           toast.success('Commission rule updated successfully')
         }
       } else {
-        // Only allow one commission rule - check if one already exists
-        if (commissions.length > 0) {
-          toast.error('Only one commission rule is allowed. Please edit the existing rule instead.')
-          return
-        }
-        
-        // Create new commission (only if no existing rule)
+        // Create new commission
         const response = await adminAPI.createCommissionRule(commissionData)
         let commission = null
         if (response?.data?.success && response?.data?.data?.commission) {
@@ -273,15 +333,15 @@ export default function DeliveryBoyCommission() {
         if (commission) {
           const newCommission = {
             ...commission,
-            sl: 1
+            sl: commissions.length + 1
           }
-          setCommissions([newCommission])
+          setCommissions([...commissions, newCommission])
           toast.success('Commission rule created successfully')
         }
       }
       
       setIsAddEditOpen(false)
-      setFormData({ name: "", minDistance: "", maxDistance: "", commissionPerKm: "", basePayout: "" })
+      setFormData({ minDistance: "", maxDistance: "", commissionPerKm: "", basePayout: "" })
       setSelectedCommission(null)
     } catch (error) {
       console.error('Error saving commission rule:', error)
@@ -333,6 +393,11 @@ export default function DeliveryBoyCommission() {
       } else {
         errorMessage = error.message || errorMessage
       }
+
+      // Short, standard alert text for overlap errors
+      if (typeof errorMessage === 'string' && errorMessage.toLowerCase().includes('overlap')) {
+        errorMessage = 'Distance range overlaps with another slab for this tier.'
+      }
       
       toast.error(errorMessage)
       
@@ -342,11 +407,11 @@ export default function DeliveryBoyCommission() {
       } else if (error.response?.data?.message) {
         // If backend returns a single error message, try to parse it
         const message = error.response.data.message
-        if (message.includes('overlap')) {
-          setFormErrors({ overlap: message })
-        } else if (message.includes('name')) {
+        if (message.toLowerCase().includes('overlap')) {
+          setFormErrors({ overlap: 'Distance range overlaps with another slab for this tier.' })
+        } else if (message.toLowerCase().includes('name')) {
           setFormErrors({ name: message })
-        } else if (message.includes('distance')) {
+        } else if (message.toLowerCase().includes('distance')) {
           setFormErrors({ minDistance: message, maxDistance: message })
         }
       }
@@ -355,34 +420,7 @@ export default function DeliveryBoyCommission() {
     }
   }
 
-  const toggleColumn = (columnKey) => {
-    setVisibleColumns(prev => ({ ...prev, [columnKey]: !prev[columnKey] }))
-  }
-
-  const resetColumns = () => {
-    setVisibleColumns({
-      si: true,
-      name: true,
-      minDistance: true,
-      maxDistance: true,
-      commissionPerKm: true,
-      basePayout: true,
-      totalCommission: true,
-      status: true,
-      actions: true,
-    })
-  }
-
-  const columnsConfig = {
-    si: "Serial Number",
-    name: "Name",
-    minDistance: "Min Distance",
-    maxDistance: "Max Distance",
-    commissionPerKm: "Commission/Km",
-    basePayout: "Base Payout",
-    status: "Status",
-    actions: "Actions",
-  }
+  // Column visibility settings are fixed; table settings UI has been removed
 
   return (
     <div className="p-4 lg:p-6 bg-slate-50 min-h-screen">
@@ -399,31 +437,10 @@ export default function DeliveryBoyCommission() {
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <button 
-                onClick={() => setIsSettingsOpen(true)}
-                className="p-2.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 transition-all"
-              >
-                <Settings className="w-5 h-5" />
-              </button>
-            </div>
+            {/* Settings button removed as table settings are not used */}
           </div>
 
-          {/* Info Card */}
-          <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <div className="flex items-start gap-3">
-              <MapPin className="w-5 h-5 text-blue-600 mt-0.5" />
-              <div className="text-sm text-slate-700">
-                <p className="font-semibold text-blue-900 mb-1">Distance-Based Commission System</p>
-                <p className="text-slate-600">
-                  Commission is calculated as: <strong>Base Payout + (Distance × Commission Per Km)</strong>. 
-                  Each rule applies to a specific distance range. For orders outside any range, the nearest applicable rule will be used.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="mb-4 flex items-center gap-3">
+          <div className="mb-4 flex flex-col sm:flex-row sm:items-center gap-3">
             <div className="relative flex-1 sm:flex-initial min-w-[250px]">
               <input
                 type="text"
@@ -433,6 +450,21 @@ export default function DeliveryBoyCommission() {
                 className="pl-10 pr-4 py-2.5 w-full text-sm rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-slate-400"
               />
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-medium text-slate-600">Tier:</label>
+              <select
+                value={selectedTier}
+                onChange={(e) => setSelectedTier(e.target.value)}
+                className="px-3 py-2 text-sm rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-slate-400"
+              >
+                <option value="">Select Tier</option>
+                {availableTiers.map((tier) => (
+                  <option key={tier} value={tier}>
+                    {tier}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
@@ -445,13 +477,9 @@ export default function DeliveryBoyCommission() {
                     <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">SI</th>
                   )}
                   {visibleColumns.name && (
-                    <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">Name</th>
-                  )}
-                  {visibleColumns.minDistance && (
-                    <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">Min Distance (km)</th>
-                  )}
-                  {visibleColumns.maxDistance && (
-                    <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">Max Distance (km)</th>
+                    <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
+                      Distance Slab
+                    </th>
                   )}
                   {visibleColumns.commissionPerKm && (
                     <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">Amount Per/Km (₹)</th>
@@ -493,23 +521,26 @@ export default function DeliveryBoyCommission() {
                       )}
                       {visibleColumns.name && (
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="text-sm font-medium text-slate-900">{commission.name}</span>
-                        </td>
-                      )}
-                      {visibleColumns.minDistance && (
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="text-sm text-slate-700">{commission.minDistance} km</span>
-                        </td>
-                      )}
-                      {visibleColumns.maxDistance && (
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="text-sm text-slate-700">
-                            {commission.maxDistance === null ? (
-                              <span className="text-slate-500 italic">Unlimited</span>
-                            ) : (
-                              `${commission.maxDistance} km`
-                            )}
-                          </span>
+                          {(() => {
+                            const index = filteredCommissions.findIndex(c => c._id === commission._id)
+                            const isFirst = index === 0
+                            const rawMin = Number(commission.minDistance || 0)
+                            const rawMax = commission.maxDistance === null || commission.maxDistance === undefined
+                              ? null
+                              : Number(commission.maxDistance)
+                            const effectiveMin = isFirst ? rawMin : rawMin + 0.2
+                            const effectiveMax = rawMax === null ? null : rawMax + 0.2
+
+                            const label = effectiveMax === null
+                              ? `${effectiveMin.toFixed(1)} km+`
+                              : `${effectiveMin.toFixed(1)} - ${effectiveMax.toFixed(1)} km`
+
+                            return (
+                              <span className="text-sm font-medium text-slate-900">
+                                {label}
+                              </span>
+                            )
+                          })()}
                         </td>
                       )}
                       {visibleColumns.commissionPerKm && (
@@ -572,59 +603,48 @@ export default function DeliveryBoyCommission() {
 
       {/* Add/Edit Dialog */}
       <Dialog open={isAddEditOpen} onOpenChange={setIsAddEditOpen}>
-        <DialogContent className="max-w-md bg-white p-0 opacity-0 data-[state=open]:opacity-100 data-[state=closed]:opacity-0 transition-opacity duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=open]:scale-100 data-[state=closed]:scale-100">
-          <DialogHeader className="px-6 pt-6 pb-4">
-            <DialogTitle>{selectedCommission ? "Edit Commission Rule" : "Add Commission Rule"}</DialogTitle>
+        <DialogContent className="max-w-lg bg-white p-0 rounded-xl shadow-xl data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0">
+          <DialogHeader className="px-5 pt-4 pb-2 border-b border-slate-100">
+            <DialogTitle className="text-base font-semibold text-slate-900">
+              {selectedCommission ? "Edit Commission Rule" : "Add Commission Rule"}
+            </DialogTitle>
           </DialogHeader>
-          <div className="px-6 pb-6 space-y-4">
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">
-                Name <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className={`w-full px-4 py-2.5 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
-                  formErrors.name ? "border-red-500" : "border-slate-300"
-                }`}
-                placeholder="e.g., Short Distance (0-2 km)"
-              />
-              {formErrors.name && <p className="text-xs text-red-500 mt-1">{formErrors.name}</p>}
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">
-                Minimum Distance (km) <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="number"
-                step="0.1"
-                min="0"
-                value={formData.minDistance}
-                onChange={(e) => setFormData({ ...formData, minDistance: e.target.value })}
-                className={`w-full px-4 py-2.5 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
-                  formErrors.minDistance ? "border-red-500" : "border-slate-300"
-                }`}
-                placeholder="e.g., 0"
-              />
-              {formErrors.minDistance && <p className="text-xs text-red-500 mt-1">{formErrors.minDistance}</p>}
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">
-                Maximum Distance (km) <span className="text-slate-500 text-xs">(Leave empty for unlimited)</span>
-              </label>
-              <input
-                type="number"
-                step="0.1"
-                min="0"
-                value={formData.maxDistance}
-                onChange={(e) => setFormData({ ...formData, maxDistance: e.target.value })}
-                className={`w-full px-4 py-2.5 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
-                  formErrors.maxDistance ? "border-red-500" : "border-slate-300"
-                }`}
-                placeholder="e.g., 2 (or leave empty)"
-              />
-              {formErrors.maxDistance && <p className="text-xs text-red-500 mt-1">{formErrors.maxDistance}</p>}
+          <div className="px-5 py-4 space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">
+                  Minimum Distance (km) <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  value={formData.minDistance}
+                  onChange={(e) => setFormData({ ...formData, minDistance: e.target.value })}
+                  className={`w-full px-3 py-2 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
+                    formErrors.minDistance ? "border-red-500" : "border-slate-300"
+                  }`}
+                  placeholder="e.g., 0"
+                />
+                {formErrors.minDistance && <p className="text-[11px] text-red-500 mt-1">{formErrors.minDistance}</p>}
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">
+                  Maximum Distance (km)
+                </label>
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  value={formData.maxDistance}
+                  onChange={(e) => setFormData({ ...formData, maxDistance: e.target.value })}
+                  className={`w-full px-3 py-2 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
+                    formErrors.maxDistance ? "border-red-500" : "border-slate-300"
+                  }`}
+                  placeholder="e.g., 4"
+                />
+                {formErrors.maxDistance && <p className="text-[11px] text-red-500 mt-1">{formErrors.maxDistance}</p>}
+              </div>
             </div>
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-2">
@@ -636,7 +656,7 @@ export default function DeliveryBoyCommission() {
                 min="0"
                 value={formData.commissionPerKm}
                 onChange={(e) => setFormData({ ...formData, commissionPerKm: e.target.value })}
-                className={`w-full px-4 py-2.5 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
+                className={`w-full px-3 py-2 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
                   formErrors.commissionPerKm ? "border-red-500" : "border-slate-300"
                 }`}
                 placeholder="e.g., 15"
@@ -644,37 +664,38 @@ export default function DeliveryBoyCommission() {
               {formErrors.commissionPerKm && <p className="text-xs text-red-500 mt-1">{formErrors.commissionPerKm}</p>}
             </div>
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">
-                Base Payout (₹) <span className="text-red-500">*</span>
+              <label className="block text-sm font-semibold text-slate-700 mb-1">
+                Base Payout (₹) {parseFloat(formData.minDistance || "0") === 0 && <span className="text-red-500">*</span>}
               </label>
               <input
                 type="number"
                 step="0.01"
                 min="0"
-                value={formData.basePayout}
+                value={parseFloat(formData.minDistance || "0") === 0 ? formData.basePayout : "0"}
                 onChange={(e) => setFormData({ ...formData, basePayout: e.target.value })}
-                className={`w-full px-4 py-2.5 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
+                disabled={parseFloat(formData.minDistance || "0") !== 0}
+                className={`w-full px-3 py-2 border rounded-lg bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
                   formErrors.basePayout ? "border-red-500" : "border-slate-300"
-                }`}
+                } ${parseFloat(formData.minDistance || "0") !== 0 ? "text-slate-400 cursor-not-allowed" : ""}`}
                 placeholder="e.g., 20"
               />
-              {formErrors.basePayout && <p className="text-xs text-red-500 mt-1">{formErrors.basePayout}</p>}
-              <p className="text-xs text-slate-500 mt-1">
-                Base payout is given regardless of distance, plus commission per km
+              {formErrors.basePayout && <p className="text-[11px] text-red-500 mt-1">{formErrors.basePayout}</p>}
+              <p className="text-[11px] text-slate-500 mt-1">
+                Base payout applies only to the base slab starting from 0 km. Other slabs always use 0.
               </p>
             </div>
           </div>
-          <DialogFooter className="px-6 pb-6">
+          <DialogFooter className="px-5 pb-4 pt-2 border-t border-slate-100">
             <button
               onClick={() => setIsAddEditOpen(false)}
-              className="px-4 py-2 text-sm font-medium rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition-all"
+              className="px-3 py-1.5 text-sm font-medium rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition-all"
             >
               Cancel
             </button>
             <button
               onClick={handleSave}
               disabled={saving}
-              className="px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="px-4 py-1.5 text-sm font-medium rounded-lg bg-orange-600 text-white hover:bg-orange-700 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {saving && <Loader2 className="w-4 h-4 animate-spin" />}
               {selectedCommission ? "Update" : "Add"}
@@ -713,58 +734,6 @@ export default function DeliveryBoyCommission() {
         </DialogContent>
       </Dialog>
 
-      {/* Settings Dialog */}
-      <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
-        <DialogContent className="max-w-md bg-white p-0 opacity-0 data-[state=open]:opacity-100 data-[state=closed]:opacity-0 transition-opacity duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=open]:scale-100 data-[state=closed]:scale-100">
-          <DialogHeader className="px-6 pt-6 pb-4">
-            <DialogTitle className="flex items-center gap-2">
-              <Settings className="w-5 h-5" />
-              Table Settings
-            </DialogTitle>
-          </DialogHeader>
-          <div className="px-6 pb-6 space-y-4">
-            <div>
-              <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
-                <Columns className="w-4 h-4" />
-                Visible Columns
-              </h3>
-              <div className="space-y-2">
-                {Object.entries(columnsConfig).map(([key, label]) => (
-                  <label
-                    key={key}
-                    className="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50 cursor-pointer"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={visibleColumns[key]}
-                      onChange={() => toggleColumn(key)}
-                      className="w-4 h-4 text-emerald-600 border-slate-300 rounded focus:ring-emerald-500"
-                    />
-                    <span className="text-sm text-slate-700">{label}</span>
-                    {visibleColumns[key] && (
-                      <Check className="w-4 h-4 text-emerald-600 ml-auto" />
-                    )}
-                  </label>
-                ))}
-              </div>
-            </div>
-            <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
-              <button
-                onClick={resetColumns}
-                className="px-4 py-2 text-sm font-medium rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition-all"
-              >
-                Reset
-              </button>
-              <button
-                onClick={() => setIsSettingsOpen(false)}
-                className="px-4 py-2 text-sm font-medium rounded-lg bg-emerald-500 text-white hover:bg-emerald-600 transition-all shadow-md"
-              >
-                Apply
-              </button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

@@ -396,7 +396,7 @@ export const createOrder = async (req, res) => {
             transactionId: existingTransaction._id
           });
         } else {
-          // Deduct money from wallet
+        // Deduct money from wallet
           const transaction = wallet.addTransaction({
             amount: pricingData.total,
             type: 'deduction',
@@ -405,13 +405,6 @@ export const createOrder = async (req, res) => {
             orderId: order._id
           });
           await wallet.save();
-
-          // Update user's wallet balance in User model (for backward compatibility)
-          const User = (await import('../../auth/models/User.js')).default;
-          await User.findByIdAndUpdate(userId, {
-            'wallet.balance': wallet.balance,
-            'wallet.currency': wallet.currency
-          });
         }
 
         // Create payment record
