@@ -37,6 +37,13 @@ export default function RestaurantSignupEmail() {
       return
     }
 
+    // Name regex: Only allow letters, spaces, and hyphens
+    const nameRegex = /^[a-zA-Z\s\-]+$/
+    if (!nameRegex.test(formData.name.trim())) {
+      setError("Restaurant name can only contain letters, spaces, and hyphens")
+      return
+    }
+
     if (!formData.email.trim()) {
       setError("Email is required")
       return

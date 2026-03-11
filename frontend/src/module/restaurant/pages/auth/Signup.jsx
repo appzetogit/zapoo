@@ -54,14 +54,23 @@ export default function RestaurantSignup() {
   const [isLoading, setIsLoading] = useState(false)
   const [apiError, setApiError] = useState("")
 
-  const validatePhone = (phone) => {
+  const validatePhone = (phone, countryCode = "+91") => {
     if (!phone.trim()) {
       return "Phone number is required"
     }
-    const cleanPhone = phone.replace(/[\s\-\(\)]/g, "")
-    const phoneRegex = /^\d{7,15}$/
-    if (!phoneRegex.test(cleanPhone)) {
-      return "Phone number must be 7-15 digits"
+    const cleanPhone = phone.replace(/\D/g, "")
+
+    if (countryCode === "+91") {
+      if (cleanPhone.length !== 10) {
+        return "Indian phone number must be 10 digits"
+      }
+      if (!["6", "7", "8", "9"].includes(cleanPhone[0])) {
+        return "Invalid Indian mobile number"
+      }
+    } else {
+      if (cleanPhone.length < 7 || cleanPhone.length > 15) {
+        return "Phone number must be 7-15 digits"
+      }
     }
     return ""
   }
@@ -76,21 +85,35 @@ export default function RestaurantSignup() {
     if (name.trim().length > 50) {
       return "Restaurant name must be less than 50 characters"
     }
+    // Only allow letters, spaces, and hyphens
+    const nameRegex = /^[a-zA-Z\s\-]+$/
+    if (!nameRegex.test(name.trim())) {
+      return "Restaurant name can only contain letters, spaces, and hyphens"
+    }
     return ""
   }
 
   const handleChange = (e) => {
     const { name, value } = e.target
+
+    let sanitizedValue = value;
+    if (name === "phone") {
+      sanitizedValue = value.replace(/\D/g, "");
+      // Limit to 10 digits for India or 15 for international
+      const maxLength = formData.countryCode === "+91" ? 10 : 15;
+      if (sanitizedValue.length > maxLength) return;
+    }
+
     setFormData({
       ...formData,
-      [name]: value,
+      [name]: sanitizedValue,
     })
 
     // Real-time validation
     if (name === "phone") {
-      setErrors({ ...errors, phone: validatePhone(value) })
+      setErrors({ ...errors, phone: validatePhone(sanitizedValue, formData.countryCode) })
     } else if (name === "name") {
-      setErrors({ ...errors, name: validateName(value) })
+      setErrors({ ...errors, name: validateName(sanitizedValue) })
     }
   }
 
@@ -99,6 +122,8 @@ export default function RestaurantSignup() {
       ...formData,
       countryCode: value,
     })
+    // Re-validate phone with new country code
+    setErrors({ ...errors, phone: validatePhone(formData.phone, value) })
   }
 
   const handleSubmit = async (e) => {
@@ -110,7 +135,7 @@ export default function RestaurantSignup() {
     let hasErrors = false
     const newErrors = { phone: "", name: "" }
 
-    const phoneError = validatePhone(formData.phone)
+    const phoneError = validatePhone(formData.phone, formData.countryCode)
     newErrors.phone = phoneError
     if (phoneError) hasErrors = true
 

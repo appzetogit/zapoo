@@ -1035,13 +1035,13 @@ export const getUserById = asyncHandler(async (req, res) => {
     const walletDoc = await UserWallet.findOne({ userId: user._id }).lean();
     const walletData = walletDoc
       ? {
-          balance: walletDoc.balance || 0,
-          currency: walletDoc.currency || "INR",
-        }
+        balance: walletDoc.balance || 0,
+        currency: walletDoc.currency || "INR",
+      }
       : {
-          balance: 0,
-          currency: "INR",
-        };
+        balance: 0,
+        currency: "INR",
+      };
 
     return successResponse(res, 200, "User retrieved successfully", {
       user: {
@@ -1705,6 +1705,55 @@ export const createRestaurant = asyncHandler(async (req, res) => {
     const normalizedPhone = phone ? normalizePhoneNumber(phone) : null;
     if (phone && !normalizedPhone) {
       return errorResponse(res, 400, "Invalid phone number format");
+    }
+
+    // Regex validations
+    const nameRegex = /^[a-zA-Z\s\-]+$/;
+    const phoneFormatRegex = /^(\+91[\-\s]?)?[6-9]\d{9}$/;
+
+    if (!nameRegex.test(restaurantName)) {
+      return errorResponse(res, 400, "Restaurant name can only contain letters, spaces, and hyphens");
+    }
+    if (!nameRegex.test(ownerName)) {
+      return errorResponse(res, 400, "Owner name can only contain letters, spaces, and hyphens");
+    }
+
+    if (phone && !phoneFormatRegex.test(phone)) {
+      return errorResponse(res, 400, "Invalid primary phone number format");
+    }
+
+    if (ownerPhone && !phoneFormatRegex.test(ownerPhone)) {
+      return errorResponse(res, 400, "Invalid owner phone number format");
+    }
+
+    if (primaryContactNumber && !phoneFormatRegex.test(primaryContactNumber)) {
+      return errorResponse(res, 400, "Invalid restaurant contact number format");
+    }
+
+    const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+    const gstRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+    const fssaiRegex = /^\d{14}$/;
+    const accountRegex = /^\d{9,18}$/;
+    const ifscRegex = /^[A-Z]{4}0[A-Z0-9]{6}$/;
+
+    if (panNumber && !panRegex.test(panNumber.toUpperCase())) {
+      return errorResponse(res, 400, "Invalid PAN number format");
+    }
+
+    if (gstNumber && !gstRegex.test(gstNumber.toUpperCase())) {
+      return errorResponse(res, 400, "Invalid GST number format");
+    }
+
+    if (fssaiNumber && !fssaiRegex.test(fssaiNumber)) {
+      return errorResponse(res, 400, "Invalid FSSAI number format (must be 14 digits)");
+    }
+
+    if (accountNumber && !accountRegex.test(accountNumber)) {
+      return errorResponse(res, 400, "Invalid account number format (9-18 digits)");
+    }
+
+    if (ifscCode && !ifscRegex.test(ifscCode.toUpperCase())) {
+      return errorResponse(res, 400, "Invalid IFSC code format");
     }
 
     // Generate random password if email is provided but password is not

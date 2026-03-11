@@ -3,6 +3,8 @@ import express from 'express';
 import { authenticate } from './middleware/restaurantAuth.js';
 import { uploadMiddleware } from '../../shared/utils/cloudinaryService.js';
 import restaurantAuthRoutes from './routes/restaurantAuthRoutes.js';
+import { validate } from '../../shared/middleware/validate.js';
+import Joi from 'joi';
 import { getOnboarding, upsertOnboarding, createRestaurantFromOnboardingManual } from './controllers/restaurantOnboardingController.js';
 import { getRestaurants, getRestaurantById, getRestaurantByOwner, updateRestaurantProfile, uploadProfileImage, uploadMenuImage, deleteRestaurantAccount, updateDeliveryStatus, getRestaurantsWithDishesUnder250, getDeliveryPricingConfig, updateDeliveryPricingConfig } from './controllers/restaurantController.js';
 import { getRestaurantFinance } from './controllers/restaurantFinanceController.js';
@@ -22,12 +24,55 @@ import { getOutletTimingsByRestaurantId } from './controllers/outletTimingsContr
 
 const router = express.Router();
 
+// Validation schemas
+const onboardingSchema = Joi.object({
+    step1: Joi.object({
+        restaurantName: Joi.string().required(),
+        ownerName: Joi.string().required(),
+        ownerEmail: Joi.string().email().required(),
+        ownerPhone: Joi.string().required(),
+        primaryContactNumber: Joi.string().required(),
+        location: Joi.object().optional()
+    }).optional(),
+    step2: Joi.object().optional(),
+    step3: Joi.object({
+        pan: Joi.object({
+            panNumber: Joi.string().uppercase().pattern(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/).required(),
+            nameOnPan: Joi.string().required(),
+            image: Joi.object().required()
+        }).required(),
+        gst: Joi.object({
+            isRegistered: Joi.boolean().required(),
+            gstNumber: Joi.string().allow('', null).when('isRegistered', {
+                is: true,
+                then: Joi.string().uppercase().pattern(/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/).required()
+            }),
+            legalName: Joi.string().allow('', null).when('isRegistered', { is: true, then: Joi.required() }),
+            address: Joi.string().allow('', null).when('isRegistered', { is: true, then: Joi.required() }),
+            image: Joi.object().allow(null).when('isRegistered', { is: true, then: Joi.required() })
+        }).required(),
+        fssai: Joi.object({
+            registrationNumber: Joi.string().pattern(/^\d{14}$/).required(),
+            expiryDate: Joi.string().required(),
+            image: Joi.object().required()
+        }).required(),
+        bank: Joi.object({
+            accountNumber: Joi.string().pattern(/^\d{9,18}$/).required(),
+            ifscCode: Joi.string().uppercase().pattern(/^[A-Z]{4}0[A-Z0-9]{6}$/).required(),
+            accountHolderName: Joi.string().required(),
+            accountType: Joi.string().required()
+        }).required()
+    }).optional(),
+    step4: Joi.object().optional(),
+    completedSteps: Joi.number().optional()
+});
+
 // Restaurant authentication routes
 router.use('/auth', restaurantAuthRoutes);
 
 // Onboarding routes for restaurant (authenticated)
 router.get('/onboarding', authenticate, getOnboarding);
-router.put('/onboarding', authenticate, upsertOnboarding);
+router.put('/onboarding', authenticate, validate(onboardingSchema), upsertOnboarding);
 router.post('/onboarding/create-restaurant', authenticate, createRestaurantFromOnboardingManual);
 
 // Menu routes (authenticated - for restaurant module)

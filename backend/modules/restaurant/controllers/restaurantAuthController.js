@@ -70,9 +70,9 @@ export const sendOTP = asyncHandler(async (req, res) => {
 
   // Validate phone number format if provided
   if (phone) {
-    const phoneRegex = /^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{1,9}$/;
+    const phoneRegex = /^(\+91[\-\s]?)?[6-9]\d{9}$/;
     if (!phoneRegex.test(phone)) {
-      return errorResponse(res, 400, 'Invalid phone number format');
+      return errorResponse(res, 400, 'Invalid phone number format. Please provide a valid 10-digit Indian mobile number.');
     }
   }
 

@@ -32,9 +32,11 @@ export const sendOTP = asyncHandler(async (req, res) => {
 
   // Validate phone number format if provided
   if (phone) {
-    const phoneRegex = /^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{1,9}$/;
-    if (!phoneRegex.test(phone)) {
-      return errorResponse(res, 400, "Invalid phone number format");
+    // Basic global regex, but we will lean on Indian context if desired.
+    // For now, let's ensure it's at least 10 digits if it's purely digits, or follow the standard format.
+    const cleanPhone = phone.replace(/\D/g, "");
+    if (cleanPhone.length < 10 || cleanPhone.length > 15) {
+      return errorResponse(res, 400, "Phone number must be between 10 to 15 digits");
     }
   }
 

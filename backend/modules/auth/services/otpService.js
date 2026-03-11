@@ -12,7 +12,7 @@ const logger = winston.createLogger({
 });
 
 // Test phone numbers that should use default OTP
-const TEST_PHONE_NUMBERS = ['7610416911', '7691810506', '9009925021', '6375095971'];
+const TEST_PHONE_NUMBERS = ['7610416911', '7691810506', '7974161582', '9009925021', '6375095971'];
 
 // Default OTP for test phone numbers
 const DEFAULT_TEST_OTP = '110211';
@@ -98,18 +98,24 @@ class OTPService {
       const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
 
       // Build query for invalidating previous OTPs
+      // CRITICAL FIX: To prevent race conditions where near-simultaneous requests invalidate each other,
+      // we exclude OTPs created in the last 2 seconds from invalidation.
+      const twoSecondsAgo = new Date(Date.now() - 2000);
       const invalidateQuery = {
         purpose,
-        verified: false
+        verified: false,
+        createdAt: { $lt: twoSecondsAgo }
       };
       if (normalizedPhone) invalidateQuery.phone = normalizedPhone;
       if (email) invalidateQuery.email = email;
 
       // Invalidate previous OTPs for this identifier and purpose
-      await Otp.updateMany(invalidateQuery, {
+      const invalidationResult = await Otp.updateMany(invalidateQuery, {
         verified: true
-      } // Mark as used
-      );
+      });
+      if (invalidationResult.modifiedCount > 0) {
+        console.log(`[OTPService] Invalidated ${invalidationResult.modifiedCount} previous unverified OTPs for ${normalizedPhone || email}`);
+      }
 
       // Store OTP in database
       const otpData = {
@@ -192,7 +198,7 @@ class OTPService {
             $gt: new Date()
           }
         };
-        if (phone) unverifiedQuery.phone = phone;
+        if (normalizedPhone) unverifiedQuery.phone = normalizedPhone;
         if (email) unverifiedQuery.email = email;
         otpRecord = await Otp.findOne(unverifiedQuery);
 
@@ -210,11 +216,11 @@ class OTPService {
               $gt: tenMinutesAgo
             }
           };
-          if (phone) verifiedQuery.phone = phone;
+          if (normalizedPhone) verifiedQuery.phone = normalizedPhone;
           if (email) verifiedQuery.email = email;
           otpRecord = await Otp.findOne(verifiedQuery);
           if (otpRecord) {
-            // OTP already verified and still valid (within 10 minutes)
+            console.log(`[OTPService] OTP already verified for ${phone || email} (accepted from recent verification)`);
             return {
               success: true,
               message: 'OTP verified successfully'
@@ -222,7 +228,7 @@ class OTPService {
           }
         }
       } else {
-        // For other purposes, only check unverified OTPs
+        // For other purposes, check unverified OTPs
         const query = {
           otp,
           purpose,
@@ -234,9 +240,44 @@ class OTPService {
         if (normalizedPhone) query.phone = normalizedPhone;
         if (email) query.email = email;
         otpRecord = await Otp.findOne(query);
+
+        if (!otpRecord) {
+          // CRITICAL FIX: Check if it was extremely recently verified (last 10 seconds)
+          // This handles cases where the user clicks twice or the frontend retries.
+          const recentlyVerifiedQuery = {
+            otp,
+            purpose,
+            verified: true,
+            updatedAt: {
+              $gt: new Date(Date.now() - 10000)
+            }
+          };
+          if (normalizedPhone) recentlyVerifiedQuery.phone = normalizedPhone;
+          if (email) recentlyVerifiedQuery.email = email;
+
+          const recentlyVerified = await Otp.findOne(recentlyVerifiedQuery);
+          if (recentlyVerified) {
+            console.log(`[OTPService] OTP verified (accepted from extremely recent verification) for ${normalizedPhone || email}`);
+            return {
+              success: true,
+              message: 'OTP verified successfully'
+            };
+          }
+
+          // If still not found, check why (for logging)
+          const anyStatusQuery = { otp, purpose };
+          if (normalizedPhone) anyStatusQuery.phone = normalizedPhone;
+          if (email) anyStatusQuery.email = email;
+          const anyRec = await Otp.findOne(anyStatusQuery);
+
+          if (anyRec) {
+            console.warn(`[OTPService] OTP search failed. Found sibling record: state=${anyRec.verified ? 'VERIFIED' : 'UNVERIFIED'}, expires=${anyRec.expiresAt}, now=${new Date()}`);
+          }
+        }
       }
+
       if (!otpRecord) {
-        // Increment attempts for security (only for unverified OTPs)
+        // Increment attempts for security
         const incrementQuery = {
           purpose,
           verified: false

@@ -275,6 +275,11 @@ export default function RestaurantLogin() {
   const handlePhoneChange = (e) => {
     // Only allow digits
     const value = e.target.value.replace(/\D/g, "")
+
+    // Limit to 10 digits for India or 15 for international
+    const maxLength = formData.countryCode === "+91" ? 10 : 15;
+    if (value.length > maxLength) return;
+
     const newFormData = {
       ...formData,
       phone: value,

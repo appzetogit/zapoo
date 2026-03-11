@@ -17,10 +17,17 @@ import Joi from 'joi';
 
 const router = express.Router();
 
+// Validation patterns
+const nameRegex = /^[a-zA-Z\s\-]+$/;
+const phoneRegex = /^(\+91[\-\s]?)?[6-9]\d{9}$/;
+
 // Validation schemas
 const sendOTPSchema = Joi.object({
   phone: Joi.string()
-    .pattern(/^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{1,9}$/)
+    .pattern(phoneRegex)
+    .messages({
+      'string.pattern.base': 'Invalid phone number format. Please provide a valid 10-digit mobile number.'
+    })
     .optional(),
   email: Joi.string().email().optional(),
   purpose: Joi.string()
@@ -29,28 +36,49 @@ const sendOTPSchema = Joi.object({
 }).or('phone', 'email');
 
 const verifyOTPSchema = Joi.object({
-  phone: Joi.string().optional(),
+  phone: Joi.string().pattern(phoneRegex).optional(),
   email: Joi.string().email().optional(),
   otp: Joi.string().required().length(6),
   purpose: Joi.string()
     .valid('login', 'register', 'reset-password', 'verify-phone', 'verify-email')
     .default('login'),
-  name: Joi.string().when('purpose', {
-    is: 'register',
-    then: Joi.required(),
-    otherwise: Joi.optional()
-  }),
+  name: Joi.string()
+    .pattern(nameRegex)
+    .min(2)
+    .max(50)
+    .messages({
+      'string.pattern.base': 'Name can only contain letters, spaces, and hyphens'
+    })
+    .when('purpose', {
+      is: 'register',
+      then: Joi.required(),
+      otherwise: Joi.optional()
+    }),
   password: Joi.string().min(6).max(100).optional()
 }).or('phone', 'email');
 
 const registerSchema = Joi.object({
-  name: Joi.string().required().min(2).max(100),
+  name: Joi.string()
+    .pattern(nameRegex)
+    .required()
+    .min(2)
+    .max(50)
+    .messages({
+      'string.pattern.base': 'Restaurant name can only contain letters, spaces, and hyphens'
+    }),
   email: Joi.string().email().required(),
   password: Joi.string().min(6).max(100).required(),
-  phone: Joi.string().optional(),
-  ownerName: Joi.string().optional(),
+  phone: Joi.string().pattern(phoneRegex).optional(),
+  ownerName: Joi.string()
+    .pattern(nameRegex)
+    .min(2)
+    .max(50)
+    .optional()
+    .messages({
+      'string.pattern.base': 'Owner name can only contain letters, spaces, and hyphens'
+    }),
   ownerEmail: Joi.string().email().optional(),
-  ownerPhone: Joi.string().optional()
+  ownerPhone: Joi.string().pattern(phoneRegex).optional()
 });
 
 const loginSchema = Joi.object({

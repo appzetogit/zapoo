@@ -23,9 +23,19 @@ export default function SignupStep1() {
 
   const handleChange = (e) => {
     const { name, value } = e.target
+    let newValue = value
+
+    if (name === "aadharNumber") {
+      // Allow only digits and limit to 12
+      newValue = value.replace(/\D/g, "").slice(0, 12)
+    } else if (name === "panNumber") {
+      // Allow only alphanumeric and limit to 10
+      newValue = value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 10)
+    }
+
     setFormData(prev => ({
       ...prev,
-      [name]: value
+      [name]: newValue
     }))
     // Clear error for this field
     if (errors[name]) {
@@ -313,8 +323,8 @@ export default function SignupStep1() {
             type="submit"
             disabled={isSubmitting}
             className={`w-full py-4 rounded-lg font-bold text-white text-base transition-colors mt-6 ${isSubmitting
-                ? "bg-gray-400 cursor-not-allowed"
-                : "bg-[#DC2626] hover:bg-[#C52222]"
+              ? "bg-gray-400 cursor-not-allowed"
+              : "bg-[#DC2626] hover:bg-[#C52222]"
               }`}
           >
             {isSubmitting ? "Saving..." : "Continue"}
