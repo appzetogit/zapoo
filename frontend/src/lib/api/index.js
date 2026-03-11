@@ -20,6 +20,7 @@
 
 import apiClient from "./axios.js";
 import { API_ENDPOINTS } from "./config.js";
+import { getCachedResource, invalidateCachedResource } from "./requestCache.js";
 
 // Export the configured axios instance
 export default apiClient;
@@ -125,8 +126,13 @@ export const authAPI = {
   },
 
   // Get current user
-  getCurrentUser: () => {
-    return apiClient.get(API_ENDPOINTS.AUTH.ME);
+  getCurrentUser: (options = {}) => {
+    const { force = false } = options;
+    return getCachedResource(
+      "auth:current-user",
+      () => apiClient.get(API_ENDPOINTS.AUTH.ME),
+      { ttl: 5 * 60 * 1000, force }
+    );
   },
 };
 
@@ -154,17 +160,24 @@ export const userAPI = {
   },
 
   // Get user addresses
-  getAddresses: () => {
-    return apiClient.get(API_ENDPOINTS.USER.ADDRESSES);
+  getAddresses: (options = {}) => {
+    const { force = false } = options;
+    return getCachedResource(
+      "user:addresses",
+      () => apiClient.get(API_ENDPOINTS.USER.ADDRESSES),
+      { ttl: 5 * 60 * 1000, force }
+    );
   },
 
   // Add address
   addAddress: (address) => {
+    invalidateCachedResource("user:addresses");
     return apiClient.post(API_ENDPOINTS.USER.ADDRESSES, address);
   },
 
   // Update address
   updateAddress: (addressId, address) => {
+    invalidateCachedResource("user:addresses");
     return apiClient.put(
       `${API_ENDPOINTS.USER.ADDRESSES}/${addressId}`,
       address,
@@ -173,6 +186,7 @@ export const userAPI = {
 
   // Delete address
   deleteAddress: (addressId) => {
+    invalidateCachedResource("user:addresses");
     return apiClient.delete(`${API_ENDPOINTS.USER.ADDRESSES}/${addressId}`);
   },
 
@@ -564,7 +578,11 @@ export const restaurantAPI = {
 
   // Get all restaurants (for user module)
   getRestaurants: (params = {}) => {
-    return apiClient.get(API_ENDPOINTS.RESTAURANT.LIST, { params });
+    return getCachedResource(
+      ["restaurant:list", params],
+      () => apiClient.get(API_ENDPOINTS.RESTAURANT.LIST, { params }),
+      { ttl: 60 * 1000 }
+    );
   },
 
   // Get restaurants with dishes under ₹250. Pass { zoneId, latitude, longitude } for zone and deliveryRange filtering.
@@ -854,12 +872,21 @@ export const marketingAPI = {
 
   // Get active ads for a zone (user app)
   getActiveAds: (zoneId) => {
-    return apiClient.get(API_ENDPOINTS.MARKETING.ACTIVE_BY_ZONE.replace(":zoneId", zoneId));
+    return getCachedResource(
+      ["marketing:active-ads", zoneId],
+      () => apiClient.get(API_ENDPOINTS.MARKETING.ACTIVE_BY_ZONE.replace(":zoneId", zoneId)),
+      { ttl: 30 * 1000 }
+    );
   },
 
   // Admin: Get all ad requests
-  getAllRequests: () => {
-    return apiClient.get(API_ENDPOINTS.MARKETING.ALL_REQUESTS);
+  getAllRequests: (options = {}) => {
+    const { force = false } = options;
+    return getCachedResource(
+      "marketing:all-requests",
+      () => apiClient.get(API_ENDPOINTS.MARKETING.ALL_REQUESTS),
+      { ttl: 30 * 1000, force }
+    );
   },
 
   // Admin: Update ad status
@@ -868,6 +895,7 @@ export const marketingAPI = {
       console.error("marketingAPI.updateStatus called with invalid adId:", adId);
       return Promise.reject(new Error("Invalid Advertisement ID"));
     }
+    invalidateCachedResource("marketing:all-requests");
     return apiClient.put(API_ENDPOINTS.MARKETING.UPDATE_STATUS.replace(":adId", adId), { status, notes });
   },
 
@@ -884,16 +912,24 @@ export const marketingAPI = {
 // Export tier API helper functions
 export const tierAPI = {
   // Tier CRUD
-  getAllTiers: () => {
-    return apiClient.get('/admin/tiers');
+  getAllTiers: (options = {}) => {
+    const { force = false } = options;
+    return getCachedResource(
+      "admin:tiers",
+      () => apiClient.get('/admin/tiers'),
+      { ttl: 60 * 1000, force }
+    );
   },
   createTier: (data) => {
+    invalidateCachedResource("admin:tiers");
     return apiClient.post('/admin/tiers', data);
   },
   updateTier: (id, data) => {
+    invalidateCachedResource("admin:tiers");
     return apiClient.put(`/admin/tiers/${id}`, data);
   },
   deleteTier: (id) => {
+    invalidateCachedResource("admin:tiers");
     return apiClient.delete(`/admin/tiers/${id}`);
   },
   // Drill down
@@ -1171,7 +1207,11 @@ export const adminAPI = {
 
   // Get dashboard stats
   getDashboardStats: (params = {}) => {
-    return apiClient.get(API_ENDPOINTS.ADMIN.DASHBOARD_STATS, { params });
+    return getCachedResource(
+      ["admin:dashboard-stats", params],
+      () => apiClient.get(API_ENDPOINTS.ADMIN.DASHBOARD_STATS, { params }),
+      { ttl: 30 * 1000 }
+    );
   },
 
   // Get users
@@ -2040,4 +2080,3 @@ export const notificationAPI = {
     });
   },
 };
-

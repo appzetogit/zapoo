@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react"
 import { Edit2, Loader2, Save, X, Layers } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
-import apiClient from "@/lib/api/axios"
+import { tierAPI } from "@/lib/api"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -21,10 +21,10 @@ export default function SlotConfiguration() {
     const [editValue, setEditValue] = useState(5)
     const [saving, setSaving] = useState(false)
 
-    const fetchTiers = async () => {
+    const fetchTiers = async (force = false) => {
         try {
             setLoading(true)
-            const res = await apiClient.get("/admin/tiers")
+            const res = await tierAPI.getAllTiers({ force })
             // getAllTiers returns data as a flat array via successResponse
             const tiersData = res.data.data
             setTiers(Array.isArray(tiersData) ? tiersData : tiersData?.tiers || [])
@@ -44,10 +44,10 @@ export default function SlotConfiguration() {
         }
         try {
             setSaving(true)
-            await apiClient.put(`/admin/tiers/${tierId}`, { maxBanners: editValue })
+            await tierAPI.updateTier(tierId, { maxBanners: editValue })
             toast.success("Banner limit updated!")
             setEditingTier(null)
-            fetchTiers()
+            fetchTiers(true)
         } catch (error) {
             toast.error(error.response?.data?.message || "Failed to update")
         } finally {

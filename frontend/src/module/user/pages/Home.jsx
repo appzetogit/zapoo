@@ -31,7 +31,7 @@ import { useZone } from "../hooks/useZone";
 import appzetoFoodLogo from "@/assets/zapoo_logo.png";
 import offerImage from "@/assets/offerimage.png";
 import api, { restaurantAPI } from "@/lib/api";
-import { API_BASE_URL } from "@/lib/api/config";
+import { getCachedResource } from "@/lib/api/requestCache";
 import OptimizedImage from "@/components/OptimizedImage";
 // Explore More Icons
 import exploreOffers from "@/assets/explore more icons/offers.png";
@@ -235,7 +235,11 @@ export default function Home() {
     const fetchRealCategories = async () => {
       try {
         setLoadingRealCategories(true);
-        const response = await api.get('/categories/public');
+        const response = await getCachedResource(
+          "home:categories-public",
+          () => api.get('/categories/public'),
+          { ttl: 10 * 60 * 1000 }
+        );
         if (response.data.success && response.data.data.categories) {
           const adminCategories = response.data.data.categories.map(cat => ({
             id: cat.id,
@@ -264,7 +268,11 @@ export default function Home() {
     const fetchLandingConfig = async () => {
       try {
         setLoadingLandingConfig(true);
-        const response = await api.get('/hero-banners/landing/public');
+        const response = await getCachedResource(
+          "home:landing-config",
+          () => api.get('/hero-banners/landing/public'),
+          { ttl: 5 * 60 * 1000 }
+        );
         if (response.data.success && response.data.data) {
           const apiCategories = response.data.data.categories || [];
           const apiExploreMore = response.data.data.exploreMore || [];
@@ -468,7 +476,11 @@ export default function Home() {
           params.latitude = location.latitude;
           params.longitude = location.longitude;
         }
-        const response = await api.get('/hero-banners/public', { params });
+        const response = await getCachedResource(
+          ["home:hero-banners", params.latitude ?? "na", params.longitude ?? "na"],
+          () => api.get('/hero-banners/public', { params }),
+          { ttl: 60 * 1000 }
+        );
         if (response.data.success && response.data.data.banners) {
           const banners = response.data.data.banners;
           setHeroBannersData(banners);
@@ -495,7 +507,11 @@ export default function Home() {
           params.latitude = location.latitude;
           params.longitude = location.longitude;
         }
-        const response = await api.get('/hero-banners/top-10/public', { params });
+        const response = await getCachedResource(
+          ["home:top10", params.latitude ?? "na", params.longitude ?? "na"],
+          () => api.get('/hero-banners/top-10/public', { params }),
+          { ttl: 60 * 1000 }
+        );
         if (response.data.success && response.data.data) {
           setTop10Restaurants(response.data.data.restaurants || []);
         }
@@ -567,21 +583,6 @@ export default function Home() {
   const fetchRestaurants = useCallback(async (filters = {}) => {
     try {
       setLoadingRestaurants(true);
-
-      // First, test backend connection
-      try {
-        // Use API_BASE_URL from config (supports both dev and production)
-        const backendUrl = API_BASE_URL.replace('/api', '');
-        const healthCheck = await fetch(`${backendUrl}/health`);
-        if (!healthCheck.ok) {
-          throw new Error(`Backend health check failed: ${healthCheck.status}`);
-        }
-      } catch (healthError) {
-        // Backend connection error - handled silently, toast notifications shown via axios interceptor
-        setRestaurantsData([]);
-        setLoadingRestaurants(false);
-        return;
-      }
 
       // Build query parameters from filters
       const params = {};

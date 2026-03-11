@@ -48,15 +48,16 @@ class ETAEventService {
         timestamp: acceptedAt
       });
 
-      // Recalculate ETA
+      // Recalculate ETA (Optimized: pass fetched order)
       const newETA = await etaCalculationService.recalculateETA(
         orderId,
         eventType,
-        eventData
+        eventData,
+        order
       );
 
-      // Emit WebSocket update
-      await etaWebSocketService.emitETAUpdate(orderId, newETA);
+      // Emit WebSocket update (Optimized: pass fetched order)
+      await etaWebSocketService.emitETAUpdate(orderId, newETA, order);
 
       return { event, newETA };
     } catch (error) {
@@ -83,11 +84,11 @@ class ETAEventService {
       }
 
       // Get rider location
-      const riderLocation = rider.availability?.currentLocation 
+      const riderLocation = rider.availability?.currentLocation
         ? {
-            latitude: rider.availability.currentLocation.coordinates[1],
-            longitude: rider.availability.currentLocation.coordinates[0]
-          }
+          latitude: rider.availability.currentLocation.coordinates[1],
+          longitude: rider.availability.currentLocation.coordinates[0]
+        }
         : null;
 
       // Check if assignment was delayed
@@ -117,19 +118,20 @@ class ETAEventService {
         timestamp: assignedAt
       });
 
-      // Recalculate ETA with actual rider location
+      // Recalculate ETA with actual rider location (Optimized: pass fetched order)
       const newETA = await etaCalculationService.recalculateETA(
         orderId,
         'RIDER_ASSIGNED',
-        eventData
+        eventData,
+        order
       );
 
-      // Emit WebSocket updates
-      await etaWebSocketService.emitETAUpdate(orderId, newETA);
+      // Emit WebSocket updates (Optimized: pass fetched order)
+      await etaWebSocketService.emitETAUpdate(orderId, newETA, order);
       await etaWebSocketService.emitRiderAssigned(orderId, {
         riderId: rider._id,
         riderName: rider.name
-      });
+      }, order);
 
       return { event, newETA };
     } catch (error) {
@@ -161,15 +163,16 @@ class ETAEventService {
         timestamp: reachedAt
       });
 
-      // Recalculate ETA
+      // Recalculate ETA (Optimized: pass fetched order)
       const newETA = await etaCalculationService.recalculateETA(
         orderId,
         'RIDER_REACHED_RESTAURANT',
-        {}
+        {},
+        order
       );
 
-      // Emit WebSocket update
-      await etaWebSocketService.emitETAUpdate(orderId, newETA);
+      // Emit WebSocket update (Optimized: pass fetched order)
+      await etaWebSocketService.emitETAUpdate(orderId, newETA, order);
 
       return { event, newETA };
     } catch (error) {
@@ -200,15 +203,16 @@ class ETAEventService {
         timestamp: new Date()
       });
 
-      // Recalculate ETA
+      // Recalculate ETA (Optimized: pass fetched order)
       const newETA = await etaCalculationService.recalculateETA(
         orderId,
         'FOOD_NOT_READY',
-        { waitingTime }
+        { waitingTime },
+        order
       );
 
-      // Emit WebSocket update
-      await etaWebSocketService.emitETAUpdate(orderId, newETA);
+      // Emit WebSocket update (Optimized: pass fetched order)
+      await etaWebSocketService.emitETAUpdate(orderId, newETA, order);
 
       return { event, newETA };
     } catch (error) {
@@ -238,16 +242,17 @@ class ETAEventService {
         timestamp: new Date()
       });
 
-      // Recalculate ETA
+      // Recalculate ETA (Optimized: pass fetched order)
       const newETA = await etaCalculationService.recalculateETA(
         orderId,
         'RIDER_STARTED_DELIVERY',
-        {}
+        {},
+        order
       );
 
-      // Emit WebSocket updates
-      await etaWebSocketService.emitETAUpdate(orderId, newETA);
-      await etaWebSocketService.emitPickedUp(orderId);
+      // Emit WebSocket updates (Optimized: pass fetched order)
+      await etaWebSocketService.emitETAUpdate(orderId, newETA, order);
+      await etaWebSocketService.emitPickedUp(orderId, order);
 
       return { event, newETA };
     } catch (error) {
@@ -279,15 +284,16 @@ class ETAEventService {
         timestamp: new Date()
       });
 
-      // Recalculate ETA
+      // Recalculate ETA (Optimized: pass fetched order)
       const newETA = await etaCalculationService.recalculateETA(
         orderId,
         'TRAFFIC_DETECTED',
-        { trafficLevel }
+        { trafficLevel },
+        order
       );
 
-      // Emit WebSocket update
-      await etaWebSocketService.emitETAUpdate(orderId, newETA);
+      // Emit WebSocket update (Optimized: pass fetched order)
+      await etaWebSocketService.emitETAUpdate(orderId, newETA, order);
 
       return { event, newETA };
     } catch (error) {
@@ -323,16 +329,17 @@ class ETAEventService {
         timestamp: new Date()
       });
 
-      // Recalculate ETA
+      // Recalculate ETA (Optimized: pass fetched order)
       const newETA = await etaCalculationService.recalculateETA(
         orderId,
         'RIDER_NEARING_DROP',
-        { distanceToDrop }
+        { distanceToDrop },
+        order
       );
 
-      // Emit WebSocket updates
-      await etaWebSocketService.emitETAUpdate(orderId, newETA);
-      await etaWebSocketService.emitNearby(orderId, distanceToDrop);
+      // Emit WebSocket updates (Optimized: pass fetched order)
+      await etaWebSocketService.emitETAUpdate(orderId, newETA, order);
+      await etaWebSocketService.emitNearby(orderId, distanceToDrop, order);
 
       return { event, newETA };
     } catch (error) {

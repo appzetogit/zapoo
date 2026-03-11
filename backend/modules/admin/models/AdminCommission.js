@@ -55,6 +55,7 @@ const adminCommissionSchema = new mongoose.Schema({
 
 // Indexes
 adminCommissionSchema.index({ restaurantId: 1, orderDate: -1 });
+adminCommissionSchema.index({ restaurantId: 1, status: 1, orderDate: -1 });
 adminCommissionSchema.index({ status: 1 });
 adminCommissionSchema.index({ orderDate: -1 });
 
@@ -100,4 +101,3 @@ adminCommissionSchema.statics.getCommissionByDateRange = async function(startDat
 const AdminCommission = mongoose.model('AdminCommission', adminCommissionSchema);
 
 export default AdminCommission;
-

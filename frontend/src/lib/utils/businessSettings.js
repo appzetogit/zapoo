@@ -5,6 +5,7 @@
 
 import apiClient from "../api/axios.js";
 import { API_ENDPOINTS } from "../api/config.js";
+import { getCachedResource, invalidateCachedResource } from "../api/requestCache.js";
 
 let cachedSettings = null;
 
@@ -13,14 +14,14 @@ let cachedSettings = null;
  */
 export const loadBusinessSettings = async () => {
   try {
-    // Check if we have a cached version
     if (cachedSettings) {
       return cachedSettings;
     }
 
-    // Use public endpoint that doesn't require authentication
-    const response = await apiClient.get(
-      API_ENDPOINTS.ADMIN.BUSINESS_SETTINGS_PUBLIC,
+    const response = await getCachedResource(
+      "business-settings:public",
+      () => apiClient.get(API_ENDPOINTS.ADMIN.BUSINESS_SETTINGS_PUBLIC),
+      { ttl: 5 * 60 * 1000 }
     );
     const settings = response?.data?.data || response?.data;
 
@@ -72,6 +73,7 @@ export const updateTitle = (companyName) => {
  */
 export const clearCache = () => {
   cachedSettings = null;
+  invalidateCachedResource("business-settings:public");
 };
 
 /**

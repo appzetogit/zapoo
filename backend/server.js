@@ -326,6 +326,10 @@ app.use(cookieParser());
 // Data sanitization
 app.use(mongoSanitize());
 
+// Query Counter for benchmarking (Phase 9)
+import { queryCounterMiddleware } from './shared/middleware/queryCounter.js';
+app.use(queryCounterMiddleware);
+
 // Rate limiting (disabled in development mode)
 if (process.env.NODE_ENV === 'production') {
   const limiter = rateLimit({

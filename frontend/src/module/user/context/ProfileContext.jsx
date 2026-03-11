@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useMemo, useCallback } from "react"
+import { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { authAPI, userAPI } from "@/lib/api"
 
 const ProfileContext = createContext(null)
@@ -14,7 +14,7 @@ export function ProfileProvider({ children }) {
         console.error("Error parsing user_user from localStorage:", e)
       }
     }
-    
+
     // Fallback to userProfile from localStorage
     const saved = localStorage.getItem("userProfile")
     if (saved) {
@@ -24,14 +24,26 @@ export function ProfileProvider({ children }) {
         console.error("Error parsing userProfile from localStorage:", e)
       }
     }
-    
+
     // Default empty profile
     return null
   })
-  
+
   const [loading, setLoading] = useState(true)
 
-  const [addresses, setAddresses] = useState([])
+  const [addresses, setAddresses] = useState(() => {
+    const saved = localStorage.getItem("userAddresses")
+    if (!saved) {
+      return []
+    }
+
+    try {
+      return JSON.parse(saved)
+    } catch (error) {
+      console.error("Error parsing userAddresses from localStorage:", error)
+      return []
+    }
+  })
 
   const [paymentMethods, setPaymentMethods] = useState(() => {
     const saved = localStorage.getItem("userPaymentMethods")
@@ -63,6 +75,7 @@ export function ProfileProvider({ children }) {
     const saved = localStorage.getItem("userFavorites")
     return saved ? JSON.parse(saved) : []
   })
+  const userProfileRef = useRef(userProfile)
 
   // Dish favorites state - stored in localStorage for persistence
   const [dishFavorites, setDishFavorites] = useState(() => {
@@ -80,6 +93,10 @@ export function ProfileProvider({ children }) {
   // Save to localStorage whenever userProfile, addresses or paymentMethods change
   useEffect(() => {
     localStorage.setItem("userProfile", JSON.stringify(userProfile))
+  }, [userProfile])
+
+  useEffect(() => {
+    userProfileRef.current = userProfile
   }, [userProfile])
 
   useEffect(() => {
@@ -104,38 +121,50 @@ export function ProfileProvider({ children }) {
 
   // Fetch user profile and addresses from API on mount and when authentication changes
   useEffect(() => {
-    const fetchUserProfile = async () => {
+    const fetchUserProfile = async (force = false) => {
       // Check if user is authenticated
-      const isAuthenticated = localStorage.getItem("user_authenticated") === "true" || 
-                             localStorage.getItem("user_accessToken")
-      
+      const isAuthenticated = localStorage.getItem("user_authenticated") === "true" ||
+        localStorage.getItem("user_accessToken")
+
       if (!isAuthenticated) {
+        setLoading(false)
+        return
+      }
+
+      // Optimization: Avoid redundant profile fetches
+      const lastFetchTime = localStorage.getItem("lastProfileFetchTime")
+      const STALE_TIME = 5 * 60 * 1000 // 5 minutes
+      const now = Date.now()
+
+      if (!force && lastFetchTime && (now - parseInt(lastFetchTime) < STALE_TIME) && userProfileRef.current) {
         setLoading(false)
         return
       }
 
       try {
         setLoading(true)
-        
-        // Fetch user profile
-        const response = await authAPI.getCurrentUser()
+
+        const [response, addressesResponse] = await Promise.all([
+          authAPI.getCurrentUser({ force }),
+          userAPI.getAddresses({ force }).catch((error) => {
+            console.error("Error fetching addresses:", error)
+            return null
+          }),
+        ])
+
         const userData = response?.data?.data?.user || response?.data?.user || response?.data
-        
         if (userData) {
           setUserProfile(userData)
-          // Update localStorage
           localStorage.setItem("user_user", JSON.stringify(userData))
           localStorage.setItem("userProfile", JSON.stringify(userData))
+          localStorage.setItem("lastProfileFetchTime", now.toString())
         }
 
-        // Fetch addresses
         try {
-          const addressesResponse = await userAPI.getAddresses()
           const addressesData = addressesResponse?.data?.data?.addresses || addressesResponse?.data?.addresses || []
           setAddresses(addressesData)
           localStorage.setItem("userAddresses", JSON.stringify(addressesData))
-        } catch (addressError) {
-          console.error("Error fetching addresses:", addressError)
+        } catch {
           // Try to load from localStorage as fallback
           const saved = localStorage.getItem("userAddresses")
           if (saved) {
@@ -164,14 +193,14 @@ export function ProfileProvider({ children }) {
     }
 
     fetchUserProfile()
-    
-    // Listen for auth changes
+
+    // Listen for auth changes - force refresh on login/registration events
     const handleAuthChange = () => {
-      fetchUserProfile()
+      fetchUserProfile(true)
     }
-    
+
     window.addEventListener("userAuthChanged", handleAuthChange)
-    
+
     return () => {
       window.removeEventListener("userAuthChanged", handleAuthChange)
     }
@@ -182,7 +211,7 @@ export function ProfileProvider({ children }) {
     try {
       const response = await userAPI.addAddress(address)
       const newAddress = response?.data?.data?.address || response?.data?.address
-      
+
       if (newAddress) {
         setAddresses((prev) => {
           const updated = [...prev, newAddress]
@@ -201,7 +230,7 @@ export function ProfileProvider({ children }) {
     try {
       const response = await userAPI.updateAddress(id, updatedAddress)
       const updatedAddr = response?.data?.data?.address || response?.data?.address
-      
+
       if (updatedAddr) {
         setAddresses((prev) => {
           const updated = prev.map((addr) => (addr.id === id ? { ...updatedAddr, id } : addr))
@@ -265,12 +294,12 @@ export function ProfileProvider({ children }) {
     setPaymentMethods((prev) => {
       const paymentToDelete = prev.find((pm) => pm.id === id)
       const newPayments = prev.filter((pm) => pm.id !== id)
-      
+
       // If deleting default, set first remaining as default
       if (paymentToDelete?.isDefault && newPayments.length > 0) {
         newPayments[0].isDefault = true
       }
-      
+
       return newPayments
     })
   }, [])
@@ -329,7 +358,7 @@ export function ProfileProvider({ children }) {
   }, [])
 
   const removeDishFavorite = useCallback((dishId, restaurantId) => {
-    setDishFavorites((prev) => 
+    setDishFavorites((prev) =>
       prev.filter(fav => !(fav.id === dishId && fav.restaurantId === restaurantId))
     )
   }, [])
@@ -456,4 +485,3 @@ export function useProfile() {
   }
   return context
 }
-

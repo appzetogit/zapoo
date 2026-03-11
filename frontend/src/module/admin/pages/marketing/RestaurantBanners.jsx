@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from "react"
 import { Search, Building2, Upload, Loader2, Image as ImageIcon, CheckCircle2, AlertCircle } from "lucide-react"
 import apiClient from "@/lib/api/axios"
+import { marketingAPI } from "@/lib/api"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -19,10 +20,10 @@ export default function RestaurantBanners() {
 
     const fileInputRef = useRef(null)
 
-    const fetchRequests = async () => {
+    const fetchRequests = async (force = false) => {
         try {
             setLoading(true)
-            const res = await apiClient.get("/marketing/ads/all")
+            const res = await marketingAPI.getAllRequests({ force })
             const data = res.data.data || []
             // Filter for ads that are paid but pending banner
             const pendingAds = data.filter(ad => ad.status === "Banner Pending")
@@ -78,7 +79,7 @@ export default function RestaurantBanners() {
             setSelectedAd(null)
             setSelectedFile(null)
             setPreviewUrl(null)
-            fetchRequests()
+            fetchRequests(true)
         } catch (err) {
             toast.error(err.response?.data?.message || "Failed to upload banner")
         } finally {

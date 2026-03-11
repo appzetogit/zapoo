@@ -223,9 +223,9 @@ const calculateTierPlatformFee = (tier, defaultPlatformFee) => {
  * Calculate GST (Goods and Services Tax)
  * GST is calculated on subtotal after discounts
  */
-export const calculateGST = async (subtotal, discount = 0, restaurant = null) => {
+export const calculateGST = async (subtotal, discount = 0, restaurant = null, passedFeeSettings = null) => {
   const taxableAmount = Math.max(subtotal - discount, 0);
-  const feeSettings = await getFeeSettings();
+  const feeSettings = passedFeeSettings || await getFeeSettings();
   const gstRate = (feeSettings.gstRate || 5) / 100;
 
   const isRegistered = restaurant?.onboarding?.step3?.gst?.isRegistered || false;
@@ -287,6 +287,7 @@ export const calculateDistance = (coord1, coord2) => {
 export const calculateOrderPricing = async ({
   items,
   restaurantId,
+  passedRestaurant = null,
   deliveryAddress = null,
   couponCode = null,
 }) => {
@@ -299,8 +300,8 @@ export const calculateOrderPricing = async ({
       throw new Error('Order subtotal must be greater than 0');
     }
 
-    let restaurant = null;
-    if (restaurantId) {
+    let restaurant = passedRestaurant;
+    if (!restaurant && restaurantId) {
       if (mongoose.Types.ObjectId.isValid(restaurantId) && restaurantId.length === 24) {
         restaurant = await Restaurant.findById(restaurantId).lean();
       }
@@ -408,7 +409,7 @@ export const calculateOrderPricing = async ({
     });
 
     const platformFee = roundCurrency(calculateTierPlatformFee(tier, feeSettings.platformFee));
-    const gst = await calculateGST(subtotal, discount, restaurant);
+    const gst = await calculateGST(subtotal, discount, restaurant, feeSettings);
 
     let internalRecommendedFee = 0;
     let recommendedFeePerItem = Number(feeSettings.recommendedItemFee || 0);

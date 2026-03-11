@@ -984,22 +984,7 @@ export default function Cart() {
           apiBaseUrl: API_BASE_URL
         });
 
-        // Try to test backend connectivity
-        try {
-          fetch(backendUrl + '/health', {
-            method: 'GET',
-            signal: AbortSignal.timeout(5000)
-          }).then(response => {
-            if (response.ok) {} else {
-              console.warn("⚠️ Backend health check returned:", response.status);
-            }
-          }).catch(fetchError => {
-            console.error("❌ Backend health check failed:", fetchError.message);
-            console.error("💡 Make sure backend server is running at:", backendUrl);
-          });
-        } catch (fetchTestError) {
-          console.error("❌ Could not test backend connectivity:", fetchTestError.message);
-        }
+        console.error("💡 Make sure backend server is running at:", backendUrl);
       }
       // Handle timeout errors
       else if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {

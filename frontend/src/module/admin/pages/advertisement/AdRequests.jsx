@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import SettingsDialog from "../../components/orders/SettingsDialog";
 import { exportAdvertisementsToCSV, exportAdvertisementsToExcel, exportAdvertisementsToPDF, exportAdvertisementsToJSON } from "../../components/advertisements/advertisementsExportUtils";
 import apiClient from "@/lib/api/axios";
+import { marketingAPI } from "@/lib/api";
 import { toast } from "sonner";
 export default function AdRequests() {
   const [activeTab, setActiveTab] = useState("new");
@@ -54,10 +55,10 @@ export default function AdRequests() {
     totalCost: ad.totalCost,
     raw: ad
   });
-  const fetchRequests = async () => {
+  const fetchRequests = async (force = false) => {
     try {
       setLoading(true);
-      const res = await apiClient.get("/marketing/ads/all");
+      const res = await marketingAPI.getAllRequests({ force });
       const data = res.data.data || [];
       setRequests(data.map(mapAd));
     } catch (err) {
@@ -131,7 +132,7 @@ export default function AdRequests() {
         status: "Approved"
       });
       toast.success("Ad approved!");
-      fetchRequests();
+      fetchRequests(true);
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to approve");
     }
@@ -142,7 +143,7 @@ export default function AdRequests() {
         status: "Rejected"
       });
       toast.success("Ad rejected");
-      fetchRequests();
+      fetchRequests(true);
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to reject");
     }
@@ -152,7 +153,7 @@ export default function AdRequests() {
     try {
       await apiClient.delete(`/marketing/ads/${id}`);
       toast.success("Ad request deleted successfully");
-      fetchRequests();
+      fetchRequests(true);
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to delete");
     }

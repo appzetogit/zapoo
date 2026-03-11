@@ -24,26 +24,28 @@ export const getWallet = asyncHandler(async (req, res) => {
   try {
     const user = req.user;
 
-    // Find or create wallet for this user
-    let wallet = await UserWallet.findOne({
-      userId: user._id
-    });
+    // Find or create wallet for this user - use lean for performance
+    let wallet = await UserWallet.findOne({ userId: user._id }).lean();
+
     if (!wallet) {
       // Create wallet if doesn't exist
-      wallet = await UserWallet.create({
+      const newWallet = await UserWallet.create({
         userId: user._id,
         balance: 0,
         totalAdded: 0,
         totalSpent: 0,
         totalRefunded: 0
       });
+      wallet = newWallet.toObject(); // Convert to plan object to match lean() output
     }
 
-    // Get all transactions (sorted by date, newest first)
-    const allTransactions = wallet.transactions.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    // Limit transactions to recent 20 for performance. 
+    // Full history should be fetched via /transactions endpoint.
+    const recentTransactions = (wallet.transactions || [])
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .slice(0, 20);
 
-    // Map transactions for frontend
-    const transactions = allTransactions.map(t => ({
+    const transactions = recentTransactions.map(t => ({
       id: t._id,
       _id: t._id,
       amount: t.amount,
@@ -57,6 +59,7 @@ export const getWallet = asyncHandler(async (req, res) => {
       paymentGateway: t.paymentGateway,
       paymentId: t.paymentId
     }));
+
     const walletData = {
       balance: wallet.balance || 0,
       currency: wallet.currency || 'INR',
@@ -64,8 +67,9 @@ export const getWallet = asyncHandler(async (req, res) => {
       totalSpent: wallet.totalSpent || 0,
       totalRefunded: wallet.totalRefunded || 0,
       transactions: transactions,
-      totalTransactions: wallet.transactions.length
+      totalTransactions: (wallet.transactions || []).length
     };
+
     return successResponse(res, 200, 'Wallet balance retrieved successfully', {
       wallet: walletData
     });
@@ -89,9 +93,10 @@ export const getTransactions = asyncHandler(async (req, res) => {
       page = 1,
       limit = 50
     } = req.query;
-    let wallet = await UserWallet.findOne({
-      userId: user._id
-    });
+
+    // Use lean() and select specific fields
+    let wallet = await UserWallet.findOne({ userId: user._id }).lean();
+
     if (!wallet) {
       return successResponse(res, 200, 'No transactions found', {
         transactions: [],
@@ -107,7 +112,6 @@ export const getTransactions = asyncHandler(async (req, res) => {
     // Filter transactions
     let transactions = wallet.transactions || [];
     if (type) {
-      // Map frontend filter types to backend types
       const typeMap = {
         'all': null,
         'additions': 'addition',
@@ -128,8 +132,11 @@ export const getTransactions = asyncHandler(async (req, res) => {
 
     // Pagination
     const total = transactions.length;
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-    const paginatedTransactions = transactions.slice(skip, skip + parseInt(limit));
+    const pageInt = parseInt(page);
+    const limitInt = parseInt(limit);
+    const skip = (pageInt - 1) * limitInt;
+    const paginatedTransactions = transactions.slice(skip, skip + limitInt);
+
     return successResponse(res, 200, 'Transactions retrieved successfully', {
       transactions: paginatedTransactions.map(t => ({
         id: t._id,
@@ -148,10 +155,10 @@ export const getTransactions = asyncHandler(async (req, res) => {
         failureReason: t.failureReason
       })),
       pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
+        page: pageInt,
+        limit: limitInt,
         total,
-        pages: Math.ceil(total / parseInt(limit))
+        pages: Math.ceil(total / limitInt)
       }
     });
   } catch (error) {

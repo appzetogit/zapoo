@@ -82,117 +82,53 @@ export const createOrder = async (req, res) => {
 
     // Log incoming restaurant data for debugging
 
-    // Find and validate the restaurant
-    let restaurant = null;
-    // Try to find restaurant by restaurantId, _id, or slug
-    if (mongoose.Types.ObjectId.isValid(restaurantId) && restaurantId.length === 24) {
-      restaurant = await Restaurant.findById(restaurantId);
-    }
-    if (!restaurant) {
-      restaurant = await Restaurant.findOne({
-        $or: [{
-          restaurantId: restaurantId
-        }, {
-          slug: restaurantId
-        }]
-      });
-    }
-    if (!restaurant) {
-      logger.error('❌ Restaurant not found:', {
-        searchedRestaurantId: restaurantId,
-        searchedRestaurantName: restaurantName
-      });
-      return res.status(404).json({
-        success: false,
-        message: 'Restaurant not found'
-      });
-    }
+    // Find and validate the restaurant (Optimized with lean and selection)
+    const restaurant = await Restaurant.findOne({
+      $or: [
+        ...(mongoose.Types.ObjectId.isValid(restaurantId) && restaurantId.length === 24 ? [{ _id: restaurantId }] : []),
+        { restaurantId: restaurantId },
+        { slug: restaurantId }
+      ]
+    }).select('name location deliveryRange isActive').lean();
 
-    // CRITICAL: Validate restaurant name matches
-    if (restaurantName && restaurant.name !== restaurantName) {
-      logger.warn('⚠️ Restaurant name mismatch:', {
-        incomingName: restaurantName,
-        foundRestaurantName: restaurant.name,
-        incomingRestaurantId: restaurantId,
-        foundRestaurantId: restaurant._id?.toString() || restaurant.restaurantId
-      });
-      // Still proceed but log the mismatch
+    if (!restaurant) {
+      logger.error('❌ Restaurant not found:', { searchedRestaurantId: restaurantId, searchedRestaurantName: restaurantName });
+      return res.status(404).json({ success: false, message: 'Restaurant not found' });
     }
-
-    // Note: Removed isAcceptingOrders check - orders can come even when restaurant is offline
-    // Restaurant can accept/reject orders manually, or orders will auto-reject after accept time expires
-    // if (!restaurant.isAcceptingOrders) {
-    //   logger.warn('⚠️ Restaurant not accepting orders:', {
-    //     restaurantId: restaurant._id?.toString() || restaurant.restaurantId,
-    //     restaurantName: restaurant.name
-    //   });
-    //   return res.status(403).json({
-    //     success: false,
-    //     message: 'Restaurant is currently not accepting orders'
-    //   });
-    // }
 
     if (!restaurant.isActive) {
-      logger.warn('⚠️ Restaurant is inactive:', {
-        restaurantId: restaurant._id?.toString() || restaurant.restaurantId,
-        restaurantName: restaurant.name
-      });
-      return res.status(403).json({
-        success: false,
-        message: 'Restaurant is currently inactive'
-      });
+      logger.warn('⚠️ Restaurant is inactive:', { restaurantId: restaurant._id, restaurantName: restaurant.name });
+      return res.status(403).json({ success: false, message: 'Restaurant is currently inactive' });
     }
 
-    // CRITICAL: Validate that restaurant's location (pin) is within an active zone
+    // CRITICAL: Validate restaurant location
     const restaurantLat = restaurant.location?.latitude || restaurant.location?.coordinates?.[1];
     const restaurantLng = restaurant.location?.longitude || restaurant.location?.coordinates?.[0];
+
     if (!restaurantLat || !restaurantLng) {
-      logger.error('❌ Restaurant location not found:', {
-        restaurantId: restaurant._id?.toString() || restaurant.restaurantId,
-        restaurantName: restaurant.name
-      });
-      return res.status(400).json({
-        success: false,
-        message: 'Restaurant location is not set. Please contact support.'
-      });
+      logger.error('❌ Restaurant location not found:', { restaurantId: restaurant._id, restaurantName: restaurant.name });
+      return res.status(400).json({ success: false, message: 'Restaurant location is not set. Please contact support.' });
     }
 
-    // Check if restaurant is within any active zone
-    const activeZones = await Zone.find({
-      isActive: true
-    }).lean();
-    let restaurantInZone = false;
-    let restaurantZone = null;
-    for (const zone of activeZones) {
-      if (!zone.coordinates || zone.coordinates.length < 3) continue;
-      let isInZone = false;
-      if (typeof zone.containsPoint === 'function') {
-        isInZone = zone.containsPoint(restaurantLat, restaurantLng);
-      } else {
-        // Ray casting algorithm
-        let inside = false;
-        for (let i = 0, j = zone.coordinates.length - 1; i < zone.coordinates.length; j = i++) {
-          const coordI = zone.coordinates[i];
-          const coordJ = zone.coordinates[j];
-          const xi = typeof coordI === 'object' ? coordI.latitude || coordI.lat : null;
-          const yi = typeof coordI === 'object' ? coordI.longitude || coordI.lng : null;
-          const xj = typeof coordJ === 'object' ? coordJ.latitude || coordJ.lat : null;
-          const yj = typeof coordJ === 'object' ? coordJ.longitude || coordJ.lng : null;
-          if (xi === null || yi === null || xj === null || yj === null) continue;
-          const intersect = yi > restaurantLng !== yj > restaurantLng && restaurantLat < (xj - xi) * (restaurantLng - yi) / (yj - yi) + xi;
-          if (intersect) inside = !inside;
+    // Parallelize Zone Validation and Wallet check
+    const [restaurantZone, wallet] = await Promise.all([
+      Zone.findOne({
+        isActive: true,
+        boundary: {
+          $geoIntersects: {
+            $geometry: {
+              type: 'Point',
+              coordinates: [restaurantLng, restaurantLat]
+            }
+          }
         }
-        isInZone = inside;
-      }
-      if (isInZone) {
-        restaurantInZone = true;
-        restaurantZone = zone;
-        break;
-      }
-    }
-    if (!restaurantInZone) {
+      }).lean(),
+      normalizedPaymentMethod === 'wallet' ? UserWallet.findOne({ userId }).lean() : Promise.resolve(null)
+    ]);
+
+    if (!restaurantZone) {
       logger.warn('⚠️ Restaurant location is not within any active zone:', {
-        restaurantId: restaurant._id?.toString() || restaurant.restaurantId,
+        restaurantId: restaurant._id,
         restaurantName: restaurant.name,
         restaurantLat,
         restaurantLng
@@ -202,13 +138,13 @@ export const createOrder = async (req, res) => {
         message: 'This restaurant is not available in your area. Only restaurants within active delivery zones can receive orders.'
       });
     }
+
     // NEW: Calculate distance and validate restaurant's deliveryRange
-    // Get user's coordinates from address
     const userLat = address.location?.latitude || address.location?.coordinates?.[1];
     const userLng = address.location?.longitude || address.location?.coordinates?.[0];
     if (userLat && userLng) {
       const distance = calculateDistance([restaurantLng, restaurantLat], [userLng, userLat]);
-      const maxRange = restaurant.deliveryRange || 5; // Default 5km if not set
+      const maxRange = restaurant.deliveryRange || 5;
 
       if (distance > maxRange) {
         return res.status(403).json({
@@ -218,36 +154,22 @@ export const createOrder = async (req, res) => {
       }
     }
 
-    // RELAXED: Validate user's zone matches restaurant's zone (Allow cross-zone if within range)
-    const {
-      zoneId: userZoneId
-    } = req.body; // User's zone ID from frontend
-
-    if (userZoneId) {
-      const restaurantZoneId = restaurantZone._id.toString();
-      if (restaurantZoneId !== userZoneId) {}
-    } else {
-      logger.warn('⚠️ User zoneId not provided in order request');
-    }
-    assignedRestaurantId = restaurant._id?.toString() || restaurant.restaurantId;
+    assignedRestaurantId = restaurant._id.toString();
     assignedRestaurantName = restaurant.name;
 
-    // Log restaurant assignment for debugging
-
-    // Generate order ID before creating order
-    const timestamp = Date.now();
-    const random = Math.floor(Math.random() * 1000);
-    const generatedOrderId = `ORD-${timestamp}-${random}`;
+    // Generate order ID
+    const generatedOrderId = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
     // Ensure couponCode is included in pricing
     if (!pricing.couponCode && pricing.appliedCoupon?.code) {
       pricing.couponCode = pricing.appliedCoupon.code;
     }
 
-    // Calculate pricing including potential internal recommendation fees
+    // Calculate pricing (Optimized: pass pre-fetched restaurant)
     const pricingData = await calculateOrderPricing({
       items,
       restaurantId: assignedRestaurantId,
+      passedRestaurant: restaurant, // Use pre-fetched object
       deliveryAddress: address,
       couponCode: pricing.couponCode,
       deliveryFleet: deliveryFleet || 'standard'
@@ -396,7 +318,7 @@ export const createOrder = async (req, res) => {
             transactionId: existingTransaction._id
           });
         } else {
-        // Deduct money from wallet
+          // Deduct money from wallet
           const transaction = wallet.addTransaction({
             amount: pricingData.total,
             type: 'deduction',
@@ -865,9 +787,13 @@ export const getUserOrders = async (req, res) => {
       query.status = status;
     }
     const skip = (parseInt(page) - 1) * parseInt(limit);
-    const orders = await Order.find(query).sort({
-      createdAt: -1
-    }).limit(parseInt(limit)).skip(skip).select('-__v').populate('restaurantId', 'name slug profileImage address location phone ownerPhone').populate('userId', 'name phone email').lean();
+    const orders = await Order.find(query)
+      .sort({ createdAt: -1 })
+      .limit(parseInt(limit))
+      .skip(skip)
+      .select('orderId status pricing items address createdAt')
+      .populate('restaurantId', 'name slug profileImage address location')
+      .lean();
     const total = await Order.countDocuments(query);
     res.json({
       success: true,
@@ -901,24 +827,32 @@ export const getOrderDetails = async (req, res) => {
       id
     } = req.params;
 
-    // Try to find order by MongoDB _id or orderId (custom order ID)
-    let order = null;
+    // Optimized parallel fetch for order and its payment
+    const [order, payment] = await Promise.all([
+      (async () => {
+        let foundOrder = null;
+        if (mongoose.Types.ObjectId.isValid(id) && id.length === 24) {
+          foundOrder = await Order.findOne({ _id: id, userId })
+            .populate('deliveryPartnerId', 'name email phone')
+            .populate('restaurantId', 'name slug address location profileImage')
+            .lean();
+        }
+        if (!foundOrder) {
+          foundOrder = await Order.findOne({ orderId: id, userId })
+            .populate('deliveryPartnerId', 'name email phone')
+            .populate('restaurantId', 'name slug address location profileImage')
+            .lean();
+        }
+        return foundOrder;
+      })(),
+      Payment.findOne({
+        $or: [
+          { orderId: mongoose.Types.ObjectId.isValid(id) && id.length === 24 ? id : null },
+          { paymentId: id } // fallback for some payment-first lookups
+        ]
+      }).select('-logs').lean()
+    ]);
 
-    // First try MongoDB _id if it's a valid ObjectId
-    if (mongoose.Types.ObjectId.isValid(id) && id.length === 24) {
-      order = await Order.findOne({
-        _id: id,
-        userId
-      }).populate('deliveryPartnerId', 'name email phone').populate('userId', 'name fullName phone email').lean();
-    }
-
-    // If not found, try by orderId (custom order ID like "ORD-123456-789")
-    if (!order) {
-      order = await Order.findOne({
-        orderId: id,
-        userId
-      }).populate('deliveryPartnerId', 'name email phone').populate('userId', 'name fullName phone email').lean();
-    }
     if (!order) {
       return res.status(404).json({
         success: false,
@@ -926,10 +860,8 @@ export const getOrderDetails = async (req, res) => {
       });
     }
 
-    // Get payment details
-    const payment = await Payment.findOne({
-      orderId: order._id
-    }).lean();
+    // Attempt second payment lookup by internal MongoDB _id if first failed
+    const effectivePayment = payment || await Payment.findOne({ orderId: order._id }).select('-logs').lean();
     res.json({
       success: true,
       data: {
@@ -1106,7 +1038,7 @@ export const calculateOrder = async (req, res) => {
       }
     }
 
-    // Calculate pricing
+    // Calculate pricing (Note: calculateOrder still fetches restaurant internally if not provided)
     const pricing = await calculateOrderPricing({
       items,
       restaurantId,

@@ -1,3 +1,5 @@
+import { invalidateCachedResource } from "../api/requestCache.js";
+
 /**
  * JWT Token Utilities
  * Decode and extract information from JWT tokens
@@ -138,6 +140,10 @@ export function clearModuleAuth(module) {
   localStorage.removeItem(`${module}_user`);
   // Also clear any sessionStorage data
   sessionStorage.removeItem(`${module}AuthData`);
+  if (module === "user") {
+    invalidateCachedResource("auth:current-user");
+    invalidateCachedResource("user:addresses");
+  }
 }
 
 /**
@@ -202,6 +208,9 @@ export function setAuthData(module, token, user) {
         stored: storedAuth
       });
       throw new Error(`Authentication flag storage failed for module: ${module}`);
+    }
+    if (module === "user") {
+      invalidateCachedResource("auth:current-user");
     }
   } catch (error) {
     // If quota exceeded, try to clear some space

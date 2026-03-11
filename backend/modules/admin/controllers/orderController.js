@@ -531,10 +531,14 @@ export const getSearchingDeliverymanOrders = asyncHandler(async (req, res) => {
 
     // Calculate pagination
     const skip = (parseInt(page) - 1) * parseInt(limit);
-    // Fetch orders with population
-    const orders = await Order.find(finalQuery).populate('userId', 'name email phone').populate('restaurantId', 'name slug').sort({
-      createdAt: -1
-    }).limit(parseInt(limit)).skip(skip).lean();
+    // Fetch orders with population and strict projection to exclude heavy fields
+    const orders = await Order.find(finalQuery)
+      .populate('userId', 'name email phone')
+      .populate('restaurantId', 'name slug')
+      .select('-deliveryState.routeToPickup -deliveryState.routeToDelivery -address.location.coordinates')
+      .sort({
+        createdAt: -1
+      }).limit(parseInt(limit)).skip(skip).lean();
 
     // Get total count
     const total = await Order.countDocuments(finalQuery);
@@ -724,10 +728,15 @@ export const getOngoingOrders = asyncHandler(async (req, res) => {
 
     // Calculate pagination
     const skip = (parseInt(page) - 1) * parseInt(limit);
-    // Fetch orders with population
-    const orders = await Order.find(finalQuery).populate('userId', 'name email phone').populate('restaurantId', 'name slug').populate('deliveryPartnerId', 'name phone').sort({
-      createdAt: -1
-    }).limit(parseInt(limit)).skip(skip).lean();
+    // Fetch orders with population and strict projection
+    const orders = await Order.find(finalQuery)
+      .populate('userId', 'name email phone')
+      .populate('restaurantId', 'name slug')
+      .populate('deliveryPartnerId', 'name phone')
+      .select('-deliveryState.routeToPickup -deliveryState.routeToDelivery -address.location.coordinates')
+      .sort({
+        createdAt: -1
+      }).limit(parseInt(limit)).skip(skip).lean();
 
     // Get total count
     const total = await Order.countDocuments(finalQuery);
@@ -1209,108 +1218,141 @@ export const getRestaurantReport = asyncHandler(async (req, res) => {
       }
     }
 
-    // Process each restaurant
-    const restaurantReports = await Promise.all(restaurants.map(async restaurant => {
-      const restaurantId = restaurant._id?.toString();
-      const restaurantIdField = restaurant.restaurantId;
+    const restaurantObjectIds = restaurants.map((restaurant) =>
+      restaurant._id instanceof mongoose.Types.ObjectId
+        ? restaurant._id
+        : new mongoose.Types.ObjectId(restaurant._id)
+    );
 
-      // Build order query for this restaurant
-      const orderQuery = {
-        ...dateQuery,
-        $or: [{
-          restaurantId: restaurantId
-        }, {
-          restaurantId: restaurantIdField
-        }]
-      };
-
-      // Get orders for this restaurant
-      const orders = await Order.find(orderQuery).lean();
-
-      // Calculate statistics
-      const totalOrder = orders.length;
-
-      // Total order amount
-      const totalOrderAmount = orders.reduce((sum, order) => sum + (order.pricing?.total || 0), 0);
-
-      // Total discount given
-      const totalDiscountGiven = orders.reduce((sum, order) => sum + (order.pricing?.discount || 0), 0);
-
-      // Total VAT/TAX
-      const totalVATTAX = orders.reduce((sum, order) => sum + (order.pricing?.tax || 0), 0);
-
-      // Get unique food items (count distinct itemIds from all orders)
-      const uniqueItemIds = new Set();
-      orders.forEach(order => {
-        if (order.items && Array.isArray(order.items)) {
-          order.items.forEach(item => {
-            if (item.itemId) {
-              uniqueItemIds.add(item.itemId);
-            }
-          });
-        }
-      });
-      const totalFood = uniqueItemIds.size;
-
-      // Get admin commission for this restaurant
-      const restaurantObjectId = restaurant._id instanceof mongoose.Types.ObjectId ? restaurant._id : new mongoose.Types.ObjectId(restaurant._id);
-      const commissionQuery = {
-        restaurantId: restaurantObjectId,
-        status: 'completed'
-      };
-      if (dateQuery.createdAt) {
-        commissionQuery.orderDate = dateQuery.createdAt;
+    const restaurantKeyByIdentifier = new Map();
+    restaurants.forEach((restaurant) => {
+      const canonicalId = restaurant._id?.toString();
+      if (!canonicalId) return;
+      restaurantKeyByIdentifier.set(canonicalId, canonicalId);
+      if (restaurant.restaurantId) {
+        restaurantKeyByIdentifier.set(restaurant.restaurantId, canonicalId);
       }
-      const commissions = await AdminCommission.find(commissionQuery).lean();
-      const totalAdminCommission = commissions.reduce((sum, comm) => sum + (comm.commissionAmount || 0), 0);
+    });
 
-      // Get ratings from FeedbackExperience
-      const ratingStats = await FeedbackExperience.aggregate([{
-        $match: {
-          restaurantId: restaurantObjectId,
-          rating: {
-            $exists: true,
-            $ne: null,
-            $gt: 0
+    const orderIdentifiers = [...restaurantKeyByIdentifier.keys()];
+    const [orders, commissionAgg, ratingAgg] = await Promise.all([
+      Order.find({
+        ...dateQuery,
+        restaurantId: { $in: orderIdentifiers }
+      })
+        .select('restaurantId pricing.total pricing.discount pricing.tax items.itemId')
+        .lean(),
+      AdminCommission.aggregate([
+        {
+          $match: {
+            restaurantId: { $in: restaurantObjectIds },
+            status: 'completed',
+            ...(dateQuery.createdAt ? { orderDate: dateQuery.createdAt } : {})
+          }
+        },
+        {
+          $group: {
+            _id: '$restaurantId',
+            totalAdminCommission: { $sum: '$commissionAmount' }
           }
         }
-      }, {
-        $group: {
-          _id: null,
-          averageRating: {
-            $avg: '$rating'
-          },
-          totalRatings: {
-            $sum: 1
+      ]),
+      FeedbackExperience.aggregate([
+        {
+          $match: {
+            restaurantId: { $in: restaurantObjectIds },
+            rating: {
+              $exists: true,
+              $ne: null,
+              $gt: 0
+            }
+          }
+        },
+        {
+          $group: {
+            _id: '$restaurantId',
+            averageRating: { $avg: '$rating' },
+            totalRatings: { $sum: 1 }
           }
         }
-      }]);
-      const averageRatings = ratingStats[0]?.averageRating || restaurant.rating || 0;
-      const reviews = ratingStats[0]?.totalRatings || restaurant.totalRatings || 0;
+      ])
+    ]);
 
-      // Format currency values
-      const formatCurrency = amount => {
-        return `₹${amount.toLocaleString('en-US', {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2
-        })}`;
+    const orderStatsByRestaurant = new Map();
+    for (const order of orders) {
+      const canonicalId = restaurantKeyByIdentifier.get(order.restaurantId);
+      if (!canonicalId) continue;
+
+      const stats = orderStatsByRestaurant.get(canonicalId) || {
+        totalOrder: 0,
+        totalOrderAmount: 0,
+        totalDiscountGiven: 0,
+        totalVATTAX: 0,
+        uniqueItemIds: new Set()
       };
+
+      stats.totalOrder += 1;
+      stats.totalOrderAmount += order.pricing?.total || 0;
+      stats.totalDiscountGiven += order.pricing?.discount || 0;
+      stats.totalVATTAX += order.pricing?.tax || 0;
+
+      if (Array.isArray(order.items)) {
+        for (const item of order.items) {
+          if (item?.itemId) {
+            stats.uniqueItemIds.add(item.itemId);
+          }
+        }
+      }
+
+      orderStatsByRestaurant.set(canonicalId, stats);
+    }
+
+    const commissionByRestaurant = new Map(
+      commissionAgg.map((entry) => [entry._id?.toString(), entry.totalAdminCommission || 0])
+    );
+    const ratingsByRestaurant = new Map(
+      ratingAgg.map((entry) => [
+        entry._id?.toString(),
+        {
+          averageRating: entry.averageRating || 0,
+          totalRatings: entry.totalRatings || 0
+        }
+      ])
+    );
+
+    const formatCurrency = (amount) => `₹${amount.toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    })}`;
+
+    const restaurantReports = restaurants.map((restaurant) => {
+      const restaurantId = restaurant._id?.toString();
+      const orderStats = orderStatsByRestaurant.get(restaurantId) || {
+        totalOrder: 0,
+        totalOrderAmount: 0,
+        totalDiscountGiven: 0,
+        totalVATTAX: 0,
+        uniqueItemIds: new Set()
+      };
+      const ratingStats = ratingsByRestaurant.get(restaurantId);
+      const averageRatings = ratingStats?.averageRating || restaurant.rating || 0;
+      const reviews = ratingStats?.totalRatings || restaurant.totalRatings || 0;
+
       return {
         sl: 0,
-        // Will be set in frontend
         id: restaurantId,
         restaurantName: restaurant.name,
         icon: restaurant.profileImage?.url || restaurant.profileImage || null,
-        totalFood,
-        totalOrder,
-        totalOrderAmount: formatCurrency(totalOrderAmount),
-        totalDiscountGiven: formatCurrency(totalDiscountGiven),
-        totalAdminCommission: formatCurrency(totalAdminCommission),
-        totalVATTAX: formatCurrency(totalVATTAX),
+        totalFood: orderStats.uniqueItemIds.size,
+        totalOrder: orderStats.totalOrder,
+        totalOrderAmount: formatCurrency(orderStats.totalOrderAmount),
+        totalDiscountGiven: formatCurrency(orderStats.totalDiscountGiven),
+        totalAdminCommission: formatCurrency(commissionByRestaurant.get(restaurantId) || 0),
+        totalVATTAX: formatCurrency(orderStats.totalVATTAX),
         averageRatings: parseFloat(averageRatings.toFixed(1)),
         reviews
       };
-    }));
+    });
 
     // Filter by type (Commission/Subscription) if needed
     let filteredReports = restaurantReports;

@@ -286,7 +286,8 @@ export const getDeliveryPartners = asyncHandler(async (req, res) => {
       limit = 50,
       search,
       isActive,
-      includeAvailability
+      includeAvailability,
+      mapOnly
     } = req.query;
 
     // Build query - only get approved/active delivery partners for list
@@ -334,60 +335,50 @@ export const getDeliveryPartners = asyncHandler(async (req, res) => {
     // Calculate pagination
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
-    // Build select fields - always include availability when requested
-    // Note: In Mongoose, if a field is not explicitly excluded, it's included by default
-    // So we just need to make sure we're not excluding availability
+    // Build select fields - optimize for map view if requested
     let selectFields = '-password -refreshToken';
+    const isMapMode = mapOnly === 'true' || mapOnly === true;
+
+    if (isMapMode) {
+      selectFields = '_id name phone availability deliveryId metrics.rating status isActive profileImage';
+    }
 
     // Fetch delivery partners
     const deliveries = await Delivery.find(query).select(selectFields).sort({
       createdAt: -1
     }).skip(skip).limit(parseInt(limit)).lean();
 
-    // Log for debugging
-    if (includeAvailability === 'true' || includeAvailability === true) {
-      deliveries.forEach((d, idx) => {
-        const hasLocation = d.availability?.currentLocation?.coordinates;
-      });
-    }
+    // Import Order model for order counts only if NOT in map mode
+    let statsMap = {};
+    if (!isMapMode) {
+      const Order = (await import('../../order/models/Order.js')).default;
+      const deliveryIds = deliveries.map(d => d._id);
 
-    // Import Order model for order counts
-    const Order = (await import('../../order/models/Order.js')).default;
-
-    // Get order statistics for each delivery partner
-    const deliveryIds = deliveries.map(d => d._id);
-
-    // Get order counts for each delivery partner
-    const orderStats = await Order.aggregate([{
-      $match: {
-        deliveryPartnerId: {
-          $in: deliveryIds
+      const orderStats = await Order.aggregate([{
+        $match: {
+          deliveryPartnerId: { $in: deliveryIds }
         }
-      }
-    }, {
-      $group: {
-        _id: '$deliveryPartnerId',
-        totalOrders: {
-          $sum: 1
-        },
-        assignedOrders: {
-          $sum: {
-            $cond: [{
-              $in: ['$status', ['out_for_delivery', 'ready', 'preparing']]
-            }, 1, 0]
+      }, {
+        $group: {
+          _id: '$deliveryPartnerId',
+          totalOrders: { $sum: 1 },
+          assignedOrders: {
+            $sum: {
+              $cond: [{
+                $in: ['$status', ['out_for_delivery', 'ready', 'preparing']]
+              }, 1, 0]
+            }
           }
         }
-      }
-    }]);
+      }]);
 
-    // Create a map of deliveryId -> stats
-    const statsMap = {};
-    orderStats.forEach(stat => {
-      statsMap[stat._id.toString()] = {
-        totalOrders: stat.totalOrders || 0,
-        assignedOrders: stat.assignedOrders || 0
-      };
-    });
+      orderStats.forEach(stat => {
+        statsMap[stat._id.toString()] = {
+          totalOrders: stat.totalOrders || 0,
+          assignedOrders: stat.assignedOrders || 0
+        };
+      });
+    }
 
     // Format response with order stats and zone info
     const formattedPartners = deliveries.map((delivery, index) => {
@@ -412,7 +403,7 @@ export const getDeliveryPartners = asyncHandler(async (req, res) => {
       // Get availability status
       const isOnline = delivery.availability?.isOnline || false;
       const availabilityStatus = isOnline ? 'Online' : 'Offline';
-      return {
+      const partner = {
         _id: delivery._id.toString(),
         sl: skip + index + 1,
         name: delivery.name || 'N/A',
@@ -425,17 +416,23 @@ export const getDeliveryPartners = asyncHandler(async (req, res) => {
         rating: delivery.metrics?.rating || 0,
         deliveryId: delivery.deliveryId || 'N/A',
         isActive: delivery.isActive !== false,
-        profileImage: delivery.profileImage?.url || null,
-        // Include availability data when requested
-        ...(includeAvailability === 'true' || includeAvailability === true ? {
-          availability: delivery.availability || null
-        } : {}),
-        // Include full data
-        fullData: {
+        profileImage: delivery.profileImage?.url || null
+      };
+
+      // Include availability data when requested or in map mode
+      if (isMapMode || includeAvailability === 'true' || includeAvailability === true) {
+        partner.availability = delivery.availability || null;
+      }
+
+      // Include full data only if NOT in map mode to keep payload small
+      if (!isMapMode) {
+        partner.fullData = {
           ...delivery,
           _id: delivery._id.toString()
-        }
-      };
+        };
+      }
+
+      return partner;
     });
 
     // Get total count

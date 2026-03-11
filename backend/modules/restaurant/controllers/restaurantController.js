@@ -103,11 +103,11 @@ export const getRestaurants = async (req, res) => {
 
     // Optional: Zone-based filtering - if zoneId is provided, validate and filter by zone
     let userZone = null;
-    if (zoneId) {
-      // Validate zone exists and is active
-      userZone = await Zone.findById(zoneId).lean();
-      if (!userZone || !userZone.isActive) {
-        return errorResponse(res, 400, 'Invalid or inactive zone. Please detect your zone again.');
+    if (zoneId && mongoose.Types.ObjectId.isValid(zoneId)) {
+      // Zone hint is optional; ignore stale/inactive values instead of failing the listing API.
+      userZone = await Zone.findById(zoneId).select('_id isActive').lean();
+      if (!userZone?.isActive) {
+        userZone = null;
       }
     }
 
@@ -130,7 +130,7 @@ export const getRestaurants = async (req, res) => {
       };
     }
 
-    // Trust filters (top-rated = 4.5+, trusted = 4.0+ with high totalRatings)
+    // Trust filters
     if (req.query.topRated === 'true') {
       query.rating = {
         $gte: 4.5
@@ -141,42 +141,22 @@ export const getRestaurants = async (req, res) => {
       };
       query.totalRatings = {
         $gte: 100
-      }; // At least 100 ratings to be "trusted"
-    }
-
-    // Delivery time filter (estimatedDeliveryTime contains time in format "25-30 mins")
-    if (maxDeliveryTime) {
-      const maxTime = parseInt(maxDeliveryTime);
-      query.$or = [{
-        estimatedDeliveryTime: {
-          $regex: new RegExp(`(\\d+)-?\\d*\\s*mins?`, 'i')
-        }
-      }];
-      // We'll filter this in application logic since it's a string field
-    }
-
-    // Distance filter (distance is stored as string like "1.2 km")
-    if (maxDistance) {
-      const maxDist = parseFloat(maxDistance);
-      query.$or = [{
-        distance: {
-          $regex: new RegExp(`\\d+\\.?\\d*\\s*km`, 'i')
-        }
-      }];
-      // We'll filter this in application logic since it's a string field
-    }
-
-    // Price range filter
-    if (maxPrice) {
-      const priceMap = {
-        200: ['$'],
-        500: ['$', '$$']
       };
-      if (priceMap[maxPrice]) {
-        query.priceRange = {
-          $in: priceMap[maxPrice]
-        };
-      }
+    }
+
+    // Delivery time filter (using optimized numeric field)
+    if (maxDeliveryTime) {
+      query.avgDeliveryTime = {
+        $lte: parseInt(maxDeliveryTime)
+      };
+    }
+
+    // Price range filter (using optimized numeric field)
+    if (maxPrice) {
+      const priceThreshold = parseInt(maxPrice);
+      query.avgPriceValue = {
+        $lte: priceThreshold
+      };
     }
 
     // Offers filter
@@ -203,13 +183,13 @@ export const getRestaurants = async (req, res) => {
       switch (sortBy) {
         case 'price-low':
           sortObj = {
-            priceRange: 1,
+            avgPriceValue: 1,
             rating: -1
           }; // $ < $$ < $$$, then by rating
           break;
         case 'price-high':
           sortObj = {
-            priceRange: -1,
+            avgPriceValue: -1,
             rating: -1
           }; // $$$$ > $$$ > $$ > $, then by rating
           break;
@@ -236,52 +216,59 @@ export const getRestaurants = async (req, res) => {
       }
     }
 
-    // Fetch restaurants - Show ALL restaurants regardless of zone
-    let restaurants = await Restaurant.find(query).select('-owner -createdAt -updatedAt -password').sort(sortObj).limit(parseInt(limit)).skip(parseInt(offset)).lean();
+    const hasGeoFilter = userLat != null && userLng != null && Number.isFinite(userLat) && Number.isFinite(userLng);
+    const maxDistanceMeters = (parseFloat(maxDistance) || 15) * 1000;
 
-    // Note: We show all restaurants regardless of zone. Zone-based filtering is removed.
-    // Users in any zone will see all restaurants.
-
-    // Apply string-based filters that can't be done in MongoDB query
-    if (maxDeliveryTime) {
-      const maxTime = parseInt(maxDeliveryTime);
-      restaurants = restaurants.filter(r => {
-        if (!r.estimatedDeliveryTime) return false;
-        const timeMatch = r.estimatedDeliveryTime.match(/(\d+)/);
-        return timeMatch && parseInt(timeMatch[1]) <= maxTime;
-      });
-    }
-    if (maxDistance) {
-      const maxDist = parseFloat(maxDistance);
-      restaurants = restaurants.filter(r => {
-        if (!r.distance) return false;
-        const distMatch = r.distance.match(/(\d+\.?\d*)/);
-        return distMatch && parseFloat(distMatch[1]) <= maxDist;
-      });
+    // Geo-spatial filtering if coordinates provided
+    if (hasGeoFilter) {
+      query["location.coordinates"] = {
+        $nearSphere: {
+          $geometry: {
+            type: "Point",
+            coordinates: [userLng, userLat]
+          },
+          $maxDistance: maxDistanceMeters
+        }
+      };
     }
 
-    // Filter by deliveryRange when user coordinates provided
-    if (userLat != null && userLng != null && Number.isFinite(userLat) && Number.isFinite(userLng)) {
-      restaurants = restaurants.filter(r => {
-        const resLocation = r.location;
-        const resLat = resLocation?.latitude ?? resLocation?.coordinates?.[1];
-        const resLng = resLocation?.longitude ?? resLocation?.coordinates?.[0];
-        if (resLat == null || resLng == null) return true;
-        const dist = calculateDistance([resLng, resLat], [userLng, userLat]);
-        const rangeKm = r.deliveryRange ?? 5;
-        return dist <= rangeKm;
-      });
+    // Fetch restaurants - optimized with projection and lean
+    const projection = 'name slug cuisines rating totalRatings promo profileImage location avgDeliveryTime avgPriceValue isActive isAcceptingOrders featuredDish featuredPrice offer estimatedDeliveryTime distance';
+    const restaurants = await Restaurant.find(query)
+      .select(projection)
+      .sort(sortObj)
+      .limit(parseInt(limit))
+      .skip(parseInt(offset))
+      .lean();
+
+    let total = 0;
+    if (hasGeoFilter) {
+      const totalResult = await Restaurant.aggregate([
+        {
+          $geoNear: {
+            near: {
+              type: "Point",
+              coordinates: [userLng, userLat]
+            },
+            distanceField: "distanceMeters",
+            spherical: true,
+            maxDistance: maxDistanceMeters,
+            query: {
+              ...query,
+              "location.coordinates": { $exists: true, $ne: null }
+            }
+          }
+        },
+        { $count: "total" }
+      ]);
+      total = totalResult[0]?.total || 0;
+    } else {
+      total = await Restaurant.countDocuments(query);
     }
 
-    // Get total count (before filtering by string fields)
-    const totalQuery = {
-      ...query
-    };
-    delete totalQuery.$or; // Remove $or for count
-    const total = await Restaurant.countDocuments(totalQuery);
     return successResponse(res, 200, 'Restaurants retrieved successfully', {
       restaurants,
-      total: restaurants.length,
+      total,
       filters: {
         sortBy,
         cuisine,
@@ -324,7 +311,13 @@ export const getRestaurantById = async (req, res) => {
       });
     }
     queryConditions.$or = orConditions;
-    const restaurant = await Restaurant.findOne(queryConditions).select('-owner -createdAt -updatedAt').lean();
+
+    // Strict field projection for public restaurant profile
+    const projection = 'name slug cuisines rating totalRatings promo profileImage location avgDeliveryTime avgPriceValue isActive isAcceptingOrders featuredDish featuredPrice offer distance deliveryRange estimatedDeliveryTime cuisines';
+
+    const restaurant = await Restaurant.findOne(queryConditions)
+      .select(projection)
+      .lean();
     if (!restaurant) {
       return errorResponse(res, 404, 'Restaurant not found');
     }
@@ -1032,79 +1025,10 @@ export const getRestaurantsWithDishesUnder250 = async (req, res) => {
       });
     };
 
-    // Helper function to process a single restaurant
-    const processRestaurant = async restaurant => {
-      try {
-        // Get menu for this restaurant
-        const menu = await Menu.findOne({
-          restaurant: restaurant._id,
-          isActive: true
-        }).lean();
-        if (!menu || !menu.sections || menu.sections.length === 0) {
-          return null; // Skip restaurants without menus
-        }
-
-        // Collect all dishes under ₹250 from all sections
-        const dishesUnder250 = [];
-        menu.sections.forEach(section => {
-          if (section.isEnabled === false) return;
-
-          // Filter direct items in section
-          const sectionItems = filterItemsUnder250(section.items || []);
-          dishesUnder250.push(...sectionItems.map(item => ({
-            ...item,
-            sectionName: section.name
-          })));
-
-          // Filter items in subsections
-          (section.subsections || []).forEach(subsection => {
-            const subsectionItems = filterItemsUnder250(subsection.items || []);
-            dishesUnder250.push(...subsectionItems.map(item => ({
-              ...item,
-              sectionName: section.name,
-              subsectionName: subsection.name
-            })));
-          });
-        });
-
-        // Only include restaurant if it has at least one dish under ₹250
-        if (dishesUnder250.length > 0) {
-          return {
-            id: restaurant._id.toString(),
-            restaurantId: restaurant.restaurantId,
-            name: restaurant.name,
-            slug: restaurant.slug,
-            rating: restaurant.rating || 0,
-            totalRatings: restaurant.totalRatings || 0,
-            deliveryTime: restaurant.estimatedDeliveryTime || "25-30 mins",
-            distance: restaurant.distance || "1.2 km",
-            cuisine: restaurant.cuisines && restaurant.cuisines.length > 0 ? restaurant.cuisines.join(' • ') : "Multi-cuisine",
-            price: restaurant.priceRange || "$$",
-            image: restaurant.profileImage?.url || restaurant.menuImages?.[0]?.url || "",
-            menuItems: dishesUnder250.map(item => ({
-              id: item.id,
-              name: item.name,
-              price: getFinalPrice(item),
-              originalPrice: item.originalPrice || item.price,
-              image: item.image || (item.images && item.images.length > 0 ? item.images[0] : ""),
-              isVeg: item.foodType === 'Veg',
-              bestPrice: item.discountAmount > 0 || item.originalPrice && item.originalPrice > getFinalPrice(item),
-              description: item.description || "",
-              category: item.category || item.sectionName || ""
-            }))
-          };
-        }
-        return null;
-      } catch (error) {
-        console.error(`Error processing restaurant ${restaurant._id}:`, error);
-        return null;
-      }
-    };
-
-    // Get all active restaurants - Show ALL restaurants regardless of zone
+    // Get all active restaurants
     let restaurants = await Restaurant.find({
       isActive: true
-    }).select('-owner -createdAt -updatedAt').lean().limit(100); // Limit to first 100 restaurants for performance
+    }).select('-owner -createdAt -updatedAt').lean().limit(100);
 
     // Filter by deliveryRange when user coordinates provided
     if (userLat != null && userLng != null && Number.isFinite(userLat) && Number.isFinite(userLng)) {
@@ -1119,13 +1043,61 @@ export const getRestaurantsWithDishesUnder250 = async (req, res) => {
       });
     }
 
-    // Process restaurants in parallel (batch processing for better performance)
-    const batchSize = 10; // Process 10 restaurants at a time
+    // Process restaurants by bulk-fetching menus and then mapping
+    const restaurantIds = restaurants.map(r => r._id);
+    const allMenus = await Menu.find({
+      restaurant: { $in: restaurantIds },
+      isActive: true
+    }).lean();
+
+    const menuMap = new Map();
+    allMenus.forEach(m => menuMap.set(m.restaurant.toString(), m));
+
     const restaurantsWithDishes = [];
-    for (let i = 0; i < restaurants.length; i += batchSize) {
-      const batch = restaurants.slice(i, i + batchSize);
-      const results = await Promise.all(batch.map(processRestaurant));
-      restaurantsWithDishes.push(...results.filter(r => r !== null));
+
+    // Process restaurants using the pre-fetched menus
+    for (const restaurant of restaurants) {
+      const menu = menuMap.get(restaurant._id.toString());
+      if (!menu || !menu.sections || menu.sections.length === 0) continue;
+
+      const dishesUnder250 = [];
+      menu.sections.forEach(section => {
+        if (section.isEnabled === false) return;
+        const sectionItems = filterItemsUnder250(section.items || []);
+        dishesUnder250.push(...sectionItems.map(item => ({ ...item, sectionName: section.name })));
+
+        (section.subsections || []).forEach(subsection => {
+          const subsectionItems = filterItemsUnder250(subsection.items || []);
+          dishesUnder250.push(...subsectionItems.map(item => ({ ...item, sectionName: section.name, subsectionName: subsection.name })));
+        });
+      });
+
+      if (dishesUnder250.length > 0) {
+        restaurantsWithDishes.push({
+          id: restaurant._id.toString(),
+          restaurantId: restaurant.restaurantId,
+          name: restaurant.name,
+          slug: restaurant.slug,
+          rating: restaurant.rating || 0,
+          totalRatings: restaurant.totalRatings || 0,
+          deliveryTime: restaurant.estimatedDeliveryTime || "25-30 mins",
+          distance: restaurant.distance || "1.2 km",
+          cuisine: restaurant.cuisines?.length > 0 ? restaurant.cuisines.join(' • ') : "Multi-cuisine",
+          price: restaurant.priceRange || "$$",
+          image: restaurant.profileImage?.url || restaurant.menuImages?.[0]?.url || "",
+          menuItems: dishesUnder250.map(item => ({
+            id: item.id,
+            name: item.name,
+            price: getFinalPrice(item),
+            originalPrice: item.originalPrice || item.price,
+            image: item.image || item.images?.[0] || "",
+            isVeg: item.foodType === 'Veg',
+            bestPrice: item.discountAmount > 0 || (item.originalPrice && item.originalPrice > getFinalPrice(item)),
+            description: item.description || "",
+            category: item.category || item.sectionName || ""
+          }))
+        });
+      }
     }
 
     // Sort by rating (highest first) or by number of dishes

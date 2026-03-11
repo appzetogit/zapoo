@@ -1,6 +1,7 @@
 import jwtService from "../services/jwtService.js";
 import User from "../models/User.js";
 import { errorResponse } from "../../../shared/utils/response.js";
+import { getRedisClient } from "../../../config/redis.js";
 
 /**
  * Authentication Middleware
@@ -19,9 +20,25 @@ export const authenticate = async (req, res, next) => {
 
     // Verify token
     const decoded = jwtService.verifyAccessToken(token);
+    const userId = decoded.userId;
 
-    // Get user from database
-    const user = await User.findById(decoded.userId).select("-password");
+    // Try to get user from Redis cache first
+    const redisClient = getRedisClient();
+    if (redisClient) {
+      try {
+        const cachedUser = await redisClient.get(`user_session:${userId}`);
+        if (cachedUser) {
+          req.user = JSON.parse(cachedUser);
+          req.token = decoded;
+          return next();
+        }
+      } catch (cacheErr) {
+        console.warn(`[Redis] Cache read error for user ${userId}:`, cacheErr.message);
+      }
+    }
+
+    // Get user from database - select only essential fields
+    const user = await User.findById(userId).select("name email phone role profileImage isActive preferences").lean();
 
     if (!user) {
       return errorResponse(res, 401, "User not found");
@@ -29,6 +46,15 @@ export const authenticate = async (req, res, next) => {
 
     if (!user.isActive) {
       return errorResponse(res, 401, "User account is inactive");
+    }
+
+    // Store in Redis if available (TTL: 1 hour)
+    if (redisClient) {
+      try {
+        await redisClient.setEx(`user_session:${userId}`, 3600, JSON.stringify(user));
+      } catch (cacheErr) {
+        console.warn(`[Redis] Cache write error for user ${userId}:`, cacheErr.message);
+      }
     }
 
     // Attach user to request
@@ -80,12 +106,12 @@ export const optionalAuthenticate = async (req, res, next) => {
     const decoded = jwtService.verifyAccessToken(token);
 
     // Try finding in User first (most common)
-    let user = await User.findById(decoded.userId).select("-password");
+    let user = await User.findById(decoded.userId).select("name email phone role profileImage isActive preferences").lean();
 
     // If not found in User, check Admin (since we have separate collections)
     if (!user) {
       const { default: Admin } = await import("../../admin/models/Admin.js");
-      user = await Admin.findById(decoded.userId).select("-password");
+      user = await Admin.findById(decoded.userId).select("name email role isActive").lean();
     }
 
     if (user && user.isActive) {

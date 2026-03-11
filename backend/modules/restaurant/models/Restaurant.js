@@ -203,6 +203,22 @@ const restaurantSchema = new mongoose.Schema(
       min: [1, "Delivery range must be at least 1km"],
       max: [20, "Delivery range cannot exceed 20km"],
     },
+    // Numeric helper fields for optimized DB-level filtering
+    avgDeliveryTime: {
+      type: Number,
+      default: 30,
+      index: true
+    },
+    avgDistanceValue: {
+      type: Number,
+      default: 1.2,
+      index: true
+    },
+    avgPriceValue: {
+      type: Number,
+      default: 200,
+      index: true
+    },
     // Onboarding fields (merged from RestaurantOnboarding)
     onboarding: {
       step1: {
@@ -371,11 +387,18 @@ const restaurantSchema = new mongoose.Schema(
 
 // Indexes for authentication, discovery and geo queries
 restaurantSchema.index({ "location.coordinates": "2dsphere" });
-// Fast lookups by slug / id are already covered by unique indexes on slug and restaurantId
-// Visibility filters for listings
+
+// Fast listing and visibility filters
 restaurantSchema.index({ isActive: 1, isAcceptingOrders: 1 });
-// Zone-based queries (e.g. admin dashboards, zone management)
-restaurantSchema.index({ zoneId: 1 });
+restaurantSchema.index({ isActive: 1, createdAt: -1 });
+
+// Zone-based regional queries
+restaurantSchema.index({ zoneId: 1, isActive: 1 });
+restaurantSchema.index({ zoneId: 1, createdAt: -1 });
+
+// Subscription and Admin management
+restaurantSchema.index({ "subscription.planId": 1, "subscription.status": 1 });
+restaurantSchema.index({ "subscription.status": 1, createdAt: -1 });
 
 // Hash password before saving
 restaurantSchema.pre("save", async function (next) {
@@ -480,6 +503,33 @@ restaurantSchema.pre("save", async function (next) {
   // Set ownerEmail from email if email exists and ownerEmail not set
   if (this.email && !this.ownerEmail) {
     this.ownerEmail = this.email;
+  }
+
+  // Populate numeric helper fields for optimized filtering
+  // 1. Parse delivery time (e.g., "25-30 mins" -> 27.5)
+  if (this.estimatedDeliveryTime) {
+    const numbers = this.estimatedDeliveryTime.match(/\d+/g);
+    if (numbers && numbers.length > 0) {
+      if (numbers.length === 2) {
+        this.avgDeliveryTime = (parseInt(numbers[0]) + parseInt(numbers[1])) / 2;
+      } else {
+        this.avgDeliveryTime = parseInt(numbers[0]);
+      }
+    }
+  }
+
+  // 2. Parse distance (e.g., "1.2 km" -> 1.2) - Note: This is an reference field, real distance is geo-calculated
+  if (this.distance) {
+    const distMatch = this.distance.match(/(\d+\.?\d*)/);
+    if (distMatch) {
+      this.avgDistanceValue = parseFloat(distMatch[1]);
+    }
+  }
+
+  // 3. Map price range to numeric value for filtering
+  const priceMap = { "$": 100, "$$": 250, "$$$": 500, "$$$$": 1000 };
+  if (this.priceRange && priceMap[this.priceRange]) {
+    this.avgPriceValue = priceMap[this.priceRange];
   }
 
   next();

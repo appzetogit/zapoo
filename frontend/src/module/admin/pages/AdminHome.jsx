@@ -5,7 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Activity, ArrowUpRight, ShoppingBag, CreditCard, Truck, Receipt, DollarSign, Store, UserCheck, Package, UserCircle, Clock, CheckCircle, Plus } from "lucide-react";
 import zapooLogo from "@/assets/zapoo_logo.png";
-import { adminAPI } from "@/lib/api";
+import { adminAPI, tierAPI } from "@/lib/api";
 export default function AdminHome() {
   const navigate = useNavigate();
   const [selectedTier, setSelectedTier] = useState("all");
@@ -18,7 +18,7 @@ export default function AdminHome() {
   useEffect(() => {
     const fetchTiers = async () => {
       try {
-        const response = await adminAPI.getAllTiers();
+        const response = await tierAPI.getAllTiers();
         if (response.data?.success && response.data?.data) {
           setTiers(response.data.data);
         }

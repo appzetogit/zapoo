@@ -539,6 +539,13 @@ export const resetPassword = asyncHandler(async (req, res) => {
   // Update password
   user.password = newPassword; // Will be hashed by pre-save hook
   await user.save();
+
+  // Invalidate Redis cache
+  const { getRedisClient } = await import("../../../config/redis.js");
+  const redisClient = getRedisClient();
+  if (redisClient) {
+    await redisClient.del(`user_session:${user._id}`).catch(e => logger.warn(`[Redis] Cache invalidation failed: ${e.message}`));
+  }
   return successResponse(res, 200, "Password reset successfully. Please login with your new password.");
 });
 
@@ -547,15 +554,20 @@ export const resetPassword = asyncHandler(async (req, res) => {
  * GET /api/auth/me
  */
 export const getCurrentUser = asyncHandler(async (req, res) => {
-  // User is attached by authenticate middleware
-  // Wallet is sourced from UserWallet to avoid relying on embedded User.wallet
+  // req.user is attached by authenticate middleware (already optimized to select essential fields)
+
   let walletData = {
     balance: 0,
     currency: "INR",
   };
+
   try {
+    // Dynamic import is fine, but we'll use .lean() and select only needed fields
     const { default: UserWallet } = await import("../../user/models/UserWallet.js");
-    const wallet = await UserWallet.findOne({ userId: req.user._id }).lean();
+    const wallet = await UserWallet.findOne({ userId: req.user._id })
+      .select("balance currency")
+      .lean();
+
     if (wallet) {
       walletData = {
         balance: wallet.balance || 0,
@@ -563,11 +575,7 @@ export const getCurrentUser = asyncHandler(async (req, res) => {
       };
     }
   } catch (e) {
-    // On any error, fall back to zero balance; do not break /me
-    walletData = {
-      balance: 0,
-      currency: "INR",
-    };
+    logger.warn(`Wallet fetch failed for user ${req.user._id}: ${e.message}`);
   }
 
   return successResponse(res, 200, "User retrieved successfully", {
@@ -582,7 +590,6 @@ export const getCurrentUser = asyncHandler(async (req, res) => {
       signupMethod: req.user.signupMethod,
       preferences: req.user.preferences,
       wallet: walletData,
-      // Include additional profile fields
       dateOfBirth: req.user.dateOfBirth,
       anniversary: req.user.anniversary,
       gender: req.user.gender,

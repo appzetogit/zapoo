@@ -181,6 +181,7 @@ const orderSettlementSchema = new mongoose.Schema({
 orderSettlementSchema.index({ restaurantId: 1, settlementStatus: 1 });
 orderSettlementSchema.index({ deliveryPartnerId: 1, settlementStatus: 1 });
 orderSettlementSchema.index({ settlementStatus: 1, createdAt: -1 });
+orderSettlementSchema.index({ restaurantId: 1, createdAt: -1 });
 orderSettlementSchema.index({ escrowStatus: 1 });
 orderSettlementSchema.index({ 'restaurantEarning.status': 1 });
 orderSettlementSchema.index({ 'deliveryPartnerEarning.status': 1 });

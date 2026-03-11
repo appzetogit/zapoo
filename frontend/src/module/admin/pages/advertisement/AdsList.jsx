@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import SettingsDialog from "../../components/orders/SettingsDialog"
 import { exportAdvertisementsToCSV, exportAdvertisementsToExcel, exportAdvertisementsToPDF, exportAdvertisementsToJSON } from "../../components/advertisements/advertisementsExportUtils"
 import apiClient from "@/lib/api/axios"
+import { marketingAPI } from "@/lib/api"
 import { toast } from "sonner"
 
 export default function AdsList() {
@@ -63,10 +64,10 @@ export default function AdsList() {
     }
   }, [visibleColumns.actions])
 
-  const fetchAds = async () => {
+  const fetchAds = async (force = false) => {
     try {
       setLoading(true)
-      const res = await apiClient.get("/marketing/ads/all")
+      const res = await marketingAPI.getAllRequests({ force })
       const data = res.data.data || []
       setAds(data.map(mapAd))
     } catch (err) {
@@ -150,7 +151,7 @@ export default function AdsList() {
     try {
       await apiClient.put(`/marketing/ads/${adId}/status`, { priority: newPriority })
       toast.success("Priority updated")
-      fetchAds()
+      fetchAds(true)
     } catch (err) {
       toast.error("Failed to update priority")
     }
@@ -192,7 +193,7 @@ export default function AdsList() {
       toast.success("Advertisement updated successfully")
       setIsEditOpen(false)
       setSelectedAd(null)
-      fetchAds()
+      fetchAds(true)
     } catch (err) {
       toast.error(err?.response?.data?.message || "Failed to update advertisement")
     } finally {
@@ -220,7 +221,7 @@ export default function AdsList() {
         toast.success("Ad deleted")
         setIsDeleteOpen(false)
         setSelectedAd(null)
-        fetchAds()
+      fetchAds(true)
       } catch (err) {
         toast.error("Failed to delete ad")
       }

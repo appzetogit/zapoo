@@ -115,7 +115,7 @@ export default function CreatePercentageDiscount() {
               });
             }
           });
-          allItems.forEach((item, idx) => {});
+          allItems.forEach((item, idx) => { });
           setMenuItems(allItems);
         }
       } catch (error) {
@@ -607,123 +607,123 @@ export default function CreatePercentageDiscount() {
     }
   };
   return <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Header */}
-      <div className="sticky top-0 z-40 bg-white border-b border-gray-200 px-4 py-3">
-        <div className="flex items-center gap-3">
-          <button onClick={() => navigate(`/restaurant/hub-growth/create-offers/${goalId}`)} className="p-1 rounded-full hover:bg-gray-100">
-            <ArrowLeft className="w-5 h-5 text-gray-700" />
-          </button>
-          <h1 className="text-lg font-bold text-gray-900">
-            {discountType === "percentage" ? "Create percentage discount" : "Create flat discount"}
-          </h1>
-        </div>
+    {/* Header */}
+    <div className="sticky top-0 z-40 bg-white border-b border-gray-200 px-4 py-3">
+      <div className="flex items-center gap-3">
+        <button onClick={() => navigate(`/restaurant/hub-growth/create-offers/${goalId}`)} className="p-1 rounded-full hover:bg-gray-100">
+          <ArrowLeft className="w-5 h-5 text-gray-700" />
+        </button>
+        <h1 className="text-lg font-bold text-gray-900">
+          {discountType === "percentage" ? "Create percentage discount" : "Create flat discount"}
+        </h1>
       </div>
+    </div>
 
-      {/* Tabs */}
-      <div className="sticky top-[57px] z-30 bg-white border-b border-gray-200">
-        <div className="flex gap-1 px-4 py-2">
-          <button onClick={() => setActiveTab("dish")} className={`flex-1 py-2.5 px-4 rounded-lg font-medium text-sm transition-colors ${activeTab === "dish" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}>
-            Dish
-          </button>
-          <button onClick={() => setActiveTab("running-offer")} className={`flex-1 py-2.5 px-4 rounded-lg font-medium text-sm transition-colors ${activeTab === "running-offer" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}>
-            Running Offer
-          </button>
-        </div>
+    {/* Tabs */}
+    <div className="sticky top-[57px] z-30 bg-white border-b border-gray-200">
+      <div className="flex gap-1 px-4 py-2">
+        <button onClick={() => setActiveTab("dish")} className={`flex-1 py-2.5 px-4 rounded-lg font-medium text-sm transition-colors ${activeTab === "dish" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}>
+          Dish
+        </button>
+        <button onClick={() => setActiveTab("running-offer")} className={`flex-1 py-2.5 px-4 rounded-lg font-medium text-sm transition-colors ${activeTab === "running-offer" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}>
+          Running Offer
+        </button>
       </div>
+    </div>
 
-      {/* Search Bar (only show in Dish tab) */}
-      {activeTab === "dish" && <div className="sticky top-[113px] z-20 bg-white px-4 py-4 border-b border-gray-200">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <input type="text" placeholder="Search food items..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-          </div>
-        </div>}
+    {/* Search Bar (only show in Dish tab) */}
+    {activeTab === "dish" && <div className="sticky top-[113px] z-20 bg-white px-4 py-4 border-b border-gray-200">
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+        <input type="text" placeholder="Search food items..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+      </div>
+    </div>}
 
-      {/* Content */}
-      <div className="flex-1 px-4 py-6 overflow-y-auto">
-        {activeTab === "dish" ? loadingMenu ? <div className="text-center py-12">
-              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-              <p className="text-sm text-gray-500 mt-4">Loading menu items...</p>
-            </div> : filteredItems.length === 0 ? <div className="text-center py-12">
-              <p className="text-gray-500">No items found</p>
-            </div> : <div className="space-y-3">
-              {filteredItems.map(item => {
+    {/* Content */}
+    <div className="flex-1 px-4 py-6 overflow-y-auto">
+      {activeTab === "dish" ? loadingMenu ? <div className="text-center py-12">
+        <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <p className="text-sm text-gray-500 mt-4">Loading menu items...</p>
+      </div> : filteredItems.length === 0 ? <div className="text-center py-12">
+        <p className="text-gray-500">No items found</p>
+      </div> : <div className="space-y-3">
+        {filteredItems.map(item => {
           return <motion.div key={item.id} whileTap={{
             scale: 0.98
-          }} className="bg-white rounded-lg p-4 border-2 border-gray-200 transition-all">
-                    <div className="flex items-start gap-4">
-                      {/* Item Image */}
-                      <div className="relative w-20 h-20 rounded-lg overflow-hidden flex-shrink-0">
-                        <img src={item.image || item.images?.[0] || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200&h=200&fit=crop"} alt={item.name} className="w-full h-full object-cover" onError={e => {
+          }} className="relative bg-white rounded-lg p-4 border-2 border-gray-200 transition-all">
+            <div className="flex items-start gap-4">
+              {/* Item Image */}
+              <div className="relative w-20 h-20 rounded-lg overflow-hidden flex-shrink-0">
+                <img src={item.image || item.images?.[0] || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200&h=200&fit=crop"} alt={item.name} className="w-full h-full object-cover" onError={e => {
                   e.target.onerror = null;
                   e.target.src = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200&h=200&fit=crop";
                 }} />
-                        {/* Veg/Non-Veg Indicator */}
-                        <div className="absolute top-1 left-1">
-                          <div className={`w-4 h-4 border-2 rounded flex items-center justify-center ${item.foodType === "Veg" ? "border-green-600 bg-white" : "border-red-600 bg-white"}`}>
-                            <div className={`w-2 h-2 rounded-full ${item.foodType === "Veg" ? "bg-green-600" : "bg-red-600"}`} />
-                          </div>
-                        </div>
-                      </div>
+                {/* Veg/Non-Veg Indicator */}
+                <div className="absolute top-1 left-1">
+                  <div className={`w-4 h-4 border-2 rounded flex items-center justify-center ${item.foodType === "Veg" ? "border-green-600 bg-white" : "border-red-600 bg-white"}`}>
+                    <div className={`w-2 h-2 rounded-full ${item.foodType === "Veg" ? "bg-green-600" : "bg-red-600"}`} />
+                  </div>
+                </div>
+              </div>
 
-                      {/* Item Details */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex-1 min-w-0">
-                            <h3 className="text-base font-bold text-gray-900 mb-1 line-clamp-1">
-                              {item.name}
-                            </h3>
-                            {item.description && <p className="text-xs text-gray-500 line-clamp-2 mb-2">
-                                {item.description}
-                              </p>}
-                            <div className="flex items-center gap-3">
-                              <span className="text-sm font-semibold text-gray-900">
-                                ₹{item.price || 0}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-
-                        {/* Make Offer Button */}
-                        <div className="-mt-13.5 pt-2">
-                          <button onClick={() => openMakeOfferModal(item)} className="ml-32 mb-2 w-30  py-1.5 px-3 bg-green-600 text-white rounded-lg text-xs font-semibold hover:bg-green-700 transition-colors flex items-center justify-center gap-1.5">
-                            <Tag className="w-3.5 h-3.5" />
-                            Make Offer
-                          </button>
-                        </div>
-                      </div>
+              {/* Item Details */}
+              <div className="flex-1 min-w-0 pr-24">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-base font-bold text-gray-900 mb-1 line-clamp-1">
+                      {item.name}
+                    </h3>
+                    {item.description && <p className="text-xs text-gray-500 line-clamp-2 mb-2">
+                      {item.description}
+                    </p>}
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-semibold text-gray-900">
+                        ₹{item.price || 0}
+                      </span>
                     </div>
-                  </motion.div>;
+                  </div>
+                </div>
+
+
+                {/* Make Offer Button */}
+                <div className="absolute bottom-4 right-4">
+                  <button onClick={() => openMakeOfferModal(item)} className="py-1.5 px-3 bg-green-600 text-white rounded-lg text-xs font-semibold hover:bg-green-700 transition-colors flex items-center justify-center gap-1.5">
+                    <Tag className="w-3.5 h-3.5" />
+                    Make Offer
+                  </button>
+                </div>
+              </div>
+            </div>
+          </motion.div>;
         })}
-            </div> : loadingOffers ? <div className="text-center py-12">
-              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-              <p className="text-sm text-gray-500 mt-4">Loading running offers...</p>
-            </div> : runningOffers.length === 0 ? <div className="text-center py-12">
-              <Tag className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-500 font-medium">No running offers</p>
-              <p className="text-sm text-gray-400 mt-2">Create your first offer from the Dish tab</p>
-            </div> : <div className="space-y-4">
-              {runningOffers.map(offer => <motion.div key={offer._id} initial={{
+      </div> : loadingOffers ? <div className="text-center py-12">
+        <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <p className="text-sm text-gray-500 mt-4">Loading running offers...</p>
+      </div> : runningOffers.length === 0 ? <div className="text-center py-12">
+        <Tag className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+        <p className="text-gray-500 font-medium">No running offers</p>
+        <p className="text-sm text-gray-400 mt-2">Create your first offer from the Dish tab</p>
+      </div> : <div className="space-y-4">
+        {runningOffers.map(offer => <motion.div key={offer._id} initial={{
           opacity: 0,
           y: 20
         }} animate={{
           opacity: 1,
           y: 0
         }} className="bg-white rounded-lg p-4 border border-gray-200">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <div className={`w-2 h-2 rounded-full ${offer.status === 'active' ? 'bg-green-500' : offer.status === 'paused' ? 'bg-orange-500' : 'bg-gray-400'}`}></div>
-                      <span className={`text-xs font-medium ${offer.status === 'active' ? 'text-green-600' : offer.status === 'paused' ? 'text-orange-600' : 'text-gray-600'}`}>
-                        {offer.status === 'active' ? 'Active' : offer.status === 'paused' ? 'Paused' : offer.status || 'Inactive'}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs text-gray-500">
-                        {new Date(offer.createdAt).toLocaleDateString()}
-                      </span>
-                      {/* Edit and Delete Icons */}
-                      <button onClick={() => {
+          <div className="flex items-start justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <div className={`w-2 h-2 rounded-full ${offer.status === 'active' ? 'bg-green-500' : offer.status === 'paused' ? 'bg-orange-500' : 'bg-gray-400'}`}></div>
+              <span className={`text-xs font-medium ${offer.status === 'active' ? 'text-green-600' : offer.status === 'paused' ? 'text-orange-600' : 'text-gray-600'}`}>
+                {offer.status === 'active' ? 'Active' : offer.status === 'paused' ? 'Paused' : offer.status || 'Inactive'}
+              </span>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-gray-500">
+                {new Date(offer.createdAt).toLocaleDateString()}
+              </span>
+              {/* Edit and Delete Icons */}
+              <button onClick={() => {
                 const offerItem = offer.items?.[0];
                 if (offerItem) {
                   // Find the original menu item to edit
@@ -737,64 +737,64 @@ export default function CreatePercentageDiscount() {
                   openMakeOfferModal(menuItem, offer);
                 }
               }} className="p-1.5 rounded-full hover:bg-blue-50 text-blue-600 transition-colors" title="Edit offer">
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button onClick={() => handleDeleteOffer(offer._id)} disabled={deletingOfferId === offer._id} className="p-1.5 rounded-full hover:bg-red-50 text-red-600 transition-colors disabled:opacity-50" title="Delete offer">
-                        {deletingOfferId === offer._id ? <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin"></div> : <Trash2 className="w-4 h-4" />}
-                      </button>
-                    </div>
-                  </div>
+                <Edit className="w-4 h-4" />
+              </button>
+              <button onClick={() => handleDeleteOffer(offer._id)} disabled={deletingOfferId === offer._id} className="p-1.5 rounded-full hover:bg-red-50 text-red-600 transition-colors disabled:opacity-50" title="Delete offer">
+                {deletingOfferId === offer._id ? <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin"></div> : <Trash2 className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
 
-                  {/* Toggle Button */}
-                  <div className="mb-3 pt-2 border-t border-gray-200">
-                    <button onClick={() => handleToggleOfferStatus(offer)} disabled={togglingOfferId === offer._id} className={`w-full py-2 px-4 rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-2 ${offer.status === 'active' ? "bg-orange-600 text-white hover:bg-orange-700" : "bg-green-600 text-white hover:bg-green-700"} disabled:opacity-50`}>
-                      {togglingOfferId === offer._id ? <>
-                          <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                          <span>{offer.status === 'active' ? 'Deactivating...' : 'Activating...'}</span>
-                        </> : <span>{offer.status === 'active' ? 'Deactivate Offer' : 'Activate Offer'}</span>}
-                    </button>
-                  </div>
+          {/* Toggle Button */}
+          <div className="mb-3 pt-2 border-t border-gray-200">
+            <button onClick={() => handleToggleOfferStatus(offer)} disabled={togglingOfferId === offer._id} className={`w-full py-2 px-4 rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-2 ${offer.status === 'active' ? "bg-orange-600 text-white hover:bg-orange-700" : "bg-green-600 text-white hover:bg-green-700"} disabled:opacity-50`}>
+              {togglingOfferId === offer._id ? <>
+                <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                <span>{offer.status === 'active' ? 'Deactivating...' : 'Activating...'}</span>
+              </> : <span>{offer.status === 'active' ? 'Deactivate Offer' : 'Activate Offer'}</span>}
+            </button>
+          </div>
 
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <Tag className="w-4 h-4 text-gray-500" />
-                      <span className="text-sm font-medium text-gray-700">
-                        {offer.items?.length || 0} item{offer.items?.length !== 1 ? 's' : ''} on offer
-                      </span>
-                    </div>
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Tag className="w-4 h-4 text-gray-500" />
+              <span className="text-sm font-medium text-gray-700">
+                {offer.items?.length || 0} item{offer.items?.length !== 1 ? 's' : ''} on offer
+              </span>
+            </div>
 
-                    {offer.items && offer.items.length > 0 && <div className="mt-3 space-y-2">
-                        {offer.items.slice(0, 3).map((item, index) => <div key={index} className="flex items-center gap-3 bg-gray-50 rounded-lg p-2">
-                            <img src={item.image || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200&h=200&fit=crop"} alt={item.itemName} className="w-12 h-12 rounded object-cover" />
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-gray-900 truncate">{item.itemName}</p>
-                              <div className="flex items-center gap-2 mt-1">
-                                <span className="text-xs text-gray-400 line-through">₹{item.originalPrice}</span>
-                                <span className="text-xs font-semibold text-green-600">₹{item.discountedPrice}</span>
-                                <span className="text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded">
-                                  {offer.discountType === "flat-price" ? `₹${item.originalPrice - item.discountedPrice} OFF` : `${item.discountPercentage}% OFF`}
-                                </span>
-                              </div>
-                            </div>
-                            <div className="text-xs font-mono text-blue-600 bg-blue-50 px-2 py-1 rounded">
-                              {item.couponCode}
-                            </div>
-                          </div>)}
-                        {offer.items.length > 3 && <p className="text-xs text-gray-500 text-center mt-2">
-                            +{offer.items.length - 3} more item{offer.items.length - 3 !== 1 ? 's' : ''}
-                          </p>}
-                      </div>}
+            {offer.items && offer.items.length > 0 && <div className="mt-3 space-y-2">
+              {offer.items.slice(0, 3).map((item, index) => <div key={index} className="flex items-center gap-3 bg-gray-50 rounded-lg p-2">
+                <img src={item.image || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200&h=200&fit=crop"} alt={item.itemName} className="w-12 h-12 rounded object-cover" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-900 truncate">{item.itemName}</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-xs text-gray-400 line-through">₹{item.originalPrice}</span>
+                    <span className="text-xs font-semibold text-green-600">₹{item.discountedPrice}</span>
+                    <span className="text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded">
+                      {offer.discountType === "flat-price" ? `₹${item.originalPrice - item.discountedPrice} OFF` : `${item.discountPercentage}% OFF`}
+                    </span>
                   </div>
-                </motion.div>)}
+                </div>
+                <div className="text-xs font-mono text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                  {item.couponCode}
+                </div>
+              </div>)}
+              {offer.items.length > 3 && <p className="text-xs text-gray-500 text-center mt-2">
+                +{offer.items.length - 3} more item{offer.items.length - 3 !== 1 ? 's' : ''}
+              </p>}
             </div>}
-      </div>
+          </div>
+        </motion.div>)}
+      </div>}
+    </div>
 
 
-      {/* Discount Percentage Selection Modal */}
-      <AnimatePresence>
-        {discountModal.open && <>
-            {/* Backdrop */}
-            <motion.div initial={{
+    {/* Discount Percentage Selection Modal */}
+    <AnimatePresence>
+      {discountModal.open && <>
+        {/* Backdrop */}
+        <motion.div initial={{
           opacity: 0
         }} animate={{
           opacity: 1
@@ -802,8 +802,8 @@ export default function CreatePercentageDiscount() {
           opacity: 0
         }} onClick={closeDiscountModal} className="fixed inset-0 bg-black/50 z-[9999]" />
 
-            {/* Bottom Sheet */}
-            <motion.div initial={{
+        {/* Bottom Sheet */}
+        <motion.div initial={{
           y: "100%"
         }} animate={{
           y: 0
@@ -814,62 +814,62 @@ export default function CreatePercentageDiscount() {
           damping: 30,
           stiffness: 300
         }} className="fixed bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-2xl z-[9999] max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
-              {/* Header */}
-              <div className="px-4 py-4 border-b border-gray-200">
-                <h2 className="text-lg font-bold text-gray-900 text-center">
-                  Select discount percentage
-                </h2>
-              </div>
+          {/* Header */}
+          <div className="px-4 py-4 border-b border-gray-200">
+            <h2 className="text-lg font-bold text-gray-900 text-center">
+              Select discount percentage
+            </h2>
+          </div>
 
-              {/* Search Bar */}
-              <div className="px-4 py-3 border-b border-gray-200">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <input type="text" placeholder="Search percentage..." value={percentageSearchQuery} onChange={e => setPercentageSearchQuery(e.target.value)} className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                </div>
-              </div>
+          {/* Search Bar */}
+          <div className="px-4 py-3 border-b border-gray-200">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input type="text" placeholder="Search percentage..." value={percentageSearchQuery} onChange={e => setPercentageSearchQuery(e.target.value)} className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+          </div>
 
-              {/* List of Options */}
-              <div className="flex-1 overflow-y-auto px-4 py-4">
-                {filteredPercentages.length === 0 ? <div className="text-center py-8 text-gray-500">No options found</div> : <div className="space-y-3">
-                    {filteredPercentages.map(percentage => {
+          {/* List of Options */}
+          <div className="flex-1 overflow-y-auto px-4 py-4">
+            {filteredPercentages.length === 0 ? <div className="text-center py-8 text-gray-500">No options found</div> : <div className="space-y-3">
+              {filteredPercentages.map(percentage => {
                 const isSelected = getCurrentPercentage() === percentage;
                 return <div key={percentage} onClick={() => handleDiscountSelect(percentage)} className="flex items-center justify-between py-3 cursor-pointer hover:bg-gray-50 rounded-lg px-2 -mx-2">
-                          <div className="flex items-center gap-3 flex-1">
-                            <div className="flex-1">
-                              <p className="text-sm font-medium text-gray-900">
-                                {percentage}% discount
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <button onClick={e => {
+                  <div className="flex items-center gap-3 flex-1">
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-gray-900">
+                        {percentage}% discount
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button onClick={e => {
                       e.stopPropagation();
                       handleDiscountSelect(percentage);
                     }} className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 ${isSelected ? "bg-black border-black" : "bg-white border-gray-400"}`}>
-                              {isSelected && <Check className="w-3 h-3 text-white" />}
-                            </button>
-                          </div>
-                        </div>;
+                      {isSelected && <Check className="w-3 h-3 text-white" />}
+                    </button>
+                  </div>
+                </div>;
               })}
-                  </div>}
-              </div>
+            </div>}
+          </div>
 
-              {/* Footer */}
-              <div className="px-4 py-4 border-t border-gray-200">
-                <button onClick={closeDiscountModal} className={`w-full py-3 rounded-lg font-semibold text-sm transition-colors ${getCurrentPercentage() ? "bg-green-600 text-white hover:bg-green-700" : "bg-gray-300 text-gray-500 cursor-not-allowed"}`} disabled={!getCurrentPercentage()}>
-                  Confirm
-                </button>
-              </div>
-            </motion.div>
-          </>}
-      </AnimatePresence>
+          {/* Footer */}
+          <div className="px-4 py-4 border-t border-gray-200">
+            <button onClick={closeDiscountModal} className={`w-full py-3 rounded-lg font-semibold text-sm transition-colors ${getCurrentPercentage() ? "bg-green-600 text-white hover:bg-green-700" : "bg-gray-300 text-gray-500 cursor-not-allowed"}`} disabled={!getCurrentPercentage()}>
+              Confirm
+            </button>
+          </div>
+        </motion.div>
+      </>}
+    </AnimatePresence>
 
-      {/* Make Offer Modal */}
-      <AnimatePresence>
-        {makeOfferModal.open && makeOfferModal.item && <>
-            {/* Backdrop */}
-            <motion.div initial={{
+    {/* Make Offer Modal */}
+    <AnimatePresence>
+      {makeOfferModal.open && makeOfferModal.item && <>
+        {/* Backdrop */}
+        <motion.div initial={{
           opacity: 0
         }} animate={{
           opacity: 1
@@ -877,8 +877,8 @@ export default function CreatePercentageDiscount() {
           opacity: 0
         }} onClick={closeMakeOfferModal} className="fixed inset-0 bg-black/50 z-[9999]" />
 
-            {/* Bottom Sheet */}
-            <motion.div initial={{
+        {/* Bottom Sheet */}
+        <motion.div initial={{
           y: "100%"
         }} animate={{
           y: 0
@@ -889,104 +889,104 @@ export default function CreatePercentageDiscount() {
           damping: 30,
           stiffness: 300
         }} className="fixed bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-2xl z-[9999] max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
-              {/* Header */}
-              <div className="px-4 py-4 border-b border-gray-200 flex items-center justify-between">
-                <h2 className="text-lg font-bold text-gray-900">
-                  {makeOfferModal.editingOffer ? "Edit Offer" : "Make Offer"} - {makeOfferModal.item.name || makeOfferModal.item.itemName}
-                </h2>
-                <button onClick={closeMakeOfferModal} className="p-1 rounded-full hover:bg-gray-100">
-                  <X className="w-5 h-5 text-gray-600" />
-                </button>
+          {/* Header */}
+          <div className="px-4 py-4 border-b border-gray-200 flex items-center justify-between">
+            <h2 className="text-lg font-bold text-gray-900">
+              {makeOfferModal.editingOffer ? "Edit Offer" : "Make Offer"} - {makeOfferModal.item.name || makeOfferModal.item.itemName}
+            </h2>
+            <button onClick={closeMakeOfferModal} className="p-1 rounded-full hover:bg-gray-100">
+              <X className="w-5 h-5 text-gray-600" />
+            </button>
+          </div>
+
+          {/* Form Content */}
+          <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+            {/* Discount Type Dropdown */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Discount Type
+              </label>
+              <select value={offerFormData.discountType} onChange={e => handleOfferFormChange("discountType", e.target.value)} className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                <option value="percentage">Percentage Discount</option>
+                <option value="flat">Flat Discount</option>
+              </select>
+            </div>
+
+            {/* Percentage Discount */}
+            {offerFormData.discountType === "percentage" && <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Discount Percentage (%)
+              </label>
+              <div className="relative">
+                <Percent className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input type="number" min="0" max="100" value={offerFormData.percentage} onChange={e => handleOfferFormChange("percentage", e.target.value)} placeholder="Enter discount percentage" className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
+              {offerFormData.percentage && makeOfferModal.item && <p className="text-xs text-gray-500 mt-1">
+                Original: ₹{makeOfferModal.item.price || makeOfferModal.item.originalPrice} → Discounted: ₹{getDiscountedPrice(makeOfferModal.item, offerFormData.percentage)}
+              </p>}
+            </div>}
 
-              {/* Form Content */}
-              <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-                {/* Discount Type Dropdown */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Discount Type
-                  </label>
-                  <select value={offerFormData.discountType} onChange={e => handleOfferFormChange("discountType", e.target.value)} className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
-                    <option value="percentage">Percentage Discount</option>
-                    <option value="flat">Flat Discount</option>
-                  </select>
-                </div>
-
-                {/* Percentage Discount */}
-                {offerFormData.discountType === "percentage" && <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Discount Percentage (%)
-                    </label>
-                    <div className="relative">
-                      <Percent className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                      <input type="number" min="0" max="100" value={offerFormData.percentage} onChange={e => handleOfferFormChange("percentage", e.target.value)} placeholder="Enter discount percentage" className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                    </div>
-                    {offerFormData.percentage && makeOfferModal.item && <p className="text-xs text-gray-500 mt-1">
-                        Original: ₹{makeOfferModal.item.price || makeOfferModal.item.originalPrice} → Discounted: ₹{getDiscountedPrice(makeOfferModal.item, offerFormData.percentage)}
-                      </p>}
-                  </div>}
-
-                {/* Flat Discount */}
-                {offerFormData.discountType === "flat" && <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Flat Discount Amount (₹)
-                    </label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-semibold">₹</span>
-                      <input type="number" min="0" max={makeOfferModal.item?.price || makeOfferModal.item?.originalPrice || 10000} value={offerFormData.flatAmount} onChange={e => handleOfferFormChange("flatAmount", e.target.value)} placeholder="Enter flat discount amount" className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                    </div>
-                    {offerFormData.flatAmount && makeOfferModal.item && <p className="text-xs text-gray-500 mt-1">
-                        Original: ₹{makeOfferModal.item.price || makeOfferModal.item.originalPrice} → Discounted: ₹{getFlatDiscountedPrice(makeOfferModal.item, offerFormData.flatAmount)}
-                      </p>}
-                  </div>}
-
-                {/* Coupon Code */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Coupon Code
-                  </label>
-                  <div className="relative">
-                    <Tag className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                    <input type="text" value={offerFormData.couponCode} onChange={e => handleOfferFormChange("couponCode", e.target.value)} placeholder="Enter coupon code" className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono" />
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1">
-                    {offerFormData.discountType === "percentage" ? "Coupon code will be auto-generated based on percentage" : "Coupon code will be auto-generated based on flat discount amount"}
-                  </p>
-                </div>
-
-                {/* Start Date */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Start Date
-                  </label>
-                  <div className="relative">
-                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                    <input type="date" value={offerFormData.startDate} onChange={e => handleOfferFormChange("startDate", e.target.value)} min={new Date().toISOString().split('T')[0]} className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                  </div>
-                </div>
-
-                {/* End Date */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    End Date
-                  </label>
-                  <div className="relative">
-                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                    <input type="date" value={offerFormData.endDate} onChange={e => handleOfferFormChange("endDate", e.target.value)} min={offerFormData.startDate || new Date().toISOString().split('T')[0]} className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                  </div>
-                </div>
+            {/* Flat Discount */}
+            {offerFormData.discountType === "flat" && <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Flat Discount Amount (₹)
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-semibold">₹</span>
+                <input type="number" min="0" max={makeOfferModal.item?.price || makeOfferModal.item?.originalPrice || 10000} value={offerFormData.flatAmount} onChange={e => handleOfferFormChange("flatAmount", e.target.value)} placeholder="Enter flat discount amount" className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
+              {offerFormData.flatAmount && makeOfferModal.item && <p className="text-xs text-gray-500 mt-1">
+                Original: ₹{makeOfferModal.item.price || makeOfferModal.item.originalPrice} → Discounted: ₹{getFlatDiscountedPrice(makeOfferModal.item, offerFormData.flatAmount)}
+              </p>}
+            </div>}
 
-              {/* Footer */}
-              <div className="px-4 py-4 border-t border-gray-200">
-                <button onClick={handleActivateSingleOffer} disabled={activatingOffer || !offerFormData.couponCode || !offerFormData.startDate || !offerFormData.endDate || offerFormData.discountType === "percentage" && !offerFormData.percentage || offerFormData.discountType === "flat" && !offerFormData.flatAmount} className={`w-full py-3 rounded-lg font-semibold text-sm transition-colors ${offerFormData.couponCode && offerFormData.startDate && offerFormData.endDate && (offerFormData.discountType === "percentage" && offerFormData.percentage || offerFormData.discountType === "flat" && offerFormData.flatAmount) && !activatingOffer ? "bg-green-600 text-white hover:bg-green-700" : "bg-gray-300 text-gray-500 cursor-not-allowed"}`}>
-                  {activatingOffer ? makeOfferModal.editingOffer ? "Updating..." : "Activating..." : makeOfferModal.editingOffer ? "Update Offer" : "Activate Offer"}
-                </button>
+            {/* Coupon Code */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Coupon Code
+              </label>
+              <div className="relative">
+                <Tag className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input type="text" value={offerFormData.couponCode} onChange={e => handleOfferFormChange("couponCode", e.target.value)} placeholder="Enter coupon code" className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono" />
               </div>
-            </motion.div>
-          </>}
-      </AnimatePresence>
+              <p className="text-xs text-gray-500 mt-1">
+                {offerFormData.discountType === "percentage" ? "Coupon code will be auto-generated based on percentage" : "Coupon code will be auto-generated based on flat discount amount"}
+              </p>
+            </div>
 
-      <BottomNavOrders />
-    </div>;
+            {/* Start Date */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Start Date
+              </label>
+              <div className="relative">
+                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input type="date" value={offerFormData.startDate} onChange={e => handleOfferFormChange("startDate", e.target.value)} min={new Date().toISOString().split('T')[0]} className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+            </div>
+
+            {/* End Date */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                End Date
+              </label>
+              <div className="relative">
+                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input type="date" value={offerFormData.endDate} onChange={e => handleOfferFormChange("endDate", e.target.value)} min={offerFormData.startDate || new Date().toISOString().split('T')[0]} className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="px-4 py-4 border-t border-gray-200">
+            <button onClick={handleActivateSingleOffer} disabled={activatingOffer || !offerFormData.couponCode || !offerFormData.startDate || !offerFormData.endDate || offerFormData.discountType === "percentage" && !offerFormData.percentage || offerFormData.discountType === "flat" && !offerFormData.flatAmount} className={`w-full py-3 rounded-lg font-semibold text-sm transition-colors ${offerFormData.couponCode && offerFormData.startDate && offerFormData.endDate && (offerFormData.discountType === "percentage" && offerFormData.percentage || offerFormData.discountType === "flat" && offerFormData.flatAmount) && !activatingOffer ? "bg-green-600 text-white hover:bg-green-700" : "bg-gray-300 text-gray-500 cursor-not-allowed"}`}>
+              {activatingOffer ? makeOfferModal.editingOffer ? "Updating..." : "Activating..." : makeOfferModal.editingOffer ? "Update Offer" : "Activate Offer"}
+            </button>
+          </div>
+        </motion.div>
+      </>}
+    </AnimatePresence>
+
+    <BottomNavOrders />
+  </div>;
 }

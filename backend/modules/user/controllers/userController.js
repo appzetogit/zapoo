@@ -1,6 +1,7 @@
 import { asyncHandler } from '../../../shared/middleware/asyncHandler.js';
 import { successResponse, errorResponse } from '../../../shared/utils/response.js';
 import User from '../../auth/models/User.js';
+import { getRedisClient } from '../../../config/redis.js';
 import { uploadToCloudinary } from '../../../shared/utils/cloudinaryService.js';
 import axios from 'axios';
 import winston from 'winston';
@@ -18,7 +19,10 @@ const logger = winston.createLogger({
  */
 export const getUserProfile = asyncHandler(async (req, res) => {
   try {
-    const user = await User.findById(req.user._id).select('-password').lean();
+    // Exclude large arrays like addresses and fcmTokens, as they have separate endpoints if needed
+    const user = await User.findById(req.user._id)
+      .select('-password -addresses -fcmTokens -paymentMethods -favorites')
+      .lean();
     if (!user) {
       return errorResponse(res, 404, 'User profile not found');
     }
@@ -99,6 +103,12 @@ export const updateUserProfile = asyncHandler(async (req, res) => {
     // Save to database
     await user.save();
 
+    // Invalidate Redis cache
+    const redisClient = getRedisClient();
+    if (redisClient) {
+      await redisClient.del(`user_session:${user._id}`).catch(e => logger.warn(`[Redis] Cache invalidation failed: ${e.message}`));
+    }
+
     // Remove password from response
     const userResponse = user.toObject();
     delete userResponse.password;
@@ -145,6 +155,12 @@ export const uploadProfileImage = asyncHandler(async (req, res) => {
     // Update user profile image
     user.profileImage = result.secure_url;
     await user.save();
+
+    // Invalidate Redis cache
+    const redisClient = getRedisClient();
+    if (redisClient) {
+      await redisClient.del(`user_session:${user._id}`).catch(e => logger.warn(`[Redis] Cache invalidation failed for user ${user._id}: ${e.message}`));
+    }
     return successResponse(res, 200, 'Profile image uploaded successfully', {
       profileImage: result.secure_url,
       publicId: result.public_id
@@ -248,6 +264,12 @@ export const updateUserLocation = asyncHandler(async (req, res) => {
 
     // Save to database
     await user.save();
+
+    // Invalidate Redis cache
+    const redisClient = getRedisClient();
+    if (redisClient) {
+      await redisClient.del(`user_session:${user._id}`).catch(e => logger.warn(`[Redis] Cache invalidation failed: ${e.message}`));
+    }
     const userResponse = user.toObject();
     delete userResponse.password;
     return successResponse(res, 200, 'Location updated successfully', {

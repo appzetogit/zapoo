@@ -24,15 +24,16 @@ class ETAWebSocketService {
    * Emit ETA update to all connected clients for an order
    * @param {String} orderId - Order ID
    * @param {Object} etaData - ETA data to emit
+   * @param {Object} passedOrder - Optional pre-fetched order object
    */
-  async emitETAUpdate(orderId, etaData) {
+  async emitETAUpdate(orderId, etaData, passedOrder = null) {
     try {
       const io = await this.getIOInstance();
       if (!io) {
         console.warn('Socket.IO not initialized, skipping ETA update');
         return;
       }
-      const order = await Order.findById(orderId).lean();
+      const order = passedOrder || await Order.findById(orderId).lean();
       if (!order) {
         console.error('Order not found for ETA update:', orderId);
         return;
@@ -76,12 +77,13 @@ class ETAWebSocketService {
    * Emit rider assignment event
    * @param {String} orderId - Order ID
    * @param {Object} riderData - Rider assignment data
+   * @param {Object} passedOrder - Optional pre-fetched order object
    */
-  async emitRiderAssigned(orderId, riderData) {
+  async emitRiderAssigned(orderId, riderData, passedOrder = null) {
     try {
       const io = await this.getIOInstance();
       if (!io) return;
-      const order = await Order.findById(orderId).lean();
+      const order = passedOrder || await Order.findById(orderId).lean();
       if (!order) return;
       const eventData = {
         orderId: order.orderId,
@@ -106,12 +108,13 @@ class ETAWebSocketService {
   /**
    * Emit pickup event
    * @param {String} orderId - Order ID
+   * @param {Object} passedOrder - Optional pre-fetched order object
    */
-  async emitPickedUp(orderId) {
+  async emitPickedUp(orderId, passedOrder = null) {
     try {
       const io = await this.getIOInstance();
       if (!io) return;
-      const order = await Order.findById(orderId).lean();
+      const order = passedOrder || await Order.findById(orderId).lean();
       if (!order) return;
       const eventData = {
         orderId: order.orderId,
@@ -131,12 +134,13 @@ class ETAWebSocketService {
    * Emit nearing drop location event
    * @param {String} orderId - Order ID
    * @param {Number} distanceToDrop - Distance to drop in km
+   * @param {Object} passedOrder - Optional pre-fetched order object
    */
-  async emitNearby(orderId, distanceToDrop) {
+  async emitNearby(orderId, distanceToDrop, passedOrder = null) {
     try {
       const io = await this.getIOInstance();
       if (!io) return;
-      const order = await Order.findById(orderId).lean();
+      const order = passedOrder || await Order.findById(orderId).lean();
       if (!order) return;
       const eventData = {
         orderId: order.orderId,
@@ -170,8 +174,8 @@ class ETAWebSocketService {
         // Get live ETA
         const liveETA = await etaCalculationService.getLiveETA(orderId);
 
-        // Emit update
-        await this.emitETAUpdate(orderId, liveETA);
+        // Emit update (Optimized: pass fetched order)
+        await this.emitETAUpdate(orderId, liveETA, order);
       } catch (error) {
         console.error('Error in periodic ETA update:', error);
         clearInterval(intervalId);

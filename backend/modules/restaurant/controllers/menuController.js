@@ -12,7 +12,7 @@ export const getMenu = asyncHandler(async (req, res) => {
   // Find or create menu
   let menu = await Menu.findOne({
     restaurant: restaurantId
-  });
+  }).lean();
   if (!menu) {
     // Create empty menu
     menu = new Menu({
@@ -41,19 +41,19 @@ export const updateMenu = asyncHandler(async (req, res) => {
   const existingMenu = await Menu.findOne({
     restaurant: restaurantId
   });
-  if (existingMenu) {}
+  if (existingMenu) { }
 
   // Debug: Log incoming images data
   if (sections && Array.isArray(sections)) {
     sections.forEach((section, sIdx) => {
       if (section.items && Array.isArray(section.items)) {
-        section.items.forEach((item, iIdx) => {});
+        section.items.forEach((item, iIdx) => { });
       }
       // Also check subsections
       if (section.subsections && Array.isArray(section.subsections)) {
         section.subsections.forEach((subsection, ssIdx) => {
           if (subsection.items && Array.isArray(subsection.items)) {
-            subsection.items.forEach((item, iIdx) => {});
+            subsection.items.forEach((item, iIdx) => { });
           }
         });
       }
@@ -225,7 +225,7 @@ export const updateMenu = asyncHandler(async (req, res) => {
 
   normalizedSections.forEach((section, sIdx) => {
     if (section.items && Array.isArray(section.items)) {
-      section.items.forEach((item, iIdx) => {});
+      section.items.forEach((item, iIdx) => { });
     }
   });
   if (!menu) {
@@ -576,7 +576,7 @@ export const getMenuByRestaurantId = async (req, res) => {
         _id: new mongoose.Types.ObjectId(id)
       }] : [])],
       isActive: true
-    });
+    }).select('name location deliveryRange').lean();
     if (!restaurant) {
       return errorResponse(res, 404, 'Restaurant not found');
     }
@@ -585,7 +585,7 @@ export const getMenuByRestaurantId = async (req, res) => {
     const menu = await Menu.findOne({
       restaurant: restaurant._id,
       isActive: true
-    });
+    }).lean();
     if (!menu) {
       // Return empty menu if not found
       return successResponse(res, 200, 'Menu retrieved successfully', {
@@ -600,7 +600,7 @@ export const getMenuByRestaurantId = async (req, res) => {
       // Only show sections where isEnabled is not explicitly false
       // If isEnabled is undefined/null, treat as enabled (default true)
       const isEnabled = section.isEnabled !== false;
-      if (!isEnabled) {}
+      if (!isEnabled) { }
       return isEnabled;
     }).map(section => {
       // Filter direct items - only show available AND approved items
@@ -611,10 +611,10 @@ export const getMenuByRestaurantId = async (req, res) => {
         const shouldShow = isAvailable && isApproved;
 
         // Debug logging for filtered items
-        if (!shouldShow) {}
+        if (!shouldShow) { }
 
         // Debug logging for preparationTime - log ALL items to see what's in the data
-        if (shouldShow) {}
+        if (shouldShow) { }
         return shouldShow;
       });
 
@@ -626,10 +626,10 @@ export const getMenuByRestaurantId = async (req, res) => {
           const shouldShow = isAvailable && isApproved;
 
           // Debug logging for filtered items
-          if (!shouldShow) {}
+          if (!shouldShow) { }
 
           // Debug logging for preparationTime - log ALL items to see what's in the data
-          if (shouldShow) {}
+          if (shouldShow) { }
           return shouldShow;
         });
         // Only include subsection if it has available items
@@ -797,7 +797,7 @@ export const getAddonsByRestaurantId = async (req, res) => {
 
     // Log all addons for debugging
 
-    if (allAddons.length > 0) {} else {}
+    if (allAddons.length > 0) { } else { }
     return successResponse(res, 200, 'Add-ons retrieved successfully', {
       addons: allAddons
     });

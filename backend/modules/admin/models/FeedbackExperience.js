@@ -80,10 +80,10 @@ feedbackExperienceSchema.pre('save', function(next) {
 // Indexes
 feedbackExperienceSchema.index({ userId: 1 });
 feedbackExperienceSchema.index({ restaurantId: 1 });
+feedbackExperienceSchema.index({ restaurantId: 1, rating: 1 });
 feedbackExperienceSchema.index({ rating: 1 });
 feedbackExperienceSchema.index({ experience: 1 });
 feedbackExperienceSchema.index({ module: 1 });
 feedbackExperienceSchema.index({ createdAt: -1 });
 
 export default mongoose.model('FeedbackExperience', feedbackExperienceSchema);
-

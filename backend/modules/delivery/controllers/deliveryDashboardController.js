@@ -20,123 +20,67 @@ export const getDashboard = asyncHandler(async (req, res) => {
   try {
     const delivery = req.delivery; // From authenticate middleware
 
-    // Get order statistics
-    // Note: deliveryPartnerId in Order model references User, but we'll use delivery._id
-    // In future, this should be updated to reference Delivery model
-    let totalOrders = 0;
-    let completedOrders = 0;
-    let pendingOrders = 0;
-    try {
-      totalOrders = await Order.countDocuments({
-        deliveryPartnerId: delivery._id
-      });
-    } catch (error) {
-      logger.warn(`Error counting total orders for delivery ${delivery._id}:`, error);
-    }
-    try {
-      completedOrders = await Order.countDocuments({
+    // Calculate time ranges
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    // Parallelize all data fetching
+    const [
+      totalOrders,
+      completedOrders,
+      pendingOrders,
+      wallet,
+      recentOrders,
+      todayOrders,
+      weeklyOrders
+    ] = await Promise.all([
+      Order.countDocuments({ deliveryPartnerId: delivery._id }),
+      Order.countDocuments({ deliveryPartnerId: delivery._id, status: 'delivered' }),
+      Order.countDocuments({ deliveryPartnerId: delivery._id, status: { $in: ['out_for_delivery', 'ready'] } }),
+      DeliveryWallet.findOne({ deliveryId: delivery._id }).lean(),
+      Order.find({ deliveryPartnerId: delivery._id })
+        .sort({ createdAt: -1 })
+        .limit(5)
+        .select('orderId status createdAt deliveredAt pricing.deliveryFee restaurantName')
+        .lean(),
+      Order.find({
         deliveryPartnerId: delivery._id,
-        status: 'delivered'
-      });
-    } catch (error) {
-      logger.warn(`Error counting completed orders for delivery ${delivery._id}:`, error);
-    }
-    try {
-      pendingOrders = await Order.countDocuments({
+        status: 'delivered',
+        deliveredAt: { $gte: todayStart }
+      }).select('pricing.deliveryFee').lean(),
+      Order.find({
         deliveryPartnerId: delivery._id,
-        status: {
-          $in: ['out_for_delivery', 'ready']
-        }
-      });
-    } catch (error) {
-      logger.warn(`Error counting pending orders for delivery ${delivery._id}:`, error);
-    }
+        status: 'delivered',
+        deliveredAt: { $gte: sevenDaysAgo }
+      }).select('pricing.deliveryFee').lean()
+    ]);
 
     // Calculate joining bonus status
-    // Joining bonus: ₹100, unlocked after completing 1 order
     const joiningBonusAmount = 100;
-    const joiningBonusUnlockThreshold = 1; // Complete 1 order to unlock
+    const joiningBonusUnlockThreshold = 1;
     const joiningBonusUnlocked = completedOrders >= joiningBonusUnlockThreshold;
-
-    // Get wallet data (using new DeliveryWallet model)
-    let wallet = null;
-    try {
-      wallet = await DeliveryWallet.findOne({
-        deliveryId: delivery._id
-      });
-    } catch (error) {
-      logger.warn(`Error fetching wallet for dashboard:`, error);
-    }
     const joiningBonusClaimed = wallet?.joiningBonusClaimed || false;
-    const joiningBonusValidTill = new Date('2025-12-10'); // Valid till 10 December 2025
+    const joiningBonusValidTill = new Date('2025-12-10');
 
-    // Calculate wallet balance (using new DeliveryWallet model only; embedded delivery.earnings is deprecated)
+    // Calculate wallet metrics from transactions
     const walletBalance = wallet?.totalBalance || 0;
     const totalEarned = wallet?.totalEarned || 0;
     const currentBalance = wallet?.totalBalance || 0;
-    const pendingPayout =
-      wallet?.transactions
-        ?.filter(t => t.type === 'withdrawal' && t.status === 'Pending')
-        .reduce((sum, t) => sum + t.amount, 0) || wallet?.pendingPayout || 0;
-    const tips =
-      wallet?.transactions
-        ?.filter(
-          t =>
-            t.type === 'payment' &&
-            typeof t.description === 'string' &&
-            t.description.toLowerCase().includes('tip')
-        )
-        .reduce((sum, t) => sum + t.amount, 0) || wallet?.tips || 0;
 
-    // Calculate weekly earnings (last 7 days)
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    let weeklyOrders = [];
-    try {
-      weeklyOrders = await Order.find({
-        deliveryPartnerId: delivery._id,
-        status: 'delivered',
-        deliveredAt: {
-          $gte: sevenDaysAgo
-        }
-      }).select('pricing.deliveryFee');
-    } catch (error) {
-      logger.warn(`Error fetching weekly orders for delivery ${delivery._id}:`, error);
-    }
-    const weeklyEarnings = weeklyOrders.reduce((sum, order) => {
-      return sum + (order.pricing?.deliveryFee || 0);
-    }, 0);
+    // Efficiently calculate pending payouts and tips from transactions
+    const pendingPayout = wallet?.transactions
+      ?.filter(t => t.type === 'withdrawal' && t.status === 'Pending')
+      .reduce((sum, t) => sum + t.amount, 0) || 0;
 
-    // Get recent orders (last 5)
-    let recentOrders = [];
-    try {
-      recentOrders = await Order.find({
-        deliveryPartnerId: delivery._id
-      }).sort({
-        createdAt: -1
-      }).limit(5).select('orderId status createdAt deliveredAt pricing.deliveryFee restaurantName').lean();
-    } catch (error) {
-      logger.warn(`Error fetching recent orders for delivery ${delivery._id}:`, error);
-    }
+    const tips = wallet?.transactions
+      ?.filter(t => t.type === 'payment' && t.description?.toLowerCase().includes('tip'))
+      .reduce((sum, t) => sum + t.amount, 0) || 0;
 
-    // Calculate today's earnings
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    let todayOrders = [];
-    try {
-      todayOrders = await Order.find({
-        deliveryPartnerId: delivery._id,
-        status: 'delivered',
-        deliveredAt: {
-          $gte: todayStart
-        }
-      }).select('pricing.deliveryFee');
-    } catch (error) {
-      logger.warn(`Error fetching today's orders for delivery ${delivery._id}:`, error);
-    }
-    const todayEarnings = todayOrders.reduce((sum, order) => {
-      return sum + (order.pricing?.deliveryFee || 0);
-    }, 0);
+    // Calculate earnings sums
+    const todayEarnings = todayOrders.reduce((sum, order) => sum + (order.pricing?.deliveryFee || 0), 0);
+    const weeklyEarnings = weeklyOrders.reduce((sum, order) => sum + (order.pricing?.deliveryFee || 0), 0);
 
     // Prepare dashboard data
     const dashboardData = {

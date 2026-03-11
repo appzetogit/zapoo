@@ -366,15 +366,24 @@ const orderSchema = new mongoose.Schema({
 // Indexes for better query performance
 // User order history
 orderSchema.index({ userId: 1, createdAt: -1 });
-// Restaurant dashboards / reports
+
+// Restaurant dashboards and history
 orderSchema.index({ restaurantId: 1, createdAt: -1 });
-orderSchema.index({ restaurantId: 1, status: 1 });
-// Delivery partner trip history
-orderSchema.index({ deliveryPartnerId: 1, createdAt: -1 });
-// Admin lists by status + recency
+orderSchema.index({ restaurantId: 1, status: 1, createdAt: -1 });
+
+// Admin and Operational listings
 orderSchema.index({ status: 1, createdAt: -1 });
-// Payment gateway lookups
-orderSchema.index({ 'payment.razorpayOrderId': 1 });
+orderSchema.index({ status: 1, deliveredAt: -1 });
+
+// Delivery partner tracking and assignment
+orderSchema.index({ deliveryPartnerId: 1, createdAt: -1 });
+orderSchema.index({ deliveryPartnerId: 1, status: 1, createdAt: -1 });
+orderSchema.index({ "assignmentInfo.zoneId": 1, createdAt: -1 });
+orderSchema.index({ status: 1, "assignmentInfo.zoneId": 1, createdAt: -1 });
+
+// Payment and finance lookups
+orderSchema.index({ "payment.method": 1, deliveryPartnerId: 1, status: 1 });
+orderSchema.index({ "payment.razorpayOrderId": 1 });
 
 // Generate order ID before saving (fallback if not provided)
 orderSchema.pre('save', async function (next) {
@@ -430,4 +439,3 @@ orderSchema.pre('save', function (next) {
 });
 
 export default mongoose.model('Order', orderSchema);
-

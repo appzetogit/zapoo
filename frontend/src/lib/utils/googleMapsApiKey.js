@@ -16,9 +16,11 @@
 const FIREBASE_RTDB_URL =
   import.meta.env.VITE_FIREBASE_DATABASE_URL ||
   'https://zapoo-d23ea-default-rtdb.asia-southeast1.firebasedatabase.app';
+const ENV_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
 
 let cachedApiKey = null;
 let apiKeyPromise = null;
+let missingKeyWarned = false;
 
 /**
  * Get Google Maps API Key from Firebase RTDB (REST endpoint).
@@ -26,6 +28,11 @@ let apiKeyPromise = null;
  * @returns {Promise<string>} Google Maps API Key or empty string on failure
  */
 export async function getGoogleMapsApiKey() {
+  if (ENV_API_KEY) {
+    cachedApiKey = ENV_API_KEY;
+    return ENV_API_KEY;
+  }
+
   // Return cached key if available
   if (cachedApiKey) {
     return cachedApiKey;
@@ -53,13 +60,20 @@ export async function getGoogleMapsApiKey() {
         return cachedApiKey;
       }
 
-      console.warn(
-        '⚠️ Google Maps API key not found in Firebase RTDB.\n' +
-        '   Set it at: Firebase Console → Realtime Database → /config/googleMapsApiKey'
-      );
+      if (!missingKeyWarned) {
+        console.warn(
+          '⚠️ Google Maps API key not found in Firebase RTDB.\n' +
+          '   Set it at: Firebase Console → Realtime Database → /config/googleMapsApiKey\n' +
+          '   or add VITE_GOOGLE_MAPS_API_KEY in frontend env.'
+        );
+        missingKeyWarned = true;
+      }
       return '';
     } catch (error) {
-      console.warn('⚠️ Failed to fetch Google Maps API key from Firebase RTDB:', error.message);
+      if (!missingKeyWarned) {
+        console.warn('⚠️ Failed to fetch Google Maps API key from Firebase RTDB:', error.message);
+        missingKeyWarned = true;
+      }
       return '';
     } finally {
       apiKeyPromise = null;
@@ -76,4 +90,5 @@ export async function getGoogleMapsApiKey() {
 export function clearGoogleMapsApiKeyCache() {
   cachedApiKey = null;
   apiKeyPromise = null;
+  missingKeyWarned = false;
 }

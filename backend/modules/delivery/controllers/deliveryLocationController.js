@@ -63,37 +63,64 @@ export const updateLocation = asyncHandler(async (req, res) => {
     }
 
     const updateData = {};
+    const lastUpdate = delivery.availability?.lastLocationUpdate;
+    const now = new Date();
+    const isOnlineChanged = typeof isOnline === 'boolean' && isOnline !== delivery.availability?.isOnline;
 
-    // Update location only if both latitude and longitude are provided
+    // Throttle DB updates to once every 30 seconds, unless online status changes
+    const shouldUpdateDb = !lastUpdate || (now - new Date(lastUpdate) > 30000) || isOnlineChanged;
+
+    // Build update object
     if (typeof latitude === 'number' && typeof longitude === 'number') {
       updateData['availability.currentLocation'] = {
         type: 'Point',
         coordinates: [longitude, latitude] // MongoDB uses [longitude, latitude]
       };
-      updateData['availability.lastLocationUpdate'] = new Date();
+      updateData['availability.lastLocationUpdate'] = now;
     }
 
-    // Update online status if provided
     if (typeof isOnline === 'boolean') {
       updateData['availability.isOnline'] = isOnline;
     }
 
-    // If no updates, return error
+    // If no potential updates, return error
     if (Object.keys(updateData).length === 0) {
       return errorResponse(res, 400, 'At least one field (latitude, longitude, or isOnline) must be provided');
     }
 
-    const updatedDelivery = await Delivery.findByIdAndUpdate(
-      delivery._id,
-      { $set: updateData },
-      { new: true }
-    ).select('-password -refreshToken');
+    let resultDelivery = delivery;
 
-    if (!updatedDelivery) {
-      return errorResponse(res, 404, 'Delivery partner not found');
+    if (shouldUpdateDb) {
+      resultDelivery = await Delivery.findByIdAndUpdate(
+        delivery._id,
+        { $set: updateData },
+        { new: true }
+      ).select('-password -refreshToken').lean();
+
+      if (!resultDelivery) {
+        return errorResponse(res, 404, 'Delivery partner not found');
+      }
+    } else {
+      // Logic for skipped DB update: manually prepare the resultDelivery object for Firebase and response
+      // This ensures the response reflects the attempted update even if DB write was skipped
+      const mockResult = JSON.parse(JSON.stringify(delivery));
+      if (!mockResult.availability) mockResult.availability = {};
+
+      if (typeof latitude === 'number' && typeof longitude === 'number') {
+        mockResult.availability.currentLocation = {
+          type: 'Point',
+          coordinates: [longitude, latitude]
+        };
+        mockResult.availability.lastLocationUpdate = now;
+      }
+
+      if (typeof isOnline === 'boolean') {
+        mockResult.availability.isOnline = isOnline;
+      }
+      resultDelivery = mockResult;
     }
 
-    const currentLocation = updatedDelivery.availability?.currentLocation;
+    const currentLocation = resultDelivery.availability?.currentLocation;
 
     // --- FIREBASE REALTIME DB SYNC ---
     if (currentLocation) {
@@ -106,7 +133,7 @@ export const updateLocation = asyncHandler(async (req, res) => {
         await boyRef.update({
           lat: currentLocation.coordinates[1],
           lng: currentLocation.coordinates[0],
-          status: updatedDelivery.availability?.isOnline ? 'online' : 'offline',
+          status: resultDelivery.availability?.isOnline ? 'online' : 'offline',
           last_updated: Date.now()
         });
 
@@ -136,10 +163,10 @@ export const updateLocation = asyncHandler(async (req, res) => {
       location: currentLocation ? {
         latitude: currentLocation.coordinates[1],
         longitude: currentLocation.coordinates[0],
-        isOnline: updatedDelivery.availability?.isOnline || false,
-        lastUpdate: updatedDelivery.availability?.lastLocationUpdate
+        isOnline: resultDelivery.availability?.isOnline || false,
+        lastUpdate: resultDelivery.availability?.lastLocationUpdate
       } : null,
-      isOnline: updatedDelivery.availability?.isOnline || false
+      isOnline: resultDelivery.availability?.isOnline || false
     });
   } catch (error) {
     logger.error(`Error updating delivery location: ${error.message}`);

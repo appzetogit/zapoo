@@ -73,9 +73,18 @@ export const getRestaurantOrders = asyncHandler(async (req, res) => {
       query.status = status;
     }
     const skip = (parseInt(page) - 1) * parseInt(limit);
-    const orders = await Order.find(query).populate('userId', 'name email phone').sort({
-      createdAt: -1
-    }).limit(parseInt(limit)).skip(skip).lean();
+
+    // Strict field projection for order listing
+    const projection = 'orderId userId items pricing payment status address createdAt deliveredAt eta preparationTime';
+
+    const orders = await Order.find(query)
+      .populate('userId', 'name email phone')
+      .select(projection)
+      .sort({ createdAt: -1 })
+      .limit(parseInt(limit))
+      .skip(skip)
+      .lean();
+
     const total = await Order.countDocuments(query);
 
     // Resolve paymentMethod: order.payment.method or Payment collection (COD fallback)
@@ -89,7 +98,7 @@ export const getRestaurantOrders = asyncHandler(async (req, res) => {
         method: 'cash'
       }).select('orderId').lean();
       codPayments.forEach(p => codOrderIds.add(p.orderId?.toString()));
-    } catch (e) {/* ignore */}
+    } catch (e) {/* ignore */ }
     const ordersWithPaymentMethod = orders.map(o => {
       let paymentMethod = o.payment?.method ?? 'razorpay';
       if (paymentMethod !== 'cash' && codOrderIds.has(o._id?.toString())) paymentMethod = 'cash';
@@ -114,7 +123,7 @@ export const getRestaurantOrders = asyncHandler(async (req, res) => {
       const allOrdersCount = await Order.countDocuments({});
       // Check if orders exist with similar restaurantId
       const sampleOrders = await Order.find({}).limit(5).select('orderId restaurantId status').lean();
-      if (sampleOrders.length > 0) {}
+      if (sampleOrders.length > 0) { }
     }
     return successResponse(res, 200, 'Orders retrieved successfully', {
       orders: ordersWithPaymentMethod,
@@ -307,7 +316,7 @@ export const acceptOrder = asyncHandler(async (req, res) => {
           const freshOrder = await Order.findById(order._id);
           if (!freshOrder) {
             console.error(`❌ Order ${order.orderId} not found after save`);
-          } else if (freshOrder.deliveryPartnerId) {} else {
+          } else if (freshOrder.deliveryPartnerId) { } else {
             // Step 1: Find nearest delivery boys (within 5km priority distance)
             const priorityDeliveryBoys = await findNearestDeliveryBoys(restaurantLat, restaurantLng, restaurantId, 5);
             if (priorityDeliveryBoys && priorityDeliveryBoys.length > 0) {
@@ -386,7 +395,7 @@ export const acceptOrder = asyncHandler(async (req, res) => {
         console.error('❌ Error stack:', assignmentError.stack);
         // Don't fail the order acceptance if notification fails
       }
-    } else {}
+    } else { }
     return successResponse(res, 200, 'Order accepted successfully', {
       order
     });
@@ -839,14 +848,14 @@ export const resendDeliveryNotification = asyncHandler(async (req, res) => {
 
     // Find nearest delivery boys
     const priorityDeliveryBoys = await findNearestDeliveryBoys(restaurantLat, restaurantLng, restaurantId, 20,
-    // 20km radius for priority
-    10 // Top 10 nearest
+      // 20km radius for priority
+      10 // Top 10 nearest
     );
     if (!priorityDeliveryBoys || priorityDeliveryBoys.length === 0) {
       // Try with larger radius
       const allDeliveryBoys = await findNearestDeliveryBoys(restaurantLat, restaurantLng, restaurantId, 50,
-      // 50km radius
-      20 // Top 20 nearest
+        // 50km radius
+        20 // Top 20 nearest
       );
       if (!allDeliveryBoys || allDeliveryBoys.length === 0) {
         return errorResponse(res, 404, 'No delivery partners available in your area');

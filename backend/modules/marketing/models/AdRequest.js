@@ -78,8 +78,10 @@ const adRequestSchema = new mongoose.Schema(
 
 // Indexes for performance
 adRequestSchema.index({ status: 1 });
+adRequestSchema.index({ status: 1, paymentStatus: 1, startDate: 1, endDate: 1 });
 adRequestSchema.index({ targetZones: 1 });
 adRequestSchema.index({ startDate: 1, endDate: 1 });
 adRequestSchema.index({ restaurant: 1 });
+adRequestSchema.index({ restaurant: 1, status: 1, createdAt: -1 });
 
 export default mongoose.model('AdRequest', adRequestSchema);
