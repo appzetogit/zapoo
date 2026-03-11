@@ -5,41 +5,50 @@ const adminCategoryManagementSchema = new mongoose.Schema(
     name: {
       type: String,
       required: [true, 'Category name is required'],
-      trim: true,
+      trim: true
     },
     image: {
       type: String,
-      default: 'https://via.placeholder.com/40',
+      default: 'https://via.placeholder.com/40'
     },
     type: {
       type: String,
       trim: true,
-      enum: ['Starters', 'Main course', 'Desserts', 'Beverages', 'Varieties'],
+      enum: ['Starters', 'Main course', 'Desserts', 'Beverages', 'Varieties']
     },
     priority: {
       type: String,
       enum: ['High', 'Normal', 'Low'],
-      default: 'Normal',
+      default: 'Normal'
     },
     status: {
       type: Boolean,
-      default: true,
+      default: true
     },
     description: {
       type: String,
-      trim: true,
+      trim: true
     },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'Admin',
+      ref: 'Admin'
     },
     updatedBy: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'Admin',
+      ref: 'Admin'
     },
+    // Landing page specific properties so we can reuse this model
+    landingOrder: {
+      type: Number,
+      default: 0
+    },
+    landingStatus: {
+      type: Boolean,
+      default: false
+    }
   },
   {
-    timestamps: true,
+    timestamps: true
   }
 );
 
@@ -48,6 +57,7 @@ adminCategoryManagementSchema.index({ name: 1 });
 adminCategoryManagementSchema.index({ status: 1 });
 adminCategoryManagementSchema.index({ priority: 1 });
 adminCategoryManagementSchema.index({ createdAt: -1 });
+adminCategoryManagementSchema.index({ landingStatus: 1, landingOrder: 1 });
 
 // Virtual for serial number (for display purposes)
 adminCategoryManagementSchema.virtual('sl').get(function() {

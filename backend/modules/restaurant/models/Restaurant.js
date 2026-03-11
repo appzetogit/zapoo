@@ -369,8 +369,13 @@ const restaurantSchema = new mongoose.Schema(
   },
 );
 
-// Indexes for authentication and geo queries
+// Indexes for authentication, discovery and geo queries
 restaurantSchema.index({ "location.coordinates": "2dsphere" });
+// Fast lookups by slug / id are already covered by unique indexes on slug and restaurantId
+// Visibility filters for listings
+restaurantSchema.index({ isActive: 1, isAcceptingOrders: 1 });
+// Zone-based queries (e.g. admin dashboards, zone management)
+restaurantSchema.index({ zoneId: 1 });
 
 // Hash password before saving
 restaurantSchema.pre("save", async function (next) {

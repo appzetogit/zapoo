@@ -162,27 +162,22 @@ export const submitSignupDocuments = asyncHandler(async (req, res) => {
         url: profilePhoto.url,
         publicId: profilePhoto.publicId
       },
-      // Store all documents in documents schema
+      // Store all documents in documents schema (profile photo is only in profileImage)
       documents: {
-        // Profile photo in documents.photo (for backward compatibility)
-        photo: profilePhoto.url,
         // Aadhar card document
         aadhar: {
           ...delivery.documents?.aadhar,
-          document: aadharPhoto.url,
-          verified: false // Will be verified by admin later
+          document: aadharPhoto.url
         },
         // PAN card document
         pan: {
           ...delivery.documents?.pan,
-          document: panPhoto.url,
-          verified: false // Will be verified by admin later
+          document: panPhoto.url
         },
         // Driving license document
         drivingLicense: {
           ...delivery.documents?.drivingLicense,
-          document: drivingLicensePhoto.url,
-          verified: false // Will be verified by admin later
+          document: drivingLicensePhoto.url
         }
       },
       // Mark signup as complete - status remains pending until admin approval

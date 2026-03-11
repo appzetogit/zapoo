@@ -59,7 +59,7 @@ export const getCommissionRules = asyncHandler(async (req, res) => {
     const total = await DeliveryBoyCommission.countDocuments(query);
 
     // Get commission rules sorted by minDistance
-    const commissions = await DeliveryBoyCommission.find(query).populate('createdBy', 'name email').populate('updatedBy', 'name email').sort({
+    const commissions = await DeliveryBoyCommission.find(query).sort({
       minDistance: 1,
       createdAt: -1
     }).skip(skip).limit(limitNum).lean();
@@ -96,7 +96,7 @@ export const getCommissionRuleById = asyncHandler(async (req, res) => {
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return errorResponse(res, 400, 'Invalid commission rule ID');
     }
-    const commission = await DeliveryBoyCommission.findById(id).populate('createdBy', 'name email').populate('updatedBy', 'name email').lean();
+    const commission = await DeliveryBoyCommission.findById(id).lean();
     if (!commission) {
       return errorResponse(res, 404, 'Commission rule not found');
     }
@@ -206,8 +206,7 @@ export const createCommissionRule = asyncHandler(async (req, res) => {
       commissionPerKm: parseFloat(commissionPerKm),
       basePayout: parseFloat(basePayout),
       status: status !== undefined ? status : true,
-      tier: tier || 'default',
-      createdBy: new mongoose.Types.ObjectId(adminId)
+      tier: tier || 'default'
     };
     const commission = new DeliveryBoyCommission(commissionData);
     try {
@@ -222,18 +221,9 @@ export const createCommissionRule = asyncHandler(async (req, res) => {
       });
       throw saveError; // Re-throw to be caught by outer catch
     }
-
-    // Try to populate, but handle errors gracefully
-    let populatedCommission;
-    try {
-      populatedCommission = await DeliveryBoyCommission.findById(commission._id).populate('createdBy', 'name email').populate('updatedBy', 'name email').lean();
-    } catch (populateError) {
-      console.warn('Error populating commission:', populateError);
-      // If populate fails, return the commission without populated fields
-      populatedCommission = commission.toObject ? commission.toObject() : commission;
-    }
+    const created = await DeliveryBoyCommission.findById(commission._id).lean();
     return successResponse(res, 201, 'Commission rule created successfully', {
-      commission: populatedCommission
+      commission: created
     });
   } catch (error) {
     console.error('❌ Error creating commission rule:', error);
@@ -423,11 +413,10 @@ export const toggleCommissionRuleStatus = asyncHandler(async (req, res) => {
       return errorResponse(res, 404, 'Commission rule not found');
     }
     commission.status = status !== undefined ? status : !commission.status;
-    commission.updatedBy = adminId;
     await commission.save();
-    const populatedCommission = await DeliveryBoyCommission.findById(commission._id).populate('createdBy', 'name email').populate('updatedBy', 'name email').lean();
+    const updated = await DeliveryBoyCommission.findById(commission._id).lean();
     return successResponse(res, 200, 'Commission rule status updated successfully', {
-      commission: populatedCommission
+      commission: updated
     });
   } catch (error) {
     console.error('Error toggling commission rule status:', error);

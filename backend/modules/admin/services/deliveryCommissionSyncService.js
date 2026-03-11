@@ -68,8 +68,6 @@ export const syncCommissionRulesForTier = async ({
             : 0,
         status: true,
         tier: tierName,
-        createdBy: adminId,
-        updatedBy: adminId,
       };
     });
 

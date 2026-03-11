@@ -251,7 +251,7 @@ export const verifyOTP = asyncHandler(async (req, res) => {
         rejectionReason: delivery.rejectionReason || null,
         // Include rejection reason for blocked accounts
         metrics: delivery.metrics,
-        earnings: walletData || delivery.earnings
+        earnings: walletData ?? { totalEarned: 0, currentBalance: 0, pendingPayout: 0, tips: 0 }
       }
     });
   } catch (error) {
@@ -366,7 +366,7 @@ export const getCurrentDelivery = asyncHandler(async (req, res) => {
       documents: req.delivery.documents,
       availability: req.delivery.availability,
       metrics: req.delivery.metrics,
-      earnings: walletData || req.delivery.earnings,
+      earnings: walletData ?? { totalEarned: 0, currentBalance: 0, pendingPayout: 0, tips: 0 },
       level: req.delivery.level,
       lastLogin: req.delivery.lastLogin
     }

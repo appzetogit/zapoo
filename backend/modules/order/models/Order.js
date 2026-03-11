@@ -1,5 +1,25 @@
 import mongoose from 'mongoose';
 
+/**
+ * IMPORTANT DESIGN NOTE:
+ *
+ * The Order schema is intentionally denormalized and stores a full snapshot
+ * of the order at the time of placement:
+ *  - items, address, pricing and payment details
+ *  - tracking, ETA, assignment info and delivery state
+ *  - restaurant name and user-facing metadata
+ *
+ * This shape is optimized for:
+ *  - fast reads for user history, restaurant dashboards and admin support
+ *  - immutable business/audit records that do not change if related data
+ *    (menu items, user addresses, restaurant profile) is edited later
+ *
+ * Do NOT restructure this schema (e.g. extracting items / address /
+ * deliveryState into separate collections or removing snapshots) unless you
+ * plan a coordinated refactor of all controllers, services and reports that
+ * depend on it.
+ */
+
 const orderItemSchema = new mongoose.Schema({
   itemId: {
     type: String,
@@ -344,9 +364,16 @@ const orderSchema = new mongoose.Schema({
 });
 
 // Indexes for better query performance
+// User order history
 orderSchema.index({ userId: 1, createdAt: -1 });
+// Restaurant dashboards / reports
+orderSchema.index({ restaurantId: 1, createdAt: -1 });
 orderSchema.index({ restaurantId: 1, status: 1 });
+// Delivery partner trip history
+orderSchema.index({ deliveryPartnerId: 1, createdAt: -1 });
+// Admin lists by status + recency
 orderSchema.index({ status: 1, createdAt: -1 });
+// Payment gateway lookups
 orderSchema.index({ 'payment.razorpayOrderId': 1 });
 
 // Generate order ID before saving (fallback if not provided)

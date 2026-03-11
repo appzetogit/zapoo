@@ -1,12 +1,11 @@
 import mongoose from 'mongoose';
 import HeroBanner from '../models/HeroBanner.js';
-import LandingPageCategory from '../models/LandingPageCategory.js';
 import LandingPageExploreMore from '../models/LandingPageExploreMore.js';
-import LandingPageSettings from '../models/LandingPageSettings.js';
 import Top10Restaurant from '../models/Top10Restaurant.js';
 import GourmetRestaurant from '../models/GourmetRestaurant.js';
 import Under250Banner from '../models/Under250Banner.js';
 import Restaurant from '../../restaurant/models/Restaurant.js';
+import AdminCategoryManagement from '../../admin/models/AdminCategoryManagement.js';
 import { successResponse, errorResponse } from '../../../shared/utils/response.js';
 import { calculateDistance } from '../../order/services/orderCalculationService.js';
 
@@ -164,23 +163,36 @@ export const linkRestaurantsToBanner = async (req, res) => {
  */
 export const getLandingConfig = async (req, res) => {
   try {
-    const [categories, exploreMore, settings] = await Promise.all([
-      LandingPageCategory.find({ isActive: true })
-        .sort({ order: 1, createdAt: -1 })
-        .select('label slug imageUrl order isActive')
+    const [adminCategories, exploreMore] = await Promise.all([
+      AdminCategoryManagement.find({ status: true, landingStatus: true })
+        .sort({ landingOrder: 1, createdAt: -1 })
+        .select('name image status landingStatus landingOrder')
         .lean(),
       LandingPageExploreMore.find({ isActive: true })
         .sort({ order: 1, createdAt: -1 })
         .select('label link imageUrl order isActive')
-        .lean(),
-      LandingPageSettings.getSettings(),
+        .lean()
     ]);
+
+    const categories = (adminCategories || []).map(cat => {
+      const label = cat.name;
+      const slug = label.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+
+      return {
+        _id: cat._id,
+        label,
+        slug,
+        imageUrl: cat.image,
+        order: typeof cat.landingOrder === 'number' ? cat.landingOrder : 0,
+        isActive: cat.landingStatus ?? cat.status ?? true
+      };
+    });
 
     return successResponse(res, 200, 'Landing config retrieved successfully', {
       categories,
       exploreMore,
       settings: {
-        exploreMoreHeading: settings.exploreMoreHeading,
+        exploreMoreHeading: 'Explore More',
       },
     });
   } catch (error) {
@@ -196,13 +208,25 @@ export const getLandingConfig = async (req, res) => {
  */
 export const getLandingCategories = async (req, res) => {
   try {
-    const categories = await LandingPageCategory.find()
-      .sort({ order: 1, createdAt: -1 })
+    const categoriesDocs = await AdminCategoryManagement.find()
+      .sort({ landingOrder: 1, createdAt: -1 })
       .lean();
 
-    return successResponse(res, 200, 'Categories retrieved successfully', {
-      categories
+    const categories = categoriesDocs.map(cat => {
+      const label = cat.name;
+      const slug = label.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+
+      return {
+        _id: cat._id,
+        label,
+        slug,
+        imageUrl: cat.image,
+        order: typeof cat.landingOrder === 'number' ? cat.landingOrder : 0,
+        isActive: cat.landingStatus ?? cat.status ?? true
+      };
     });
+
+    return successResponse(res, 200, 'Categories retrieved successfully', { categories });
   } catch (error) {
     console.error('Error fetching landing categories:', error);
     return errorResponse(res, 500, 'Failed to fetch landing categories');
@@ -222,9 +246,6 @@ export const createLandingCategory = async (req, res) => {
       return errorResponse(res, 400, 'No image file provided');
     }
 
-    // Generate slug from label
-    const slug = label.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-
     // Upload to Cloudinary
     const folder = 'appzeto/landing/categories';
     const result = await uploadToCloudinary(req.file.buffer, {
@@ -232,33 +253,36 @@ export const createLandingCategory = async (req, res) => {
       resource_type: 'image'
     });
 
-    // Get the highest order number
-    const lastCategory = await LandingPageCategory.findOne()
-      .sort({ order: -1 })
-      .select('order')
+    // Get the highest landingOrder number among existing categories
+    const lastCategory = await AdminCategoryManagement.findOne()
+      .sort({ landingOrder: -1 })
+      .select('landingOrder')
       .lean();
 
-    const newOrder = lastCategory ? lastCategory.order + 1 : 0;
+    const newOrder = lastCategory && typeof lastCategory.landingOrder === 'number'
+      ? lastCategory.landingOrder + 1
+      : 0;
 
-    // Create category record
-    const category = new LandingPageCategory({
-      label,
-      slug,
-      imageUrl: result.secure_url,
-      cloudinaryPublicId: result.public_id,
-      order: newOrder,
-      isActive: true
+    // Create admin category record that is also used for landing page
+    const category = await AdminCategoryManagement.create({
+      name: label.trim(),
+      image: result.secure_url,
+      status: true,
+      priority: 'Normal',
+      description: '',
+      createdBy: req.user?._id,
+      updatedBy: req.user?._id,
+      landingStatus: true,
+      landingOrder: newOrder
     });
-
-    await category.save();
 
     return successResponse(res, 201, 'Category created successfully', {
       category: {
         _id: category._id,
-        label: category.label,
-        imageUrl: category.imageUrl,
-        order: category.order,
-        isActive: category.isActive,
+        label: category.name,
+        imageUrl: category.image,
+        order: category.landingOrder,
+        isActive: category.landingStatus ?? category.status,
         createdAt: category.createdAt
       }
     });
@@ -275,21 +299,16 @@ export const deleteLandingCategory = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const category = await LandingPageCategory.findById(id);
+    const category = await AdminCategoryManagement.findById(id);
     if (!category) {
       return errorResponse(res, 404, 'Category not found');
     }
 
-    // Delete from Cloudinary
-    try {
-      await cloudinary.uploader.destroy(category.cloudinaryPublicId);
-    } catch (cloudinaryError) {
-      console.error('Error deleting from Cloudinary:', cloudinaryError);
-    }
+    // Delete from database. We don't track Cloudinary public IDs on this model,
+    // so we only remove the document.
+    await AdminCategoryManagement.findByIdAndDelete(id);
 
-    // Delete from database
-    await LandingPageCategory.findByIdAndDelete(id);
-
+    return successResponse(res, 200, 'Category deleted successfully');
   } catch (error) {
     console.error('Error deleting landing category:', error);
     return errorResponse(res, 500, 'Failed to delete category');
@@ -309,9 +328,9 @@ export const updateLandingCategoryOrder = async (req, res) => {
       return errorResponse(res, 400, 'Order must be a number');
     }
 
-    const category = await LandingPageCategory.findByIdAndUpdate(
+    const category = await AdminCategoryManagement.findByIdAndUpdate(
       id,
-      { order, updatedAt: new Date() },
+      { landingOrder: order, updatedAt: new Date() },
       { new: true }
     );
 
@@ -320,7 +339,13 @@ export const updateLandingCategoryOrder = async (req, res) => {
     }
 
     return successResponse(res, 200, 'Category order updated successfully', {
-      category
+      category: {
+        _id: category._id,
+        label: category.name,
+        imageUrl: category.image,
+        order: category.landingOrder,
+        isActive: category.landingStatus ?? category.status
+      }
     });
   } catch (error) {
     console.error('Error updating category order:', error);
@@ -335,17 +360,24 @@ export const toggleLandingCategoryStatus = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const category = await LandingPageCategory.findById(id);
+    const category = await AdminCategoryManagement.findById(id);
     if (!category) {
       return errorResponse(res, 404, 'Category not found');
     }
 
-    category.isActive = !category.isActive;
+    const current = category.landingStatus ?? category.status ?? true;
+    category.landingStatus = !current;
     category.updatedAt = new Date();
     await category.save();
 
     return successResponse(res, 200, 'Category status updated successfully', {
-      category
+      category: {
+        _id: category._id,
+        label: category.name,
+        imageUrl: category.image,
+        order: category.landingOrder,
+        isActive: category.landingStatus
+      }
     });
   } catch (error) {
     console.error('Error toggling category status:', error);
@@ -522,11 +554,9 @@ export const toggleLandingExploreMoreStatus = async (req, res) => {
  */
 export const getLandingSettings = async (req, res) => {
   try {
-    const settings = await LandingPageSettings.getSettings();
-
     return successResponse(res, 200, 'Landing settings retrieved successfully', {
       settings: {
-        exploreMoreHeading: settings.exploreMoreHeading
+        exploreMoreHeading: 'Explore More'
       }
     });
   } catch (error) {
@@ -540,19 +570,9 @@ export const getLandingSettings = async (req, res) => {
  */
 export const updateLandingSettings = async (req, res) => {
   try {
-    const { exploreMoreHeading } = req.body;
-
-    const settings = await LandingPageSettings.getSettings();
-
-    if (typeof exploreMoreHeading === 'string') {
-      settings.exploreMoreHeading = exploreMoreHeading;
-    }
-
-    await settings.save();
-
     return successResponse(res, 200, 'Landing settings updated successfully', {
       settings: {
-        exploreMoreHeading: settings.exploreMoreHeading
+        exploreMoreHeading: 'Explore More'
       }
     });
   } catch (error) {

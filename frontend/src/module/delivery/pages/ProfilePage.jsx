@@ -227,32 +227,22 @@ export default function ProfilePage() {
               </p>
             </div>
             <div className="relative shrink-0 ml-4">
-              {profile?.profileImage?.url ? (
-                <img
-                  src={profile.profileImage.url}
-                  alt="Profile"
-                  className="w-20 h-20 md:w-24 md:h-24 rounded-full object-cover border-2 border-gray-200"
-                  onError={(e) => {
-                    if (profile?.documents?.photo) {
-                      e.target.src = profile.documents.photo;
-                    } else {
+              {(profile?.profileImage?.url || profile?.documents?.photo) ? (
+                <>
+                  <img
+                    src={profile?.profileImage?.url || profile?.documents?.photo}
+                    alt="Profile"
+                    className="w-20 h-20 md:w-24 md:h-24 rounded-full object-cover border-2 border-gray-200"
+                    onError={(e) => {
                       e.target.style.display = "none";
                       e.target.nextElementSibling?.classList.remove("hidden");
-                    }
-                  }}
-                />
-              ) : profile?.documents?.photo ? (
-                <img
-                  src={profile.documents.photo}
-                  alt="Profile"
-                  className="w-20 h-20 md:w-24 md:h-24 rounded-full object-cover border-2 border-gray-200"
-                  onError={(e) => {
-                    e.target.style.display = "none";
-                    e.target.nextElementSibling?.classList.remove("hidden");
-                  }}
-                />
-              ) : null}
-              {(!profile?.profileImage?.url && !profile?.documents?.photo) && (
+                    }}
+                  />
+                  <div className="hidden w-20 h-20 md:w-24 md:h-24 rounded-full bg-gray-300 flex items-center justify-center border-2 border-gray-200">
+                    <User className="w-10 h-10 md:w-12 md:h-12 text-gray-500" />
+                  </div>
+                </>
+              ) : (
                 <div className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-gray-300 flex items-center justify-center border-2 border-gray-200">
                   <User className="w-10 h-10 md:w-12 md:h-12 text-gray-500" />
                 </div>

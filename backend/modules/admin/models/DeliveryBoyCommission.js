@@ -61,18 +61,6 @@ const deliveryBoyCommissionSchema = new mongoose.Schema(
       type: Boolean,
       default: true
     },
-    // Created by admin
-    createdBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Admin',
-      required: true
-    },
-    // Updated by admin
-    updatedBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Admin'
-    },
-    // Metadata
     metadata: {
       type: mongoose.Schema.Types.Mixed,
       default: {}
@@ -87,7 +75,6 @@ const deliveryBoyCommissionSchema = new mongoose.Schema(
 deliveryBoyCommissionSchema.index({ minDistance: 1, maxDistance: 1 });
 deliveryBoyCommissionSchema.index({ status: 1 });
 deliveryBoyCommissionSchema.index({ createdAt: -1 });
-deliveryBoyCommissionSchema.index({ createdBy: 1 });
 
 const DELIVERY_SLAB_MARGIN_KM = 0.2;
 const roundKm = (value) => Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;

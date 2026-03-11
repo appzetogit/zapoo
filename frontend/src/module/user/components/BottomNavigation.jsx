@@ -5,9 +5,17 @@ export default function BottomNavigation() {
   const location = useLocation()
 
   // Check active routes - support both /user/* and /* paths
-  const isUnder250 = location.pathname === "/under-250" || location.pathname === "/user/under-250"
-  const isProfile = location.pathname.startsWith("/profile") || location.pathname.startsWith("/user/profile")
-  const isDelivery = !isUnder250 && !isProfile && (location.pathname === "/" || location.pathname === "/user" || (location.pathname.startsWith("/") && !location.pathname.startsWith("/restaurant") && !location.pathname.startsWith("/delivery") && !location.pathname.startsWith("/admin") && !location.pathname.startsWith("/usermain")))
+  const isUnder250 = location.pathname === "/under-250"
+  const isProfile = location.pathname.startsWith("/profile")
+  const isDelivery =
+    !isUnder250 &&
+    !isProfile &&
+    (location.pathname === "/" ||
+      (location.pathname.startsWith("/") &&
+        !location.pathname.startsWith("/restaurant") &&
+        !location.pathname.startsWith("/delivery") &&
+        !location.pathname.startsWith("/admin") &&
+        !location.pathname.startsWith("/usermain")))
 
   return (
     <div
@@ -16,7 +24,7 @@ export default function BottomNavigation() {
       <div className="flex items-center justify-around h-auto px-4 sm:px-6">
         {/* Delivery Tab */}
         <Link
-          to="/user"
+          to="/"
           className={`flex flex-col items-center gap-1.5 px-4 sm:px-5 py-2 transition-all duration-200 relative ${isDelivery
             ? "text-orange-600 dark:text-orange-500"
             : "text-gray-600 dark:text-gray-400"
@@ -36,7 +44,7 @@ export default function BottomNavigation() {
 
         {/* Under 250 Tab */}
         <Link
-          to="/user/under-250"
+          to="/under-250"
           className={`flex flex-col items-center gap-1.5 px-4 sm:px-5 py-2 transition-all duration-200 relative ${isUnder250
             ? "text-orange-600 dark:text-orange-500"
             : "text-gray-600 dark:text-gray-400"
@@ -53,7 +61,7 @@ export default function BottomNavigation() {
 
         {/* Profile Tab */}
         <Link
-          to="/user/profile"
+          to="/profile"
           className={`flex flex-col items-center gap-1.5 px-4 sm:px-5 py-2 transition-all duration-200 relative ${isProfile
             ? "text-orange-600 dark:text-orange-500"
             : "text-gray-600 dark:text-gray-400"

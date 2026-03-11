@@ -26,36 +26,20 @@ const vehicleSchema = new mongoose.Schema({
 const documentsSchema = new mongoose.Schema({
   aadhar: {
     number: String,
-    document: String, // URL to document
-    verified: {
-      type: Boolean,
-      default: false
-    }
+    document: String // URL to document
   },
   pan: {
     number: String,
-    document: String,
-    verified: {
-      type: Boolean,
-      default: false
-    }
+    document: String
   },
   drivingLicense: {
     number: String,
     document: String,
-    verified: {
-      type: Boolean,
-      default: false
-    },
     expiryDate: Date
   },
   vehicleRC: {
     number: String,
-    document: String,
-    verified: {
-      type: Boolean,
-      default: false
-    }
+    document: String
   },
   photo: String, // Profile photo URL
   bankDetails: {
@@ -87,25 +71,6 @@ const availabilitySchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Zone'
   }]
-}, { _id: false });
-
-const earningsSchema = new mongoose.Schema({
-  totalEarned: {
-    type: Number,
-    default: 0
-  },
-  currentBalance: {
-    type: Number,
-    default: 0
-  },
-  pendingPayout: {
-    type: Number,
-    default: 0
-  },
-  tips: {
-    type: Number,
-    default: 0
-  }
 }, { _id: false });
 
 const metricsSchema = new mongoose.Schema({
@@ -147,121 +112,50 @@ const metricsSchema = new mongoose.Schema({
 
 const deliverySchema = new mongoose.Schema(
   {
-    deliveryId: {
-      type: String
-    },
-    // Authentication fields
-    phone: {
-      type: String,
-      required: true,
-      trim: true
-    },
-    phoneVerified: {
-      type: Boolean,
-      default: false
-    },
-    password: {
-      type: String,
-      select: false // Don't return password by default
-    },
-    googleId: {
-      type: String,
-      sparse: true
-    },
-    googleEmail: {
-      type: String,
-      sparse: true
-    },
-    signupMethod: {
-      type: String,
-      enum: ['google', 'phone', 'email'],
-      default: 'phone'
-    },
-    // Basic information
-    name: {
-      type: String,
-      required: true,
-      trim: true
-    },
-    email: {
-      type: String,
-      lowercase: true,
-      trim: true,
-      sparse: true
-    },
-    profileImage: {
-      url: String,
-      publicId: String
-    },
+    deliveryId: { type: String, trim: true },
+    // --- Auth ---
+    phone: { type: String, required: true, trim: true },
+    phoneVerified: { type: Boolean, default: false },
+    password: { type: String, select: false },
+    googleId: { type: String, sparse: true },
+    googleEmail: { type: String, sparse: true },
+    signupMethod: { type: String, enum: ['google', 'phone', 'email'], default: 'phone' },
+    refreshToken: { type: String, select: false },
+    // --- Profile ---
+    name: { type: String, required: true, trim: true },
+    email: { type: String, lowercase: true, trim: true, sparse: true },
+    profileImage: { url: String, publicId: String },
     dateOfBirth: Date,
-    gender: {
-      type: String,
-      enum: ['male', 'female', 'other', 'prefer-not-to-say']
-    },
-    // Location
+    gender: { type: String, enum: ['male', 'female', 'other', 'prefer-not-to-say'] },
     location: locationSchema,
-    // Vehicle information
     vehicle: vehicleSchema,
-    // Documents
     documents: documentsSchema,
-    // Availability
+    // --- Availability & metrics ---
     availability: availabilitySchema,
-    // Earnings
-    earnings: earningsSchema,
-    // Metrics
     metrics: metricsSchema,
-    // Status
+    // --- Workflow ---
     status: {
       type: String,
       enum: ['pending', 'approved', 'active', 'suspended', 'blocked'],
       default: 'pending'
     },
-    level: {
-      type: String,
-      enum: ['bronze', 'silver', 'gold', 'platinum'],
-      default: 'bronze'
-    },
-    // Note: Wallet functionality has been moved to separate DeliveryWallet model
-    // Use DeliveryWallet.findOne({ deliveryId: this._id }) to access wallet
-    // The embedded wallet schema has been removed in favor of the separate model
-    // Refresh token (for JWT)
-    refreshToken: {
-      type: String,
-      select: false
-    },
-    // Active status
-    isActive: {
-      type: Boolean,
-      default: true
-    },
-    // Last login
+    level: { type: String, enum: ['bronze', 'silver', 'gold', 'platinum'], default: 'bronze' },
+    isActive: { type: Boolean, default: true },
     lastLogin: Date,
-    // Verification
     verifiedAt: Date,
-    verifiedBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Admin'
-    },
-    // Rejection details
-    rejectionReason: {
-      type: String,
-      trim: true
-    },
+    verifiedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' },
+    rejectionReason: { type: String, trim: true },
     rejectedAt: Date,
-    rejectedBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Admin'
-    }
+    rejectedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' }
   },
-  {
-    timestamps: true
-  }
+  { timestamps: true }
 );
 
-// Indexes
+// Indexes: geo + common query filters + unique lookups
 deliverySchema.index({ 'availability.currentLocation': '2dsphere' });
-deliverySchema.index({ status: 1 });
-deliverySchema.index({ isActive: 1 });
+deliverySchema.index({ status: 1, isActive: 1 });
+deliverySchema.index({ phone: 1 }, { unique: true });
+deliverySchema.index({ deliveryId: 1 }, { unique: true, sparse: true });
 
 // Hash password before saving
 deliverySchema.pre('save', async function (next) {

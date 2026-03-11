@@ -420,40 +420,49 @@ export default function SignIn() {
     }
     return "";
   };
-  if (name === "phone") {
+
+  // Handle changes for email/phone/name fields
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+
+    if (name === "phone") {
     // Allow only digits
     const cleaned = value.replace(/\D/g, "");
     // Limit based on country code (91 for India is 10 digits)
     const maxLength = formData.countryCode === "+91" ? 10 : 15;
     const restrictedValue = cleaned.slice(0, maxLength);
 
-    setFormData({
-      ...formData,
-      [name]: restrictedValue
-    });
-    setErrors({
-      ...errors,
-      phone: validatePhone(restrictedValue)
-    });
-  } else {
-    setFormData({
-      ...formData,
-      [name]: value
-    });
+      setFormData({
+        ...formData,
+        [name]: restrictedValue
+      });
+      setErrors({
+        ...errors,
+        phone: validatePhone(restrictedValue)
+      });
+    } else {
+      setFormData({
+        ...formData,
+        [name]: value
+      });
 
-    // Real-time validation
-    if (name === "email") {
-      setErrors({
-        ...errors,
-        email: validateEmail(value)
-      });
-    } else if (name === "name") {
-      setErrors({
-        ...errors,
-        name: validateName(value)
-      });
+      // Real-time validation
+      if (name === "email") {
+        setErrors({
+          ...errors,
+          email: validateEmail(value)
+        });
+      } else if (name === "name") {
+        setErrors({
+          ...errors,
+          name: validateName(value)
+        });
+      }
     }
-  }
+  };
+
+  // Backwards-compatible alias for existing JSX handlers
+  const handleChange = handleInputChange;
   const handleCountryCodeChange = value => {
     setFormData({
       ...formData,
