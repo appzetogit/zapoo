@@ -44,7 +44,6 @@ const PromotionalBanner = lazy(() => import("../pages/PromotionalBanner"));
 const NewAdvertisement = lazy(() => import("../pages/advertisement/NewAdvertisement"));
 const AdRequests = lazy(() => import("../pages/advertisement/AdRequests"));
 const AdsList = lazy(() => import("../pages/advertisement/AdsList"));
-const SlotConfiguration = lazy(() => import("../pages/advertisement/SlotConfiguration"));
 const PushNotification = lazy(() => import("../pages/PushNotification"));
 const NotificationRequests = lazy(() => import("../pages/NotificationRequests"));
 // Help & Support
@@ -215,7 +214,6 @@ export default function AdminRouter() {
           <Route path="advertisement" element={<AdsList />} />
           <Route path="marketing/ad-requests" element={<AdRequests />} />
           <Route path="marketing/active-campaigns" element={<AdsList />} />
-          <Route path="marketing/slots" element={<SlotConfiguration />} />
           <Route path="push-notification" element={<PushNotification />} />
           <Route path="notification-requests" element={<NotificationRequests />} />
 

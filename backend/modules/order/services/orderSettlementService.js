@@ -94,8 +94,6 @@ export const calculateOrderSettlement = async (orderId) => {
       distance: 0,
       commissionPerKm: 0,
       distanceCommission: 0,
-      surgeMultiplier: 1,
-      surgeAmount: 0,
       totalEarning: 0,
       status: 'pending'
     };
@@ -106,18 +104,14 @@ export const calculateOrderSettlement = async (orderId) => {
         distance,
         tierMeta?.name || null
       );
-      const surgeMultiplier = order.assignmentInfo?.surgeMultiplier || 1;
       const baseEarning = deliveryCommission.commission;
-      const surgeAmount = baseEarning * (surgeMultiplier - 1);
 
       deliveryPartnerEarning = {
         basePayout: deliveryCommission.breakdown.basePayout,
         distance: distance,
         commissionPerKm: deliveryCommission.breakdown.commissionPerKm,
         distanceCommission: deliveryCommission.breakdown.distanceCommission,
-        surgeMultiplier: surgeMultiplier,
-        surgeAmount: surgeAmount,
-        totalEarning: roundCurrency(baseEarning + surgeAmount),
+        totalEarning: roundCurrency(baseEarning),
         status: 'pending'
       };
     }

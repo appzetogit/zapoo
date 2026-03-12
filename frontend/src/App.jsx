@@ -2,7 +2,7 @@ import { Routes, Route, Navigate, useLocation } from "react-router-dom"
 import ProtectedRoute from "@/components/ProtectedRoute"
 import AuthRedirect from "@/components/AuthRedirect"
 
-import { Suspense, lazy } from "react"
+import { Suspense, lazy, useMemo } from "react"
 import Loader from "@/components/Loader"
 
 // Lazy Loading Components
@@ -125,13 +125,18 @@ const DeliveryChallenges = lazy(() => import("@/module/delivery/pages/Challenges
 
 function UserPathRedirect() {
   const location = useLocation()
-  const newPath = location.pathname.replace(/^\/user/, "") || "/"
+  const newPath = useMemo(
+    () => location.pathname.replace(/^\/user/, "") || "/",
+    [location.pathname]
+  )
   return <Navigate to={newPath} replace />
 }
 
+const LoaderFallback = <Loader />
+
 export default function App() {
   return (
-    <Suspense fallback={<Loader />}>
+    <Suspense fallback={LoaderFallback}>
       <Routes>
         <Route path="/user" element={<Navigate to="/" replace />} />
         <Route path="/user/*" element={<UserPathRedirect />} />

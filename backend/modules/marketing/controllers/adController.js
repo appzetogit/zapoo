@@ -20,57 +20,9 @@ const AD_PRICING = {
 };
 const DEFAULT_PRICING = 500;
 
-/**
- * Check banner slot availability using tier-based limits.
- * Each tier defines maxBanners (max concurrent approved ads/day for zones in that tier).
- * Minimum 1 banner always allowed regardless of tier config.
- */
-const checkAvailability = async (zones, startDate, endDate) => {
-  const results = [];
-  for (const zoneId of zones) {
-    // Get zone with its tier
-    const zone = await Zone.findById(zoneId).populate('tierId');
-    const tier = zone?.tierId;
-
-    // Max banners from tier, minimum 1 always enforced
-    const maxBanners = Math.max(1, tier?.maxBanners ?? 5);
-
-    // Find overlapping approved/active campaigns for this zone
-    const overlappingAds = await AdRequest.find({
-      targetZones: zoneId,
-      status: {
-        $in: ['Approved', 'Scheduled', 'Active']
-      },
-      startDate: {
-        $lte: endDate
-      },
-      endDate: {
-        $gte: startDate
-      }
-    });
-
-    // Check each day in the requested range
-    let isFull = false;
-    let curr = new Date(startDate);
-    const end = new Date(endDate);
-    while (curr <= end) {
-      const countForDay = overlappingAds.filter(ad => ad.startDate <= curr && ad.endDate >= curr).length;
-      if (countForDay >= maxBanners) {
-        isFull = true;
-        break;
-      }
-      curr.setDate(curr.getDate() + 1);
-    }
-    results.push({
-      zoneId,
-      available: !isFull,
-      slotsUsed: overlappingAds.length,
-      maxBanners,
-      tier: tier?.name || 'Unknown'
-    });
-  }
-  return results;
-};
+// NOTE: Slot-based capacity (max banners per tier/zone) has been removed.
+// Ads are no longer limited by per-day slot counts; only dates and status
+// determine eligibility.
 import { uploadToCloudinary } from '../../../shared/utils/cloudinaryService.js';
 
 /**
@@ -172,18 +124,7 @@ export const createAdRequest = async (req, res) => {
       });
     }
 
-    // 2. Check availability (Zone Capacity)
-    const availability = await checkAvailability(targetZoneIds, start, end);
-    const unavailableZones = availability.filter(a => !a.available);
-    if (unavailableZones.length > 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Slots are full for some selected zones/dates',
-        unavailableZones
-      });
-    }
-
-    // 3. Calculate total cost based on Tier
+    // 2. Calculate total cost based on Tier
     let totalCost = 0;
     for (const zoneId of targetZoneIds) {
       if (!mongoose.Types.ObjectId.isValid(zoneId)) {
@@ -269,16 +210,6 @@ export const updateAdStatus = async (req, res) => {
         });
       }
 
-      // Re-verify availability at time of approval
-      const availability = await checkAvailability(ad.targetZones, ad.startDate, ad.endDate);
-      const unavailableZones = availability.filter(a => !a.available);
-      if (unavailableZones.length > 0) {
-        return res.status(400).json({
-          success: false,
-          message: 'Slots became full during the pending period. Cannot approve.',
-          unavailableZones
-        });
-      }
       ad.status = 'Approved';
       // Payment remains Pending until restaurant pays via Razorpay
       // ad.paymentStatus = 'Paid'; // REMOVED: Auto-pay logic
@@ -373,10 +304,9 @@ export const getActiveAdsByZone = async (req, res) => {
       });
     }
 
-    const zone = await Zone.findById(zoneId).populate('tierId');
-    const maxBanners = zone?.tierId?.maxBanners ?? 5;
-    const selectedPaid = paidAdsInRange.slice(0, maxBanners);
-    const combined = [...selectedPaid, ...challengeAds].slice(0, 20);
+    // Combine paid ads and challenge ads. We no longer cap paid ads per-tier
+    // by maxBanners; instead we rely on a general overall cap for performance.
+    const combined = [...paidAdsInRange, ...challengeAds].slice(0, 20);
 
     res.status(200).json({ success: true, data: combined });
   } catch (error) {
@@ -495,18 +425,6 @@ export const verifyAdPayment = async (req, res) => {
       });
     }
 
-    // Check availability again before activating
-    const availability = await checkAvailability(ad.targetZones, ad.startDate, ad.endDate);
-    const unavailableZones = availability.filter(a => !a.available);
-    if (unavailableZones.length > 0) {
-      // Edge case: Slots filled up between approval and payment
-      // In a real system, we might refund here automatically
-      return res.status(409).json({
-        success: false,
-        message: 'Slot no longer available. Please contact support for refund.',
-        unavailableZones
-      });
-    }
     ad.paymentStatus = 'Paid';
     ad.razorpayPaymentId = razorpayPaymentId;
     ad.razorpaySignature = razorpaySignature;
@@ -670,9 +588,7 @@ export const getAllAdRequests = async (req, res) => {
       status: 'Rejected',
       rejectionReason: 'Approval window expired'
     });
-    const ads = await AdRequest.find().populate('restaurant', 'name').populate('targetZones', 'name').sort({
-      createdAt: -1
-    });
+    const ads = await AdRequest.find().populate('restaurant', 'name').populate('targetZones', 'name').sort({ createdAt: -1 }).lean();
     res.status(200).json({
       success: true,
       data: ads
@@ -697,11 +613,7 @@ export const getMyAdRequests = async (req, res) => {
         message: 'Restaurant authentication required'
       });
     }
-    const ads = await AdRequest.find({
-      restaurant: restaurantId
-    }).populate('targetZones', 'name').sort({
-      createdAt: -1
-    });
+    const ads = await AdRequest.find({ restaurant: restaurantId }).populate('targetZones', 'name').sort({ createdAt: -1 }).lean();
     res.status(200).json({
       success: true,
       data: ads

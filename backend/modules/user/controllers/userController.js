@@ -62,11 +62,9 @@ export const updateUserProfile = asyncHandler(async (req, res) => {
       // Check if email already exists for another user
       const existingUser = await User.findOne({
         email: email.toLowerCase().trim(),
-        _id: {
-          $ne: user._id
-        },
+        _id: { $ne: user._id },
         role: 'user'
-      });
+      }).select('_id').lean();
       if (existingUser) {
         return errorResponse(res, 400, 'Email already in use');
       }
@@ -77,11 +75,9 @@ export const updateUserProfile = asyncHandler(async (req, res) => {
       if (phone.trim() !== '') {
         const existingUser = await User.findOne({
           phone: phone.trim(),
-          _id: {
-            $ne: user._id
-          },
+          _id: { $ne: user._id },
           role: 'user'
-        });
+        }).select('_id').lean();
         if (existingUser) {
           return errorResponse(res, 400, 'Phone number already in use');
         }
@@ -188,7 +184,6 @@ export const updateUserLocation = asyncHandler(async (req, res) => {
       address,
       city,
       state,
-      area,
       formattedAddress,
       accuracy,
       postalCode,
@@ -236,7 +231,6 @@ export const updateUserLocation = asyncHandler(async (req, res) => {
       address: address || user.currentLocation?.address || '',
       city: city || user.currentLocation?.city || '',
       state: state || user.currentLocation?.state || '',
-      area: area || user.currentLocation?.area || '',
       formattedAddress: formattedAddress || user.currentLocation?.formattedAddress || '',
       lastUpdated: new Date(),
       location: {

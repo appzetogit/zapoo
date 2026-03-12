@@ -203,7 +203,7 @@ export const getTransactions = asyncHandler(async (req, res) => {
     } = req.query;
     let wallet = await DeliveryWallet.findOne({
       deliveryId: delivery._id
-    });
+    }).lean();
     if (!wallet) {
       return successResponse(res, 200, 'No transactions found', {
         transactions: [],

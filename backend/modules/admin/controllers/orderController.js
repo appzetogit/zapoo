@@ -1735,8 +1735,6 @@ export const processRefund = asyncHandler(async (req, res) => {
           distance: 0,
           commissionPerKm: 0,
           distanceCommission: 0,
-          surgeMultiplier: 1,
-          surgeAmount: 0,
           totalEarning: 0,
           status: 'cancelled'
         },

@@ -898,15 +898,6 @@ export const marketingAPI = {
     invalidateCachedResource("marketing:all-requests");
     return apiClient.put(API_ENDPOINTS.MARKETING.UPDATE_STATUS.replace(":adId", adId), { status, notes });
   },
-
-  // Admin: Get/Set slot configurations
-  getSlots: (zoneId) => {
-    return apiClient.get(API_ENDPOINTS.MARKETING.SLOTS, { params: { zoneId } });
-  },
-
-  configureSlots: (zoneId, maxSlots) => {
-    return apiClient.post(API_ENDPOINTS.MARKETING.CONFIGURE_SLOTS, { zoneId, maxSlots });
-  },
 };
 
 // Export tier API helper functions
@@ -1556,12 +1547,18 @@ export const adminAPI = {
     });
   },
 
-  // Business Settings Management
-  getBusinessSettings: () => {
-    return apiClient.get(API_ENDPOINTS.ADMIN.BUSINESS_SETTINGS);
+  // Business Settings Management - cached for dashboard/setup
+  getBusinessSettings: (options = {}) => {
+    const { force = false } = options;
+    return getCachedResource(
+      "admin:business-settings",
+      () => apiClient.get(API_ENDPOINTS.ADMIN.BUSINESS_SETTINGS),
+      { ttl: 5 * 60 * 1000, force }
+    );
   },
 
   updateBusinessSettings: (data, files = {}) => {
+    invalidateCachedResource("admin:business-settings");
     const formData = new FormData();
 
     // Add text fields
@@ -1596,9 +1593,14 @@ export const adminAPI = {
     return apiClient.get(API_ENDPOINTS.ADMIN.CATEGORIES, { params });
   },
 
-  // Get public categories (for user frontend)
-  getPublicCategories: () => {
-    return apiClient.get(API_ENDPOINTS.ADMIN.CATEGORIES_PUBLIC);
+  // Get public categories (for user frontend) - cached to avoid duplicate calls
+  getPublicCategories: (options = {}) => {
+    const { force = false } = options;
+    return getCachedResource(
+      "admin:categories-public",
+      () => apiClient.get(API_ENDPOINTS.ADMIN.CATEGORIES_PUBLIC),
+      { ttl: 2 * 60 * 1000, force }
+    );
   },
 
   getCategoryById: (id) => {
@@ -1606,14 +1608,12 @@ export const adminAPI = {
   },
 
   createCategory: (data) => {
-    // Axios will automatically handle FormData headers (including boundary)
-    // No need to manually set Content-Type for FormData
+    invalidateCachedResource("admin:categories-public");
     return apiClient.post(API_ENDPOINTS.ADMIN.CATEGORIES, data);
   },
 
   updateCategory: (id, data) => {
-    // Axios will automatically handle FormData headers (including boundary)
-    // No need to manually set Content-Type for FormData
+    invalidateCachedResource("admin:categories-public");
     return apiClient.put(
       API_ENDPOINTS.ADMIN.CATEGORY_BY_ID.replace(":id", id),
       data,
@@ -1621,18 +1621,21 @@ export const adminAPI = {
   },
 
   deleteCategory: (id) => {
+    invalidateCachedResource("admin:categories-public");
     return apiClient.delete(
       API_ENDPOINTS.ADMIN.CATEGORY_BY_ID.replace(":id", id),
     );
   },
 
   toggleCategoryStatus: (id) => {
+    invalidateCachedResource("admin:categories-public");
     return apiClient.patch(
       API_ENDPOINTS.ADMIN.CATEGORY_STATUS.replace(":id", id),
     );
   },
 
   updateCategoryPriority: (id, priority) => {
+    invalidateCachedResource("admin:categories-public");
     return apiClient.patch(
       API_ENDPOINTS.ADMIN.CATEGORY_PRIORITY.replace(":id", id),
       { priority },

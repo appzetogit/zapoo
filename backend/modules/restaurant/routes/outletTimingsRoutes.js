@@ -22,7 +22,6 @@ const dayTimingSchema = Joi.object({
 });
 
 const upsertOutletTimingsSchema = Joi.object({
-  outletType: Joi.string().valid('Appzeto delivery', 'Takeaway', 'All').optional(),
   timings: Joi.array().items(dayTimingSchema).length(7).optional()
 });
 

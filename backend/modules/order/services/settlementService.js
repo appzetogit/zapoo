@@ -212,7 +212,6 @@ export const generateDeliverySettlementReport = async (deliveryId, startDate, en
         distance: s.deliveryPartnerEarning.distance,
         basePayout: s.deliveryPartnerEarning.basePayout,
         distanceCommission: s.deliveryPartnerEarning.distanceCommission,
-        surgeAmount: s.deliveryPartnerEarning.surgeAmount,
         totalEarning: s.deliveryPartnerEarning.totalEarning,
         status: s.deliveryPartnerEarning.status
       }))

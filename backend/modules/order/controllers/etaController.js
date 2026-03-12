@@ -11,12 +11,13 @@ import mongoose from 'mongoose';
  * Helper function to find order by MongoDB _id or custom orderId
  */
 async function findOrderById(orderIdParam) {
+  const select = '_id orderId eta estimatedDeliveryTime';
   let order = null;
   if (mongoose.Types.ObjectId.isValid(orderIdParam) && orderIdParam.length === 24) {
-    order = await Order.findById(orderIdParam);
+    order = await Order.findById(orderIdParam).select(select).lean();
   }
   if (!order) {
-    order = await Order.findOne({ orderId: orderIdParam });
+    order = await Order.findOne({ orderId: orderIdParam }).select(select).lean();
   }
   return order;
 }

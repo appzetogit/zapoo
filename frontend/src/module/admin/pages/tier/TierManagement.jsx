@@ -72,6 +72,7 @@ export default function TierManagement() {
         platformFee: parseFloat(data.platformFee || 0),
         baseDistance: parseFloat(data.baseDistance || 3),
         extraKmCharge: parseFloat(data.extraKmCharge || 10),
+        recommendedItemFee: parseFloat(data.recommendedItemFee || 0),
       };
 
       if (editingTier) {
@@ -105,6 +106,7 @@ export default function TierManagement() {
     setValue("baseDistance", tier.deliveryPricing?.baseDistance || 3);
     setValue("extraKmCharge", tier.deliveryPricing?.extraKmCharge || 10);
     setValue("platformFee", tier.platformFee || 0);
+    setValue("recommendedItemFee", tier.recommendedItemFee || 0);
     setIsDialogOpen(true);
   };
 
@@ -131,6 +133,7 @@ export default function TierManagement() {
       baseDistance: 3,
       extraKmCharge: 10,
       platformFee: 0,
+      recommendedItemFee: 0,
       isActive: true,
     });
     setIsDialogOpen(true);
@@ -300,6 +303,20 @@ export default function TierManagement() {
                     {...register("rank", { required: "Required" })}
                   />
                 </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="recommendedItemFee" className="text-sm text-neutral-700 font-medium">Recommended Item Fee (Rs)</Label>
+                <Input
+                  id="recommendedItemFee"
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  placeholder="0"
+                  className="h-9 border-neutral-200 focus:border-orange-500 focus:ring-orange-500/20 appearance-none"
+                  onWheel={(e) => e.target.blur()}
+                  {...register("recommendedItemFee", { min: 0 })}
+                />
               </div>
 
               <div className="bg-neutral-50/50 p-3 rounded-lg border border-neutral-100 space-y-3">

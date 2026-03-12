@@ -628,7 +628,8 @@ export const verifyOrderPayment = async (req, res) => {
         paymentId: razorpayPaymentId,
         signature: razorpaySignature
       },
-      transactionId: razorpayPaymentId,
+      // transactionId is conceptually the external gateway reference; for Razorpay this
+      // is already stored as razorpay.paymentId, so we avoid duplicating the same value.
       completedAt: new Date(),
       logs: [{
         action: 'completed',

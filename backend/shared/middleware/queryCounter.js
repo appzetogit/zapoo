@@ -4,12 +4,15 @@ import mongoose from 'mongoose';
 const storage = new AsyncLocalStorage();
 
 /**
- * Middleware to track database query counts per request
+ * Middleware to track database query counts per request.
+ * No-op in production to avoid overhead; set ENABLE_QUERY_COUNT=1 to enable.
  */
 export const queryCounterMiddleware = (req, res, next) => {
+    if (process.env.NODE_ENV === 'production' && process.env.ENABLE_QUERY_COUNT !== '1') {
+        return next();
+    }
     const context = { count: 0 };
     storage.run(context, () => {
-        // Override the end method to add headers
         const originalEnd = res.end;
         res.end = function (...args) {
             const finalContext = storage.getStore();

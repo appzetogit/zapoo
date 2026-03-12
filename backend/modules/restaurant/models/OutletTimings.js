@@ -48,11 +48,6 @@ const outletTimingsSchema = new mongoose.Schema(
       required: true,
       unique: true
     },
-    outletType: {
-      type: String,
-      enum: ['Appzeto delivery', 'Takeaway', 'All'],
-      default: 'Appzeto delivery'
-    },
     timings: {
       type: [dayTimingSchema],
       default: [
@@ -85,8 +80,8 @@ const outletTimingsSchema = new mongoose.Schema(
   }
 );
 
-// Index for faster queries
-outletTimingsSchema.index({ restaurantId: 1, outletType: 1 });
+// Index for faster queries (single outlet per restaurant)
+outletTimingsSchema.index({ restaurantId: 1 });
 
 // Ensure timings are always sorted by day order
 outletTimingsSchema.pre('save', function(next) {

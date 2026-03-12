@@ -77,11 +77,6 @@ const paymentSchema = new mongoose.Schema({
       provider: String // 'paytm', 'phonepe', etc.
     }
   },
-  // Transaction details
-  transactionId: {
-    type: String
-    // Index added manually via schema.index
-  },
   gatewayResponse: {
     type: mongoose.Schema.Types.Mixed // Store full gateway response
   },

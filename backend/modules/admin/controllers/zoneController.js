@@ -116,15 +116,8 @@ export const createZone = asyncHandler(async (req, res) => {
       restaurantId,
       unit,
       coordinates,
-      peakZoneRideCount,
-      peakZoneRadius,
-      peakZoneSelectionDuration,
-      peakZoneDuration,
-      peakZoneSurgePercentage,
       isActive,
-      deliveryPricing,
-      recommendedItemFee,
-      isRecommendedFeeOverridden
+      deliveryPricing
     } = req.body;
 
     // Validation - For customer zones, country and zoneName are required instead of restaurantId
@@ -173,15 +166,8 @@ export const createZone = asyncHandler(async (req, res) => {
       restaurantId: restaurantId ? new mongoose.Types.ObjectId(restaurantId) : null,
       unit: unit || 'kilometer',
       coordinates,
-      peakZoneRideCount: peakZoneRideCount || 0,
-      peakZoneRadius: peakZoneRadius || 0,
-      peakZoneSelectionDuration: peakZoneSelectionDuration || 0,
-      peakZoneDuration: peakZoneDuration || 0,
-      peakZoneSurgePercentage: peakZoneSurgePercentage || 0,
       isActive: isActive !== undefined ? isActive : true,
       deliveryPricing,
-      recommendedItemFee: recommendedItemFee || 0,
-      isRecommendedFeeOverridden: isRecommendedFeeOverridden || false,
       createdBy: req.admin?._id || null
     };
 

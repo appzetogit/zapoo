@@ -158,7 +158,6 @@ export const sidebarMenuData = [
         subItems: [
           { label: "Ad Requests", path: "/admin/marketing/ad-requests" },
           { label: "Active Campaigns", path: "/admin/marketing/active-campaigns" },
-          { label: "Slot Configuration", path: "/admin/marketing/slots" },
         ],
       },
     ],

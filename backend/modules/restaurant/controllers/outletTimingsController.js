@@ -83,7 +83,7 @@ export const getOutletTimingsByRestaurantId = asyncHandler(async (req, res) => {
  */
 export const upsertOutletTimings = asyncHandler(async (req, res) => {
   const restaurantId = req.restaurant._id;
-  const { outletType, timings } = req.body;
+  const { timings } = req.body;
 
   // Validate timings array
   if (timings && !Array.isArray(timings)) {
@@ -123,7 +123,6 @@ export const upsertOutletTimings = asyncHandler(async (req, res) => {
 
   if (outletTimings) {
     // Update existing
-    if (outletType) outletTimings.outletType = outletType;
     if (timings) {
       // Sort timings by day order
       timings.sort((a, b) => dayOrder.indexOf(a.day) - dayOrder.indexOf(b.day));
@@ -144,7 +143,6 @@ export const upsertOutletTimings = asyncHandler(async (req, res) => {
 
     outletTimings = await OutletTimings.create({
       restaurantId,
-      outletType: outletType || 'Appzeto delivery',
       timings: defaultTimings
     });
   }

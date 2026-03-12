@@ -637,8 +637,6 @@ export const processWalletRefund = async (orderId, adminId = null, refundAmount 
           distance: 0,
           commissionPerKm: 0,
           distanceCommission: 0,
-          surgeMultiplier: 1,
-          surgeAmount: 0,
           totalEarning: 0,
           status: 'cancelled'
         },

@@ -71,17 +71,6 @@ const zoneSchema = new mongoose.Schema(
         default: Date.now
       }
     },
-    recommendedItemFee: {
-      type: Number,
-      default: 0,
-      min: 0,
-      comment: 'Fee for recommended items in this zone (if overridden)'
-    },
-    isRecommendedFeeOverridden: {
-      type: Boolean,
-      default: false,
-      comment: 'If true, use the zone-level recommendedItemFee instead of tier-level'
-    },
     area: {
       type: Number,
       default: 0,
@@ -113,33 +102,6 @@ const zoneSchema = new mongoose.Schema(
         type: [[[Number]]],
         required: false // Will be created by pre-save hook
       }
-    },
-    // Peak Zone Settings (like Zomato)
-    peakZoneRideCount: {
-      type: Number,
-      default: 0,
-      min: 0
-    },
-    peakZoneRadius: {
-      type: Number,
-      default: 0,
-      min: 0
-    },
-    peakZoneSelectionDuration: {
-      type: Number,
-      default: 0, // in minutes
-      min: 0
-    },
-    peakZoneDuration: {
-      type: Number,
-      default: 0, // in minutes
-      min: 0
-    },
-    peakZoneSurgePercentage: {
-      type: Number,
-      default: 0, // percentage
-      min: 0,
-      max: 100
     },
     // Status
     isActive: {

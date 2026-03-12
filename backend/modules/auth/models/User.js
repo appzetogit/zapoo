@@ -129,14 +129,6 @@ const userSchema = new mongoose.Schema({
       default: Date.now
     }
   }],
-  goldMembership: {
-    isActive: {
-      type: Boolean,
-      default: false
-    },
-    startDate: Date,
-    endDate: Date
-  },
   currentLocation: {
     latitude: {
       type: Number
@@ -151,9 +143,6 @@ const userSchema = new mongoose.Schema({
       type: String
     },
     state: {
-      type: String
-    },
-    area: {
       type: String
     },
     formattedAddress: {

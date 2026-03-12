@@ -110,20 +110,8 @@ export const getRestaurantOrders = asyncHandler(async (req, res) => {
 
     // Log detailed order info for debugging
 
-    // If no orders found, log a warning with more details
     if (orders.length === 0 && total === 0) {
-      console.warn('⚠️ No orders found for restaurant:', {
-        restaurantId: restaurantIdString,
-        restaurant_id: restaurant._id?.toString(),
-        variationsTried: restaurantIdVariations,
-        query: JSON.stringify(query)
-      });
-
-      // Try to find ANY orders in database for debugging
-      const allOrdersCount = await Order.countDocuments({});
-      // Check if orders exist with similar restaurantId
-      const sampleOrders = await Order.find({}).limit(5).select('orderId restaurantId status').lean();
-      if (sampleOrders.length > 0) { }
+      // No orders for this restaurant (normal for new restaurants)
     }
     return successResponse(res, 200, 'Orders retrieved successfully', {
       orders: ordersWithPaymentMethod,

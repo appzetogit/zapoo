@@ -121,8 +121,6 @@ export default function HomePage() {
       } else if (parts.length >= 1) {
         mainLocation = parts[0];
       }
-    } else if (currentLocation?.area) {
-      mainLocation = currentLocation.area;
     } else if (currentLocation?.city) {
       mainLocation = currentLocation.city;
     } else {

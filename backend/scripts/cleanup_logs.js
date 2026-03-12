@@ -10,8 +10,7 @@ const IGNORED_FILES = [
     'db.js',
     'socket.js',
     'firebaseConfig.js',
-    'cloudinary.js',
-    'sync_zones.js'
+    'cloudinary.js'
 ];
 
 function processFile(filePath) {

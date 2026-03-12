@@ -71,8 +71,6 @@ const orderSettlementSchema = new mongoose.Schema({
     distance: { type: Number, default: 0, min: 0 }, // in km
     commissionPerKm: { type: Number, default: 0, min: 0 },
     distanceCommission: { type: Number, default: 0, min: 0 },
-    surgeMultiplier: { type: Number, default: 1, min: 1 },
-    surgeAmount: { type: Number, default: 0, min: 0 },
     totalEarning: { type: Number, default: 0, min: 0 },
     status: {
       type: String,

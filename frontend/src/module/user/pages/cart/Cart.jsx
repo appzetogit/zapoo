@@ -150,7 +150,6 @@ export default function Cart() {
     city: currentLocation.city,
     state: currentLocation.state,
     zipCode: currentLocation.postalCode,
-    area: currentLocation.area,
     location: currentLocation.latitude && currentLocation.longitude ? {
       coordinates: [currentLocation.longitude, currentLocation.latitude]
     } : savedAddress?.location

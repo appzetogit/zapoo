@@ -128,7 +128,7 @@ export default function ZoneRestaurants() {
                                         <TableCell>
                                             <div className="flex items-center gap-3">
                                                 <div className="w-8 h-8 rounded-full bg-neutral-100 overflow-hidden">
-                                                    <img src={restaurant.image || '/placeholder.png'} alt="" className="w-full h-full object-cover" />
+                                                    <img src={restaurant.image || '/placeholder.png'} alt="" className="w-full h-full object-cover" loading="lazy" />
                                                 </div>
                                                 <div>
                                                     <div className="font-medium text-neutral-900">{restaurant.name}</div>

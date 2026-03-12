@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react"
+import { useDebounce } from "@/hooks/useDebounce"
 import { adminAPI } from "@/lib/api"
 import { toast } from "sonner"
 import { Search, Filter, AlertCircle, CheckCircle, Clock, XCircle, FileText } from "lucide-react"
@@ -47,6 +48,7 @@ export default function RestaurantComplaints() {
     page: 1,
     limit: 50
   })
+  const debouncedSearch = useDebounce(filters.search, 400)
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 50,
@@ -56,7 +58,7 @@ export default function RestaurantComplaints() {
 
   useEffect(() => {
     fetchComplaints()
-  }, [filters])
+  }, [filters.page, filters.limit, filters.status, filters.complaintType, debouncedSearch])
 
   const fetchComplaints = async () => {
     try {
@@ -67,7 +69,7 @@ export default function RestaurantComplaints() {
       }
       if (filters.status && filters.status !== 'all') params.status = filters.status
       if (filters.complaintType && filters.complaintType !== 'all') params.complaintType = filters.complaintType
-      if (filters.search) params.search = filters.search
+      if (debouncedSearch) params.search = debouncedSearch
 
       const response = await adminAPI.getRestaurantComplaints(params)
       if (response?.data?.success) {

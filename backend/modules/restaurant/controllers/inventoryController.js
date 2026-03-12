@@ -87,27 +87,23 @@ export const getInventoryByRestaurantId = async (req, res) => {
   try {
     const { id } = req.params;
     
-    // Find restaurant by ID, slug, or restaurantId
     const restaurant = await Restaurant.findOne({
       $or: [
         { restaurantId: id },
         { slug: id },
-        ...(mongoose.Types.ObjectId.isValid(id) && id.length === 24 
-          ? [{ _id: new mongoose.Types.ObjectId(id) }] 
-          : []),
+        ...(mongoose.Types.ObjectId.isValid(id) && id.length === 24 ? [{ _id: new mongoose.Types.ObjectId(id) }] : []),
       ],
       isActive: true,
-    });
+    }).select('_id').lean();
 
     if (!restaurant) {
       return errorResponse(res, 404, 'Restaurant not found');
     }
 
-    // Find inventory
-    const inventory = await Inventory.findOne({ 
+    const inventory = await Inventory.findOne({
       restaurant: restaurant._id,
       isActive: true,
-    });
+    }).select('categories isActive').lean();
 
     if (!inventory) {
       // Return empty inventory if not found

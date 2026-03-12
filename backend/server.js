@@ -5,12 +5,12 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import mongoSanitize from 'express-mongo-sanitize';
 import rateLimit from 'express-rate-limit';
+import compression from 'compression';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import cron from 'node-cron';
 import mongoose from 'mongoose';
 
-// Load environment variables
 // Load environment variables
 dotenv.config();
 
@@ -318,6 +318,9 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
 
+// Response compression (gzip) - reduce payload size for all responses
+app.use(compression({ level: 6, threshold: 1024 }));
+
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -339,11 +342,11 @@ if (process.env.NODE_ENV === 'production') {
   });
 
   app.use('/api/', limiter);
-} else {
 }
 
-// Health check route
+// Health check route (no auth, cache briefly for load balancers)
 app.get('/health', (req, res) => {
+  res.set('Cache-Control', 'no-store');
   res.json({
     status: 'OK',
     timestamp: new Date().toISOString(),
@@ -390,22 +393,8 @@ app.use((req, res, next) => {
     return next();
   }
 
-  // Log 404 errors for debugging (especially for admin routes)
-  if (req.path.includes('/admin') || req.path.includes('refund')) {
-    console.error('❌ [404 HANDLER] Route not found:', {
-      method: req.method,
-      path: req.path,
-      url: req.url,
-      originalUrl: req.originalUrl,
-      baseUrl: req.baseUrl,
-      route: req.route?.path,
-      registeredRoutes: 'Check server startup logs for route registration'
-    });
-    console.error('💡 [404 HANDLER] Expected route: POST /api/admin/refund-requests/:orderId/process');
-    console.error('💡 [404 HANDLER] Make sure:');
-    console.error('   1. Backend server has been restarted');
-    console.error('   2. Route is registered (check startup logs)');
-    console.error('   3. Authentication token is valid');
+  if (process.env.NODE_ENV !== 'production' && (req.path.includes('/admin') || req.path.includes('refund'))) {
+    console.error('❌ [404]', req.method, req.path);
   }
 
   res.status(404).json({
