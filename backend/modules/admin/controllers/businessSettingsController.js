@@ -23,7 +23,6 @@ export const getBusinessSettingsPublic = asyncHandler(async (req, res) => {
       {
         companyName: settings?.companyName || "Appzeto Food",
         logo: settings?.logo || { url: "", publicId: "" },
-        favicon: settings?.favicon || { url: "", publicId: "" },
       },
     );
   } catch (error) {
@@ -36,7 +35,6 @@ export const getBusinessSettingsPublic = asyncHandler(async (req, res) => {
       {
         companyName: "Appzeto Food",
         logo: { url: "", publicId: "" },
-        favicon: { url: "", publicId: "" },
       },
     );
   }
@@ -174,65 +172,7 @@ export const updateBusinessSettings = asyncHandler(async (req, res) => {
       }
     }
 
-    // Handle favicon upload
-    if (req.files && req.files.favicon && req.files.favicon.length > 0) {
-      try {
-        await initializeCloudinary();
-        const faviconFile = req.files.favicon[0];
 
-        // Validate file type
-        const allowedMimeTypes = [
-          "image/jpeg",
-          "image/jpg",
-          "image/png",
-          "image/webp",
-          "image/x-icon",
-          "image/vnd.microsoft.icon",
-        ];
-        if (!allowedMimeTypes.includes(faviconFile.mimetype)) {
-          return errorResponse(
-            res,
-            400,
-            "Invalid favicon file type. Allowed: JPEG, PNG, WEBP, ICO",
-          );
-        }
-
-        // Validate file size (max 5MB)
-        const maxSize = 5 * 1024 * 1024;
-        if (faviconFile.size > maxSize) {
-          return errorResponse(res, 400, "Favicon file size exceeds 5MB limit");
-        }
-
-        // Delete old favicon from Cloudinary if exists
-        if (settings.favicon.publicId) {
-          try {
-            const { cloudinary } =
-              await import("../../../config/cloudinary.js");
-            await cloudinary.uploader.destroy(settings.favicon.publicId);
-          } catch (deleteError) {
-            console.warn("Failed to delete old favicon:", deleteError);
-          }
-        }
-
-        // Upload new favicon
-        const faviconResult = await uploadToCloudinary(faviconFile.buffer, {
-          folder: "appzeto/business/favicon",
-          resource_type: "image",
-          transformation: [
-            { width: 64, height: 64, crop: "limit" },
-            { quality: "auto" },
-          ],
-        });
-
-        settings.favicon = {
-          url: faviconResult.secure_url,
-          publicId: faviconResult.public_id,
-        };
-      } catch (faviconError) {
-        console.error("Error uploading favicon:", faviconError);
-        return errorResponse(res, 500, "Failed to upload favicon");
-      }
-    }
 
     // Set updated by
     if (req.admin && req.admin._id) {

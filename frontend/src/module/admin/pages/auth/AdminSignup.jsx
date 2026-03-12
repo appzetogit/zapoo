@@ -115,8 +115,14 @@ export default function AdminSignup() {
     newOtp[index] = value.slice(-1)
     setOtp(newOtp)
 
+    // Auto-focus next input
     if (value && index < 5) {
       inputRefs.current[index + 1]?.focus()
+    }
+
+    // Auto-submit if all digits are entered
+    if (value && newOtp.every((digit) => digit !== "")) {
+      handleOtpSubmit({ preventDefault: () => {} })
     }
   }
 
@@ -137,8 +143,10 @@ export default function AdminSignup() {
       }
     })
     setOtp(newOtp)
+
     if (digits.length === 6) {
       inputRefs.current[5]?.focus()
+      handleOtpSubmit({ preventDefault: () => {} })
     } else {
       inputRefs.current[digits.length]?.focus()
     }

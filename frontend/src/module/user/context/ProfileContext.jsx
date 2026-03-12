@@ -90,6 +90,13 @@ export function ProfileProvider({ children }) {
     return saved !== null ? saved === "true" : true
   })
 
+  // Appearance state - stored in localStorage for persistence
+  const [appearance, setAppearance] = useState(() => {
+    const saved = localStorage.getItem("userAppearance")
+    // Default to "light" if not set
+    return saved || "light"
+  })
+
   // Save to localStorage whenever userProfile, addresses or paymentMethods change
   useEffect(() => {
     localStorage.setItem("userProfile", JSON.stringify(userProfile))
@@ -118,6 +125,20 @@ export function ProfileProvider({ children }) {
   useEffect(() => {
     localStorage.setItem("userVegMode", vegMode.toString())
   }, [vegMode])
+
+  useEffect(() => {
+    localStorage.setItem("userAppearance", appearance)
+    // Also update appTheme for compatibility with Profile.jsx until it's fully migrated
+    localStorage.setItem("appTheme", appearance)
+
+    // Apply theme to document
+    const root = document.documentElement;
+    if (appearance === 'dark') {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
+  }, [appearance])
 
   // Fetch user profile and addresses from API on mount and when authentication changes
   useEffect(() => {
@@ -408,6 +429,8 @@ export function ProfileProvider({ children }) {
       removeDishFavorite,
       isDishFavorite,
       getDishFavorites,
+      appearance,
+      setAppearance,
     }),
     [
       userProfile,
@@ -439,6 +462,8 @@ export function ProfileProvider({ children }) {
       removeDishFavorite,
       isDishFavorite,
       getDishFavorites,
+      appearance,
+      setAppearance,
     ]
   )
 
@@ -480,7 +505,9 @@ export function useProfile() {
       isDishFavorite: () => false,
       getDishFavorites: () => [],
       vegMode: true,
-      setVegMode: () => console.warn("ProfileProvider not available")
+      setVegMode: () => console.warn("ProfileProvider not available"),
+      appearance: "light",
+      setAppearance: () => console.warn("ProfileProvider not available")
     }
   }
   return context

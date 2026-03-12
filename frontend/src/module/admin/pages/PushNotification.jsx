@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import apiClient from "@/lib/api";
+import apiClient, { adminAPI } from "@/lib/api";
 import { Search, Download, ChevronDown, Bell, Edit, Trash2, Upload, Settings, Image as ImageIcon } from "lucide-react";
 
 // Using placeholders for notification images
@@ -24,6 +24,7 @@ export default function PushNotification() {
   const [searchQuery, setSearchQuery] = useState("");
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
+  const [availableZones, setAvailableZones] = useState([]);
 
   // Fetch notifications from backend
   const fetchNotifications = async () => {
@@ -41,7 +42,19 @@ export default function PushNotification() {
 
   useEffect(() => {
     fetchNotifications();
+    fetchZones();
   }, []);
+
+  const fetchZones = async () => {
+    try {
+      const response = await adminAPI.getZones();
+      if (response.data?.success && response.data.data?.zones) {
+        setAvailableZones(response.data.data.zones.filter(z => z.isActive !== false));
+      }
+    } catch (error) {
+      console.error("Error fetching zones for push notifications:", error);
+    }
+  };
 
   const filteredNotifications = useMemo(() => {
     if (!searchQuery.trim()) {
@@ -101,6 +114,7 @@ export default function PushNotification() {
       payload.append("title", formData.title.trim());
       payload.append("body", formData.description.trim());
       payload.append("targetRole", targetRole);
+      payload.append("targetZone", formData.zone || "All");
       payload.append("data", JSON.stringify({
         zone: formData.zone || "All",
       }));
@@ -178,8 +192,9 @@ export default function PushNotification() {
               </label>
               <select value={formData.zone} onChange={e => handleInputChange("zone", e.target.value)} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#FF5200] focus:border-[#FF5200] text-sm">
                 <option value="All">All</option>
-                <option value="Asia">Asia</option>
-                <option value="Europe">Europe</option>
+                {availableZones.map(zone => (
+                  <option key={zone._id || zone.id} value={zone._id || zone.id}>{zone.name}</option>
+                ))}
               </select>
             </div>
 
@@ -274,11 +289,7 @@ export default function PushNotification() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             </div>
 
-            <button className="px-4 py-2.5 text-sm font-medium rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 flex items-center gap-2 transition-all">
-              <Download className="w-4 h-4" />
-              <span>Export</span>
-              <ChevronDown className="w-3 h-3" />
-            </button>
+
           </div>
         </div>
 
@@ -341,7 +352,9 @@ export default function PushNotification() {
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-slate-700">All</span>
+                      <span className="text-sm text-slate-700">
+                        {notification.targetZone ? notification.targetZone.name : "All"}
+                      </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 capitalize">

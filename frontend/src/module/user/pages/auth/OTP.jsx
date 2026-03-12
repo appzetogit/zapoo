@@ -97,8 +97,8 @@ export default function OTP() {
       inputRefs.current[index + 1]?.focus()
     }
 
-    // Auto-submit when all 6 digits are entered and we are in OTP step
-    if (!showNameInput && newOtp.every((digit) => digit !== "") && newOtp.length === 6 && !isLoading) {
+    // Auto-submit if all digits are entered
+    if (value && newOtp.every(digit => digit !== "")) {
       handleVerify(newOtp.join(""))
     }
   }
@@ -124,6 +124,8 @@ export default function OTP() {
       e.preventDefault()
       navigator.clipboard.readText().then((text) => {
         const digits = text.replace(/\D/g, "").slice(0, 6).split("")
+        if (digits.length === 0) return
+        
         const newOtp = [...otp]
         digits.forEach((digit, i) => {
           if (i < 6) {
@@ -131,8 +133,10 @@ export default function OTP() {
           }
         })
         setOtp(newOtp)
-        if (!showNameInput && digits.length === 6) {
-          handleVerify(newOtp.join(""))
+        
+        if (digits.length === 6) {
+          inputRefs.current[5]?.focus()
+          handleVerify(digits.join(""))
         } else {
           inputRefs.current[digits.length]?.focus()
         }
@@ -144,6 +148,8 @@ export default function OTP() {
     e.preventDefault()
     const pastedData = e.clipboardData.getData("text")
     const digits = pastedData.replace(/\D/g, "").slice(0, 6).split("")
+    if (digits.length === 0) return
+
     const newOtp = [...otp]
     digits.forEach((digit, i) => {
       if (i < 6) {
@@ -151,8 +157,10 @@ export default function OTP() {
       }
     })
     setOtp(newOtp)
-    if (!showNameInput && digits.length === 6) {
-      handleVerify(newOtp.join(""))
+
+    if (digits.length === 6) {
+      inputRefs.current[5]?.focus()
+      handleVerify(digits.join(""))
     } else {
       inputRefs.current[digits.length]?.focus()
     }

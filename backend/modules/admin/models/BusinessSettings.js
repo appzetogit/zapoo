@@ -59,16 +59,7 @@ const businessSettingsSchema = new mongoose.Schema(
         default: "",
       },
     },
-    favicon: {
-      url: {
-        type: String,
-        default: "",
-      },
-      publicId: {
-        type: String,
-        default: "",
-      },
-    },
+
     maintenanceMode: {
       isEnabled: {
         type: Boolean,

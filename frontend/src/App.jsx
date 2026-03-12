@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate, useLocation } from "react-router-dom"
 import ProtectedRoute from "@/components/ProtectedRoute"
 import AuthRedirect from "@/components/AuthRedirect"
+import FaviconManager from "@/components/FaviconManager"
 
 import { Suspense, lazy, useMemo } from "react"
 import Loader from "@/components/Loader"
@@ -136,7 +137,8 @@ const LoaderFallback = <Loader />
 
 export default function App() {
   return (
-    <Suspense fallback={LoaderFallback}>
+    <Suspense fallback={<Loader />}>
+      <FaviconManager />
       <Routes>
         <Route path="/user" element={<Navigate to="/" replace />} />
         <Route path="/user/*" element={<UserPathRedirect />} />

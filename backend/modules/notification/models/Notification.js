@@ -22,6 +22,11 @@ const notificationSchema = new mongoose.Schema(
             type: String,
             default: null,
         },
+        targetZone: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Zone',
+            default: null,
+        },
         // 'all_users' for now; can be extended to all_delivery / all_restaurants
         target: {
             type: String,

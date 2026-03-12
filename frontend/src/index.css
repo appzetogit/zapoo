@@ -128,11 +128,11 @@
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border outline-ring/50 transition-colors duration-300;
   }
 
   body {
-    @apply bg-background text-foreground m-0 min-h-screen;
+    @apply bg-background text-foreground m-0 min-h-screen transition-colors duration-300;
   }
 }
 

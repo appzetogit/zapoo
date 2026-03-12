@@ -338,11 +338,11 @@ function MetricCard({
   onClick
 }) {
   return <Card
-    className={`overflow-hidden border-neutral-200 bg-white p-0 transition-all duration-200 ${onClick ? 'cursor-pointer hover:shadow-md hover:scale-[1.02] active:scale-[0.98]' : ''}`}
+    className={`relative overflow-hidden border-neutral-200 bg-white p-0 transition-all duration-200 h-full flex flex-col ${onClick ? 'cursor-pointer hover:shadow-md hover:scale-[1.02] active:scale-[0.98]' : ''}`}
     onClick={onClick}
   >
-    <CardContent className="relative flex flex-col gap-2 px-4 pb-4 pt-4">
-      <div className={`absolute inset-0 ${accent} `} />
+    <div className={`absolute inset-0 ${accent}`} />
+    <CardContent className="relative flex flex-col gap-2 px-4 pb-4 pt-4 flex-1">
       <div className="relative flex items-center justify-between">
         <div>
           <p className="text-xs uppercase tracking-[0.18em] text-neutral-500">{title}</p>

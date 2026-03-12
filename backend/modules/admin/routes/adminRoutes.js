@@ -483,7 +483,6 @@ router.put(
   "/business-settings",
   uploadMiddleware.fields([
     { name: "logo", maxCount: 1 },
-    { name: "favicon", maxCount: 1 },
   ]),
   updateBusinessSettings,
 );

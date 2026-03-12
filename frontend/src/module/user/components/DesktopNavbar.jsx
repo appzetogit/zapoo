@@ -1,6 +1,7 @@
 import { Link, useLocation } from "react-router-dom"
 import { useEffect, useState, useRef } from "react"
-import { ChevronDown, ShoppingCart, Wallet } from "lucide-react"
+import { ChevronDown, ShoppingCart, Wallet, Sun, Moon } from "lucide-react"
+import { useTheme } from "../../../context/ThemeContext"
 import { Button } from "@/components/ui/button"
 import { useLocation as useLocationHook } from "../hooks/useLocation"
 import { useCart } from "../context/CartContext"
@@ -12,6 +13,7 @@ export default function DesktopNavbar() {
   const { location: userLocation, loading: locationLoading } = useLocationHook()
   const { getCartCount } = useCart()
   const { openLocationSelector } = useLocationSelector()
+  const { theme, toggleTheme } = useTheme()
   const cartCount = getCartCount()
   const [isVisible, setIsVisible] = useState(true)
   const lastScrollY = useRef(0)
@@ -205,6 +207,21 @@ export default function DesktopNavbar() {
                   )}
                 </Button>
               </Link>
+
+              {/* Theme Toggle */}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={toggleTheme}
+                className="h-9 w-9 lg:h-10 lg:w-10 rounded-full p-0 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-300"
+                title={theme === 'light' ? 'Switch to Dark Mode' : 'Switch to Light Mode'}
+              >
+                {theme === 'light' ? (
+                  <Moon className="h-5 w-5 lg:h-6 lg:w-6 text-gray-700 hover:text-indigo-600 transition-colors" />
+                ) : (
+                  <Sun className="h-5 w-5 lg:h-6 lg:w-6 text-yellow-400 hover:text-yellow-300 transition-colors" />
+                )}
+              </Button>
             </div>
           </div>
         </div>

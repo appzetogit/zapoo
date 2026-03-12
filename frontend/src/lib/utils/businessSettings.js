@@ -1,6 +1,6 @@
 /**
  * Business Settings Utility
- * Handles loading and updating business settings (favicon, title, logo)
+ * Handles loading and updating business settings (title, logo)
  */
 
 import apiClient from "../api/axios.js";
@@ -27,7 +27,6 @@ export const loadBusinessSettings = async () => {
 
     if (settings) {
       cachedSettings = settings;
-      updateFavicon(settings.favicon?.url);
       updateTitle(settings.companyName);
       return settings;
     }
@@ -37,27 +36,7 @@ export const loadBusinessSettings = async () => {
   }
 };
 
-/**
- * Update favicon in document
- */
-export const updateFavicon = (url) => {
-  if (!url) return;
 
-  // Remove existing favicon
-  const existingFavicon = document.querySelector("link[rel='icon']");
-  if (existingFavicon) {
-    existingFavicon.remove();
-  }
-
-  // Add new favicon
-  const link = document.createElement("link");
-  link.rel = "icon";
-  link.type = "image/png";
-  link.href = url;
-  // Prevent third-party cookie warning (Cloudinary)
-  link.crossOrigin = "anonymous";
-  document.head.appendChild(link);
-};
 
 /**
  * Update page title

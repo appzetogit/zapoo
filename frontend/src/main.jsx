@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import './index.css';
 import App from './App.jsx';
+import { ThemeProvider } from './context/ThemeContext.jsx';
 import { getGoogleMapsApiKey } from './lib/utils/googleMapsApiKey.js';
 import { loadBusinessSettings } from './lib/utils/businessSettings.js';
 
@@ -71,13 +72,6 @@ window.__googleMapsLoaded = window.__googleMapsLoaded || false;
   }
 })();
 
-// Apply theme on app initialization
-const savedTheme = localStorage.getItem('appTheme') || 'light';
-if (savedTheme === 'dark') {
-  document.documentElement.classList.add('dark');
-} else {
-  document.documentElement.classList.remove('dark');
-}
 
 // Suppress browser extension errors
 const originalError = console.error;
@@ -173,8 +167,10 @@ if (!rootElement) {
   throw new Error('Root element not found');
 }
 createRoot(rootElement).render(<StrictMode>
-    <BrowserRouter>
-      <App />
-      <Toaster position="top-center" richColors offset="80px" />
-    </BrowserRouter>
+    <ThemeProvider>
+      <BrowserRouter>
+        <App />
+        <Toaster position="top-center" richColors offset="80px" />
+      </BrowserRouter>
+    </ThemeProvider>
   </StrictMode>);

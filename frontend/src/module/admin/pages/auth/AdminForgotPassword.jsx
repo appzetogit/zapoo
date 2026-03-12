@@ -78,10 +78,9 @@ export default function AdminForgotPassword() {
       inputRefs.current[index + 1]?.focus()
     }
 
-    // Auto-submit when all 6 digits are entered
-    const combinedOtp = newOtp.join("");
-    if (combinedOtp.length === 6 && !isLoading) {
-      handleOtpSubmit({ preventDefault: () => { } }, combinedOtp);
+    // Auto-submit if all digits are entered
+    if (value && newOtp.every((digit) => digit !== "")) {
+      handleOtpSubmit(null, newOtp.join(""))
     }
   }
 
@@ -95,6 +94,8 @@ export default function AdminForgotPassword() {
     e.preventDefault()
     const pastedData = e.clipboardData.getData("text")
     const digits = pastedData.replace(/\D/g, "").slice(0, 6).split("")
+    if (digits.length === 0) return
+
     const newOtp = [...otp]
     digits.forEach((digit, i) => {
       if (i < 6) {
@@ -102,8 +103,10 @@ export default function AdminForgotPassword() {
       }
     })
     setOtp(newOtp)
+
     if (digits.length === 6) {
       inputRefs.current[5]?.focus()
+      handleOtpSubmit(null, digits.join(""))
     } else {
       inputRefs.current[digits.length]?.focus()
     }

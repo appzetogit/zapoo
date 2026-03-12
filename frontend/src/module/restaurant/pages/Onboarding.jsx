@@ -933,11 +933,10 @@ export default function RestaurantOnboarding() {
   const renderStep1 = () => <div className="space-y-6">
     <section className="bg-white p-4 sm:p-6 rounded-md">
       <h2 className="text-lg font-semibold text-blue-600 mb-4">Restaurant information</h2>
-      <p className="text-sm text-gray-600 mb-4">Restaurant name</p>
-      <div className="space-y-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <Label className="text-xs text-gray-700">Restaurant name*</Label>
-          <Input value={step1.restaurantName || ""} onChange={e => handleStep1Change("restaurantName", e.target.value)} className="mt-1 bg-white text-sm text-black placeholder-black" placeholder="Customers will see this name" />
+          <Input value={step1.restaurantName || ""} onChange={e => handleStep1Change("restaurantName", e.target.value)} className="mt-1 bg-white text-sm text-black placeholder:text-gray-400" placeholder="e.g. The Grand Kitchen" />
         </div>
       </div>
     </section>
@@ -947,21 +946,23 @@ export default function RestaurantOnboarding() {
       <p className="text-sm text-gray-600 mb-4">
         These details will be used for all business communications and updates.
       </p>
-      <div className="space-y-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <Label className="text-xs text-gray-700">Full name*</Label>
-          <Input value={step1.ownerName || ""} onChange={e => handleStep1Change("ownerName", e.target.value)} className="mt-1 bg-white text-sm text-black placeholder-black" placeholder="Owner full name" />
+          <Input value={step1.ownerName || ""} onChange={e => handleStep1Change("ownerName", e.target.value)} className="mt-1 bg-white text-sm text-black placeholder:text-gray-400" placeholder="Owner full name" />
         </div>
         <div>
           <Label className="text-xs text-gray-700">Email address*</Label>
           <Input type="email" value={step1.ownerEmail || ""} onChange={e => setStep1({
             ...step1,
             ownerEmail: e.target.value
-          })} className="mt-1 bg-white text-sm text-black placeholder-black" placeholder="owner@example.com" />
+          })} className="mt-1 bg-white text-sm text-black placeholder:text-gray-400" placeholder="owner@email.com" />
         </div>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <Label className="text-xs text-gray-700">Phone number*</Label>
-          <Input value={step1.ownerPhone || ""} onChange={e => handleStep1Change("ownerPhone", e.target.value)} className="mt-1 bg-white text-sm text-black placeholder-black" placeholder="+91 98XXXXXX" />
+          <Input value={step1.ownerPhone || ""} onChange={e => handleStep1Change("ownerPhone", e.target.value)} className="mt-1 bg-white text-sm text-black placeholder:text-gray-400" placeholder="+91 98XXXXXX" />
         </div>
       </div>
     </section>
@@ -970,7 +971,7 @@ export default function RestaurantOnboarding() {
       <h2 className="text-lg font-semibold text-blue-600">Restaurant contact & location</h2>
       <div>
         <Label className="text-xs text-gray-700">Primary contact number*</Label>
-        <Input value={step1.primaryContactNumber || ""} onChange={e => handleStep1Change("primaryContactNumber", e.target.value)} className="mt-1 bg-white text-sm text-black placeholder-black" placeholder="Restaurant's primary contact number" />
+        <Input value={step1.primaryContactNumber || ""} onChange={e => handleStep1Change("primaryContactNumber", e.target.value)} className="mt-1 bg-white text-sm text-black placeholder:text-gray-400" placeholder="Restaurant's primary contact number" />
         <p className="text-[11px] text-gray-500 mt-1">
           Customers, delivery partners and {companyName} may call on this number for order
           support.
@@ -980,41 +981,58 @@ export default function RestaurantOnboarding() {
         <p className="text-sm text-gray-700">
           Add your restaurant's location for order pick-up.
         </p>
-        <Input value={step1.location?.area || ""} onChange={e => setStep1({
-          ...step1,
-          location: {
-            ...step1.location,
-            area: e.target.value
-          }
-        })} className="bg-white text-sm" placeholder="Area / Sector / Locality*" />
-        <Input value={step1.location?.city || ""} onChange={e => setStep1({
-          ...step1,
-          location: {
-            ...step1.location,
-            city: e.target.value
-          }
-        })} className="bg-white text-sm" placeholder="City" />
-        <Input value={step1.location?.addressLine1 || ""} onChange={e => setStep1({
-          ...step1,
-          location: {
-            ...step1.location,
-            addressLine1: e.target.value
-          }
-        })} className="bg-white text-sm" placeholder="Shop no. / building no. (optional)" />
-        <Input value={step1.location?.addressLine2 || ""} onChange={e => setStep1({
-          ...step1,
-          location: {
-            ...step1.location,
-            addressLine2: e.target.value
-          }
-        })} className="bg-white text-sm" placeholder="Floor / tower (optional)" />
-        <Input value={step1.location?.landmark || ""} onChange={e => setStep1({
-          ...step1,
-          location: {
-            ...step1.location,
-            landmark: e.target.value
-          }
-        })} className="bg-white text-sm" placeholder="Nearby landmark (optional)" />
+        <div className="space-y-4 pt-2">
+          <div>
+            <Label className="text-xs text-gray-700">Area / Sector / Locality*</Label>
+            <Input value={step1.location?.area || ""} onChange={e => setStep1({
+              ...step1,
+              location: {
+                ...step1.location,
+                area: e.target.value
+              }
+            })} className="mt-1 bg-white text-sm text-black placeholder:text-gray-400" placeholder="Area / Sector / Locality" />
+          </div>
+          <div>
+            <Label className="text-xs text-gray-700">City*</Label>
+            <Input value={step1.location?.city || ""} onChange={e => setStep1({
+              ...step1,
+              location: {
+                ...step1.location,
+                city: e.target.value
+              }
+            })} className="mt-1 bg-white text-sm text-black placeholder:text-gray-400" placeholder="City" />
+          </div>
+          <div>
+            <Label className="text-xs text-gray-700">Shop no. / building no. (optional)</Label>
+            <Input value={step1.location?.addressLine1 || ""} onChange={e => setStep1({
+              ...step1,
+              location: {
+                ...step1.location,
+                addressLine1: e.target.value
+              }
+            })} className="mt-1 bg-white text-sm text-black placeholder:text-gray-400" placeholder="Shop no. / building no." />
+          </div>
+          <div>
+            <Label className="text-xs text-gray-700">Floor / tower (optional)</Label>
+            <Input value={step1.location?.addressLine2 || ""} onChange={e => setStep1({
+              ...step1,
+              location: {
+                ...step1.location,
+                addressLine2: e.target.value
+              }
+            })} className="mt-1 bg-white text-sm text-black placeholder:text-gray-400" placeholder="Floor / tower" />
+          </div>
+          <div>
+            <Label className="text-xs text-gray-700">Nearby landmark (optional)</Label>
+            <Input value={step1.location?.landmark || ""} onChange={e => setStep1({
+              ...step1,
+              location: {
+                ...step1.location,
+                landmark: e.target.value
+              }
+            })} className="mt-1 bg-white text-sm text-black placeholder:text-gray-400" placeholder="Nearby landmark" />
+          </div>
+        </div>
         <p className="text-[11px] text-gray-500 mt-1">
           Please ensure that this address is the same as mentioned on your FSSAI license.
         </p>
@@ -1032,7 +1050,7 @@ export default function RestaurantOnboarding() {
 
       {/* Menu images */}
       <div className="space-y-2">
-        <Label className="text-xs font-medium text-gray-700">Menu images</Label>
+        <Label className="text-xs font-medium text-gray-700">Menu images*</Label>
         <div className="mt-1 border border-dashed border-gray-300 rounded-md bg-gray-50/70 px-4 py-3 flex items-center justify-between flex-col gap-3">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-md bg-white flex items-center justify-center">
@@ -1135,7 +1153,7 @@ export default function RestaurantOnboarding() {
                 <ImageIcon className="w-5 h-5 text-gray-700" />
               </div>
               <div className="flex flex-col">
-                <span className="text-xs font-medium text-gray-900">Upload profile image</span>
+                <span className="text-xs font-medium text-gray-900">Upload profile image*</span>
                 <span className="text-[11px] text-gray-500">
                   Visible to customers on your listing
                 </span>
@@ -1175,7 +1193,7 @@ export default function RestaurantOnboarding() {
     <section className="bg-white p-4 sm:p-6 rounded-md space-y-5">
       {/* Cuisines */}
       <div>
-        <Label className="text-xs text-gray-700">Select cuisines (up to 3)</Label>
+        <Label className="text-xs text-gray-700">Select cuisines (up to 3)*</Label>
         <div className="mt-2 flex flex-wrap gap-2">
           {cuisinesOptions.map(cuisine => {
             const active = step2.cuisines.includes(cuisine);
@@ -1188,7 +1206,7 @@ export default function RestaurantOnboarding() {
 
       {/* Timings with popover time selectors */}
       <div className="space-y-3">
-        <Label className="text-xs text-gray-700">Delivery timings</Label>
+        <Label className="text-xs text-gray-700">Delivery timings*</Label>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <TimeSelector label="Opening time" value={step2.openingTime || ""} onChange={val => setStep2({
             ...step2,
@@ -1205,7 +1223,7 @@ export default function RestaurantOnboarding() {
       <div className="space-y-2">
         <Label className="text-xs text-gray-700 flex items-center gap-1.5">
           <CalendarIcon className="w-3.5 h-3.5 text-gray-800" />
-          <span>Open days</span>
+          <span>Open days*</span>
         </Label>
         <p className="text-[11px] text-gray-500">
           Select the days your restaurant accepts delivery orders.
@@ -1226,26 +1244,26 @@ export default function RestaurantOnboarding() {
       <h2 className="text-lg font-semibold text-blue-600">PAN details</h2>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
-          <Label className="text-xs text-gray-700">PAN number</Label>
-          <Input value={step3.panNumber || ""} onChange={e => setStep3({
+          <Label className="text-xs text-gray-700">PAN number*</Label>
+          <Input placeholder='ASDFG1234H' value={step3.panNumber || ""} onChange={e => setStep3({
             ...step3,
             panNumber: e.target.value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 10)
-          })} className="mt-1 bg-white text-sm text-black placeholder-black" maxLength={10} />
+          })} className="mt-1 bg-white text-sm text-black placeholder:text-gray-400" maxLength={10} />
         </div>
         <div>
-          <Label className="text-xs text-gray-700">Name on PAN</Label>
-          <Input value={step3.nameOnPan || ""} onChange={e => setStep3({
+          <Label className="text-xs text-gray-700">Name on PAN*</Label>
+          <Input placeholder='Name as per PAN' value={step3.nameOnPan || ""} onChange={e => setStep3({
             ...step3,
             nameOnPan: e.target.value
-          })} className="mt-1 bg-white text-sm text-black placeholder-black" />
+          })} className="mt-1 bg-white text-sm text-black placeholder:text-gray-400" />
         </div>
       </div>
       <div>
-        <Label className="text-xs text-gray-700">PAN image</Label>
+        <Label className="text-xs text-gray-700">PAN image*</Label>
         <Input type="file" accept="image/*" onChange={e => setStep3({
           ...step3,
           panImage: e.target.files?.[0] || null
-        })} className="mt-1 bg-white text-sm text-black placeholder-black" />
+        })} className="mt-1 bg-white text-sm text-black" />
       </div>
     </section>
 
@@ -1266,35 +1284,50 @@ export default function RestaurantOnboarding() {
           No
         </button>
       </div>
-      {step3.gstRegistered && <div className="space-y-3">
-        <Input value={step3.gstNumber || ""} onChange={e => setStep3({
-          ...step3,
-          gstNumber: e.target.value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 15)
-        })} className="bg-white text-sm" placeholder="GST number" maxLength={15} />
-        <Input value={step3.gstLegalName || ""} onChange={e => setStep3({
-          ...step3,
-          gstLegalName: e.target.value
-        })} className="bg-white text-sm" placeholder="Legal name" />
-        <Input value={step3.gstAddress || ""} onChange={e => setStep3({
-          ...step3,
-          gstAddress: e.target.value
-        })} className="bg-white text-sm" placeholder="Registered address" />
-        <Input type="file" accept="image/*" onChange={e => setStep3({
-          ...step3,
-          gstImage: e.target.files?.[0] || null
-        })} className="bg-white text-sm" />
+      {step3.gstRegistered && <div className="space-y-4">
+        <div>
+          <Label className="text-xs text-gray-700">GST number*</Label>
+          <Input value={step3.gstNumber || ""} onChange={e => setStep3({
+            ...step3,
+            gstNumber: e.target.value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 15)
+          })} className="mt-1 bg-white text-sm text-black placeholder:text-gray-400" placeholder="GST number" maxLength={15} />
+        </div>
+        <div>
+          <Label className="text-xs text-gray-700">Legal name*</Label>
+          <Input value={step3.gstLegalName || ""} onChange={e => setStep3({
+            ...step3,
+            gstLegalName: e.target.value
+          })} className="mt-1 bg-white text-sm text-black placeholder:text-gray-400" placeholder="Legal name" />
+        </div>
+        <div>
+          <Label className="text-xs text-gray-700">Registered address*</Label>
+          <Input value={step3.gstAddress || ""} onChange={e => setStep3({
+            ...step3,
+            gstAddress: e.target.value
+          })} className="mt-1 bg-white text-sm text-black placeholder:text-gray-400" placeholder="Registered address" />
+        </div>
+        <div>
+          <Label className="text-xs text-gray-700">GST certificate image*</Label>
+          <Input type="file" accept="image/*" onChange={e => setStep3({
+            ...step3,
+            gstImage: e.target.files?.[0] || null
+          })} className="mt-1 bg-white text-sm text-black placeholder:text-gray-400" />
+        </div>
       </div>}
     </section>
 
     <section className="bg-white p-4 sm:p-6 rounded-md space-y-4">
       <h2 className="text-lg font-semibold text-blue-600">FSSAI details</h2>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Input value={step3.fssaiNumber || ""} onChange={e => setStep3({
-          ...step3,
-          fssaiNumber: e.target.value.replace(/\D/g, "").slice(0, 14)
-        })} className="bg-white text-sm" placeholder="FSSAI number" maxLength={14} />
         <div>
-          <Label className="text-xs text-gray-700 mb-1 block">FSSAI expiry date</Label>
+          <Label className="text-xs text-gray-700">FSSAI registration number*</Label>
+          <Input value={step3.fssaiNumber || ""} onChange={e => setStep3({
+            ...step3,
+            fssaiNumber: e.target.value.replace(/\D/g, "").slice(0, 14)
+          })} className="mt-1 bg-white text-sm text-black placeholder:text-gray-400" placeholder="FSSAI number" maxLength={14} />
+        </div>
+        <div>
+          <Label className="text-xs text-gray-700 mb-1 block">FSSAI expiry date*</Label>
           <Popover>
             <PopoverTrigger asChild>
               <button type="button" className="w-full px-3 py-2 border border-gray-200 rounded-md bg-white text-sm text-left flex items-center justify-between hover:bg-gray-50">
@@ -1328,38 +1361,56 @@ export default function RestaurantOnboarding() {
           </Popover>
         </div>
       </div>
-      <Input type="file" accept="image/*" onChange={e => setStep3({
-        ...step3,
-        fssaiImage: e.target.files?.[0] || null
-      })} className="bg-white text-sm" />
+      <div>
+        <Label className="text-xs text-gray-700">FSSAI license image*</Label>
+        <Input type="file" accept="image/*" onChange={e => setStep3({
+          ...step3,
+          fssaiImage: e.target.files?.[0] || null
+        })} className="mt-1 bg-white text-sm text-black placeholder:text-gray-400" />
+      </div>
     </section>
 
     <section className="bg-white p-4 sm:p-6 rounded-md space-y-4">
       <h2 className="text-lg font-semibold text-blue-600">Bank account details</h2>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Input value={step3.accountNumber || ""} onChange={e => setStep3({
-          ...step3,
-          accountNumber: e.target.value.replace(/\D/g, "").slice(0, 18)
-        })} className="bg-white text-sm" placeholder="Account number" maxLength={18} />
-        <Input value={step3.confirmAccountNumber || ""} onChange={e => setStep3({
-          ...step3,
-          confirmAccountNumber: e.target.value.replace(/\D/g, "").slice(0, 18)
-        })} className="bg-white text-sm" placeholder="Re-enter account number" maxLength={18} />
+        <div>
+          <Label className="text-xs text-gray-700">Account number*</Label>
+          <Input value={step3.accountNumber || ""} onChange={e => setStep3({
+            ...step3,
+            accountNumber: e.target.value.replace(/\D/g, "").slice(0, 18)
+          })} className="mt-1 bg-white text-sm text-black placeholder:text-gray-400" placeholder="Account number" maxLength={18} />
+        </div>
+        <div>
+          <Label className="text-xs text-gray-700">Re-enter account number*</Label>
+          <Input value={step3.confirmAccountNumber || ""} onChange={e => setStep3({
+            ...step3,
+            confirmAccountNumber: e.target.value.replace(/\D/g, "").slice(0, 18)
+          })} className="mt-1 bg-white text-sm text-black placeholder:text-gray-400" placeholder="Re-enter account number" maxLength={18} />
+        </div>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Input value={step3.ifscCode || ""} onChange={e => setStep3({
-          ...step3,
-          ifscCode: e.target.value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 11)
-        })} className="bg-white text-sm" placeholder="IFSC code" maxLength={11} />
-        <Input value={step3.accountType || ""} onChange={e => setStep3({
-          ...step3,
-          accountType: e.target.value
-        })} className="bg-white text-sm" placeholder="Account type (savings / current)" />
+        <div>
+          <Label className="text-xs text-gray-700">IFSC code*</Label>
+          <Input value={step3.ifscCode || ""} onChange={e => setStep3({
+            ...step3,
+            ifscCode: e.target.value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 11)
+          })} className="mt-1 bg-white text-sm text-black placeholder:text-gray-400" placeholder="SBIN0000123" maxLength={11} />
+        </div>
+        <div>
+          <Label className="text-xs text-gray-700">Account type*</Label>
+          <Input value={step3.accountType || ""} onChange={e => setStep3({
+            ...step3,
+            accountType: e.target.value
+          })} className="mt-1 bg-white text-sm text-black placeholder:text-gray-400" placeholder="Account type (savings / current)" />
+        </div>
       </div>
-      <Input value={step3.accountHolderName || ""} onChange={e => setStep3({
-        ...step3,
-        accountHolderName: e.target.value
-      })} className="bg-white text-sm" placeholder="Account holder name" />
+      <div>
+        <Label className="text-xs text-gray-700">Account holder name*</Label>
+        <Input value={step3.accountHolderName || ""} onChange={e => setStep3({
+          ...step3,
+          accountHolderName: e.target.value
+        })} className="mt-1 bg-white text-sm text-black placeholder:text-gray-400" placeholder="Account holder name" />
+      </div>
     </section>
   </div>;
   const renderStep4 = () => <div className="space-y-6">
@@ -1367,38 +1418,33 @@ export default function RestaurantOnboarding() {
       <h2 className="text-lg font-semibold text-blue-600">Restaurant Display Information</h2>
       <p className="text-sm text-gray-600">
         Add information that will be displayed to customers on the home page
-      </p>
-
-      <div>
+      </p>      <div>
         <Label className="text-xs text-gray-700">Estimated Delivery Time*</Label>
         <Input value={step4.estimatedDeliveryTime || ""} onChange={e => setStep4({
           ...step4,
           estimatedDeliveryTime: e.target.value
-        })} className="mt-1 bg-white text-sm" placeholder="e.g., 25-30 mins" />
+        })} className="mt-1 bg-white text-sm text-black placeholder:text-gray-400" placeholder="e.g. 30-40 mins" />
       </div>
-
       <div>
         <Label className="text-xs text-gray-700">Featured Dish Name*</Label>
         <Input value={step4.featuredDish || ""} onChange={e => setStep4({
           ...step4,
           featuredDish: e.target.value
-        })} className="mt-1 bg-white text-sm" placeholder="e.g., Butter Chicken Special" />
+        })} className="mt-1 bg-white text-sm text-black placeholder:text-gray-400" placeholder="Name of your popular dish" />
       </div>
-
       <div>
         <Label className="text-xs text-gray-700">Featured Dish Price (₹)*</Label>
         <Input type="number" value={step4.featuredPrice || ""} onChange={e => setStep4({
           ...step4,
           featuredPrice: e.target.value
-        })} className="mt-1 bg-white text-sm" placeholder="e.g., 249" min="0" />
+        })} className="mt-1 bg-white text-sm text-black placeholder:text-gray-400" placeholder="0.00" />
       </div>
-
       <div>
         <Label className="text-xs text-gray-700">Special Offer/Promotion*</Label>
         <Input value={step4.offer || ""} onChange={e => setStep4({
           ...step4,
           offer: e.target.value
-        })} className="mt-1 bg-white text-sm" placeholder="e.g., Flat ₹50 OFF above ₹199" />
+        })} className="mt-1 bg-white text-sm text-black placeholder:text-gray-400" placeholder="e.g. 20% off on first order" />
       </div>
     </section>
   </div>;

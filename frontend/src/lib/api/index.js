@@ -1563,7 +1563,7 @@ export const adminAPI = {
 
     // Add text fields
     Object.keys(data).forEach((key) => {
-      if (key !== "logo" && key !== "favicon") {
+      if (key !== "logo") {
         formData.append(key, data[key]);
       }
     });
@@ -1572,9 +1572,7 @@ export const adminAPI = {
     if (files.logo) {
       formData.append("logo", files.logo);
     }
-    if (files.favicon) {
-      formData.append("favicon", files.favicon);
-    }
+
 
     return apiClient.put(API_ENDPOINTS.ADMIN.BUSINESS_SETTINGS, formData, {
       headers: {

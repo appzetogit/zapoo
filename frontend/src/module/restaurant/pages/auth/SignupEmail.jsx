@@ -100,6 +100,14 @@ export default function RestaurantSignupEmail() {
     if (value && index < 5) {
       inputRefs.current[index + 1]?.focus()
     }
+
+    // Auto-submit if all digits are entered
+    if (value && newOtp.every(digit => digit !== "")) {
+      // Small timeout to ensure state is updated and UI reflects the last digit
+      setTimeout(() => {
+        handleOtpSubmit(new Event("submit"))
+      }, 10)
+    }
   }
 
   const handleOtpKeyDown = (index, e) => {

@@ -17,7 +17,9 @@ export default function Profile() {
   const {
     userProfile,
     vegMode,
-    setVegMode
+    setVegMode,
+    appearance,
+    setAppearance
   } = useProfile();
   const navigate = useNavigate();
   const companyName = useCompanyName();
@@ -27,23 +29,6 @@ export default function Profile() {
   const [appearanceOpen, setAppearanceOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-  // Settings states
-  const [appearance, setAppearance] = useState(() => {
-    // Load theme from localStorage or default to 'light'
-    return localStorage.getItem('appTheme') || 'light';
-  });
-
-  // Apply theme to document
-  useEffect(() => {
-    const root = document.documentElement;
-    if (appearance === 'dark') {
-      root.classList.add('dark');
-    } else {
-      root.classList.remove('dark');
-    }
-    // Save to localStorage
-    localStorage.setItem('appTheme', appearance);
-  }, [appearance]);
 
   // Get first letter of name for avatar
   const avatarInitial = userProfile?.name?.charAt(0)?.toUpperCase() || userProfile?.phone?.charAt(1)?.toUpperCase() || 'U';

@@ -4,6 +4,10 @@ import Notification from '../models/Notification.js';
 import DeviceToken from '../models/DeviceToken.js';
 import { sendPushNotification } from '../utils/pushNotificationHelper.js';
 import { uploadToCloudinary } from '../../../shared/utils/cloudinaryService.js';
+import Zone from '../../admin/models/Zone.js';
+import User from '../../auth/models/User.js';
+import Restaurant from '../../restaurant/models/Restaurant.js';
+import Delivery from '../../delivery/models/Delivery.js';
 
 /**
  * Broadcast notification to specific roles or all users.
@@ -14,6 +18,7 @@ import { uploadToCloudinary } from '../../../shared/utils/cloudinaryService.js';
  *    body: string;
  *    imageUrl?: string;
  *    targetRole?: 'all' | 'customer' | 'user' | 'restaurant' | 'delivery';
+ *    targetZone?: 'all' | string;
  *    data?: Record<string, string>;
  *  }
  */
@@ -22,6 +27,7 @@ export const broadcastNotification = asyncHandler(async (req, res) => {
     title,
     body,
     targetRole = 'all',
+    targetZone = 'all',
     data = {}
   } = req.body;
 
@@ -75,7 +81,8 @@ export const broadcastNotification = asyncHandler(async (req, res) => {
     description: body,
     imageUrl,
     target: notificationTarget,
-    sourceType: 'admin_direct'
+    sourceType: 'admin_direct',
+    targetZone: targetZone !== 'all' ? targetZone : null
   });
 
   // Fetch tokens from DeviceToken collection
@@ -91,7 +98,63 @@ export const broadcastNotification = asyncHandler(async (req, res) => {
     query.role = deviceRoleFilter;
   }
 
-  console.log(`[Broadcast] targetRole=${targetRole}, deviceRoleFilter=${deviceRoleFilter}, query=${JSON.stringify(query)}`);
+  // Zone filtering
+  if (targetZone && targetZone !== 'all') {
+    const zone = await Zone.findById(targetZone);
+    if (!zone) {
+      return errorResponse(res, 404, 'Target zone not found');
+    }
+
+    const matchedUserIds = [];
+
+    // Filter Users by location within Zone boundary
+    if (deviceRoleFilter === 'all' || deviceRoleFilter === 'user') {
+      const usersInZone = await User.find({
+        $or: [
+          {
+            'currentLocation.location': {
+              $geoWithin: {
+                $geometry: zone.boundary
+              }
+            }
+          },
+          {
+            'addresses.location': {
+              $geoWithin: {
+                $geometry: zone.boundary
+              }
+            }
+          }
+        ]
+      }).select('_id').lean();
+      matchedUserIds.push(...usersInZone.map(u => u._id));
+    }
+
+    // Filter Restaurants by zoneId
+    if (deviceRoleFilter === 'all' || deviceRoleFilter === 'restaurant') {
+      const restaurantsInZone = await Restaurant.find({ zoneId: targetZone }).select('_id').lean();
+      matchedUserIds.push(...restaurantsInZone.map(r => r._id));
+    }
+
+    // Filter Delivery Partners by zoneId (availability.zones)
+    if (deviceRoleFilter === 'all' || deviceRoleFilter === 'delivery') {
+      const deliveryInZone = await Delivery.find({ 'availability.zones': targetZone }).select('_id').lean();
+      matchedUserIds.push(...deliveryInZone.map(d => d._id));
+    }
+
+    // Add filter logic
+    if (matchedUserIds.length === 0) {
+      // Short-circuit if no users found in this zone
+      return successResponse(res, 200, 'No users found in this zone to broadcast to', {
+        sentCount: 0,
+        notificationId: notification._id
+      });
+    }
+
+    query.userId = { $in: matchedUserIds };
+  }
+
+  console.log(`[Broadcast] targetRole=${targetRole}, targetZone=${targetZone}, deviceRoleFilter=${deviceRoleFilter}, query=${JSON.stringify(query)}`);
   console.log(`[AdminBroadcast] Query: ${JSON.stringify(query)}`);
   const tokensRaw = await DeviceToken.find(query).select('deviceToken role').lean();
   const tokens = tokensRaw.map(t => t.deviceToken).filter(Boolean);
@@ -139,6 +202,7 @@ export const getBroadcastHistory = asyncHandler(async (req, res) => {
 
   const [notifications, total] = await Promise.all([
     Notification.find({})
+      .populate('targetZone', 'name')
       .sort({ sentAt: -1 })
       .skip(skip)
       .limit(parseInt(limit))
