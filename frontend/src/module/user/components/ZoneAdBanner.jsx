@@ -44,7 +44,9 @@ export default function ZoneAdBanner() {
 
     useEffect(() => {
         const fetchAds = async () => {
-            if (!zoneId) {
+            const hasCoords = location?.latitude != null && location?.longitude != null
+
+            if (!zoneId && !hasCoords) {
                 setLoading(false)
                 setAds(FALLBACK_ADS)
                 return
@@ -53,11 +55,16 @@ export default function ZoneAdBanner() {
             try {
                 setLoading(true)
                 const params = {}
-                if (location?.latitude != null && location?.longitude != null) {
+                if (hasCoords) {
                     params.latitude = location.latitude
                     params.longitude = location.longitude
                 }
-                const res = await api.get(`/marketing/ads/active/${zoneId}`, { params })
+
+                const endpoint = zoneId
+                    ? `/marketing/ads/active/${zoneId}`
+                    : '/marketing/ads/nearby'
+
+                const res = await api.get(endpoint, { params })
 
                 if (res.data.success && res.data.data && res.data.data.length > 0) {
                     setAds(res.data.data)
@@ -65,7 +72,7 @@ export default function ZoneAdBanner() {
                     setAds(FALLBACK_ADS)
                 }
             } catch (error) {
-                console.error("Failed to fetch zone ads:", error)
+                console.error("Failed to fetch ads:", error)
                 setAds(FALLBACK_ADS)
             } finally {
                 setLoading(false)

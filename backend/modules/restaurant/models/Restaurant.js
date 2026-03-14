@@ -201,7 +201,7 @@ const restaurantSchema = new mongoose.Schema(
       type: Number,
       default: 5, // Default 5km
       min: [1, "Delivery range must be at least 1km"],
-      max: [20, "Delivery range cannot exceed 20km"],
+      max: [100, "Delivery range cannot exceed 100km"],
     },
     // Numeric helper fields for optimized DB-level filtering
     avgDeliveryTime: {

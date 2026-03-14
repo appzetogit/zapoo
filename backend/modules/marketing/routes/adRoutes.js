@@ -4,6 +4,7 @@ import {
     updateAdRequest,
     updateAdStatus,
     getActiveAdsByZone,
+    getNearbyAds,
     trackAdMetric,
     getMyZone,
     getAllAdRequests,
@@ -64,11 +65,12 @@ router.put('/:adId/status', authenticateAdmin, updateAdStatus);
 router.post('/:adId/banner', authenticateAdmin, uploadMiddleware.single('bannerImage'), uploadAdminBanner);
 router.delete('/:adId', authenticateAdmin, deleteAdRequest);
 
-// Shared Admin/Restaurant Detail route
-router.get('/:adId', authenticateAny, getAdRequestById);
-
-// Public/Common routes
+// Public/Common routes (must be above the /:adId catch-all)
+router.get('/nearby', getNearbyAds);
 router.get('/active/:zoneId', getActiveAdsByZone);
 router.post('/:adId/track', trackAdMetric);
+
+// Shared Admin/Restaurant Detail route (catch-all param — keep last among GETs)
+router.get('/:adId', authenticateAny, getAdRequestById);
 
 export default router;

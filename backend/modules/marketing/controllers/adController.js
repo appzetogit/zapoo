@@ -6,6 +6,7 @@ import express from 'express';
 import Zone from '../../admin/models/Zone.js';
 import Tier from '../../admin/models/Tier.js';
 import Restaurant from '../../restaurant/models/Restaurant.js';
+import BusinessSettings from '../../admin/models/BusinessSettings.js';
 import { calculateDistance } from '../../order/services/orderCalculationService.js';
 
 // Pricing configuration based on Tier Rank
@@ -291,7 +292,8 @@ export const getActiveAdsByZone = async (req, res) => {
 
     // Filter paid ads by restaurant deliveryRange when user coordinates provided
     let paidAdsInRange = paidAds;
-    if (userLat != null && userLng != null && Number.isFinite(userLat) && Number.isFinite(userLng)) {
+    const hasCoords = userLat != null && userLng != null && Number.isFinite(userLat) && Number.isFinite(userLng);
+    if (hasCoords) {
       paidAdsInRange = paidAds.filter(ad => {
         const rest = ad.restaurant;
         if (!rest) return false;
@@ -304,10 +306,158 @@ export const getActiveAdsByZone = async (req, res) => {
       });
     }
 
-    // Combine paid ads and challenge ads. We no longer cap paid ads per-tier
-    // by maxBanners; instead we rely on a general overall cap for performance.
+    // Cross-zone: include ads from nearby restaurants outside the user's zone
+    if (hasCoords) {
+      const existingAdIds = new Set(paidAdsInRange.map(a => a._id.toString()));
+      const existingChallengeIds = new Set(challengeAds.map(a => a._id.toString()));
+
+      const settings = await BusinessSettings.getSettings();
+      const maxRangeMeters = (settings.maxDeliveryRange || 20) * 1000;
+
+      const nearbyRestaurants = await Restaurant.find({
+        isActive: true,
+        'location.coordinates': {
+          $nearSphere: {
+            $geometry: { type: 'Point', coordinates: [userLng, userLat] },
+            $maxDistance: maxRangeMeters
+          }
+        }
+      }).select('_id deliveryRange location').lean();
+
+      const inRangeRestIds = nearbyRestaurants
+        .filter(r => {
+          const rLat = r.location?.latitude ?? r.location?.coordinates?.[1];
+          const rLng = r.location?.longitude ?? r.location?.coordinates?.[0];
+          if (rLat == null || rLng == null) return false;
+          return calculateDistance([rLng, rLat], [userLng, userLat]) <= (r.deliveryRange ?? 5);
+        })
+        .map(r => r._id);
+
+      if (inRangeRestIds.length > 0) {
+        const [extraPaidAds, extraChallengeBanners] = await Promise.all([
+          AdRequest.find({
+            restaurant: { $in: inRangeRestIds },
+            status: { $in: ['Active', 'Scheduled'] },
+            startDate: { $lte: now },
+            endDate: { $gte: now }
+          })
+            .populate('restaurant', 'name logo address location deliveryRange')
+            .limit(20)
+            .lean(),
+          ChallengeBanner.find({
+            restaurant: { $in: inRangeRestIds },
+            startDate: { $lte: now },
+            endDate: { $gte: now }
+          })
+            .populate('restaurant', 'name logo address location deliveryRange')
+            .lean()
+        ]);
+
+        for (const ad of extraPaidAds) {
+          if (!existingAdIds.has(ad._id.toString())) {
+            paidAdsInRange.push(ad);
+            existingAdIds.add(ad._id.toString());
+          }
+        }
+
+        for (const cb of extraChallengeBanners) {
+          if (!existingChallengeIds.has(cb._id.toString())) {
+            challengeAds.push({
+              _id: cb._id,
+              bannerImage: cb.bannerImage,
+              title: cb.title,
+              description: cb.description,
+              redirectTarget: cb.redirectTarget || 'menu',
+              restaurant: cb.restaurant,
+              source: 'challenge'
+            });
+            existingChallengeIds.add(cb._id.toString());
+          }
+        }
+      }
+    }
+
     const combined = [...paidAdsInRange, ...challengeAds].slice(0, 20);
 
+    res.status(200).json({ success: true, data: combined });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * Get nearby ads for users without a detected zone.
+ * Finds ads from restaurants whose deliveryRange covers the user's location.
+ * GET /marketing/ads/nearby?latitude=&longitude=
+ */
+export const getNearbyAds = async (req, res) => {
+  try {
+    const { latitude, longitude } = req.query;
+    const userLat = latitude != null ? parseFloat(latitude) : null;
+    const userLng = longitude != null ? parseFloat(longitude) : null;
+
+    if (userLat == null || userLng == null || !Number.isFinite(userLat) || !Number.isFinite(userLng)) {
+      return res.status(200).json({ success: true, data: [] });
+    }
+
+    const now = new Date();
+
+    const settings = await BusinessSettings.getSettings();
+    const maxRangeMeters = (settings.maxDeliveryRange || 20) * 1000;
+
+    const nearbyRestaurants = await Restaurant.find({
+      isActive: true,
+      'location.coordinates': {
+        $nearSphere: {
+          $geometry: { type: 'Point', coordinates: [userLng, userLat] },
+          $maxDistance: maxRangeMeters
+        }
+      }
+    }).select('_id deliveryRange location').lean();
+
+    const inRangeRestIds = nearbyRestaurants
+      .filter(r => {
+        const rLat = r.location?.latitude ?? r.location?.coordinates?.[1];
+        const rLng = r.location?.longitude ?? r.location?.coordinates?.[0];
+        if (rLat == null || rLng == null) return false;
+        return calculateDistance([rLng, rLat], [userLng, userLat]) <= (r.deliveryRange ?? 5);
+      })
+      .map(r => r._id);
+
+    if (inRangeRestIds.length === 0) {
+      return res.status(200).json({ success: true, data: [] });
+    }
+
+    const [paidAds, challengeBanners] = await Promise.all([
+      AdRequest.find({
+        restaurant: { $in: inRangeRestIds },
+        status: { $in: ['Active', 'Scheduled'] },
+        startDate: { $lte: now },
+        endDate: { $gte: now }
+      })
+        .populate('restaurant', 'name logo address location deliveryRange')
+        .limit(20)
+        .lean(),
+      ChallengeBanner.find({
+        restaurant: { $in: inRangeRestIds },
+        startDate: { $lte: now },
+        endDate: { $gte: now }
+      })
+        .populate('restaurant', 'name logo address location deliveryRange')
+        .lean()
+    ]);
+
+    const challengeAds = challengeBanners.map(cb => ({
+      _id: cb._id,
+      bannerImage: cb.bannerImage,
+      title: cb.title,
+      description: cb.description,
+      redirectTarget: cb.redirectTarget || 'menu',
+      restaurant: cb.restaurant,
+      source: 'challenge'
+    }));
+
+    const combined = [...paidAds, ...challengeAds].slice(0, 20);
     res.status(200).json({ success: true, data: combined });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

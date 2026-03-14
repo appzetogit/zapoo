@@ -94,7 +94,15 @@ export default function Notifications() {
 
     const loadPromotions = async () => {
       try {
-        const res = await apiClient.get("/notification/users")
+        const params = {}
+        try {
+          const stored = JSON.parse(localStorage.getItem('userLocation'))
+          if (stored?.latitude && stored?.longitude) {
+            params.latitude = stored.latitude
+            params.longitude = stored.longitude
+          }
+        } catch { /* no stored location */ }
+        const res = await apiClient.get("/notification/users", { params })
         if (!mounted) return
         const list = Array.isArray(res?.data?.data?.notifications)
           ? res.data.data.notifications

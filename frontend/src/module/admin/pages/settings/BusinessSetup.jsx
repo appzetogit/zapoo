@@ -20,6 +20,7 @@ export default function BusinessSetup() {
     state: "",
     pincode: "",
     region: "",
+    maxDeliveryRange: 20,
   });
 
   // Fetch business settings on mount
@@ -43,6 +44,7 @@ export default function BusinessSetup() {
           state: settings.state || "",
           pincode: settings.pincode || "",
           region: settings.region || "India",
+          maxDeliveryRange: settings.maxDeliveryRange ?? 20,
         });
 
         // Set logo and favicon previews if they exist
@@ -93,6 +95,7 @@ export default function BusinessSetup() {
         state: formData.state.trim(),
         pincode: formData.pincode.trim(),
         region: formData.region,
+        maxDeliveryRange: Number(formData.maxDeliveryRange) || 20,
       };
 
       // Prepare files
@@ -488,6 +491,27 @@ export default function BusinessSetup() {
                   onChange={(e) => handleInputChange("pincode", e.target.value)}
                   className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#FF5200] focus:border-[#FF5200]"
                 />
+              </div>
+            </div>
+
+            {/* Max Delivery Range */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  Max Delivery Range (km)
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  step="1"
+                  placeholder="e.g. 20"
+                  value={formData.maxDeliveryRange}
+                  onChange={(e) => handleInputChange("maxDeliveryRange", e.target.value)}
+                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#FF5200] focus:border-[#FF5200]"
+                />
+                <p className="text-[10px] text-slate-400 mt-1">
+                  Maximum radius (km) a restaurant can set for its delivery range.
+                </p>
               </div>
             </div>
 

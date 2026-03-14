@@ -376,12 +376,23 @@ export default function LocationSelectorOverlay({
     setMapLoading(true);
     const initializeGoogleMap = async () => {
       try {
-        const loader = new Loader({
-          apiKey: GOOGLE_MAPS_API_KEY,
-          version: "weekly",
-          libraries: ["places", "geocoding"]
-        });
-        const google = await loader.load();
+        let google = window.google;
+        if (!google || !google.maps) {
+          let attempts = 0;
+          while (!window.google?.maps && attempts < 50) {
+            await new Promise(r => setTimeout(r, 100));
+            attempts++;
+          }
+          google = window.google;
+        }
+        if (!google || !google.maps) {
+          const loader = new Loader({
+            apiKey: GOOGLE_MAPS_API_KEY,
+            version: "weekly",
+            libraries: ["places", "geocoding"]
+          });
+          google = await loader.load();
+        }
         if (!isMounted || !mapContainerRef.current) return;
 
         // Initial location (Indore center or current location)
@@ -1401,35 +1412,7 @@ export default function LocationSelectorOverlay({
                 }
               }
 
-              // Step 2: Use Places API for even more detailed information
-              try {
-                const nearbyUrl = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${roundedLat},${roundedLng}&radius=50&key=${apiKey}&language=en`;
-                const nearbyResponse = await fetch(nearbyUrl).then(res => res.json());
-                if (nearbyResponse.status === "OK" && nearbyResponse.results && nearbyResponse.results.length > 0) {
-                  const placeId = nearbyResponse.results[0].place_id;
-                  const placeName = nearbyResponse.results[0].name;
-
-                  // Use place name if available (more accurate)
-                  if (placeName && !pointOfInterest) {
-                    pointOfInterest = placeName;
-                  }
-
-                  // Get place details for complete address
-                  if (placeId) {
-                    const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=formatted_address,address_components&key=${apiKey}&language=en`;
-                    const detailsResponse = await fetch(detailsUrl).then(res => res.json());
-                    if (detailsResponse.status === "OK" && detailsResponse.result) {
-                      // Use Places API formatted address if it's more complete
-                      const placesAddress = detailsResponse.result.formatted_address || "";
-                      if (placesAddress && placesAddress.split(',').length > formattedAddress.split(',').length) {
-                        formattedAddress = placesAddress;
-                      }
-                    }
-                  }
-                }
-              } catch (placesError) {
-                console.warn("⚠️ Places API error (non-critical):", placesError.message);
-              }
+              // Places API removed — geocoding address_components are sufficient
             }
           } catch (googleError) {
             console.warn("⚠️ Google Maps API error, trying backend fallback:", googleError.message);
@@ -1525,7 +1508,7 @@ export default function LocationSelectorOverlay({
       } finally {
         setLoadingAddress(false);
       }
-    }, 300); // 300ms debounce delay
+    }, 500); // 500ms debounce delay
   };
   const handleUseCurrentLocationForAddress = async () => {
     try {

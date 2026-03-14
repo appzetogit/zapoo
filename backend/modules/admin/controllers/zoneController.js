@@ -1,4 +1,5 @@
 import Zone from '../models/Zone.js';
+import Restaurant from '../../restaurant/models/Restaurant.js';
 import { successResponse, errorResponse } from '../../../shared/utils/response.js';
 import asyncHandler from '../../../shared/middleware/asyncHandler.js';
 import mongoose from 'mongoose';
@@ -222,13 +223,50 @@ export const updateZone = asyncHandler(async (req, res) => {
       }
     }
 
+    const coordinatesChanged = !!updateData.coordinates;
+
     // Update zone
     Object.assign(zone, updateData);
-
-    // Explicitly handle coordinates if passed as empty array (Object.assign might not be enough depending on how it was being handled before, but here it should be fine)
-    // The main thing is ensures recommendedItemFee and isRecommendedFeeOverridden are included which Object.assign does.
-
     await zone.save();
+
+    // Re-validate restaurant assignments when polygon changes
+    if (coordinatesChanged) {
+      const restaurantsInZone = await Restaurant.find({ zoneId: zone._id })
+        .select('_id location')
+        .lean();
+
+      if (restaurantsInZone.length > 0) {
+        const activeZones = await Zone.find({ isActive: true });
+        const bulkOps = [];
+
+        for (const r of restaurantsInZone) {
+          const lat = r.location?.latitude;
+          const lng = r.location?.longitude;
+          if (!lat || !lng) continue;
+
+          if (!zone.containsPoint(lat, lng)) {
+            let newZoneId = null;
+            for (const z of activeZones) {
+              if (z._id.toString() === zone._id.toString()) continue;
+              if (z.containsPoint && z.containsPoint(lat, lng)) {
+                newZoneId = z._id;
+                break;
+              }
+            }
+            bulkOps.push({
+              updateOne: {
+                filter: { _id: r._id },
+                update: { $set: { zoneId: newZoneId } }
+              }
+            });
+          }
+        }
+
+        if (bulkOps.length > 0) {
+          await Restaurant.bulkWrite(bulkOps);
+        }
+      }
+    }
 
     // Populate before returning (only if restaurantId exists)
     if (zone.restaurantId) {

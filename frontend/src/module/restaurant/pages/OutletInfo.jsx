@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { restaurantAPI } from "@/lib/api"
+import apiClient, { restaurantAPI } from "@/lib/api"
 import { toast } from "sonner"
 
 const CUISINES_STORAGE_KEY = "restaurant_cuisines"
@@ -55,6 +55,7 @@ export default function OutletInfo() {
   const [deliveryRange, setDeliveryRange] = useState(5)
   const [showEditRangeDialog, setShowEditRangeDialog] = useState(false)
   const [editRangeValue, setEditRangeValue] = useState(5)
+  const [maxDeliveryRange, setMaxDeliveryRange] = useState(20)
 
   // Format address from location object
   const formatAddress = (location) => {
@@ -150,13 +151,19 @@ export default function OutletInfo() {
           }
         }
       } catch (error) {
-        // Only log error if it's not a network/timeout error (backend might be down/slow)
         if (error.code !== 'ERR_NETWORK' && error.code !== 'ECONNABORTED' && !error.message?.includes('timeout')) {
           console.error("Error fetching restaurant data:", error)
         }
-        // Continue with default values if fetch fails
       } finally {
         setLoading(false)
+      }
+
+      try {
+        const settingsRes = await apiClient.get("/business-settings/public")
+        const maxRange = settingsRes?.data?.data?.maxDeliveryRange
+        if (maxRange && maxRange > 0) setMaxDeliveryRange(maxRange)
+      } catch {
+        // keep default
       }
     }
 
@@ -588,8 +595,8 @@ export default function OutletInfo() {
 
   const handleSaveRange = async () => {
     const newRange = parseInt(editRangeValue)
-    if (isNaN(newRange) || newRange < 1 || newRange > 20) {
-      alert("Delivery range must be between 1 and 20 km")
+    if (isNaN(newRange) || newRange < 1 || newRange > maxDeliveryRange) {
+      alert(`Delivery range must be between 1 and ${maxDeliveryRange} km`)
       return
     }
 
@@ -852,7 +859,7 @@ export default function OutletInfo() {
         >
           <div className="flex items-start justify-between">
             <div className="flex-1 min-w-0">
-              <p className="text-xs text-gray-500 font-normal mb-1">Delivery range (max 20km)</p>
+              <p className="text-xs text-gray-500 font-normal mb-1">Delivery range (max {maxDeliveryRange}km)</p>
               <div className="flex items-center gap-2">
                 <Truck className="w-4 h-4 text-blue-600" />
                 <p className="text-base font-semibold text-gray-900">
@@ -946,7 +953,7 @@ export default function OutletInfo() {
           <DialogHeader>
             <DialogTitle className="text-left">Edit Delivery Range</DialogTitle>
             <DialogDescription className="text-left text-xs text-gray-500">
-              Set the maximum distance (in kilometers) you want to deliver. Maximum allowed is 20km.
+              Set the maximum distance (in kilometers) you want to deliver. Maximum allowed is {maxDeliveryRange}km.
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
@@ -954,17 +961,17 @@ export default function OutletInfo() {
               <Input
                 type="number"
                 min="1"
-                max="20"
+                max={maxDeliveryRange}
                 value={editRangeValue}
                 onChange={(e) => setEditRangeValue(e.target.value)}
-                placeholder="Range (1-20)"
+                placeholder={`Range (1-${maxDeliveryRange})`}
                 className="w-24 focus-visible:border-black focus-visible:ring-0"
                 autoFocus
               />
               <span className="text-base font-medium text-gray-700">km</span>
             </div>
-            {parseInt(editRangeValue) > 20 && (
-              <p className="text-red-500 text-xs mt-2">Maximum range is 20km</p>
+            {parseInt(editRangeValue) > maxDeliveryRange && (
+              <p className="text-red-500 text-xs mt-2">Maximum range is {maxDeliveryRange}km</p>
             )}
           </div>
           <DialogFooter>
@@ -976,7 +983,7 @@ export default function OutletInfo() {
             </Button>
             <Button
               onClick={handleSaveRange}
-              disabled={!editRangeValue || parseInt(editRangeValue) < 1 || parseInt(editRangeValue) > 20}
+              disabled={!editRangeValue || parseInt(editRangeValue) < 1 || parseInt(editRangeValue) > maxDeliveryRange}
               className="bg-black text-white"
             >
               Save

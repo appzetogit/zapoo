@@ -2,6 +2,7 @@ import Restaurant from '../models/Restaurant.js';
 import Menu from '../models/Menu.js';
 import Zone from '../../admin/models/Zone.js';
 import Tier from '../../admin/models/Tier.js';
+import BusinessSettings from '../../admin/models/BusinessSettings.js';
 import { successResponse, errorResponse } from '../../../shared/utils/response.js';
 import { uploadToCloudinary, deleteFromCloudinary } from '../../../shared/utils/cloudinaryService.js';
 import { initializeCloudinary } from '../../../config/cloudinary.js';
@@ -217,52 +218,67 @@ export const getRestaurants = async (req, res) => {
     }
 
     const hasGeoFilter = userLat != null && userLng != null && Number.isFinite(userLat) && Number.isFinite(userLng);
-    const maxDistanceMeters = (parseFloat(maxDistance) || 15) * 1000;
 
-    // Geo-spatial filtering if coordinates provided
-    if (hasGeoFilter) {
-      query["location.coordinates"] = {
-        $nearSphere: {
-          $geometry: {
-            type: "Point",
-            coordinates: [userLng, userLat]
-          },
-          $maxDistance: maxDistanceMeters
-        }
-      };
-    }
+    const projectionFields = {
+      name: 1, slug: 1, cuisines: 1, rating: 1, totalRatings: 1, promo: 1,
+      profileImage: 1, location: 1, avgDeliveryTime: 1, avgPriceValue: 1,
+      isActive: 1, isAcceptingOrders: 1, featuredDish: 1, featuredPrice: 1,
+      offer: 1, estimatedDeliveryTime: 1, distance: 1, deliveryRange: 1
+    };
 
-    // Fetch restaurants - optimized with projection and lean
-    const projection = 'name slug cuisines rating totalRatings promo profileImage location avgDeliveryTime avgPriceValue isActive isAcceptingOrders featuredDish featuredPrice offer estimatedDeliveryTime distance';
-    const restaurants = await Restaurant.find(query)
-      .select(projection)
-      .sort(sortObj)
-      .limit(parseInt(limit))
-      .skip(parseInt(offset))
-      .lean();
-
+    let restaurants;
     let total = 0;
+
     if (hasGeoFilter) {
-      const totalResult = await Restaurant.aggregate([
+      const settings = await BusinessSettings.getSettings();
+      const maxRangeMeters = (settings.maxDeliveryRange || 20) * 1000;
+
+      const basePipeline = [
         {
           $geoNear: {
-            near: {
-              type: "Point",
-              coordinates: [userLng, userLat]
-            },
+            near: { type: "Point", coordinates: [userLng, userLat] },
             distanceField: "distanceMeters",
             spherical: true,
-            maxDistance: maxDistanceMeters,
-            query: {
-              ...query,
-              "location.coordinates": { $exists: true, $ne: null }
-            }
+            maxDistance: maxRangeMeters,
+            query: query
           }
         },
-        { $count: "total" }
+        {
+          $match: {
+            $expr: {
+              $lte: [
+                "$distanceMeters",
+                { $multiply: [{ $ifNull: ["$deliveryRange", 5] }, 1000] }
+              ]
+            }
+          }
+        }
+      ];
+
+      const [restaurantsResult, countResult] = await Promise.all([
+        Restaurant.aggregate([
+          ...basePipeline,
+          { $sort: sortObj },
+          { $skip: parseInt(offset) },
+          { $limit: parseInt(limit) },
+          { $project: { ...projectionFields, distanceMeters: 1 } }
+        ]),
+        Restaurant.aggregate([
+          ...basePipeline,
+          { $count: "total" }
+        ])
       ]);
-      total = totalResult[0]?.total || 0;
+
+      restaurants = restaurantsResult;
+      total = countResult[0]?.total || 0;
     } else {
+      const projection = 'name slug cuisines rating totalRatings promo profileImage location avgDeliveryTime avgPriceValue isActive isAcceptingOrders featuredDish featuredPrice offer estimatedDeliveryTime distance deliveryRange';
+      restaurants = await Restaurant.find(query)
+        .select(projection)
+        .sort(sortObj)
+        .limit(parseInt(limit))
+        .skip(parseInt(offset))
+        .lean();
       total = await Restaurant.countDocuments(query);
     }
 
@@ -577,6 +593,14 @@ export const updateRestaurantProfile = asyncHandler(async (req, res) => {
         if (!location.latitude) location.latitude = location.coordinates[1];
       }
       updateData.location = location;
+
+      const lat = location.latitude || location.coordinates?.[1];
+      const lng = location.longitude || location.coordinates?.[0];
+      if (lat && lng) {
+        const activeZones = await Zone.find({ isActive: true }).lean();
+        const detectedZoneId = getRestaurantZoneId(lat, lng, activeZones);
+        updateData.zoneId = detectedZoneId || null;
+      }
     }
 
     // Update owner details if provided
@@ -590,7 +614,13 @@ export const updateRestaurantProfile = asyncHandler(async (req, res) => {
       updateData.ownerPhone = ownerPhone;
     }
     if (deliveryRange !== undefined) {
-      updateData.deliveryRange = Number(deliveryRange);
+      const rangeNum = Number(deliveryRange);
+      const settings = await BusinessSettings.getSettings();
+      const maxRange = settings.maxDeliveryRange || 20;
+      if (rangeNum < 1 || rangeNum > maxRange) {
+        return errorResponse(res, 400, `Delivery range must be between 1 and ${maxRange} km`);
+      }
+      updateData.deliveryRange = rangeNum;
     }
 
     // Update restaurant

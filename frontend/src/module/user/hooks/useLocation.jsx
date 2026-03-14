@@ -1,5 +1,56 @@
 import { useState, useEffect, useRef } from "react";
 import { locationAPI, userAPI } from "@/lib/api";
+import { ref, set, get } from 'firebase/database';
+import { realtimeDb } from '@/lib/firebaseConfig';
+
+// Module-level geocode cache — shared across hook instances, survives re-renders
+const _geocodeCache = new Map();
+const GEOCODE_GRID_SIZE = 0.0013; // ~150m grid cell
+const GEOCODE_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+
+function _getGridKey(lat, lng) {
+  return `${(Math.round(lat / GEOCODE_GRID_SIZE) * GEOCODE_GRID_SIZE).toFixed(4)}_${(Math.round(lng / GEOCODE_GRID_SIZE) * GEOCODE_GRID_SIZE).toFixed(4)}`;
+}
+
+function _getCachedGeocode(lat, lng) {
+  const key = _getGridKey(lat, lng);
+  const entry = _geocodeCache.get(key);
+  if (entry && Date.now() - entry.ts < GEOCODE_CACHE_TTL) return entry.data;
+  if (entry) _geocodeCache.delete(key);
+  return null;
+}
+
+function _setCachedGeocode(lat, lng, data) {
+  const key = _getGridKey(lat, lng);
+  _geocodeCache.set(key, { data, ts: Date.now() });
+  // Evict old entries when cache grows too large
+  if (_geocodeCache.size > 200) {
+    const now = Date.now();
+    for (const [k, v] of _geocodeCache) {
+      if (now - v.ts > GEOCODE_CACHE_TTL) _geocodeCache.delete(k);
+    }
+  }
+}
+
+function _getUserId() {
+  try {
+    const userStr = localStorage.getItem('user_user');
+    if (userStr) {
+      const user = JSON.parse(userStr);
+      return user?._id || user?.id || null;
+    }
+  } catch { /* ignore */ }
+  return null;
+}
+
+function _syncLocationToFirebase(lat, lng) {
+  const userId = _getUserId();
+  if (!userId) return;
+  set(ref(realtimeDb, `users/${userId}/location`), {
+    lat, lng, timestamp: Date.now()
+  }).catch(() => {});
+}
+
 export function useLocation() {
   const [location, setLocation] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -11,6 +62,7 @@ export function useLocation() {
     latitude: null,
     longitude: null
   });
+  const lastGeocodedCoordsRef = useRef({ latitude: null, longitude: null });
 
   /* ===================== DB UPDATE (LIVE LOCATION TRACKING) ===================== */
   const updateLocationInDB = async locationData => {
@@ -93,8 +145,11 @@ export function useLocation() {
 
   /* ===================== GOOGLE MAPS REVERSE GEOCODE ===================== */
   const reverseGeocodeWithGoogleMaps = async (latitude, longitude) => {
+    // Check grid cache first — avoids an API call if the user is in the same ~50m area
+    const cached = _getCachedGeocode(latitude, longitude);
+    if (cached) return cached;
+
     try {
-      // Get Google Maps API key from backend database
       const {
         getGoogleMapsApiKey
       } = await import('@/lib/utils/googleMapsApiKey.js');
@@ -333,140 +388,14 @@ export function useLocation() {
         }
       }
 
-      // ===================== GOOGLE PLACES API - GET DETAILED PLACE INFORMATION =====================
-      // Use Places API to get comprehensive details (name, phone, website, rating, etc.)
-      let placeDetails = null;
-      let placeId = null;
-      let placeName = "";
-      let placePhone = "";
-      let placeWebsite = "";
-      let placeRating = null;
-      let placeOpeningHours = null;
-      let placePhotos = [];
-      try {
-        // Get API key dynamically from backend
-        const {
-          getGoogleMapsApiKey
-        } = await import('@/lib/utils/googleMapsApiKey.js');
-        const apiKey = await getGoogleMapsApiKey();
-        if (!apiKey) {
-          console.warn("⚠️ Google Maps API key not found, skipping Places API");
-          return null;
-        }
-
-        // Step 1: Use Nearby Search to find the closest place
-
-        const nearbySearchUrl = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${latitude},${longitude}&radius=50&key=${apiKey}&language=en`;
-
-        // Add timeout for Nearby Search
-        const nearbyController = new AbortController();
-        const nearbyTimeoutId = setTimeout(() => nearbyController.abort(), 15000); // 15 seconds
-
-        let nearbyResponse;
-        try {
-          const nearbyRes = await fetch(nearbySearchUrl, {
-            signal: nearbyController.signal
-          });
-          clearTimeout(nearbyTimeoutId);
-          if (!nearbyRes.ok) {
-            throw new Error(`HTTP error! status: ${nearbyRes.status}`);
-          }
-          nearbyResponse = await nearbyRes.json();
-        } catch (error) {
-          clearTimeout(nearbyTimeoutId);
-          if (error.name === 'AbortError') {
-            console.warn("⚠️ Google Places Nearby Search timeout, skipping Places API");
-            throw new Error("Google Places Nearby Search timeout");
-          }
-          throw error;
-        }
-        if (nearbyResponse.status === "OK" && nearbyResponse.results && nearbyResponse.results.length > 0) {
-          // Find the closest place (first result is usually the closest)
-          const closestPlace = nearbyResponse.results[0];
-          placeId = closestPlace.place_id;
-          placeName = closestPlace.name || "";
-          // Step 2: Get detailed place information using Place Details API
-          if (placeId) {
-            const placeDetailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=name,formatted_address,formatted_phone_number,website,rating,opening_hours,photos,address_components,geometry,types&key=${apiKey}&language=en`;
-
-            // Add timeout for Place Details
-            const detailsController = new AbortController();
-            const detailsTimeoutId = setTimeout(() => detailsController.abort(), 15000); // 15 seconds
-
-            let detailsResponse;
-            try {
-              const detailsRes = await fetch(placeDetailsUrl, {
-                signal: detailsController.signal
-              });
-              clearTimeout(detailsTimeoutId);
-              if (!detailsRes.ok) {
-                throw new Error(`HTTP error! status: ${detailsRes.status}`);
-              }
-              detailsResponse = await detailsRes.json();
-            } catch (error) {
-              clearTimeout(detailsTimeoutId);
-              if (error.name === 'AbortError') {
-                console.warn("⚠️ Google Places Details timeout, using geocoding results only");
-                throw new Error("Google Places Details timeout");
-              }
-              throw error;
-            }
-            if (detailsResponse.status === "OK" && detailsResponse.result) {
-              placeDetails = detailsResponse.result;
-              placeName = placeDetails.name || placeName;
-              placePhone = placeDetails.formatted_phone_number || "";
-              placeWebsite = placeDetails.website || "";
-              placeRating = placeDetails.rating || null;
-              placeOpeningHours = placeDetails.opening_hours || null;
-
-              // Get photo references (first 3 photos)
-              if (placeDetails.photos && placeDetails.photos.length > 0) {
-                placePhotos = placeDetails.photos.slice(0, 3).map(photo => ({
-                  reference: photo.photo_reference,
-                  width: photo.width,
-                  height: photo.height,
-                  url: `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=${photo.photo_reference}&key=${apiKey}`
-                }));
-              }
-              // If Places API has better address components, use them
-              if (placeDetails.address_components && placeDetails.address_components.length > addressComponents.length) {
-                // Merge Places API address components with geocoding results
-                const placesComponents = placeDetails.address_components;
-                // Update missing components from Places API
-                for (const comp of placesComponents) {
-                  const types = comp.types || [];
-                  if (types.includes("point_of_interest") && !pointOfInterest) {
-                    pointOfInterest = comp.long_name;
-                  }
-                  if (types.includes("premise") && !premise) {
-                    premise = comp.long_name;
-                  }
-                }
-              }
-            }
-          }
-        }
-      } catch (placesError) {
-        console.warn("⚠️ Google Places API error (non-critical):", placesError.message);
-        // Continue with geocoding results even if Places API fails
-      }
-
-      // ZOMATO-STYLE: Extract exact building/cafe name (Mama Loca Cafe, Princess Center)
-      // Priority: Places API name > point_of_interest > premise > sublocality_level_1
+      // Extract main title from geocoding address_components
+      // Priority: point_of_interest > premise > sublocality_level_1
       let mainTitle = "";
-
-      // First priority: Use name from Places API (most accurate)
-      if (placeName && placeName.trim() !== "") {
-        mainTitle = placeName;
+      const building = addressComponents.find(c => c.types.includes("point_of_interest") || c.types.includes("premise") || c.types.includes("sublocality_level_1"));
+      if (building) {
+        mainTitle = building.long_name;
       } else {
-        // Fallback to geocoding components
-        const building = addressComponents.find(c => c.types.includes("point_of_interest") || c.types.includes("premise") || c.types.includes("sublocality_level_1"));
-        if (building) {
-          mainTitle = building.long_name;
-        } else {
-          mainTitle = "Location Found";
-          console.warn("⚠️ No building/cafe name found in address components");
-        }
+        mainTitle = "Location Found";
       }
 
       // Use mainTitle as mainLocation (Zomato-style)
@@ -667,40 +596,21 @@ export function useLocation() {
         console.warn("   3. GPS accuracy is low (try on mobile device)");
       }
 
-      // Return location object with ZOMATO-STYLE exact location + Google Places API details
       const locationResult = {
         city: city || "Unknown City",
         state: state || "",
         area: area || city || "Location Found",
         address: displayAddress,
-        // Locality parts for navbar display (e.g., "Mama Loca Cafe, 501 Princess Center")
         formattedAddress: completeFormattedAddress,
-        // Complete detailed address (e.g., "Mama Loca Cafe, 501 Princess Center, 5th Floor, New Palasia, Indore, Madhya Pradesh 452001")
         street: street || "",
         streetNumber: streetNumber || "",
         postalCode: postalCode || "",
-        // ZOMATO-STYLE: Add mainTitle for exact building/cafe name
         mainTitle: mainTitle !== "Location Found" ? mainTitle : null,
         pointOfInterest: pointOfInterest || null,
-        premise: premise || null,
-        // Google Places API - Complete Details
-        placeId: placeId || null,
-        placeName: placeName || null,
-        phone: placePhone || null,
-        website: placeWebsite || null,
-        rating: placeRating || null,
-        openingHours: placeOpeningHours ? {
-          openNow: placeOpeningHours.open_now,
-          weekdayText: placeOpeningHours.weekday_text || []
-        } : null,
-        photos: placePhotos.length > 0 ? placePhotos : null,
-        // Additional metadata
-        hasPlaceDetails: !!placeDetails,
-        placeTypes: placeDetails?.types || []
+        premise: premise || null
       };
 
-      // Final location calculated
-
+      _setCachedGeocode(latitude, longitude, locationResult);
       return locationResult;
     } catch (error) {
       console.error("❌❌❌ Google Maps Reverse Geocode Error:", error);
@@ -722,7 +632,6 @@ export function useLocation() {
         console.error("   3. Billing is enabled and linked");
         console.error("   4. API key restrictions allow this request");
 
-        // Return error location instead of fallback
         return {
           city: "API Error",
           state: "",
@@ -734,16 +643,7 @@ export function useLocation() {
           postalCode: "",
           mainTitle: null,
           pointOfInterest: null,
-          premise: null,
-          placeId: null,
-          placeName: null,
-          phone: null,
-          website: null,
-          rating: null,
-          openingHours: null,
-          photos: null,
-          hasPlaceDetails: false,
-          placeTypes: []
+          premise: null
         };
       }
 
@@ -1031,61 +931,53 @@ export function useLocation() {
     }
   };
 
-  /* ===================== DB FETCH ===================== */
+  /* ===================== DB FETCH (Firebase RTDB first, then REST) ===================== */
   const fetchLocationFromDB = async () => {
     try {
-      // Check if user is authenticated before trying to fetch from DB
+      const userId = _getUserId();
+
+      // --- Try Firebase RTDB first (instant, works offline) ---
+      if (userId) {
+        try {
+          const snapshot = await get(ref(realtimeDb, `users/${userId}/location`));
+          if (snapshot.exists()) {
+            const { lat, lng, timestamp } = snapshot.val();
+            const isRecent = timestamp && (Date.now() - timestamp < 30 * 60 * 1000);
+            if (isRecent && lat && lng) {
+              const isInIndiaRange = lat >= 6.5 && lat <= 37.1 && lng >= 68.7 && lng <= 97.4 && lng > 0;
+              if (isInIndiaRange) {
+                try {
+                  const addr = await reverseGeocodeWithGoogleMaps(lat, lng);
+                  return { ...addr, latitude: lat, longitude: lng };
+                } catch {
+                  return { latitude: lat, longitude: lng, city: "Current Location", area: "", state: "", address: "Select location", formattedAddress: "Select location" };
+                }
+              }
+            }
+          }
+        } catch { /* Firebase read failed — fall through to REST */ }
+      }
+
+      // --- Fallback: REST API ---
       const userToken = localStorage.getItem('user_accessToken') || localStorage.getItem('accessToken');
       if (!userToken || userToken === 'null' || userToken === 'undefined') {
-        // User not logged in - skip DB fetch, return null to use localStorage
         return null;
       }
       const res = await userAPI.getLocation();
       const loc = res?.data?.data?.location;
       if (loc?.latitude && loc?.longitude) {
-        // Validate coordinates are in India range BEFORE attempting geocoding
         const isInIndiaRange = loc.latitude >= 6.5 && loc.latitude <= 37.1 && loc.longitude >= 68.7 && loc.longitude <= 97.4 && loc.longitude > 0;
         if (!isInIndiaRange || loc.longitude < 0) {
-          // Coordinates are outside India - return placeholder
-          console.warn("⚠️ Coordinates from DB are outside India range:", {
-            latitude: loc.latitude,
-            longitude: loc.longitude
-          });
-          return {
-            latitude: loc.latitude,
-            longitude: loc.longitude,
-            city: "Current Location",
-            state: "",
-            country: "",
-            area: "",
-            address: "Select location",
-            formattedAddress: "Select location"
-          };
+          return { latitude: loc.latitude, longitude: loc.longitude, city: "Current Location", state: "", country: "", area: "", address: "Select location", formattedAddress: "Select location" };
         }
         try {
           const addr = await reverseGeocodeWithGoogleMaps(loc.latitude, loc.longitude);
-          return {
-            ...addr,
-            latitude: loc.latitude,
-            longitude: loc.longitude
-          };
-        } catch (geocodeErr) {
-          // If reverse geocoding fails, return location without coordinates in address
-          console.warn("⚠️ Reverse geocoding failed in fetchLocationFromDB:", geocodeErr.message);
-          return {
-            latitude: loc.latitude,
-            longitude: loc.longitude,
-            city: "Current Location",
-            area: "",
-            state: "",
-            address: "Select location",
-            // Don't show coordinates
-            formattedAddress: "Select location" // Don't show coordinates
-          };
+          return { ...addr, latitude: loc.latitude, longitude: loc.longitude };
+        } catch {
+          return { latitude: loc.latitude, longitude: loc.longitude, city: "Current Location", area: "", state: "", address: "Select location", formattedAddress: "Select location" };
         }
       }
     } catch (err) {
-      // Silently fail for 404/401 (user not authenticated) or network errors
       if (err.code !== "ERR_NETWORK" && err.response?.status !== 404 && err.response?.status !== 401) {
         console.error("DB location fetch error:", err);
       }
@@ -1120,176 +1012,71 @@ export function useLocation() {
         };
         navigator.geolocation.getCurrentPosition(async pos => {
           try {
-            const {
-              latitude,
-              longitude,
-              accuracy
-            } = pos.coords;
-            const timestamp = pos.timestamp || Date.now();
-            // Validate coordinates are in India range BEFORE attempting geocoding
-            // India: Latitude 6.5° to 37.1° N, Longitude 68.7° to 97.4° E
+            const { latitude, longitude, accuracy } = pos.coords;
             const isInIndiaRange = latitude >= 6.5 && latitude <= 37.1 && longitude >= 68.7 && longitude <= 97.4 && longitude > 0;
 
-            // Get address from Google Maps API
-            let addr;
+            // Set coordinates immediately so zone detection + restaurant fetch can start
+            const coordOnlyLoc = {
+              ...(location || {}),
+              latitude,
+              longitude,
+              accuracy: accuracy || null
+            };
+            setLocation(coordOnlyLoc);
+            setPermissionGranted(true);
+            if (showLoading) setLoading(false);
+            setError(null);
+            _syncLocationToFirebase(latitude, longitude);
+
             if (!isInIndiaRange || longitude < 0) {
-              // Coordinates are outside India - skip geocoding and use placeholder
-              console.warn("⚠️ Coordinates outside India range, skipping geocoding:", {
-                latitude,
-                longitude
-              });
-              addr = {
-                city: "Current Location",
-                state: "",
-                country: "",
-                area: "",
-                address: "Select location",
-                formattedAddress: "Select location"
-              };
-            } else {
-              try {
-                // Try Google Maps first
-                addr = await reverseGeocodeWithGoogleMaps(latitude, longitude);
-              } catch (geocodeErr) {
-                console.warn("⚠️ Google Maps geocoding failed, trying fallback:", geocodeErr.message);
-                try {
-                  // Fallback to direct reverse geocode (BigDataCloud)
-                  addr = await reverseGeocodeDirect(latitude, longitude);
-                  // Validate fallback result - if it still has placeholder values, don't use it
-                  if (addr.city === "Current Location" || addr.address.includes(latitude.toFixed(4))) {
-                    console.warn("⚠️ Fallback geocoding returned placeholder, will not save");
-                    addr = {
-                      city: "Current Location",
-                      state: "",
-                      country: "",
-                      area: "",
-                      address: "Select location",
-                      formattedAddress: "Select location"
-                    };
-                  }
-                } catch (fallbackErr) {
-                  console.error("❌ All geocoding methods failed:", fallbackErr.message);
-                  addr = {
-                    city: "Current Location",
-                    state: "",
-                    country: "",
-                    area: "",
-                    address: "Select location",
-                    formattedAddress: "Select location"
-                  };
-                }
-              }
+              resolve(coordOnlyLoc);
+              return;
             }
-            // Ensure we don't use coordinates as address if we have area/city
-            // Keep the complete formattedAddress from Google Maps (it has all details)
-            const completeFormattedAddress = addr.formattedAddress || "";
+
+            // Now geocode (may return from cache instantly)
+            let addr;
+            try {
+              addr = await reverseGeocodeWithGoogleMaps(latitude, longitude);
+            } catch {
+              try { addr = await reverseGeocodeDirect(latitude, longitude); } catch { resolve(coordOnlyLoc); return; }
+            }
+
+            if (!addr || addr.city === "Current Location" || addr.address === "Select location") {
+              resolve(coordOnlyLoc);
+              return;
+            }
+
+            lastGeocodedCoordsRef.current = { latitude, longitude };
+
             let displayAddress = addr.address || "";
-
-            // If address contains coordinates pattern, use area/city instead
-            const isCoordinatesPattern = /^-?\d+\.\d+,\s*-?\d+\.\d+$/.test(displayAddress.trim());
-            if (isCoordinatesPattern) {
-              if (addr.area && addr.area.trim() !== "") {
-                displayAddress = addr.area;
-              } else if (addr.city && addr.city.trim() !== "" && addr.city !== "Unknown City") {
-                displayAddress = addr.city;
-              }
+            const completeFormattedAddress = addr.formattedAddress || "";
+            if (/^-?\d+\.\d+,\s*-?\d+\.\d+$/.test(displayAddress.trim())) {
+              displayAddress = addr.area || addr.city || "Select location";
             }
 
-            // Build location object with ALL fields from reverse geocoding
             const finalLoc = {
               ...addr,
-              // This includes: city, state, area, street, streetNumber, postalCode, formattedAddress
               latitude,
               longitude,
               accuracy: accuracy || null,
               address: displayAddress,
-              // Locality parts for navbar display
-              formattedAddress: completeFormattedAddress || addr.formattedAddress || displayAddress // Complete detailed address
+              formattedAddress: completeFormattedAddress || displayAddress
             };
 
-            // Check if location has placeholder values - don't save placeholders
-            const hasPlaceholder = finalLoc.city === "Current Location" || finalLoc.address === "Select location" || finalLoc.formattedAddress === "Select location" || !finalLoc.city && !finalLoc.address && !finalLoc.formattedAddress && !finalLoc.area;
-            if (hasPlaceholder) {
-              console.warn("⚠️ Skipping save - location contains placeholder values:", finalLoc);
-              // Don't save placeholder values to localStorage or DB
-              // Just set in state for display but don't persist
-              const coordOnlyLoc = {
-                latitude,
-                longitude,
-                accuracy: accuracy || null,
-                city: finalLoc.city,
-                address: finalLoc.address,
-                formattedAddress: finalLoc.formattedAddress
-              };
-              setLocation(coordOnlyLoc);
-              setPermissionGranted(true);
-              if (showLoading) setLoading(false);
-              setError(null);
-              resolve(coordOnlyLoc);
-              return;
-            }
             localStorage.setItem("userLocation", JSON.stringify(finalLoc));
             setLocation(finalLoc);
-            setPermissionGranted(true);
-            if (showLoading) setLoading(false);
-            setError(null);
+
             if (updateDB) {
-              await updateLocationInDB(finalLoc).catch(err => {
-                console.warn("Failed to update location in DB:", err);
-              });
+              updateLocationInDB(finalLoc).catch(() => {});
             }
             resolve(finalLoc);
           } catch (err) {
-            console.error("❌ Error processing location:", err);
-            // Try one more time with direct reverse geocode as last resort
-            const {
-              latitude,
-              longitude
-            } = pos.coords;
-            try {
-              const lastResortAddr = await reverseGeocodeDirect(latitude, longitude);
-
-              // Check if we got valid data (not just coordinates)
-              if (lastResortAddr && lastResortAddr.city !== "Current Location" && !lastResortAddr.address.includes(latitude.toFixed(4)) && lastResortAddr.formattedAddress && !lastResortAddr.formattedAddress.includes(latitude.toFixed(4))) {
-                const lastResortLoc = {
-                  ...lastResortAddr,
-                  latitude,
-                  longitude,
-                  accuracy: pos.coords.accuracy || null
-                };
-                localStorage.setItem("userLocation", JSON.stringify(lastResortLoc));
-                setLocation(lastResortLoc);
-                setPermissionGranted(true);
-                if (showLoading) setLoading(false);
-                setError(null);
-                if (updateDB) await updateLocationInDB(lastResortLoc).catch(() => {});
-                resolve(lastResortLoc);
-                return;
-              } else {
-                console.warn("⚠️ Last resort geocoding returned invalid data:", lastResortAddr);
-              }
-            } catch (lastErr) {
-              console.error("❌ Last resort geocoding also failed:", lastErr.message);
-            }
-
-            // If all geocoding fails, use placeholder but don't save
-            const fallbackLoc = {
-              latitude,
-              longitude,
-              city: "Current Location",
-              area: "",
-              state: "",
-              address: "Select location",
-              // Don't show coordinates
-              formattedAddress: "Select location" // Don't show coordinates
-            };
-            // Don't save placeholder values to localStorage
-            // Only set in state for display
-            console.warn("⚠️ Skipping save - all geocoding failed, using placeholder");
+            console.error("Error processing location:", err);
+            const { latitude, longitude } = pos.coords;
+            const fallbackLoc = { ...(location || {}), latitude, longitude, city: "Current Location", area: "", state: "", address: "Select location", formattedAddress: "Select location" };
             setLocation(fallbackLoc);
             setPermissionGranted(true);
             if (showLoading) setLoading(false);
-            // Don't try to update DB with placeholder
             resolve(fallbackLoc);
           }
         }, async err => {
@@ -1395,201 +1182,90 @@ export function useLocation() {
     const startWatch = options => {
       watchIdRef.current = navigator.geolocation.watchPosition(async pos => {
         try {
-          const {
-            latitude,
-            longitude,
-            accuracy
-          } = pos.coords;
-          // Reset retry count on success
+          const { latitude, longitude, accuracy } = pos.coords;
           retryCount = 0;
 
-          // Validate coordinates are in India range BEFORE attempting geocoding
-          // India: Latitude 6.5° to 37.1° N, Longitude 68.7° to 97.4° E
-          const isInIndiaRange = latitude >= 6.5 && latitude <= 37.1 && longitude >= 68.7 && longitude <= 97.4 && longitude > 0;
+          // --- Step 1: Immediately update coordinates in state ---
+          // This triggers zone detection + restaurant/ad fetches without waiting for geocoding
+          const coordThreshold = 0.0001; // ~10m
+          const coordsChanged =
+            !prevLocationCoordsRef.current.latitude ||
+            !prevLocationCoordsRef.current.longitude ||
+            Math.abs(prevLocationCoordsRef.current.latitude - latitude) > coordThreshold ||
+            Math.abs(prevLocationCoordsRef.current.longitude - longitude) > coordThreshold;
 
-          // Get address from Google Maps API with error handling
-          let addr;
-          if (!isInIndiaRange || longitude < 0) {
-            // Coordinates are outside India - skip geocoding and use placeholder
-            console.warn("⚠️ Coordinates outside India range, skipping geocoding:", {
-              latitude,
-              longitude
-            });
-            addr = {
-              city: "Current Location",
-              state: "",
-              country: "",
-              area: "",
-              address: "Select location",
-              formattedAddress: "Select location"
-            };
-          } else {
-            try {
-              addr = await reverseGeocodeWithGoogleMaps(latitude, longitude);
-            } catch (geocodeErr) {
-              console.error("❌ Google Maps reverse geocoding failed:", geocodeErr.message);
-              // Try fallback geocoding
-              try {
-                addr = await reverseGeocodeDirect(latitude, longitude);
-              } catch (fallbackErr) {
-                console.error("❌ Fallback geocoding also failed:", fallbackErr.message);
-                // Don't use coordinates - use placeholder instead
-                addr = {
-                  city: "Current Location",
-                  state: "",
-                  country: "",
-                  area: "",
-                  address: "Select location",
-                  // Don't show coordinates
-                  formattedAddress: "Select location" // Don't show coordinates
-                };
-              }
-            }
-          }
-
-          // CRITICAL: Ensure formattedAddress is NEVER coordinates
-          // Check if reverse geocoding returned proper address or just coordinates
-          let completeFormattedAddress = addr.formattedAddress || "";
-          let displayAddress = addr.address || "";
-
-          // Check if formattedAddress is coordinates pattern
-          const isFormattedAddressCoordinates = /^-?\d+\.\d+,\s*-?\d+\.\d+$/.test(completeFormattedAddress.trim());
-          const isDisplayAddressCoordinates = /^-?\d+\.\d+,\s*-?\d+\.\d+$/.test(displayAddress.trim());
-
-          // If formattedAddress is coordinates, it means reverse geocoding failed
-          // Build proper address from components or use fallback
-          if (isFormattedAddressCoordinates || !completeFormattedAddress || completeFormattedAddress === "Select location") {
-            console.warn("⚠️⚠️⚠️ Reverse geocoding returned coordinates or empty address!");
-            console.warn("⚠️ Attempting to build address from components:", {
-              city: addr.city,
-              state: addr.state,
-              area: addr.area,
-              street: addr.street,
-              streetNumber: addr.streetNumber
-            });
-
-            // Build address from components
-            const addressParts = [];
-            if (addr.area && addr.area.trim() !== "") {
-              addressParts.push(addr.area);
-            }
-            if (addr.city && addr.city.trim() !== "") {
-              addressParts.push(addr.city);
-            }
-            if (addr.state && addr.state.trim() !== "") {
-              addressParts.push(addr.state);
-            }
-            if (addressParts.length > 0) {
-              completeFormattedAddress = addressParts.join(', ');
-              displayAddress = addr.area || addr.city || "Select location";
-            } else {
-              // Final fallback - don't use coordinates
-              completeFormattedAddress = addr.city || "Select location";
-              displayAddress = addr.city || "Select location";
-              console.warn("⚠️ Using fallback address:", completeFormattedAddress);
-            }
-          }
-
-          // Also check displayAddress
-          if (isDisplayAddressCoordinates) {
-            displayAddress = addr.area || addr.city || "Select location";
-          }
-
-          // Build location object with ALL fields from reverse geocoding
-          // NEVER include coordinates in formattedAddress or address
-          const loc = {
-            ...addr,
-            // This includes: city, state, area, street, streetNumber, postalCode
-            latitude,
-            longitude,
-            accuracy: accuracy || null,
-            address: displayAddress,
-            // Locality parts for navbar display (NEVER coordinates)
-            formattedAddress: completeFormattedAddress // Complete detailed address (NEVER coordinates)
-          };
-
-          // STABILITY: Only update if location changed significantly (>10m) OR address improved
-          const currentLoc = location;
-          if (currentLoc && currentLoc.latitude && currentLoc.longitude) {
-            // Calculate distance in meters (Haversine formula simplified for small distances)
-            const latDiff = latitude - currentLoc.latitude;
-            const lngDiff = longitude - currentLoc.longitude;
-            const distanceMeters = Math.sqrt(latDiff * latDiff + lngDiff * lngDiff) * 111320; // ~111320m per degree
-
-            // Check if address is better (more parts = more complete)
-            const currentParts = (currentLoc.formattedAddress || "").split(',').filter(p => p.trim()).length;
-            const newParts = completeFormattedAddress.split(',').filter(p => p.trim()).length;
-            const addressImproved = newParts > currentParts;
-
-            // Only update if moved >10 meters OR address significantly improved
-            if (distanceMeters <= 10 && !addressImproved) {
-              return; // Don't update - keep current stable address
-            }
-          }
-
-          // Final validation - ensure formattedAddress is never coordinates
-          if (loc.formattedAddress && /^-?\d+\.\d+,\s*-?\d+\.\d+$/.test(loc.formattedAddress.trim())) {
-            console.error("❌❌❌ CRITICAL: formattedAddress is still coordinates! Replacing with city/area");
-            loc.formattedAddress = loc.area || loc.city || "Select location";
-            loc.address = loc.area || loc.city || "Select location";
-          }
-
-          // Check if location has placeholder values - don't save placeholders
-          const hasPlaceholder = loc.city === "Current Location" || loc.address === "Select location" || loc.formattedAddress === "Select location" || !loc.city && !loc.address && !loc.formattedAddress && !loc.area;
-          if (hasPlaceholder) {
-            console.warn("⚠️ Skipping live location update - contains placeholder values:", loc);
-            return; // Don't update location or save to DB
-          }
-
-          // Check if coordinates have changed significantly (threshold: ~10 meters)
-          const coordThreshold = 0.0001; // approximately 10 meters
-          const coordsChanged = !prevLocationCoordsRef.current.latitude || !prevLocationCoordsRef.current.longitude || Math.abs(prevLocationCoordsRef.current.latitude - loc.latitude) > coordThreshold || Math.abs(prevLocationCoordsRef.current.longitude - loc.longitude) > coordThreshold;
-
-          // Only update location state if coordinates changed significantly
           if (coordsChanged) {
-            prevLocationCoordsRef.current = {
-              latitude: loc.latitude,
-              longitude: loc.longitude
-            };
-            localStorage.setItem("userLocation", JSON.stringify(loc));
-            setLocation(loc);
+            prevLocationCoordsRef.current = { latitude, longitude };
+
+            setLocation(prev => {
+              const updated = {
+                ...(prev || {}),
+                latitude,
+                longitude,
+                accuracy: accuracy || null
+              };
+              localStorage.setItem("userLocation", JSON.stringify(updated));
+              return updated;
+            });
             setPermissionGranted(true);
             setError(null);
-          } else {
-            // Coordinates haven't changed significantly, skip state update to prevent re-renders
-            // Still update localStorage silently for persistence
-            localStorage.setItem("userLocation", JSON.stringify(loc));
+
+            // Sync coordinates to Firebase RTDB (real-time location bus)
+            _syncLocationToFirebase(latitude, longitude);
           }
 
-          // Debounce DB updates - only update every 5 seconds
-          clearTimeout(updateTimerRef.current);
-          updateTimerRef.current = setTimeout(() => {
-            updateLocationInDB(loc).catch(err => {
-              console.warn("Failed to update location in DB:", err);
-            });
-          }, 5000);
+          // --- Step 2: Geocode asynchronously only if moved ~150m from last geocoded position ---
+          const geocodeThreshold = 0.0013; // ~150m — matches the grid cache cell size
+          const needsGeocode =
+            !lastGeocodedCoordsRef.current.latitude ||
+            !lastGeocodedCoordsRef.current.longitude ||
+            Math.abs(lastGeocodedCoordsRef.current.latitude - latitude) > geocodeThreshold ||
+            Math.abs(lastGeocodedCoordsRef.current.longitude - longitude) > geocodeThreshold;
+
+          if (needsGeocode) {
+            const isInIndiaRange = latitude >= 6.5 && latitude <= 37.1 && longitude >= 68.7 && longitude <= 97.4 && longitude > 0;
+            if (isInIndiaRange) {
+              // Fire-and-forget — don't block the position callback
+              (async () => {
+                try {
+                  let addr;
+                  try {
+                    addr = await reverseGeocodeWithGoogleMaps(latitude, longitude);
+                  } catch {
+                    try { addr = await reverseGeocodeDirect(latitude, longitude); } catch { return; }
+                  }
+                  if (!addr || addr.city === "Current Location" || addr.address === "Select location") return;
+
+                  lastGeocodedCoordsRef.current = { latitude, longitude };
+
+                  let displayAddress = addr.address || "";
+                  let completeFormattedAddress = addr.formattedAddress || "";
+                  if (/^-?\d+\.\d+,\s*-?\d+\.\d+$/.test(displayAddress.trim())) {
+                    displayAddress = addr.area || addr.city || "Select location";
+                  }
+                  if (/^-?\d+\.\d+,\s*-?\d+\.\d+$/.test(completeFormattedAddress.trim()) || !completeFormattedAddress || completeFormattedAddress === "Select location") {
+                    const parts = [addr.area, addr.city, addr.state].filter(Boolean);
+                    completeFormattedAddress = parts.length ? parts.join(', ') : addr.city || "Select location";
+                    displayAddress = addr.area || addr.city || displayAddress;
+                  }
+
+                  const mergedLoc = { ...addr, latitude, longitude, accuracy: accuracy || null, address: displayAddress, formattedAddress: completeFormattedAddress };
+                  localStorage.setItem("userLocation", JSON.stringify(mergedLoc));
+                  setLocation(mergedLoc);
+
+                  // Debounce DB update
+                  clearTimeout(updateTimerRef.current);
+                  updateTimerRef.current = setTimeout(() => {
+                    updateLocationInDB(mergedLoc).catch(() => {});
+                  }, 5 * 60 * 1000);
+                } catch { /* geocoding failed silently — coordinates already in state */ }
+              })();
+            }
+          }
         } catch (err) {
-          console.error("❌ Error processing live location update:", err);
-          // If reverse geocoding fails, DON'T use coordinates - use placeholder
-          const {
-            latitude,
-            longitude
-          } = pos.coords;
-          const fallbackLoc = {
-            latitude,
-            longitude,
-            city: "Current Location",
-            area: "",
-            state: "",
-            address: "Select location",
-            // NEVER use coordinates
-            formattedAddress: "Select location" // NEVER use coordinates
-          };
-          console.warn("⚠️ Using fallback location (reverse geocoding failed):", fallbackLoc);
-          // Don't save placeholder values to localStorage
-          // Only set in state for display
-          console.warn("⚠️ Skipping localStorage save - fallback location contains placeholder values");
-          setLocation(fallbackLoc);
+          console.error("Error processing live location update:", err);
+          const { latitude, longitude } = pos.coords;
+          setLocation(prev => ({ ...(prev || {}), latitude, longitude, city: prev?.city || "Current Location", area: prev?.area || "", state: prev?.state || "", address: prev?.address || "Select location", formattedAddress: prev?.formattedAddress || "Select location" }));
           setPermissionGranted(true);
         }
       }, err => {

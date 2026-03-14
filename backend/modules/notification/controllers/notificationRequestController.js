@@ -6,6 +6,7 @@ import BusinessSettings from '../../admin/models/BusinessSettings.js';
 import Restaurant from '../../restaurant/models/Restaurant.js';
 import User from '../../auth/models/User.js';
 import admin from 'firebase-admin';
+import { calculateDistance } from '../../order/services/orderCalculationService.js';
 
 /**
  * POST /api/notification-requests
@@ -163,18 +164,22 @@ export const adminApproveRequest = asyncHandler(async (req, res) => {
   if (request.status !== 'pending') {
     return errorResponse(res, 400, `Request already processed (status: ${request.status})`);
   }
+  const restaurant = await Restaurant.findById(request.restaurantId).select('name location deliveryRange').lean();
+  const restaurantCoords = restaurant?.location?.coordinates;
+  const hasValidRestaurantCoords = Array.isArray(restaurantCoords) && restaurantCoords.length >= 2 && Number.isFinite(restaurantCoords[0]) && Number.isFinite(restaurantCoords[1]) && !(restaurantCoords[0] === 0 && restaurantCoords[1] === 0);
+  const targetRangeKm = Number(restaurant?.deliveryRange) > 0 ? Number(restaurant.deliveryRange) : 5;
   const notification = await Notification.create({
     title: (titleOverride || request.title).trim(),
     description: (descriptionOverride || request.description).trim(),
     imageUrl: request.imageUrl,
     target: 'all_users',
     sourceType: 'restaurant_request',
-    restaurantId: request.restaurantId
+    restaurantId: request.restaurantId,
+    restaurantLocation: hasValidRestaurantCoords
+      ? { type: 'Point', coordinates: restaurantCoords }
+      : undefined,
+    deliveryRangeKm: targetRangeKm
   });
-  const restaurant = await Restaurant.findById(request.restaurantId).select('name location deliveryRange').lean();
-  const restaurantCoords = restaurant?.location?.coordinates;
-  const hasValidRestaurantCoords = Array.isArray(restaurantCoords) && restaurantCoords.length >= 2 && Number.isFinite(restaurantCoords[0]) && Number.isFinite(restaurantCoords[1]) && !(restaurantCoords[0] === 0 && restaurantCoords[1] === 0);
-  const targetRangeKm = Number(restaurant?.deliveryRange) > 0 ? Number(restaurant.deliveryRange) : 5;
   const userFilter = {
     role: 'user',
     isActive: true,
@@ -370,17 +375,28 @@ export const updateNotificationSettings = asyncHandler(async (req, res) => {
 });
 
 /**
- * GET /api/notifications/users
- * Users fetch all active notifications (used as initial load / fallback).
+ * GET /api/notifications/users?latitude=&longitude=
+ * Users fetch active notifications. Restaurant-originated notifications are
+ * filtered by the restaurant's deliveryRange so users only see relevant ones.
  */
 export const getUserNotifications = asyncHandler(async (req, res) => {
-  const notifications = await Notification.find({
+  const { latitude, longitude } = req.query;
+  const userLat = latitude != null ? parseFloat(latitude) : null;
+  const userLng = longitude != null ? parseFloat(longitude) : null;
+
+  let notifications = await Notification.find({
     target: 'all_users',
     isActive: true
-  }).sort({
-    sentAt: -1
-  }).limit(50).lean();
-  return successResponse(res, 200, 'Notifications fetched', {
-    notifications
-  });
+  }).sort({ sentAt: -1 }).limit(50).lean();
+
+  if (userLat != null && userLng != null && Number.isFinite(userLat) && Number.isFinite(userLng)) {
+    notifications = notifications.filter(n => {
+      if (n.sourceType !== 'restaurant_request') return true;
+      if (!n.restaurantLocation?.coordinates || n.restaurantLocation.coordinates.length < 2) return true;
+      const dist = calculateDistance(n.restaurantLocation.coordinates, [userLng, userLat]);
+      return dist <= (n.deliveryRangeKm || 5);
+    });
+  }
+
+  return successResponse(res, 200, 'Notifications fetched', { notifications });
 });

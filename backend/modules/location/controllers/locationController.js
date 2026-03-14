@@ -197,27 +197,17 @@ export const reverseGeocode = async (req, res) => {
                     }
                   }
 
-                  // If still no area, try Google Places Nearby Search for more specific location
-                  if (!area && googleApiKey) {
-                    try {
-                      const placesResponse = await axios.get(`https://maps.googleapis.com/maps/api/place/nearbysearch/json`, {
-                        params: {
-                          location: `${latNum},${lngNum}`,
-                          radius: 100,
-                          // 100 meters - very close
-                          type: 'neighborhood|sublocality',
-                          key: googleApiKey
-                        },
-                        timeout: 3000
-                      });
-                      if (placesResponse.data && placesResponse.data.results && placesResponse.data.results.length > 0) {
-                        const place = placesResponse.data.results[0];
-                        if (place.name && place.name !== city && place.name !== state && !place.name.toLowerCase().includes('district')) {
-                          area = place.name;
-                        }
-                      }
-                    } catch (placesErr) {
-                      // Silently fail - this is optional enhancement
+                  // If still no area, extract from formatted_address (avoids $32/1000 Nearby Search)
+                  if (!area && googleResult.formatted_address) {
+                    const parts = googleResult.formatted_address.split(',').map(p => p.trim());
+                    for (const part of parts) {
+                      if (!part) continue;
+                      if (/^\d/.test(part)) continue;
+                      if (part === city || part === state || part === country) continue;
+                      if (/\d{6}/.test(part)) continue;
+                      if (part.toLowerCase().includes('india')) continue;
+                      area = part;
+                      break;
                     }
                   }
                   const transformedData = {

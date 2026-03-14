@@ -23,6 +23,7 @@ export const getBusinessSettingsPublic = asyncHandler(async (req, res) => {
       {
         companyName: settings?.companyName || "Appzeto Food",
         logo: settings?.logo || { url: "", publicId: "" },
+        maxDeliveryRange: settings?.maxDeliveryRange ?? 20,
       },
     );
   } catch (error) {
@@ -35,6 +36,7 @@ export const getBusinessSettingsPublic = asyncHandler(async (req, res) => {
       {
         companyName: "Appzeto Food",
         logo: { url: "", publicId: "" },
+        maxDeliveryRange: 20,
       },
     );
   }
@@ -75,6 +77,7 @@ export const updateBusinessSettings = asyncHandler(async (req, res) => {
       pincode,
       region,
       maintenanceMode,
+      maxDeliveryRange,
     } = req.body;
 
     // Get existing settings
@@ -102,6 +105,10 @@ export const updateBusinessSettings = asyncHandler(async (req, res) => {
     if (state !== undefined) settings.state = state;
     if (pincode !== undefined) settings.pincode = pincode;
     if (region !== undefined) settings.region = region;
+    if (maxDeliveryRange !== undefined) {
+      const parsed = Number(maxDeliveryRange);
+      if (Number.isFinite(parsed) && parsed >= 1) settings.maxDeliveryRange = parsed;
+    }
     if (maintenanceMode !== undefined) {
       settings.maintenanceMode.isEnabled = maintenanceMode.isEnabled || false;
       if (maintenanceMode.startDate) {

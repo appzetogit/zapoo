@@ -87,6 +87,12 @@ const businessSettingsSchema = new mongoose.Schema(
       default: 100,
       min: 0,
     },
+    // Maximum delivery range (km) a restaurant can set. Used as the geo-query cap.
+    maxDeliveryRange: {
+      type: Number,
+      default: 20,
+      min: 1,
+    },
     // Maximum notification requests a restaurant can submit per day
     restaurantNotificationDailyLimit: {
       type: Number,

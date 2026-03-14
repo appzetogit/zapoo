@@ -44,6 +44,15 @@ const notificationSchema = new mongoose.Schema(
             ref: 'Restaurant',
             default: null,
         },
+        // Denormalized snapshot for read-time range filtering (restaurant_request only)
+        restaurantLocation: {
+            type: { type: String, enum: ['Point'], default: 'Point' },
+            coordinates: { type: [Number] },
+        },
+        deliveryRangeKm: {
+            type: Number,
+            default: null,
+        },
         sentAt: {
             type: Date,
             default: Date.now,
