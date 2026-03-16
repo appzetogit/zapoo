@@ -44,7 +44,6 @@ export const getOrders = asyncHandler(async (req, res) => {
         // Payment failed orders have pending status
         'refunded': 'cancelled',
         // Refunded orders might be cancelled
-        'dine-in': 'dine_in',
         'offline-payments': 'pending' // Offline payment orders
       };
       const mappedStatus = statusMap[status] || status;
@@ -282,8 +281,7 @@ export const getOrders = asyncHandler(async (req, res) => {
           'ready': 'Ready',
           'out_for_delivery': 'Food On The Way',
           'delivered': 'Delivered',
-          'scheduled': 'Scheduled',
-          'dine_in': 'Dine In'
+          'scheduled': 'Scheduled'
         };
         orderStatusDisplay = statusMap[order.status] || order.status;
       }
@@ -584,8 +582,7 @@ export const getSearchingDeliverymanOrders = asyncHandler(async (req, res) => {
         'out_for_delivery': 'Food On The Way',
         'delivered': 'Delivered',
         'cancelled': 'Canceled',
-        'scheduled': 'Scheduled',
-        'dine_in': 'Dine In'
+        'scheduled': 'Scheduled'
       };
       const orderStatusDisplay = statusMap[order.status] || 'Pending';
 
@@ -807,10 +804,6 @@ export const getOngoingOrders = asyncHandler(async (req, res) => {
           text: 'Scheduled',
           color: 'bg-purple-50 text-purple-600'
         },
-        'dine_in': {
-          text: 'Dine In',
-          color: 'bg-indigo-50 text-indigo-600'
-        }
       };
 
       // Check for handover status (when delivery partner has reached pickup)

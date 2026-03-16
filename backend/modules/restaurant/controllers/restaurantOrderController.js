@@ -4,7 +4,7 @@ import Restaurant from '../models/Restaurant.js';
 import { successResponse, errorResponse } from '../../../shared/utils/response.js';
 import asyncHandler from '../../../shared/middleware/asyncHandler.js';
 import { notifyRestaurantOrderUpdate } from '../../order/services/restaurantNotificationService.js';
-import { assignOrderToDeliveryBoy, findNearestDeliveryBoys, findNearestDeliveryBoy } from '../../order/services/deliveryAssignmentService.js';
+import { assignOrderToDeliveryBoy, findNearestDeliveryBoys, findNearestDeliveryBoy, filterByCodCashLimit } from '../../order/services/deliveryAssignmentService.js';
 import { notifyDeliveryBoyNewOrder, notifyMultipleDeliveryBoys } from '../../order/services/deliveryNotificationService.js';
 import mongoose from 'mongoose';
 
@@ -319,9 +319,13 @@ export const acceptOrder = asyncHandler(async (req, res) => {
               // Reload order with populated userId and restaurantId (with location)
               const populatedOrder = await Order.findById(freshOrder._id).populate('userId', 'name phone').populate('restaurantId', 'name address location phone ownerPhone').lean();
               if (populatedOrder) {
-                // Notify priority delivery boys (without assigning)
-                const priorityIds = priorityDeliveryBoys.map(db => db.deliveryPartnerId);
-                await notifyMultipleDeliveryBoys(populatedOrder, priorityIds, 'priority');
+                // Notify priority delivery boys (without assigning), filtered by COD cash limit
+                const priorityIds = await filterByCodCashLimit(
+                  priorityDeliveryBoys.map(db => db.deliveryPartnerId), populatedOrder
+                );
+                if (priorityIds.length > 0) {
+                  await notifyMultipleDeliveryBoys(populatedOrder, priorityIds, 'priority');
+                }
                 // Step 2: Set timeout to expand to other delivery boys after 30 seconds
                 setTimeout(async () => {
                   try {
@@ -338,7 +342,15 @@ export const acceptOrder = asyncHandler(async (req, res) => {
                     // Filter out priority delivery boys
                     const expandedDeliveryBoys = allDeliveryBoys.filter(db => !priorityIds.includes(db.deliveryPartnerId));
                     if (expandedDeliveryBoys && expandedDeliveryBoys.length > 0) {
-                      const expandedIds = expandedDeliveryBoys.map(db => db.deliveryPartnerId);
+                      const expandedIdsRaw = expandedDeliveryBoys.map(db => db.deliveryPartnerId);
+
+                      // Reload with populated userId and restaurantId (with location)
+                      const expandedOrder = await Order.findById(checkOrder._id).populate('userId', 'name phone').populate('restaurantId', 'name address location phone ownerPhone').lean();
+
+                      // Filter by COD cash limit before notifying
+                      const expandedIds = expandedOrder
+                        ? await filterByCodCashLimit(expandedIdsRaw, expandedOrder)
+                        : expandedIdsRaw;
 
                       // Update assignment info
                       checkOrder.assignmentInfo = {
@@ -349,10 +361,7 @@ export const acceptOrder = asyncHandler(async (req, res) => {
                       };
                       await checkOrder.save();
 
-                      // Reload with populated userId and restaurantId (with location)
-                      const expandedOrder = await Order.findById(checkOrder._id).populate('userId', 'name phone').populate('restaurantId', 'name address location phone ownerPhone').lean();
-                      if (expandedOrder) {
-                        // Notify all expanded delivery boys
+                      if (expandedOrder && expandedIds.length > 0) {
                         await notifyMultipleDeliveryBoys(expandedOrder, expandedIds, 'expanded');
                       }
                     } else {
@@ -370,7 +379,10 @@ export const acceptOrder = asyncHandler(async (req, res) => {
               if (anyDeliveryBoy) {
                 const populatedOrder = await Order.findById(freshOrder._id).populate('userId', 'name phone').lean();
                 if (populatedOrder) {
-                  await notifyMultipleDeliveryBoys(populatedOrder, [anyDeliveryBoy.deliveryPartnerId], 'immediate');
+                  const filteredIds = await filterByCodCashLimit([anyDeliveryBoy.deliveryPartnerId], populatedOrder);
+                  if (filteredIds.length > 0) {
+                    await notifyMultipleDeliveryBoys(populatedOrder, filteredIds, 'immediate');
+                  }
                 }
               } else {
                 console.warn(`⚠️ No delivery partners available for order ${order.orderId}`);
@@ -852,7 +864,9 @@ export const resendDeliveryNotification = asyncHandler(async (req, res) => {
       // Notify all available delivery boys
       const populatedOrder = await Order.findById(order._id).populate('userId', 'name phone').populate('restaurantId', 'name location address phone ownerPhone').lean();
       if (populatedOrder) {
-        const deliveryPartnerIds = allDeliveryBoys.map(db => db.deliveryPartnerId);
+        const deliveryPartnerIds = await filterByCodCashLimit(
+          allDeliveryBoys.map(db => db.deliveryPartnerId), populatedOrder
+        );
 
         // Update assignment info
         await Order.findByIdAndUpdate(order._id, {
@@ -862,7 +876,9 @@ export const resendDeliveryNotification = asyncHandler(async (req, res) => {
             'assignmentInfo.assignedAt': new Date()
           }
         });
-        await notifyMultipleDeliveryBoys(populatedOrder, deliveryPartnerIds, 'priority');
+        if (deliveryPartnerIds.length > 0) {
+          await notifyMultipleDeliveryBoys(populatedOrder, deliveryPartnerIds, 'priority');
+        }
         return successResponse(res, 200, `Notification sent to ${deliveryPartnerIds.length} delivery partners`, {
           order: populatedOrder,
           notifiedCount: deliveryPartnerIds.length
@@ -872,7 +888,9 @@ export const resendDeliveryNotification = asyncHandler(async (req, res) => {
       // Notify priority delivery boys
       const populatedOrder = await Order.findById(order._id).populate('userId', 'name phone').populate('restaurantId', 'name location address phone ownerPhone').lean();
       if (populatedOrder) {
-        const priorityIds = priorityDeliveryBoys.map(db => db.deliveryPartnerId);
+        const priorityIds = await filterByCodCashLimit(
+          priorityDeliveryBoys.map(db => db.deliveryPartnerId), populatedOrder
+        );
 
         // Update assignment info
         await Order.findByIdAndUpdate(order._id, {
@@ -882,7 +900,9 @@ export const resendDeliveryNotification = asyncHandler(async (req, res) => {
             'assignmentInfo.assignedAt': new Date()
           }
         });
-        await notifyMultipleDeliveryBoys(populatedOrder, priorityIds, 'priority');
+        if (priorityIds.length > 0) {
+          await notifyMultipleDeliveryBoys(populatedOrder, priorityIds, 'priority');
+        }
         return successResponse(res, 200, `Notification sent to ${priorityIds.length} delivery partners`, {
           order: populatedOrder,
           notifiedCount: priorityIds.length

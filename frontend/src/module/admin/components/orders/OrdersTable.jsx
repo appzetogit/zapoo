@@ -14,7 +14,6 @@ const getStatusColor = (orderStatus) => {
     "Cancelled by User": "bg-orange-100 text-orange-700",
     "Payment Failed": "bg-red-100 text-red-700",
     "Refunded": "bg-sky-100 text-sky-700",
-    "Dine In": "bg-indigo-100 text-indigo-700",
     "Offline Payments": "bg-slate-100 text-slate-700",
   }
   return colors[orderStatus] || "bg-slate-100 text-slate-700"

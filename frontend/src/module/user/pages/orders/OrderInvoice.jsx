@@ -200,7 +200,12 @@ export default function OrderInvoice() {
                   <h3 className="font-bold mb-2 text-sm sm:text-base">Invoice Details:</h3>
                   <p className="text-xs sm:text-sm"><strong>Invoice #:</strong> {order.id}</p>
                   <p className="text-xs sm:text-sm"><strong>Date:</strong> {formatDate(order.createdAt)}</p>
-                  <p className="text-xs sm:text-sm"><strong>Payment:</strong> {order.paymentMethod?.type?.toUpperCase() || "Card"}</p>
+                  <p className="text-xs sm:text-sm"><strong>Payment:</strong> {(() => {
+                    const m = (order.payment?.method || order.paymentMethod || '').toString().toLowerCase();
+                    if (m === 'cash' || m === 'cod') return 'Cash on Delivery';
+                    if (m === 'wallet') return 'Wallet';
+                    return 'Online';
+                  })()}</p>
                 </div>
               </div>
 

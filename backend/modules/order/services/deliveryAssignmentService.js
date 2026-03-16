@@ -2,6 +2,8 @@ import Delivery from '../../delivery/models/Delivery.js';
 import Order from '../models/Order.js';
 import Zone from '../../admin/models/Zone.js';
 import Restaurant from '../../restaurant/models/Restaurant.js';
+import DeliveryWallet from '../../delivery/models/DeliveryWallet.js';
+import BusinessSettings from '../../admin/models/BusinessSettings.js';
 import mongoose from 'mongoose';
 
 /**
@@ -369,5 +371,53 @@ export async function assignOrderToDeliveryBoy(order, restaurantLat, restaurantL
   } catch (error) {
     console.error('❌ Error assigning order to delivery boy:', error);
     throw error;
+  }
+}
+
+/**
+ * Filter out delivery partners whose cashInHand + orderTotal would exceed the cash limit.
+ * Only applies to COD orders; non-COD orders return the full list unchanged.
+ * @param {Array<string>} deliveryPartnerIds - Array of delivery partner IDs
+ * @param {Object} order - Order document (needs payment.method and pricing.total)
+ * @returns {Promise<Array<string>>} Filtered delivery partner IDs
+ */
+export async function filterByCodCashLimit(deliveryPartnerIds, order) {
+  if (!deliveryPartnerIds || deliveryPartnerIds.length === 0) return deliveryPartnerIds;
+
+  const payMethod = (order?.payment?.method || '').toLowerCase();
+  if (payMethod !== 'cash' && payMethod !== 'cod') return deliveryPartnerIds;
+
+  const orderTotal = Number(order?.pricing?.total) || 0;
+  if (orderTotal <= 0) return deliveryPartnerIds;
+
+  try {
+    const settings = await BusinessSettings.getSettings();
+    const cashLimit = Number(settings?.deliveryCashLimit) || 0;
+    if (cashLimit <= 0) return deliveryPartnerIds;
+
+    const objectIds = deliveryPartnerIds
+      .map(id => { try { return new mongoose.Types.ObjectId(id.toString()); } catch { return null; } })
+      .filter(Boolean);
+
+    const wallets = await DeliveryWallet.find({
+      deliveryId: { $in: objectIds }
+    }).select('deliveryId cashInHand').lean();
+
+    const cashMap = {};
+    wallets.forEach(w => { cashMap[w.deliveryId.toString()] = Number(w.cashInHand) || 0; });
+
+    const filtered = deliveryPartnerIds.filter(id => {
+      const cashInHand = cashMap[id.toString()] || 0;
+      return cashInHand + orderTotal <= cashLimit;
+    });
+
+    if (filtered.length < deliveryPartnerIds.length) {
+      console.log(`💰 COD cash limit filter: ${deliveryPartnerIds.length} → ${filtered.length} partners (order total: ₹${orderTotal}, limit: ₹${cashLimit})`);
+    }
+
+    return filtered;
+  } catch (err) {
+    console.warn('⚠️ COD cash limit filter failed, returning all partners:', err.message);
+    return deliveryPartnerIds;
   }
 }

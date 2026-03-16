@@ -15,6 +15,7 @@ export const useDeliveryNotifications = () => {
   // Step 2: All state hooks (unconditional)
   const [newOrder, setNewOrder] = useState(null);
   const [orderReady, setOrderReady] = useState(null);
+  const [orderTaken, setOrderTaken] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
   const [deliveryPartnerId, setDeliveryPartnerId] = useState(null);
 
@@ -284,6 +285,9 @@ export const useDeliveryNotifications = () => {
       setNewOrder(orderData);
       playNotificationSound();
     });
+    socketRef.current.on('order_taken', data => {
+      setOrderTaken(data);
+    });
     socketRef.current.on('play_notification_sound', data => {
       playNotificationSound();
     });
@@ -306,11 +310,16 @@ export const useDeliveryNotifications = () => {
   const clearOrderReady = () => {
     setOrderReady(null);
   };
+  const clearOrderTaken = () => {
+    setOrderTaken(null);
+  };
   return {
     newOrder,
     clearNewOrder,
     orderReady,
     clearOrderReady,
+    orderTaken,
+    clearOrderTaken,
     isConnected,
     playNotificationSound
   };

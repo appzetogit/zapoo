@@ -100,7 +100,10 @@ export async function notifyRestaurantNewOrder(order, restaurantId, paymentMetho
       estimatedDeliveryTime: order.estimatedDeliveryTime || 30,
       note: order.note || '',
       sendCutlery: order.sendCutlery,
-      paymentMethod: resolvedPaymentMethod
+      paymentMethod: resolvedPaymentMethod,
+      deliveryFee: order.pricing?.deliveryFee ?? 0,
+      adminDeliveryCost: order.pricing?.adminDeliveryCost ?? 0,
+      distanceKm: order.pricing?.distanceKm ?? 0,
     };
     // Get restaurant namespace
     const restaurantNamespace = io.of('/restaurant');

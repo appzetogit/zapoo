@@ -8,16 +8,6 @@ import Loader from "@/components/Loader"
 
 // Lazy Loading Components
 const UserRouter = lazy(() => import("@/module/user/components/UserRouter"))
-const HomePage = lazy(() => import("@/module/usermain/pages/HomePage"))
-const CategoriesPage = lazy(() => import("@/module/usermain/pages/CategoriesPage"))
-const CategoryFoodsPage = lazy(() => import("@/module/usermain/pages/CategoryFoodsPage"))
-const FoodDetailPage = lazy(() => import("@/module/usermain/pages/FoodDetailPage"))
-const CartPage = lazy(() => import("@/module/usermain/pages/CartPage"))
-const CheckoutPage = lazy(() => import("@/module/usermain/pages/CheckoutPage"))
-const PaymentPage = lazy(() => import("@/module/usermain/pages/PaymentPage"))
-const OrdersPage = lazy(() => import("@/module/usermain/pages/OrdersPage"))
-const OrderDetailsPage = lazy(() => import("@/module/usermain/pages/OrderDetailsPage"))
-const WishlistPage = lazy(() => import("@/module/usermain/pages/WishlistPage"))
 
 // Restaurant Module
 const RestaurantOrdersPage = lazy(() => import("@/module/restaurant/pages/OrdersPage"))
@@ -163,18 +153,6 @@ export default function App() {
             </ProtectedRoute>
           }
         />
-
-
-        <Route path="/usermain" element={<HomePage />} />
-        <Route path="/usermain/categories" element={<CategoriesPage />} />
-        <Route path="/usermain/category/:categoryName" element={<CategoryFoodsPage />} />
-        <Route path="/usermain/food/:id" element={<FoodDetailPage />} />
-        <Route path="/usermain/cart" element={<CartPage />} />
-        <Route path="/usermain/checkout" element={<CheckoutPage />} />
-        <Route path="/usermain/payment" element={<PaymentPage />} />
-        <Route path="/usermain/orders" element={<OrdersPage />} />
-        <Route path="/usermain/orders/:orderId" element={<OrderDetailsPage />} />
-        <Route path="/usermain/wishlist" element={<WishlistPage />} />
 
         {/* Restaurant Protected Routes - Old Routes */}
         <Route

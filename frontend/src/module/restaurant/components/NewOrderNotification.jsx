@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bell, X, ShoppingBag, MapPin, Clock, IndianRupee } from 'lucide-react';
+import { Bell, X, ShoppingBag, MapPin, Clock, IndianRupee, Truck, CreditCard } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 /**
@@ -63,6 +63,21 @@ export default function NewOrderNotification({ order, onClose, onViewOrder }) {
                 </span>
               </div>
 
+              {/* Payment Method */}
+              {(() => {
+                const raw = order.paymentMethod ?? order.payment?.method;
+                const m = raw != null ? String(raw).toLowerCase().trim() : '';
+                const isCod = m === 'cash' || m === 'cod' || m === 'cash on delivery';
+                return (
+                  <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${isCod ? 'bg-amber-50 border border-amber-200' : 'bg-emerald-50 border border-emerald-200'}`}>
+                    <CreditCard className={`w-4 h-4 ${isCod ? 'text-amber-600' : 'text-emerald-600'}`} />
+                    <span className={`text-sm font-semibold ${isCod ? 'text-amber-700' : 'text-emerald-700'}`}>
+                      {isCod ? 'Cash on Delivery' : 'Online Payment'}
+                    </span>
+                  </div>
+                );
+              })()}
+
               {/* Items */}
               <div>
                 <h4 className="text-sm font-semibold text-gray-700 mb-2">Items:</h4>
@@ -84,6 +99,37 @@ export default function NewOrderNotification({ order, onClose, onViewOrder }) {
                   )}
                 </div>
               </div>
+
+              {/* Delivery Charge & Restaurant Earnings */}
+              {(order.deliveryFee > 0 || order.adminDeliveryCost > 0) && (() => {
+                const adminCost = order.adminDeliveryCost || 0;
+                const custFee = order.deliveryFee || 0;
+                const restaurantEarning = Math.max(custFee - adminCost, 0);
+                return (
+                  <div className="p-3 bg-blue-50 rounded-xl space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Truck className="w-4 h-4 text-blue-600" />
+                        <span className="text-gray-600 font-medium text-sm">Delivery Charge</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-lg font-bold text-blue-600">
+                          ₹{adminCost.toFixed(2)}
+                        </span>
+                        {order.distanceKm > 0 && (
+                          <p className="text-[11px] text-gray-500">{order.distanceKm.toFixed(1)} km</p>
+                        )}
+                      </div>
+                    </div>
+                    {restaurantEarning > 0 && (
+                      <div className="flex items-center justify-between pt-1.5 border-t border-blue-100">
+                        <span className="text-xs text-gray-500">Your earnings from delivery</span>
+                        <span className="text-sm font-semibold text-green-600">+₹{restaurantEarning.toFixed(2)}</span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* Delivery Address */}
               {order.customerAddress && (

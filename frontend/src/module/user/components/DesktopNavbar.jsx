@@ -38,7 +38,7 @@ export default function DesktopNavbar() {
   // Check active routes - support both /user/* and /* paths
   const isUnder250 = location.pathname === "/under-250" || location.pathname === "/user/under-250"
   const isProfile = location.pathname.startsWith("/profile") || location.pathname.startsWith("/user/profile")
-  const isDelivery = !isUnder250 && !isProfile && (location.pathname === "/" || location.pathname === "/user" || (location.pathname.startsWith("/") && !location.pathname.startsWith("/restaurant") && !location.pathname.startsWith("/delivery") && !location.pathname.startsWith("/admin") && !location.pathname.startsWith("/usermain")))
+  const isDelivery = !isUnder250 && !isProfile && (location.pathname === "/" || location.pathname === "/user" || (location.pathname.startsWith("/") && !location.pathname.startsWith("/restaurant") && !location.pathname.startsWith("/delivery") && !location.pathname.startsWith("/admin")))
 
   // Reset visibility and scroll position when route changes
   useEffect(() => {

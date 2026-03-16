@@ -1591,7 +1591,12 @@ export default function OrdersMain() {
           <div className="flex items-center justify-between text-[11px] text-gray-500 mb-4">
             {/* Hide ETA for ready orders */}
             {selectedOrder.status !== 'ready' && selectedOrder.eta && <span>ETA: <span className="font-medium text-black">{selectedOrder.eta}</span></span>}
-            <span>Payment: <span className="font-medium text-black">Paid online</span></span>
+            {(() => {
+              const raw = selectedOrder?.paymentMethod ?? selectedOrder?.payment?.method;
+              const m = raw != null ? String(raw).toLowerCase().trim() : '';
+              const isCod = m === 'cash' || m === 'cod' || m === 'cash on delivery';
+              return <span>Payment: <span className={`font-medium ${isCod ? 'text-amber-600' : 'text-black'}`}>{isCod ? 'Cash on Delivery' : 'Paid online'}</span></span>;
+            })()}
           </div>
 
           <button className="w-full bg-[#3B82F6] text-white py-2.5 rounded-xl text-sm font-medium" onClick={() => setIsSheetOpen(false)}>

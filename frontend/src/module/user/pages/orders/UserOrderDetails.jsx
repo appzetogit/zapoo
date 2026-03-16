@@ -119,7 +119,12 @@ export default function UserOrderDetails() {
   const pricing = order.pricing || {};
   const userName = order.userName || "";
   const userPhone = order.userPhone || "";
-  const paymentMethod = order.payment?.method || "Online";
+  const paymentMethod = (() => {
+    const m = (order.payment?.method || '').toLowerCase();
+    if (m === 'cash' || m === 'cod') return 'Cash on Delivery';
+    if (m === 'wallet') return 'Wallet';
+    return 'Online';
+  })();
   const paymentDate = order.createdAt ? new Date(order.createdAt).toLocaleString("en-IN", {
     month: "long",
     day: "numeric",
@@ -434,7 +439,7 @@ export default function UserOrderDetails() {
                 Payment method
               </h4>
               <p className="text-gray-500 text-xs mt-0.5">
-                Paid via: {paymentMethod.toUpperCase()}
+                Paid via: {paymentMethod}
               </p>
             </div>
           </div>

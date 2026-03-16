@@ -338,6 +338,8 @@ export default function DeliveryHome() {
     clearNewOrder,
     orderReady,
     clearOrderReady,
+    orderTaken,
+    clearOrderTaken,
     isConnected
   } = useDeliveryNotifications();
 
@@ -1224,29 +1226,20 @@ export default function DeliveryHome() {
       setCountdownSeconds(300);
     }
   }, [showNewOrderPopup]);
-  // Simulate audio playback for Earnings Guarantee
-  useEffect(() => {
-    if (earningsGuaranteeIsPlaying) {
-      // Simulate audio time progression
-      let time = 0;
-      const interval = setInterval(() => {
-        time += 1;
-        const minutes = Math.floor(time / 60);
-        const seconds = time % 60;
-        setEarningsGuaranteeAudioTime(`${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`);
 
-        // Stop after 10 seconds (simulating audio length)
-        if (time >= 10) {
-          setEarningsGuaranteeIsPlaying(false);
-          clearInterval(interval);
-        }
-      }, 1000);
-      return () => clearInterval(interval);
+  // Auto-dismiss order popup when another delivery partner accepts it
+  useEffect(() => {
+    if (!orderTaken) return;
+    const takenId = orderTaken.orderMongoId || orderTaken.orderId;
+    const currentId = newOrder?.orderMongoId || newOrder?.orderId || selectedRestaurant?.id;
+    if (takenId && currentId && takenId === currentId) {
+      acceptedOrderIdsRef.current.add(takenId);
+      setShowNewOrderPopup(false);
+      clearNewOrder();
+      toast.info('This order was accepted by another delivery partner.');
     }
-  }, [earningsGuaranteeIsPlaying]);
-  const toggleEarningsGuaranteeAudio = () => {
-    setEarningsGuaranteeIsPlaying(!earningsGuaranteeIsPlaying);
-  };
+    clearOrderTaken();
+  }, [orderTaken]);
 
   // Reject reasons for order cancellation
   const rejectReasons = ["Too far from current location", "Vehicle issue", "Personal emergency", "Weather conditions", "Already have too many orders", "Other reason"];

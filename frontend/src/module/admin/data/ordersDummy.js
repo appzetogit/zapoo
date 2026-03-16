@@ -1,7 +1,7 @@
 // Dummy data for admin orders "All" page
 // 30 sample orders with full details covering all states:
 // Scheduled, Pending, Accepted, Processing, Food On The Way,
-// Delivered, Canceled, Payment Failed, Refunded, Dine In, Offline Payments.
+// Delivered, Canceled, Payment Failed, Refunded, Offline Payments.
 
 export const ordersDummy = [
   // Delivered (8)
@@ -384,21 +384,6 @@ export const ordersDummy = [
     paymentStatus: "Unpaid",
     orderStatus: "Refunded",
     deliveryType: "Home Delivery",
-  },
-
-  // Dine In (1)
-  {
-    sl: 29,
-    orderId: "100154",
-    date: "07 JUL 2025",
-    time: "09:30 AM",
-    customerName: "Table 07 Guest",
-    customerPhone: "N/A",
-    restaurant: "Dine In Hub",
-    totalAmount: 192.75,
-    paymentStatus: "Paid",
-    orderStatus: "Dine In",
-    deliveryType: "Dine In",
   },
 
   // Offline Payments (1)

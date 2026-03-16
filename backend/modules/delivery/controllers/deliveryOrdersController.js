@@ -9,6 +9,7 @@ import DeliveryBoyCommission from '../../admin/models/DeliveryBoyCommission.js';
 import RestaurantWallet from '../../restaurant/models/RestaurantWallet.js';
 import RestaurantCommission from '../../admin/models/RestaurantCommission.js';
 import AdminCommission from '../../admin/models/AdminCommission.js';
+import BusinessSettings from '../../admin/models/BusinessSettings.js';
 import { calculateRoute } from '../../order/services/routeCalculationService.js';
 import {
   evaluateChallengesOnOrderCompleted,
@@ -227,6 +228,27 @@ export const acceptOrder = asyncHandler(async (req, res) => {
       return errorResponse(res, 404, 'Order not found');
     }
 
+    // COD cash limit enforcement: block acceptance if cashInHand + orderTotal > deliveryCashLimit
+    const payMethod = (order.payment?.method || '').toLowerCase();
+    if (payMethod === 'cash' || payMethod === 'cod') {
+      try {
+        const [wallet, settings] = await Promise.all([
+          DeliveryWallet.findOne({ deliveryId: delivery._id }).select('cashInHand').lean(),
+          BusinessSettings.getSettings()
+        ]);
+        const cashInHand = Number(wallet?.cashInHand) || 0;
+        const cashLimit = Number(settings?.deliveryCashLimit) || 0;
+        const orderTotal = Number(order.pricing?.total) || 0;
+        if (cashLimit > 0 && cashInHand + orderTotal > cashLimit) {
+          return errorResponse(res, 400,
+            `Cannot accept COD order. Your cash in hand (₹${cashInHand.toFixed(0)}) plus this order (₹${orderTotal.toFixed(0)}) would exceed your cash limit (₹${cashLimit.toFixed(0)}). Please deposit cash first.`
+          );
+        }
+      } catch (cashLimitErr) {
+        console.warn('⚠️ Cash limit check failed, allowing acceptance:', cashLimitErr.message);
+      }
+    }
+
     // Check if order is assigned to this delivery partner
     const orderDeliveryPartnerId = order.deliveryPartnerId?.toString();
     const currentDeliveryId = delivery._id.toString();
@@ -314,6 +336,32 @@ export const acceptOrder = asyncHandler(async (req, res) => {
           acceptedFromNotification: true
         };
         await orderDoc.save();
+
+        // Broadcast order_taken to all other notified delivery partners (non-blocking)
+        try {
+          const { getIO } = await import('../../../server.js');
+          const io = getIO();
+          if (io) {
+            const deliveryNamespace = io.of('/delivery');
+            const allNotifiedIds = [
+              ...(orderDoc.assignmentInfo?.priorityDeliveryPartnerIds || []),
+              ...(orderDoc.assignmentInfo?.expandedDeliveryPartnerIds || [])
+            ].map(id => id?.toString()).filter(Boolean);
+            const otherPartnerIds = allNotifiedIds.filter(id => id !== currentDeliveryId);
+            if (otherPartnerIds.length > 0) {
+              const takenPayload = {
+                orderId: orderDoc.orderId,
+                orderMongoId: orderDoc._id.toString(),
+                takenBy: currentDeliveryId
+              };
+              otherPartnerIds.forEach(id => {
+                deliveryNamespace.to(`delivery:${id}`).emit('order_taken', takenPayload);
+              });
+            }
+          }
+        } catch (e) {
+          console.warn('⚠️ order_taken broadcast failed (non-blocking):', e.message);
+        }
       } catch (saveError) {
         console.error(`❌ Error saving order assignment: ${saveError.message}`);
         console.error(`❌ Error stack: ${saveError.stack}`);

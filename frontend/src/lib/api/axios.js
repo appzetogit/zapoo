@@ -69,7 +69,7 @@ function getTokenForContext(requestUrl = "") {
     return localStorage.getItem("restaurant_accessToken");
   } else if (path.startsWith("/delivery")) {
     return localStorage.getItem("delivery_accessToken");
-  } else if (path.startsWith("/user/") || path.startsWith("/usermain") || path === "/") {
+  } else if (path.startsWith("/user/") || path === "/") {
     return localStorage.getItem("user_accessToken");
   }
 
@@ -227,8 +227,7 @@ apiClient.interceptors.response.use(response => {
     } else if (currentPath.startsWith("/delivery")) {
       tokenKey = "delivery_accessToken";
       expectedRole = "delivery";
-    } else if (currentPath.startsWith("/user") || currentPath.startsWith("/usermain") || currentPath === "/" || currentPath.startsWith("/restaurants")) {
-      // User module includes /restaurants/* and /usermain/* paths
+    } else if (currentPath.startsWith("/user") || currentPath === "/" || currentPath.startsWith("/restaurants")) {
       tokenKey = "user_accessToken";
       expectedRole = "user";
     }

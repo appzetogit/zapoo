@@ -1125,7 +1125,7 @@ export default function Home() {
       </div>
 
       {/* 1. Sticky Navbar Section - Light Orange Background - Mobile only */}
-      <motion.div className="md:hidden sticky top-0 z-50 bg-white" initial={{
+      <motion.div className="md:hidden sticky top-0 z-50 bg-white dark:bg-[#0a0a0a]" initial={{
       y: -100
     }} animate={{
       y: 0
@@ -1137,7 +1137,7 @@ export default function Home() {
       </motion.div>
 
       {/* 2. Search & Veg Mode Bar - Non-sticky on white background */}
-      <div className="relative z-40 bg-white py-2 sm:py-3 px-3 sm:px-6 lg:px-8 border-b border-gray-50 shadow-sm">
+      <div className="relative z-40 bg-white dark:bg-[#0a0a0a] py-2 sm:py-3 px-3 sm:px-6 lg:px-8 border-b border-gray-50 dark:border-gray-800 shadow-sm">
         <div className="max-w-7xl mx-auto flex items-center gap-3 sm:gap-4 lg:gap-6">
           {/* Enhanced Search Input */}
           <motion.div className="flex-1 relative" whileHover={{
@@ -1198,9 +1198,9 @@ export default function Home() {
       </div>
 
       {/* 3. Hero Banner Section */}
-      <div className="relative w-full bg-white pt-3 sm:pt-4 pb-1 sm:pb-2">
+      <div className="relative w-full bg-white dark:bg-[#0a0a0a] pt-3 sm:pt-4 pb-1 sm:pb-2">
         <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
-          {loadingBanners ? <div className="w-full rounded-2xl bg-gray-100 flex items-center justify-center" style={{
+          {loadingBanners ? <div className="w-full rounded-2xl bg-gray-100 dark:bg-gray-900 flex items-center justify-center" style={{
           minHeight: '320px'
         }}>
               <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
@@ -1211,11 +1211,11 @@ export default function Home() {
           const hasLinkedRestaurants = linkedRestaurants.length > 0;
           return <>
                   {/* MOBILE: Vertical card layout (hidden on sm+) */}
-                  <div className="sm:hidden relative w-full rounded-2xl overflow-hidden shadow-md border-t border-gray-200 bg-white" style={{
+                  <div className="sm:hidden relative w-full rounded-2xl overflow-hidden shadow-md border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-[#1a1a1a]" style={{
               minHeight: '270px'
             }} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
                     {/* Top: Text with Animation */}
-                    <div className="px-5 pt-5 pb-3 bg-white relative z-10 min-h-[110px]">
+                    <div className="px-5 pt-5 pb-3 bg-white dark:bg-[#1a1a1a] relative z-10 min-h-[110px]">
                       <AnimatePresence mode="wait">
                         <motion.div key={currentBannerIndex} initial={{
                     opacity: 0,
@@ -1233,10 +1233,10 @@ export default function Home() {
                           {currentBanner?.subtitle && <span className="font-semibold text-xs text-orange-500 tracking-wide uppercase block mb-0.5">
                               {currentBanner.subtitle}
                             </span>}
-                          {currentBanner?.title && <h2 className="text-2xl font-extrabold text-gray-900 leading-tight mb-1">
+                          {currentBanner?.title && <h2 className="text-2xl font-extrabold text-gray-900 dark:text-white leading-tight mb-1">
                               {currentBanner.title}
                             </h2>}
-                          {currentBanner?.description && <p className="text-gray-500 text-xs mb-2 line-clamp-2">{currentBanner.description}</p>}
+                          {currentBanner?.description && <p className="text-gray-500 dark:text-gray-400 text-xs mb-2 line-clamp-2">{currentBanner.description}</p>}
                         </motion.div>
                       </AnimatePresence>
                     </div>
@@ -1267,7 +1267,7 @@ export default function Home() {
                     </AnimatePresence>
 
                     {/* Bottom: Image with curved top */}
-                    <div className="relative w-full overflow-hidden bg-white" style={{
+                    <div className="relative w-full overflow-hidden bg-white dark:bg-[#1a1a1a]" style={{
                 aspectRatio: '16/7',
                 marginTop: '-2px'
               }} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
@@ -1295,7 +1295,7 @@ export default function Home() {
                       </motion.div>
 
                       {/* Curved white overlay at top */}
-                      <div className="absolute inset-x-0 top-0 z-10 bg-white pointer-events-none" style={{
+                      <div className="absolute inset-x-0 top-0 z-10 bg-white dark:bg-[#1a1a1a] pointer-events-none" style={{
                   height: '36px',
                   borderRadius: '0 0 50% 50% / 0 0 100% 100%'
                 }} />
@@ -1308,11 +1308,11 @@ export default function Home() {
                   </div>
 
                   {/* DESKTOP: Horizontal split layout (hidden on mobile) */}
-                  <div className="hidden sm:flex w-full rounded-2xl overflow-hidden shadow-sm border border-gray-100 bg-white" style={{
+                  <div className="hidden sm:flex w-full rounded-2xl overflow-hidden shadow-sm border border-gray-100 dark:border-gray-800 bg-white dark:bg-[#1a1a1a]" style={{
               minHeight: '220px'
             }} onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp}>
                     {/* Left: Text with Animation */}
-                    <div className="flex flex-col justify-center px-8 py-6 w-2/5 bg-white z-10 min-h-[220px]">
+                    <div className="flex flex-col justify-center px-8 py-6 w-2/5 bg-white dark:bg-[#1a1a1a] z-10 min-h-[220px]">
                       <AnimatePresence mode="wait">
                         <motion.div key={currentBannerIndex} initial={{
                     opacity: 0,
@@ -1330,10 +1330,10 @@ export default function Home() {
                           {currentBanner?.subtitle && <span className="text-orange-500 font-semibold text-sm uppercase tracking-wider mb-1">
                               {currentBanner.subtitle}
                             </span>}
-                          {currentBanner?.title && <h2 className="text-3xl lg:text-4xl font-extrabold text-gray-900 leading-tight mb-2">
+                          {currentBanner?.title && <h2 className="text-3xl lg:text-4xl font-extrabold text-gray-900 dark:text-white leading-tight mb-2">
                               {currentBanner.title}
                             </h2>}
-                          {currentBanner?.description && <p className="text-gray-500 text-sm mb-4 line-clamp-3">{currentBanner.description}</p>}
+                          {currentBanner?.description && <p className="text-gray-500 dark:text-gray-400 text-sm mb-4 line-clamp-3">{currentBanner.description}</p>}
                           <button className="inline-flex items-center gap-2 bg-orange-500 text-white text-sm font-semibold px-5 py-2 rounded-full w-fit shadow pointer-events-none">
                             {currentBanner?.ctaText || 'Order Now'}
                           </button>
@@ -1372,7 +1372,7 @@ export default function Home() {
       </div>
 
       {/* Zone Ad Banner - same width container as hero banner */}
-      <div className="relative w-full bg-white pt-4 sm:pt-4 pb-1 sm:pb-2">
+      <div className="relative w-full bg-white dark:bg-[#0a0a0a] pt-4 sm:pt-4 pb-1 sm:pb-2">
         <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
           <ZoneAdBanner />
         </div>
@@ -1575,7 +1575,7 @@ export default function Home() {
           }}>
               <Button variant="outline" onClick={() => setIsFilterOpen(true)} className="h-7 sm:h-8 px-2 sm:px-3 rounded-md flex items-center gap-1.5 whitespace-nowrap flex-shrink-0 font-medium transition-all bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-white">
                 <SlidersHorizontal className="h-3 w-3 sm:h-4 sm:w-4" />
-                <span className="text-xs sm:text-sm font-bold text-black dark:text-white">Filters</span>
+                <span className="text-xs sm:text-sm font-bold text-gray-900 dark:text-white">Filters</span>
               </Button>
             </motion.div>
 
@@ -1622,7 +1622,7 @@ export default function Home() {
                 }, 500);
               }} className={`h-7 sm:h-8 px-2 sm:px-3 rounded-md flex items-center gap-1.5 whitespace-nowrap flex-shrink-0 transition-all font-medium ${isActive ? 'bg-orange-600 text-white border border-orange-600 hover:bg-orange-600/90' : 'bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300'}`}>
                     {Icon && <Icon className={`h-3 w-3 sm:h-4 sm:w-4 ${isActive ? 'fill-white' : ''}`} />}
-                    <span className="text-xs sm:text-sm font-bold text-black dark:text-white">{filter.label}</span>
+                    <span className={`text-xs sm:text-sm font-bold ${isActive ? 'text-white' : 'text-gray-900 dark:text-white'}`}>{filter.label}</span>
                   </Button>
                 </motion.div>;
           })}
@@ -1704,9 +1704,9 @@ export default function Home() {
           }} whileTap={{
             scale: 0.95
           }}>
-                  <Link to={item.href} className="flex-shrink-0 bg-white  dark:bg-[#1a1a1a]/80 dark:text-white">
+                  <Link to={item.href} className="flex-shrink-0 bg-transparent dark:text-white">
                     <div className="flex flex-col items-center gap-2.5 w-24 sm:w-28 md:w-32 group">
-                      <div className="w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 rounded-2xl bg-white dark:bg-[#1a1a1a]/80 dark:text-white flex items-center justify-center shadow-sm group-hover:shadow-lg transition-all duration-300 overflow-hidden p-2.5">
+                      <div className="w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 rounded-2xl bg-white dark:bg-[#1a1a1a] flex items-center justify-center shadow-sm dark:shadow-gray-900/30 group-hover:shadow-lg transition-all duration-300 overflow-hidden p-2.5">
                         <OptimizedImage src={item.image} alt={item.label} className="w-full h-full dark:rounded-md" width={112} height={112} sizes="(max-width: 640px) 80px, (max-width: 768px) 96px, 112px" objectFit="contain" placeholder="blur" />
                       </div>
                       <span className="text-sm sm:text-base font-semibold text-gray-700 dark:text-gray-300 text-center leading-tight">
@@ -1735,9 +1735,9 @@ export default function Home() {
           }} whileTap={{
             scale: 0.95
           }}>
-                    <Link to={item.link} className="flex-shrink-0 bg-white dark:bg-[#1a1a1a]/80 dark:text-white">
+                    <Link to={item.link} className="flex-shrink-0 bg-transparent dark:text-white">
                       <div className="flex flex-col items-center gap-2.5 w-24 sm:w-28 md:w-32 group">
-                        <div className="w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 rounded-2xl bg-white dark:bg-[#1a1a1a]/80 dark:text-white  flex items-center justify-center shadow-sm group-hover:shadow-lg transition-all duration-300 overflow-hidden p-2.5">
+                        <div className="w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 rounded-2xl bg-white dark:bg-[#1a1a1a] flex items-center justify-center shadow-sm dark:shadow-gray-900/30 group-hover:shadow-lg transition-all duration-300 overflow-hidden p-2.5">
                           <OptimizedImage src={item.imageUrl} alt={item.label} className="w-full h-full" width={112} height={112} sizes="(max-width: 640px) 80px, (max-width: 768px) 96px, 112px" objectFit="contain" placeholder="blur" onError={() => {}} />
                         </div>
                         <span className="text-sm sm:text-base font-semibold text-gray-700 dark:text-gray-300 text-center leading-tight">
