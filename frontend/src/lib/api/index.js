@@ -1958,12 +1958,38 @@ export const adminAPI = {
 };
 
 export const subscriptionAPI = {
-  // Admin: Manage Plans
+  // Public / Restaurant
   getPlans: () => {
-    return apiClient.get(API_ENDPOINTS.SUBSCRIPTION.PLANS);
+    return apiClient.get(API_ENDPOINTS.SUBSCRIPTION.PLANS_V2);
+  },
+  subscribe: (data) => {
+    return apiClient.post(API_ENDPOINTS.SUBSCRIPTION.CREATE_ORDER, data);
+  },
+  verifyPayment: (data) => {
+    return apiClient.post(API_ENDPOINTS.SUBSCRIPTION.VERIFY_PAYMENT_V2, data);
+  },
+  getMySubscription: () => {
+    return apiClient.get(API_ENDPOINTS.SUBSCRIPTION.MY_PLAN);
+  },
+  cancelSubscription: () => {
+    return apiClient.post(API_ENDPOINTS.SUBSCRIPTION.CANCEL_V2);
+  },
+  requestRMCall: (data) => {
+    return apiClient.post(API_ENDPOINTS.SUBSCRIPTION.RM_REQUEST, data);
+  },
+  getHistory: () => {
+    return apiClient.get(API_ENDPOINTS.SUBSCRIPTION.HISTORY);
+  },
+  claimTrial: () => {
+    return apiClient.post(API_ENDPOINTS.SUBSCRIPTION.CLAIM_TRIAL_V2 || API_ENDPOINTS.SUBSCRIPTION.CLAIM_TRIAL);
+  },
+
+  // Admin: Manage Plans
+  getAdminPlans: () => {
+    return apiClient.get(API_ENDPOINTS.SUBSCRIPTION.ADMIN_PLANS);
   },
   createPlan: (data) => {
-    return apiClient.post(API_ENDPOINTS.SUBSCRIPTION.PLANS, data);
+    return apiClient.post(API_ENDPOINTS.SUBSCRIPTION.ADMIN_CREATE_PLAN, data);
   },
   updatePlan: (id, data) => {
     return apiClient.put(API_ENDPOINTS.SUBSCRIPTION.PLAN_BY_ID.replace(":id", id), data);
@@ -1972,21 +1998,13 @@ export const subscriptionAPI = {
     return apiClient.delete(API_ENDPOINTS.SUBSCRIPTION.PLAN_BY_ID.replace(":id", id));
   },
   togglePlanStatus: (id) => {
-    return apiClient.patch(API_ENDPOINTS.SUBSCRIPTION.PLAN_STATUS.replace(":id", id));
+    return apiClient.patch(API_ENDPOINTS.SUBSCRIPTION.ADMIN_TOGGLE_PLAN, { planId: id });
   },
-
-  // Restaurant: Subscription
-  subscribe: (data) => {
-    return apiClient.post(API_ENDPOINTS.SUBSCRIPTION.SUBSCRIBE, data);
+  updatePlanPrice: (planId, pricing) => {
+    return apiClient.patch(API_ENDPOINTS.SUBSCRIPTION.ADMIN_UPDATE_PRICE, { planId, pricing });
   },
-  verifyPayment: (data) => {
-    return apiClient.post(API_ENDPOINTS.SUBSCRIPTION.VERIFY_PAYMENT, data);
-  },
-  getMySubscription: () => {
-    return apiClient.get(API_ENDPOINTS.SUBSCRIPTION.MY_SUBSCRIPTION);
-  },
-  cancelSubscription: () => {
-    return apiClient.post(API_ENDPOINTS.SUBSCRIPTION.CANCEL);
+  getRestaurantSubscriptions: (params = {}) => {
+    return apiClient.get(API_ENDPOINTS.SUBSCRIPTION.ADMIN_RESTAURANTS, { params });
   },
 };
 

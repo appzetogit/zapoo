@@ -24,7 +24,10 @@ export const authenticate = async (req, res, next) => {
     }
 
     // Get restaurant from database
-    const restaurant = await Restaurant.findById(decoded.userId).select('-password');
+    const restaurant = await Restaurant.findById(decoded.userId)
+      .select('-password')
+      .populate('subscription.planId')
+      .populate('relationshipManager');
     if (!restaurant) {
       console.error('❌ Restaurant not found in database:', {
         userId: decoded.userId,
@@ -86,7 +89,35 @@ export const authenticate = async (req, res, next) => {
       });
       return errorResponse(res, 401, 'Restaurant account is inactive. Please wait for admin approval.');
     }
+    // JIT (Just-In-Time) Subscription status check
+    // If the subscription end date has passed, treat it as expired regardless of the stored status
+    if (restaurant.businessModel === 'Subscription Base' && 
+        restaurant.subscription && 
+        restaurant.subscription.endDate && 
+        new Date(restaurant.subscription.endDate) < new Date()) {
+      
+      // Update status in memory for this request
+      if (restaurant.subscription.status !== 'expired') {
+        console.warn('⚠️ Restaurant subscription has expired JIT:', {
+          restaurantId: restaurant._id,
+          endDate: restaurant.subscription.endDate,
+          currentStatus: restaurant.subscription.status
+        });
+        restaurant.subscription.status = 'expired';
+      }
 
+      // Block order management actions for expired subscriptions
+      // Exempt: subscription management, profile, onboarding, and basic GET requests
+      const isSubscriptionRoute = requestPath.includes('/subscription') || reqPath.includes('/subscription') || baseUrl.includes('/subscription');
+      const isOrderAction = (requestPath.includes('/orders') || reqPath.includes('/orders')) && req.method !== 'GET';
+      const isMenuAction = (requestPath.includes('/menu') || reqPath.includes('/menu')) && req.method !== 'GET';
+
+      if (isOrderAction || isMenuAction) {
+        if (!isSubscriptionRoute && !isProfileRoute && !isOnboardingRoute) {
+          return errorResponse(res, 403, 'Your subscription has expired. Please renew to continue taking orders and managing your menu.');
+        }
+      }
+    }
     // Attach restaurant to request
     req.restaurant = restaurant;
     req.user = restaurant; // Also set req.user for consistency

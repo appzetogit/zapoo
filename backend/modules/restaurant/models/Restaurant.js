@@ -320,6 +320,10 @@ const restaurantSchema = new mongoose.Schema(
       ref: "Admin",
       default: null,
     },
+    trialUsed: {
+      type: Boolean,
+      default: false,
+    },
     businessModel: {
       type: String,
       enum: ["Commission Base", "Subscription Base"],
@@ -353,6 +357,31 @@ const restaurantSchema = new mongoose.Schema(
         type: String,
         default: null,
       },
+      razorpayOrderId: {
+        type: String,
+        default: null,
+      },
+      razorpayPaymentId: {
+        type: String,
+        default: null,
+      },
+      razorpaySignature: {
+        type: String,
+        default: null,
+      },
+      paymentStatus: {
+        type: String,
+        enum: ["pending", "completed", "failed", "refunded"],
+        default: "pending",
+      },
+      paymentDate: {
+        type: Date,
+        default: null,
+      },
+      amount: {
+        type: Number,
+        default: 0,
+      },
       features: [String], // Snapshot of features at time of subscription
     },
     // Zone mapping
@@ -378,6 +407,12 @@ const restaurantSchema = new mongoose.Schema(
         type: Date,
         default: null,
       }
+    },
+    // Relationship Manager (RM) assignment for premium plans
+    relationshipManager: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Admin",
+      default: null,
     },
   },
   {

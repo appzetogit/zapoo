@@ -7,7 +7,7 @@ import { Image as ImageIcon, Upload, Clock, Calendar as CalendarIcon, Sparkles, 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { uploadAPI, api } from "@/lib/api";
+import { uploadAPI, api, subscriptionAPI } from "@/lib/api";
 import { MobileTimePicker } from "@mui/x-date-pickers/MobileTimePicker";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
@@ -160,6 +160,9 @@ export default function RestaurantOnboarding() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [showTrialOffer, setShowTrialOffer] = useState(false);
+  const [trialLoading, setTrialLoading] = useState(false);
+  const [trialError, setTrialError] = useState("");
   const [step1, setStep1] = useState({
     restaurantName: "",
     ownerName: "",
@@ -869,16 +872,8 @@ export default function RestaurantOnboarding() {
         // Clear localStorage when onboarding is complete
         clearOnboardingFromLocalStorage();
 
-        // Show success message briefly, then navigate
-
-        // Wait a moment to ensure data is saved, then navigate
-        setTimeout(() => {
-          // Navigate to restaurant home page after onboarding completion
-
-          navigate("/restaurant", {
-            replace: true
-          });
-        }, 800);
+        // Show trial offer after completing all steps
+        setShowTrialOffer(true);
       }
     } catch (err) {
       const msg = err?.response?.data?.message || err?.response?.data?.error || err?.message || "Failed to save onboarding data";
@@ -886,6 +881,27 @@ export default function RestaurantOnboarding() {
     } finally {
       setSaving(false);
     }
+  };
+  const proceedAfterOnboarding = () => {
+    navigate("/restaurant", {
+      replace: true
+    });
+  };
+  const handleClaimTrial = async () => {
+    setTrialLoading(true);
+    setTrialError("");
+    try {
+      await subscriptionAPI.claimTrial();
+      proceedAfterOnboarding();
+    } catch (err) {
+      const message = err?.response?.data?.message || err?.response?.data?.error || err?.message || "Failed to activate free trial.";
+      setTrialError(message);
+    } finally {
+      setTrialLoading(false);
+    }
+  };
+  const handleSkipTrial = () => {
+    proceedAfterOnboarding();
   };
   const toggleCuisine = cuisine => {
     setStep2(prev => {
@@ -1484,6 +1500,22 @@ export default function RestaurantOnboarding() {
           </Button>
         </div>
       </footer>
+
+      {showTrialOffer && <div className="fixed inset-0 z-[60] bg-black/30 backdrop-blur-[1px] flex items-center justify-center p-6">
+          <div className="w-full max-w-sm bg-white rounded-2xl shadow-xl p-6 text-center">
+            <div className="text-lg font-bold text-gray-900">Get 1 month free</div>
+            <p className="mt-2 text-sm text-gray-600">
+              Activate your free Growth plan for 30 days. You can use all advanced analytics without paying.
+            </p>
+            {trialError && <p className="mt-3 text-xs text-red-600">{trialError}</p>}
+            <Button onClick={handleClaimTrial} disabled={trialLoading} className="mt-5 w-full h-11 rounded-lg font-bold text-sm bg-gray-900 hover:bg-black text-white">
+              {trialLoading ? "Activating..." : "Get 1 month free"}
+            </Button>
+            <button type="button" onClick={handleSkipTrial} className="mt-3 text-xs font-semibold text-gray-500 hover:text-gray-700">
+              Maybe later
+            </button>
+          </div>
+        </div>}
     </div>
   </LocalizationProvider>;
 }

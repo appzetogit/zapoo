@@ -3,26 +3,33 @@ import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { DateRangeCalendar } from "@/components/ui/date-range-calendar";
 import { Bell, HelpCircle, Menu, Search, TrendingUp, BarChart3, Users, CalendarRange, Download, MoreVertical, ChevronLeft, ChevronRight, Wand2, X, MapPin, Megaphone } from "lucide-react";
-import { FaPhone, FaHistory, FaExclamationTriangle, FaStar, FaCommentDots, FaLink, FaCog, FaThLarge } from "react-icons/fa";
+import { FaHistory, FaExclamationTriangle, FaStar, FaCommentDots, FaLink, FaCog } from "react-icons/fa";
 import { AreaChart, Area, Line, Bar, ComposedChart, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, LineChart } from "recharts";
 import BottomNavOrders from "../components/BottomNavOrders";
+import SubscriptionFeatureOverlay from "../components/SubscriptionFeatureOverlay";
 import { restaurantAPI } from "@/lib/api";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, eachDayOfInterval, eachMonthOfInterval, format, isSameDay, isSameMonth } from "date-fns";
 export default function ToHub() {
   const navigate = useNavigate();
-  const topTabs = [{
-    id: "my-feed",
-    label: "My feed"
-  }, {
-    id: "sales",
-    label: "Sales"
-  }];
   const [activeTopTab, setActiveTopTab] = useState("my-feed");
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [restaurantData, setRestaurantData] = useState(null);
   const [loadingRestaurant, setLoadingRestaurant] = useState(true);
   const [graphFilter, setGraphFilter] = useState("daily"); // daily, weekly, monthly, yearly
+  const subscription = restaurantData?.subscription;
+  const planName = String(subscription?.planId?.name || "").toUpperCase();
+  const featureList = subscription?.features || subscription?.planId?.features || [];
+  const hasAdvancedAnalytics = planName === "GROWTH" || featureList.includes("advanced_analytics");
+  const topTabs = useMemo(() => {
+    return [{
+      id: "my-feed",
+      label: "Sales"
+    }, {
+      id: "sales",
+      label: "Advanced Analytics"
+    }];
+  }, []);
 
   // Fetch restaurant data on mount
   useEffect(() => {
@@ -46,6 +53,11 @@ export default function ToHub() {
     };
     fetchRestaurantData();
   }, []);
+  useEffect(() => {
+    if (!topTabs.some(tab => tab.id === activeTopTab)) {
+      setActiveTopTab("my-feed");
+    }
+  }, [topTabs, activeTopTab]);
   const topTabBarRef = useRef(null);
   const contentContainerRef = useRef(null);
   const touchStartX = useRef(0);
@@ -316,53 +328,65 @@ export default function ToHub() {
     touchStartY.current = 0;
     isSwiping.current = false;
   };
-  const quickLinks = [{
-    id: "promoted-banners",
-    label: "Promoted Banners",
-    icon: Megaphone,
-    route: "/restaurant/advertisements"
-  }, {
-    id: "growth-helpline",
-    label: "Growth helpline",
-    icon: FaPhone,
-    route: "tel:+911111111111",
-    isPhone: true
-  }, {
-    id: "order-history",
-    label: "Order history",
-    icon: FaHistory,
-    route: "/restaurant/orders/all"
-  }, {
-    id: "complaints",
-    label: "Complaints",
-    icon: FaExclamationTriangle,
-    route: "/restaurant/feedback?tab=complaints"
-  }, {
-    id: "reviews",
-    label: "Reviews",
-    icon: FaStar,
-    route: "/restaurant/feedback"
-  }, {
-    id: "feedback",
-    label: "Share your feedback",
-    icon: FaCommentDots,
-    route: "/restaurant/Share-Feedback"
-  }, {
-    id: "zone-setup",
-    label: "Zone Setup",
-    icon: MapPin,
-    route: "/restaurant/zone-setup"
-  }, {
-    id: "settings",
-    label: "Settings",
-    icon: FaCog,
-    route: "/restaurant/delivery-settings"
-  }, {
-    id: "show-all",
-    label: "Show all",
-    icon: FaThLarge,
-    route: "/restaurant/explore"
-  }];
+  const quickLinks = useMemo(() => {
+    const links = [{
+      id: "promoted-banners",
+      label: "Promoted Banners",
+      icon: Megaphone,
+      route: "/restaurant/advertisements"
+    }];
+
+    // Add Relationship Manager if restaurant has subscription with RM access
+    const isPremium = restaurantData?.subscription?.planId?.isPremium;
+    const planFeatures = restaurantData?.subscription?.features || restaurantData?.subscription?.planId?.features || [];
+    const hasRM = planFeatures.includes("relationship_manager") || planFeatures.some(f => String(f).toLowerCase().includes('relationship manager'));
+    const rmDetails = restaurantData?.relationshipManager;
+
+    if (hasRM || isPremium || rmDetails) {
+      links.push({
+        id: "relationship-manager",
+        label: "Your RM",
+        icon: Users,
+        route: rmDetails?.phone ? `tel:${rmDetails.phone}` : "tel:+911111111111", // Default if not assigned
+        isPhone: true,
+        subLabel: rmDetails?.name || "Premium assigned"
+      });
+    }
+
+    links.push(...[{
+      id: "order-history",
+      label: "Order history",
+      icon: FaHistory,
+      route: "/restaurant/orders/all"
+    }, {
+      id: "complaints",
+      label: "Complaints",
+      icon: FaExclamationTriangle,
+      route: "/restaurant/feedback?tab=complaints"
+    }, {
+      id: "reviews",
+      label: "Reviews",
+      icon: FaStar,
+      route: "/restaurant/feedback"
+    }, {
+      id: "feedback",
+      label: "feedback",
+      icon: FaCommentDots,
+      route: "/restaurant/Share-Feedback"
+    }, {
+      id: "zone-setup",
+      label: "Zone Setup",
+      icon: MapPin,
+      route: "/restaurant/zone-setup"
+    }, {
+      id: "settings",
+      label: "Settings",
+      icon: FaCog,
+      route: "/restaurant/delivery-settings"
+    }]);
+
+    return links;
+  }, [restaurantData]);
   const [chartData, setChartData] = useState([{
     hour: "12am",
     orders: 0,
@@ -2039,44 +2063,56 @@ export default function ToHub() {
 
 
 
-        {/* Business insights + filters */}
-        <div className="px-4 space-y-3">
-          <p className="text-lg font-bold text-gray-900 mb-3">Business insights</p>
-        </div>
+      </div>
+    </div>;
+  const SalesTabContent = () => {
+    const salesMax = Math.max(...chartData.map(d => d.sales || 0), 1);
+    const ordersMax = Math.max(...chartData.map(d => d.orders || 0), 1);
+    const aovData = useMemo(() => chartData.map(d => ({
+      ...d,
+      aov: d.orders ? d.sales / d.orders : 0
+    })), [chartData]);
+    const aovMax = Math.max(...aovData.map(d => d.aov || 0), 1);
+    return <>
+        <div className="space-y-4">
+          {/* Business insights + filters */}
+          <div className="px-4 space-y-3">
+            <p className="text-lg font-bold text-gray-900 mb-3">Business insights</p>
+          </div>
 
 
-        {/* Sales card */}
-        <div className="px-4">
-          <div className="bg-white rounded-lg p-4 space-y-4 relative">
-            {isDateLoading && <div className="absolute inset-0 flex items-center justify-center">
-                <div className="absolute inset-0 bg-white/60 rounded-lg" />
-                <div className="relative text-sm font-semibold text-gray-700 animate-pulse">Refreshing...</div>
-              </div>}
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-base font-bold text-gray-900">Sales</p>
-                <p className="text-xs text-gray-500">Last updated: few seconds ago</p>
-              </div>
-              <div className="relative">
-                <button onClick={() => setShowLearnMoreButton(showLearnMoreButton === 'sales' ? null : 'sales')} className="p-2 rounded-full hover:bg-gray-100">
-                  <MoreVertical className="w-5 h-5 text-gray-600" />
-                </button>
-                {showLearnMoreButton === 'sales' && <motion.div initial={{
+          {/* Sales card */}
+          <div className="px-4">
+            <div className="bg-white rounded-lg p-4 space-y-4 relative">
+              {isDateLoading && <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="absolute inset-0 bg-white/60 rounded-lg" />
+                  <div className="relative text-sm font-semibold text-gray-700 animate-pulse">Refreshing...</div>
+                </div>}
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-base font-bold text-gray-900">Sales</p>
+                  <p className="text-xs text-gray-500">Last updated: few seconds ago</p>
+                </div>
+                <div className="relative">
+                  <button onClick={() => setShowLearnMoreButton(showLearnMoreButton === 'sales' ? null : 'sales')} className="p-2 rounded-full hover:bg-gray-100">
+                    <MoreVertical className="w-5 h-5 text-gray-600" />
+                  </button>
+                  {showLearnMoreButton === 'sales' && <motion.div initial={{
                 opacity: 0,
                 scale: 0.95
               }} animate={{
                 opacity: 1,
                 scale: 1
               }} className="absolute right-0 top-full mt-1 z-10">
-                    <button onClick={e => handleLearnMoreClick('sales', e)} className="bg-white border border-gray-200 shadow-lg rounded-lg px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 whitespace-nowrap">
-                      Learn more
-                    </button>
-                  </motion.div>}
+                      <button onClick={e => handleLearnMoreClick('sales', e)} className="bg-white border border-gray-200 shadow-lg rounded-lg px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 whitespace-nowrap">
+                        Learn more
+                      </button>
+                    </motion.div>}
+                </div>
+
               </div>
 
-            </div>
-
-            {[{
+              {[{
             title: "Net sales",
             value: "₹0 • 0%",
             dataKey: "sales",
@@ -2092,368 +2128,209 @@ export default function ToHub() {
             dataKey: "sales",
             color: "#f97316"
           }].map((section, idx) => <div key={section.title} className={idx < 2 ? "pb-3 border-b border-dashed border-gray-200 space-y-2" : "space-y-2"}>
-                <div className="flex items-center justify-between text-sm font-semibold text-gray-900">
-                  <span>{section.title}</span>
-                  <span>{section.value}</span>
-                </div>
-                <div className="h-16 chart-shell-mini">
-                  <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-                    <AreaChart data={chartData} margin={{
+                  <div className="flex items-center justify-between text-sm font-semibold text-gray-900">
+                    <span>{section.title}</span>
+                    <span>{section.value}</span>
+                  </div>
+                  <div className="h-16 chart-shell-mini">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+                      <AreaChart data={chartData} margin={{
                   top: 0,
                   right: 0,
                   left: 0,
                   bottom: 0
                 }}>
-                      <defs>
-                        <linearGradient id={`mini-${section.dataKey}`} x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor={section.color} stopOpacity={0.5} />
-                          <stop offset="95%" stopColor={section.color} stopOpacity={0.05} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f5f5f5" />
-                      <XAxis dataKey={xAxisKey} tick={{
+                        <defs>
+                          <linearGradient id={`mini-${section.dataKey}`} x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor={section.color} stopOpacity={0.5} />
+                            <stop offset="95%" stopColor={section.color} stopOpacity={0.05} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f5f5f5" />
+                        <XAxis dataKey={xAxisKey} tick={{
                     fontSize: 10,
                     fill: "#9ca3af"
                   }} />
-                      <YAxis hide />
-                      <Tooltip />
-                      <Area type="monotone" dataKey={section.dataKey} stroke={section.color} fill={`url(#mini-${section.dataKey})`} />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>)}
+                        <YAxis hide />
+                        <Tooltip />
+                        <Area type="monotone" dataKey={section.dataKey} stroke={section.color} fill={`url(#mini-${section.dataKey})`} />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>)}
 
-            <div className="pt-2">
-              <div className="flex items-center justify-center gap-4 text-xs text-gray-600">
-                <span className="flex items-center gap-2"><span className="w-3 h-0.5 bg-[#3B82F6] inline-block"></span>Yesterday</span>
-                <span className="flex items-center gap-2"><span className="w-3 h-0.5 bg-gray-400 inline-block"></span>Day before yesterday</span>
+              <div className="pt-2">
+                <div className="flex items-center justify-center gap-4 text-xs text-gray-600">
+                  <span className="flex items-center gap-2"><span className="w-3 h-0.5 bg-[#3B82F6] inline-block"></span>Yesterday</span>
+                  <span className="flex items-center gap-2"><span className="w-3 h-0.5 bg-gray-400 inline-block"></span>Day before yesterday</span>
+                </div>
               </div>
-              <button onClick={() => setActiveTopTab("sales")} className="w-full mt-3 bg-[#3B82F6] text-white py-3 rounded-md text-sm font-semibold hover:bg-blue-700 transition-colors">
-                Get deeper insights
-              </button>
             </div>
           </div>
-        </div>
 
-        {/* Customers card */}
-        <div className="px-4">
-          <div className="bg-white rounded-lg p-4 space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-base font-bold text-gray-900">Customers</p>
-                <p className="text-xs text-gray-500">Last updated: a day ago</p>
-              </div>
-              <div className="relative">
-                <button onClick={() => setShowLearnMoreButton(showLearnMoreButton === 'customers-myfeed' ? null : 'customers-myfeed')} className="p-2 rounded-full hover:bg-gray-100">
-                  <MoreVertical className="w-5 h-5 text-gray-600" />
-                </button>
-                {showLearnMoreButton === 'customers-myfeed' && <motion.div initial={{
+          {/* Customers card */}
+          <div className="px-4 mt-4">
+            <div className="bg-white rounded-lg p-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-base font-bold text-gray-900">Customers</p>
+                  <p className="text-xs text-gray-500">Last updated: a day ago</p>
+                </div>
+                <div className="relative">
+                  <button onClick={() => setShowLearnMoreButton(showLearnMoreButton === 'customers-myfeed' ? null : 'customers-myfeed')} className="p-2 rounded-full hover:bg-gray-100">
+                    <MoreVertical className="w-5 h-5 text-gray-600" />
+                  </button>
+                  {showLearnMoreButton === 'customers-myfeed' && <motion.div initial={{
                 opacity: 0,
                 scale: 0.95
               }} animate={{
                 opacity: 1,
                 scale: 1
               }} className="absolute right-0 top-full mt-1 z-10">
-                    <button onClick={e => handleLearnMoreClick('customers', e)} className="bg-white border border-gray-200 shadow-lg rounded-lg px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 whitespace-nowrap">
-                      Learn more
-                    </button>
-                  </motion.div>}
+                      <button onClick={e => handleLearnMoreClick('customers', e)} className="bg-white border border-gray-200 shadow-lg rounded-lg px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 whitespace-nowrap">
+                        Learn more
+                      </button>
+                    </motion.div>}
+                </div>
               </div>
-            </div>
 
-            <div className="space-y-4">
-              {customersMetrics.map(metric => <div key={metric.title} className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <span className="w-2.5 h-2.5 rounded-full" style={{
+              <div className="space-y-4">
+                {customersMetrics.map(metric => <div key={metric.title} className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <span className="w-2.5 h-2.5 rounded-full" style={{
                   backgroundColor: metric.color
                 }} />
-                    <div className="flex flex-col">
-                      <span className="text-sm font-semibold text-gray-900">{metric.title}</span>
-                      <span className="text-xs text-gray-600">{metric.sub}</span>
+                      <div className="flex flex-col">
+                        <span className="text-sm font-semibold text-gray-900">{metric.title}</span>
+                        <span className="text-xs text-gray-600">{metric.sub}</span>
+                      </div>
                     </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-lg font-bold text-gray-900">{metric.value}</p>
-                    <p className="text-xs text-gray-600">{metric.change}</p>
-                  </div>
-                </div>)}
-            </div>
-
-            <button onClick={() => setActiveTopTab("customers")} className="w-full bg-[#3B82F6] text-white py-3 rounded-md text-sm font-semibold hover:bg-blue-700 transition-colors">
-              Get deeper insights
-            </button>
-          </div>
-        </div>
-
-        {/* Orders by mealtime */}
-        <div className="px-4">
-          <div className="bg-white rounded-lg p-4 space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-base font-bold text-gray-900">Orders by mealtime</p>
-                <p className="text-xs text-gray-500">
-                  {lastUpdated ? `Last updated: ${formatTimeAgo(lastUpdated)}` : "Last updated: a day ago"}
-                </p>
+                    <div className="text-right">
+                      <p className="text-lg font-bold text-gray-900">{metric.value}</p>
+                      <p className="text-xs text-gray-600">{metric.change}</p>
+                    </div>
+                  </div>)}
               </div>
-              <div className="relative">
-                <button onClick={() => setShowLearnMoreButton(showLearnMoreButton === 'orders-by-mealtime-myfeed' ? null : 'orders-by-mealtime-myfeed')} className="p-2 rounded-full hover:bg-gray-100">
-                  <MoreVertical className="w-5 h-5 text-gray-600" />
-                </button>
-                {showLearnMoreButton === 'orders-by-mealtime-myfeed' && <motion.div initial={{
+
+            </div>
+          </div>
+
+          {/* Orders by mealtime */}
+          <div className="px-4 mt-4">
+            <div className="bg-white rounded-lg p-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-base font-bold text-gray-900">Orders by mealtime</p>
+                  <p className="text-xs text-gray-500">
+                    {lastUpdated ? `Last updated: ${formatTimeAgo(lastUpdated)}` : "Last updated: a day ago"}
+                  </p>
+                </div>
+                <div className="relative">
+                  <button onClick={() => setShowLearnMoreButton(showLearnMoreButton === 'orders-by-mealtime-myfeed' ? null : 'orders-by-mealtime-myfeed')} className="p-2 rounded-full hover:bg-gray-100">
+                    <MoreVertical className="w-5 h-5 text-gray-600" />
+                  </button>
+                  {showLearnMoreButton === 'orders-by-mealtime-myfeed' && <motion.div initial={{
                 opacity: 0,
                 scale: 0.95
               }} animate={{
                 opacity: 1,
                 scale: 1
               }} className="absolute right-0 top-full mt-1 z-10">
-                    <button onClick={e => handleLearnMoreClick('orders-by-mealtime', e)} className="bg-white border border-gray-200 shadow-lg rounded-lg px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 whitespace-nowrap">
-                      Learn more
-                    </button>
-                  </motion.div>}
+                      <button onClick={e => handleLearnMoreClick('orders-by-mealtime', e)} className="bg-white border border-gray-200 shadow-lg rounded-lg px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 whitespace-nowrap">
+                        Learn more
+                      </button>
+                    </motion.div>}
+                </div>
               </div>
-            </div>
 
-            <div className="space-y-3">
-              {mealtimeMetrics.map(slot => <div key={slot.title} className="flex items-start justify-between">
-                  <div className="flex items-start gap-3">
-                    <span className="w-2.5 h-2.5 rounded-full mt-1" style={{
+              <div className="space-y-3">
+                {mealtimeMetrics.map(slot => <div key={slot.title} className="flex items-start justify-between">
+                    <div className="flex items-start gap-3">
+                      <span className="w-2.5 h-2.5 rounded-full mt-1" style={{
                   backgroundColor: slot.color
                 }} />
-                    <div className="flex flex-col">
-                      <span className="text-sm font-semibold text-gray-900">{slot.title}</span>
-                      <span className="text-xs text-gray-600">{slot.window}</span>
+                      <div className="flex flex-col">
+                        <span className="text-sm font-semibold text-gray-900">{slot.title}</span>
+                        <span className="text-xs text-gray-600">{slot.window}</span>
+                      </div>
                     </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-semibold text-gray-900">{slot.value}</p>
-                    <p className="text-xs text-gray-600">{slot.change}</p>
-                  </div>
-                </div>)}
-            </div>
-          </div>
-        </div>
-
-        {/* Offers card */}
-        <div className="px-4">
-          <div className="bg-white rounded-lg p-4 space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-base font-bold text-gray-900">Offers</p>
-                <p className="text-xs text-gray-500">Last updated: an hour ago</p>
-              </div>
-              <div className="relative">
-                <button onClick={() => setShowLearnMoreButton(showLearnMoreButton === 'offers-myfeed' ? null : 'offers-myfeed')} className="p-2 rounded-full hover:bg-gray-100">
-                  <MoreVertical className="w-5 h-5 text-gray-600" />
-                </button>
-                {showLearnMoreButton === 'offers-myfeed' && <motion.div initial={{
-                opacity: 0,
-                scale: 0.95
-              }} animate={{
-                opacity: 1,
-                scale: 1
-              }} className="absolute right-0 top-full mt-1 z-10">
-                    <button onClick={e => handleLearnMoreClick('offers', e)} className="bg-white border border-gray-200 shadow-lg rounded-lg px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 whitespace-nowrap">
-                      Learn more
-                    </button>
-                  </motion.div>}
-              </div>
-            </div>
-
-            <div className="divide-y divide-dashed divide-gray-200">
-              <div className="grid grid-cols-2 gap-y-4 py-3">
-                {offersMetrics.slice(0, 2).map(metric => <div key={metric.title} className="flex flex-col gap-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold text-gray-900">{metric.title}</span>
+                    <div className="text-right">
+                      <p className="text-sm font-semibold text-gray-900">{slot.value}</p>
+                      <p className="text-xs text-gray-600">{slot.change}</p>
                     </div>
-                    <div className="text-lg font-bold text-gray-900">
-                      {metric.value} <span className="text-sm font-normal text-gray-600">{metric.change}</span>
-                    </div>
-                    <div className="text-xs text-gray-600">{metric.sub}</div>
-                  </div>)}
-              </div>
-              <div className="grid grid-cols-2 gap-y-4 py-3">
-                {offersMetrics.slice(2).map(metric => <div key={metric.title} className="flex flex-col gap-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold text-gray-900">{metric.title}</span>
-                    </div>
-                    <div className="text-lg font-bold text-gray-900">
-                      {metric.value} <span className="text-sm font-normal text-gray-600">{metric.change}</span>
-                    </div>
-                    <div className="text-xs text-gray-600">{metric.sub}</div>
                   </div>)}
               </div>
             </div>
-
-            <button onClick={() => setActiveTopTab("offers")} className="w-full bg-[#3B82F6] text-white py-3 rounded-md text-sm font-semibold hover:bg-blue-700 transition-colors">
-              Get deeper insights
-            </button>
           </div>
-        </div>
-      </div>
-    </div>;
-  const SalesTabContent = () => {
-    const salesMax = Math.max(...chartData.map(d => d.sales || 0), 1);
-    const ordersMax = Math.max(...chartData.map(d => d.orders || 0), 1);
-    const aovData = useMemo(() => chartData.map(d => ({
-      ...d,
-      aov: d.orders ? d.sales / d.orders : 0
-    })), [chartData]);
-    const aovMax = Math.max(...aovData.map(d => d.aov || 0), 1);
-    return <>
-        <div className="space-y-4">
-          <div className="px-4">
-            <div className="bg-white rounded-lg p-4 space-y-4 relative">
-              {isDateLoading && <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="absolute inset-0 bg-white/60 rounded-lg" />
-                  <div className="relative text-sm font-semibold text-gray-700 animate-pulse">Refreshing...</div>
-                </div>}
+
+          {/* Offers card */}
+          <div className="px-4 mt-4">
+            <div className="bg-white rounded-lg p-4 space-y-4">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <p className="text-base font-bold text-gray-900">Sales</p>
-                  <Select value={graphFilter} onValueChange={handleFilterChange}>
-                    <SelectTrigger className="w-[100px] h-8 text-xs bg-gray-50 border-gray-200">
-                      <SelectValue placeholder="Filter" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="daily">Daily</SelectItem>
-                      <SelectItem value="weekly">Weekly</SelectItem>
-                      <SelectItem value="monthly">Monthly</SelectItem>
-                      <SelectItem value="yearly">Yearly</SelectItem>
-                    </SelectContent>
-                  </Select>
+                <div>
+                  <p className="text-base font-bold text-gray-900">Offers</p>
+                  <p className="text-xs text-gray-500">Last updated: an hour ago</p>
                 </div>
-                <p className="text-xs text-gray-500">Last updated: few seconds ago</p>
-              </div>
-              <div className="relative">
-                <button onClick={() => setShowLearnMoreButton(showLearnMoreButton === 'sales-tab' ? null : 'sales-tab')} className="p-2 rounded-full hover:bg-gray-100">
-                  <MoreVertical className="w-5 h-5 text-gray-600" />
-                </button>
-                {showLearnMoreButton === 'sales-tab' && <motion.div initial={{
+                <div className="relative">
+                  <button onClick={() => setShowLearnMoreButton(showLearnMoreButton === 'offers-myfeed' ? null : 'offers-myfeed')} className="p-2 rounded-full hover:bg-gray-100">
+                    <MoreVertical className="w-5 h-5 text-gray-600" />
+                  </button>
+                  {showLearnMoreButton === 'offers-myfeed' && <motion.div initial={{
                 opacity: 0,
                 scale: 0.95
               }} animate={{
                 opacity: 1,
                 scale: 1
               }} className="absolute right-0 top-full mt-1 z-10">
-                    <button onClick={e => handleLearnMoreClick('sales', e)} className="bg-white border border-gray-200 shadow-lg rounded-lg px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 whitespace-nowrap">
-                      Learn more
-                    </button>
-                  </motion.div>}
-              </div>
-            </div>
-
-            {[{
-            title: "Net sales",
-            value: `${totalSales} • 0%`,
-            dataKey: "sales",
-            color: "#f97316"
-          }, {
-            title: "Orders delivered",
-            value: `${totalOrders} • 0%`,
-            dataKey: "orders",
-            color: "#f97316"
-          }, {
-            title: "Avg. order value",
-            value: `₹${(parseFloat(totalSales.replace(/[^\d.]/g, '')) / (parseInt(totalOrders) || 1)).toFixed(0)} • 0%`,
-            dataKey: "sales",
-            color: "#f97316"
-          }].map((section, idx) => <div key={section.title} className={idx < 2 ? "pb-3 border-b border-dashed border-gray-200 space-y-2" : "space-y-2"}>
-                <div className="flex items-center justify-between text-sm font-semibold text-gray-900">
-                  <span>{section.title}</span>
-                  <span>{section.value}</span>
-                </div>
-                <div className="h-16 chart-shell-mini">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={chartData} margin={{
-                  top: 0,
-                  right: 0,
-                  left: 0,
-                  bottom: 0
-                }}>
-                      <defs>
-                        <linearGradient id={`mini-${section.dataKey}`} x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor={section.color} stopOpacity={0.5} />
-                          <stop offset="95%" stopColor={section.color} stopOpacity={0.05} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f5f5f5" />
-                      <XAxis dataKey={xAxisKey} tick={{
-                    fontSize: 10,
-                    fill: "#9ca3af"
-                  }} hide />
-                      <YAxis hide />
-                      <Tooltip />
-                      <Area type="monotone" dataKey={section.dataKey} stroke={section.color} fill={`url(#mini-${section.dataKey})`} />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>)}
-          </div>
-
-          {/* Recommended Items Performance card */}
-          <div className="px-4">
-            <div className="bg-white rounded-lg p-4 space-y-4 relative overflow-hidden">
-              <div className="absolute top-0 right-0 p-2">
-                <Wand2 className="w-8 h-8 text-blue-100/50" />
-              </div>
-              <div className="flex items-center justify-between relative z-10">
-                <div>
-                  <p className="text-base font-bold text-gray-900">Special Items Performance</p>
-                  <p className="text-xs text-gray-500">How your boosted items are performing</p>
+                      <button onClick={e => handleLearnMoreClick('offers', e)} className="bg-white border border-gray-200 shadow-lg rounded-lg px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 whitespace-nowrap">
+                        Learn more
+                      </button>
+                    </motion.div>}
                 </div>
               </div>
 
-              {/* Top metrics row */}
-              <div className="grid grid-cols-2 gap-4 relative z-10">
-                <div className="bg-blue-50/50 p-3 rounded-lg border border-blue-100/50">
-                  <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-1">Items Sold</p>
-                  <p className="text-xl font-bold text-blue-600">{recommendedStats.count}</p>
-                  <p className="text-[10px] text-blue-400 mt-1">{recommendedStats.contribution}% of total sales</p>
+              <div className="divide-y divide-dashed divide-gray-200">
+                <div className="grid grid-cols-2 gap-y-4 py-3">
+                  {offersMetrics.slice(0, 2).map(metric => <div key={metric.title} className="flex flex-col gap-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold text-gray-900">{metric.title}</span>
+                      </div>
+                      <div className="text-lg font-bold text-gray-900">
+                        {metric.value} <span className="text-sm font-normal text-gray-600">{metric.change}</span>
+                      </div>
+                      <div className="text-xs text-gray-600">{metric.sub}</div>
+                    </div>)}
                 </div>
-                <div className="bg-green-50/50 p-3 rounded-lg border border-green-100/50">
-                  <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-1">Gross Revenue</p>
-                  <p className="text-xl font-bold text-green-600">₹{recommendedStats.revenue?.toLocaleString('en-IN')}</p>
-                  <p className="text-[10px] text-green-400 mt-1">Before platform fees</p>
-                </div>
-              </div>
-
-              {/* Earnings breakdown */}
-              <div className="relative z-10 border-t border-gray-100 pt-3 space-y-2">
-                <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Earnings Breakdown</p>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-red-50/60 p-3 rounded-lg border border-red-100/60">
-                    <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-1">Platform Fee</p>
-                    <p className="text-xl font-bold text-red-500">- ₹{recommendedStats.fees?.toLocaleString('en-IN') ?? 0}</p>
-                    <p className="text-[10px] text-red-400 mt-1">Goes to admin</p>
-                  </div>
-                  <div className="bg-green-50/60 p-3 rounded-lg border border-green-100/60">
-                    <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-1">Your Earnings</p>
-                    <p className="text-xl font-bold text-green-600">₹{(recommendedStats.revenue - recommendedStats.fees).toLocaleString('en-IN')}</p>
-                    <p className="text-[10px] text-green-400 mt-1">After platform fee</p>
-                  </div>
+                <div className="grid grid-cols-2 gap-y-4 py-3">
+                  {offersMetrics.slice(2).map(metric => <div key={metric.title} className="flex flex-col gap-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold text-gray-900">{metric.title}</span>
+                      </div>
+                      <div className="text-lg font-bold text-gray-900">
+                        {metric.value} <span className="text-sm font-normal text-gray-600">{metric.change}</span>
+                      </div>
+                      <div className="text-xs text-gray-600">{metric.sub}</div>
+                    </div>)}
                 </div>
               </div>
 
-              <div className="flex items-start gap-2 text-[10px] text-gray-400 italic bg-gray-50/80 p-2 rounded relative z-10">
-                <span>💡</span>
-                <span>Platform fees are charged for featuring your items to more customers. These are separate from your regular earnings.</span>
-              </div>
             </div>
           </div>
-
 
           {/* Sales & orders combined card */}
-          <div className="px-4">
+          <div className="px-4 mt-4">
             <div className="bg-white rounded-lg p-4 space-y-4 relative">
               {isDateLoading && <div className="absolute inset-0 flex items-center justify-center">
                   <div className="absolute inset-0 bg-white/60 rounded-lg" />
                   <div className="relative text-sm font-semibold text-gray-700 animate-pulse">Refreshing...</div>
                 </div>}
 
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
                   <div className="text-base font-bold text-gray-900">Sales & orders</div>
+                  <p className="text-xs text-gray-500">Last updated: few seconds ago</p>
+                </div>
+                <div className="flex items-start gap-2">
                   <Select value={graphFilter} onValueChange={handleFilterChange}>
                     <SelectTrigger className="w-[100px] h-8 text-xs bg-gray-50 border-gray-200">
                       <SelectValue placeholder="Filter" />
@@ -2465,24 +2342,23 @@ export default function ToHub() {
                       <SelectItem value="yearly">Yearly</SelectItem>
                     </SelectContent>
                   </Select>
-                </div>
-                <p className="text-xs text-gray-500">Last updated: few seconds ago</p>
-              </div>
-              <div className="relative">
-                <button onClick={() => setShowLearnMoreButton(showLearnMoreButton === 'sales-orders' ? null : 'sales-orders')} className="p-2 rounded-full hover:bg-gray-100">
-                  <MoreVertical className="w-5 h-5 text-gray-600" />
-                </button>
-                {showLearnMoreButton === 'sales-orders' && <motion.div initial={{
-                opacity: 0,
-                scale: 0.95
-              }} animate={{
-                opacity: 1,
-                scale: 1
-              }} className="absolute right-0 top-full mt-1 z-10">
-                    <button onClick={e => handleLearnMoreClick('sales-orders', e)} className="bg-white border border-gray-200 shadow-lg rounded-lg px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 whitespace-nowrap">
-                      Learn more
+                  <div className="relative">
+                    <button onClick={() => setShowLearnMoreButton(showLearnMoreButton === 'sales-orders' ? null : 'sales-orders')} className="p-2 rounded-full hover:bg-gray-100">
+                      <MoreVertical className="w-5 h-5 text-gray-600" />
                     </button>
-                  </motion.div>}
+                    {showLearnMoreButton === 'sales-orders' && <motion.div initial={{
+                  opacity: 0,
+                  scale: 0.95
+                }} animate={{
+                  opacity: 1,
+                  scale: 1
+                }} className="absolute right-0 top-full mt-1 z-10">
+                        <button onClick={e => handleLearnMoreClick('sales-orders', e)} className="bg-white border border-gray-200 shadow-lg rounded-lg px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 whitespace-nowrap">
+                          Learn more
+                        </button>
+                      </motion.div>}
+                  </div>
+                </div>
               </div>
 
 
@@ -2500,7 +2376,7 @@ export default function ToHub() {
               </div>
 
               <div className="h-64 chart-shell -mx-2">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                   <AreaChart data={chartData} margin={{
                   top: 10,
                   right: 12,
@@ -2556,16 +2432,19 @@ export default function ToHub() {
           </div>
 
 
-          <div className="px-4">
+          <div className="px-4 mt-4">
             <div className="bg-white rounded-lg p-4 space-y-4 relative">
               {isDateLoading && <div className="absolute inset-0 flex items-center justify-center">
                   <div className="absolute inset-0 bg-white/60 rounded-lg" />
                   <div className="relative text-sm font-semibold text-gray-700 animate-pulse">Refreshing...</div>
                 </div>}
 
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
                   <div className="text-base font-bold text-gray-900">Average order value</div>
+                  <p className="text-xs text-gray-500">Last updated: few seconds ago</p>
+                </div>
+                <div className="flex items-start gap-2">
                   <Select value={graphFilter} onValueChange={handleFilterChange}>
                     <SelectTrigger className="w-[100px] h-8 text-xs bg-gray-50 border-gray-200">
                       <SelectValue placeholder="Filter" />
@@ -2577,128 +2456,120 @@ export default function ToHub() {
                       <SelectItem value="yearly">Yearly</SelectItem>
                     </SelectContent>
                   </Select>
-                </div>
-                <p className="text-xs text-gray-500">Last updated: few seconds ago</p>
-              </div>
-              <div className="relative">
-                <button onClick={() => setShowLearnMoreButton(showLearnMoreButton === 'avg-order-value' ? null : 'avg-order-value')} className="p-2 rounded-full hover:bg-gray-100">
-                  <MoreVertical className="w-5 h-5 text-gray-600" />
-                </button>
-                {showLearnMoreButton === 'avg-order-value' && <motion.div initial={{
-                opacity: 0,
-                scale: 0.95
-              }} animate={{
-                opacity: 1,
-                scale: 1
-              }} className="absolute right-0 top-full mt-1 z-10">
-                    <button onClick={e => handleLearnMoreClick('avg-order-value', e)} className="bg-white border border-gray-200 shadow-lg rounded-lg px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 whitespace-nowrap">
-                      Learn more
+                  <div className="relative">
+                    <button onClick={() => setShowLearnMoreButton(showLearnMoreButton === 'avg-order-value' ? null : 'avg-order-value')} className="p-2 rounded-full hover:bg-gray-100">
+                      <MoreVertical className="w-5 h-5 text-gray-600" />
                     </button>
-                  </motion.div>}
-              </div>
-            </div>
-
-            <div className="space-y-1">
-              <p className="text-xs text-gray-500">AOV</p>
-              <p className="text-lg font-bold text-gray-900">
-                ₹{(parseFloat(totalSales.replace(/[^\d.]/g, '')) / (parseInt(totalOrders) || 1)).toFixed(0)} <span className="text-xs font-normal text-gray-500">- 0%</span>
-              </p>
-            </div>
-
-            <div className="h-64 chart-shell -mx-2">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={aovData} margin={{
-                top: 10,
-                right: 8,
-                left: 0,
-                bottom: 0
-              }}>
-                  <CartesianGrid strokeDasharray="4 4" stroke="#e5e7eb" />
-                  <XAxis dataKey={xAxisKey} tick={{
-                  fontSize: 10,
-                  fill: "#9ca3af"
-                }} tickLine={false} axisLine={{
-                  stroke: "#e5e7eb"
-                }} />
-                  <YAxis tick={{
-                  fontSize: 10,
-                  fill: "#9ca3af"
-                }} tickFormatter={value => `₹${value.toLocaleString("en-IN")}`} tickLine={false} axisLine={{
-                  stroke: "#e5e7eb"
-                }} allowDecimals={false} domain={[0, aovMax]} tickCount={5} />
-                  <Tooltip contentStyle={{
-                  fontSize: "0.75rem"
-                }} />
-                  <Area type="monotone" dataKey="aov" stroke="#3B82F6" strokeWidth={2} fill="rgba(59, 130, 246, 0.08)" dot={{
-                  r: 3,
-                  fill: "#3B82F6"
-                }} activeDot={{
-                  r: 4
-                }} />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          <div className="px-4">
-            <div className="bg-white rounded-lg p-4 space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="flex items-center gap-4">
-                    <p className="text-base font-bold text-gray-900">Orders by mealtime</p>
-                    <Select value={graphFilter} onValueChange={handleFilterChange}>
-                      <SelectTrigger className="w-[100px] h-8 text-xs bg-gray-50 border-gray-200">
-                        <SelectValue placeholder="Filter" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="daily">Daily</SelectItem>
-                        <SelectItem value="weekly">Weekly</SelectItem>
-                        <SelectItem value="monthly">Monthly</SelectItem>
-                        <SelectItem value="yearly">Yearly</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <p className="text-xs text-gray-500">
-                    {lastUpdated ? `Last updated: ${formatTimeAgo(lastUpdated)}` : "Last updated: a day ago"}
-                  </p>
-                </div>
-                <div className="relative">
-                  <button onClick={() => setShowLearnMoreButton(showLearnMoreButton === 'orders-by-mealtime-sales' ? null : 'orders-by-mealtime-sales')} className="p-2 rounded-full hover:bg-gray-100">
-                    <MoreVertical className="w-5 h-5 text-gray-600" />
-                  </button>
-                  {showLearnMoreButton === 'orders-by-mealtime-sales' && <motion.div initial={{
+                    {showLearnMoreButton === 'avg-order-value' && <motion.div initial={{
                   opacity: 0,
                   scale: 0.95
                 }} animate={{
                   opacity: 1,
                   scale: 1
                 }} className="absolute right-0 top-full mt-1 z-10">
-                      <button onClick={e => handleLearnMoreClick('orders-by-mealtime', e)} className="bg-white border border-gray-200 shadow-lg rounded-lg px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 whitespace-nowrap">
-                        Learn more
-                      </button>
-                    </motion.div>}
+                        <button onClick={e => handleLearnMoreClick('avg-order-value', e)} className="bg-white border border-gray-200 shadow-lg rounded-lg px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 whitespace-nowrap">
+                          Learn more
+                        </button>
+                      </motion.div>}
+                  </div>
                 </div>
               </div>
 
-              <div className="space-y-3">
-                {mealtimeMetrics.map(slot => <div key={slot.title} className="flex items-start justify-between">
-                    <div className="flex items-start gap-3">
-                      <span className="w-2.5 h-2.5 rounded-full mt-1" style={{
-                    backgroundColor: slot.color
+              <div className="space-y-1 pt-1">
+                <p className="text-xs text-gray-500">AOV</p>
+                <p className="text-lg font-bold text-gray-900">
+                  ₹{(parseFloat(totalSales.replace(/[^\d.]/g, '')) / (parseInt(totalOrders) || 1)).toFixed(0)} <span className="text-xs font-normal text-gray-500">- 0%</span>
+                </p>
+              </div>
+
+              <div className="h-64 chart-shell -mx-2">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+                  <AreaChart data={aovData} margin={{
+                  top: 10,
+                  right: 8,
+                  left: 0,
+                  bottom: 0
+                }}>
+                    <CartesianGrid strokeDasharray="4 4" stroke="#e5e7eb" />
+                    <XAxis dataKey={xAxisKey} tick={{
+                    fontSize: 10,
+                    fill: "#9ca3af"
+                  }} tickLine={false} axisLine={{
+                    stroke: "#e5e7eb"
                   }} />
-                      <div className="flex flex-col">
-                        <span className="text-sm font-semibold text-gray-900">{slot.title}</span>
-                        <span className="text-xs text-gray-600">{slot.window}</span>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-semibold text-gray-900">{slot.value}</p>
-                      <p className="text-xs text-gray-600">{slot.change}</p>
-                    </div>
-                  </div>)}
+                    <YAxis tick={{
+                    fontSize: 10,
+                    fill: "#9ca3af"
+                  }} tickFormatter={value => `₹${value.toLocaleString("en-IN")}`} tickLine={false} axisLine={{
+                    stroke: "#e5e7eb"
+                  }} allowDecimals={false} domain={[0, aovMax]} tickCount={5} />
+                    <Tooltip contentStyle={{
+                    fontSize: "0.75rem"
+                  }} />
+                    <Area type="monotone" dataKey="aov" stroke="#3B82F6" strokeWidth={2} fill="rgba(59, 130, 246, 0.08)" dot={{
+                    r: 3,
+                    fill: "#3B82F6"
+                  }} activeDot={{
+                    r: 4
+                  }} />
+                  </AreaChart>
+                </ResponsiveContainer>
               </div>
             </div>
           </div>
+
+          {/* Recommended Items Performance card */}
+          <div className="px-4 mt-4">
+            <div className="bg-white rounded-lg p-4 space-y-4 relative overflow-hidden">
+              <div className="absolute top-0 right-0 p-2">
+                <Wand2 className="w-8 h-8 text-blue-100/50" />
+              </div>
+              <div className="flex items-center justify-between relative z-10">
+                <div>
+                  <p className="text-base font-bold text-gray-900">Special Items Performance</p>
+                  <p className="text-xs text-gray-500">How your boosted items are performing</p>
+                </div>
+              </div>
+
+              {/* Top metrics row */}
+              <div className="grid grid-cols-2 gap-4 relative z-10">
+                <div className="bg-blue-50/50 p-3 rounded-lg border border-blue-100/50">
+                  <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-1">Items Sold</p>
+                  <p className="text-xl font-bold text-blue-600">{recommendedStats.count}</p>
+                  <p className="text-[10px] text-blue-400 mt-1">{recommendedStats.contribution}% of total sales</p>
+                </div>
+                <div className="bg-green-50/50 p-3 rounded-lg border border-green-100/50">
+                  <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-1">Gross Revenue</p>
+                  <p className="text-xl font-bold text-green-600">₹{recommendedStats.revenue?.toLocaleString('en-IN')}</p>
+                  <p className="text-[10px] text-green-400 mt-1">Before platform fees</p>
+                </div>
+              </div>
+
+              {/* Earnings breakdown */}
+              <div className="relative z-10 border-t border-gray-100 pt-3 space-y-2">
+                <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Earnings Breakdown</p>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-red-50/60 p-3 rounded-lg border border-red-100/60">
+                    <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-1">Platform Fee</p>
+                    <p className="text-xl font-bold text-red-500">- ₹{recommendedStats.fees?.toLocaleString('en-IN') ?? 0}</p>
+                    <p className="text-[10px] text-red-400 mt-1">Goes to admin</p>
+                  </div>
+                  <div className="bg-green-50/60 p-3 rounded-lg border border-green-100/60">
+                    <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-1">Your Earnings</p>
+                    <p className="text-xl font-bold text-green-600">₹{(recommendedStats.revenue - recommendedStats.fees).toLocaleString('en-IN')}</p>
+                    <p className="text-[10px] text-green-400 mt-1">After platform fee</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-2 text-[10px] text-gray-400 italic bg-gray-50/80 p-2 rounded relative z-10">
+                <span>💡</span>
+                <span>Platform fees are charged for featuring your items to more customers. These are separate from your regular earnings.</span>
+              </div>
+            </div>
+          </div>
+
         </div>
       </>;
   };
@@ -2717,7 +2588,7 @@ export default function ToHub() {
       `}</style>
       <div className="">
         {/* Reuse Feedback-like navbar */}
-        <div className="sticky bg-white top-0 z-40 px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+        <div className="sticky bg-white top-0 z-60 px-4 py-3 border-b border-gray-200 flex items-center justify-between">
           <div>
             <p className="text-[10px] tracking-[0.12em] text-gray-500 uppercase">
               Showing data for
@@ -2741,7 +2612,7 @@ export default function ToHub() {
         </div>
 
         {/* Top tabs (matching Orders tab style) */}
-        <div className="sticky top-[50px] z-40 pb-2 bg-gray-100">
+        <div className="sticky top-[50px] z-50 pb-2 bg-gray-100">
           <div ref={topTabBarRef} className="flex gap-2 overflow-x-auto scrollbar-hide bg-transparent rounded-full px-3 py-2 mt-2" style={{
           scrollbarWidth: 'none',
           msOverflowStyle: 'none',
@@ -2793,7 +2664,7 @@ export default function ToHub() {
         y: 10
       }} transition={{
         duration: 0.2
-      }} className="flex-1" onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd} onMouseDown={e => {
+      }} className="flex-1 pb-[calc(5.5rem+env(safe-area-inset-bottom))]" onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd} onMouseDown={e => {
         const target = e.target;
         // Don't handle swipe if starting on topbar or chart
         if (topTabBarRef.current?.contains(target)) return;
@@ -2827,10 +2698,15 @@ export default function ToHub() {
           isSwiping.current = false;
         }
       }}>
-          {activeTopTab === "my-feed" ? <MyFeedContent /> : activeTopTab === "sales" ? <SalesTabContent /> : activeTopTab === "growth" ? <div className="p-4 bg-gray-100 min-h-screen">
-              <motion.div whileTap={{
+          {activeTopTab === "my-feed" ? <MyFeedContent /> : activeTopTab === "sales" ? hasAdvancedAnalytics ? <SalesTabContent /> : <div className="p-4 bg-gray-100 min-h-screen">
+                <SubscriptionFeatureOverlay fullscreen isLocked title="Advanced Analytics" message="Upgrade to GROWTH to unlock Advanced Analytics insights and reports." onGoBack={() => setActiveTopTab("my-feed")}>
+                  <SalesTabContent />
+                </SubscriptionFeatureOverlay>
+              </div> : activeTopTab === "growth" ? <div className="p-4 bg-gray-100 min-h-screen">
+              <div className="space-y-4">
+                <motion.div whileTap={{
             scale: 0.98
-          }} onClick={() => navigate("/restaurant/advertisements")} className="bg-white rounded-lg p-4 flex items-center gap-4  border border-gray-200 cursor-pointer mb-4">
+          }} onClick={() => navigate("/restaurant/advertisements")} className="bg-white rounded-lg p-4 flex items-center gap-4 border border-gray-200 cursor-pointer">
                 <div className="shrink-0">
                   <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
                     <Megaphone className="w-6 h-6 text-orange-600" />
@@ -2845,7 +2721,7 @@ export default function ToHub() {
 
               <motion.div whileTap={{
             scale: 0.98
-          }} onClick={() => navigate("/restaurant/hub-growth/create-offers")} className="bg-white rounded-lg p-4 flex items-center gap-4  border border-gray-200 cursor-pointer ">
+          }} onClick={() => navigate("/restaurant/hub-growth/create-offers")} className="bg-white rounded-lg p-4 flex items-center gap-4 border border-gray-200 cursor-pointer">
                 <div className="shrink-0">
                   <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
                     <TrendingUp className="w-6 h-6 text-blue-600" />
@@ -2857,6 +2733,7 @@ export default function ToHub() {
                 </div>
                 <ChevronRight className="w-5 h-5 text-blue-600 shrink-0" />
               </motion.div>
+              </div>
             </div> : <EmptyTab label={topTabs.find(t => t.id === activeTopTab)?.label || "Tab"} />}
         </motion.div>
       </AnimatePresence>

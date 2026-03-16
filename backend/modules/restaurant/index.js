@@ -21,6 +21,8 @@ import restaurantOrderRoutes from './routes/restaurantOrderRoutes.js';
 import outletTimingsRoutes from './routes/outletTimingsRoutes.js';
 import complaintRoutes from './routes/complaintRoutes.js';
 import { getOutletTimingsByRestaurantId } from './controllers/outletTimingsController.js';
+import { requestRMCall, getRMCallHistory } from './controllers/relationshipManagerController.js';
+import { checkFeatureAccess } from './middleware/subscriptionGuard.js';
 
 const router = express.Router();
 
@@ -76,23 +78,23 @@ router.put('/onboarding', authenticate, validate(onboardingSchema), upsertOnboar
 router.post('/onboarding/create-restaurant', authenticate, createRestaurantFromOnboardingManual);
 
 // Menu routes (authenticated - for restaurant module)
-router.get('/menu', authenticate, getMenu);
-router.put('/menu', authenticate, updateMenu);
-router.post('/menu/section', authenticate, addSection);
-router.post('/menu/section/item', authenticate, addItemToSection);
-router.post('/menu/section/subsection', authenticate, addSubsectionToSection);
-router.post('/menu/subsection/item', authenticate, addItemToSubsection);
+router.get('/menu', authenticate, checkFeatureAccess('menu_control'), getMenu);
+router.put('/menu', authenticate, checkFeatureAccess('menu_control'), updateMenu);
+router.post('/menu/section', authenticate, checkFeatureAccess('menu_control'), addSection);
+router.post('/menu/section/item', authenticate, checkFeatureAccess('menu_control'), addItemToSection);
+router.post('/menu/section/subsection', authenticate, checkFeatureAccess('menu_control'), addSubsectionToSection);
+router.post('/menu/subsection/item', authenticate, checkFeatureAccess('menu_control'), addItemToSubsection);
 
 // Add-on routes
-router.post('/menu/addon', authenticate, addAddon);
-router.get('/menu/addons', authenticate, getAddons);
-router.put('/menu/addon/:id', authenticate, updateAddon);
-router.delete('/menu/addon/:id', authenticate, deleteAddon);
+router.post('/menu/addon', authenticate, checkFeatureAccess('menu_control'), addAddon);
+router.get('/menu/addons', authenticate, checkFeatureAccess('menu_control'), getAddons);
+router.put('/menu/addon/:id', authenticate, checkFeatureAccess('menu_control'), updateAddon);
+router.delete('/menu/addon/:id', authenticate, checkFeatureAccess('menu_control'), deleteAddon);
 
 // Menu item scheduling routes
-router.post('/menu/item/schedule', authenticate, scheduleItemAvailability);
-router.delete('/menu/item/schedule/:scheduleId', authenticate, cancelScheduledAvailability);
-router.get('/menu/item/schedule/:sectionId/:itemId', authenticate, getItemSchedule);
+router.post('/menu/item/schedule', authenticate, checkFeatureAccess('menu_control'), scheduleItemAvailability);
+router.delete('/menu/item/schedule/:scheduleId', authenticate, checkFeatureAccess('menu_control'), cancelScheduledAvailability);
+router.get('/menu/item/schedule/:sectionId/:itemId', authenticate, checkFeatureAccess('menu_control'), getItemSchedule);
 
 // Inventory routes (authenticated - for restaurant module)
 router.get('/inventory', authenticate, getInventory);
@@ -102,14 +104,14 @@ router.put('/inventory', authenticate, updateInventory);
 router.use('/categories', categoryRoutes);
 
 // Offer routes (authenticated - for restaurant module)
-router.post('/offers', authenticate, createOffer);
-router.get('/offers', authenticate, getOffers);
-router.get('/offers/item/:itemId/coupons', authenticate, getCouponsByItemId);
+router.post('/offers', authenticate, checkFeatureAccess('marketing_tools'), createOffer);
+router.get('/offers', authenticate, checkFeatureAccess('marketing_tools'), getOffers);
+router.get('/offers/item/:itemId/coupons', authenticate, checkFeatureAccess('marketing_tools'), getCouponsByItemId);
 // Public offers route - must come before /offers/:id to avoid route conflict
 router.get('/offers/public', getPublicOffers);
-router.get('/offers/:id', authenticate, getOfferById);
-router.put('/offers/:id/status', authenticate, updateOfferStatus);
-router.delete('/offers/:id', authenticate, deleteOffer);
+router.get('/offers/:id', authenticate, checkFeatureAccess('marketing_tools'), getOfferById);
+router.put('/offers/:id/status', authenticate, checkFeatureAccess('marketing_tools'), updateOfferStatus);
+router.delete('/offers/:id', authenticate, checkFeatureAccess('marketing_tools'), deleteOffer);
 
 // Staff Management routes (authenticated - for restaurant module)
 // Must come before /:id to avoid route conflicts
@@ -128,20 +130,24 @@ router.use('/complaints', complaintRoutes);
 
 // Finance routes (authenticated - for restaurant module)
 // Must come BEFORE /:id route to avoid route conflicts (/:id would match /finance)
-router.get('/finance', authenticate, getRestaurantFinance);
+router.get('/finance', authenticate, checkFeatureAccess('basic_reports'), getRestaurantFinance);
 
 // Wallet routes (authenticated - for restaurant module)
 // Must come BEFORE /:id route to avoid route conflicts (/:id would match /wallet)
-router.get('/wallet', authenticate, getWallet);
-router.get('/wallet/transactions', authenticate, getWalletTransactions);
-router.get('/wallet/stats', authenticate, getWalletStats);
-router.get('/challenges', authenticate, getMyChallenges);
+router.get('/wallet', authenticate, checkFeatureAccess('basic_reports'), getWallet);
+router.get('/wallet/transactions', authenticate, checkFeatureAccess('basic_reports'), getWalletTransactions);
+router.get('/wallet/stats', authenticate, checkFeatureAccess('basic_reports'), getWalletStats);
+router.get('/challenges', authenticate, checkFeatureAccess('basic_reports'), getMyChallenges);
 
 // Withdrawal routes (authenticated - for restaurant module)
-router.post('/withdrawal/request', authenticate, createWithdrawalRequest);
-router.get('/withdrawal/requests', authenticate, getRestaurantWithdrawalRequests);
-router.get('/delivery-pricing', authenticate, getDeliveryPricingConfig);
-router.put('/delivery-pricing', authenticate, updateDeliveryPricingConfig);
+router.post('/withdrawal/request', authenticate, checkFeatureAccess('basic_reports'), createWithdrawalRequest);
+router.get('/withdrawal/requests', authenticate, checkFeatureAccess('basic_reports'), getRestaurantWithdrawalRequests);
+router.get('/delivery-pricing', authenticate, checkFeatureAccess('basic_reports'), getDeliveryPricingConfig);
+router.put('/delivery-pricing', authenticate, checkFeatureAccess('basic_reports'), updateDeliveryPricingConfig);
+
+// Relationship Manager routes (authenticated - for GROWTH/EXECUTIVE plans)
+router.post('/rm/request-call', authenticate, checkFeatureAccess('relationship_manager'), requestRMCall);
+router.get('/rm/call-history', authenticate, checkFeatureAccess('relationship_manager'), getRMCallHistory);
 
 // Restaurant routes (public - for user module)
 router.get('/list', getRestaurants);

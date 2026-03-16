@@ -98,7 +98,7 @@ export default function MenuOverlay({ showMenu, setShowMenu }) {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2, ease: "easeOut" }}
             onClick={() => setShowMenu(false)}
-            className="fixed inset-0 bg-black/40 z-[100] backdrop-blur-sm"
+            className="fixed inset-0 bg-slate-900/45 z-[100] backdrop-blur-[2px]"
           />
 
           {/* Menu Sheet - Full bottom slide */}
@@ -113,7 +113,7 @@ export default function MenuOverlay({ showMenu, setShowMenu }) {
               mass: 0.8
             }}
             onClick={(e) => e.stopPropagation()}
-            className="fixed bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-2xl z-[110] max-h-[90vh] overflow-hidden"
+            className="fixed bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-2xl z-[110] max-h-[92vh] overflow-hidden border-t border-slate-200"
           >
             {/* Drag Handle */}
             <motion.div
@@ -126,12 +126,16 @@ export default function MenuOverlay({ showMenu, setShowMenu }) {
             </motion.div>
 
             {/* Menu Grid - Improved Layout */}
-            <div className="px-4 pb-20 md:pb-6 pt-2 overflow-y-auto max-h-[calc(90vh-60px)] scrollbar-hide scroll-smooth">
+            <div className="px-4 pb-20 md:pb-6 pt-2 overflow-y-auto max-h-[calc(92vh-60px)] scrollbar-hide scroll-smooth">
+              <div className="mb-4 px-1">
+                <h3 className="text-sm font-semibold text-slate-900">Quick actions</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Manage your restaurant tools and settings</p>
+              </div>
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.15, duration: 0.3 }}
-                className="grid grid-cols-3 gap-3 md:gap-4"
+                className="grid grid-cols-3 gap-2.5 md:gap-3.5"
               >
                 {menuOptions.map((option, index) => {
                   const IconComponent = option.icon
@@ -184,9 +188,9 @@ export default function MenuOverlay({ showMenu, setShowMenu }) {
                           navigate(option.route)
                         }
                       }}
-                      className={`flex flex-col items-center justify-center gap-2 p-3 md:p-4 rounded-xl transition-all shadow-md hover:shadow-lg ${option.isLogout
-                        ? "bg-red-500 hover:bg-red-600 text-white"
-                        : "bg-gradient-to-br from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white"
+                      className={`group flex flex-col items-center justify-center gap-2 p-3 md:p-4 rounded-2xl border transition-all shadow-sm hover:shadow-md ${option.isLogout
+                        ? "bg-red-50 border-red-200 hover:bg-red-100 text-red-700"
+                        : "bg-white border-slate-200 hover:border-blue-200 text-slate-800"
                         }`}
                     >
                       <motion.div
@@ -198,15 +202,15 @@ export default function MenuOverlay({ showMenu, setShowMenu }) {
                           stiffness: 200,
                           damping: 15
                         }}
-                        className="flex items-center justify-center"
+                        className={`flex items-center justify-center rounded-full w-9 h-9 md:w-10 md:h-10 ${option.isLogout ? "bg-red-100" : "bg-blue-50 group-hover:bg-blue-100"}`}
                       >
-                        <IconComponent className="w-5 h-5 md:w-6 md:h-6 text-white flex-shrink-0" />
+                        <IconComponent className={`w-[18px] h-[18px] md:w-5 md:h-5 flex-shrink-0 ${option.isLogout ? "text-red-600" : "text-blue-700"}`} />
                       </motion.div>
                       <motion.span
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         transition={{ delay: 0.35 + (index * 0.02), duration: 0.2 }}
-                        className="text-[10px] md:text-[11px] font-semibold text-white text-center leading-tight px-1"
+                        className={`text-[10px] md:text-[11px] font-medium text-center leading-tight px-1 ${option.isLogout ? "text-red-700" : "text-slate-700"}`}
                         style={{
                           display: '-webkit-box',
                           WebkitLineClamp: 2,
@@ -228,4 +232,3 @@ export default function MenuOverlay({ showMenu, setShowMenu }) {
     </AnimatePresence>
   )
 }
-

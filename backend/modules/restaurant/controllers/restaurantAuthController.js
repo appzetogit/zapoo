@@ -1,4 +1,5 @@
 import Restaurant from '../models/Restaurant.js';
+import SubscriptionPlan from '../../admin/models/SubscriptionPlan.js';
 import otpService from '../../auth/services/otpService.js';
 import jwtService from '../../auth/services/jwtService.js';
 import firebaseAuthService from '../../auth/services/firebaseAuthService.js';
@@ -177,13 +178,8 @@ export const verifyOTP = asyncHandler(async (req, res) => {
       // Set isActive to false - restaurant needs admin approval before becoming active
       restaurantData.isActive = false;
       try {
-        // For phone signups, use $unset to ensure email field is not saved
         if (phone && !email) {
-          // Use collection.insertOne directly to have full control over the document
-          const docToInsert = {
-            ...restaurantData
-          };
-          // Explicitly remove email field
+          const docToInsert = { ...restaurantData };
           delete docToInsert.email;
           restaurant = await Restaurant.create(docToInsert);
         } else {
@@ -852,7 +848,10 @@ export const getCurrentRestaurant = asyncHandler(async (req, res) => {
       // Include verification status
       rejectionReason: req.restaurant.rejectionReason || null,
       approvedAt: req.restaurant.approvedAt || null,
-      rejectedAt: req.restaurant.rejectedAt || null
+      rejectedAt: req.restaurant.rejectedAt || null,
+      businessModel: req.restaurant.businessModel,
+      subscription: req.restaurant.subscription,
+      relationshipManager: req.restaurant.relationshipManager
     }
   });
 });

@@ -394,5 +394,6 @@ export default function RestaurantOTP() {
         </Button>
       </div>
     </div>
+
   </div>;
 }

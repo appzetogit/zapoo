@@ -1,477 +1,752 @@
 import SubscriptionPlan from "../../admin/models/SubscriptionPlan.js";
 import Restaurant from "../../restaurant/models/Restaurant.js";
-import Payment from "../../payment/models/Payment.js";
+import RestaurantSubscription from "../../restaurant/models/RestaurantSubscription.js";
+import RelationshipRequest from "../../restaurant/models/RelationshipRequest.js";
 import * as razorpayService from "../../payment/services/razorpayService.js";
 import { getRazorpayCredentials } from "../../../shared/utils/envService.js";
-import mongoose from "mongoose";
+
+const getRestaurantTierKey = (restaurant) => {
+  if (restaurant?.zoneId?.tierId?.rank) {
+    return `tier${restaurant.zoneId.tierId.rank}`;
+  }
+  return "tier1";
+};
+
+const getPlanAmountForRestaurant = (plan, restaurant) => {
+  const tierKey = getRestaurantTierKey(restaurant);
+  if (plan?.pricing && plan.pricing[tierKey] !== undefined) {
+    return plan.pricing[tierKey];
+  }
+  return plan?.pricing?.tier1 || 0;
+};
 
 /**
  * Get all active subscription plans
  */
 export const getPlans = async (req, res) => {
-    try {
-        let query = { isActive: true };
+  try {
+    let query = { isActive: true };
 
-        // If admin is requesting, return all plans
-        if ((req.admin) || (req.user && req.user.role === 'admin')) {
-            query = {};
-        }
-
-        const plans = await SubscriptionPlan.find(query).lean();
-
-        if (req.user && req.user.role === 'restaurant') {
-            try {
-                const restaurantId = req.user._id || req.user.id;
-                const restaurant = await Restaurant.findById(restaurantId).populate({
-                    path: 'zoneId',
-                    populate: { path: 'tierId' }
-                });
-
-
-                if (restaurant && restaurant.zoneId && restaurant.zoneId.tierId && restaurant.zoneId.tierId.rank) {
-                    const tierRank = restaurant.zoneId.tierId.rank; // Assuming 1, 2, 3, 4
-                    const tierKey = `tier${tierRank}`;
-
-                    // Adjust prices based on zone tier
-                    plans.forEach(plan => {
-                        if (plan.pricing && plan.pricing[tierKey] !== undefined) {
-                            plan.price = plan.pricing[tierKey];
-                            plan.tierName = restaurant.zoneId.tierId.name;
-                        } else {
-                            // Fallback to Tier 1 if specific tier price not found
-                            plan.price = plan.pricing?.tier1 || 0;
-                        }
-                    });
-                } else {
-                    // Fallback if no tier assigned
-                    plans.forEach(plan => {
-                        plan.price = plan.pricing?.tier1 || 0;
-                    });
-                }
-            } catch (err) {
-                console.error("Error applying zone pricing:", err);
-                // Continue with base prices if error occurs
-            }
-        } else {
-            // For Admin or Public view, show tier 1 price as default
-            plans.forEach(plan => {
-                plan.price = plan.pricing?.tier1 || 0;
-            });
-        }
-
-        res.status(200).json({
-            success: true,
-            data: plans,
-        });
-    } catch (error) {
-        console.error("Error fetching subscription plans:", error);
-        res.status(500).json({
-            success: false,
-            message: "Failed to fetch subscription plans",
-        });
+    if (req.admin || (req.user && req.user.role === "admin")) {
+      query = {};
     }
+
+    const plans = await SubscriptionPlan.find(query).lean();
+
+    let restaurant = req.restaurant || null;
+    if (!restaurant && req.user && req.user.role === "restaurant") {
+      restaurant = await Restaurant.findById(req.user._id || req.user.id).populate({
+        path: "zoneId",
+        populate: { path: "tierId" },
+      });
+    }
+
+    plans.forEach((plan) => {
+      plan.price = getPlanAmountForRestaurant(plan, restaurant);
+      if (restaurant?.zoneId?.tierId?.name) {
+        plan.tierName = restaurant.zoneId.tierId.name;
+      }
+    });
+
+    res.status(200).json({
+      success: true,
+      data: plans,
+    });
+  } catch (error) {
+    console.error("Error fetching subscription plans:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch subscription plans",
+    });
+  }
 };
 
 /**
- * Subscribe a restaurant to a plan
+ * Subscribe a restaurant to a plan (creates Razorpay order for paid plans)
  */
 export const subscribe = async (req, res) => {
-    try {
-        const { planId } = req.body;
-        const restaurantId = req.user._id || req.user.id;
+  try {
+    const { planId } = req.body;
+    const restaurantId = req.user._id || req.user.id;
 
-        if (!planId) {
-            return res.status(400).json({
-                success: false,
-                message: "Plan ID is required",
-            });
-        }
-
-        const plan = await SubscriptionPlan.findById(planId);
-        if (!plan) {
-            return res.status(404).json({
-                success: false,
-                message: "Subscription plan not found",
-            });
-        }
-
-        const restaurant = await Restaurant.findById(restaurantId).populate({
-            path: 'zoneId',
-            populate: { path: 'tierId' }
-        });
-
-        if (!restaurant) {
-            return res.status(404).json({
-                success: false,
-                message: "Restaurant not found",
-            });
-        }
-
-        // Calculate price based on zone tier
-        let amount = 0;
-        if (restaurant.zoneId && restaurant.zoneId.tierId && restaurant.zoneId.tierId.rank) {
-            const tierRank = restaurant.zoneId.tierId.rank;
-            const tierKey = `tier${tierRank}`;
-            amount = plan.pricing[tierKey] !== undefined ? plan.pricing[tierKey] : (plan.pricing?.tier1 || 0);
-        } else {
-            amount = plan.pricing?.tier1 || 0;
-        }
-
-        if (amount === 0) {
-            // Free plan logic or skip payment
-            const startDate = new Date();
-            const endDate = new Date();
-            endDate.setDate(startDate.getDate() + (plan.durationInDays || 30));
-
-            restaurant.subscription = {
-                planId: plan._id,
-                startDate: startDate,
-                endDate: endDate,
-                status: "active",
-                autoRenew: true,
-                paymentId: "FREE_" + Date.now(),
-                features: plan.features,
-            };
-            restaurant.businessModel = "Subscription Base";
-            await restaurant.save();
-
-            return res.status(200).json({
-                success: true,
-                message: "Free subscription activated successfully",
-                data: {
-                    subscription: restaurant.subscription,
-                    plan: plan
-                },
-            });
-        }
-
-        // Create Razorpay Order
-        try {
-            const razorpayOrder = await razorpayService.createOrder({
-                amount: Math.round(amount * 100), // Convert to paise
-                currency: 'INR',
-                receipt: `sub_${Date.now()}`,
-                notes: {
-                    restaurantId: restaurantId.toString(),
-                    planId: planId.toString(),
-                    type: 'subscription_purchase'
-                }
-            });
-
-            // Get Razorpay Key ID
-            const credentials = await getRazorpayCredentials();
-            const razorpayKeyId = credentials.keyId;
-
-            res.status(200).json({
-                success: true,
-                data: {
-                    razorpay: {
-                        orderId: razorpayOrder.id,
-                        amount: razorpayOrder.amount,
-                        currency: razorpayOrder.currency,
-                        key: razorpayKeyId
-                    },
-                    plan: plan
-                },
-            });
-        } catch (razorpayError) {
-            console.error("[Subscription] Razorpay order creation failed:", razorpayError);
-            throw razorpayError;
-        }
-
-    } catch (error) {
-        console.error("Error subscribing to plan:", error);
-        res.status(500).json({
-            success: false,
-            message: "Failed to subscribe to plan",
-        });
+    if (!planId) {
+      return res.status(400).json({
+        success: false,
+        message: "Plan ID is required",
+      });
     }
+
+    const plan = await SubscriptionPlan.findById(planId);
+    if (!plan) {
+      return res.status(404).json({
+        success: false,
+        message: "Subscription plan not found",
+      });
+    }
+
+    if (!plan.isActive) {
+      return res.status(400).json({
+        success: false,
+        message: "This subscription plan is currently disabled",
+      });
+    }
+
+    const restaurant = await Restaurant.findById(restaurantId).populate({
+      path: "zoneId",
+      populate: { path: "tierId" },
+    });
+
+    if (!restaurant) {
+      return res.status(404).json({
+        success: false,
+        message: "Restaurant not found",
+      });
+    }
+
+    const amount = getPlanAmountForRestaurant(plan, restaurant);
+
+    if (amount === 0) {
+      const startDate = new Date();
+      const endDate = new Date();
+      endDate.setDate(startDate.getDate() + (plan.durationInDays || 30));
+
+      restaurant.subscription = {
+        planId: plan._id,
+        startDate,
+        endDate,
+        status: "active",
+        autoRenew: true,
+        paymentId: `FREE_${Date.now()}`,
+        paymentStatus: "completed",
+        paymentDate: startDate,
+        amount,
+        features: plan.features,
+      };
+      restaurant.businessModel = "Subscription Base";
+      await restaurant.save();
+
+      await RestaurantSubscription.create({
+        restaurantId,
+        planId: plan._id,
+        startDate,
+        endDate,
+        trialUsed: !!restaurant.trialUsed,
+        amount,
+        paymentStatus: "completed",
+        paymentDate: startDate,
+        status: "active",
+      });
+
+      return res.status(200).json({
+        success: true,
+        message: "Free subscription activated successfully",
+        data: {
+          subscription: restaurant.subscription,
+          plan,
+        },
+      });
+    }
+
+    const razorpayOrder = await razorpayService.createOrder({
+      amount: Math.round(amount * 100),
+      currency: "INR",
+      receipt: `sub_${Date.now()}`,
+      notes: {
+        restaurantId: restaurantId.toString(),
+        planId: planId.toString(),
+        type: "subscription_purchase",
+      },
+    });
+
+    const credentials = await getRazorpayCredentials();
+
+    res.status(200).json({
+      success: true,
+      data: {
+        razorpay: {
+          orderId: razorpayOrder.id,
+          amount: razorpayOrder.amount,
+          currency: razorpayOrder.currency,
+          key: credentials.keyId,
+        },
+        plan,
+      },
+    });
+  } catch (error) {
+    console.error("Error subscribing to plan:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to subscribe to plan",
+    });
+  }
 };
+
+/**
+ * Claim 30-day Growth trial (one-time per restaurant)
+ */
+export const claimTrial = async (req, res) => {
+  try {
+    const restaurantId = req.user._id || req.user.id;
+    const restaurant = await Restaurant.findById(restaurantId);
+
+    if (!restaurant) {
+      return res.status(404).json({
+        success: false,
+        message: "Restaurant not found",
+      });
+    }
+
+    if (restaurant.trialUsed) {
+      return res.status(400).json({
+        success: false,
+        message: "Trial already used",
+      });
+    }
+
+    const now = new Date();
+    const hasActiveSubscription =
+      restaurant.subscription &&
+      restaurant.subscription.status === "active" &&
+      restaurant.subscription.endDate &&
+      new Date(restaurant.subscription.endDate) > now;
+
+    if (hasActiveSubscription) {
+      return res.status(400).json({
+        success: false,
+        message: "Active subscription already exists",
+      });
+    }
+
+    const growthPlan = await SubscriptionPlan.findOne({ name: "GROWTH", isActive: true });
+    if (!growthPlan) {
+      return res.status(404).json({
+        success: false,
+        message: "Growth plan not available",
+      });
+    }
+
+    const startDate = new Date();
+    const endDate = new Date();
+    endDate.setDate(startDate.getDate() + (growthPlan.durationInDays || 30));
+
+    restaurant.subscription = {
+      planId: growthPlan._id,
+      startDate,
+      endDate,
+      status: "active",
+      autoRenew: false,
+      paymentId: `TRIAL_${Date.now()}`,
+      paymentStatus: "completed",
+      paymentDate: startDate,
+      amount: 0,
+      features: growthPlan.features,
+    };
+    restaurant.businessModel = "Subscription Base";
+    restaurant.trialUsed = true;
+    await restaurant.save();
+
+    await RestaurantSubscription.create({
+      restaurantId,
+      planId: growthPlan._id,
+      startDate,
+      endDate,
+      trialUsed: true,
+      amount: 0,
+      paymentStatus: "completed",
+      paymentDate: startDate,
+      status: "active",
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Trial activated successfully",
+      data: {
+        subscription: restaurant.subscription,
+        plan: growthPlan,
+      },
+    });
+  } catch (error) {
+    console.error("Error claiming trial:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to activate trial",
+    });
+  }
+};
+
+export const createSubscriptionOrder = subscribe;
 
 /**
  * Get current subscription details
  */
 export const getMySubscription = async (req, res) => {
-    try {
-        const restaurantId = req.user._id || req.user.id;
-        const restaurant = await Restaurant.findById(restaurantId).populate("subscription.planId");
+  try {
+    const restaurantId = req.user._id || req.user.id;
+    const restaurant = await Restaurant.findById(restaurantId).populate("subscription.planId");
 
-        if (!restaurant) {
-            return res.status(404).json({
-                success: false,
-                message: "Restaurant not found",
-            });
-        }
-
-        if (!restaurant.subscription || !restaurant.subscription.planId) {
-            return res.status(200).json({
-                success: true,
-                data: null,
-                message: "No active subscription"
-            });
-        }
-
-        res.status(200).json({
-            success: true,
-            data: restaurant.subscription,
-        });
-
-    } catch (error) {
-        console.error("Error fetching subscription:", error);
-        res.status(500).json({
-            success: false,
-            message: "Failed to fetch subscription details",
-        });
+    if (!restaurant) {
+      return res.status(404).json({
+        success: false,
+        message: "Restaurant not found",
+      });
     }
+
+    if (!restaurant.subscription || !restaurant.subscription.planId) {
+      return res.status(200).json({
+        success: true,
+        data: null,
+        message: "No active subscription",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: restaurant.subscription,
+    });
+  } catch (error) {
+    console.error("Error fetching subscription:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch subscription details",
+    });
+  }
 };
+
+export const getMyPlan = getMySubscription;
 
 /**
  * Cancel subscription
  */
 export const cancelSubscription = async (req, res) => {
-    try {
-        const restaurantId = req.user._id || req.user.id;
-        const restaurant = await Restaurant.findById(restaurantId);
+  try {
+    const restaurantId = req.user._id || req.user.id;
+    const restaurant = await Restaurant.findById(restaurantId);
 
-        if (!restaurant) {
-            return res.status(404).json({
-                success: false,
-                message: "Restaurant not found",
-            });
-        }
-
-        if (restaurant.subscription) {
-            restaurant.subscription.autoRenew = false;
-            // Optionally set status to 'cancelled' immediately or let it expire
-            // restaurant.subscription.status = 'cancelled'; 
-            await restaurant.save();
-        }
-
-        res.status(200).json({
-            success: true,
-            message: "Subscription auto-renewal cancelled. Plan remains active until end date.",
-            data: restaurant.subscription
-        });
-
-    } catch (error) {
-        console.error("Error cancelling subscription:", error);
-        res.status(500).json({
-            success: false,
-            message: "Failed to cancel subscription",
-        });
+    if (!restaurant) {
+      return res.status(404).json({
+        success: false,
+        message: "Restaurant not found",
+      });
     }
+
+    if (restaurant.subscription) {
+      restaurant.subscription.autoRenew = false;
+      await restaurant.save();
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Subscription auto-renewal cancelled. Plan remains active until end date.",
+      data: restaurant.subscription,
+    });
+  } catch (error) {
+    console.error("Error cancelling subscription:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to cancel subscription",
+    });
+  }
 };
+
 /**
  * Create a new subscription plan (Admin)
  */
 export const createPlan = async (req, res) => {
-    try {
-        const { name, pricing, durationInDays, features, isActive } = req.body;
+  try {
+    const { name, pricing, durationInDays, features, isActive } = req.body;
 
-        const plan = await SubscriptionPlan.create({
-            name,
-            pricing,
-            durationInDays,
-            features,
-            isActive
-        });
+    const plan = await SubscriptionPlan.create({
+      name,
+      pricing,
+      durationInDays,
+      features,
+      isActive,
+    });
 
-        res.status(201).json({
-            success: true,
-            data: plan,
-            message: "Subscription plan created successfully"
-        });
-    } catch (error) {
-        console.error("Error creating plan:", error);
-        res.status(500).json({
-            success: false,
-            message: "Failed to create subscription plan",
-            error: error.message
-        });
-    }
+    res.status(201).json({
+      success: true,
+      data: plan,
+      message: "Subscription plan created successfully",
+    });
+  } catch (error) {
+    console.error("Error creating plan:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to create subscription plan",
+      error: error.message,
+    });
+  }
 };
 
 /**
  * Update a subscription plan (Admin)
  */
 export const updatePlan = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const updates = req.body;
+  try {
+    const { id } = req.params;
+    const updates = req.body;
 
-        const plan = await SubscriptionPlan.findByIdAndUpdate(id, updates, {
-            new: true,
-            runValidators: true
-        });
+    const plan = await SubscriptionPlan.findByIdAndUpdate(id, updates, {
+      new: true,
+      runValidators: true,
+    });
 
-        if (!plan) {
-            return res.status(404).json({
-                success: false,
-                message: "Subscription plan not found"
-            });
-        }
-
-        res.status(200).json({
-            success: true,
-            data: plan,
-            message: "Subscription plan updated successfully"
-        });
-    } catch (error) {
-        console.error("Error updating plan:", error);
-        res.status(500).json({
-            success: false,
-            message: "Failed to update subscription plan",
-            error: error.message
-        });
+    if (!plan) {
+      return res.status(404).json({
+        success: false,
+        message: "Subscription plan not found",
+      });
     }
+
+    res.status(200).json({
+      success: true,
+      data: plan,
+      message: "Subscription plan updated successfully",
+    });
+  } catch (error) {
+    console.error("Error updating plan:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update subscription plan",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Update subscription plan pricing only (Admin)
+ */
+export const updatePlanPrice = async (req, res) => {
+  try {
+    const { planId, pricing } = req.body;
+
+    if (!planId || !pricing) {
+      return res.status(400).json({
+        success: false,
+        message: "planId and pricing are required",
+      });
+    }
+
+    const plan = await SubscriptionPlan.findByIdAndUpdate(
+      planId,
+      { pricing },
+      { new: true, runValidators: true }
+    );
+
+    if (!plan) {
+      return res.status(404).json({
+        success: false,
+        message: "Subscription plan not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: plan,
+      message: "Subscription price updated successfully",
+    });
+  } catch (error) {
+    console.error("Error updating plan price:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update subscription plan price",
+      error: error.message,
+    });
+  }
 };
 
 /**
  * Delete a subscription plan (Admin)
  */
 export const deletePlan = async (req, res) => {
-    try {
-        const { id } = req.params;
+  try {
+    const { id } = req.params;
 
-        const plan = await SubscriptionPlan.findByIdAndDelete(id);
+    const plan = await SubscriptionPlan.findByIdAndDelete(id);
 
-        if (!plan) {
-            return res.status(404).json({
-                success: false,
-                message: "Subscription plan not found"
-            });
-        }
-
-        res.status(200).json({
-            success: true,
-            message: "Subscription plan deleted successfully"
-        });
-    } catch (error) {
-        console.error("Error deleting plan:", error);
-        res.status(500).json({
-            success: false,
-            message: "Failed to delete subscription plan",
-            error: error.message
-        });
+    if (!plan) {
+      return res.status(404).json({
+        success: false,
+        message: "Subscription plan not found",
+      });
     }
+
+    res.status(200).json({
+      success: true,
+      message: "Subscription plan deleted successfully",
+    });
+  } catch (error) {
+    console.error("Error deleting plan:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to delete subscription plan",
+      error: error.message,
+    });
+  }
 };
 
 /**
  * Toggle plan status (Admin)
  */
 export const togglePlanStatus = async (req, res) => {
-    try {
-        const { id } = req.params;
+  try {
+    const { id } = req.params;
 
-        const plan = await SubscriptionPlan.findById(id);
-        if (!plan) {
-            return res.status(404).json({
-                success: false,
-                message: "Subscription plan not found"
-            });
-        }
-
-        plan.isActive = !plan.isActive;
-        await plan.save();
-
-        res.status(200).json({
-            success: true,
-            data: plan,
-            message: `Plan ${plan.isActive ? 'activated' : 'deactivated'} successfully`
-        });
-    } catch (error) {
-        console.error("Error toggling plan status:", error);
-        res.status(500).json({
-            success: false,
-            message: "Failed to update plan status",
-            error: error.message
-        });
+    const plan = await SubscriptionPlan.findById(id);
+    if (!plan) {
+      return res.status(404).json({
+        success: false,
+        message: "Subscription plan not found",
+      });
     }
+
+    plan.isActive = !plan.isActive;
+    await plan.save();
+
+    res.status(200).json({
+      success: true,
+      data: plan,
+      message: `Plan ${plan.isActive ? "activated" : "deactivated"} successfully`,
+    });
+  } catch (error) {
+    console.error("Error toggling plan status:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update plan status",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * List restaurant subscriptions (Admin)
+ */
+export const getRestaurantSubscriptions = async (req, res) => {
+  try {
+    const { page = 1, limit = 20, status, search } = req.query;
+    const skip = (parseInt(page, 10) - 1) * parseInt(limit, 10);
+
+    const query = {};
+    if (status) {
+      query["subscription.status"] = status;
+    }
+
+    if (search) {
+      const regex = new RegExp(search, "i");
+      query.$or = [{ name: regex }, { email: regex }, { phone: regex }, { restaurantId: regex }];
+    }
+
+    const [restaurants, total] = await Promise.all([
+      Restaurant.find(query)
+        .select("name restaurantId email phone trialUsed subscription businessModel createdAt")
+        .populate("subscription.planId", "name")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(parseInt(limit, 10))
+        .lean(),
+      Restaurant.countDocuments(query),
+    ]);
+
+    const now = new Date();
+    const data = restaurants.map((restaurant) => {
+      const endDate = restaurant.subscription?.endDate ? new Date(restaurant.subscription.endDate) : null;
+      const isExpired = endDate ? endDate < now : true;
+      return {
+        restaurantId: restaurant._id,
+        name: restaurant.name,
+        restaurantCode: restaurant.restaurantId,
+        email: restaurant.email,
+        phone: restaurant.phone,
+        trialUsed: !!restaurant.trialUsed,
+        subscription: {
+          ...restaurant.subscription,
+          status: isExpired && restaurant.subscription?.status === "active" ? "expired" : restaurant.subscription?.status,
+        },
+      };
+    });
+
+    return res.status(200).json({
+      success: true,
+      data,
+      pagination: {
+        page: parseInt(page, 10),
+        limit: parseInt(limit, 10),
+        total,
+        totalPages: Math.ceil(total / parseInt(limit, 10)) || 1,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching restaurant subscriptions:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch restaurant subscriptions",
+      error: error.message,
+    });
+  }
 };
 
 /**
  * Verify subscription payment
  */
 export const verifySubscriptionPayment = async (req, res) => {
-    try {
-        const { razorpay_payment_id, razorpay_order_id, razorpay_signature, planId } = req.body;
-        const restaurantId = req.user._id || req.user.id;
+  try {
+    const { razorpay_payment_id, razorpay_order_id, razorpay_signature, planId } = req.body;
+    const restaurantId = req.user._id || req.user.id;
 
-        // Verify Razorpay signature — NOTE: must await since verifyPayment is async
-        const isSignatureValid = await razorpayService.verifyPayment(
-            razorpay_order_id,
-            razorpay_payment_id,
-            razorpay_signature
-        );
+    const isSignatureValid = await razorpayService.verifyPayment(
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature
+    );
 
-        if (!isSignatureValid) {
-            return res.status(400).json({
-                success: false,
-                message: "Invalid payment signature",
-            });
-        }
-
-        const plan = await SubscriptionPlan.findById(planId);
-        if (!plan) {
-            return res.status(404).json({
-                success: false,
-                message: "Subscription plan not found",
-            });
-        }
-
-        const restaurant = await Restaurant.findById(restaurantId).populate({
-            path: 'zoneId',
-            populate: { path: 'tierId' }
-        });
-        if (!restaurant) {
-            return res.status(404).json({
-                success: false,
-                message: "Restaurant not found",
-            });
-        }
-
-        // Calculate amount from tier pricing
-        let amount = 0;
-        if (restaurant.zoneId && restaurant.zoneId.tierId && restaurant.zoneId.tierId.rank) {
-            const tierKey = `tier${restaurant.zoneId.tierId.rank}`;
-            amount = plan.pricing[tierKey] !== undefined ? plan.pricing[tierKey] : (plan.pricing?.tier1 || 0);
-        } else {
-            amount = plan.pricing?.tier1 || 0;
-        }
-
-        // Activate subscription (store payment info directly on restaurant — no Payment model needed for subscriptions)
-        const startDate = new Date();
-        const endDate = new Date();
-        endDate.setDate(startDate.getDate() + (plan.durationInDays || 30));
-
-        restaurant.subscription = {
-            planId: plan._id,
-            startDate,
-            endDate,
-            status: "active",
-            autoRenew: true,
-            paymentId: razorpay_payment_id,
-            razorpayOrderId: razorpay_order_id,
-            amount,
-            features: plan.features,
-        };
-        restaurant.businessModel = "Subscription Base";
-        await restaurant.save();
-
-        res.status(200).json({
-            success: true,
-            message: "Subscription payment verified and activated successfully",
-            data: {
-                subscription: restaurant.subscription,
-            }
-        });
-
-    } catch (error) {
-        console.error("Error verifying subscription payment:", error);
-        res.status(500).json({
-            success: false,
-            message: "Failed to verify subscription payment",
-            error: process.env.NODE_ENV === 'development' ? error.message : undefined,
-        });
+    if (!isSignatureValid) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid payment signature",
+      });
     }
+
+    const plan = await SubscriptionPlan.findById(planId);
+    if (!plan) {
+      return res.status(404).json({
+        success: false,
+        message: "Subscription plan not found",
+      });
+    }
+
+    if (!plan.isActive) {
+      return res.status(400).json({
+        success: false,
+        message: "This subscription plan is currently disabled",
+      });
+    }
+
+    const restaurant = await Restaurant.findById(restaurantId).populate({
+      path: "zoneId",
+      populate: { path: "tierId" },
+    });
+
+    if (!restaurant) {
+      return res.status(404).json({
+        success: false,
+        message: "Restaurant not found",
+      });
+    }
+
+    const amount = getPlanAmountForRestaurant(plan, restaurant);
+    const startDate = new Date();
+    const endDate = new Date();
+    endDate.setDate(startDate.getDate() + (plan.durationInDays || 30));
+
+    restaurant.subscription = {
+      planId: plan._id,
+      startDate,
+      endDate,
+      status: "active",
+      autoRenew: true,
+      paymentId: razorpay_payment_id,
+      razorpayOrderId: razorpay_order_id,
+      razorpayPaymentId: razorpay_payment_id,
+      razorpaySignature: razorpay_signature,
+      paymentStatus: "completed",
+      paymentDate: startDate,
+      amount,
+      features: plan.features,
+    };
+    restaurant.businessModel = "Subscription Base";
+    await restaurant.save();
+
+    await RestaurantSubscription.create({
+      restaurantId,
+      planId: plan._id,
+      startDate,
+      endDate,
+      trialUsed: !!restaurant.trialUsed,
+      amount,
+      paymentStatus: "completed",
+      paymentDate: startDate,
+      razorpayOrderId: razorpay_order_id,
+      razorpayPaymentId: razorpay_payment_id,
+      razorpaySignature: razorpay_signature,
+      status: "active",
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Subscription payment verified and activated successfully",
+      data: {
+        subscription: restaurant.subscription,
+      },
+    });
+  } catch (error) {
+    console.error("Error verifying subscription payment:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to verify subscription payment",
+      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+    });
+  }
+};
+
+/**
+ * Subscription module alias: request RM call
+ */
+export const requestRMCallViaSubscription = async (req, res) => {
+  try {
+    const restaurantId = req.restaurant._id;
+    const { notes } = req.body;
+
+    const existingRequest = await RelationshipRequest.findOne({
+      restaurantId,
+      status: "pending",
+    });
+
+    if (existingRequest) {
+      return res.status(400).json({
+        success: false,
+        message: "You already have a pending call request. Our team will contact you soon.",
+      });
+    }
+
+    const newRequest = await RelationshipRequest.create({
+      restaurantId,
+      notes,
+      time: new Date(),
+      status: "pending",
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: "Call request submitted successfully. Your Relationship Manager will contact you within 24 hours.",
+      data: newRequest,
+    });
+  } catch (error) {
+    console.error("[SubscriptionController] Error requesting RM call:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error while processing your request.",
+    });
+  }
+};
+
+/**
+ * Subscription module alias: get RM call history
+ */
+export const getRMCallHistoryViaSubscription = async (req, res) => {
+  try {
+    const restaurantId = req.restaurant._id;
+    const history = await RelationshipRequest.find({ restaurantId }).sort({ createdAt: -1 });
+
+    return res.status(200).json({
+      success: true,
+      message: "Call history retrieved successfully",
+      data: history,
+    });
+  } catch (error) {
+    console.error("[SubscriptionController] Error fetching RM call history:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error fetching call history.",
+    });
+  }
 };

@@ -1,20 +1,30 @@
 import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import { useNavigate } from "react-router-dom"
-import { ChevronRight, Menu, Megaphone, Crown, Bell, Trophy } from "lucide-react"
+import { ChevronRight, Menu, Megaphone, Crown, Bell, Trophy, TrendingUp, Search, Users } from "lucide-react"
 import BottomNavOrders from "../components/BottomNavOrders"
+import SubscriptionFeatureOverlay from "../components/SubscriptionFeatureOverlay"
 import offersAndDiscountsIcon from "@/assets/hub/icons/offersanddiscounts.png"
 import { subscriptionAPI } from "@/lib/api"
 
 export default function HubGrowth() {
   const navigate = useNavigate()
   const [activePlan, setActivePlan] = useState(null)
+  const [hasAdvancedAccess, setHasAdvancedAccess] = useState(false)
 
   useEffect(() => {
     subscriptionAPI.getMySubscription()
       .then((res) => {
-        if (res?.data?.success && res?.data?.data?.status === 'active') {
-          setActivePlan(res.data.data?.planId?.name || null)
+        const subscription = res?.data?.data
+        if (res?.data?.success && subscription?.status === 'active') {
+          const planName = subscription?.planId?.name || null
+          const features = subscription?.features || subscription?.planId?.features || []
+          setActivePlan(planName)
+          setHasAdvancedAccess(
+            planName === "GROWTH" ||
+            features.includes("advanced_analytics") ||
+            features.includes("advanced_marketing_tools")
+          )
         }
       })
       .catch(() => { }) // silently ignore if not subscribed
@@ -145,6 +155,61 @@ export default function HubGrowth() {
             </motion.div>
 
           </div>
+        </div>
+
+        {/* Premium Growth Tools Section */}
+        <div className="mb-6 pt-4">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-base font-bold text-gray-900">Premium Growth Tools</h2>
+            {!hasAdvancedAccess && (
+              <span className="flex items-center gap-1 text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full uppercase tracking-tighter border border-blue-100">
+                <Crown size={10} className="fill-blue-600" />
+                Growth Plan
+              </span>
+            )}
+          </div>
+
+          <SubscriptionFeatureOverlay 
+            fullscreen
+            isLocked={!hasAdvancedAccess} 
+            title="Growth Intelligence"
+            message="Upgrade to GROWTH to unlock advanced analytics and premium growth tooling."
+          >
+            <div className="space-y-3">
+              {/* Premium Analytics Card */}
+              <div className="bg-gray-50/50 rounded-xl p-4 border border-gray-100 flex items-center gap-4">
+                <div className="w-11 h-11 bg-white rounded-lg shadow-sm flex items-center justify-center border border-gray-100">
+                  <TrendingUp className="w-5 h-5 text-green-600" />
+                </div>
+                <div className="flex-1">
+                  <h4 className="text-sm font-bold text-gray-800">Advanced Analytics</h4>
+                  <p className="text-xs text-gray-500">Deep-dive into customer behavior & buying patterns</p>
+                </div>
+              </div>
+
+              {/* Competitor Analysis */}
+              <div className="bg-gray-50/50 rounded-xl p-4 border border-gray-100 flex items-center gap-4">
+                <div className="w-11 h-11 bg-white rounded-lg shadow-sm flex items-center justify-center border border-gray-100">
+                  <Search className="w-5 h-5 text-blue-500" />
+                </div>
+                <div className="flex-1">
+                  <h4 className="text-sm font-bold text-gray-800">Market Intelligence</h4>
+                  <p className="text-xs text-gray-500">See how you rank against similar restaurants in your zone</p>
+                </div>
+              </div>
+
+              {/* CRM / Retention Tool */}
+              <div className="bg-gray-50/50 rounded-xl p-4 border border-gray-100 flex items-center gap-4">
+                <div className="w-11 h-11 bg-white rounded-lg shadow-sm flex items-center justify-center border border-gray-100">
+                  <Users className="w-5 h-5 text-purple-500" />
+                </div>
+                <div className="flex-1">
+                  <h4 className="text-sm font-bold text-gray-800">Retention Pro</h4>
+                  <p className="text-xs text-gray-500">Automated win-back offers for lapsed customers</p>
+                </div>
+              </div>
+            </div>
+          </SubscriptionFeatureOverlay>
         </div>
       </div>
 

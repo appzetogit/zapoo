@@ -14,6 +14,8 @@ import { Badge } from "@/components/ui/badge";
 export default function SubscriptionManagement() {
     // ... state and hooks ...
     const [plans, setPlans] = useState([]);
+    const [restaurantSubscriptions, setRestaurantSubscriptions] = useState([]);
+    const [subscriptionsLoading, setSubscriptionsLoading] = useState(false);
     const [loading, setLoading] = useState(true);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [editingPlan, setEditingPlan] = useState(null);
@@ -25,10 +27,16 @@ export default function SubscriptionManagement() {
         fetchPlans();
     }, []);
 
+    useEffect(() => {
+        if (activeTab === "subscribers") {
+            fetchRestaurantSubscriptions();
+        }
+    }, [activeTab]);
+
     const fetchPlans = async () => {
         try {
             setLoading(true);
-            const res = await subscriptionAPI.getPlans();
+            const res = await subscriptionAPI.getAdminPlans();
             if (res.data.success) {
                 setPlans(res.data.data);
             }
@@ -37,6 +45,21 @@ export default function SubscriptionManagement() {
             toast.error("Failed to load subscription plans");
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchRestaurantSubscriptions = async () => {
+        try {
+            setSubscriptionsLoading(true);
+            const res = await subscriptionAPI.getRestaurantSubscriptions({ page: 1, limit: 100 });
+            if (res.data.success) {
+                setRestaurantSubscriptions(res.data.data || []);
+            }
+        } catch (error) {
+            console.error("Error fetching restaurant subscriptions:", error);
+            toast.error("Failed to load restaurant subscriptions");
+        } finally {
+            setSubscriptionsLoading(false);
         }
     };
 
@@ -179,6 +202,7 @@ export default function SubscriptionManagement() {
                     <button
                         onClick={() => setActiveTab('subscribers')}
                         className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all ${activeTab === 'subscribers' ? 'bg-white text-neutral-900 shadow-sm' : 'text-neutral-500 hover:text-neutral-900'}`}
+                        disabled={subscriptionsLoading}
                     >
                         Subscribers
                     </button>
@@ -258,12 +282,57 @@ export default function SubscriptionManagement() {
 
                 </div>
             ) : (
-                <div className="flex flex-col items-center justify-center py-20 bg-neutral-50 rounded-lg border border-dashed border-neutral-300">
-                    <div className="bg-white p-4 rounded-full shadow-sm mb-4">
-                        <Users className="w-8 h-8 text-neutral-400" />
+                <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-hidden">
+                    <div className="p-4 border-b border-neutral-200 flex items-center justify-between">
+                        <div>
+                            <h3 className="text-lg font-semibold text-neutral-900">Restaurant Subscriptions</h3>
+                            <p className="text-sm text-neutral-500">Active plans, expiry state and trial usage</p>
+                        </div>
+                        <Button variant="outline" size="sm" onClick={fetchRestaurantSubscriptions} disabled={subscriptionsLoading}>
+                            {subscriptionsLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Refresh"}
+                        </Button>
                     </div>
-                    <h3 className="text-lg font-medium text-neutral-900">Subscriber Management</h3>
-                    <p className="text-neutral-500 max-w-sm text-center mt-1">This feature is coming soon. You will be able to view and manage all restaurant subscriptions here.</p>
+                    {subscriptionsLoading ? (
+                        <div className="py-12 flex items-center justify-center">
+                            <Loader2 className="w-6 h-6 animate-spin text-orange-600" />
+                        </div>
+                    ) : restaurantSubscriptions.length === 0 ? (
+                        <div className="py-12 text-center text-neutral-500">No subscriptions found</div>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="w-full min-w-[760px]">
+                                <thead className="bg-neutral-50">
+                                    <tr>
+                                        <th className="text-left text-xs font-semibold text-neutral-600 p-3">Restaurant</th>
+                                        <th className="text-left text-xs font-semibold text-neutral-600 p-3">Plan</th>
+                                        <th className="text-left text-xs font-semibold text-neutral-600 p-3">Status</th>
+                                        <th className="text-left text-xs font-semibold text-neutral-600 p-3">Expiry</th>
+                                        <th className="text-left text-xs font-semibold text-neutral-600 p-3">Trial Used</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {restaurantSubscriptions.map((row) => (
+                                        <tr key={row.restaurantId} className="border-t border-neutral-100">
+                                            <td className="p-3">
+                                                <div className="text-sm font-medium text-neutral-900">{row.name || "N/A"}</div>
+                                                <div className="text-xs text-neutral-500">{row.restaurantCode || "—"}</div>
+                                            </td>
+                                            <td className="p-3 text-sm text-neutral-700">{row.subscription?.planId?.name || "No Plan"}</td>
+                                            <td className="p-3">
+                                                <Badge className={row.subscription?.status === "active" ? "bg-green-100 text-green-700" : "bg-neutral-200 text-neutral-700"}>
+                                                    {row.subscription?.status || "inactive"}
+                                                </Badge>
+                                            </td>
+                                            <td className="p-3 text-sm text-neutral-700">
+                                                {row.subscription?.endDate ? new Date(row.subscription.endDate).toLocaleDateString("en-IN") : "—"}
+                                            </td>
+                                            <td className="p-3 text-sm text-neutral-700">{row.trialUsed ? "Yes" : "No"}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
                 </div>
             )}
 

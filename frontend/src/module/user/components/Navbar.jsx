@@ -12,6 +12,7 @@ import {
 import { useLocation } from "../hooks/useLocation"
 import { useCart } from "../context/CartContext"
 import { useLocationSelector } from "./UserLayout"
+import ThemeToggle from "@/components/ThemeToggle"
 import { getCachedSettings, loadBusinessSettings } from "@/lib/utils/businessSettings"
 
 export default function Navbar() {
@@ -152,6 +153,9 @@ export default function Navbar() {
                 )}
               </Button>
             </Link>
+
+            {/* Theme Toggle */}
+            <ThemeToggle className="h-10 w-10 sm:h-11 sm:w-11 md:h-12 md:w-12" />
 
             {/* Profile */}
             <DropdownMenu>

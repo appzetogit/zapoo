@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Search, Menu, ChevronRight, MapPin, X, Bell } from "lucide-react";
 import { restaurantAPI } from "@/lib/api";
 import { useFCMNotification } from "@/hooks/useFCMNotification";
+import ThemeToggle from "@/components/ThemeToggle";
 
 export default function RestaurantNavbar({
   restaurantName: propRestaurantName,
@@ -221,55 +222,62 @@ export default function RestaurantNavbar({
 
   // Show search input when search is active
   if (isSearchActive) {
-    return <div className="w-full bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3">
+    return <div className="w-full bg-white/95 backdrop-blur-md border-b border-slate-200 px-4 py-3 flex items-center gap-3 shadow-sm">
       {/* Search Input */}
-      <div className="flex-1 relative">
-        <input type="text" value={searchValue} onChange={handleSearchChange} placeholder="Search by order ID" className="w-full px-4 py-2 text-gray-900 placeholder-gray-500 focus:outline-none" autoFocus />
+      <div className="flex-1 relative rounded-xl border border-slate-200 bg-slate-50/80">
+        <input type="text" value={searchValue} onChange={handleSearchChange} placeholder="Search by order ID" className="w-full rounded-xl bg-transparent px-4 py-2.5 text-sm text-slate-900 placeholder-slate-500 focus:outline-none" autoFocus />
       </div>
 
       {/* Close Button */}
-      <button onClick={handleSearchClose} className="w-6 h-6 bg-[#3B82F6] rounded-full flex items-center justify-center shrink-0" aria-label="Close search">
+      <button onClick={handleSearchClose} className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center shrink-0 shadow-sm" aria-label="Close search">
         <X className="w-3 h-3 text-white" />
       </button>
     </div>;
   }
-  return <div className="w-full bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+  return <div className="w-full sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 px-4 py-3 shadow-[0_1px_0_rgba(15,23,42,0.04)]">
+    <div className="flex items-start justify-between gap-3">
     {/* Left Side - Restaurant Info */}
-    <div className="flex-1 min-w-0 pr-4">
+    <div className="flex-1 min-w-0">
       {/* Restaurant Name */}
-      <h1 className="text-base font-bold text-gray-900 truncate">
+      <h1 className="text-[15px] font-semibold text-slate-900 truncate">
         {loading ? "Loading..." : restaurantName}
       </h1>
 
       {/* Location */}
+      <div className="mt-1 flex items-center gap-1.5 text-[11px] text-slate-500">
+        <MapPin className="w-3.5 h-3.5 shrink-0 text-slate-400" />
+        <span className="truncate">{location || "Location not set"}</span>
+      </div>
 
     </div>
 
     {/* Right Side - Interactive Elements */}
-    <div className="flex items-center">
+    <div className="flex items-center gap-1.5">
+      <ThemeToggle />
       {/* Offline/Online Status Tag */}
-      {showOfflineOnlineTag && <button onClick={handleStatusClick} className={`flex items-center gap-1.5 px-2 py-1 border rounded-full hover:opacity-80 transition-all ${status === "Online" ? "bg-green-50 border-green-300" : "bg-gray-100 border-gray-300"}`}>
+      {showOfflineOnlineTag && <button onClick={handleStatusClick} className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 border rounded-full hover:opacity-90 transition-all ${status === "Online" ? "bg-emerald-50 border-emerald-200" : "bg-slate-100 border-slate-200"}`}>
         <span className={`w-1.5 h-1.5 rounded-full ${status === "Online" ? "bg-green-500" : "bg-gray-500"}`}></span>
-        <span className={`text-sm font-medium ${status === "Online" ? "text-green-700" : "text-gray-700"}`}>
+        <span className={`text-xs font-semibold ${status === "Online" ? "text-emerald-700" : "text-slate-700"}`}>
           {status}
         </span>
-        <ChevronRight className={`w-4 h-4 ${status === "Online" ? "text-green-700" : "text-gray-700"}`} />
+        <ChevronRight className={`w-3.5 h-3.5 ${status === "Online" ? "text-emerald-700" : "text-slate-700"}`} />
       </button>}
 
       {/* Search Icon */}
-      {showSearch && <button onClick={handleSearchClick} className="p-2 ml-1 hover:bg-gray-100 rounded-full transition-colors" aria-label="Search">
-        <Search className="w-5 h-5 text-gray-700" />
+      {showSearch && <button onClick={handleSearchClick} className="p-2 hover:bg-slate-100 rounded-full transition-colors" aria-label="Search">
+        <Search className="w-[18px] h-[18px] text-slate-700" />
       </button>}
 
       {/* Notifications Icon */}
-      {showNotifications && <button onClick={handleNotificationsClick} className="p-2 ml-1 hover:bg-gray-100 rounded-full transition-colors" aria-label="Notifications">
-        <Bell className="w-5 h-5 text-gray-700" />
+      {showNotifications && <button onClick={handleNotificationsClick} className="p-2 hover:bg-slate-100 rounded-full transition-colors" aria-label="Notifications">
+        <Bell className="w-[18px] h-[18px] text-slate-700" />
       </button>}
 
       {/* Hamburger Menu Icon */}
-      <button onClick={handleMenuClick} className="p-2 hover:bg-gray-100 rounded-full transition-colors" aria-label="Menu">
-        <Menu className="w-5 h-5 text-gray-700" />
+      <button onClick={handleMenuClick} className="p-2 bg-blue-600 hover:bg-blue-700 rounded-full transition-colors shadow-sm" aria-label="Menu">
+        <Menu className="w-[18px] h-[18px] text-white" />
       </button>
+    </div>
     </div>
   </div>;
 }

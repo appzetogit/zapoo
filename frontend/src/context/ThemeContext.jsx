@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 
 const ThemeContext = createContext();
 
@@ -11,6 +12,7 @@ export const useTheme = () => {
 };
 
 export const ThemeProvider = ({ children }) => {
+  const location = useLocation();
   const [theme, setTheme] = useState(() => {
     // Check if theme is saved in localStorage
     const savedTheme = localStorage.getItem('appTheme');
@@ -24,15 +26,23 @@ export const ThemeProvider = ({ children }) => {
   useEffect(() => {
     const root = window.document.documentElement;
     
+    // Check if we are in admin, restaurant or delivery module
+    const isSpecialModule = /^\/(admin|restaurant|delivery)/.test(location.pathname);
+    
     // Remove both classes first
     root.classList.remove('light', 'dark');
     
-    // Add the current theme class
-    root.classList.add(theme);
+    if (isSpecialModule) {
+      // Force light theme for these modules
+      root.classList.add('light');
+    } else {
+      // Add the current theme class for customer module
+      root.classList.add(theme);
+    }
     
     // Save to localStorage
     localStorage.setItem('appTheme', theme);
-  }, [theme]);
+  }, [theme, location.pathname]);
 
   const toggleTheme = () => {
     setTheme((prevTheme) => (prevTheme === 'light' ? 'dark' : 'light'));

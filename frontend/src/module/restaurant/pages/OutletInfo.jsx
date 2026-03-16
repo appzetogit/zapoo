@@ -801,6 +801,37 @@ export default function OutletInfo() {
           </div>
         </motion.div>
 
+        {/* Relationship Manager Card */}
+        {restaurantData?.relationshipManager && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: 0.02 }}
+            className="bg-blue-100/50 rounded-lg p-4 border border-blue-300"
+          >
+            <div className="flex items-start justify-between">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-gray-500 font-normal mb-1">Relationship Manager</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-base font-semibold text-gray-900">
+                    {restaurantData.relationshipManager.name}
+                  </p>
+                  <a 
+                    href={`tel:${restaurantData.relationshipManager.phone}`}
+                    className="flex items-center gap-1 text-xs text-blue-600 font-medium hover:underline"
+                  >
+                    <Phone className="w-3 h-3" />
+                    Call
+                  </a>
+                </div>
+                <p className="text-sm text-gray-600 font-normal">
+                  {restaurantData.relationshipManager.email}
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
         {/* Cuisine Tags Card */}
         <motion.div
           initial={{ opacity: 0, y: 8 }}

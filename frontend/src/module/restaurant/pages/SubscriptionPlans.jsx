@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Check, Loader2, CreditCard, ShieldCheck, Zap, ArrowLeft } from "lucide-react";
+import { Check, Loader2, CreditCard, ShieldCheck, Zap, ArrowLeft, Phone } from "lucide-react";
 import { toast } from "sonner";
-import { subscriptionAPI } from "@/lib/api";
+import { subscriptionAPI, restaurantAPI } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import BottomNavOrders from "../components/BottomNavOrders";
@@ -25,6 +25,7 @@ export default function SubscriptionPlans() {
     const [loading, setLoading] = useState(true);
     const [currentSubscription, setCurrentSubscription] = useState(null);
     const [processingId, setProcessingId] = useState(null);
+    const [trialUsed, setTrialUsed] = useState(false);
 
     useEffect(() => {
         fetchData();
@@ -33,9 +34,10 @@ export default function SubscriptionPlans() {
     const fetchData = async () => {
         try {
             setLoading(true);
-            const [plansRes, subRes] = await Promise.all([
+            const [plansRes, subRes, restaurantRes] = await Promise.all([
                 subscriptionAPI.getPlans(),
-                subscriptionAPI.getMySubscription()
+                subscriptionAPI.getMySubscription(),
+                restaurantAPI.getCurrentRestaurant()
             ]);
 
             if (plansRes.data.success) {
@@ -45,6 +47,8 @@ export default function SubscriptionPlans() {
             if (subRes.data.success && subRes.data.data) {
                 setCurrentSubscription(subRes.data.data);
             }
+            const restaurant = restaurantRes?.data?.data?.restaurant || restaurantRes?.data?.restaurant;
+            setTrialUsed(!!restaurant?.trialUsed);
         } catch (error) {
             console.error("Error fetching data:", error);
             toast.error("Failed to load subscription details");
@@ -54,6 +58,23 @@ export default function SubscriptionPlans() {
     };
 
     const handleSubscribe = async (plan) => {
+        if (plan.needsRMCall) {
+            try {
+                setProcessingId(plan._id);
+                const res = await subscriptionAPI.requestRMCall({ planId: plan._id });
+                if (res.data.success) {
+                    toast.success("Request sent! Our Relationship Manager will contact you shortly.");
+                    await fetchData();
+                }
+            } catch (error) {
+                console.error("RM request error:", error);
+                toast.error("Failed to send request");
+            } finally {
+                setProcessingId(null);
+            }
+            return;
+        }
+
         try {
             setProcessingId(plan._id);
 
@@ -128,6 +149,24 @@ export default function SubscriptionPlans() {
         }
     };
 
+    const handleClaimTrial = async () => {
+        try {
+            setProcessingId("trial");
+            const res = await subscriptionAPI.claimTrial();
+            if (res?.data?.success) {
+                toast.success("Free trial activated!");
+                await fetchData();
+            } else {
+                throw new Error(res?.data?.message || "Failed to activate free trial");
+            }
+        } catch (error) {
+            const message = error?.response?.data?.message || error?.response?.data?.error || error?.message || "Failed to activate free trial";
+            toast.error(message);
+        } finally {
+            setProcessingId(null);
+        }
+    };
+
     const handleCancel = async () => {
         if (confirm("Are you sure you want to cancel auto-renewal? Your benefits will continue until the end of the current period.")) {
             try {
@@ -188,6 +227,17 @@ export default function SubscriptionPlans() {
                         Choose a plan that fits your growth. Zero commission, enhanced visibility, and powerful analytics to scale your business.
                     </p>
                 </div>
+                {!isSubscribed && !trialUsed && (
+                    <div className="max-w-md mx-auto">
+                        <Button
+                            onClick={handleClaimTrial}
+                            disabled={processingId === "trial"}
+                            className="w-full h-11 rounded-xl font-bold text-sm bg-gray-900 hover:bg-black text-white"
+                        >
+                            {processingId === "trial" ? "Activating free trial..." : "Get 1 month free"}
+                        </Button>
+                    </div>
+                )}
 
                 {/* Current Subscription Status */}
                 {isSubscribed && (
@@ -291,7 +341,9 @@ export default function SubscriptionPlans() {
                                     <Button
                                         className={`w-full h-11 text-sm font-semibold rounded-xl transition-all duration-200 flex items-center justify-center gap-2 ${isCurrent
                                             ? 'bg-green-100 text-green-700 border border-green-200 hover:bg-green-200 cursor-default'
-                                            : 'bg-gray-900 text-white hover:bg-orange-500 hover:shadow-orange-200 hover:shadow-lg'
+                                            : plan.needsRMCall 
+                                                ? 'bg-orange-600 text-white hover:bg-orange-700 hover:shadow-orange-200 hover:shadow-lg'
+                                                : 'bg-gray-900 text-white hover:bg-orange-500 hover:shadow-orange-200 hover:shadow-lg'
                                             }`}
                                         onClick={() => !isCurrent && handleSubscribe(plan)}
                                         disabled={isCurrent || (processingId === plan._id)}
@@ -300,6 +352,8 @@ export default function SubscriptionPlans() {
                                             <Loader2 className="w-5 h-5 animate-spin" />
                                         ) : isCurrent ? (
                                             <><Check className="w-4 h-4" /> Current Plan</>
+                                        ) : plan.needsRMCall ? (
+                                            <>Request Call <Phone className="w-4 h-4 ml-1.5" /></>
                                         ) : (
                                             <>Get Started <span className="ml-1.5">→</span></>
                                         )}

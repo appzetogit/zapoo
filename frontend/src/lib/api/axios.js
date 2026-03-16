@@ -244,6 +244,26 @@ apiClient.interceptors.response.use(response => {
   return response;
 }, async error => {
   const originalRequest = error.config;
+  const errorData = error.response?.data;
+  const rawMessage = errorData?.message || errorData?.error || error.message || "";
+  const lowerMessage = String(rawMessage).toLowerCase();
+  const isSubscription403 =
+    error.response?.status === 403 &&
+    (lowerMessage.includes("subscription") ||
+      lowerMessage.includes("plan does not include") ||
+      lowerMessage.includes("active subscription is required"));
+
+  // For subscription-blocked GET calls, return a handled response so screens don't spam catch logs.
+  if (isSubscription403 && (originalRequest?.method || "get").toLowerCase() === "get") {
+    return {
+      ...error.response,
+      data: {
+        ...(error.response?.data || {}),
+        success: false,
+        subscriptionBlocked: true,
+      },
+    };
+  }
 
   // If error is 401 and we haven't tried to refresh yet
   if (error.response?.status === 401 && !originalRequest._retry) {
@@ -504,9 +524,12 @@ apiClient.interceptors.response.use(response => {
 
   // Show error toast in development mode only
   if (import.meta.env.DEV) {
-    // Extract error messages from various possible locations
-    const errorData = error.response?.data;
+    // Feature lock UI handles these; skip popup spam.
+    if (isSubscription403) {
+      return Promise.reject(error);
+    }
 
+    // Extract error messages from various possible locations
     // Handle array of error messages (common in validation errors)
     let errorMessages = [];
     if (Array.isArray(errorData?.message)) {

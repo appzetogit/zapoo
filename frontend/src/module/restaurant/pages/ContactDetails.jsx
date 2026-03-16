@@ -9,6 +9,7 @@ import {
   Plus,
   Coffee,
   Trash2,
+  Phone,
 } from "lucide-react"
 import { restaurantAPI } from "@/lib/api"
 import OptimizedImage from "@/components/OptimizedImage"
@@ -26,6 +27,7 @@ export default function ContactDetails() {
     email: "",
     photo: null
   })
+  const [rmData, setRmData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [loadingStaff, setLoadingStaff] = useState(true)
 
@@ -43,6 +45,9 @@ export default function ContactDetails() {
             email: data.ownerEmail || data.email || "",
             photo: data.profileImage?.url || null
           })
+          if (data.relationshipManager) {
+            setRmData(data.relationshipManager)
+          }
         }
       } catch (error) {
         // Only log error if it's not a network/timeout error (backend might be down/slow)
@@ -244,6 +249,47 @@ export default function ContactDetails() {
             </button>
           </div>
         </div>
+
+        {/* Relationship Manager Section */}
+        {rmData && (
+          <div>
+            <h2 className="px-4 text-base font-bold text-gray-900 mb-3">Zapoo Relationship Manager</h2>
+            <div className="bg-white rounded-0 p-4 flex items-center gap-4">
+              <div className="w-12 h-12 bg-blue-100 border border-blue-300 rounded-full flex items-center justify-center shrink-0 overflow-hidden">
+                {rmData.profileImage?.url ? (
+                  <OptimizedImage
+                    src={rmData.profileImage.url}
+                    alt="RM profile"
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <User className="w-6 h-6 text-blue-600" />
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-base font-bold text-gray-900 mb-1">
+                  {rmData.name || "N/A"}
+                </p>
+                <a 
+                  href={`tel:${rmData.phone}`}
+                  className="text-sm text-blue-600 font-normal hover:underline block"
+                >
+                  {rmData.phone || "N/A"}
+                </a>
+                <p className="text-sm text-gray-900 font-normal">
+                  {rmData.email || "N/A"}
+                </p>
+              </div>
+              <a
+                href={`tel:${rmData.phone}`}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors shrink-0"
+                aria-label="Call Relationship Manager"
+              >
+                <Phone className="w-5 h-5 text-blue-600" />
+              </a>
+            </div>
+          </div>
+        )}
 
         {/* Manager Section */}
         <div>

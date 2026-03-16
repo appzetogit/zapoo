@@ -7,6 +7,7 @@ import { useCart } from "../context/CartContext";
 import { useLocationSelector } from "./UserLayout";
 import { FaLocationDot } from "react-icons/fa6";
 import { getCachedSettings, loadBusinessSettings } from "@/lib/utils/businessSettings";
+import ThemeToggle from "@/components/ThemeToggle";
 import zapooFoodLogo from "@/assets/zapoo_logo.png";
 export default function PageNavbar({
   textColor = "white",
@@ -708,6 +709,9 @@ export default function PageNavbar({
 
         {/* Right: Actions - Hidden on desktop, shown on mobile */}
         <div className="flex md:hidden items-center gap-2 sm:gap-3 flex-shrink-0">
+          {/* Theme Toggle */}
+          <ThemeToggle />
+
           {/* Wallet Icon */}
           <Link to="/user/wallet">
             <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-9 sm:w-9 rounded-full p-0 hover:opacity-80 transition-opacity" title="Wallet">

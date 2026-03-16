@@ -17,6 +17,7 @@ import {
 } from '../controllers/adController.js';
 import { uploadMiddleware } from '../../../shared/utils/cloudinaryService.js';
 import { authenticate as restaurantAuth } from '../../restaurant/middleware/restaurantAuth.js';
+import { checkFeatureAccess } from '../../restaurant/middleware/subscriptionGuard.js';
 import { authenticateAdmin } from '../../admin/middleware/adminAuth.js';
 import jwt from 'jsonwebtoken';
 
@@ -52,12 +53,12 @@ const authenticateAny = async (req, res, next) => {
 };
 
 // Restaurant routes
-router.post('/request', restaurantAuth, createAdRequest);
-router.put('/request/:adId', restaurantAuth, uploadMiddleware.single('bannerImage'), updateAdRequest);
-router.get('/my-zone', restaurantAuth, getMyZone);
-router.get('/my-ads', restaurantAuth, getMyAdRequests);
-router.post('/payment/create-order/:adId', restaurantAuth, createAdPaymentOrder);
-router.post('/payment/verify', restaurantAuth, verifyAdPayment);
+router.post('/request', restaurantAuth, checkFeatureAccess('marketing_tools'), createAdRequest);
+router.put('/request/:adId', restaurantAuth, checkFeatureAccess('marketing_tools'), uploadMiddleware.single('bannerImage'), updateAdRequest);
+router.get('/my-zone', restaurantAuth, checkFeatureAccess('marketing_tools'), getMyZone);
+router.get('/my-ads', restaurantAuth, checkFeatureAccess('marketing_tools'), getMyAdRequests);
+router.post('/payment/create-order/:adId', restaurantAuth, checkFeatureAccess('marketing_tools'), createAdPaymentOrder);
+router.post('/payment/verify', restaurantAuth, checkFeatureAccess('marketing_tools'), verifyAdPayment);
 
 // Admin routes
 router.get('/all', authenticateAdmin, getAllAdRequests);

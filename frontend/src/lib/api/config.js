@@ -413,12 +413,26 @@ export const API_ENDPOINTS = {
   // Subscription endpoints
   SUBSCRIPTION: {
     PLANS: "/subscription/plans",
+    PLANS_V2: "/subscriptions/plans",
     PLAN_BY_ID: "/subscription/plans/:id",
     PLAN_STATUS: "/subscription/plans/:id/toggle-status",
     SUBSCRIBE: "/subscription/subscribe",
+    CLAIM_TRIAL: "/subscription/claim-trial",
+    CLAIM_TRIAL_V2: "/subscriptions/claim-trial",
+    CREATE_ORDER: "/subscriptions/create-order",
     VERIFY_PAYMENT: "/subscription/verify-payment",
+    VERIFY_PAYMENT_V2: "/subscriptions/verify-payment",
     MY_SUBSCRIPTION: "/subscription/my-subscription",
-    CANCEL: "/subscription/cancel"
+    MY_PLAN: "/subscriptions/my-plan",
+    CANCEL: "/subscription/cancel",
+    CANCEL_V2: "/subscriptions/cancel",
+    RM_REQUEST: "/subscription/request-rm-call",
+    HISTORY: "/subscription/history",
+    ADMIN_PLANS: "/admin/subscriptions/plans",
+    ADMIN_CREATE_PLAN: "/admin/subscriptions/create-plan",
+    ADMIN_UPDATE_PRICE: "/admin/subscriptions/update-price",
+    ADMIN_TOGGLE_PLAN: "/admin/subscriptions/toggle-plan",
+    ADMIN_RESTAURANTS: "/admin/subscriptions/restaurants"
   },
   // Notification endpoints
   NOTIFICATION: {

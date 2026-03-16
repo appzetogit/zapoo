@@ -1,5 +1,6 @@
 import express from 'express';
 import { authenticate as authenticateRestaurant } from '../restaurant/middleware/restaurantAuth.js';
+import { checkFeatureAccess } from '../restaurant/middleware/subscriptionGuard.js';
 import { authenticate } from '../auth/middleware/auth.js';
 import { authenticateAdmin } from '../admin/middleware/adminAuth.js';
 import { authenticate as authenticateDelivery } from '../delivery/middleware/deliveryAuth.js';
@@ -48,13 +49,13 @@ router.delete('/tokens', removeDeviceToken);
 
 // ── Restaurant routes (/api/notification/...) ─────────────────────────────
 // Submit a new notification request (restaurant auth)
-router.post('/requests', authenticateRestaurant, submitNotificationRequest);
+router.post('/requests', authenticateRestaurant, checkFeatureAccess('marketing_tools'), submitNotificationRequest);
 
 // Get own submitted requests + quota info
-router.get('/requests/my', authenticateRestaurant, getMyNotificationRequests);
+router.get('/requests/my', authenticateRestaurant, checkFeatureAccess('marketing_tools'), getMyNotificationRequests);
 
 // Delete own request
-router.delete('/requests/:id', authenticateRestaurant, deleteMyNotificationRequest);
+router.delete('/requests/:id', authenticateRestaurant, checkFeatureAccess('marketing_tools'), deleteMyNotificationRequest);
 
 // ── User route (/api/notification/...) ────────────────────────────────────
 // Get all active notifications (history/list view)

@@ -40,7 +40,9 @@ export default function BottomNavOrders() {
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [transitionPhase, setTransitionPhase] = useState('idle') // 'idle', 'entering', 'exiting'
   const [transitionDirection, setTransitionDirection] = useState('right')
+  const [isNavVisible, setIsNavVisible] = useState(true)
   const prevIsHubModeRef = useRef(null)
+  const lastScrollYRef = useRef(0)
 
   // Hide on internal pages (create-offers flow)
   const isInternalPage = pathname.includes("/create-offers")
@@ -166,6 +168,30 @@ export default function BottomNavOrders() {
     })
   }
 
+  // Hide nav on scroll down, show on scroll up
+  useEffect(() => {
+    lastScrollYRef.current = window.scrollY || 0
+
+    const onScroll = () => {
+      const currentY = window.scrollY || 0
+      const delta = currentY - lastScrollYRef.current
+      const threshold = 8
+
+      if (currentY <= 24) {
+        setIsNavVisible(true)
+      } else if (delta > threshold) {
+        setIsNavVisible(false)
+      } else if (delta < -threshold) {
+        setIsNavVisible(true)
+      }
+
+      lastScrollYRef.current = currentY
+    }
+
+    window.addEventListener("scroll", onScroll, { passive: true })
+    return () => window.removeEventListener("scroll", onScroll)
+  }, [])
+
   return (
     <>
       {/* Floating badge indicator - 60fps smooth, under 250ms */}
@@ -259,23 +285,32 @@ export default function BottomNavOrders() {
         </>
       )}
 
-      <div className="fixed bottom-0 left-0 right-0 z-50 pb-4 px-2 sm:px-4 md:pb-6 md:px-8">
-        <div className="flex items-center gap-3 w-full max-w-2xl mx-auto md:max-w-none">
+      <motion.div
+        className={`fixed bottom-0 left-0 right-0 z-50 px-2 sm:px-4 ${isNavVisible ? "pointer-events-auto" : "pointer-events-none"}`}
+        initial={false}
+        animate={{
+          y: isNavVisible ? 0 : 120,
+          opacity: isNavVisible ? 1 : 0.88,
+        }}
+        transition={{ duration: 0.22, ease: [0.2, 0.8, 0.2, 1] }}
+      >
+        <div className="w-full max-w-xl mx-auto pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+          <div className="flex items-center gap-1.5 sm:gap-3">
 
           {/* Left toggle (Hub → Orders) */}
           {isHubMode && (
             <button
               onClick={handleToggleMode}
-              className="flex flex-col items-center gap-1 bg-[#3B82F6] text-white/90 px-4 py-3 rounded-full shadow-lg border border-[#3B82F6] active:scale-95 transition-all"
+              className="h-11 w-11 sm:h-auto sm:w-auto sm:px-3 sm:py-2.5 shrink-0 flex flex-col items-center justify-center gap-0.5 sm:gap-1 bg-[#2563EB] text-white/90 rounded-full shadow-lg border border-blue-500 active:scale-95 transition-all"
             >
-              <ArrowRightLeft className="w-5 h-5" />
-              <span className="text-[11px] font-medium">To Orders</span>
+              <ArrowRightLeft className="w-4 h-4 sm:w-5 sm:h-5" />
+              <span className="hidden sm:block text-[10px] font-medium">Orders</span>
             </button>
           )}
 
           <div className="flex-1">
-            <div className="bg-[#3B82F6] rounded-full py-1.5 px-2 shadow-xl relative transition-all">
-              <div className="flex items-center justify-around relative">
+            <div className="bg-[#3B82F6]/95 backdrop-blur-md rounded-full py-1.5 px-1.5 shadow-xl border border-blue-500/40 relative transition-all">
+              <div className="flex items-center justify-between gap-0.5 relative">
                 {tabs.map(tab => {
                   const Icon = tab.icon
                   const isActive = activeTab === tab.id
@@ -285,7 +320,7 @@ export default function BottomNavOrders() {
                       key={tab.id}
                       onClick={() => handleTabClick(tab)}
                       aria-current={isActive ? "page" : undefined}
-                      className="relative flex flex-col items-center gap-1 px-4 py-2 rounded-full overflow-hidden z-10 min-w-[80px]"
+                      className="relative flex-1 min-w-0 flex flex-col items-center gap-0.5 px-2 py-1.5 sm:px-3 sm:py-2 rounded-full overflow-hidden z-10"
                       whileTap={{ scale: 0.95 }}
                     >
                       {isActive && (
@@ -300,8 +335,8 @@ export default function BottomNavOrders() {
                           }}
                         />
                       )}
-                      <Icon className={`w-5 h-5 relative z-10 transition-colors duration-300 ease-in-out ${isActive ? "text-white" : "text-white/80"}`} />
-                      <span className={`text-[11px] relative z-10 transition-colors duration-300 ease-in-out ${isActive ? "text-white font-bold" : "text-white/80"}`}>
+                      <Icon className={`w-4 h-4 sm:w-5 sm:h-5 relative z-10 transition-colors duration-300 ease-in-out ${isActive ? "text-white" : "text-white/80"}`} />
+                      <span className={`text-[10px] leading-none sm:text-[11px] relative z-10 transition-colors duration-300 ease-in-out truncate max-w-full ${isActive ? "text-white font-semibold" : "text-white/80"}`}>
                         {tab.label}
                       </span>
                     </motion.button>
@@ -315,14 +350,15 @@ export default function BottomNavOrders() {
           {!isHubMode && (
             <button
               onClick={handleToggleMode}
-              className="flex flex-col items-center gap-1 bg-[#3B82F6] text-white/90 px-4 py-3 rounded-full shadow-lg border border-[#3B82F6] active:scale-95 transition-all"
+              className="h-11 w-11 sm:h-auto sm:w-auto sm:px-3 sm:py-2.5 shrink-0 flex flex-col items-center justify-center gap-0.5 sm:gap-1 bg-[#2563EB] text-white/90 rounded-full shadow-lg border border-blue-500 active:scale-95 transition-all"
             >
-              <ArrowRightLeft className="w-5 h-5" />
-              <span className="text-[11px] font-medium">To Hub</span>
+              <ArrowRightLeft className="w-4 h-4 sm:w-5 sm:h-5" />
+              <span className="hidden sm:block text-[10px] font-medium">Hub</span>
             </button>
           )}
         </div>
-      </div>
+        </div>
+      </motion.div>
     </>
   )
 }

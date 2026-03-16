@@ -6,6 +6,7 @@ import { HelpCircle, ArrowRight, Phone, Ambulance, AlertTriangle, Shield, Shield
 import { toast } from "sonner";
 import { deliveryAPI } from "@/lib/api";
 import { useCompanyName } from "@/lib/hooks/useCompanyName";
+import ThemeToggle from "@/components/ThemeToggle";
 const LS_KEY = "app:isOnline";
 const TOAST_ID_KEY = "feedNavbar-onlineStatus";
 
@@ -370,6 +371,7 @@ export default function FeedNavbar({
 
         {/* Right Icons */}
         <div className="flex items-center gap-3">
+          <ThemeToggle />
 
           {/* Emergency */}
           <button onClick={() => setShowEmergencyPopup(true)} className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center hover:bg-[#DC2626] transition-colors relative" title="Emergency">

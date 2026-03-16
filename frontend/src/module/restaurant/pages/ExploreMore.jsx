@@ -560,6 +560,19 @@ export default function ExploreMore() {
     };
   }, [profileOpen, scheduleOffOpen, dateTimePickerOpen, successPopupOpen, existingScheduleOpen, searchOpen]);
 
+  useEffect(() => {
+    if (profileOpen) {
+      document.body.dataset.noPlanPopup = "suppress";
+    } else {
+      delete document.body.dataset.noPlanPopup;
+    }
+    window.dispatchEvent(new Event("noPlanPopupToggle"));
+    return () => {
+      delete document.body.dataset.noPlanPopup;
+      window.dispatchEvent(new Event("noPlanPopupToggle"));
+    };
+  }, [profileOpen]);
+
   // Lenis smooth scrolling
   useEffect(() => {
     const lenis = new Lenis({

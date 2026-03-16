@@ -38,7 +38,7 @@ export default function SubscriptionRenewalPopup() {
             .then((res) => {
                 if (cancelled) return
                 const sub = res?.data?.data
-                if (!sub || !sub.planId || sub.status !== 'active') return
+                if (!sub || !sub.planId || (sub.status !== 'active' && sub.status !== 'expired')) return
 
                 // If auto-renew is ON, the plan will renew automatically — no warning needed
                 if (sub.autoRenew) return

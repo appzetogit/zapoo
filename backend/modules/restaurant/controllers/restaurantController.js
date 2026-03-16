@@ -112,68 +112,72 @@ export const getRestaurants = async (req, res) => {
       }
     }
 
-    // Build query
-    const query = {
-      isActive: true
-    };
+    // Build query conditions array
+    const queryAndConditions = [
+      { isActive: true },
+      {
+        $or: [
+          { businessModel: 'Commission Base' },
+          {
+            businessModel: { $ne: 'Commission Base' },
+            'subscription.status': 'active',
+            'subscription.endDate': { $gt: new Date() }
+          }
+        ]
+      }
+    ];
 
     // Cuisine filter
     if (cuisine) {
-      query.cuisines = {
-        $in: [new RegExp(cuisine, 'i')]
-      };
+      queryAndConditions.push({
+        cuisines: { $in: [new RegExp(cuisine, 'i')] }
+      });
     }
 
     // Rating filter
     if (minRating) {
-      query.rating = {
-        $gte: parseFloat(minRating)
-      };
+      queryAndConditions.push({
+        rating: { $gte: parseFloat(minRating) }
+      });
     }
 
     // Trust filters
     if (req.query.topRated === 'true') {
-      query.rating = {
-        $gte: 4.5
-      };
+      queryAndConditions.push({
+        rating: { $gte: 4.5 }
+      });
     } else if (req.query.trusted === 'true') {
-      query.rating = {
-        $gte: 4.0
-      };
-      query.totalRatings = {
-        $gte: 100
-      };
+      queryAndConditions.push({
+        rating: { $gte: 4.0 },
+        totalRatings: { $gte: 100 }
+      });
     }
 
-    // Delivery time filter (using optimized numeric field)
+    // Delivery time filter
     if (maxDeliveryTime) {
-      query.avgDeliveryTime = {
-        $lte: parseInt(maxDeliveryTime)
-      };
+      queryAndConditions.push({
+        avgDeliveryTime: { $lte: parseInt(maxDeliveryTime) }
+      });
     }
 
-    // Price range filter (using optimized numeric field)
+    // Price range filter
     if (maxPrice) {
-      const priceThreshold = parseInt(maxPrice);
-      query.avgPriceValue = {
-        $lte: priceThreshold
-      };
+      queryAndConditions.push({
+        avgPriceValue: { $lte: parseInt(maxPrice) }
+      });
     }
 
     // Offers filter
     if (hasOffers === 'true') {
-      query.$or = [{
-        offer: {
-          $exists: true,
-          $ne: null,
-          $ne: ''
-        }
-      }, {
-        featuredPrice: {
-          $exists: true
-        }
-      }];
+      queryAndConditions.push({
+        $or: [
+          { offer: { $exists: true, $ne: null, $ne: '' } },
+          { featuredPrice: { $exists: true } }
+        ]
+      });
     }
+
+    const query = { $and: queryAndConditions };
 
     // Build sort object
     let sortObj = {
@@ -310,10 +314,7 @@ export const getRestaurantById = async (req, res) => {
     const userLat = latitude != null ? parseFloat(latitude) : null;
     const userLng = longitude != null ? parseFloat(longitude) : null;
 
-    // Build query conditions - only include _id if it's a valid ObjectId
-    const queryConditions = {
-      isActive: true
-    };
+    // Build query conditions
     const orConditions = [{
       restaurantId: id
     }, {
@@ -326,7 +327,23 @@ export const getRestaurantById = async (req, res) => {
         _id: new mongoose.Types.ObjectId(id)
       });
     }
-    queryConditions.$or = orConditions;
+
+    const queryConditions = {
+      isActive: true,
+      $and: [
+        { $or: orConditions },
+        {
+          $or: [
+            { businessModel: 'Commission Base' },
+            {
+              businessModel: { $ne: 'Commission Base' },
+              'subscription.status': 'active',
+              'subscription.endDate': { $gt: new Date() }
+            }
+          ]
+        }
+      ]
+    };
 
     // Strict field projection for public restaurant profile
     const projection = 'name slug cuisines rating totalRatings promo profileImage location avgDeliveryTime avgPriceValue isActive isAcceptingOrders featuredDish featuredPrice offer distance deliveryRange estimatedDeliveryTime cuisines';

@@ -13,17 +13,18 @@ import {
   getReviewByOrderId
 } from '../controllers/reviewController.js';
 import { authenticate } from '../middleware/restaurantAuth.js';
+import { checkFeatureAccess } from '../middleware/subscriptionGuard.js';
 
 const router = express.Router();
 
-// Order routes - each route requires restaurant authentication
-router.get('/orders', authenticate, getRestaurantOrders);
-router.get('/orders/:id', authenticate, getRestaurantOrderById);
-router.patch('/orders/:id/accept', authenticate, acceptOrder);
-router.patch('/orders/:id/reject', authenticate, rejectOrder);
-router.patch('/orders/:id/preparing', authenticate, markOrderPreparing);
-router.patch('/orders/:id/ready', authenticate, markOrderReady);
-router.post('/orders/:id/resend-delivery-notification', authenticate, resendDeliveryNotification);
+// Order routes - each route requires restaurant authentication and order_management feature
+router.get('/orders', authenticate, checkFeatureAccess('order_management'), getRestaurantOrders);
+router.get('/orders/:id', authenticate, checkFeatureAccess('order_management'), getRestaurantOrderById);
+router.patch('/orders/:id/accept', authenticate, checkFeatureAccess('order_management'), acceptOrder);
+router.patch('/orders/:id/reject', authenticate, checkFeatureAccess('order_management'), rejectOrder);
+router.patch('/orders/:id/preparing', authenticate, checkFeatureAccess('order_management'), markOrderPreparing);
+router.patch('/orders/:id/ready', authenticate, checkFeatureAccess('order_management'), markOrderReady);
+router.post('/orders/:id/resend-delivery-notification', authenticate, checkFeatureAccess('order_management'), resendDeliveryNotification);
 
 // Review routes
 router.get('/reviews', authenticate, getRestaurantReviews);

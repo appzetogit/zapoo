@@ -26,6 +26,12 @@ import referralBonusBg from "../../../assets/referralbonuscardbg.png";
 import alertSound from "../../../assets/audio/alert.mp3";
 import originalSound from "../../../assets/audio/original.mp3";
 import bikeLogo from "../../../assets/bikelogo.png";
+import DeliveryMap from '../components/DeliveryMap';
+import DeliveryStatusBanner from '../components/DeliveryStatusBanner';
+import DeliveryPopups from '../components/DeliveryPopups';
+import DeliveryCarousel from '../components/DeliveryCarousel';
+import DeliverySwipeBar from '../components/DeliverySwipeBar';
+import DeliveryOrderFlowPopups from '../components/DeliveryOrderFlowPopups';
 
 // Ola Maps API Key removed
 
@@ -534,6 +540,8 @@ export default function DeliveryHome() {
   const [hasAutoShown, setHasAutoShown] = useState(false);
   const [showNewOrderPopup, setShowNewOrderPopup] = useState(false);
   const [countdownSeconds, setCountdownSeconds] = useState(300);
+  const [earningsGuaranteeIsPlaying, setEarningsGuaranteeIsPlaying] = useState(false);
+  const [earningsGuaranteeAudioTime, setEarningsGuaranteeAudioTime] = useState('00:00');
   const countdownTimerRef = useRef(null);
   const [showRejectPopup, setShowRejectPopup] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
@@ -1828,6 +1836,134 @@ export default function DeliveryHome() {
       setNewOrderAcceptButtonProgress(progress);
     }
   };
+  // Extract the order acceptance logic to a standalone function so it can be called from different UI components
+  const processOrderAcceptance = async () => {
+    // Stop audio immediately when user accepts
+    if (alertAudioRef.current) {
+      alertAudioRef.current.pause();
+      alertAudioRef.current.currentTime = 0;
+      alertAudioRef.current = null;
+    }
+
+    // Get order ID from selectedRestaurant or newOrder
+    const orderId = selectedRestaurant?.id || newOrder?.orderMongoId || newOrder?.orderId;
+    if (!orderId) {
+      console.error('❌ No order ID found to accept');
+      toast.error('Order ID not found. Please try again.');
+      return false;
+    }
+
+    let currentLocation = null;
+    try {
+      // Get current LIVE location
+      currentLocation = riderLocation;
+
+      if (!currentLocation || currentLocation.length !== 2) {
+        currentLocation = lastLocationRef.current;
+      }
+
+      if (!currentLocation || currentLocation.length !== 2) {
+        try {
+          const position = await new Promise((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(
+              pos => resolve([pos.coords.latitude, pos.coords.longitude]),
+              reject,
+              { timeout: 5000, enableHighAccuracy: true }
+            );
+          });
+          currentLocation = position;
+        } catch (geoError) {
+          console.error('❌ Could not get current location:', geoError);
+          toast.error('Location not available. Please enable location services.');
+          return false;
+        }
+      }
+
+      if (!currentLocation || currentLocation.length !== 2) {
+        toast.error('Location not available. Please enable location services.');
+        return false;
+      }
+
+      // Call backend API to accept order
+      const response = await deliveryAPI.acceptOrder(orderId, {
+        lat: currentLocation[0],
+        lng: currentLocation[1]
+      });
+
+      if (response.data?.success && response.data.data) {
+        const orderData = response.data.data;
+        const order = orderData.order || orderData;
+        const routeData = response.data.data.route;
+        
+        let restaurantInfo = null;
+        if (order) {
+          const restaurantCoords = order.restaurantId?.location?.coordinates || [];
+          const restaurantLat = restaurantCoords[1];
+          const restaurantLng = restaurantCoords[0];
+
+          let restaurantAddress = 'Restaurant Address';
+          if (order.restaurantId?.address) {
+            restaurantAddress = order.restaurantId.address;
+          } else if (order.restaurantId?.location?.formattedAddress) {
+            restaurantAddress = order.restaurantId.location.formattedAddress;
+          }
+
+          let restaurantName = order.restaurantName || order.restaurantId?.name || 'Restaurant';
+          
+          const backendEarnings = orderData.estimatedEarnings || response.data.data.estimatedEarnings;
+          const earningsValue = backendEarnings ? (typeof backendEarnings === 'object' ? backendEarnings.totalEarning : backendEarnings) : selectedRestaurant?.estimatedEarnings || 0;
+
+          restaurantInfo = {
+            id: order._id || order.orderId,
+            orderId: order.orderId,
+            name: restaurantName,
+            address: restaurantAddress,
+            lat: restaurantLat || selectedRestaurant?.lat,
+            lng: restaurantLng || selectedRestaurant?.lng,
+            estimatedEarnings: backendEarnings || selectedRestaurant?.estimatedEarnings || 0,
+            amount: earningsValue,
+            customerName: order.userId?.name,
+            customerAddress: order.address?.formattedAddress || '',
+            customerLat: order.address?.location?.coordinates?.[1],
+            customerLng: order.address?.location?.coordinates?.[0],
+            items: order.items || [],
+            total: order.pricing?.total || 0,
+            paymentMethod: order.paymentMethod || 'razorpay',
+            phone: order.restaurantId?.phone || null,
+            orderStatus: order.status || 'preparing',
+            deliveryPhase: 'en_route_to_pickup'
+          };
+          setSelectedRestaurant(restaurantInfo);
+        }
+
+        // Handle route
+        if (restaurantInfo && restaurantInfo.lat && restaurantInfo.lng && currentLocation) {
+          const directionsResult = await calculateRouteWithDirectionsAPI(currentLocation, {
+            lat: restaurantInfo.lat,
+            lng: restaurantInfo.lng
+          });
+          if (directionsResult) {
+            setDirectionsResponse(directionsResult);
+            directionsResponseRef.current = directionsResult;
+            updateLiveTrackingPolyline(directionsResult, currentLocation);
+          }
+        }
+        
+        setShowNewOrderPopup(false);
+        setNavigationMode('restaurant');
+        setShowDirectionsMap(true);
+        return true;
+      } else {
+        toast.error(response.data?.message || 'Failed to accept order');
+        return false;
+      }
+    } catch (error) {
+      console.error('❌ Error in processOrderAcceptance:', error);
+      toast.error('Something went wrong. Please try again.');
+      return false;
+    }
+  };
+
   const handleNewOrderAcceptTouchEnd = e => {
     if (!newOrderAcceptButtonIsSwiping.current) {
       setNewOrderAcceptButtonProgress(0);
@@ -1841,584 +1977,17 @@ export default function DeliveryHome() {
     const threshold = maxSwipe * 0.7; // 70% of max swipe
 
     if (deltaX > threshold) {
-      // Stop audio immediately when user accepts
-      if (alertAudioRef.current) {
-        alertAudioRef.current.pause();
-        alertAudioRef.current.currentTime = 0;
-        alertAudioRef.current = null;
-      }
-
       // Animate to completion
       setNewOrderIsAnimatingToComplete(true);
       setNewOrderAcceptButtonProgress(1);
 
-      // Accept order via backend API and get route
-      const acceptOrderAndShowRoute = async () => {
-        // Get order ID from selectedRestaurant or newOrder (define outside try-catch for error handling)
-        const orderId = selectedRestaurant?.id || newOrder?.orderMongoId || newOrder?.orderId;
-        if (!orderId) {
-          console.error('❌ No order ID found to accept');
-          toast.error('Order ID not found. Please try again.');
-          return;
+      // Call our new standalone function
+      processOrderAcceptance().then(success => {
+        if (!success) {
+          setNewOrderIsAnimatingToComplete(false);
+          setNewOrderAcceptButtonProgress(0);
         }
-
-        // Declare currentLocation in outer scope so it's accessible in catch block
-        let currentLocation = null;
-        try {
-          // Get current LIVE location (prioritize riderLocation which is updated in real-time)
-          currentLocation = riderLocation;
-
-          // If riderLocation is not available, try to get from lastLocationRef
-          if (!currentLocation || currentLocation.length !== 2) {
-            currentLocation = lastLocationRef.current;
-          }
-
-          // If still not available, try to get current position
-          if (!currentLocation || currentLocation.length !== 2) {
-            try {
-              const position = await new Promise((resolve, reject) => {
-                navigator.geolocation.getCurrentPosition(pos => resolve([pos.coords.latitude, pos.coords.longitude]), reject, {
-                  timeout: 5000,
-                  enableHighAccuracy: true
-                });
-              });
-              currentLocation = position;
-            } catch (geoError) {
-              console.error('❌ Could not get current location:', geoError);
-              toast.error('Location not available. Please enable location services.');
-              // Ensure currentLocation is set to null before returning
-              currentLocation = null;
-              return;
-            }
-          }
-
-          // Validate currentLocation before proceeding
-          if (!currentLocation || currentLocation.length !== 2) {
-            console.error('❌ No valid location available');
-            toast.error('Location not available. Please enable location services.');
-            return;
-          }
-          // Call backend API to accept order
-          // Backend expects currentLat and currentLng
-          const response = await deliveryAPI.acceptOrder(orderId, {
-            lat: currentLocation[0],
-            // latitude
-            lng: currentLocation[1] // longitude
-          });
-          if (response.data?.success && response.data.data) {
-            // Stop audio immediately when order is successfully accepted
-            if (alertAudioRef.current) {
-              alertAudioRef.current.pause();
-              alertAudioRef.current.currentTime = 0;
-              alertAudioRef.current = null;
-            }
-            const orderData = response.data.data;
-            const order = orderData.order || orderData; // Backend returns { order, route }
-            const routeData = response.data.data.route;
-            // Update selectedRestaurant with correct data from backend
-            let restaurantInfo = null;
-            if (order) {
-              // Extract restaurant location (GeoJSON format: [longitude, latitude])
-              const restaurantCoords = order.restaurantId?.location?.coordinates || [];
-              const restaurantLat = restaurantCoords[1]; // Latitude is second element
-              const restaurantLng = restaurantCoords[0]; // Longitude is first element
-
-              // Format restaurant address - check multiple possible locations
-              let restaurantAddress = 'Restaurant Address';
-              const restaurantLocation = order.restaurantId?.location;
-
-              // Debug: Log order structure to understand data format
-
-              // Priority 1: Direct address fields on restaurantId
-              if (order.restaurantId?.address) {
-                restaurantAddress = order.restaurantId.address;
-              }
-              // Priority 2: formattedAddress from location
-              else if (restaurantLocation?.formattedAddress) {
-                restaurantAddress = restaurantLocation.formattedAddress;
-              }
-              // Priority 3: address from location
-              else if (restaurantLocation?.address) {
-                restaurantAddress = restaurantLocation.address;
-              }
-              // Priority 4: Build from addressLine1 (with zone and pin code)
-              else if (restaurantLocation?.addressLine1) {
-                const addressParts = [restaurantLocation.addressLine1, restaurantLocation.addressLine2, restaurantLocation.area,
-                // Zone
-                restaurantLocation.city, restaurantLocation.state, restaurantLocation.pincode || restaurantLocation.zipCode || restaurantLocation.postalCode].filter(Boolean);
-                restaurantAddress = addressParts.join(', ');
-              }
-              // Priority 5: Build from street components (with zone and pin code)
-              else if (restaurantLocation?.street) {
-                const addressParts = [restaurantLocation.street, restaurantLocation.area,
-                // Zone
-                restaurantLocation.city, restaurantLocation.state, restaurantLocation.pincode || restaurantLocation.zipCode || restaurantLocation.postalCode].filter(Boolean);
-                restaurantAddress = addressParts.join(', ');
-              }
-              // Priority 6: Check restaurantId directly for address fields
-              else if (order.restaurantId?.street || order.restaurantId?.city) {
-                const addressParts = [order.restaurantId.street, order.restaurantId.area, order.restaurantId.city, order.restaurantId.state, order.restaurantId.zipCode || order.restaurantId.pincode || order.restaurantId.postalCode].filter(Boolean);
-                restaurantAddress = addressParts.join(', ');
-              }
-              // Priority 7: Check order.restaurantAddress (if exists)
-              else if (order.restaurantAddress) {
-                restaurantAddress = order.restaurantAddress;
-              }
-              // Priority 8: Use coordinates if address not available
-              else if (restaurantLat && restaurantLng) {
-                restaurantAddress = `${restaurantLat}, ${restaurantLng}`;
-              } else {
-                console.warn('⚠️ Restaurant address not found in order, will try to fetch from restaurant API');
-                // Try to fetch restaurant address by ID if available
-                const restaurantId = order.restaurantId;
-                if (restaurantId) {
-                  // Handle both string and object restaurantId
-                  const restaurantIdString = typeof restaurantId === 'string' ? restaurantId : restaurantId._id || restaurantId.id || restaurantId.toString();
-                  if (restaurantIdString) {
-                    try {
-                      const restaurantResponse = await restaurantAPI.getRestaurantById(restaurantIdString);
-                      if (restaurantResponse.data?.success && restaurantResponse.data.data) {
-                        const restaurant = restaurantResponse.data.data.restaurant || restaurantResponse.data.data;
-                        const restLocation = restaurant.location;
-                        // Priority: location.formattedAddress (this is what user wants)
-                        if (restLocation?.formattedAddress) {
-                          restaurantAddress = restLocation.formattedAddress;
-                        } else if (restaurant.address) {
-                          restaurantAddress = restaurant.address;
-                        } else if (restLocation?.address) {
-                          restaurantAddress = restLocation.address;
-                        } else if (restLocation?.addressLine1) {
-                          const addressParts = [restLocation.addressLine1, restLocation.addressLine2, restLocation.area,
-                          // Zone
-                          restLocation.city, restLocation.state, restLocation.pincode || restLocation.zipCode || restLocation.postalCode].filter(Boolean);
-                          restaurantAddress = addressParts.join(', ');
-                        } else if (restLocation?.street) {
-                          const addressParts = [restLocation.street, restLocation.area,
-                          // Zone
-                          restLocation.city, restLocation.state, restLocation.pincode || restLocation.zipCode || restLocation.postalCode].filter(Boolean);
-                          restaurantAddress = addressParts.join(', ');
-                        }
-                      }
-                    } catch (restaurantError) {
-                      console.error('❌ Error fetching restaurant address:', restaurantError);
-                    }
-                  }
-                }
-                if (restaurantAddress === 'Restaurant Address') {
-                  console.warn('⚠️ Restaurant address not found in any location, using default');
-                }
-              }
-
-              // Extract restaurant name - priority: restaurantName field > restaurantId.name > fallback
-              // Backend returns restaurantName as a direct field on order, and restaurantId is populated with name
-              let restaurantName = null;
-
-              // Priority 1: Direct restaurantName field from order (stored in Order model)
-              if (order.restaurantName && typeof order.restaurantName === 'string' && order.restaurantName.trim()) {
-                restaurantName = order.restaurantName.trim();
-              }
-              // Priority 2: Name from populated restaurantId object
-              else if (order.restaurantId && typeof order.restaurantId === 'object' && order.restaurantId.name) {
-                restaurantName = order.restaurantId.name.trim();
-              }
-              // Priority 3: Fallback to existing selectedRestaurant name
-              else if (selectedRestaurant?.name) {
-                restaurantName = selectedRestaurant.name;
-                console.warn('⚠️ Restaurant name not found in order, using selectedRestaurant.name:', restaurantName);
-              }
-              // Final fallback
-              else {
-                restaurantName = 'Restaurant';
-                console.error('❌ Restaurant name not found anywhere, using default:', restaurantName);
-              }
-              // Extract earnings from backend response
-              const backendEarnings = orderData.estimatedEarnings || response.data.data.estimatedEarnings;
-              const earningsValue = backendEarnings ? typeof backendEarnings === 'object' ? backendEarnings.totalEarning : backendEarnings : selectedRestaurant?.estimatedEarnings || 0;
-              restaurantInfo = {
-                id: order._id || order.orderId,
-                orderId: order.orderId,
-                // Correct order ID from backend
-                name: restaurantName,
-                // Restaurant name from backend (priority: restaurantName > restaurantId.name)
-                address: restaurantAddress,
-                // Restaurant address from backend
-                lat: restaurantLat || selectedRestaurant?.lat,
-                lng: restaurantLng || selectedRestaurant?.lng,
-                distance: selectedRestaurant?.distance || '0 km',
-                timeAway: selectedRestaurant?.timeAway || '0 mins',
-                dropDistance: selectedRestaurant?.dropDistance || '0 km',
-                pickupDistance: selectedRestaurant?.pickupDistance || '0 km',
-                estimatedEarnings: backendEarnings || selectedRestaurant?.estimatedEarnings || 0,
-                amount: earningsValue,
-                // Also set amount for compatibility
-                customerName: order.userId?.name || selectedRestaurant?.customerName,
-                customerAddress: order.address?.formattedAddress || (order.address?.street ? `${order.address.street}, ${order.address.city || ''}, ${order.address.state || ''}`.trim() : '') || selectedRestaurant?.customerAddress,
-                customerLat: order.address?.location?.coordinates?.[1],
-                customerLng: order.address?.location?.coordinates?.[0],
-                items: order.items || [],
-                total: order.pricing?.total || 0,
-                paymentMethod: order.paymentMethod ?? order.payment?.method ?? 'razorpay',
-                // backend-resolved first (COD vs Online)
-                phone: order.restaurantId?.phone || order.restaurantId?.ownerPhone || null,
-                // Restaurant phone number (prefer phone, fallback to ownerPhone)
-                ownerPhone: order.restaurantId?.ownerPhone || null,
-                // Owner phone number (separate field for direct access)
-                orderStatus: order.status || 'preparing',
-                // Store order status (pending, preparing, ready, out_for_delivery, delivered)
-                deliveryState: {
-                  ...(order.deliveryState || {}),
-                  currentPhase: 'en_route_to_pickup',
-                  // CRITICAL: Set to en_route_to_pickup after order acceptance
-                  status: 'accepted' // Set status to accepted
-                },
-                // Store delivery state (currentPhase, status, etc.)
-                deliveryPhase: 'en_route_to_pickup' // CRITICAL: Set to en_route_to_pickup after order acceptance so Reached Pickup popup can show
-              };
-              // Update state immediately
-              setSelectedRestaurant(restaurantInfo);
-            }
-
-            // Ensure we have restaurantInfo before proceeding
-            if (!restaurantInfo) {
-              console.error('❌ Restaurant info not available, cannot proceed');
-              return;
-            }
-            let routeCoordinates = null;
-            let directionsResultForMap = null; // Store directions result for main map rendering
-
-            // Use route from backend if available (for fallback/polyline)
-            if (routeData && routeData.coordinates && routeData.coordinates.length > 0) {
-              // Backend returns coordinates as [[lat, lng], ...]
-              routeCoordinates = routeData.coordinates;
-              setRoutePolyline(routeCoordinates);
-            }
-
-            // Calculate route using Google Maps Directions API (Zomato-style road-based routing)
-            // Use LIVE location from delivery boy to restaurant
-            // Use restaurantInfo directly (not selectedRestaurant) since state update is async
-            if (restaurantInfo && restaurantInfo.lat && restaurantInfo.lng && currentLocation) {
-              try {
-                // Calculate route immediately with current live location
-                const directionsResult = await calculateRouteWithDirectionsAPI(currentLocation,
-                  // Delivery boy's current live location
-                  {
-                    lat: restaurantInfo.lat,
-                    lng: restaurantInfo.lng
-                  } // Restaurant location
-                );
-                if (directionsResult) {
-                  // Store pickup route distance and time
-                  const pickupDistance = directionsResult.routes[0]?.legs[0]?.distance?.value || 0; // in meters
-                  const pickupDuration = directionsResult.routes[0]?.legs[0]?.duration?.value || 0; // in seconds
-                  pickupRouteDistanceRef.current = pickupDistance;
-                  pickupRouteTimeRef.current = pickupDuration;
-                  // Store directions result for rendering on main map
-                  setDirectionsResponse(directionsResult);
-                  directionsResponseRef.current = directionsResult; // Store in ref for callbacks
-                  directionsResultForMap = directionsResult; // Store for use in setTimeout
-
-                  // Initialize live tracking polyline with full route (Delivery Boy → Restaurant)
-                  if (currentLocation) {
-                    // Ensure map is ready before updating polyline
-                    if (window.deliveryMapInstance) {
-                      updateLiveTrackingPolyline(directionsResult, currentLocation);
-                    } else {
-                      // Wait for map to be ready
-                      setTimeout(() => {
-                        if (window.deliveryMapInstance && currentLocation) {
-                          updateLiveTrackingPolyline(directionsResult, currentLocation);
-                        }
-                      }, 500);
-                    }
-                  }
-                } else {
-                  // Fallback: Use backend route or OSRM
-
-                  if (!routeCoordinates || routeCoordinates.length === 0) {
-                    try {
-                      const url = `https://router.project-osrm.org/route/v1/driving/${currentLocation[1]},${currentLocation[0]};${restaurantInfo.lng},${restaurantInfo.lat}?overview=full&geometries=geojson`;
-                      const osrmResponse = await fetch(url);
-                      const osrmData = await osrmResponse.json();
-                      if (osrmData.code === 'Ok' && osrmData.routes && osrmData.routes.length > 0) {
-                        routeCoordinates = osrmData.routes[0].geometry.coordinates.map(coord => [coord[1], coord[0]]);
-                        setRoutePolyline(routeCoordinates);
-                      } else {
-                        // Final fallback: straight line
-                        routeCoordinates = [currentLocation, [restaurantInfo.lat, restaurantInfo.lng]];
-                        setRoutePolyline(routeCoordinates);
-                      }
-                    } catch (osrmError) {
-                      console.error('❌ Error calculating route with OSRM:', osrmError);
-                      // Final fallback: straight line
-                      routeCoordinates = [currentLocation, [restaurantInfo.lat, restaurantInfo.lng]];
-                      setRoutePolyline(routeCoordinates);
-                    }
-                  }
-                }
-              } catch (directionsError) {
-                // Handle REQUEST_DENIED gracefully (billing/API key issue)
-                if (directionsError.message?.includes('REQUEST_DENIED') || directionsError.message?.includes('not available')) {
-                  console.warn('⚠️ Google Maps Directions API not available (billing/API key issue). Using fallback route.');
-                } else {
-                  console.error('❌ Error calculating route with Directions API:', directionsError);
-                }
-
-                // Fallback to OSRM or straight line
-                if (!routeCoordinates || routeCoordinates.length === 0) {
-                  try {
-                    // Try OSRM first
-                    const url = `https://router.project-osrm.org/route/v1/driving/${currentLocation[1]},${currentLocation[0]};${restaurantInfo.lng},${restaurantInfo.lat}?overview=full&geometries=geojson`;
-                    const osrmResponse = await fetch(url);
-                    const osrmData = await osrmResponse.json();
-                    if (osrmData.code === 'Ok' && osrmData.routes && osrmData.routes.length > 0) {
-                      routeCoordinates = osrmData.routes[0].geometry.coordinates.map(coord => [coord[1], coord[0]]);
-                      setRoutePolyline(routeCoordinates);
-                    } else {
-                      // Final fallback: straight line
-                      routeCoordinates = [currentLocation, [restaurantInfo.lat, restaurantInfo.lng]];
-                      setRoutePolyline(routeCoordinates);
-                    }
-                  } catch (osrmError) {
-                    console.warn('⚠️ OSRM fallback failed, using straight line');
-                    // Final fallback: straight line
-                    routeCoordinates = [currentLocation, [restaurantInfo.lat, restaurantInfo.lng]];
-                    setRoutePolyline(routeCoordinates);
-                  }
-                }
-              }
-            } else {
-              console.error('❌ Cannot calculate route: missing restaurant info or location', {
-                restaurantInfo: !!restaurantInfo,
-                restaurantLat: restaurantInfo?.lat,
-                restaurantLng: restaurantInfo?.lng,
-                currentLocation: !!currentLocation
-              });
-            }
-
-            // Close popup and show route on main map (not full-screen directions map)
-            setShowNewOrderPopup(false);
-            // CRITICAL: Clear newOrder notification immediately to prevent duplicate notifications
-            const acceptedOrderId = restaurantInfo.id || restaurantInfo.orderId || newOrder?.orderMongoId || newOrder?.orderId;
-            if (acceptedOrderId) {
-              acceptedOrderIdsRef.current.add(acceptedOrderId);
-            }
-            clearNewOrder();
-
-            // Ensure route path is visible
-            setShowRoutePath(true);
-
-            // Show Reached Pickup popup immediately after order acceptance (no distance check)
-            // But only if order is not already past pickup phase
-            setTimeout(() => {
-              const currentOrderStatus = selectedRestaurant?.orderStatus || selectedRestaurant?.status || '';
-              const currentDeliveryPhase = selectedRestaurant?.deliveryPhase || selectedRestaurant?.deliveryState?.currentPhase || '';
-              const isAlreadyPastPickup = currentOrderStatus === 'out_for_delivery' || currentDeliveryPhase === 'en_route_to_delivery' || currentDeliveryPhase === 'en_route_to_drop' || currentDeliveryPhase === 'picked_up';
-              if (!isAlreadyPastPickup) {
-                setShowreachedPickupPopup(true);
-                // Close directions map if open
-                setShowDirectionsMap(false);
-              } else { }
-            }, 500); // Wait 500ms for state to update
-
-            // Show route on main map instead of opening full-screen directions map
-            setTimeout(() => {
-              // Show route on main map using DirectionsRenderer or polyline
-              if (window.deliveryMapInstance && restaurantInfo) {
-                // Use DirectionsRenderer on main map if we have directions result
-                // Use directionsResponse state (which was set above) instead of local variable
-                const directionsResult = directionsResultForMap || (directionsResponse && directionsResponse.routes && directionsResponse.routes.length > 0 ? directionsResponse : null);
-                if (directionsResult && directionsResult.routes && directionsResult.routes.length > 0) {
-                  // Initialize DirectionsRenderer for main map if not exists
-                  // Don't create DirectionsRenderer - it adds dots
-                  // We'll extract route path and use custom polyline instead
-                  if (!directionsRendererRef.current) {
-                    // Create DirectionsRenderer but don't set it on map (only for extracting route data)
-                    directionsRendererRef.current = new window.google.maps.DirectionsRenderer({
-                      suppressMarkers: true,
-                      suppressInfoWindows: false,
-                      polylineOptions: {
-                        strokeColor: '#4285F4',
-                        strokeWeight: 0,
-                        strokeOpacity: 0,
-                        zIndex: -1,
-                        icons: []
-                      },
-                      preserveViewport: true
-                    });
-                    // Explicitly don't set map - we use custom polyline instead
-                  }
-
-                  // Extract route path directly from directionsResult (don't use DirectionsRenderer - it adds dots)
-                  try {
-                    // Validate directionsResult is a valid DirectionsResult object
-                    if (!directionsResult || typeof directionsResult !== 'object' || !directionsResult.routes || !Array.isArray(directionsResult.routes) || directionsResult.routes.length === 0) {
-                      console.error('❌ Invalid directionsResult:', directionsResult);
-                      return;
-                    }
-
-                    // Validate it's a Google Maps DirectionsResult (has request and legs)
-                    if (!directionsResult.request || !directionsResult.routes[0]?.legs || !Array.isArray(directionsResult.routes[0].legs)) {
-                      console.error('❌ directionsResult is not a valid Google Maps DirectionsResult');
-                      return;
-                    }
-                    // Don't create main route polyline - only live tracking polyline will be shown
-                    // Remove old custom polyline if exists (cleanup)
-                    try {
-                      if (routePolylineRef.current) {
-                        routePolylineRef.current.setMap(null);
-                        routePolylineRef.current = null;
-                      }
-
-                      // Completely remove DirectionsRenderer from map to prevent any dots/icons
-                      if (directionsRendererRef.current) {
-                        directionsRendererRef.current.setMap(null);
-                      }
-                    } catch (e) {
-                      console.warn('⚠️ Error cleaning up polyline:', e);
-                    }
-
-                    // Fit bounds to show entire route - but preserve zoom if user has zoomed in
-                    const bounds = directionsResult.routes[0].bounds;
-                    if (bounds) {
-                      const currentZoom = window.deliveryMapInstance.getZoom();
-                      window.deliveryMapInstance.fitBounds(bounds, {
-                        padding: 100
-                      });
-                      // Restore zoom if user had zoomed in more than fitBounds would set
-                      setTimeout(() => {
-                        const newZoom = window.deliveryMapInstance.getZoom();
-                        if (currentZoom > newZoom && currentZoom >= 18) {
-                          window.deliveryMapInstance.setZoom(currentZoom);
-                        }
-                      }, 100);
-                    }
-                  } catch (error) {
-                    console.error('❌ Error extracting route path:', error);
-                    console.error('❌ directionsResult type:', typeof directionsResult);
-                    console.error('❌ directionsResult:', directionsResult);
-                  }
-                } else if (routeCoordinates && routeCoordinates.length > 0) {
-                  // Fallback: Use polyline if Directions API result not available
-                  // setRoutePolyline will trigger useEffect that calls updateRoutePolyline
-
-                  setRoutePolyline(routeCoordinates);
-                } else {
-                  console.warn('⚠️ No route data available to display (neither Directions API result nor coordinates)');
-                }
-
-                // Add restaurant marker to main map
-                if (restaurantInfo.lat && restaurantInfo.lng) {
-                  const restaurantLocation = {
-                    lat: restaurantInfo.lat,
-                    lng: restaurantInfo.lng
-                  };
-
-                  // Remove old restaurant marker if exists
-                  if (restaurantMarkerRef.current) {
-                    restaurantMarkerRef.current.setMap(null);
-                  }
-
-                  // Create restaurant marker on main map with kitchen icon
-                  restaurantMarkerRef.current = new window.google.maps.Marker({
-                    position: restaurantLocation,
-                    map: window.deliveryMapInstance,
-                    icon: {
-                      url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-                        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24">
-                          <circle cx="12" cy="12" r="11" fill="#FF6B35" stroke="#FFFFFF" stroke-width="2"/>
-                          <path d="M8 10c0-1.1.9-2 2-2h4c1.1 0 2 .9 2 2v6H8v-6z" fill="#FFFFFF"/>
-                          <path d="M7 16h10M10 12h4M9 14h6" stroke="#FF6B35" stroke-width="1.5" stroke-linecap="round"/>
-                          <path d="M10 8h4v2h-4z" fill="#FFFFFF" opacity="0.7"/>
-                        </svg>
-                      `),
-                      scaledSize: new window.google.maps.Size(48, 48),
-                      anchor: new window.google.maps.Point(24, 48)
-                    },
-                    title: restaurantInfo.name || 'Kitchen',
-                    animation: window.google.maps.Animation.DROP,
-                    zIndex: 10
-                  });
-                }
-              } else {
-                console.warn('⚠️ Main map not ready, will show route when map loads');
-              }
-
-              // Save accepted order to localStorage for refresh handling
-              try {
-                const activeOrderData = {
-                  orderId: restaurantInfo.id || restaurantInfo.orderId,
-                  restaurantInfo: restaurantInfo,
-                  // Don't save directionsResponse - Google Maps objects can't be serialized to JSON
-                  // Route will be recalculated on restore using Directions API
-                  routeCoordinates: routeCoordinates,
-                  // Save coordinates for fallback polyline
-                  acceptedAt: new Date().toISOString(),
-                  hasDirectionsAPI: !!directionsResultForMap // Flag to indicate we should recalculate with Directions API
-                };
-                localStorage.setItem('deliveryActiveOrder', JSON.stringify(activeOrderData));
-              } catch (storageError) {
-                console.error('❌ Error saving active order to localStorage:', storageError);
-              }
-
-              // Don't show Reached Pickup popup here - it will be shown when order becomes ready via WebSocket
-              // The popup will be triggered by orderReady event from backend
-            }, 300); // Wait for popup close animation
-          } else {
-            console.error('❌ Failed to accept order:', response.data);
-            // Show error message to user
-            toast.error(response.data?.message || 'Failed to accept order. Please try again.');
-            // Still close popup
-            setShowNewOrderPopup(false);
-            setIsNewOrderPopupMinimized(false); // Reset minimized state
-            setNewOrderDragY(0); // Reset drag position
-          }
-        } catch (error) {
-          console.error('❌ Error accepting order:', error);
-          console.error('❌ Error details:', {
-            message: error.message,
-            response: error.response?.data,
-            status: error.response?.status,
-            orderId: orderId || 'unknown',
-            code: error.code,
-            isNetworkError: error.code === 'ERR_NETWORK',
-            currentLocation: currentLocation && currentLocation.length === 2 ? 'available' : 'not available'
-          });
-
-          // Log full error response for debugging
-          if (error.response?.data) {
-            console.error('❌ Backend error response:', JSON.stringify(error.response.data, null, 2));
-          }
-
-          // Show user-friendly error message
-          let errorMessage = 'Failed to accept order. Please try again.';
-          if (error.code === 'ERR_NETWORK') {
-            errorMessage = 'Network error. Please check your internet connection and try again.';
-          } else if (error.response?.data?.message) {
-            errorMessage = error.response.data.message;
-            // Also log the full error if available
-            if (error.response.data.error) {
-              console.error('❌ Backend error details:', error.response.data.error);
-            }
-          } else if (error.message) {
-            errorMessage = error.message;
-          }
-          toast.error(errorMessage);
-
-          // Close popup even on error
-          setShowNewOrderPopup(false);
-          setIsNewOrderPopupMinimized(false); // Reset minimized state
-          setNewOrderDragY(0); // Reset drag position
-        } finally {
-          // Reset after animation
-          setTimeout(() => {
-            setNewOrderAcceptButtonProgress(0);
-            setNewOrderIsAnimatingToComplete(false);
-          }, 500);
-        }
-      };
-
-      // Start accepting order
-      acceptOrderAndShowRoute();
+      });
     } else {
       // Reset smoothly
       setNewOrderAcceptButtonProgress(0);
@@ -2740,12 +2309,11 @@ export default function DeliveryHome() {
       setReachedDropButtonProgress(1);
 
       // Close popup, confirm reached drop, and show order delivered animation instantly (no delay)
-      // Close reached drop popup first
+      // Close reached drop popup
       setShowReachedDropPopup(false);
 
-      // Show Order Delivered popup instantly after Reached Drop is confirmed
-
-      setShowOrderDeliveredAnimation(true)
+      // We will open OTP modal instead (handled by useEffect in DeliveryOrderFlowPopups)
+      // setShowOrderDeliveredAnimation(true) // Removed to allow OTP check first
 
         // API call in background (async, doesn't block popup)
         ;
@@ -3741,11 +3309,6 @@ export default function DeliveryHome() {
   };
 
   // Carousel state
-  const [currentCarouselSlide, setCurrentCarouselSlide] = useState(0);
-  const carouselRef = useRef(null);
-  const carouselStartX = useRef(0);
-  const carouselIsSwiping = useRef(false);
-  const carouselAutoRotateRef = useRef(null);
 
   // Map view toggle state - Hotspot or Select drop (both show map, just different views)
   const [mapViewMode, setMapViewMode] = useState("hotspot"); // "hotspot" or "selectDrop"
@@ -6579,147 +6142,6 @@ export default function DeliveryHome() {
 
   // Bike marker update removed (Ola Maps removed)
 
-  // Carousel slides data - filter based on bank details status
-  const carouselSlides = useMemo(() => [...(bankDetailsFilled ? [] : [{
-    id: 2,
-    title: "Submit bank details",
-    subtitle: "PAN & bank details required for payouts",
-    icon: "bank",
-    buttonText: "Submit",
-    bgColor: "bg-[#DC2626]"
-  }])], [bankDetailsFilled]);
-
-  // Auto-rotate carousel
-  useEffect(() => {
-    // Reset to first slide if current slide is out of bounds
-    setCurrentCarouselSlide(prev => {
-      if (prev >= carouselSlides.length) {
-        return 0;
-      }
-      return prev;
-    });
-    carouselAutoRotateRef.current = setInterval(() => {
-      setCurrentCarouselSlide(prev => (prev + 1) % carouselSlides.length);
-    }, 3000);
-    return () => {
-      if (carouselAutoRotateRef.current) {
-        clearInterval(carouselAutoRotateRef.current);
-      }
-    };
-  }, [carouselSlides]);
-
-  // Reset auto-rotate timer after manual swipe
-  const resetCarouselAutoRotate = useCallback(() => {
-    if (carouselAutoRotateRef.current) {
-      clearInterval(carouselAutoRotateRef.current);
-    }
-    carouselAutoRotateRef.current = setInterval(() => {
-      setCurrentCarouselSlide(prev => (prev + 1) % carouselSlides.length);
-    }, 3000);
-  }, [carouselSlides.length]);
-
-  // Handle carousel swipe touch events
-  const carouselStartY = useRef(0);
-  const handleCarouselTouchStart = useCallback(e => {
-    carouselIsSwiping.current = true;
-    carouselStartX.current = e.touches[0].clientX;
-    carouselStartY.current = e.touches[0].clientY;
-  }, []);
-  const handleCarouselTouchMove = useCallback(e => {
-    if (!carouselIsSwiping.current) return;
-    const currentX = e.touches[0].clientX;
-    const currentY = e.touches[0].clientY;
-    const deltaX = Math.abs(currentX - carouselStartX.current);
-    const deltaY = Math.abs(currentY - carouselStartY.current);
-
-    // Only prevent default if horizontal swipe is dominant
-    // Don't call preventDefault - CSS touch-action handles scrolling prevention
-    if (deltaX > deltaY && deltaX > 10) {
-      // safePreventDefault(e) // Removed to avoid passive listener error
-    }
-  }, []);
-  const handleCarouselTouchEnd = useCallback(e => {
-    if (!carouselIsSwiping.current) return;
-    const endX = e.changedTouches[0].clientX;
-    const endY = e.changedTouches[0].clientY;
-    const deltaX = carouselStartX.current - endX;
-    const deltaY = Math.abs(carouselStartY.current - endY);
-    const threshold = 50; // Minimum swipe distance
-
-    // Only trigger if horizontal swipe is dominant
-    if (Math.abs(deltaX) > threshold && Math.abs(deltaX) > deltaY) {
-      if (deltaX > 0) {
-        // Swiped left - go to next slide
-        setCurrentCarouselSlide(prev => (prev + 1) % carouselSlides.length);
-      } else {
-        // Swiped right - go to previous slide
-        setCurrentCarouselSlide(prev => (prev - 1 + carouselSlides.length) % carouselSlides.length);
-      }
-      resetCarouselAutoRotate();
-    }
-    carouselIsSwiping.current = false;
-    carouselStartX.current = 0;
-    carouselStartY.current = 0;
-  }, [carouselSlides.length, resetCarouselAutoRotate]);
-
-  // Handle carousel mouse events for desktop
-  const handleCarouselMouseDown = e => {
-    carouselIsSwiping.current = true;
-    carouselStartX.current = e.clientX;
-    const handleMouseMove = moveEvent => {
-      if (!carouselIsSwiping.current) return;
-      // Don't call preventDefault - CSS touch-action handles scrolling prevention
-      // safePreventDefault(moveEvent) // Removed for consistency (mouse events aren't passive but removed anyway)
-    };
-    const handleMouseUp = upEvent => {
-      if (!carouselIsSwiping.current) {
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
-        return;
-      }
-      const endX = upEvent.clientX;
-      const deltaX = carouselStartX.current - endX;
-      const threshold = 50;
-      if (Math.abs(deltaX) > threshold) {
-        if (deltaX > 0) {
-          // Swiped left - go to next slide
-          setCurrentCarouselSlide(prev => (prev + 1) % carouselSlides.length);
-        } else {
-          // Swiped right - go to previous slide
-          setCurrentCarouselSlide(prev => (prev - 1 + carouselSlides.length) % carouselSlides.length);
-        }
-        resetCarouselAutoRotate();
-      }
-      carouselIsSwiping.current = false;
-      carouselStartX.current = 0;
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-  };
-
-  // Setup non-passive touch event listeners for carousel to allow preventDefault
-  useEffect(() => {
-    const carouselElement = carouselRef.current;
-    if (!carouselElement) return;
-
-    // Add event listeners with { passive: false } for touchmove to allow preventDefault
-    carouselElement.addEventListener('touchstart', handleCarouselTouchStart, {
-      passive: true
-    });
-    carouselElement.addEventListener('touchmove', handleCarouselTouchMove, {
-      passive: false
-    });
-    carouselElement.addEventListener('touchend', handleCarouselTouchEnd, {
-      passive: true
-    });
-    return () => {
-      carouselElement.removeEventListener('touchstart', handleCarouselTouchStart);
-      carouselElement.removeEventListener('touchmove', handleCarouselTouchMove);
-      carouselElement.removeEventListener('touchend', handleCarouselTouchEnd);
-    };
-  }, [handleCarouselTouchStart, handleCarouselTouchMove, handleCarouselTouchEnd]);
 
   // Handle swipe bar touch events
   const handleSwipeBarTouchStart = e => {
@@ -6938,6 +6360,58 @@ export default function DeliveryHome() {
     }
   };
 
+  // Handle map location refresh (extracted from inline onClick)
+  const handleRefreshLocation = useCallback(() => {
+    if (navigator.geolocation) {
+      setIsRefreshingLocation(true);
+      navigator.geolocation.getCurrentPosition(position => {
+        const latitude = position.coords.latitude;
+        const longitude = position.coords.longitude;
+
+        if (typeof latitude !== 'number' || typeof longitude !== 'number' || isNaN(latitude) || isNaN(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+          console.warn("⚠️ Invalid coordinates received:", { latitude, longitude });
+          setIsRefreshingLocation(false);
+          return;
+        }
+        const newLocation = [latitude, longitude];
+
+        let heading = null;
+        if (lastLocationRef.current) {
+          const [prevLat, prevLng] = lastLocationRef.current;
+          heading = calculateHeading(prevLat, prevLng, latitude, longitude);
+        }
+
+        localStorage.setItem('deliveryBoyLastLocation', JSON.stringify(newLocation));
+
+        if (lastLocationRef.current) {
+          routeHistoryRef.current.push({ lat: latitude, lng: longitude });
+          if (routeHistoryRef.current.length > 1000) {
+            routeHistoryRef.current.shift();
+          }
+        } else {
+          routeHistoryRef.current = [{ lat: latitude, lng: longitude }];
+        }
+
+        if (window.deliveryMapInstance) {
+          createOrUpdateBikeMarker(latitude, longitude, heading, !isUserPanningRef.current);
+          updateRoutePolyline();
+        }
+        setRiderLocation(newLocation);
+        lastLocationRef.current = newLocation;
+        setTimeout(() => {
+          setIsRefreshingLocation(false);
+        }, 800);
+      }, error => {
+        console.error('Error getting location:', error);
+        setIsRefreshingLocation(false);
+      }, {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
+      });
+    }
+  }, [calculateHeading, createOrUpdateBikeMarker, updateRoutePolyline]);
+
   // Add global mouse event listeners
   useEffect(() => {
     if (isDraggingSwipeBar) {
@@ -7062,772 +6536,86 @@ export default function DeliveryHome() {
       {/* Top Navigation Bar */}
       <FeedNavbar isOnline={isOnline} onToggleOnline={handleToggleOnline} onEmergencyClick={() => setShowEmergencyPopup(true)} onHelpClick={() => setShowHelpPopup(true)} />
 
-      {/* Carousel - Only show if there are slides */}
-      {carouselSlides.length > 0 && <div ref={carouselRef} className="relative overflow-hidden bg-gray-700 cursor-grab active:cursor-grabbing select-none flex-shrink-0" onMouseDown={handleCarouselMouseDown}>
-        <div className="flex transition-transform duration-500 ease-in-out" style={{
-          transform: `translateX(-${currentCarouselSlide * 100}%)`
-        }}>
-          {carouselSlides.map(slide => <div key={slide.id} className="min-w-full">
-            <div className={`${slide.bgColor} px-4 py-3 flex items-center gap-3 min-h-[80px]`}>
-              {/* Icon */}
-              <div className="flex-shrink-0">
-                {slide.icon === "bag" ? <div className="relative">
-                  {/* Delivery Bag Icon - Reduced size */}
-                  <div className="w-12 h-12 bg-black rounded-lg flex items-center justify-center shadow-lg relative">
-                    {/* Bag shape */}
-                    <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                      <path d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                    </svg>
-                  </div>
-                  {/* Shadow */}
-                  <div className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-10 h-1.5 bg-black/30 rounded-full blur-sm"></div>
-                </div> : <div className="relative w-10 h-10">
-                  {/* Bank/Rupee Icon - Reduced size */}
-                  <div className="w-10 h-10 bg-black rounded-lg flex items-center justify-center relative">
-                    {/* Rupee symbol */}
-                    <svg className="w-12 h-12 text-white absolute" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.31-8.86c-1.77-.45-2.34-.94-2.34-1.67 0-.84.79-1.43 2.1-1.43 1.38 0 1.9.66 1.94 1.64h1.71c-.05-1.34-.87-2.57-2.49-2.97V5H10.9v1.69c-1.51.32-2.72 1.3-2.72 2.81 0 1.79 1.49 2.69 3.66 3.21 1.95.46 2.34 1.15 2.34 1.87 0 .53-.39 1.39-2.1 1.39-1.6 0-2.23-.72-2.32-1.64H8.04c.1 1.7 1.36 2.66 2.86 2.97V19h2.34v-1.67c1.52-.29 2.72-1.16 2.73-2.77-.01-2.2-1.9-2.96-3.66-3.42z" />
-                    </svg>
-                  </div>
-                </div>}
-              </div>
-
-              <div className="flex-1">
-                <h3 className={`${slide.bgColor === "bg-gray-700" || slide.bgColor === "bg-[#DC2626]" ? "text-white" : "text-black"} text-sm font-semibold mb-0.5`}>
-                  {slide.title}
-                </h3>
-                <p className={`${slide.bgColor === "bg-gray-700" || slide.bgColor === "bg-[#DC2626]" ? "text-white/90" : "text-black/80"} text-xs`}>
-                  {slide.subtitle}
-                </p>
-              </div>
-
-              <button onClick={() => {
-                if (slide.id === 2) {
-                  navigate("/delivery/profile/details");
-                }
-              }} className={`px-3 py-1.5 rounded-lg font-medium text-xs transition-colors ${slide.bgColor === "bg-gray-700" ? "bg-gray-600 text-white hover:bg-gray-500" : "bg-white text-[#DC2626] hover:bg-gray-100"}`}>
-                {slide.buttonText}
-              </button>
-            </div>
-          </div>)}
-        </div>
-
-        {/* Carousel Indicators */}
-        <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
-          {carouselSlides.map((_, index) => <button key={index} onClick={() => setCurrentCarouselSlide(index)} className={`h-1.5 rounded-full transition-all duration-300 ${index === currentCarouselSlide ? currentCarouselSlide === 0 ? "w-6 bg-white" : "w-6 bg-black" : index === 0 ? "w-1.5 bg-white/50" : "w-1.5 bg-black/30"}`} />)}
-        </div>
-      </div>}
+      <DeliveryCarousel bankDetailsFilled={bankDetailsFilled} navigate={navigate} />
 
 
       {/* Conditional Content Based on Swipe Bar Position */}
-      {!showHomeSections ? <>
-        {/* Map View - Shows map with Hotspot or Select drop mode */}
+      {/* Main Content Area */}
+      {!showHomeSections && (
         <div className="relative flex-1 overflow-hidden pb-16 md:pb-0" style={{
           minHeight: 0,
           pointerEvents: 'auto'
         }}>
-          {/* Google Maps Container */}
-          <div ref={mapContainerRef} className="w-full h-full" style={{
-            height: '100%',
-            width: '100%',
-            backgroundColor: '#e5e7eb',
-            // Light gray background while loading
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            pointerEvents: 'auto',
-            zIndex: 0
-          }} />
+          <DeliveryMap
+            mapContainerRef={mapContainerRef}
+            mapLoading={mapLoading}
+            isRefreshingLocation={isRefreshingLocation}
+            onRefreshLocation={handleRefreshLocation}
+          />
 
-          {/* Loading indicator */}
-          {mapLoading && <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-10">
-            <div className="flex flex-col items-center gap-2">
-              <div className="text-gray-600 font-medium">Loading map...</div>
-              <div className="text-xs text-gray-500">Please wait</div>
-            </div>
-          </div>}
-
-          {/* Map Refresh Overlay - Professional Loading Indicator */}
-          {isRefreshingLocation && <motion.div initial={{
-            opacity: 0
-          }} animate={{
-            opacity: 1
-          }} exit={{
-            opacity: 0
-          }} transition={{
-            duration: 0.2
-          }} className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
-            {/* Loading indicator container */}
-            <motion.div initial={{
-              scale: 0.8,
-              opacity: 0
-            }} animate={{
-              scale: 1,
-              opacity: 1
-            }} exit={{
-              scale: 0.8,
-              opacity: 0
-            }} transition={{
-              duration: 0.3,
-              ease: [0.4, 0, 0.2, 1]
-            }} className="relative">
-              {/* Outer pulsing ring */}
-              <motion.div animate={{
-                scale: [1, 1.3, 1],
-                opacity: [0.6, 0.3, 0.6]
-              }} transition={{
-                duration: 2,
-                repeat: Infinity,
-                ease: [0.4, 0, 0.6, 1],
-                // Smooth ease-in-out
-                type: "tween",
-                times: [0, 0.5, 1]
-              }} className="absolute inset-0 w-20 h-20 bg-blue-500/20 rounded-full" />
-
-              {/* Middle ring */}
-              <motion.div animate={{
-                scale: [1, 1.2, 1],
-                opacity: [0.5, 0.2, 0.5]
-              }} transition={{
-                duration: 1.5,
-                repeat: Infinity,
-                ease: [0.4, 0, 0.6, 1],
-                // Smooth ease-in-out
-                type: "tween",
-                delay: 0.3,
-                times: [0, 0.5, 1]
-              }} className="absolute inset-0 w-16 h-16 bg-blue-500/30 rounded-full m-2" />
-
-              {/* Inner spinner */}
-              <div className="relative w-12 h-12 bg-white/90 rounded-full flex items-center justify-center shadow-lg">
-                <motion.div animate={{
-                  rotate: 360
-                }} transition={{
-                  duration: 1.2,
-                  repeat: Infinity,
-                  ease: "linear",
-                  type: "tween"
-                }} className="w-8 h-8 border-[3px] border-blue-600 border-t-transparent rounded-full" />
-              </div>
-            </motion.div>
-          </motion.div>}
-
-          {/* Floating Action Button - My Location */}
-          <motion.button onClick={() => {
-            if (navigator.geolocation) {
-              setIsRefreshingLocation(true);
-              navigator.geolocation.getCurrentPosition(position => {
-                // Validate coordinates
-                const latitude = position.coords.latitude;
-                const longitude = position.coords.longitude;
-
-                // Validate coordinates are valid numbers
-                if (typeof latitude !== 'number' || typeof longitude !== 'number' || isNaN(latitude) || isNaN(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
-                  console.warn("⚠️ Invalid coordinates received:", {
-                    latitude,
-                    longitude
-                  });
-                  setIsRefreshingLocation(false);
-                  return;
-                }
-                const newLocation = [latitude, longitude]; // [lat, lng] format
-
-                // Calculate heading from previous location
-                let heading = null;
-                if (lastLocationRef.current) {
-                  const [prevLat, prevLng] = lastLocationRef.current;
-                  heading = calculateHeading(prevLat, prevLng, latitude, longitude);
-                }
-
-                // Save location to localStorage (for refresh handling)
-                localStorage.setItem('deliveryBoyLastLocation', JSON.stringify(newLocation));
-
-                // Update route history
-                if (lastLocationRef.current) {
-                  routeHistoryRef.current.push({
-                    lat: latitude,
-                    lng: longitude
-                  });
-                  if (routeHistoryRef.current.length > 1000) {
-                    routeHistoryRef.current.shift();
-                  }
-                } else {
-                  routeHistoryRef.current = [{
-                    lat: latitude,
-                    lng: longitude
-                  }];
-                }
-
-                // Update bike marker (only if online - blue dot नहीं, bike icon)
-                if (window.deliveryMapInstance) {
-                  // Always show bike marker on map (both offline and online)
-                  // Center map automatically (Zomato style) unless user is panning
-                  createOrUpdateBikeMarker(latitude, longitude, heading, !isUserPanningRef.current);
-                  updateRoutePolyline();
-                }
-                setRiderLocation(newLocation);
-                lastLocationRef.current = newLocation;
-                // Stop refreshing animation after a short delay
-                setTimeout(() => {
-                  setIsRefreshingLocation(false);
-                }, 800);
-              }, error => {
-                console.error('Error getting location:', error);
-                setIsRefreshingLocation(false);
-              }, {
-                enableHighAccuracy: true,
-                timeout: 10000,
-                maximumAge: 0
-              });
-            }
-          }} className="absolute bottom-44 right-3 w-12 h-12 bg-white rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 transition-colors z-20 overflow-visible" whileTap={{
-            scale: 0.92
-          }} transition={{
-            type: "spring",
-            stiffness: 300,
-            damping: 25,
-            mass: 0.5
-          }}>
-            <div className="relative w-full h-full flex items-center justify-center">
-              {/* Ripple effect */}
-              {isRefreshingLocation && <motion.div className="absolute inset-0 rounded-full bg-blue-500/20" initial={{
-                scale: 0.9,
-                opacity: 0.6
-              }} animate={{
-                scale: [0.9, 1.6, 1.8],
-                opacity: [0.6, 0.3, 0]
-              }} transition={{
-                duration: 2,
-                repeat: Infinity,
-                ease: [0.25, 0.46, 0.45, 0.94],
-                // Smooth ease-out
-                times: [0, 0.5, 1]
-              }} />}
-
-              {/* Icon with smooth animations */}
-              <motion.div className="relative z-10" animate={{
-                rotate: isRefreshingLocation ? 360 : 0,
-                scale: isRefreshingLocation ? [1, 1.1, 1] : 1
-              }} transition={{
-                rotate: {
-                  duration: 2,
-                  repeat: isRefreshingLocation ? Infinity : 0,
-                  ease: "linear",
-                  // Linear for smooth continuous rotation
-                  type: "tween"
-                },
-                scale: {
-                  duration: 1.5,
-                  repeat: isRefreshingLocation ? Infinity : 0,
-                  ease: [0.4, 0, 0.6, 1],
-                  // Smooth ease-in-out
-                  type: "tween",
-                  times: [0, 0.5, 1]
-                }
-              }}>
-                <MapPin className={`w-6 h-6 transition-colors duration-500 ease-in-out ${isRefreshingLocation ? 'text-blue-600' : 'text-gray-700'}`} />
-              </motion.div>
-            </div>
-          </motion.button>
-
-          {/* Floating Banner - Status Message */}
-          {mapViewMode === "hotspot" && (deliveryStatus === "pending" || deliveryStatus === "blocked") && <motion.div initial={{
-            opacity: 0,
-            y: 20
-          }} animate={{
-            opacity: 1,
-            y: 0
-          }} transition={{
-            delay: 0.2
-          }} className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-white rounded-2xl shadow-sm px-6 py-4 z-20 min-w-[96%] text-center">
-            {deliveryStatus === "pending" ? <>
-              <h3 className="text-lg font-bold text-gray-900 mb-1">Verification Done in 24 Hours</h3>
-              <p className="text-sm text-gray-600">Your account is under verification. You'll be notified once approved.</p>
-            </> : deliveryStatus === "blocked" ? <>
-              <h3 className="text-lg font-bold text-red-600 mb-2">Denied Verification</h3>
-              {rejectionReason && <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-3 text-left">
-                <p className="text-xs font-semibold text-red-800 mb-2">Reason for Rejection:</p>
-                <div className="text-xs text-red-700 space-y-1">
-                  {rejectionReason.split('\n').filter(line => line.trim()).length > 1 ? <ul className="space-y-1 list-disc list-inside">
-                    {rejectionReason.split('\n').map((point, index) => point.trim() && <li key={index}>{point.trim()}</li>)}
-                  </ul> : <p className="text-red-700">{rejectionReason}</p>}
-                </div>
-              </div>}
-              <p className="text-sm text-gray-700 mb-3">
-                Please correct the above issues and click "Reverify" to resubmit your request for approval.
-              </p>
-              <button onClick={handleReverify} disabled={isReverifying} className="px-6 py-2.5 bg-blue-600 text-white rounded-lg font-semibold text-sm hover:bg-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mx-auto">
-                {isReverifying ? <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Submitting...
-                </> : "Reverify"}
-              </button>
-            </> : null}
-          </motion.div>}
-
-          {/* Bottom Swipeable Bar - Can be dragged up to show home sections */}
-          {!showHomeSections && <motion.div ref={swipeBarRef} initial={{
-            y: "100%"
-          }} animate={{
-            y: isDraggingSwipeBar ? `${-swipeBarPosition * (window.innerHeight * 0.8)}px` : 0
-          }} transition={isDraggingSwipeBar ? {
-            duration: 0
-          } : {
-            type: "spring",
-            damping: 30,
-            stiffness: 300
-          }} onTouchStart={handleSwipeBarTouchStart} onTouchMove={handleSwipeBarTouchMove} onTouchEnd={handleSwipeBarTouchEnd} onMouseDown={handleSwipeBarMouseDown} className="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-2xl z-20" style={{
-            touchAction: 'pan-y',
-            pointerEvents: 'auto'
-          }}>
-            {/* Swipe Handle */}
-            <div className="flex flex-col items-center pt-4 pb-2 cursor-grab active:cursor-grabbing" style={{
-              touchAction: 'none'
-            }}>
-              <motion.div className="flex flex-col items-center gap-1" animate={{
-                y: isDraggingSwipeBar ? swipeBarPosition * 5 : 0,
-                opacity: isDraggingSwipeBar ? 0.7 : 1
-              }} transition={{
-                duration: 0.1
-              }}>
-                <button onClick={handleChevronUpClick} className="flex items-center justify-center p-2 -m-2 rounded-full hover:bg-gray-100 active:bg-gray-200 transition-colors" aria-label="Slide up">
-                  <ChevronUp className="!w-12 !h-8 scale-x-150 text-gray-400 -mt-2 font-bold" strokeWidth={3} />
-                </button>
-              </motion.div>
-            </div>
-
-            {/* Content Area - Shows map info when down */}
-            <div className="px-4 pb-6">
-              {mapViewMode === "hotspot" ? <div className="flex flex-col items-center">
-                {/* <h3 className="text-lg font-bold text-gray-900 mb-2">No hotspots are available</h3>
-                       <p className="text-sm text-gray-600 mb-4">Please go online to see hotspots</p> */}
-              </div> : <div className="flex flex-col items-center">
-                {/* <h3 className="text-lg font-bold text-gray-900 mb-2">Select drop location</h3>
-                       <p className="text-sm text-gray-600 mb-4">Choose a drop location on the map</p> */}
-              </div>}
-            </div>
-          </motion.div>}
+          <DeliveryStatusBanner
+            mapViewMode={mapViewMode}
+            deliveryStatus={deliveryStatus}
+            rejectionReason={rejectionReason}
+            handleReverify={handleReverify}
+            isReverifying={isReverifying}
+          />
         </div>
-      </> : <>
-        {/* Home Sections View - Full screen when swipe bar is dragged up */}
-        <motion.div ref={swipeBarRef} initial={{
-          y: "100%"
-        }} animate={{
-          y: isDraggingSwipeBar ? `${(1 - swipeBarPosition) * (window.innerHeight * 0.8)}px` : 0
-        }} exit={{
-          y: "100%"
-        }} transition={isDraggingSwipeBar ? {
-          duration: 0
-        } : {
-          type: "spring",
-          damping: 30,
-          stiffness: 300
-        }} onTouchStart={handleSwipeBarTouchStart} onTouchMove={handleSwipeBarTouchMove} onTouchEnd={handleSwipeBarTouchEnd} onMouseDown={handleSwipeBarMouseDown} className="relative flex-1 bg-white rounded-t-3xl shadow-2xl overflow-hidden" style={{
-          height: 'calc(100vh - 200px)',
-          touchAction: 'pan-y'
-        }}>
-          {/* Swipe Handle at Top - Can be dragged down to go back to map */}
-          <div className="flex flex-col items-center pt-4 pb-2 cursor-grab active:cursor-grabbing bg-white sticky top-0 z-10" style={{
-            touchAction: 'none'
-          }}>
-            <motion.div className="flex flex-col items-center gap-1" animate={{
-              y: isDraggingSwipeBar ? -swipeBarPosition * 5 : 0,
-              opacity: isDraggingSwipeBar ? 0.7 : 1
-            }} transition={{
-              duration: 0.1
-            }}>
-              <button onClick={handleChevronDownClick} className="flex items-center justify-center p-2 -m-2 rounded-full hover:bg-gray-100 active:bg-gray-200 transition-colors" aria-label="Slide down">
-                <ChevronDown className="!w-12 !h-8 scale-x-150 text-gray-400 -mt-2 font-bold" strokeWidth={3} />
-              </button>
-            </motion.div>
-          </div>
+      )}
 
-          <div ref={homeSectionsScrollRef} className="px-4 pt-4 pb-16 space-y-4 overflow-y-auto" style={{
-            height: 'calc(100vh - 250px)',
-            touchAction: 'pan-y',
-            // Allow vertical scrolling
-            WebkitOverflowScrolling: 'touch' // Smooth scrolling on iOS
-          }}>
-            {/* Referral Bonus Banner */}
-            <motion.div initial={{
-              opacity: 0,
-              y: -10
-            }} animate={{
-              opacity: 1,
-              y: 0
-            }} transition={{
-              duration: 0.3
-            }} onClick={() => navigate("/delivery/refer-and-earn")} className="w-full rounded-xl p-6 shadow-lg relative overflow-hidden min-h-[70px] cursor-pointer" style={{
-              backgroundImage: `url(${referralBonusBg})`,
-              backgroundSize: '100% 100%',
-              backgroundPosition: 'center',
-              backgroundRepeat: 'no-repeat'
-            }}>
-              <div className="relative z-10">
-                <div className="text-white text-3xl font-bold mb-1">₹6,000                 <span className="text-white/90 text-base font-medium mb-1">referral bonus</span>
-                </div>
-                <div className="text-white/80 text-sm">Refer your friends now</div>
-              </div>
-            </motion.div>
+      {/* Swipe Bar Component - Handles both map view swipe bar and full-screen home sections */}
+      <DeliverySwipeBar
+        showHomeSections={showHomeSections}
+        isDraggingSwipeBar={isDraggingSwipeBar}
+        swipeBarPosition={swipeBarPosition}
+        swipeBarRef={swipeBarRef}
+        handleSwipeBarTouchStart={handleSwipeBarTouchStart}
+        handleSwipeBarTouchMove={handleSwipeBarTouchMove}
+        handleSwipeBarTouchEnd={handleSwipeBarTouchEnd}
+        handleSwipeBarMouseDown={handleSwipeBarMouseDown}
+        handleChevronUpClick={handleChevronUpClick}
+        handleChevronDownClick={handleChevronDownClick}
+        isOnline={isOnline}
+        goOffline={goOffline}
+        setShowBookGigsPopup={setShowBookGigsPopup}
+        todayEarnings={todayEarnings}
+        todayTrips={todayTrips}
+        todayHoursWorked={todayHoursWorked}
+        todayGigsCount={todayGigsCount}
+        weekEndDate={weekEndDate}
+        isOfferLive={isOfferLive}
+        earningsGuaranteeTarget={earningsGuaranteeTarget}
+        earningsGuaranteeOrdersTarget={earningsGuaranteeOrdersTarget}
+        earningsGuaranteeCurrentOrders={earningsGuaranteeCurrentOrders}
+        earningsGuaranteeCurrentEarnings={earningsGuaranteeCurrentEarnings}
+        ordersProgress={ordersProgress}
+        earningsProgress={earningsProgress}
+        referralBonusBg={referralBonusBg}
+        navigate={navigate}
+        formatCurrency={formatCurrency}
+        formatHours={formatHours}
+        onGoOnline={() => {
+          if (isOnline) {
+            goOffline();
+          } else {
+            setShowBookGigsPopup(true);
+          }
+        }}
+      />
 
-            {/* Unlock Offer Card */}
-            <motion.div initial={{
-              opacity: 0,
-              y: -10
-            }} animate={{
-              opacity: 1,
-              y: 0
-            }} transition={{
-              duration: 0.3,
-              delay: 0.1
-            }} className="w-full rounded-xl p-6 shadow-lg bg-black text-white">
-              <div className="flex items-center text-center justify-center gap-2 mb-2">
-                <div className="text-4xl font-bold text-center">₹100</div>
-                <Lock className="w-5 h-5 text-white" />
-              </div>
-              <p className="text-white/90 text-center text-sm mb-4">Complete 1 order to unlock ₹100</p>
-              <div className="flex items-center text-center justify-center gap-2 text-white/70 text-xs mb-4">
-                <Clock className="w-4 h-4" />
-                <span className="text-center">Valid till 10 December 2025</span>
-              </div>
-              <button onClick={() => {
-                if (isOnline) {
-                  goOffline();
-                } else {
-                  // Always show the popup when offline (same as navbar behavior)
-                  setShowBookGigsPopup(true);
-                }
-              }} className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-lg flex items-center justify-center gap-2 transition-colors">
-                <span>Go online</span>
-                <ArrowRight className="w-5 h-5" />
-              </button>
-            </motion.div>
-
-              {/* Earnings Guarantee Card */}
-              <motion.div initial={{
-            opacity: 0,
-            y: -10
-          }} animate={{
-            opacity: 1,
-            y: 0
-          }} transition={{
-            duration: 0.3,
-            delay: 0.25
-          }} className="w-full rounded-xl overflow-hidden shadow-lg bg-white">
-                {/* Header */}
-                <div className="border-b  border-gray-100">
-                  <div className="flex p-2 px-3 items-center justify-between bg-black">
-                    <div className="flex-1">
-                      <h2 className="text-lg font-bold text-white mb-1">Earnings Guarantee</h2>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm text-white">Valid till {weekEndDate}</span>
-                        {isOfferLive && <div className="flex items-center gap-1">
-                            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                            <span className="text-sm text-green-600 font-medium">Live</span>
-                          </div>}
-                      </div>
-                    </div>
-                    {/* Summary Box */}
-                    <div className="bg-black text-white px-4 py-3 rounded-lg text-center min-w-[80px]">
-                      <div className="text-2xl font-bold">₹{earningsGuaranteeTarget.toFixed(0)}</div>
-                      <div className="text-xs text-white/80 mt-1">{earningsGuaranteeOrdersTarget} orders</div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Progress Circles */}
-                <div className="px-6 py-6">
-                  <div className="flex items-center justify-around gap-6">
-                    {/* Orders Progress Circle */}
-                    <motion.div initial={{
-                  scale: 0.8,
-                  opacity: 0
-                }} animate={{
-                  scale: 1,
-                  opacity: 1
-                }} transition={{
-                  delay: 0.4,
-                  duration: 0.5,
-                  type: "spring"
-                }} className="flex flex-col items-center">
-                      <div className="relative w-32 h-32">
-                        <svg className="w-32 h-32 transform -rotate-90" viewBox="0 0 120 120">
-                          {/* Background circle */}
-                          <circle cx="60" cy="60" r="50" fill="none" stroke="#e5e7eb" strokeWidth="8" />
-                          {/* Progress circle */}
-                          <motion.circle cx="60" cy="60" r="50" fill="none" stroke="#000000" strokeWidth="8" strokeLinecap="round" initial={{
-                        pathLength: 0
-                      }} animate={{
-                        pathLength: ordersProgress
-                      }} transition={{
-                        delay: 0.6,
-                        duration: 1,
-                        ease: "easeOut"
-                      }} />
-                        </svg>
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <span className="text-xl font-bold text-gray-900">{earningsGuaranteeCurrentOrders} of {earningsGuaranteeOrdersTarget || 0}</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 mt-3">
-                        <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                        <span className="text-sm font-medium text-gray-700">Orders</span>
-                      </div>
-                    </motion.div>
-
-                    {/* Earnings Progress Circle */}
-                    <motion.div initial={{
-                  scale: 0.8,
-                  opacity: 0
-                }} animate={{
-                  scale: 1,
-                  opacity: 1
-                }} transition={{
-                  delay: 0.5,
-                  duration: 0.5,
-                  type: "spring"
-                }} className="flex flex-col items-center">
-                      <div className="relative w-32 h-32">
-                        <svg className="w-32 h-32 transform -rotate-90" viewBox="0 0 120 120">
-                          {/* Background circle */}
-                          <circle cx="60" cy="60" r="50" fill="none" stroke="#e5e7eb" strokeWidth="8" />
-                          {/* Progress circle */}
-                          <motion.circle cx="60" cy="60" r="50" fill="none" stroke="#000000" strokeWidth="8" strokeLinecap="round" initial={{
-                        pathLength: 0
-                      }} animate={{
-                        pathLength: earningsProgress
-                      }} transition={{
-                        delay: 0.7,
-                        duration: 1,
-                        ease: "easeOut"
-                      }} />
-                        </svg>
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <span className="text-lg font-bold text-gray-900">₹{earningsGuaranteeCurrentEarnings.toFixed(2)}</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 mt-3">
-                        <IndianRupee className="w-5 h-5 text-gray-700" />
-                        <span className="text-sm font-medium text-gray-700">Earnings</span>
-                      </div>
-                    </motion.div>
-                  </div>
-                </div>
-              </motion.div>
-
-  {/* Today's Progress Card */ }
-  <motion.div initial={{
-    opacity: 0,
-    y: -10
-  }} animate={{
-    opacity: 1,
-    y: 0
-  }} transition={{
-    duration: 0.3,
-    delay: 0.3
-  }} className="w-full rounded-xl overflow-hidden shadow-lg bg-white">
-    {/* Header */}
-    <div className="bg-black px-4 py-3 flex items-center gap-3">
-      <div className="relative">
-        <Calendar className="w-5 h-5 text-white" />
-        <CheckCircle className="w-3 h-3 text-green-500 absolute -top-1 -right-1 bg-white rounded-full" fill="currentColor" />
-      </div>
-      <span className="text-white font-semibold">Today's progress</span>
-    </div>
-
-    {/* Content */}
-    <div className="p-4">
-      {/* Grid Layout - 2x2 */}
-      <div className="grid grid-cols-2 gap-4">
-        {/* Top Left - Earnings */}
-        <button onClick={() => navigate("/delivery/earnings")} className="flex flex-col items-start gap-1 hover:opacity-80 transition-opacity">
-          <span className="text-2xl font-bold text-gray-900">
-            {formatCurrency(todayEarnings)}
-          </span>
-          <div className="flex items-center gap-1 text-sm text-gray-600">
-            <span>Earnings</span>
-            <ArrowRight className="w-4 h-4" />
-          </div>
-        </button>
-
-        {/* Top Right - Trips */}
-        <button onClick={() => navigate("/delivery/trip-history")} className="flex flex-col items-end gap-1 hover:opacity-80 transition-opacity">
-          <span className="text-2xl font-bold text-gray-900">
-            {todayTrips}
-          </span>
-          <div className="flex items-center gap-1 text-sm text-gray-600">
-            <span>Trips</span>
-            <ArrowRight className="w-4 h-4" />
-          </div>
-        </button>
-
-        {/* Bottom Left - Time on orders */}
-        <button onClick={() => navigate("/delivery/time-on-orders")} className="flex flex-col items-start gap-1 hover:opacity-80 transition-opacity">
-          <span className="text-2xl font-bold text-gray-900">
-            {`${formatHours(todayHoursWorked)} hrs`}
-          </span>
-          <div className="flex items-center gap-1 text-sm text-gray-600">
-            <span>Time on orders</span>
-            <ArrowRight className="w-4 h-4" />
-          </div>
-        </button>
-
-        {/* Bottom Right - Gigs History */}
-        <button onClick={() => navigate("/delivery/gig")} className="flex flex-col items-end gap-1 hover:opacity-80 transition-opacity">
-          <span className="text-2xl font-bold text-gray-900">
-            {`${todayGigsCount} Gigs`}
-          </span>
-          <div className="flex items-center gap-1 text-sm text-gray-600">
-            <span>History</span>
-            <ArrowRight className="w-4 h-4" />
-          </div>
-        </button>
-      </div>
-    </div>
-  </motion.div>
-            </div >
-          </motion.div >
-        </>}
-
-{/* Help Popup */ }
-<BottomPopup isOpen={showHelpPopup} onClose={() => setShowHelpPopup(false)} title="How can we help?" showCloseButton={true} closeOnBackdropClick={true} maxHeight="70vh">
-  <div className="py-2">
-    {helpOptions.map(option => <button key={option.id} onClick={() => handleHelpOptionClick(option)} className="w-full flex items-center gap-4 p-4 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0">
-      {/* Icon */}
-      <div className="shrink-0 w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center">
-        {option.icon === "helpCenter" && <HelpCircle className="w-6 h-6 text-gray-700" />}
-        {option.icon === "ticket" && <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
-        </svg>}
-        {option.icon === "idCard" && <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2" />
-        </svg>}
-        {option.icon === "language" && <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
-        </svg>}
-      </div>
-
-      {/* Text Content */}
-      <div className="flex-1 text-left">
-        <h3 className="text-base font-semibold text-gray-900 mb-1">{option.title}</h3>
-        <p className="text-sm text-gray-600">{option.subtitle}</p>
-      </div>
-
-      {/* Arrow Icon */}
-      <ArrowRight className="w-5 h-5 text-gray-400 shrink-0" />
-    </button>)}
-  </div>
-</BottomPopup>
-
-{/* Emergency Help Popup */ }
-<BottomPopup isOpen={showEmergencyPopup} onClose={() => setShowEmergencyPopup(false)} title="Emergency help" showCloseButton={true} closeOnBackdropClick={true} maxHeight="70vh">
-  <div className="py-2">
-    {emergencyOptions.map((option, index) => <button key={option.id} onClick={() => handleEmergencyOptionClick(option)} className="w-full flex items-center gap-4 p-4 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0">
-      {/* Icon */}
-      <div className="shrink-0 w-14 h-14 rounded-lg flex items-center justify-center">
-        {option.icon === "ambulance" && <div className="w-14 h-14 bg-white rounded-lg flex items-center justify-center shadow-sm border border-gray-200 relative overflow-hidden">
-          {/* Ambulance vehicle */}
-          <div className="absolute inset-0 bg-blue-500"></div>
-          {/* Red and blue lights on roof */}
-          <div className="absolute top-1 left-2 w-2 h-3 bg-red-500 rounded-sm"></div>
-          <div className="absolute top-1 right-2 w-2 h-3 bg-blue-500 rounded-sm"></div>
-          {/* Star of Life emblem */}
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 bg-white rounded-full flex items-center justify-center">
-            <svg className="w-6 h-6 text-blue-600" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M12 2L2 7v10l10 5 10-5V7l-10-5zm0 2.18l8 4v7.64l-8 4-8-4V8.18l8-4z" />
-              <path d="M12 8L6 11v6l6 3 6-3v-6l-6-3z" />
-            </svg>
-          </div>
-          {/* AMBULANCE text */}
-          <div className="absolute bottom-1 left-0 right-0 text-[6px] font-bold text-white text-center">AMBULANCE</div>
-        </div>}
-        {option.icon === "siren" && <div className="w-14 h-14 bg-white rounded-lg flex items-center justify-center shadow-sm border border-gray-200 relative">
-          {/* Red siren dome */}
-          <div className="w-10 h-10 bg-red-500 rounded-full flex items-center justify-center relative">
-            {/* Yellow light rays */}
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-12 h-12 border-2 border-yellow-400 rounded-full animate-pulse"></div>
-            </div>
-            {/* Phone icon inside */}
-            <Phone className="w-5 h-5 text-yellow-400 z-10" />
-          </div>
-        </div>}
-        {option.icon === "police" && <div className="w-14 h-14 bg-white rounded-lg flex items-center justify-center shadow-sm border border-gray-200">
-          {/* Police officer bust */}
-          <div className="relative">
-            {/* Head */}
-            <div className="w-10 h-10 bg-gray-300 rounded-full"></div>
-            {/* Cap */}
-            <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-8 h-4 bg-amber-700 rounded-t-lg"></div>
-            {/* Cap peak */}
-            <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-10 h-1 bg-amber-800"></div>
-            {/* Mustache */}
-            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-6 h-2 bg-gray-800 rounded-full"></div>
-          </div>
-        </div>}
-        {option.icon === "insurance" && <div className="w-14 h-14 bg-yellow-400 rounded-lg flex items-center justify-center shadow-sm border border-gray-200 relative">
-          {/* Card shape */}
-          <div className="w-12 h-8 bg-white rounded-sm relative">
-            {/* Red heart and cross on left */}
-            <div className="absolute left-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
-              <svg className="w-3 h-3 text-red-500" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
-              </svg>
-              <div className="w-0.5 h-3 bg-red-500"></div>
-            </div>
-          </div>
-        </div>}
-      </div>
-
-      {/* Text Content */}
-      <div className="flex-1 text-left">
-        <h3 className="text-base font-semibold text-gray-900 mb-1">{option.title}</h3>
-        <p className="text-sm text-gray-600">{option.subtitle}</p>
-      </div>
-
-      {/* Arrow Icon */}
-      <ArrowRight className="w-5 h-5 text-gray-400 flex-shrink-0" />
-    </button>)}
-  </div>
-</BottomPopup>
-
-{/* Book Gigs Popup */ }
-<BottomPopup isOpen={showBookGigsPopup} onClose={() => setShowBookGigsPopup(false)} title="Book gigs to go online" showCloseButton={true} closeOnBackdropClick={true} maxHeight="auto">
-  <div className="py-4">
-    {/* Gig Details Card */}
-    <div className="mb-6 rounded-lg overflow-hidden shadow-sm border border-gray-200">
-      {/* Header - Teal background */}
-      <div className="bg-teal-100 px-4 py-3 flex items-center gap-3">
-        <div className="w-8 h-8 bg-teal-600 rounded-full flex items-center justify-center">
-          <span className="text-white font-bold text-sm">g</span>
-        </div>
-        <span className="text-teal-700 font-semibold">Gig details</span>
-      </div>
-
-      {/* Body - White background */}
-      <div className="bg-white px-4 py-4">
-        <p className="text-gray-900 text-sm">Gig booking open in your zone</p>
-      </div>
-    </div>
-
-    {/* Description */}
-    <p className="text-gray-900 text-sm mb-6">
-      Book your Gigs now to go online and start delivering orders
-    </p>
-
-    {/* Book Gigs Button */}
-    <button onClick={() => {
-      setShowBookGigsPopup(false);
-      navigate("/delivery/gig");
-    }} className="w-full bg-black hover:bg-gray-800 text-white font-semibold py-4 rounded-lg transition-colors">
-      Book gigs
-    </button>
-  </div>
-</BottomPopup>
+<DeliveryPopups
+  showHelpPopup={showHelpPopup}
+  setShowHelpPopup={setShowHelpPopup}
+  helpOptions={helpOptions}
+  handleHelpOptionClick={handleHelpOptionClick}
+  showEmergencyPopup={showEmergencyPopup}
+  setShowEmergencyPopup={setShowEmergencyPopup}
+  emergencyOptions={emergencyOptions}
+  handleEmergencyOptionClick={handleEmergencyOptionClick}
+  showBookGigsPopup={showBookGigsPopup}
+  setShowBookGigsPopup={setShowBookGigsPopup}
+  navigate={navigate}
+/>
 
 {/* New Order Popup with Countdown Timer - Custom Implementation */ }
 <AnimatePresence>
