@@ -95,6 +95,15 @@ export default function DeliverymanList() {
     return deliverymen
   }, [deliverymen])
 
+  // Client-side pagination (20 per page)
+  const pageSize = 20
+  const [currentPage, setCurrentPage] = useState(1)
+  const totalPages = Math.max(1, Math.ceil(filteredDeliverymen.length / pageSize))
+  const paginatedDeliverymen = useMemo(() => {
+    const start = (currentPage - 1) * pageSize
+    return filteredDeliverymen.slice(start, start + pageSize)
+  }, [filteredDeliverymen, currentPage])
+
   const handleView = async (deliveryman) => {
     try {
       setLoading(true)
@@ -254,7 +263,7 @@ export default function DeliverymanList() {
           )}
 
           {/* Table */}
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto no-scrollbar">
             {loading ? (
               <div className="flex items-center justify-center py-20">
                 <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
@@ -325,11 +334,13 @@ export default function DeliverymanList() {
                       </td>
                     </tr>
                   ) : (
-                    filteredDeliverymen.map((dm) => (
+                    paginatedDeliverymen.map((dm, index) => (
                       <tr key={dm._id} className="hover:bg-slate-50 transition-colors">
                         {visibleColumns.si && (
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <span className="text-sm font-medium text-slate-700">{dm.sl}</span>
+                            <span className="text-sm font-medium text-slate-700">
+                              {(currentPage - 1) * pageSize + index + 1}
+                            </span>
                           </td>
                         )}
                         {visibleColumns.name && (
@@ -411,6 +422,33 @@ export default function DeliverymanList() {
                   )}
                 </tbody>
               </table>
+            )}
+
+            {/* Pagination controls */}
+            {filteredDeliverymen.length > 0 && (
+              <div className="mt-4 flex items-center justify-between text-sm text-slate-700">
+                <span>
+                  Page {currentPage} of {totalPages}
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="px-3 py-1 rounded border border-slate-300 bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Previous
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    className="px-3 py-1 rounded border border-slate-300 bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
             )}
           </div>
         </div>

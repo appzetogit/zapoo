@@ -61,8 +61,6 @@ export default function PocketPage() {
   const [bankDetailsFilled, setBankDetailsFilled] = useState(false);
   const [dashboardData, setDashboardData] = useState(null);
   const [dashboardLoading, setDashboardLoading] = useState(true);
-  const [activeEarningAddon, setActiveEarningAddon] = useState(null);
-  const [earningAddonLoading, setEarningAddonLoading] = useState(true);
 
   const { isOnline, bookedGigs, goOnline, goOffline } = useGigStore();
   const { getDateData, hasDateData } = useProgressStore();
@@ -154,83 +152,6 @@ export default function PocketPage() {
     }).length;
   };
   const weeklyOrders = calculateWeeklyOrders();
-
-  // Fetch active earning addon offers
-  useEffect(() => {
-    const fetchActiveEarningAddons = async () => {
-      try {
-        setEarningAddonLoading(true);
-        const response = await deliveryAPI.getActiveEarningAddons();
-        if (response?.data?.success && response?.data?.data?.activeOffers) {
-          const offers = response.data.data.activeOffers;
-          const activeOffer =
-            offers.find((offer) => offer.isValid) ||
-            offers.find((offer) => offer.isUpcoming) ||
-            offers.find((offer) => offer.status === "active") ||
-            offers[0] ||
-            null;
-          setActiveEarningAddon(activeOffer);
-        } else {
-          setActiveEarningAddon(null);
-        }
-      } catch (error) {
-        if (error.code !== "ECONNABORTED" && !error.message?.includes("timeout")) {
-          console.warn("Active offers fetch failed:", error.message);
-        }
-        setActiveEarningAddon(null);
-      } finally {
-        setEarningAddonLoading(false);
-      }
-    };
-
-    fetchActiveEarningAddons();
-    const refreshInterval = setInterval(fetchActiveEarningAddons, 3000);
-    return () => clearInterval(refreshInterval);
-  }, []);
-
-  // Calculate bonus earnings
-  const calculateBonusEarnings = () => {
-    if (!activeEarningAddon || !walletState?.transactions) return 0;
-    const startDate = activeEarningAddon.startDate ? new Date(activeEarningAddon.startDate) : null;
-    const endDate = activeEarningAddon.endDate ? new Date(activeEarningAddon.endDate) : null;
-    return walletState.transactions
-      .filter((t) => {
-        if (t.type !== "earning_addon" || t.status !== "Completed") return false;
-        if (startDate || endDate) {
-          const transactionDate = t.date ? new Date(t.date) : t.createdAt ? new Date(t.createdAt) : null;
-          if (!transactionDate) return false;
-          if (startDate && transactionDate < startDate) return false;
-          if (endDate && transactionDate > endDate) return false;
-        }
-        if (t.metadata?.earningAddonId) {
-          const id = activeEarningAddon._id?.toString() || activeEarningAddon.id?.toString();
-          return t.metadata.earningAddonId === id;
-        }
-        return true;
-      })
-      .reduce((sum, t) => sum + (t.amount || 0), 0);
-  };
-
-  const earningsGuaranteeTarget = activeEarningAddon?.earningAmount || 0;
-  const earningsGuaranteeOrdersTarget = activeEarningAddon?.requiredOrders || 0;
-  const earningsGuaranteeCurrentOrders = activeEarningAddon ? activeEarningAddon.currentOrders ?? weeklyOrders : 0;
-  const earningsGuaranteeCurrentEarnings = activeEarningAddon ? calculateBonusEarnings() : 0;
-  const ordersProgress =
-    earningsGuaranteeOrdersTarget > 0 ? Math.min(earningsGuaranteeCurrentOrders / earningsGuaranteeOrdersTarget, 1) : 0;
-  const earningsProgress =
-    earningsGuaranteeTarget > 0 ? Math.min(earningsGuaranteeCurrentEarnings / earningsGuaranteeTarget, 1) : 0;
-
-  const weekEndDate = useMemo(() => {
-    if (activeEarningAddon?.endDate) {
-      const date = new Date(activeEarningAddon.endDate);
-      return `${date.getDate()} ${date.toLocaleString("en-US", { month: "short" })}`;
-    }
-    const endOfWeek = new Date();
-    endOfWeek.setDate(endOfWeek.getDate() - endOfWeek.getDay() + 6);
-    return `${endOfWeek.getDate()} ${endOfWeek.toLocaleString("en-US", { month: "short" })}`;
-  }, [activeEarningAddon]);
-
-  const isOfferLive = activeEarningAddon?.isValid || activeEarningAddon?.isUpcoming || false;
 
   const totalBonus =
     walletState?.transactions
@@ -434,77 +355,6 @@ export default function PocketPage() {
             <div className="text-black text-3xl font-bold">₹{weeklyEarnings.toFixed(0)}</div>
           </CardContent>
         </Card>
-
-        {/* Earnings Guarantee Card */}
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: 0.25 }}
-          className="w-full rounded-xl overflow-hidden bg-white mb-4"
-        >
-          <div className="border-b border-gray-100">
-            <div className="flex p-2 px-3 items-center justify-between bg-[#DC2626]">
-              <div className="flex-1">
-                <h2 className="text-lg font-bold text-white mb-1">Earnings Guarantee</h2>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-white">Valid till {weekEndDate}</span>
-                  {isOfferLive && (
-                    <div className="flex items-center gap-1">
-                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                      <span className="text-sm text-white font-medium">Live</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div className="bg-white/10 text-white px-4 py-3 rounded-lg text-center min-w-[80px]">
-                <div className="text-2xl font-bold">₹{earningsGuaranteeTarget.toFixed(0)}</div>
-                <div className="text-xs text-white/80 mt-1">{earningsGuaranteeOrdersTarget} orders</div>
-              </div>
-            </div>
-          </div>
-
-          <div className="px-6 py-6 border-b border-gray-100">
-            <div className="flex items-center justify-around gap-6">
-              <div className="flex flex-col items-center">
-                <div className="relative w-32 h-32">
-                  <svg className="w-32 h-32 transform -rotate-90" viewBox="0 0 120 120">
-                    <circle cx="60" cy="60" r="50" fill="none" stroke="#e5e7eb" strokeWidth="8" />
-                    <motion.circle
-                      cx="60" cy="60" r="50" fill="none" stroke="#DC2626" strokeWidth="8" strokeLinecap="round"
-                      initial={{ pathLength: 0 }}
-                      animate={{ pathLength: ordersProgress }}
-                      transition={{ duration: 1 }}
-                    />
-                  </svg>
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-xl font-bold text-gray-900">
-                      {earningsGuaranteeCurrentOrders} of {earningsGuaranteeOrdersTarget}
-                    </span>
-                  </div>
-                </div>
-                <span className="text-sm font-medium text-gray-700 mt-2">Orders</span>
-              </div>
-
-              <div className="flex flex-col items-center">
-                <div className="relative w-32 h-32">
-                  <svg className="w-32 h-32 transform -rotate-90" viewBox="0 0 120 120">
-                    <circle cx="60" cy="60" r="50" fill="none" stroke="#e5e7eb" strokeWidth="8" />
-                    <motion.circle
-                      cx="60" cy="60" r="50" fill="none" stroke="#DC2626" strokeWidth="8" strokeLinecap="round"
-                      initial={{ pathLength: 0 }}
-                      animate={{ pathLength: earningsProgress }}
-                      transition={{ duration: 1 }}
-                    />
-                  </svg>
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-lg font-bold text-gray-900">₹{earningsGuaranteeCurrentEarnings.toFixed(0)}</span>
-                  </div>
-                </div>
-                <span className="text-sm font-medium text-gray-700 mt-2">Bonus</span>
-              </div>
-            </div>
-          </div>
-        </motion.div>
 
         <div className="my-6">
           <div className="relative mb-4">

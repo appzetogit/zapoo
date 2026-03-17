@@ -158,11 +158,14 @@ export default function ProtectedRoute({ children, requiredRole, loginPath }) {
     }
   }
 
-  if (requiredRole === 'restaurant') {
+  if (requiredRole === "restaurant") {
+    const path = location.pathname;
+    const isOnboarding = path.startsWith("/restaurant/onboarding");
+
     return (
       <div className="theme-blue h-full w-full">
         {children}
-        <NoPlanPopup />
+        {!isOnboarding && <NoPlanPopup />}
       </div>
     );
   }

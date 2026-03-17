@@ -38,6 +38,8 @@ export default function DeliveryEarnings() {
     toDate: ''
   })
   const [deliveryPartners, setDeliveryPartners] = useState([])
+  const [showPeriodDropdown, setShowPeriodDropdown] = useState(false)
+  const [showDeliveryDropdown, setShowDeliveryDropdown] = useState(false)
 
   // Fetch delivery partners for filter dropdown
   const fetchDeliveryPartners = useCallback(async () => {
@@ -239,31 +241,111 @@ export default function DeliveryEarnings() {
         {/* Filters */}
         <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-4 mb-4">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
+            <div className="relative">
               <label className="block text-sm font-medium text-slate-700 mb-2">Period</label>
-              <select
-                value={filters.period}
-                onChange={(e) => handleFilterChange('period', e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF5200]"
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPeriodDropdown((prev) => !prev)
+                  setShowDeliveryDropdown(false)
+                }}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white flex items-center justify-between text-left text-sm focus:outline-none focus:ring-2 focus:ring-[#FF5200]"
               >
-                <option value="all">All Time</option>
-                <option value="today">Today</option>
-                <option value="week">This Week</option>
-                <option value="month">This Month</option>
-              </select>
+                <span className="text-slate-900">
+                  {filters.period === 'today'
+                    ? 'Today'
+                    : filters.period === 'week'
+                    ? 'This Week'
+                    : filters.period === 'month'
+                    ? 'This Month'
+                    : 'All Time'}
+                </span>
+                <ChevronDown
+                  className={`w-4 h-4 text-slate-500 transition-transform ${
+                    showPeriodDropdown ? 'rotate-180' : ''
+                  }`}
+                />
+              </button>
+              {showPeriodDropdown && (
+                <div className="absolute left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-20">
+                  {[
+                    { value: 'all', label: 'All Time' },
+                    { value: 'today', label: 'Today' },
+                    { value: 'week', label: 'This Week' },
+                    { value: 'month', label: 'This Month' },
+                  ].map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => {
+                        handleFilterChange('period', option.value)
+                        setShowPeriodDropdown(false)
+                      }}
+                      className={`w-full text-left px-3 py-2 text-sm hover:bg-slate-50 ${
+                        filters.period === option.value ? 'bg-slate-50 font-semibold' : ''
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
-            <div>
+            <div className="relative">
               <label className="block text-sm font-medium text-slate-700 mb-2">Delivery Boy</label>
-              <select
-                value={filters.deliveryPartnerId}
-                onChange={(e) => handleFilterChange('deliveryPartnerId', e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF5200]"
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDeliveryDropdown((prev) => !prev)
+                  setShowPeriodDropdown(false)
+                }}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white flex items-center justify-between text-left text-sm focus:outline-none focus:ring-2 focus:ring-[#FF5200]"
               >
-                <option value="">All Delivery Boys</option>
-                {deliveryPartners.map(dp => (
-                  <option key={dp._id} value={dp._id}>{dp.name}</option>
-                ))}
-              </select>
+                <span className="text-slate-900">
+                  {filters.deliveryPartnerId
+                    ? (() => {
+                        const dp = deliveryPartners.find((p) => p._id === filters.deliveryPartnerId)
+                        return dp ? `${dp.name} (${dp.deliveryId || 'ID'})` : 'Selected Delivery Boy'
+                      })()
+                    : 'All Delivery Boys'}
+                </span>
+                <ChevronDown
+                  className={`w-4 h-4 text-slate-500 transition-transform ${
+                    showDeliveryDropdown ? 'rotate-180' : ''
+                  }`}
+                />
+              </button>
+              {showDeliveryDropdown && (
+                <div className="absolute left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-20 max-h-64 overflow-y-auto">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleFilterChange('deliveryPartnerId', '')
+                      setShowDeliveryDropdown(false)
+                    }}
+                    className={`w-full text-left px-3 py-2 text-sm hover:bg-slate-50 ${
+                      !filters.deliveryPartnerId ? 'bg-slate-50 font-semibold' : ''
+                    }`}
+                  >
+                    All Delivery Boys
+                  </button>
+                  {deliveryPartners.map((dp) => (
+                    <button
+                      key={dp._id}
+                      type="button"
+                      onClick={() => {
+                        handleFilterChange('deliveryPartnerId', dp._id)
+                        setShowDeliveryDropdown(false)
+                      }}
+                      className={`w-full text-left px-3 py-2 text-sm hover:bg-slate-50 ${
+                        filters.deliveryPartnerId === dp._id ? 'bg-slate-50 font-semibold' : ''
+                      }`}
+                    >
+                      {dp.name} {dp.deliveryId ? `(${dp.deliveryId})` : ''}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">From Date</label>

@@ -30,8 +30,6 @@ const DeliverySwipeBar = ({
   earningsGuaranteeCurrentEarnings,
   ordersProgress,
   earningsProgress,
-  referralBonusBg,
-  navigate,
   formatCurrency,
   formatHours,
   onGoOnline
@@ -103,28 +101,7 @@ const DeliverySwipeBar = ({
           <div className="flex-1 overflow-hidden flex flex-col">
             <div
               className="flex flex-col gap-4 p-4 pb-24 overflow-y-auto max-h-[calc(100vh-80px)]"
-              // homeSectionsScrollRef is no longer a prop, remove ref
             >
-              {/* Referral Bonus Banner */}
-              <div 
-                className="relative bg-emerald-600 rounded-3xl p-6 overflow-hidden min-h-[160px] flex flex-col justify-between cursor-pointer group hover:scale-[0.99] transition-transform"
-                onClick={() => navigate('/referral')}
-              >
-                <div 
-                  className="absolute inset-0 opacity-20"
-                  style={{ backgroundImage: `url(${referralBonusBg})`, backgroundSize: 'cover' }}
-                />
-                <div className="relative z-10">
-                  <p className="text-white/80 font-medium mb-1">Referral Bonus</p>
-                  <h3 className="text-white text-2xl font-bold flex items-center gap-2">
-                    Earn up to <IndianRupee className="w-6 h-6" />5,000
-                  </h3>
-                </div>
-                <div className="relative z-10 flex items-center gap-2 text-white/90 font-medium">
-                  Invite your friends <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                </div>
-              </div>
-
               {/* Unlock Offer Card */}
               <Card className="rounded-3xl border-none shadow-md overflow-hidden bg-blue-50">
                 <CardContent className="p-6">

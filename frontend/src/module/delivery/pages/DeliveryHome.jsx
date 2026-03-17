@@ -21,7 +21,6 @@ import { getGoogleMapsApiKey } from "@/lib/utils/googleMapsApiKey";
 import { useCompanyName } from "@/lib/hooks/useCompanyName";
 import { Loader } from "@googlemaps/js-api-loader";
 import { decodePolyline, extractPolylineFromDirections, findNearestPointOnPolyline, trimPolylineBehindRider, calculateBearing, animateMarker, calculateDistance } from "../utils/liveTrackingPolyline";
-import referralBonusBg from "../../../assets/referralbonuscardbg.png";
 // import dropLocationBanner from "../../../assets/droplocationbanner.png" // File not found - commented out
 import alertSound from "../../../assets/audio/alert.mp3";
 import originalSound from "../../../assets/audio/original.mp3";
@@ -6563,45 +6562,7 @@ export default function DeliveryHome() {
         </div>
       )}
 
-      {/* Swipe Bar Component - Handles both map view swipe bar and full-screen home sections */}
-      <DeliverySwipeBar
-        showHomeSections={showHomeSections}
-        isDraggingSwipeBar={isDraggingSwipeBar}
-        swipeBarPosition={swipeBarPosition}
-        swipeBarRef={swipeBarRef}
-        handleSwipeBarTouchStart={handleSwipeBarTouchStart}
-        handleSwipeBarTouchMove={handleSwipeBarTouchMove}
-        handleSwipeBarTouchEnd={handleSwipeBarTouchEnd}
-        handleSwipeBarMouseDown={handleSwipeBarMouseDown}
-        handleChevronUpClick={handleChevronUpClick}
-        handleChevronDownClick={handleChevronDownClick}
-        isOnline={isOnline}
-        goOffline={goOffline}
-        setShowBookGigsPopup={setShowBookGigsPopup}
-        todayEarnings={todayEarnings}
-        todayTrips={todayTrips}
-        todayHoursWorked={todayHoursWorked}
-        todayGigsCount={todayGigsCount}
-        weekEndDate={weekEndDate}
-        isOfferLive={isOfferLive}
-        earningsGuaranteeTarget={earningsGuaranteeTarget}
-        earningsGuaranteeOrdersTarget={earningsGuaranteeOrdersTarget}
-        earningsGuaranteeCurrentOrders={earningsGuaranteeCurrentOrders}
-        earningsGuaranteeCurrentEarnings={earningsGuaranteeCurrentEarnings}
-        ordersProgress={ordersProgress}
-        earningsProgress={earningsProgress}
-        referralBonusBg={referralBonusBg}
-        navigate={navigate}
-        formatCurrency={formatCurrency}
-        formatHours={formatHours}
-        onGoOnline={() => {
-          if (isOnline) {
-            goOffline();
-          } else {
-            setShowBookGigsPopup(true);
-          }
-        }}
-      />
+      {/* Today's earnings swipe bar has been moved to the profile section */}
 
 <DeliveryPopups
   showHelpPopup={showHelpPopup}

@@ -56,6 +56,10 @@ export default function WeekSelector({ weekStartsOn = 0, onChange, className }) 
       .format(d)
       .replace(" ", " ");
 
+  // Pre-compute standard ranges for highlighting active pill
+  const thisWeekRange = computeRange(new Date());
+  const lastWeekRange = computeRange(addDays(new Date(), -7));
+
   return (
     <div className={cn("w-full", className)}>
       {/* Pills */}
@@ -65,7 +69,7 @@ export default function WeekSelector({ weekStartsOn = 0, onChange, className }) 
           onClick={setThisWeek}
           className={cn(
             "rounded-md px-2 h-10 text-base",
-            isSameRange(range, computeRange(new Date())) &&
+            isSameRange(range, thisWeekRange) &&
             "bg-red-50 text-[#DC2626] border-red-200"
           )}
         >
@@ -75,7 +79,11 @@ export default function WeekSelector({ weekStartsOn = 0, onChange, className }) 
         <Button
           variant="outline"
           onClick={setLastWeek}
-          className="rounded-md px-2 h-10 text-base"
+          className={cn(
+            "rounded-md px-2 h-10 text-base",
+            isSameRange(range, lastWeekRange) &&
+              "bg-red-50 text-[#DC2626] border-red-200"
+          )}
         >
           Last week
         </Button>
@@ -84,7 +92,12 @@ export default function WeekSelector({ weekStartsOn = 0, onChange, className }) 
           <PopoverTrigger asChild>
             <Button
               variant="outline"
-              className="rounded-md px-2 h-10 text-base inline-flex items-center"
+              className={cn(
+                "rounded-md px-2 h-10 text-base inline-flex items-center",
+                !isSameRange(range, thisWeekRange) &&
+                  !isSameRange(range, lastWeekRange) &&
+                  "bg-red-50 text-[#DC2626] border-red-200"
+              )}
             >
               Select week <ChevronDown className="ml-2 h-4 w-4" />
             </Button>

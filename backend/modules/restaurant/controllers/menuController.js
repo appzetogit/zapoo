@@ -68,6 +68,8 @@ export const updateMenu = asyncHandler(async (req, res) => {
       id: section.id || `section-${index}`,
       name: section.name || "Unnamed Section",
       items: Array.isArray(section.items) ? section.items.map(item => {
+        // If restaurant is marked as pure veg, force all items to Veg
+        const resolvedFoodType = restaurant.isPureVeg ? "Veg" : (item.foodType || "Non-Veg");
         // CRITICAL: Find existing item to preserve approval status fields
         // Find existing item to preserve approval status fields
         const existingItem = existingSection?.items?.find(i => String(i.id) === String(item.id));
@@ -94,7 +96,7 @@ export const updateMenu = asyncHandler(async (req, res) => {
           stock: item.stock || "Unlimited",
           discount: item.discount || null,
           originalPrice: item.originalPrice || null,
-          foodType: item.foodType || "Non-Veg",
+          foodType: resolvedFoodType,
           availabilityTimeStart: item.availabilityTimeStart || "12:01 AM",
           availabilityTimeEnd: item.availabilityTimeEnd || "11:57 PM",
           description: item.description || "",
@@ -142,6 +144,8 @@ export const updateMenu = asyncHandler(async (req, res) => {
           id: subsection.id || `subsection-${Date.now()}`,
           name: subsection.name || "Unnamed Subsection",
           items: Array.isArray(subsection.items) ? subsection.items.map(item => {
+            // If restaurant is marked as pure veg, force all items to Veg
+            const resolvedFoodType = restaurant.isPureVeg ? "Veg" : (item.foodType || "Non-Veg");
             // CRITICAL: Find existing item to preserve approval status fields
             // CRITICAL: Find existing item to preserve approval status fields
             const existingItem = existingSubsection?.items?.find(i => String(i.id) === String(item.id));
@@ -168,7 +172,7 @@ export const updateMenu = asyncHandler(async (req, res) => {
               stock: item.stock || "Unlimited",
               discount: item.discount || null,
               originalPrice: item.originalPrice || null,
-              foodType: item.foodType || "Non-Veg",
+              foodType: resolvedFoodType,
               availabilityTimeStart: item.availabilityTimeStart || "12:01 AM",
               availabilityTimeEnd: item.availabilityTimeEnd || "11:57 PM",
               description: item.description || "",

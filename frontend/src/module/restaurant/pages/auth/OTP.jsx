@@ -18,6 +18,7 @@ export default function RestaurantOTP() {
   const [name, setName] = useState("");
   const [nameError, setNameError] = useState("");
   const [showNameInput, setShowNameInput] = useState(false);
+  const [otpPurpose, setOtpPurpose] = useState(null); // Lock purpose to match OTP that was sent (login vs register)
   const inputRefs = useRef([]);
   useEffect(() => {
     // Get auth data from sessionStorage
@@ -25,6 +26,8 @@ export default function RestaurantOTP() {
     if (stored) {
       const data = JSON.parse(stored);
       setAuthData(data);
+      // Lock purpose to match the OTP that was sent (never change mid-flow)
+      setOtpPurpose(data.isSignUp ? "register" : "login");
 
       // Handle both phone and email
       if (data.method === "email" && data.email) {
@@ -182,7 +185,8 @@ export default function RestaurantOTP() {
       // Determine identifier type (phone or email)
       const phone = authData.method === "phone" ? authData.phone : null;
       const email = authData.method === "email" ? authData.email : null;
-      const purpose = authData.isSignUp ? "register" : "login";
+      // Use locked purpose (matches OTP that was sent) - critical when needsName flips isSignUp
+      const purpose = otpPurpose ?? (authData.isSignUp ? "register" : "login");
 
       // Decide which name to send:
       // - If we're currently showing the name input (either because backend returned needsName
@@ -281,7 +285,7 @@ export default function RestaurantOTP() {
       if (!authData) {
         throw new Error("Session expired. Please go back and try again.");
       }
-      const purpose = authData.isSignUp ? "register" : "login";
+      const purpose = otpPurpose ?? (authData.isSignUp ? "register" : "login");
       const phone = authData.method === "phone" ? authData.phone : null;
       const email = authData.method === "email" ? authData.email : null;
       await restaurantAPI.sendOTP(phone, purpose, email);

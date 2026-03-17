@@ -87,18 +87,17 @@ export default function DeliveryChallenges() {
                         <h2 className="text-2xl font-black text-gray-900 mb-2 leading-tight">Crush Your Targets</h2>
                         <p className="text-sm text-gray-600 mb-4 font-medium italic">"Every delivery gets you closer to a bonus! Rewards are applied automatically when you hit the target."</p>
 
-                        <div className="bg-red-50 rounded-2xl p-4 flex items-center justify-between border border-red-100">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-red-600 rounded-xl flex items-center justify-center">
-                                    <Bike className="w-6 h-6 text-white" />
-                                </div>
-                                <div>
-                                    <div className="text-[10px] text-red-600 font-bold uppercase">This Week</div>
-                                    <div className="text-lg font-black text-gray-900">₹0 Bonuses</div>
-                                </div>
+                    <div className="bg-red-50 rounded-2xl p-4 flex items-center border border-red-100">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-red-600 rounded-xl flex items-center justify-center">
+                                <Bike className="w-6 h-6 text-white" />
                             </div>
-                            <ChevronRight className="w-5 h-5 text-red-300" />
+                            <div>
+                                <div className="text-[10px] text-red-600 font-bold uppercase">This Week</div>
+                                <div className="text-lg font-black text-gray-900">₹0 Bonuses</div>
+                            </div>
                         </div>
+                    </div>
                     </div>
                     {/* Background decoration */}
                     <div className="absolute top-[-10%] right-[-10%] w-32 h-32 bg-red-50 rounded-full" />
@@ -177,13 +176,10 @@ export default function DeliveryChallenges() {
                                             <span className="text-xs font-black text-gray-900 whitespace-nowrap">{progress}/{target}</span>
                                         </div>
 
-                                        <div className="flex items-center justify-between mt-4 pt-4 border-t border-dashed border-gray-100">
+                                        <div className="flex items-center mt-4 pt-4 border-t border-dashed border-gray-100">
                                             <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-400 uppercase">
                                                 <Clock className="w-3.5 h-3.5" />
                                                 Ends {new Date(challenge.endDate).toLocaleDateString()}
-                                            </div>
-                                            <div className="text-[10px] font-black text-red-600 uppercase flex items-center gap-1">
-                                                Go For It <ChevronRight className="w-3 h-3" />
                                             </div>
                                         </div>
                                     </motion.div>

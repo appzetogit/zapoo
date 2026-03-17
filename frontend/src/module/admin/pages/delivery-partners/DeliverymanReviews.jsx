@@ -29,6 +29,15 @@ export default function DeliverymanReviews() {
     const query = searchQuery.toLowerCase().trim();
     return reviews.filter(review => review.deliveryman.toLowerCase().includes(query) || review.customer.toLowerCase().includes(query) || review.review.toLowerCase().includes(query) || review.orderId && review.orderId.toLowerCase().includes(query) || review.deliverymanId && review.deliverymanId.toString().toLowerCase().includes(query));
   }, [reviews, searchQuery]);
+
+  // Client-side pagination (20 per page)
+  const pageSize = 20;
+  const [currentPage, setCurrentPage] = useState(1);
+  const totalPages = Math.max(1, Math.ceil(filteredReviews.length / pageSize));
+  const paginatedReviews = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredReviews.slice(start, start + pageSize);
+  }, [filteredReviews, currentPage]);
   const handleExport = format => {
     if (filteredReviews.length === 0) {
       alert("No data to export");
@@ -189,7 +198,7 @@ export default function DeliverymanReviews() {
           </div>
 
           {/* Table */}
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto no-scrollbar">
             {isLoading ? <div className="flex items-center justify-center py-12">
                 <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
                 <span className="ml-2 text-sm text-slate-600">Loading reviews...</span>
@@ -249,9 +258,11 @@ export default function DeliverymanReviews() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-slate-100">
-                  {filteredReviews.map(review => <tr key={review.sl || review.orderId} className="hover:bg-slate-50 transition-colors">
+                  {paginatedReviews.map((review, index) => <tr key={review.sl || review.orderId} className="hover:bg-slate-50 transition-colors">
                       {visibleColumns.si && <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="text-sm font-medium text-slate-700">{review.sl}</span>
+                          <span className="text-sm font-medium text-slate-700">
+                            {(currentPage - 1) * pageSize + index + 1}
+                          </span>
                         </td>}
                       {visibleColumns.orderId && <td className="px-6 py-4 whitespace-nowrap">
                           <span className="text-sm font-mono text-slate-700">{review.orderId || 'N/A'}</span>
@@ -298,6 +309,33 @@ export default function DeliverymanReviews() {
                     </tr>)}
                 </tbody>
               </table>}
+              
+              {/* Pagination controls */}
+              {filteredReviews.length > 0 && (
+                <div className="mt-4 flex items-center justify-between text-sm text-slate-700">
+                  <span>
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                      className="px-3 py-1 rounded border border-slate-300 bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Previous
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                      className="px-3 py-1 rounded border border-slate-300 bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              )}
           </div>
         </div>
       </div>

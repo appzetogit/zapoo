@@ -84,7 +84,7 @@ export const sendOTP = asyncHandler(async (req, res) => {
       return errorResponse(res, 400, 'Invalid email format');
     }
   }
-  console.log(`[RestaurantAuth] sendOTP requested:`, { phone, email, purpose });
+  console.log(`[RestaurantAuth] sendOTP:`, { purpose, hasPhone: !!phone, hasEmail: !!email });
   try {
     const result = await otpService.generateAndSendOTP(phone || null, purpose, email || null);
     return successResponse(res, 200, result.message, {
@@ -115,7 +115,7 @@ export const verifyOTP = asyncHandler(async (req, res) => {
   if (!phone && !email || !otp) {
     return errorResponse(res, 400, 'Either phone number or email, and OTP are required');
   }
-  console.log(`[RestaurantAuth] verifyOTP requested:`, { phone, email, otp, purpose, name });
+  console.log(`[RestaurantAuth] verifyOTP:`, { purpose, hasPhone: !!phone, hasEmail: !!email });
   try {
     let restaurant;
     // Normalize phone number if provided
@@ -142,8 +142,8 @@ export const verifyOTP = asyncHandler(async (req, res) => {
         return errorResponse(res, 400, 'Restaurant name is required for registration');
       }
 
-      // Verify OTP (phone or email) before creating restaurant
-      await otpService.verifyOTP(phone || null, otp, purpose, email || null);
+      // Verify OTP (pass normalized phone for consistency with storage)
+      await otpService.verifyOTP(normalizedPhone || phone || null, otp, purpose, email || null);
       const restaurantData = {
         name,
         signupMethod: normalizedPhone ? 'phone' : 'email'
@@ -357,16 +357,16 @@ export const verifyOTP = asyncHandler(async (req, res) => {
         if (!restaurant) {
           return errorResponse(res, 404, 'No restaurant account found with this email.');
         }
-        // Verify OTP for password reset
-        await otpService.verifyOTP(phone || null, otp, purpose, email || null);
+        // Verify OTP for password reset (pass normalized phone when applicable)
+        await otpService.verifyOTP(normalizedPhone || phone || null, otp, purpose, email || null);
         return successResponse(res, 200, 'OTP verified. You can now reset your password.', {
           verified: true,
           email: restaurant.email
         });
       }
 
-      // Verify OTP first
-      await otpService.verifyOTP(phone || null, otp, purpose, email || null);
+      // Verify OTP first (pass normalized phone for consistency with storage)
+      await otpService.verifyOTP(normalizedPhone || phone || null, otp, purpose, email || null);
       if (!restaurant) {
         // Auto-register new restaurant after OTP verification
         const restaurantData = {

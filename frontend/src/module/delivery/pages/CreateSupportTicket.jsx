@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2, ChevronDown } from "lucide-react";
 import { deliveryAPI } from "@/lib/api";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,17 @@ export default function CreateSupportTicket() {
     priority: "medium"
   });
   const [errors, setErrors] = useState({});
+  const [showCategoryOptions, setShowCategoryOptions] = useState(false);
+  const [showPriorityOptions, setShowPriorityOptions] = useState(false);
+
+  useEffect(() => {
+    const handleClickOutside = () => {
+      setShowCategoryOptions(false);
+      setShowPriorityOptions(false);
+    };
+    document.addEventListener("click", handleClickOutside);
+    return () => document.removeEventListener("click", handleClickOutside);
+  }, []);
   const validateForm = () => {
     const newErrors = {};
     if (!formData.subject.trim()) {
@@ -171,25 +182,118 @@ export default function CreateSupportTicket() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Category
               </label>
-              <select value={formData.category} onChange={e => handleInputChange("category", e.target.value)} className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#DC2626] focus:border-[#DC2626] bg-white appearance-none cursor-pointer">
-                <option value="other">Other</option>
-                <option value="payment">Payment</option>
-                <option value="account">Account</option>
-                <option value="technical">Technical</option>
-                <option value="order">Order</option>
-              </select>
+              <div
+                className="relative"
+                onClick={(e) => {
+                  // prevent outer document click handler from immediately closing
+                  e.stopPropagation();
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCategoryOptions((prev) => !prev);
+                    setShowPriorityOptions(false);
+                  }}
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#DC2626] focus:border-[#DC2626] bg-white cursor-pointer flex items-center justify-between text-left"
+                >
+                  <span className="text-sm text-gray-900">
+                    {formData.category === "payment"
+                      ? "Payment"
+                      : formData.category === "account"
+                      ? "Account"
+                      : formData.category === "technical"
+                      ? "Technical"
+                      : formData.category === "order"
+                      ? "Order"
+                      : "Other"}
+                  </span>
+                  <ChevronDown
+                    className={`w-4 h-4 text-gray-500 transition-transform ${
+                      showCategoryOptions ? "rotate-180" : ""
+                    }`}
+                  />
+                </button>
+                {showCategoryOptions && (
+                  <div className="absolute left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 max-h-60 overflow-y-auto">
+                    {[
+                      { value: "other", label: "Other" },
+                      { value: "payment", label: "Payment" },
+                      { value: "account", label: "Account" },
+                      { value: "technical", label: "Technical" },
+                      { value: "order", label: "Order" }
+                    ].map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => {
+                          handleInputChange("category", option.value);
+                          setShowCategoryOptions(false);
+                        }}
+                        className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${
+                          formData.category === option.value ? "bg-gray-50 font-medium" : ""
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Priority
               </label>
-              <select value={formData.priority} onChange={e => handleInputChange("priority", e.target.value)} className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#DC2626] focus:border-[#DC2626] bg-white appearance-none cursor-pointer">
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-                <option value="urgent">Urgent</option>
-              </select>
+              <div
+                className="relative"
+                onClick={(e) => {
+                  e.stopPropagation();
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowPriorityOptions((prev) => !prev);
+                    setShowCategoryOptions(false);
+                  }}
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#DC2626] focus:border-[#DC2626] bg-white cursor-pointer flex items-center justify-between text-left"
+                >
+                  <span className="text-sm text-gray-900 capitalize">
+                    {formData.priority || "Select priority"}
+                  </span>
+                  <ChevronDown
+                    className={`w-4 h-4 text-gray-500 transition-transform ${
+                      showPriorityOptions ? "rotate-180" : ""
+                    }`}
+                  />
+                </button>
+                {showPriorityOptions && (
+                  <div className="absolute left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 max-h-60 overflow-y-auto">
+                    {[
+                      { value: "low", label: "Low" },
+                      { value: "medium", label: "Medium" },
+                      { value: "high", label: "High" },
+                      { value: "urgent", label: "Urgent" }
+                    ].map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => {
+                          handleInputChange("priority", option.value);
+                          setShowPriorityOptions(false);
+                        }}
+                        className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${
+                          formData.priority === option.value ? "bg-gray-50 font-medium" : ""
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 

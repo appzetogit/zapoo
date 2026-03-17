@@ -38,6 +38,7 @@ export const upsertOnboarding = async (req, res) => {
     // Get existing restaurant data to merge if needed
     const existingRestaurant = await Restaurant.findById(restaurantId).lean();
     const existingOnboarding = existingRestaurant?.onboarding || {};
+    const previousCompletedSteps = typeof existingOnboarding.completedSteps === "number" ? existingOnboarding.completedSteps : 0;
     const update = {};
 
     // Step1: Always update if provided
@@ -77,10 +78,13 @@ export const upsertOnboarding = async (req, res) => {
 
     // Log saved data for verification
 
+    // Determine effective completed steps for this request vs previous state
+    const effectiveCompletedSteps = typeof completedSteps === "number" && completedSteps !== null && completedSteps !== undefined ? completedSteps : previousCompletedSteps;
+
     // If onboarding is complete (step 4), update restaurant with final data
     // Also update restaurant schema when step2 is completed (for immediate data availability)
     // Check both the request body and the saved document's completedSteps
-    const finalCompletedSteps = onboarding.completedSteps || completedSteps;
+    const finalCompletedSteps = typeof onboarding.completedSteps === "number" ? onboarding.completedSteps : effectiveCompletedSteps;
 
     // Update restaurant schema when step1 is completed (basic info)
     if (finalCompletedSteps >= 1 && step1) {
@@ -103,6 +107,10 @@ export const upsertOnboarding = async (req, res) => {
         }
         if (step1.location) {
           updateData.location = step1.location;
+        }
+        // Pure veg flag - stored on main restaurant for easy filtering
+        if (typeof step1.isPureVeg === "boolean") {
+          updateData.isPureVeg = step1.isPureVeg;
         }
         if (Object.keys(updateData).length > 0) {
           await Restaurant.findByIdAndUpdate(restaurantId, {
@@ -229,10 +237,10 @@ export const upsertOnboarding = async (req, res) => {
         // Don't fail the request, just log the error
       }
     }
-    // Update restaurant with final data if onboarding is complete (step 4)
-    // Also check if step4 is being sent (which means user is completing step 4)
+    // Update restaurant with final data only when transitioning to completion (step 4)
     // Note: Individual step updates are handled above, this is for final consolidation
-    if (finalCompletedSteps === 4 || step4 && completedSteps === 4) {
+    // We only want to send emails the first time onboarding reaches step 4.
+    if (previousCompletedSteps < 4 && finalCompletedSteps === 4) {
       // All individual steps have already updated the restaurant schema above
       // This section is kept for backward compatibility and final validation
 

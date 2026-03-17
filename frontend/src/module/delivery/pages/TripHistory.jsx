@@ -243,7 +243,7 @@ export default function TripHistory() {
           className="flex-1 flex items-center justify-between px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors"
         >
           <span className="text-sm font-medium text-black">
-            {formatDateDisplay(selectedDate)}: {selectedDate.toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}
+            {formatDateDisplay(selectedDate)}
           </span>
           <ChevronDown className={`w-4 h-4 text-gray-600 transition-transform ${showDatePicker ? 'rotate-180' : ''}`} />
         </button>
@@ -276,7 +276,7 @@ export default function TripHistory() {
                 }`}
             >
               <span className="text-sm text-black">
-                {formatDateDisplay(date)}: {date.toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}
+                {formatDateDisplay(date)}
               </span>
             </button>
           ))}

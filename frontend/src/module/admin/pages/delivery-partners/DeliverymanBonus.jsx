@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { Search, Wallet, Settings, Folder, Download, ChevronDown, FileText, FileSpreadsheet, Check, Columns, Loader2 } from "lucide-react";
+import { Search, Wallet, Settings, Folder, Download, ChevronDown, FileText, FileSpreadsheet, Check, Columns, Loader2, ChevronDown as ChevronDownIcon } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { exportBonusToExcel, exportBonusToPDF } from "../../components/deliveryman/deliverymanExportUtils";
@@ -49,6 +49,11 @@ export default function DeliverymanBonus() {
     bonus: true,
     createdAt: true
   });
+  const [deliverySearch, setDeliverySearch] = useState("");
+  const [showDeliveryResults, setShowDeliveryResults] = useState(false);
+  const [deliveryVisibleCount, setDeliveryVisibleCount] = useState(20);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 20;
 
   // Fetch delivery partners on mount
   useEffect(() => {
@@ -107,6 +112,25 @@ export default function DeliverymanBonus() {
     const query = searchQuery.toLowerCase().trim();
     return transactions.filter(transaction => transaction.deliveryman?.toLowerCase().includes(query) || transaction.transactionId?.toLowerCase().includes(query) || transaction.deliveryId?.toLowerCase().includes(query));
   }, [transactions, searchQuery]);
+
+  const totalPages = useMemo(() => {
+    return Math.max(1, Math.ceil(filteredTransactions.length / pageSize));
+  }, [filteredTransactions.length, pageSize]);
+
+  const paginatedTransactions = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredTransactions.slice(start, start + pageSize);
+  }, [filteredTransactions, currentPage, pageSize]);
+  const filteredDeliveryPartners = useMemo(() => {
+    // When there is no query, don't show any options in the dropdown.
+    if (!deliverySearch.trim()) return [];
+    const q = deliverySearch.toLowerCase().trim();
+    return deliveryPartners.filter((p) => {
+      const name = p.name || "";
+      const id = p.deliveryId || "";
+      return name.toLowerCase().includes(q) || id.toLowerCase().includes(q);
+    });
+  }, [deliveryPartners, deliverySearch]);
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
       ...prev,
@@ -159,10 +183,13 @@ export default function DeliverymanBonus() {
           }));
           setTransactions(formatted);
         }
+        // Clear form and delivery man search after successful submit
         setFormData({
           deliveryPartnerId: "",
           amount: ""
         });
+        setDeliverySearch("");
+        setShowDeliveryResults(false);
         setShowSuccessDialog(true);
       } else {
         setError("Unexpected response format. Please check console for details.");
@@ -275,17 +302,90 @@ export default function DeliverymanBonus() {
 
           <form onSubmit={handleSubmit}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
+              <div className="relative">
                 <label className="block text-sm font-semibold text-slate-700 mb-2">
                   DeliveryMan <span className="text-red-500">*</span>
                 </label>
-                <select value={formData.deliveryPartnerId} onChange={e => handleInputChange("deliveryPartnerId", e.target.value)} className={`w-full px-4 py-2.5 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#FF5200] text-sm ${formErrors.deliveryPartnerId ? "border-red-500" : "border-slate-300"}`} disabled={submitting}>
-                  <option value="">Select Delivery Man</option>
-                  {deliveryPartners.map(partner => <option key={partner._id} value={partner._id}>
-                      {partner.name} ({partner.deliveryId})
-                    </option>)}
-                </select>
-                {formErrors.deliveryPartnerId && <p className="text-xs text-red-500 mt-1">{formErrors.deliveryPartnerId}</p>}
+
+                {/* Searchable input, acts as combobox */}
+                <div
+                  className="relative"
+                  onClick={(e) => {
+                    // prevent parent clicks from closing immediately if you add global listeners later
+                    e.stopPropagation();
+                  }}
+                >
+                  <input
+                    type="text"
+                    value={
+                      deliverySearch ||
+                      (formData.deliveryPartnerId
+                        ? (() => {
+                            const selected = deliveryPartners.find(
+                              (p) => p._id === formData.deliveryPartnerId
+                            );
+                            return selected
+                              ? `${selected.name} (${selected.deliveryId})`
+                              : "";
+                          })()
+                        : "")
+                    }
+                    onChange={(e) => {
+                      setDeliverySearch(e.target.value);
+                      setShowDeliveryResults(true);
+                    }}
+                    onFocus={() => setShowDeliveryResults(true)}
+                    placeholder="Search by name or ID"
+                    className={`w-full px-4 py-2.5 pr-9 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#FF5200] text-sm ${
+                      formErrors.deliveryPartnerId ? "border-red-500" : "border-slate-300"
+                    }`}
+                    disabled={submitting}
+                  />
+                  <ChevronDownIcon className="w-4 h-4 text-slate-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+
+                {/* Results dropdown */}
+                {showDeliveryResults && (
+                  <div className="absolute z-20 mt-1 w-full max-h-64 overflow-y-auto bg-white border border-slate-200 rounded-lg shadow-lg">
+                    {filteredDeliveryPartners.length > 0 ? (
+                      <>
+                        {filteredDeliveryPartners.slice(0, deliveryVisibleCount).map((partner) => (
+                        <button
+                          key={partner._id}
+                          type="button"
+                          onClick={() => {
+                            handleInputChange("deliveryPartnerId", partner._id);
+                            setDeliverySearch(`${partner.name} (${partner.deliveryId})`);
+                            setShowDeliveryResults(false);
+                          }}
+                          className={`w-full text-left px-4 py-2 text-sm hover:bg-slate-50 ${
+                            formData.deliveryPartnerId === partner._id ? "bg-slate-50 font-medium" : ""
+                          }`}
+                          >
+                            {partner.name} ({partner.deliveryId})
+                          </button>
+                        ))}
+                        {filteredDeliveryPartners.length > deliveryVisibleCount && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setDeliveryVisibleCount((prev) => prev + 20)
+                            }
+                            className="w-full text-center px-4 py-2 text-xs font-semibold text-[#FF5200] hover:bg-slate-50 border-t border-slate-100"
+                          >
+                            Load more
+                          </button>
+                        )}
+                      </>
+                    ) : (
+                      <div className="px-4 py-2 text-sm text-slate-500">No deliveryman found</div>
+                    )}
+                  </div>
+                )}
+
+                {formErrors.deliveryPartnerId && (
+                  <p className="text-xs text-red-500 mt-1">{formErrors.deliveryPartnerId}</p>
+                )}
               </div>
 
               <div>
@@ -368,43 +468,67 @@ export default function DeliverymanBonus() {
                 </div>
               </div>
               <p className="text-lg font-semibold text-slate-700">No Data Found</p>
-            </div> : <div className="overflow-x-auto">
-              <table className="w-full">
+            </div> : <div className="overflow-x-hidden">
+              <table className="w-full table-fixed">
                 <thead className="bg-slate-50 border-b border-slate-200">
                   <tr>
-                    {visibleColumns.si && <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">SI</th>}
-                    {visibleColumns.transactionId && <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">Transaction Id</th>}
-                    {visibleColumns.deliveryBoyId && <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">Delivery Boy ID</th>}
-                    {visibleColumns.deliveryman && <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">DeliveryMan</th>}
-                    {visibleColumns.bonus && <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">Bonus</th>}
-                    {visibleColumns.reference && <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">Reference</th>}
-                    {visibleColumns.createdAt && <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">Created At</th>}
+                    {visibleColumns.si && <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider w-16">SI</th>}
+                    {visibleColumns.transactionId && <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider w-40">Transaction Id</th>}
+                    {visibleColumns.deliveryBoyId && <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider w-32">Delivery Boy ID</th>}
+                    {visibleColumns.deliveryman && <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider w-40">DeliveryMan</th>}
+                    {visibleColumns.bonus && <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider w-24">Bonus</th>}
+                    {visibleColumns.reference && <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider w-32">Reference</th>}
+                    {visibleColumns.createdAt && <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider w-40">Created At</th>}
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-slate-100">
-                  {filteredTransactions.map(transaction => <tr key={transaction.sl} className="hover:bg-slate-50 transition-colors">
-                      {visibleColumns.si && <td className="px-6 py-4 whitespace-nowrap">
+                  {paginatedTransactions.map(transaction => <tr key={transaction.sl} className="hover:bg-slate-50 transition-colors">
+                      {visibleColumns.si && <td className="px-4 py-3 whitespace-nowrap">
                           <span className="text-sm font-medium text-slate-700">{transaction.sl}</span>
                         </td>}
-                      {visibleColumns.transactionId && <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="text-sm text-slate-700">{transaction.transactionId}</span>
+                      {visibleColumns.transactionId && <td className="px-4 py-3 whitespace-nowrap">
+                          <span className="text-xs text-slate-700 break-all">{transaction.transactionId}</span>
                         </td>}
-                      {visibleColumns.deliveryBoyId && <td className="px-6 py-4 whitespace-nowrap">
+                      {visibleColumns.deliveryBoyId && <td className="px-4 py-3 whitespace-nowrap">
                           <span className="text-sm text-slate-700 font-medium">{transaction.deliveryId || 'N/A'}</span>
                         </td>}
-                      {visibleColumns.deliveryman && <td className="px-6 py-4 whitespace-nowrap">
+                      {visibleColumns.deliveryman && <td className="px-4 py-3 whitespace-nowrap">
                           <span className="text-sm text-slate-700">{transaction.deliveryman}</span>
                         </td>}
-                      {visibleColumns.bonus && <td className="px-6 py-4 whitespace-nowrap">
+                      {visibleColumns.bonus && <td className="px-4 py-3 whitespace-nowrap">
                           <span className="text-sm font-medium text-slate-900">{formatBonusAmount(transaction)}</span>
                         </td>}
-                      {visibleColumns.createdAt && <td className="px-6 py-4 whitespace-nowrap">
+                      {visibleColumns.createdAt && <td className="px-4 py-3 whitespace-nowrap">
                           <span className="text-sm text-slate-700">{transaction.createdAt}</span>
                         </td>}
                     </tr>)}
                 </tbody>
               </table>
             </div>}
+            {/* Pagination Controls (always visible, even for single page) */}
+            <div className="mt-4 flex items-center justify-between text-sm text-slate-700">
+              <span>
+                Page {currentPage} of {totalPages}
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1 rounded border border-slate-300 bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1 rounded border border-slate-300 bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
         </div>
       </div>
 

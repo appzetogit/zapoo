@@ -153,6 +153,12 @@ const restaurantSchema = new mongoose.Schema(
     cuisines: [String],
     deliveryTimings: deliveryTimingsSchema,
     openDays: [String],
+    // Whether the restaurant is purely vegetarian
+    isPureVeg: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
     rating: {
       type: Number,
       default: 0,

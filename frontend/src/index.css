@@ -268,3 +268,15 @@
 .touch-pan-x {
   touch-action: pan-x;
 }
+
+/* Hide scrollbars but keep scroll functionality */
+.no-scrollbar {
+  overflow-x: auto;
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none;    /* Firefox */
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  height: 0px;              /* Chrome, Safari, Opera */
+  width: 0px;
+}

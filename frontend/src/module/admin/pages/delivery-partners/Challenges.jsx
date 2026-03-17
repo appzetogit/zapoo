@@ -531,7 +531,7 @@ export default function Challenges() {
             </div>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto no-scrollbar">
             <table className="w-full min-w-[900px]">
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
@@ -613,7 +613,7 @@ export default function Challenges() {
                                 <span className="text-xs font-bold text-slate-700">User Progress ({progressData[challenge._id]?.length || 0})</span>
                                 {progressLoading && expandedProgressId === challenge._id && <span className="text-[10px] text-orange-600 animate-pulse">Loading...</span>}
                               </div>
-                              <div className="p-0 overflow-x-auto">
+                            <div className="p-0 overflow-x-auto no-scrollbar">
                                 <table className="w-full text-xs">
                                   <thead className="bg-slate-50 text-slate-600">
                                     <tr>

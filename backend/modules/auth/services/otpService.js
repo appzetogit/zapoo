@@ -78,15 +78,17 @@ class OTPService {
       const normalizedPhone = phone ? normalizePhoneNumber(phone) : null;
 
       // Check rate limiting (max 3 OTPs per identifier per hour) - using MongoDB
+      // Use normalized phone for rate limit query to match how OTPs are stored
       if (process.env.NODE_ENV === 'production') {
         const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
         const rateLimitQuery = {
-          [identifierType]: identifier,
           purpose,
           createdAt: {
             $gte: oneHourAgo
           }
         };
+        if (normalizedPhone) rateLimitQuery.phone = normalizedPhone;
+        else if (email) rateLimitQuery.email = email;
         const recentOtpCount = await Otp.countDocuments(rateLimitQuery);
         if (recentOtpCount >= 3) {
           throw new Error('Too many OTP requests. Please try again after some time.');
@@ -229,6 +231,8 @@ class OTPService {
         }
       } else {
         // For other purposes, check unverified OTPs
+        // For Indian numbers, match both normalized (919876543210) and 10-digit (9876543210)
+        // to handle any legacy or format mismatch
         const query = {
           otp,
           purpose,
@@ -237,7 +241,16 @@ class OTPService {
             $gt: new Date()
           }
         };
-        if (normalizedPhone) query.phone = normalizedPhone;
+        if (normalizedPhone) {
+          if (normalizedPhone.startsWith('91') && normalizedPhone.length === 12) {
+            query.$or = [
+              { phone: normalizedPhone },
+              { phone: normalizedPhone.slice(-10) }
+            ];
+          } else {
+            query.phone = normalizedPhone;
+          }
+        }
         if (email) query.email = email;
         otpRecord = await Otp.findOne(query);
 
@@ -248,11 +261,18 @@ class OTPService {
             otp,
             purpose,
             verified: true,
-            updatedAt: {
-              $gt: new Date(Date.now() - 10000)
-            }
+            updatedAt: { $gt: new Date(Date.now() - 10000) }
           };
-          if (normalizedPhone) recentlyVerifiedQuery.phone = normalizedPhone;
+          if (normalizedPhone) {
+            if (normalizedPhone.startsWith('91') && normalizedPhone.length === 12) {
+              recentlyVerifiedQuery.$or = [
+                { phone: normalizedPhone },
+                { phone: normalizedPhone.slice(-10) }
+              ];
+            } else {
+              recentlyVerifiedQuery.phone = normalizedPhone;
+            }
+          }
           if (email) recentlyVerifiedQuery.email = email;
 
           const recentlyVerified = await Otp.findOne(recentlyVerifiedQuery);
@@ -264,30 +284,44 @@ class OTPService {
             };
           }
 
-          // If still not found, check why (for logging)
-          const anyStatusQuery = { otp, purpose };
-          if (normalizedPhone) anyStatusQuery.phone = normalizedPhone;
+          // Debug: log why verification failed (without leaking OTP)
+          const anyStatusQuery = { purpose, otp };
+          if (normalizedPhone) {
+            if (normalizedPhone.startsWith('91') && normalizedPhone.length === 12) {
+              anyStatusQuery.$or = [
+                { phone: normalizedPhone },
+                { phone: normalizedPhone.slice(-10) }
+              ];
+            } else {
+              anyStatusQuery.phone = normalizedPhone;
+            }
+          }
           if (email) anyStatusQuery.email = email;
           const anyRec = await Otp.findOne(anyStatusQuery);
-
           if (anyRec) {
-            console.warn(`[OTPService] OTP search failed. Found sibling record: state=${anyRec.verified ? 'VERIFIED' : 'UNVERIFIED'}, expires=${anyRec.expiresAt}, now=${new Date()}`);
+            console.warn(`[OTPService] Verify failed: record exists but otp/expiry mismatch. purpose=${purpose}, identifier=${normalizedPhone ? 'phone' : 'email'}, verified=${anyRec.verified}, expiresAt=${anyRec.expiresAt}`);
+          } else {
+            console.warn(`[OTPService] Verify failed: no OTP record for purpose=${purpose}, identifier=${normalizedPhone || email}`);
           }
         }
       }
 
       if (!otpRecord) {
-        // Increment attempts for security
-        const incrementQuery = {
-          purpose,
-          verified: false
-        };
-        if (normalizedPhone) incrementQuery.phone = normalizedPhone;
+        // Increment attempts for security (use same phone matching as main query)
+        const incrementQuery = { purpose, verified: false };
+        if (normalizedPhone) {
+          if (normalizedPhone.startsWith('91') && normalizedPhone.length === 12) {
+            incrementQuery.$or = [
+              { phone: normalizedPhone },
+              { phone: normalizedPhone.slice(-10) }
+            ];
+          } else {
+            incrementQuery.phone = normalizedPhone;
+          }
+        }
         if (email) incrementQuery.email = email;
         await Otp.updateMany(incrementQuery, {
-          $inc: {
-            attempts: 1
-          }
+          $inc: { attempts: 1 }
         });
         throw new Error('Invalid or expired OTP');
       }
