@@ -10,12 +10,13 @@ export const getOnboarding = async (req, res) => {
       return errorResponse(res, 401, "Restaurant not authenticated");
     }
     const restaurantId = req.restaurant._id;
-    const restaurant = await Restaurant.findById(restaurantId).select("onboarding").lean();
+    const restaurant = await Restaurant.findById(restaurantId).select("name onboarding").lean();
     if (!restaurant) {
       return errorResponse(res, 404, "Restaurant not found");
     }
     return successResponse(res, 200, "Onboarding data retrieved", {
-      onboarding: restaurant.onboarding || null
+      onboarding: restaurant.onboarding || null,
+      restaurantName: restaurant.name || ""
     });
   } catch (error) {
     console.error("Error fetching restaurant onboarding:", error);

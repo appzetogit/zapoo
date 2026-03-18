@@ -3,12 +3,12 @@ import { useNavigate } from "react-router-dom";
 import { checkOnboardingStatus } from "../utils/onboardingUtils";
 import { motion, AnimatePresence } from "framer-motion";
 import Lenis from "lenis";
-import { Printer, Volume2, VolumeX, ChevronDown, ChevronUp, Minus, Plus, X, AlertCircle, Loader2, Calendar, Clock, Users, MessageSquare } from "lucide-react";
+import { Printer, Volume2, VolumeX, ChevronDown, ChevronUp, Minus, Plus, X, AlertCircle, Loader2, Calendar, Clock, Users, MessageSquare, Phone } from "lucide-react";
 import { toast } from "sonner";
 import BottomNavOrders from "../components/BottomNavOrders";
 import RestaurantNavbar from "../components/RestaurantNavbar";
 import notificationSound from "@/assets/audio/alert.mp3";
-import { restaurantAPI } from "@/lib/api";
+import { restaurantAPI, api } from "@/lib/api";
 import { useRestaurantNotifications } from "../hooks/useRestaurantNotifications";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -406,7 +406,8 @@ export default function OrdersMain() {
     isActive: null,
     rejectionReason: null,
     onboarding: null,
-    isLoading: true
+    isLoading: true,
+    restaurantId: null,
   });
   const [isReverifying, setIsReverifying] = useState(false);
 
@@ -429,7 +430,8 @@ export default function OrdersMain() {
             isActive: restaurant.isActive,
             rejectionReason: restaurant.rejectionReason || null,
             onboarding: restaurant.onboarding || null,
-            isLoading: false
+            isLoading: false,
+            restaurantId: restaurant._id || null,
           });
 
           // Check if onboarding is incomplete and redirect if needed
@@ -1013,11 +1015,22 @@ export default function OrdersMain() {
 
     switch (activeFilter) {
       case "preparing":
-        return <PreparingOrders onSelectOrder={handleSelectOrder} onCancel={handleCancelClick} />;
+        return (
+          <PreparingOrders
+            onSelectOrder={handleSelectOrder}
+            onCancel={handleCancelClick}
+            restaurantMongoId={restaurantStatus.restaurantId}
+          />
+        );
       case "ready":
         return <ReadyOrders onSelectOrder={handleSelectOrder} />;
       case "out-for-delivery":
-        return <OutForDeliveryOrders onSelectOrder={handleSelectOrder} />;
+        return (
+          <OutForDeliveryOrders
+            onSelectOrder={handleSelectOrder}
+            restaurantMongoId={restaurantStatus.restaurantId}
+          />
+        );
       case "scheduled":
         return <EmptyState message="Scheduled orders will appear here" />;
       case "completed":
@@ -1028,17 +1041,17 @@ export default function OrdersMain() {
         return <EmptyState />;
     }
   };
-  return <div className="min-h-screen bg-gray-100 flex flex-col">
+  return <div className="min-h-screen bg-background text-foreground flex flex-col">
     {/* Subscription renewal reminder popup */}
     <SubscriptionRenewalPopup />
 
     {/* Restaurant Navbar - Sticky at top */}
-    <div className="sticky top-0 z-50 bg-white">
+    <div className="sticky top-0 z-50 bg-background">
       <RestaurantNavbar showNotifications={false} />
     </div>
 
     {/* Top Filter Bar - Sticky below navbar */}
-    <div className="sticky top-[50px] z-40 pb-2 bg-gray-100">
+    <div className="sticky top-[50px] z-40 pb-2 bg-background">
       <div ref={filterBarRef} className="flex gap-2 overflow-x-auto scrollbar-hide bg-transparent rounded-full px-3 py-2 mt-2" style={{
         scrollbarWidth: 'none',
         msOverflowStyle: 'none',
@@ -1669,10 +1682,29 @@ function OrderCard({
   photoUrl,
   photoAlt,
   deliveryPartnerId,
+  restaurantMongoId,
   onSelect,
-  onCancel
+  onCancel,
 }) {
   const isReady = status === "Ready";
+
+  const handleCallDeliveryPartner = async (e) => {
+    e.stopPropagation();
+
+    if (!deliveryPartnerId || !restaurantMongoId || !orderId) {
+      return;
+    }
+
+    try {
+      await api.post("/telephony/call", {
+        order_id: orderId,
+        caller_user_id: String(restaurantMongoId),
+        receiver_user_id: String(deliveryPartnerId),
+      });
+    } catch (error) {
+      // Optional: surface a toast here if needed
+    }
+  };
   return <div className="w-full bg-white rounded-2xl p-4 mb-3 border border-gray-200 hover:border-gray-400 transition-colors relative">
     {/* Cancel button - only show for preparing orders */}
     {status === 'preparing' && onCancel && <button type="button" onClick={e => {
@@ -1743,21 +1775,50 @@ function OrderCard({
               {tableOrToken ? ` • ${tableOrToken}` : ""}
             </p>
             {/* Delivery Assignment Status - Only show for preparing orders */}
-            {status === 'preparing' && <div className="flex items-center gap-1.5 flex-wrap">
-              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${deliveryPartnerId ? 'bg-green-100 text-green-700 border border-green-300' : 'bg-blue-100 text-blue-700 border border-blue-300'}`}>
-                <span className={`h-1.5 w-1.5 rounded-full ${deliveryPartnerId ? 'bg-green-500' : 'bg-blue-500'}`} />
-                {deliveryPartnerId ? 'Assigned' : 'Not Assigned'}
-              </span>
-              {!deliveryPartnerId && <ResendNotificationButton orderId={orderId} mongoId={mongoId} onSuccess={onSelect} />}
-            </div>}
+            {status === "preparing" && (
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                    deliveryPartnerId
+                      ? "bg-green-100 text-green-700 border border-green-300"
+                      : "bg-blue-100 text-blue-700 border border-blue-300"
+                  }`}
+                >
+                  <span
+                    className={`h-1.5 w-1.5 rounded-full ${
+                      deliveryPartnerId ? "bg-green-500" : "bg-blue-500"
+                    }`}
+                  />
+                  {deliveryPartnerId ? "Assigned" : "Not Assigned"}
+                </span>
+                {!deliveryPartnerId && (
+                  <ResendNotificationButton
+                    orderId={orderId}
+                    mongoId={mongoId}
+                    onSuccess={onSelect}
+                  />
+                )}
+              </div>
+            )}
+
+            {deliveryPartnerId && (
+              <button
+                type="button"
+                onClick={handleCallDeliveryPartner}
+                className="mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-green-600 text-white hover:bg-green-700"
+              >
+                <Phone className="w-3 h-3" />
+                Call delivery partner
+              </button>
+            )}
           </div>
           {/* Hide ETA for ready orders */}
-          {status !== 'ready' && eta && <div className="flex items-baseline gap-1">
-            <span className="text-[11px] text-gray-500">ETA</span>
-            <span className="text-xs font-medium text-black">
-              {eta}
-            </span>
-          </div>}
+          {status !== "ready" && eta && (
+            <div className="flex items-baseline gap-1">
+              <span className="text-[11px] text-gray-500">ETA</span>
+              <span className="text-xs font-medium text-black">{eta}</span>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -1767,7 +1828,8 @@ function OrderCard({
 // Preparing Orders List
 function PreparingOrders({
   onSelectOrder,
-  onCancel
+  onCancel,
+  restaurantMongoId,
 }) {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -1967,7 +2029,26 @@ function PreparingOrders({
         } else {
           etaDisplay = `${remainingMinutes} mins`;
         }
-        return <OrderCard key={order.orderId || order.mongoId} orderId={order.orderId} mongoId={order.mongoId} status={order.status} customerName={order.customerName} type={order.type} tableOrToken={order.tableOrToken} timePlaced={order.timePlaced} eta={etaDisplay} itemsSummary={order.itemsSummary} photoUrl={order.photoUrl} photoAlt={order.photoAlt} deliveryPartnerId={order.deliveryPartnerId} onSelect={onSelectOrder} onCancel={onCancel} />;
+        return (
+          <OrderCard
+            key={order.orderId || order.mongoId}
+            orderId={order.orderId}
+            mongoId={order.mongoId}
+            status={order.status}
+            customerName={order.customerName}
+            type={order.type}
+            tableOrToken={order.tableOrToken}
+            timePlaced={order.timePlaced}
+            eta={etaDisplay}
+            itemsSummary={order.itemsSummary}
+            photoUrl={order.photoUrl}
+            photoAlt={order.photoAlt}
+            deliveryPartnerId={order.deliveryPartnerId}
+            restaurantMongoId={restaurantMongoId}
+            onSelect={onSelectOrder}
+            onCancel={onCancel}
+          />
+        );
       })}
     </div>}
   </div>;
@@ -2072,7 +2153,8 @@ function ReadyOrders({
 
 // Out for Delivery Orders List
 const OutForDeliveryOrders = ({
-  onSelectOrder
+  onSelectOrder,
+  restaurantMongoId,
 }) => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -2158,11 +2240,22 @@ const OutForDeliveryOrders = ({
       </h2>
       <span className="text-xs text-gray-500">{orders.length} active</span>
     </div>
-    {orders.length === 0 ? <div className="text-center py-8 text-gray-500 text-sm">
-      No orders out for delivery
-    </div> : <div>
-      {orders.map(order => <OrderCard key={order.orderId || order.mongoId} {...order} onSelect={onSelectOrder} />)}
-    </div>}
+    {orders.length === 0 ? (
+      <div className="text-center py-8 text-gray-500 text-sm">
+        No orders out for delivery
+      </div>
+    ) : (
+      <div>
+        {orders.map((order) => (
+          <OrderCard
+            key={order.orderId || order.mongoId}
+            {...order}
+            restaurantMongoId={restaurantMongoId}
+            onSelect={onSelectOrder}
+          />
+        ))}
+      </div>
+    )}
   </div>;
 };
 

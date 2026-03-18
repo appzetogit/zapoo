@@ -292,11 +292,14 @@ export default function RestaurantOnboarding() {
       try {
         setLoading(true);
         const res = await api.get("/restaurant/onboarding");
-        const data = res?.data?.data?.onboarding;
+        const payload = res?.data?.data || {};
+        const data = payload?.onboarding;
+        const baseRestaurantName = payload?.restaurantName || "";
+
         if (data) {
           if (data.step1) {
             setStep1(prev => ({
-              restaurantName: data.step1.restaurantName || "",
+              restaurantName: data.step1.restaurantName || baseRestaurantName || "",
               ownerName: data.step1.ownerName || "",
               ownerEmail: data.step1.ownerEmail || "",
               ownerPhone: data.step1.ownerPhone || "",
@@ -308,6 +311,12 @@ export default function RestaurantOnboarding() {
                 city: data.step1.location?.city || "",
                 landmark: data.step1.location?.landmark || ""
               }
+            }));
+          } else if (baseRestaurantName) {
+            // If onboarding step1 not started yet, prefill restaurantName from registration
+            setStep1(prev => ({
+              ...prev,
+              restaurantName: prev.restaurantName || baseRestaurantName
             }));
           }
           if (data.step2) {

@@ -20,15 +20,19 @@ import {
   normalizeDeliveryStatus,
   DELIVERY_ORDER_STATUS
 } from "../utils/deliveryOrderStatus"
-import { 
-  getDeliveryOrderPaymentStatus 
+import {
+  getDeliveryOrderPaymentStatus
 } from "../utils/deliveryWalletState"
+import { deliveryAPI, api } from "@/lib/api"
 
 export default function AcceptedOrderDetails() {
   const navigate = useNavigate()
   const { orderId } = useParams()
   const [orderStatus, setOrderStatus] = useState(() => getDeliveryOrderStatus(orderId))
   const [paymentStatus, setPaymentStatus] = useState(() => getDeliveryOrderPaymentStatus(orderId))
+  const [realOrder, setRealOrder] = useState(null)
+  const [deliveryProfile, setDeliveryProfile] = useState(null)
+  const [callingRestaurant, setCallingRestaurant] = useState(false)
 
   // Listen for order status updates
   useEffect(() => {
@@ -51,6 +55,58 @@ export default function AcceptedOrderDetails() {
   }, [orderId])
 
   const statusMessage = getDeliveryStatusMessage(orderStatus)
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        if (!orderId) return
+
+        const [orderRes, meRes] = await Promise.all([
+          deliveryAPI.getOrderDetails(orderId),
+          deliveryAPI.getCurrentDelivery(),
+        ])
+
+        const orderData = orderRes.data?.data?.order || orderRes.data?.order || null
+        const deliveryData = meRes.data?.data?.delivery || meRes.data?.delivery || null
+
+        setRealOrder(orderData)
+        setDeliveryProfile(deliveryData)
+      } catch (err) {
+        // Ignore and fall back to mock data for UI
+      }
+    }
+
+    fetchData()
+  }, [orderId])
+
+  const handleCallRestaurantMasked = async () => {
+    if (!realOrder || !deliveryProfile) {
+      window.open(`tel:+8801700000000`, '_self')
+      return
+    }
+
+    const businessOrderId = realOrder.orderId
+    const callerUserId = String(deliveryProfile._id || "")
+    const receiverUserId = String(realOrder.restaurantId || "")
+
+    if (!businessOrderId || !callerUserId || !receiverUserId) {
+      window.open(`tel:+8801700000000`, '_self')
+      return
+    }
+
+    try {
+      setCallingRestaurant(true)
+      await api.post("/telephony/call", {
+        order_id: businessOrderId,
+        caller_user_id: callerUserId,
+        receiver_user_id: receiverUserId,
+      })
+    } catch (error) {
+      window.open(`tel:+8801700000000`, '_self')
+    } finally {
+      setCallingRestaurant(false)
+    }
+  }
 
   // Order data matching the image exactly
   const orderData = {
@@ -155,7 +211,7 @@ export default function AcceptedOrderDetails() {
                 <p className="text-gray-600 text-sm whitespace-nowrap overflow-hidden text-ellipsis">{orderData.customer.address}</p>
               </div>
               <div className="flex items-center gap-1.5 flex-shrink-0">
-                <button 
+                <button
                   onClick={() => {
                     navigate("/delivery/profile/conversation")
                   }}
@@ -163,11 +219,10 @@ export default function AcceptedOrderDetails() {
                 >
                   <MessageCircle className="w-4 h-4 md:w-5 md:h-5 text-white" />
                 </button>
-                <button 
-                  onClick={() => {
-                    window.open(`tel:+8801700000000`, '_self')
-                  }}
-                  className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-green-500 flex items-center justify-center hover:bg-green-600 transition-colors flex-shrink-0"
+                <button
+                  onClick={handleCallRestaurantMasked}
+                  disabled={callingRestaurant}
+                  className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-green-500 flex items-center justify-center hover:bg-green-600 transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Phone className="w-4 h-4 md:w-5 md:h-5 text-white" />
                 </button>
