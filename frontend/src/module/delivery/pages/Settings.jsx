@@ -4,7 +4,6 @@ import { useNavigate } from "react-router-dom"
 import { 
   ArrowLeft,
   Bell,
-  Moon,
   Globe,
   Shield
 } from "lucide-react"
@@ -15,7 +14,6 @@ export default function Settings() {
   const navigate = useNavigate()
   const [settings, setSettings] = useState({
     notifications: true,
-    darkMode: false,
     locationServices: true,
     biometricAuth: false
   })
@@ -34,13 +32,6 @@ export default function Settings() {
       description: "Receive notifications about new orders",
       icon: Bell,
       value: settings.notifications
-    },
-    {
-      id: "darkMode",
-      label: "Dark Mode",
-      description: "Switch to dark theme",
-      icon: Moon,
-      value: settings.darkMode
     },
     {
       id: "locationServices",
@@ -116,4 +107,3 @@ export default function Settings() {
     </div>
   )
 }
-

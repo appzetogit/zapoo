@@ -717,7 +717,7 @@ export default function Profile() {
             <button onClick={() => {
             setVegMode(true);
             setVegModeOpen(false);
-          }} className={`w-full p-3 rounded-xl border-2 transition-all flex items-center justify-between ${vegMode ? 'border-orange-600 bg-orange-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}>
+          }} className={`w-full p-3 rounded-xl border-2 transition-all flex items-center justify-between ${vegMode ? 'border-orange-600 bg-orange-50 dark:bg-orange-900/20' : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-[#1a1a1a] hover:border-gray-300 dark:hover:border-gray-600'}`}>
               <div className="flex items-center gap-3">
                 <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${vegMode ? 'border-orange-600 bg-orange-600' : 'border-gray-300'}`}>
                   {vegMode && <Check className="h-3 w-3 text-white" />}
@@ -732,7 +732,7 @@ export default function Profile() {
             <button onClick={() => {
             setVegMode(false);
             setVegModeOpen(false);
-          }} className={`w-full p-3 rounded-xl border-2 transition-all flex items-center justify-between ${!vegMode ? 'border-red-600 bg-red-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}>
+          }} className={`w-full p-3 rounded-xl border-2 transition-all flex items-center justify-between ${!vegMode ? 'border-red-600 bg-red-50 dark:bg-red-900/20' : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-[#1a1a1a] hover:border-gray-300 dark:hover:border-gray-600'}`}>
               <div className="flex items-center gap-3">
                 <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${!vegMode ? 'border-red-600 bg-red-600' : 'border-gray-300'}`}>
                   {!vegMode && <Check className="h-3 w-3 text-white" />}

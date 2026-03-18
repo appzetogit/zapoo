@@ -9,7 +9,7 @@ const transactionSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['commission', 'platform_fee', 'delivery_fee', 'gst', 'recommended_item_fee', 'refund', 'withdrawal', 'bonus', 'deduction'],
+    enum: ['commission', 'platform_fee', 'delivery_fee', 'gst', 'recommended_item_fee', 'refund', 'withdrawal', 'bonus', 'deduction', 'escrow_hold', 'escrow_release'],
     required: true
   },
   status: {
@@ -87,6 +87,12 @@ const adminWalletSchema = new mongoose.Schema({
     default: 0,
     min: 0
   },
+  totalEscrow: {
+    type: Number,
+    default: 0,
+    min: 0,
+    comment: 'Total funds currently held in escrow'
+  },
   // Transactions array
   transactions: [transactionSchema],
   // Status
@@ -147,6 +153,10 @@ adminWalletSchema.methods.addTransaction = function (transactionData) {
     } else if (transaction.type === 'refund') {
       // Refunds reduce balance
       this.totalBalance = Math.max(0, this.totalBalance - transaction.amount);
+    } else if (transaction.type === 'escrow_hold') {
+      this.totalEscrow += transaction.amount;
+    } else if (transaction.type === 'escrow_release') {
+      this.totalEscrow = Math.max(0, this.totalEscrow - transaction.amount);
     }
   }
 
@@ -167,7 +177,8 @@ adminWalletSchema.statics.findOrCreate = async function () {
       totalDeliveryFee: 0,
       totalGST: 0,
       totalRecommendedFee: 0,
-      totalWithdrawn: 0
+      totalWithdrawn: 0,
+      totalEscrow: 0
     });
   }
 
@@ -177,4 +188,3 @@ adminWalletSchema.statics.findOrCreate = async function () {
 const AdminWallet = mongoose.model('AdminWallet', adminWalletSchema);
 
 export default AdminWallet;
-

@@ -34,7 +34,6 @@ import zapooLogo from "@/assets/zapoo_logo.png";
 import { adminAPI, notificationAPI } from "@/lib/api";
 import { clearModuleAuth } from "@/lib/utils/auth";
 import { getCachedSettings, loadBusinessSettings } from "@/lib/utils/businessSettings";
-import ThemeToggle from "@/components/ThemeToggle";
 
 export default function AdminNavbar({ onMenuClick }) {
   const navigate = useNavigate();
@@ -232,7 +231,6 @@ export default function AdminNavbar({ onMenuClick }) {
 
           {/* Right: Notifications and User Profile */}
           <div className="flex items-center gap-3">
-            <ThemeToggle />
             {/* User Profile */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

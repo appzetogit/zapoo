@@ -4,6 +4,7 @@ import DeliveryWallet from '../models/DeliveryWallet.js';
 import DeliveryWithdrawalRequest from '../models/DeliveryWithdrawalRequest.js';
 import Order from '../../order/models/Order.js';
 import BusinessSettings from '../../admin/models/BusinessSettings.js';
+import AdminWallet from '../../admin/models/AdminWallet.js';
 import { validate } from '../../../shared/middleware/validate.js';
 import Joi from 'joi';
 import winston from 'winston';
@@ -17,6 +18,8 @@ const logger = winston.createLogger({
     format: winston.format.simple()
   })]
 });
+
+const isSunday = (date = new Date()) => date.getDay() === 0;
 
 /**
  * Get Wallet Balance
@@ -305,6 +308,10 @@ export const createWithdrawalRequest = asyncHandler(async (req, res) => {
     } = createWithdrawalSchema.validate(req.body);
     if (validationError) {
       return errorResponse(res, 400, validationError.details[0].message);
+    }
+
+    if (!isSunday()) {
+      return errorResponse(res, 400, 'Withdrawal requests are allowed only on Sundays');
     }
 
     // Find or create wallet
@@ -799,6 +806,25 @@ export const verifyDepositPayment = asyncHandler(async (req, res) => {
   });
   wallet.markModified('transactions');
   await wallet.save();
+
+  // Reduce admin escrow when COD cash is deposited by delivery partner
+  try {
+    const adminWallet = await AdminWallet.findOrCreate();
+    adminWallet.addTransaction({
+      amount: amt,
+      type: 'escrow_release',
+      status: 'Completed',
+      description: `COD cash deposit by ${delivery.name || 'Delivery Partner'}`,
+      metadata: {
+        deliveryId: delivery._id?.toString?.() || null,
+        deliveryIdString: delivery.deliveryId || null,
+        razorpayPaymentId: razorpay_payment_id
+      }
+    });
+    await adminWallet.save();
+  } catch (e) {
+    logger.error('Failed to update admin escrow on cash deposit:', e);
+  }
   let limit = 0;
   try {
     const settings = await BusinessSettings.getSettings();

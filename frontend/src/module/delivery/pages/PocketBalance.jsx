@@ -111,8 +111,10 @@ export default function PocketBalancePage() {
   // Withdrawable amount = pocket balance (includes bonus + earnings)
   const withdrawableAmount = pocketBalance > 0 ? pocketBalance : 0;
 
-  // Withdrawal allowed only when withdrawable amount >= withdrawal limit
-  const canWithdraw = withdrawableAmount >= withdrawalLimit && withdrawableAmount > 0;
+  const isSunday = new Date().getDay() === 0;
+
+  // Withdrawal allowed only when withdrawable amount >= withdrawal limit and on Sunday
+  const canWithdraw = withdrawableAmount >= withdrawalLimit && withdrawableAmount > 0 && isSunday;
 
   // Debug logging (cashInHand = Cash collected from backend)
 
@@ -208,7 +210,11 @@ export default function PocketBalancePage() {
           <div className="text-sm leading-tight">
             <p className="font-semibold">Withdraw currently disabled</p>
             <p className="text-xs">
-              {withdrawableAmount <= 0 ? "Withdrawable amount is ₹0" : `Withdrawable amount is minimum (${formatCurrency(withdrawalLimit)}).`}
+              {!isSunday
+                ? "Withdrawals are allowed only on Sundays."
+                : withdrawableAmount <= 0
+                  ? "Withdrawable amount is ₹0"
+                  : `Withdrawable amount is minimum (${formatCurrency(withdrawalLimit)}).`}
             </p>
           </div>
         </div>}
@@ -245,7 +251,7 @@ export default function PocketBalancePage() {
             <button onClick={() => setShowWithdrawModal(false)} className="flex-1 py-2.5 text-sm font-medium rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50">
               Cancel
             </button>
-            <button onClick={handleWithdrawSubmit} disabled={withdrawSubmitting} className="flex-1 py-2.5 text-sm font-medium rounded-lg bg-black text-white hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+            <button onClick={handleWithdrawSubmit} disabled={withdrawSubmitting || !canWithdraw} className="flex-1 py-2.5 text-sm font-medium rounded-lg bg-black text-white hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
               {withdrawSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
               {withdrawSubmitting ? "Submitting…" : "Withdraw"}
             </button>

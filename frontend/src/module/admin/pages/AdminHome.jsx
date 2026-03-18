@@ -13,6 +13,7 @@ export default function AdminHome() {
   const [isLoading, setIsLoading] = useState(true);
   const [dashboardData, setDashboardData] = useState(null);
   const [tiers, setTiers] = useState([]);
+  const [adminWalletSummary, setAdminWalletSummary] = useState(null);
 
   // Fetch tiers for the dropdown
   useEffect(() => {
@@ -38,11 +39,19 @@ export default function AdminHome() {
           period: selectedPeriod,
           tierId: selectedTier === "all" ? undefined : selectedTier
         };
-        const response = await adminAPI.getDashboardStats(params);
-        if (response.data?.success && response.data?.data) {
-          setDashboardData(response.data.data);
+        const [dashboardRes, walletRes] = await Promise.all([
+          adminAPI.getDashboardStats(params),
+          adminAPI.getAdminWalletSummary()
+        ]);
+        if (dashboardRes.data?.success && dashboardRes.data?.data) {
+          setDashboardData(dashboardRes.data.data);
         } else {
-          console.error('❌ Invalid response format:', response.data);
+          console.error('❌ Invalid response format:', dashboardRes.data);
+        }
+        if (walletRes.data?.success && walletRes.data?.data) {
+          setAdminWalletSummary(walletRes.data.data);
+        } else if (walletRes.data?.data) {
+          setAdminWalletSummary(walletRes.data.data);
         }
       } catch (error) {
         console.error('❌ Error fetching dashboard stats:', error);
@@ -130,6 +139,7 @@ export default function AdminHome() {
   const recommendedItemFeeTotal = dashboardData?.recommendedItemFee?.total || 0;
   // Total revenue = Commission + Platform Fee + Delivery Fee + GST + Recommended Item Fee
   const totalAdminEarnings = commissionTotal + platformFeeTotal + deliveryFeeTotal + gstTotal + recommendedItemFeeTotal;
+  const adminEscrowBalance = adminWalletSummary?.wallet?.escrowBalance || 0;
 
   // Additional stats
   const totalRestaurants = dashboardData?.restaurants?.total || 0;
@@ -204,6 +214,7 @@ export default function AdminHome() {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2
           })}`} helper={`Commission ₹${commissionTotal.toFixed(2)} + Platform ₹${platformFeeTotal.toFixed(2)} + Delivery ₹${deliveryFeeTotal.toFixed(2)} + GST ₹${gstTotal.toFixed(2)} + Rec ₹${recommendedItemFeeTotal.toFixed(2)}`} icon={<DollarSign className="h-5 w-5 text-green-600" />} accent="bg-green-200/40" onClick={() => navigate("/admin/transaction-report")} />
+          <MetricCard title="Escrow balance" value={`₹${adminEscrowBalance.toLocaleString("en-IN")}`} helper="Funds held for payouts" icon={<DollarSign className="h-5 w-5 text-amber-600" />} accent="bg-amber-200/40" onClick={() => navigate("/admin/transaction-report")} />
           <MetricCard title="Total restaurants" value={totalRestaurants.toLocaleString("en-IN")} helper="All registered restaurants" icon={<Store className="h-5 w-5 text-blue-600" />} accent="bg-blue-200/40" onClick={() => navigate("/admin/restaurants")} />
           <MetricCard title="Restaurant request pending" value={pendingRestaurantRequests.toLocaleString("en-IN")} helper="Awaiting approval" icon={<UserCheck className="h-5 w-5 text-orange-600" />} accent="bg-orange-200/40" onClick={() => navigate("/admin/restaurants/joining-request")} />
           <MetricCard title="Total delivery boy" value={totalDeliveryBoys.toLocaleString("en-IN")} helper="All delivery partners" icon={<Truck className="h-5 w-5 text-indigo-600" />} accent="bg-indigo-200/40" onClick={() => navigate("/admin/delivery-partners")} />

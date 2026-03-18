@@ -44,6 +44,7 @@ export default function WalletPage() {
   const [showPaymentDropdown, setShowPaymentDropdown] = useState(false)
   const [showFilterModal, setShowFilterModal] = useState(false)
   const [filterStatus, setFilterStatus] = useState("all")
+  const isWithdrawalDay = new Date().getDate() % 3 === 0
 
   // Get wallet state and calculate balances
   const [walletState, setWalletState] = useState(() => getWalletState())
@@ -471,6 +472,11 @@ export default function WalletPage() {
                 <p className="text-gray-600 text-sm md:text-base mb-6">
                   Secure and simple way to withdraw your earning
                 </p>
+                {!isWithdrawalDay && (
+                  <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs md:text-sm text-amber-800">
+                    Withdrawals are allowed only on calendar days 3, 6, 9, 12, ...
+                  </div>
+                )}
 
                 {/* Withdraw Amount Input */}
                 <div className="mb-6">
@@ -548,7 +554,7 @@ export default function WalletPage() {
                       }
                     }
                   }}
-                  disabled={!withdrawAmount || !selectedPaymentMethod}
+                  disabled={!withdrawAmount || !selectedPaymentMethod || !isWithdrawalDay}
                 >
                   Send Request
                 </Button>
@@ -617,4 +623,3 @@ export default function WalletPage() {
     </div>
   )
 }
-

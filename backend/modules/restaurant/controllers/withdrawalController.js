@@ -12,6 +12,11 @@ const logger = winston.createLogger({
   })]
 });
 
+const isRestaurantWithdrawalDay = (date = new Date()) => {
+  const day = date.getDate();
+  return day % 3 === 0;
+};
+
 /**
  * Create Withdrawal Request
  * POST /api/restaurant/withdrawal/request
@@ -27,6 +32,10 @@ export const createWithdrawalRequest = asyncHandler(async (req, res) => {
     }
     if (!amount || amount <= 0) {
       return errorResponse(res, 400, "Valid withdrawal amount is required");
+    }
+
+    if (!isRestaurantWithdrawalDay()) {
+      return errorResponse(res, 400, "Withdrawal requests are allowed only on calendar days 3, 6, 9, 12, ...");
     }
 
     // Get restaurant wallet

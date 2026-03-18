@@ -1,6 +1,8 @@
 import OrderSettlement from '../models/OrderSettlement.js';
 import AdminWallet from '../../admin/models/AdminWallet.js';
 import AuditLog from '../../admin/models/AuditLog.js';
+import Order from '../models/Order.js';
+import { creditRestaurantWallet, creditDeliveryWallet } from './settlementService.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -18,6 +20,8 @@ export const holdEscrow = async (orderId, userId, amount) => {
     settlement.escrowAmount = amount;
     settlement.escrowHeldAt = new Date();
     await settlement.save();
+
+    await creditAdminEscrowHold(settlement, amount);
 
     await AuditLog.createLog({
       entityType: 'order',
@@ -73,6 +77,10 @@ export const releaseEscrow = async (orderId) => {
       deliveryPartnerEligibleAt: new Date(now.getTime() + (7 * DAY_MS))
     };
 
+    // Auto-credit wallets so balances are visible immediately (payout still manual via withdrawal)
+    await creditRestaurantWallet(settlement);
+    await creditDeliveryWallet(settlement);
+
     await creditAdminWallet(
       settlement.orderId,
       settlement.adminEarning,
@@ -85,6 +93,17 @@ export const releaseEscrow = async (orderId) => {
     settlement.adminSettled = true;
 
     await settlement.save();
+
+    // Reduce escrow for prepaid orders; COD escrow is reduced on cash deposit
+    let paymentMethod = null;
+    try {
+      const order = await Order.findById(orderId).select('payment.method').lean();
+      paymentMethod = order?.payment?.method || null;
+    } catch (_) {}
+    const isCash = paymentMethod === 'cash' || paymentMethod === 'cod';
+    if (!isCash) {
+      await creditAdminEscrowRelease(settlement, settlement.escrowAmount);
+    }
 
     await AuditLog.createLog({
       entityType: 'order',
@@ -183,5 +202,52 @@ const creditAdminWallet = async (orderId, adminEarning, orderNumber, restaurantI
   } catch (error) {
     console.error('Error crediting admin wallet:', error);
     throw error;
+  }
+};
+
+const creditAdminEscrowHold = async (settlement, amount) => {
+  try {
+    const wallet = await AdminWallet.findOrCreate();
+    const alreadyHeld = wallet.transactions?.some(
+      (t) => t.type === 'escrow_hold' && t.orderId && String(t.orderId) === String(settlement.orderId)
+    );
+    if (alreadyHeld) {
+      return;
+    }
+    wallet.addTransaction({
+      amount,
+      type: 'escrow_hold',
+      status: 'Completed',
+      description: `Escrow hold for order ${settlement.orderNumber}`,
+      orderId: settlement.orderId,
+      restaurantId: settlement.restaurantId
+    });
+    await wallet.save();
+  } catch (error) {
+    console.error('Error crediting admin escrow hold:', error);
+  }
+};
+
+const creditAdminEscrowRelease = async (settlement, amount) => {
+  try {
+    if (!amount || amount <= 0) return;
+    const wallet = await AdminWallet.findOrCreate();
+    const alreadyReleased = wallet.transactions?.some(
+      (t) => t.type === 'escrow_release' && t.orderId && String(t.orderId) === String(settlement.orderId)
+    );
+    if (alreadyReleased) {
+      return;
+    }
+    wallet.addTransaction({
+      amount,
+      type: 'escrow_release',
+      status: 'Completed',
+      description: `Escrow release for order ${settlement.orderNumber}`,
+      orderId: settlement.orderId,
+      restaurantId: settlement.restaurantId
+    });
+    await wallet.save();
+  } catch (error) {
+    console.error('Error crediting admin escrow release:', error);
   }
 };

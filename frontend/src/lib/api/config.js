@@ -330,6 +330,7 @@ export const API_ENDPOINTS = {
     SETTLEMENTS_DELIVERY: "/admin/settlements/delivery",
     SETTLEMENTS_MARK_PROCESSED: "/admin/settlements/mark-processed",
     SETTLEMENTS_STATISTICS: "/admin/settlements/statistics",
+    SETTLEMENTS_ADMIN_WALLET: "/admin/settlements/admin-wallet",
     DELIVERY_BOY_COMMISSION: "/admin/delivery-boy-commission",
     DELIVERY_BOY_COMMISSION_BY_ID: "/admin/delivery-boy-commission/:id",
     DELIVERY_BOY_COMMISSION_STATUS: "/admin/delivery-boy-commission/:id/status",

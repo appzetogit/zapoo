@@ -127,15 +127,15 @@ export default function Checkout() {
 
   if (cart.length === 0) {
     return (
-      <AnimatedPage className="min-h-screen bg-gradient-to-b from-yellow-50/30 via-white to-orange-50/20 p-4">
+      <AnimatedPage className="min-h-screen bg-gradient-to-b from-yellow-50/30 via-white to-orange-50/20 dark:from-[#0a0a0a] dark:via-[#1a1a1a] dark:to-[#0a0a0a] p-4">
         <div className="max-w-4xl mx-auto space-y-6">
-          <Card>
+          <Card className="bg-white dark:bg-[#1a1a1a] border-0 dark:border-gray-800">
             <CardHeader>
-              <CardTitle className="text-base sm:text-lg md:text-xl">Checkout</CardTitle>
+              <CardTitle className="text-base sm:text-lg md:text-xl dark:text-white">Checkout</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-center py-12">
-                <p className="text-muted-foreground text-lg mb-4">Your cart is empty</p>
+                <p className="text-muted-foreground text-lg mb-4 dark:text-gray-400">Your cart is empty</p>
                 <Link to="/user/cart">
                   <Button>Go to Cart</Button>
                 </Link>
@@ -166,11 +166,11 @@ export default function Checkout() {
           <div className="lg:col-span-2 space-y-6">
             {/* Delivery Address */}
             <ScrollReveal delay={0.1}>
-              <Card>
+              <Card className="bg-white dark:bg-[#1a1a1a] border-0 dark:border-gray-800">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <MapPin className="h-5 w-5 text-yellow-600" />
-                    Delivery Address
+                    <span className="dark:text-white">Delivery Address</span>
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -188,8 +188,8 @@ export default function Checkout() {
                           <div
                             key={address.id}
                             className={`border-2 rounded-lg p-4 cursor-pointer transition-colors ${isSelected
-                              ? "border-yellow-500 bg-yellow-50"
-                              : "border-gray-200 hover:border-yellow-300"
+                              ? "border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20"
+                              : "border-gray-200 dark:border-gray-700 hover:border-yellow-300 dark:hover:border-yellow-500"
                               }`}
                             onClick={() => setSelectedAddress(address.id)}
                           >
@@ -222,11 +222,11 @@ export default function Checkout() {
 
             {/* Payment Method */}
             <ScrollReveal delay={0.2}>
-              <Card>
+              <Card className="bg-white dark:bg-[#1a1a1a] border-0 dark:border-gray-800">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <CreditCard className="h-5 w-5 text-yellow-600" />
-                    Payment Method
+                    <span className="dark:text-white">Payment Method</span>
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">

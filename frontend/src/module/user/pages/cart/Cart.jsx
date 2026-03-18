@@ -1157,7 +1157,7 @@ export default function Cart() {
                       e.target.src = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200&h=200&fit=crop";
                     }} />
                             <div className="absolute top-1 md:top-2 left-1 md:left-2">
-                              <div className="w-3.5 h-3.5 md:w-4 md:h-4 bg-white border border-green-600 flex items-center justify-center rounded">
+                              <div className="w-3.5 h-3.5 md:w-4 md:h-4 bg-white dark:bg-[#0f0f0f] border border-green-600 dark:border-green-500 flex items-center justify-center rounded">
                                 <div className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-green-600" />
                               </div>
                             </div>
@@ -1186,7 +1186,7 @@ export default function Cart() {
                         restaurant: cartRestaurantName,
                         restaurantId: cartRestaurantId
                       });
-                    }} className="absolute bottom-1 md:bottom-2 right-1 md:right-2 w-6 h-6 md:w-7 md:h-7 bg-white border border-red-600 rounded flex items-center justify-center shadow-sm hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+                    }} className="absolute bottom-1 md:bottom-2 right-1 md:right-2 w-6 h-6 md:w-7 md:h-7 bg-white dark:bg-[#0f0f0f] border border-red-600 dark:border-red-500 rounded flex items-center justify-center shadow-sm hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
                               <Plus className="h-3.5 w-3.5 md:h-4 md:w-4 text-red-600" />
                             </button>
                           </div>
@@ -1473,20 +1473,20 @@ export default function Cart() {
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
 
           {/* Modal Sheet */}
-          <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-2xl overflow-hidden" style={{
+          <div className="absolute bottom-0 left-0 right-0 bg-white dark:bg-[#1a1a1a] rounded-t-3xl shadow-2xl overflow-hidden" style={{
         animation: 'slideUpModal 0.4s cubic-bezier(0.16, 1, 0.3, 1)'
       }}>
             <div className="px-6 py-8">
               {/* Title */}
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">Placing your order</h2>
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Placing your order</h2>
 
               {/* Payment Info */}
               <div className="flex items-center gap-4 mb-5">
-                <div className="w-14 h-14 rounded-xl border border-gray-200 flex items-center justify-center bg-white shadow-sm">
-                  <CreditCard className="w-6 h-6 text-gray-600" />
+                <div className="w-14 h-14 rounded-xl border border-gray-200 dark:border-gray-700 flex items-center justify-center bg-white dark:bg-[#0f0f0f] shadow-sm">
+                  <CreditCard className="w-6 h-6 text-gray-600 dark:text-gray-300" />
                 </div>
                 <div>
-                  <p className="text-lg font-semibold text-gray-900">
+                  <p className="text-lg font-semibold text-gray-900 dark:text-white">
                     {selectedPaymentMethod === "razorpay" ? `Pay ₹${total.toFixed(2)} online (Razorpay)` : selectedPaymentMethod === "wallet" ? `Pay ₹${total.toFixed(2)} from Wallet` : `Pay on delivery (COD)`}
                   </p>
                 </div>
@@ -1494,18 +1494,18 @@ export default function Cart() {
 
               {/* Delivery Address */}
               <div className="flex items-center gap-4 mb-8">
-                <div className="w-14 h-14 rounded-xl border border-gray-200 flex items-center justify-center bg-gray-50">
-                  <svg className="w-7 h-7 text-gray-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <div className="w-14 h-14 rounded-xl border border-gray-200 dark:border-gray-700 flex items-center justify-center bg-gray-50 dark:bg-gray-800">
+                  <svg className="w-7 h-7 text-gray-600 dark:text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                     <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
                     <path d="M9 22V12h6v10" />
                   </svg>
                 </div>
                 <div>
-                  <p className="text-lg font-semibold text-gray-900">Delivering to Location</p>
-                  <p className="text-sm text-gray-600 mt-1">
+                  <p className="text-lg font-semibold text-gray-900 dark:text-white">Delivering to Location</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
                     {defaultAddress ? formatFullAddress(defaultAddress) || defaultAddress?.formattedAddress || defaultAddress?.address || "Address" : "Add address"}
                   </p>
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
                     {defaultAddress ? formatFullAddress(defaultAddress) || "Address" : "Address"}
                   </p>
                 </div>
@@ -1513,7 +1513,7 @@ export default function Cart() {
 
               {/* Progress Bar */}
               <div className="relative mb-6">
-                <div className="h-2.5 bg-gray-200 rounded-full overflow-hidden">
+                <div className="h-2.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                   <div className="h-full bg-gradient-to-r from-green-500 to-green-600 rounded-full transition-all duration-100 ease-linear" style={{
                 width: `${orderProgress}%`,
                 boxShadow: '0 0 10px rgba(34, 197, 94, 0.5)'
@@ -1586,7 +1586,7 @@ export default function Cart() {
           damping: 20,
           stiffness: 100,
           delay: 0.1
-        }} className="relative z-10 w-[92%] max-w-lg bg-white/70 backdrop-blur-3xl border border-white/50 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.1)] p-8 md:p-12 rounded-[2.5rem] md:rounded-[3.5rem] flex flex-col items-center text-center">
+        }} className="relative z-10 w-[92%] max-w-lg bg-white/70 dark:bg-[#1a1a1a]/80 backdrop-blur-3xl border border-white/50 dark:border-white/10 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.1)] p-8 md:p-12 rounded-[2.5rem] md:rounded-[3.5rem] flex flex-col items-center text-center">
               {/* Success Tick Circle */}
               <div className="relative mb-8 md:mb-10">
                 <motion.div initial={{
@@ -1640,11 +1640,11 @@ export default function Cart() {
                 <h2 className="text-3xl md:text-5xl font-black text-[#FF5200] mb-3 tracking-tight">Order Placed!</h2>
                 <div className="flex items-center justify-center gap-2 mb-6">
                   <MapPin className="w-5 h-5 text-red-500" />
-                  <h3 className="text-xl md:text-2xl font-bold text-gray-900">
+                  <h3 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">
                     {defaultAddress?.city || "Your Location"}
                   </h3>
                 </div>
-                <p className="text-base md:text-xl text-gray-600 font-medium mb-8 md:mb-10">Your delicious food is being prepared with care</p>
+                <p className="text-base md:text-xl text-gray-600 dark:text-gray-300 font-medium mb-8 md:mb-10">Your delicious food is being prepared with care</p>
               </div>
 
               {/* Order Details Preview Card */}
@@ -1656,25 +1656,25 @@ export default function Cart() {
             y: 0
           }} transition={{
             delay: 0.6
-          }} className="w-full bg-white/60 rounded-3xl p-5 mb-8 md:mb-10 border border-white/50 flex items-center justify-between shadow-sm">
+          }} className="w-full bg-white/60 dark:bg-[#0f0f0f]/70 rounded-3xl p-5 mb-8 md:mb-10 border border-white/50 dark:border-white/10 flex items-center justify-between shadow-sm">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-indigo-100 rounded-2xl flex items-center justify-center">
-                    <MapPin className="w-6 h-6 text-indigo-600" />
+                  <div className="w-12 h-12 bg-indigo-100 dark:bg-indigo-900/30 rounded-2xl flex items-center justify-center">
+                    <MapPin className="w-6 h-6 text-indigo-600 dark:text-indigo-300" />
                   </div>
                   <div className="text-left">
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Delivering to</p>
-                    <p className="text-sm font-bold text-gray-800 truncate max-w-[120px] md:max-w-[160px]">
+                    <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest leading-none mb-1">Delivering to</p>
+                    <p className="text-sm font-bold text-gray-800 dark:text-gray-100 truncate max-w-[120px] md:max-w-[160px]">
                       {defaultAddress?.formattedAddress?.split(',')[0] || defaultAddress?.city || "Your Location"}
                     </p>
                   </div>
                 </div>
 
-                <div className="h-10 w-[1px] bg-gray-200 mx-2" />
+                <div className="h-10 w-[1px] bg-gray-200 dark:bg-gray-700 mx-2" />
 
                 <div className="text-right flex flex-col items-end">
-                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Estimated Time</p>
-                  <div className="flex items-center gap-1.5 font-bold text-gray-800">
-                    <Clock className="w-4 h-4 text-emerald-500" />
+                  <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest leading-none mb-1">Estimated Time</p>
+                  <div className="flex items-center gap-1.5 font-bold text-gray-800 dark:text-gray-100">
+                    <Clock className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />
                     <span className="text-sm">{restaurantData?.estimatedDeliveryTime || "25-30 mins"}</span>
                   </div>
                 </div>

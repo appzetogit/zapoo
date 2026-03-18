@@ -1691,6 +1691,10 @@ export const adminAPI = {
     return apiClient.get(API_ENDPOINTS.ADMIN.SETTLEMENTS_STATISTICS, { params });
   },
 
+  getAdminWalletSummary: () => {
+    return apiClient.get(API_ENDPOINTS.ADMIN.SETTLEMENTS_ADMIN_WALLET);
+  },
+
   // Tier Management
   getAllTiers: (params = {}) => {
     return apiClient.get(API_ENDPOINTS.ADMIN.TIERS, { params });

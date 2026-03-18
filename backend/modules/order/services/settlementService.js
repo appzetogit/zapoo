@@ -4,7 +4,7 @@ import DeliveryWallet from '../../delivery/models/DeliveryWallet.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-const creditRestaurantWallet = async (settlement) => {
+export const creditRestaurantWallet = async (settlement) => {
   if (!settlement.restaurantId || settlement.restaurantEarning?.netEarning <= 0) return;
 
   const wallet = await RestaurantWallet.findOrCreateByRestaurantId(settlement.restaurantId);
@@ -27,7 +27,7 @@ const creditRestaurantWallet = async (settlement) => {
   await wallet.save();
 };
 
-const creditDeliveryWallet = async (settlement) => {
+export const creditDeliveryWallet = async (settlement) => {
   if (!settlement.deliveryPartnerId || settlement.deliveryPartnerEarning?.totalEarning <= 0) return;
 
   const wallet = await DeliveryWallet.findOrCreateByDeliveryId(settlement.deliveryPartnerId);

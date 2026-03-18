@@ -240,7 +240,8 @@ export const getAdminWalletSummary = asyncHandler(async (req, res) => {
         totalGST: wallet.totalGST,
         totalRecommendedFee: wallet.totalRecommendedFee || 0,
         totalWithdrawn: wallet.totalWithdrawn,
-        pendingBalance: wallet.totalBalance - wallet.totalWithdrawn
+        pendingBalance: wallet.totalBalance - wallet.totalWithdrawn,
+        escrowBalance: wallet.totalEscrow || 0
       },
       recentTransactions
     });
