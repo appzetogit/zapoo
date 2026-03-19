@@ -28,7 +28,13 @@ const logger = winston.createLogger({
  */
 export const createOrder = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user?._id || req.user?.id;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required'
+      });
+    }
     const {
       items,
       address,

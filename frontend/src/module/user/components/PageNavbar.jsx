@@ -675,36 +675,41 @@ export default function PageNavbar({
   const iconFill = textColor === "white" ? "white" : "black";
   const ringColor = textColor === "white" ? "ring-white/30" : "ring-gray-800/30";
   const zIndexClass = zIndex === 50 ? "z-50" : "z-20";
-  return <nav className={`md:hidden relative ${zIndexClass} w-full px-1 pr-2 sm:px-2 sm:pr-3 md:px-3 lg:px-6 xl:px-8 py-1.5 sm:py-3 lg:py-4`} onClick={onNavClick}>
+  const navBgClass = textColor === "white" ? "bg-white/10 backdrop-blur-md border-b border-white/20" : "bg-white/90 backdrop-blur-md border-b border-black/5 shadow-sm";
+  return <nav className={`md:hidden relative ${zIndexClass} w-full px-2 sm:px-3 md:px-4 lg:px-6 xl:px-8 py-2 sm:py-3 ${navBgClass}`} onClick={onNavClick}>
       <div className="flex items-center justify-between gap-2 sm:gap-3 md:gap-4 lg:gap-6 max-w-7xl mx-auto">
         {/* Left: Location - Hidden on desktop, shown on mobile */}
-        <div className="flex md:hidden items-center gap-3 sm:gap-4 min-w-0">
+        <div className="flex md:hidden items-center gap-2 sm:gap-3 min-w-0 flex-1">
           {/* Location Button */}
-          <Button variant="ghost" onClick={handleLocationClick} disabled={loading} className="h-auto px-0 py-0 hover:bg-transparent transition-colors flex-shrink-0">
+          <Button variant="ghost" onClick={handleLocationClick} disabled={loading} className={`h-auto px-2 py-1 rounded-lg transition-colors flex-shrink-0 max-w-full ${textColor === "white" ? "hover:bg-white/10" : "hover:bg-black/5"}`}>
             {loading ? <span className={`text-sm font-bold ${textColorClass} ${textColor === "white" ? "drop-shadow-lg" : ""}`}>
                 Loading...
-              </span> : <div className="flex flex-col items-start min-w-0">
-                <div className="flex items-center gap-1.5">
-
-                  <span className={`text-md sm:text-lg font-bold ${textColorClass} whitespace-nowrap ${textColor === "white" ? "drop-shadow-lg" : ""}`}>
+              </span> : <div className="flex items-start gap-2 min-w-0">
+                <div className={`mt-0.5 h-7 w-7 rounded-full flex items-center justify-center ${textColor === "white" ? "bg-white/15 ring-1 ring-white/30" : "bg-black/5 ring-1 ring-black/10"}`}>
+                  <FaLocationDot className={`h-3.5 w-3.5 ${textColorClass}`} />
+                </div>
+                <div className="flex flex-col items-start min-w-0 max-w-[52vw] sm:max-w-[56vw] overflow-hidden">
+                  <div className="flex items-center gap-1.5 min-w-0 max-w-full overflow-hidden">
+                    <span title={mainLocationName} className={`text-[15px] sm:text-base font-bold ${textColorClass} truncate max-w-full ${textColor === "white" ? "drop-shadow-lg" : ""}`}>
                     {mainLocationName}
                   </span>
-                  <ChevronDown className={`h-4 w-4 sm:h-5 sm:w-5 ${textColorClass} flex-shrink-0 ${textColor === "white" ? "drop-shadow-lg" : ""}`} strokeWidth={2.5} />
+                    <ChevronDown className={`h-4 w-4 sm:h-5 sm:w-5 ${textColorClass} flex-shrink-0 ${textColor === "white" ? "drop-shadow-lg" : ""}`} strokeWidth={2.5} />
+                  </div>
+                  {/* Show sub location (city, state) in second line */}
+                  {subLocationName && <span title={subLocationName} className={`text-[11px] sm:text-xs font-semibold ${textColorClass}${textColor === "white" ? "/90" : ""} truncate max-w-full mt-0.5 ${textColor === "white" ? "drop-shadow-md" : ""}`}>
+                      {subLocationName}
+                    </span>}
                 </div>
-                {/* Show sub location (city, state) in second line */}
-                {subLocationName && <span className={`text-xs font-bold ${textColorClass}${textColor === "white" ? "/90" : ""} whitespace-nowrap mt-0.5 ${textColor === "white" ? "drop-shadow-md" : ""}`}>
-                    {subLocationName}
-                  </span>}
               </div>}
           </Button>
         </div>
 
         {/* Center: Company Logo or Name - Show on all screen sizes */}
-        <Link to="/user" className="flex items-center justify-center">
-          {logoUrl ? <img src={logoUrl} alt="Company Logo" className="h-12 w-20 mr-3 sm:h-10 sm:w-10 md:h-12 md:w-12 object-contain" crossOrigin="anonymous" onError={e => {
+        <Link to="/user" className="flex items-center justify-center flex-shrink-0">
+          {logoUrl ? <img src={logoUrl} alt="Company Logo" className="h-9 w-9 sm:h-10 sm:w-10 md:h-11 md:w-11 object-contain" crossOrigin="anonymous" onError={e => {
           // Fallback to default logo if API logo fails
           e.target.src = zapooFoodLogo;
-        }} /> : <img src={zapooFoodLogo} alt={`${companyName} Logo`} className="h-12 w-20 mr-3 sm:h-10 sm:w-10 md:h-12 md:w-12 object-contain" />}
+        }} /> : <img src={zapooFoodLogo} alt={`${companyName} Logo`} className="h-9 w-9 sm:h-10 sm:w-10 md:h-11 md:w-11 object-contain" />}
         </Link>
 
         {/* Right: Actions - Hidden on desktop, shown on mobile */}

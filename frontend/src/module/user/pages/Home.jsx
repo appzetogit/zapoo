@@ -582,6 +582,11 @@ export default function Home() {
   // Fetch restaurants from API with filters
   const fetchRestaurants = useCallback(async (filters = {}) => {
     try {
+      if (isOutOfService) {
+        setRestaurantsData([]);
+        setLoadingRestaurants(false);
+        return;
+      }
       setLoadingRestaurants(true);
 
       // Build query parameters from filters
@@ -773,7 +778,7 @@ export default function Home() {
     } finally {
       setLoadingRestaurants(false);
     }
-  }, [zoneId]);
+  }, [zoneId, location?.latitude, location?.longitude, isOutOfService]);
 
   // Fetch restaurants when appliedFilters change
   useEffect(() => {

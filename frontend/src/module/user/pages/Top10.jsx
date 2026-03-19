@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { heroBannerAPI } from "@/lib/api"
 import { useLocation } from "../hooks/useLocation"
+import { useZone } from "../hooks/useZone"
 import { toast } from "sonner"
 
 // Import banner
@@ -13,6 +14,7 @@ import top10Banner from "@/assets/top10pagebanner.png"
 export default function Top10() {
   const navigate = useNavigate()
   const { location } = useLocation()
+  const { zoneId, isOutOfService } = useZone(location)
   const [favorites, setFavorites] = useState(new Set())
   const [top10Restaurants, setTop10Restaurants] = useState([])
   const [loading, setLoading] = useState(true)
@@ -22,9 +24,16 @@ export default function Top10() {
   useEffect(() => {
     const fetchTop10Restaurants = async () => {
       try {
+        if (isOutOfService) {
+          setTop10Restaurants([])
+          setError(null)
+          setLoading(false)
+          return
+        }
         setLoading(true)
         setError(null)
         const params = {}
+        if (zoneId) params.zoneId = zoneId
         if (location?.latitude != null && location?.longitude != null) {
           params.latitude = location.latitude
           params.longitude = location.longitude
@@ -49,7 +58,7 @@ export default function Top10() {
     }
 
     fetchTop10Restaurants()
-  }, [location?.latitude, location?.longitude])
+  }, [location?.latitude, location?.longitude, zoneId, isOutOfService])
 
   const toggleFavorite = (id) => {
     setFavorites(prev => {
@@ -214,4 +223,3 @@ export default function Top10() {
     </div>
   )
 }
-

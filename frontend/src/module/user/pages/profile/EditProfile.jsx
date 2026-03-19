@@ -224,6 +224,56 @@ export default function EditProfile() {
   };
   const handleMobileChange = () => {};
   const handleEmailChange = () => {};
+  const dateFieldSx = {
+    '& .MuiOutlinedInput-root': {
+      height: '48px',
+      borderRadius: '8px',
+      backgroundColor: '#ffffff',
+      color: '#111827',
+      '& fieldset': {
+        borderColor: '#d1d5db'
+      },
+      '&:hover fieldset': {
+        borderColor: '#9ca3af'
+      },
+      '&.Mui-focused fieldset': {
+        borderColor: '#16a34a',
+        borderWidth: '1px'
+      },
+      '& .MuiSvgIcon-root': {
+        color: '#6b7280'
+      }
+    },
+    '& .MuiInputBase-input': {
+      padding: '12px 14px',
+      fontSize: '16px',
+      color: '#111827'
+    },
+    '.dark & .MuiOutlinedInput-root': {
+      backgroundColor: '#1a1a1a',
+      color: '#f3f4f6',
+      '& fieldset': {
+        borderColor: '#374151'
+      },
+      '&:hover fieldset': {
+        borderColor: '#4b5563'
+      },
+      '&.Mui-focused fieldset': {
+        borderColor: '#22c55e',
+        borderWidth: '1px'
+      },
+      '& .MuiSvgIcon-root': {
+        color: '#9ca3af'
+      }
+    },
+    '.dark & .MuiInputBase-input': {
+      color: '#f3f4f6'
+    },
+    '.dark & .MuiInputBase-input::placeholder': {
+      color: '#9ca3af',
+      opacity: 1
+    }
+  };
   return <div className="min-h-screen bg-[#f5f5f5] dark:bg-[#0a0a0a]">
       {/* Header */}
       <div className="bg-white dark:bg-[#1a1a1a] sticky top-0 z-10 border-b border-gray-100 dark:border-gray-800">
@@ -299,26 +349,7 @@ export default function EditProfile() {
                 <DatePicker value={formData.dateOfBirth} onChange={newValue => handleChange('dateOfBirth', newValue)} slotProps={{
                 textField: {
                   className: "w-full",
-                  sx: {
-                    '& .MuiOutlinedInput-root': {
-                      height: '48px',
-                      borderRadius: '8px',
-                      '& fieldset': {
-                        borderColor: '#d1d5db'
-                      },
-                      '&:hover fieldset': {
-                        borderColor: '#9ca3af'
-                      },
-                      '&.Mui-focused fieldset': {
-                        borderColor: '#16a34a',
-                        borderWidth: '1px'
-                      }
-                    },
-                    '& .MuiInputBase-input': {
-                      padding: '12px 14px',
-                      fontSize: '16px'
-                    }
-                  }
+                  sx: dateFieldSx
                 }
               }} />
               </LocalizationProvider>
@@ -333,26 +364,7 @@ export default function EditProfile() {
                 <DatePicker value={formData.anniversary} onChange={newValue => handleChange('anniversary', newValue)} slotProps={{
                 textField: {
                   className: "w-full",
-                  sx: {
-                    '& .MuiOutlinedInput-root': {
-                      height: '48px',
-                      borderRadius: '8px',
-                      '& fieldset': {
-                        borderColor: '#d1d5db'
-                      },
-                      '&:hover fieldset': {
-                        borderColor: '#9ca3af'
-                      },
-                      '&.Mui-focused fieldset': {
-                        borderColor: '#16a34a',
-                        borderWidth: '1px'
-                      }
-                    },
-                    '& .MuiInputBase-input': {
-                      padding: '12px 14px',
-                      fontSize: '16px'
-                    }
-                  }
+                  sx: dateFieldSx
                 }
               }} />
               </LocalizationProvider>
@@ -367,7 +379,7 @@ export default function EditProfile() {
                 <SelectTrigger className="h-12 text-base border border-gray-300 dark:border-gray-700 focus:border-green-600 focus:ring-1 focus:ring-green-600 rounded-lg bg-white dark:bg-[#1a1a1a] text-gray-900 dark:text-white">
                   <SelectValue placeholder="Gender" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-white dark:bg-[#1a1a1a] text-gray-900 dark:text-white border border-gray-200 dark:border-gray-700">
                   {genderOptions.map(option => <SelectItem key={option.value} value={option.value}>
                       {option.label}
                     </SelectItem>)}

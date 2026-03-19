@@ -95,10 +95,6 @@ const helpCategories = [
         answer: "Delivery fees vary by restaurant and distance, typically ranging from $2.99 to $5.99. The exact fee is shown before you place your order."
       },
       {
-        question: "Can I schedule a delivery for later?",
-        answer: "Yes, you can schedule orders for up to 7 days in advance during checkout. Select your preferred delivery time."
-      },
-      {
         question: "What if my order is late?",
         answer: "If your order is significantly delayed, contact support. We'll investigate and may provide compensation or a refund."
       }

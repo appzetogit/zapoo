@@ -4,6 +4,7 @@ import Restaurant from '../../restaurant/models/Restaurant.js';
 import Delivery from '../../delivery/models/Delivery.js';
 import OrderEvent from '../models/OrderEvent.js';
 import ETALog from '../models/ETALog.js';
+import mongoose from 'mongoose';
 
 /**
  * ETA Calculation Service
@@ -44,7 +45,15 @@ class ETACalculationService {
 
     try {
       // 1. Get restaurant data
-      const restaurant = await Restaurant.findOne({ restaurantId });
+      const restaurant = await Restaurant.findOne({
+        $or: [
+          ...(mongoose.Types.ObjectId.isValid(restaurantId) && String(restaurantId).length === 24
+            ? [{ _id: restaurantId }]
+            : []),
+          { restaurantId: restaurantId },
+          { slug: restaurantId }
+        ]
+      });
       if (!restaurant) {
         throw new Error('Restaurant not found');
       }
@@ -550,4 +559,3 @@ class ETACalculationService {
 }
 
 export default new ETACalculationService();
-

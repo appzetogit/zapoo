@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from "react";
-import { FileText, Calendar, Package } from "lucide-react";
+import { FileText, Package } from "lucide-react";
 import { adminAPI } from "@/lib/api";
 import { toast } from "sonner";
 import OrdersTopbar from "../../components/orders/OrdersTopbar";
@@ -17,11 +17,6 @@ const statusConfig = {
     title: "All Orders",
     color: "emerald",
     icon: FileText
-  },
-  "scheduled": {
-    title: "Scheduled Orders",
-    color: "blue",
-    icon: Calendar
   },
   "pending": {
     title: "Pending Orders",

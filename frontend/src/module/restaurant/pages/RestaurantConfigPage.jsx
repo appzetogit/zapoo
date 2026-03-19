@@ -33,7 +33,6 @@ export default function RestaurantConfigPage() {
   const [homeDelivery, setHomeDelivery] = useState(true);
   const [takeAway, setTakeAway] = useState(true);
   const [instanceOrder, setInstanceOrder] = useState(true);
-  const [scheduleOrder, setScheduleOrder] = useState(true);
   const [subscriptionOrder, setSubscriptionOrder] = useState(false);
   const [minOrderAmount, setMinOrderAmount] = useState("0.0");
 
@@ -230,10 +229,6 @@ export default function RestaurantConfigPage() {
                 <div className="flex items-center justify-between">
                   <span className="text-sm md:text-base text-gray-700">Instance Order</span>
                   <ToggleSwitch enabled={instanceOrder} onChange={setInstanceOrder} />
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm md:text-base text-gray-700">Schedule Order</span>
-                  <ToggleSwitch enabled={scheduleOrder} onChange={setScheduleOrder} />
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm md:text-base text-gray-700">Subscription Order</span>

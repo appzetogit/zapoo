@@ -7,6 +7,7 @@ import { OrdersProvider } from "../context/OrdersContext"
 import { useFCMNotification } from "@/hooks/useFCMNotification"
 import BottomNavigation from "./BottomNavigation"
 import DesktopNavbar from "./DesktopNavbar"
+import { useTheme } from "@/context/ThemeContext"
 
 const SearchOverlay = lazy(() => import("./SearchOverlay"))
 const LocationSelectorOverlay = lazy(() => import("./LocationSelectorOverlay"))
@@ -114,6 +115,7 @@ function LocationSelectorProvider({ children }) {
 
 export default function UserLayout() {
   const location = useLocation()
+  const { theme } = useTheme()
 
   const isLoggedIn = localStorage.getItem("user_authenticated") === "true"
   useFCMNotification({ isLoggedIn })
@@ -132,7 +134,7 @@ export default function UserLayout() {
     location.pathname.startsWith("/user/profile")
 
   return (
-    <div className="theme-orange min-h-screen bg-[#f5f5f5] dark:bg-[#0a0a0a] transition-colors duration-200">
+    <div className={`theme-orange min-h-screen bg-[#f5f5f5] dark:bg-[#0a0a0a] transition-colors duration-200 ${theme === "dark" ? "dark" : ""}`}>
       <CartProvider>
         <ProfileProvider>
           <OrdersProvider>

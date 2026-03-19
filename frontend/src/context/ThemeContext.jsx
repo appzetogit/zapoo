@@ -19,6 +19,10 @@ export const ThemeProvider = ({ children }) => {
     if (savedTheme) {
       return savedTheme;
     }
+    const savedAppearance = localStorage.getItem('userAppearance');
+    if (savedAppearance) {
+      return savedAppearance;
+    }
     // Default to light
     return 'light';
   });
@@ -42,6 +46,7 @@ export const ThemeProvider = ({ children }) => {
     
     // Save to localStorage
     localStorage.setItem('appTheme', theme);
+    localStorage.setItem('userAppearance', theme);
   }, [theme, location.pathname]);
 
   const toggleTheme = () => {

@@ -16,7 +16,10 @@
 const FIREBASE_RTDB_URL =
   import.meta.env.VITE_FIREBASE_DATABASE_URL ||
   'https://zapoo-d23ea-default-rtdb.asia-southeast1.firebasedatabase.app';
-const ENV_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
+const ENV_API_KEY =
+  import.meta.env.VITE_GOOGLE_MAPS_API_KEY ||
+  import.meta.env.VITE_MAPS_API_KEY ||
+  '';
 
 let cachedApiKey = null;
 let apiKeyPromise = null;

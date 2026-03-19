@@ -61,10 +61,7 @@ export default function RestaurantDetails() {
   const [selectedItem, setSelectedItem] = useState(null);
   const [showFilterSheet, setShowFilterSheet] = useState(false);
   const [showLocationSheet, setShowLocationSheet] = useState(false);
-  const [showScheduleSheet, setShowScheduleSheet] = useState(false);
   const [showOffersSheet, setShowOffersSheet] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(null);
-  const [selectedTimeSlot, setSelectedTimeSlot] = useState(null);
   const [expandedCoupons, setExpandedCoupons] = useState(new Set());
   const [showMenuSheet, setShowMenuSheet] = useState(false);
   const [showLargeOrderMenu, setShowLargeOrderMenu] = useState(false);
@@ -90,6 +87,13 @@ export default function RestaurantDetails() {
   useEffect(() => {
     const fetchRestaurant = async () => {
       if (!slug) return;
+      if (isOutOfService) {
+        setRestaurant(null);
+        setRestaurantError('You are outside the service zone. Please select a location within the service area.');
+        setOutOfRange(false);
+        setLoadingRestaurant(false);
+        return;
+      }
 
       // Prevent re-fetching if we've already fetched for this slug and zoneId hasn't changed meaningfully
       // Only re-fetch if slug changed or if we're waiting for zoneId and it just became available
@@ -518,7 +522,7 @@ export default function RestaurantDetails() {
       return;
     }
     fetchRestaurant();
-  }, [slug, zoneId, loadingZone, restaurant?.slug]);
+  }, [slug, zoneId, loadingZone, restaurant?.slug, isOutOfService]);
 
   // Track previous values to prevent unnecessary recalculations
   const prevCoordsRef = useRef({
@@ -659,21 +663,21 @@ export default function RestaurantDetails() {
       toast.error('Restaurant ID is missing. Please refresh the page.');
       return;
     }
-    try {
-      // Prepare cart item with all required properties
-      const cartItem = {
-        id: item.id,
-        name: item.name,
-        price: item.price,
-        image: item.image,
-        restaurant: restaurant.name,
-        restaurantId: validRestaurantId,
-        description: item.description,
-        originalPrice: item.originalPrice,
-        isVeg: item.isVeg !== false,
-        isRecommended: item.isRecommended === true
-      };
+    // Prepare cart item with all required properties
+    const cartItem = {
+      id: item.id,
+      name: item.name,
+      price: item.price,
+      image: item.image,
+      restaurant: restaurant.name,
+      restaurantId: validRestaurantId,
+      description: item.description,
+      originalPrice: item.originalPrice,
+      isVeg: item.isVeg !== false,
+      isRecommended: item.isRecommended === true
+    };
 
+    try {
       // Add to cart logic
       if (newQuantity > (quantities[item.id] || 0)) {
         addToCart(cartItem, event);
@@ -2212,108 +2216,6 @@ export default function RestaurantDetails() {
                         </div>
                       </Button>
                     </div>
-                  </div>
-                </motion.div>
-              </>}
-          </AnimatePresence>, document.body)}
-
-      {/* Schedule Delivery Time Modal */}
-      {typeof window !== "undefined" && createPortal(<AnimatePresence>
-            {showScheduleSheet && <>
-                {/* Backdrop */}
-                <motion.div className="fixed inset-0 bg-black/40 z-[9999]" initial={{
-          opacity: 0
-        }} animate={{
-          opacity: 1
-        }} exit={{
-          opacity: 0
-        }} transition={{
-          duration: 0.2
-        }} onClick={() => setShowScheduleSheet(false)} />
-
-                {/* Schedule Bottom Sheet */}
-                <motion.div className="fixed left-0 right-0 bottom-0 md:left-1/2 md:right-auto md:-translate-x-1/2 md:bottom-auto md:top-1/2 md:-translate-y-1/2 z-[10000] bg-white dark:bg-[#1a1a1a] rounded-t-3xl md:rounded-3xl shadow-2xl max-h-[60vh] md:max-h-[90vh] md:max-w-lg w-full md:w-auto flex flex-col" initial={{
-          y: "100%"
-        }} animate={{
-          y: 0
-        }} exit={{
-          y: "100%"
-        }} transition={{
-          duration: 0.15,
-          type: "spring",
-          damping: 30,
-          stiffness: 400
-        }} onClick={e => e.stopPropagation()}>
-                  {/* Close Button - Centered Overlapping */}
-                  <div className="absolute -top-5 left-1/2 -translate-x-1/2 z-10">
-                    <button onClick={() => setShowScheduleSheet(false)} className="h-10 w-10 rounded-full bg-gray-800 flex items-center justify-center hover:bg-gray-900 transition-colors shadow-lg">
-                      <X className="h-5 w-5 text-white" />
-                    </button>
-                  </div>
-
-                  {/* Scrollable Content */}
-                  <div className="flex-1 overflow-y-auto px-4 pt-10 pb-4">
-                    {/* Title */}
-                    <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4 text-center">
-                      Select your delivery time
-                    </h2>
-
-                    {/* Date Selection */}
-                    <div className="flex items-center gap-3 mb-4 overflow-x-auto pb-2 scrollbar-hide">
-                      {(() => {
-                const today = new Date();
-                const tomorrow = new Date(today);
-                tomorrow.setDate(tomorrow.getDate() + 1);
-                const dayAfter = new Date(today);
-                dayAfter.setDate(dayAfter.getDate() + 2);
-                const dates = [{
-                  date: today,
-                  label: "Today"
-                }, {
-                  date: tomorrow,
-                  label: "Tomorrow"
-                }, {
-                  date: dayAfter,
-                  label: dayAfter.toLocaleDateString('en-US', {
-                    weekday: 'short'
-                  })
-                }];
-                return dates.map((item, index) => {
-                  const dateStr = item.date.toISOString().split('T')[0];
-                  const day = String(item.date.getDate()).padStart(2, '0');
-                  const month = item.date.toLocaleDateString('en-US', {
-                    month: 'short'
-                  });
-                  const isSelected = selectedDate === dateStr;
-                  return <button key={index} onClick={() => setSelectedDate(dateStr)} className="flex flex-col items-center gap-0.5 flex-shrink-0 pb-1">
-                              <span className={`text-sm font-medium ${isSelected ? 'text-gray-900 dark:text-white' : 'text-gray-500 dark:text-gray-400'}`}>
-                                {day} {month} {item.label}
-                              </span>
-                              {isSelected && <div className="h-0.5 w-full bg-red-500 mt-0.5" />}
-                            </button>;
-                });
-              })()}
-                    </div>
-
-                    {/* Time Slot Selection */}
-                    <div className="space-y-2 mb-4">
-                      {["6:30 - 7 PM", "7 - 7:30 PM", "7:30 - 8 PM", "8 - 8:30 PM"].map((slot, index) => {
-                const isSelected = selectedTimeSlot === slot;
-                return <button key={index} onClick={() => setSelectedTimeSlot(slot)} className={`w-full text-left px-4 py-2.5 rounded-lg transition-all ${isSelected ? "bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600" : "bg-white dark:bg-[#2a2a2a] text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 border border-transparent"}`}>
-                            <span className="text-sm font-medium">{slot}</span>
-                          </button>;
-              })}
-                    </div>
-                  </div>
-
-                  {/* Confirm Button - Fixed at bottom */}
-                  <div className="px-4 pb-4 pt-2 border-t border-gray-100">
-                    <Button className="w-full bg-red-500 hover:bg-red-600 text-white py-3 rounded-lg font-semibold" onClick={() => {
-              setShowScheduleSheet(false);
-              // Handle schedule confirmation
-            }}>
-                      Confirm
-                    </Button>
                   </div>
                 </motion.div>
               </>}

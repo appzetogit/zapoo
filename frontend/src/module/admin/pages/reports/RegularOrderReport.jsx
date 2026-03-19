@@ -7,7 +7,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { exportReportsToCSV, exportReportsToExcel, exportReportsToPDF, exportReportsToJSON } from "../../components/reports/reportsExportUtils"
 import searchIcon from "../../assets/Dashboard-icons/image8.png"
 import exportIcon from "../../assets/Dashboard-icons/image9.png"
-import scheduledIcon from "../../assets/Dashboard-icons/image24.png"
 import pendingIcon from "../../assets/Dashboard-icons/image25.png"
 import acceptedIcon from "../../assets/Dashboard-icons/image26.png"
 import processingIcon from "../../assets/Dashboard-icons/image27.png"
@@ -19,7 +18,6 @@ import paymentFailedIcon from "../../assets/Dashboard-icons/image27.png"
 import refundedIcon from "../../assets/Dashboard-icons/image25.png"
 
 const statusMeta = {
-  Scheduled: { label: "Scheduled Orders", color: "text-amber-600", bg: "bg-amber-50", icon: scheduledIcon },
   Pending: { label: "Pending Orders", color: "text-[#FF5200]", bg: "bg-orange-50", icon: pendingIcon },
   Accepted: { label: "Accepted Orders", color: "text-sky-600", bg: "bg-sky-50", icon: acceptedIcon },
   Processing: { label: "Processing Orders", color: "text-indigo-600", bg: "bg-indigo-50", icon: processingIcon },
@@ -651,5 +649,4 @@ export default function RegularOrderReport() {
     </div>
   )
 }
-
 

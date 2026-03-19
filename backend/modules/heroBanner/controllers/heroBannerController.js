@@ -6,6 +6,7 @@ import GourmetRestaurant from '../models/GourmetRestaurant.js';
 import Under250Banner from '../models/Under250Banner.js';
 import Restaurant from '../../restaurant/models/Restaurant.js';
 import AdminCategoryManagement from '../../admin/models/AdminCategoryManagement.js';
+import Zone from '../../admin/models/Zone.js';
 import { successResponse, errorResponse } from '../../../shared/utils/response.js';
 import { calculateDistance } from '../../order/services/orderCalculationService.js';
 
@@ -864,16 +865,44 @@ export const getAllTop10Restaurants = async (req, res) => {
  */
 export const getTop10Restaurants = async (req, res) => {
   try {
-    const { latitude, longitude } = req.query;
+    const { latitude, longitude, zoneId } = req.query;
     const userLat = latitude ? parseFloat(latitude) : null;
     const userLng = longitude ? parseFloat(longitude) : null;
+    const hasGeoFilter = userLat != null && userLng != null && Number.isFinite(userLat) && Number.isFinite(userLng);
+
+    let userZone = null;
+    if (zoneId && mongoose.Types.ObjectId.isValid(zoneId)) {
+      userZone = await Zone.findById(zoneId).select('_id isActive').lean();
+      if (!userZone?.isActive) {
+        userZone = null;
+      }
+    }
+
+    if (hasGeoFilter && !userZone) {
+      return successResponse(res, 200, 'User is outside service zone', {
+        restaurants: [],
+        status: 'OUT_OF_SERVICE'
+      });
+    }
+
+    let activeZoneIds = null;
+    if (userZone || hasGeoFilter) {
+      const activeZones = await Zone.find({ isActive: true }).select('_id').lean();
+      activeZoneIds = activeZones.map(zone => zone._id.toString());
+      if (activeZoneIds.length === 0) {
+        return successResponse(res, 200, 'No active zones available', {
+          restaurants: [],
+          status: 'OUT_OF_SERVICE'
+        });
+      }
+    }
 
     const now = new Date();
     const restaurants = await Top10Restaurant.find({
       isActive: true,
       $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }]
     })
-      .populate('restaurant', 'name restaurantId slug profileImage coverImages menuImages rating estimatedDeliveryTime distance offer featuredDish featuredPrice location deliveryRange')
+      .populate('restaurant', 'name restaurantId slug profileImage coverImages menuImages rating estimatedDeliveryTime distance offer featuredDish featuredPrice location deliveryRange zoneId')
       .sort({ rank: 1, order: 1 })
       .lean();
 
@@ -882,6 +911,14 @@ export const getTop10Restaurants = async (req, res) => {
       rank: r.rank,
       _id: r._id
     }));
+
+    if (activeZoneIds) {
+      const activeZoneSet = new Set(activeZoneIds);
+      filteredRestaurants = filteredRestaurants.filter(res => {
+        if (!res?.zoneId) return false;
+        return activeZoneSet.has(res.zoneId.toString());
+      });
+    }
 
     // Range check if user location provided
     if (userLat !== null && userLng !== null) {
@@ -1125,12 +1162,40 @@ export const getAllGourmetRestaurants = async (req, res) => {
  */
 export const getGourmetRestaurants = async (req, res) => {
   try {
-    const { latitude, longitude } = req.query;
+    const { latitude, longitude, zoneId } = req.query;
     const userLat = latitude ? parseFloat(latitude) : null;
     const userLng = longitude ? parseFloat(longitude) : null;
+    const hasGeoFilter = userLat != null && userLng != null && Number.isFinite(userLat) && Number.isFinite(userLng);
+
+    let userZone = null;
+    if (zoneId && mongoose.Types.ObjectId.isValid(zoneId)) {
+      userZone = await Zone.findById(zoneId).select('_id isActive').lean();
+      if (!userZone?.isActive) {
+        userZone = null;
+      }
+    }
+
+    if (hasGeoFilter && !userZone) {
+      return successResponse(res, 200, 'User is outside service zone', {
+        restaurants: [],
+        status: 'OUT_OF_SERVICE'
+      });
+    }
+
+    let activeZoneIds = null;
+    if (userZone || hasGeoFilter) {
+      const activeZones = await Zone.find({ isActive: true }).select('_id').lean();
+      activeZoneIds = activeZones.map(zone => zone._id.toString());
+      if (activeZoneIds.length === 0) {
+        return successResponse(res, 200, 'No active zones available', {
+          restaurants: [],
+          status: 'OUT_OF_SERVICE'
+        });
+      }
+    }
 
     const restaurants = await GourmetRestaurant.find({ isActive: true })
-      .populate('restaurant', 'name restaurantId slug profileImage coverImages menuImages rating estimatedDeliveryTime distance offer featuredDish featuredPrice location deliveryRange')
+      .populate('restaurant', 'name restaurantId slug profileImage coverImages menuImages rating estimatedDeliveryTime distance offer featuredDish featuredPrice location deliveryRange zoneId')
       .sort({ order: 1, createdAt: -1 })
       .lean();
 
@@ -1138,6 +1203,14 @@ export const getGourmetRestaurants = async (req, res) => {
       ...r.restaurant,
       _id: r._id
     }));
+
+    if (activeZoneIds) {
+      const activeZoneSet = new Set(activeZoneIds);
+      filteredRestaurants = filteredRestaurants.filter(res => {
+        if (!res?.zoneId) return false;
+        return activeZoneSet.has(res.zoneId.toString());
+      });
+    }
 
     // Range check if user location provided
     if (userLat !== null && userLng !== null) {

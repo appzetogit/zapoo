@@ -7,6 +7,8 @@ import { realtimeDb } from '@/lib/firebaseConfig';
 const _geocodeCache = new Map();
 const GEOCODE_GRID_SIZE = 0.0013; // ~150m grid cell
 const GEOCODE_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+let mapsApiErrorWarned = false;
+let geocoderSourceLogged = false;
 
 function _getGridKey(lat, lng) {
   return `${(Math.round(lat / GEOCODE_GRID_SIZE) * GEOCODE_GRID_SIZE).toFixed(4)}_${(Math.round(lng / GEOCODE_GRID_SIZE) * GEOCODE_GRID_SIZE).toFixed(4)}`;
@@ -170,7 +172,59 @@ export function useLocation() {
         throw new Error("Coordinates outside India range");
       }
 
+      // Prefer JS Geocoder when Maps JS API is loaded (avoids REST restriction errors)
+      if (window?.google?.maps?.Geocoder) {
+        if (!geocoderSourceLogged) {
+          console.info("🗺️ Reverse geocode using Google Maps JS Geocoder");
+          geocoderSourceLogged = true;
+        }
+        const geocoder = new window.google.maps.Geocoder();
+        const results = await new Promise((resolve, reject) => {
+          geocoder.geocode(
+            { location: { lat: latitude, lng: longitude } },
+            (res, status) => {
+              if (status === "OK" && res && res.length > 0) {
+                resolve(res);
+              } else {
+                reject(new Error(`Google Maps Geocoder failed: ${status}`));
+              }
+            }
+          );
+        });
+
+        const topResult = results[0];
+        const addressComponents = topResult.address_components || [];
+        const getComponent = (types) =>
+          addressComponents.find(comp => types.some(t => comp.types.includes(t)))?.long_name || "";
+
+        const city =
+          getComponent(["locality"]) ||
+          getComponent(["administrative_area_level_2"]) ||
+          getComponent(["sublocality"]) ||
+          "Unknown City";
+        const state = getComponent(["administrative_area_level_1"]) || "";
+        const country = getComponent(["country"]) || "";
+        const area =
+          getComponent(["sublocality", "sublocality_level_1", "neighborhood"]) || "";
+
+        const locationResult = {
+          city,
+          state,
+          country,
+          area,
+          address: topResult.formatted_address || `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`,
+          formattedAddress: topResult.formatted_address || `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`
+        };
+
+        _setCachedGeocode(latitude, longitude, locationResult);
+        return locationResult;
+      }
+
       // Use AbortController for proper timeout handling
+      if (!geocoderSourceLogged) {
+        console.info("🗺️ Reverse geocode using Google Maps REST API");
+        geocoderSourceLogged = true;
+      }
       const controller = new AbortController();
       const timeoutId = setTimeout(() => {
         controller.abort();
@@ -613,42 +667,25 @@ export function useLocation() {
       _setCachedGeocode(latitude, longitude, locationResult);
       return locationResult;
     } catch (error) {
-      console.error("❌❌❌ Google Maps Reverse Geocode Error:", error);
-      console.error("❌ Error details:", {
-        message: error.message,
-        stack: error.stack,
-        coordinates: {
-          latitude,
-          longitude
+      if (!mapsApiErrorWarned) {
+        console.error("❌ Google Maps Reverse Geocode Error:", error);
+        console.error("❌ Error details:", {
+          message: error.message,
+          stack: error.stack,
+          coordinates: { latitude, longitude }
+        });
+        if (error.message.includes("REQUEST_DENIED") || error.message.includes("OVER_QUERY_LIMIT")) {
+          console.warn("⚠️ Google Maps API configuration issue (using fallback geocoder).");
         }
-      });
-
-      // If it's an API key or billing error, don't fallback - show error
-      if (error.message.includes("REQUEST_DENIED") || error.message.includes("OVER_QUERY_LIMIT")) {
-        console.error("❌❌❌ CRITICAL: Google Maps API configuration issue!");
-        console.error("❌ Please check:");
-        console.error("   1. API key is correct in .env file");
-        console.error("   2. Geocoding API is enabled in Google Cloud Console");
-        console.error("   3. Billing is enabled and linked");
-        console.error("   4. API key restrictions allow this request");
-
-        return {
-          city: "API Error",
-          state: "",
-          area: "",
-          address: "Google Maps API configuration issue",
-          formattedAddress: "Please check API key and billing",
-          street: "",
-          streetNumber: "",
-          postalCode: "",
-          mainTitle: null,
-          pointOfInterest: null,
-          premise: null
-        };
+        mapsApiErrorWarned = true;
       }
 
-      // For other errors, try fallback
-      console.warn("⚠️ Trying fallback reverse geocoding...");
+      // Fallback on all errors to keep flow non-blocking
+      if (!geocoderSourceLogged) {
+        console.info("🗺️ Reverse geocode using fallback provider");
+        geocoderSourceLogged = true;
+      }
+      console.warn("⚠️ Using fallback reverse geocoding...");
       return reverseGeocodeDirect(latitude, longitude);
     }
   };

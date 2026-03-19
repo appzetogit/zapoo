@@ -26,9 +26,6 @@ const filterTabs = [{
   id: "out-for-delivery",
   label: "Out for delivery"
 }, {
-  id: "scheduled",
-  label: "Scheduled"
-}, {
   id: "completed",
   label: "Completed"
 }, {
@@ -1031,8 +1028,6 @@ export default function OrdersMain() {
             restaurantMongoId={restaurantStatus.restaurantId}
           />
         );
-      case "scheduled":
-        return <EmptyState message="Scheduled orders will appear here" />;
       case "completed":
         return <CompletedOrders onSelectOrder={handleSelectOrder} />;
       case "cancelled":

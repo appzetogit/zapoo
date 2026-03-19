@@ -101,6 +101,7 @@ export const getRestaurants = async (req, res) => {
     } = req.query;
     const userLat = latitude != null ? parseFloat(latitude) : null;
     const userLng = longitude != null ? parseFloat(longitude) : null;
+    const hasGeoFilter = userLat != null && userLng != null && Number.isFinite(userLat) && Number.isFinite(userLng);
 
     // Optional: Zone-based filtering - if zoneId is provided, validate and filter by zone
     let userZone = null;
@@ -110,6 +111,24 @@ export const getRestaurants = async (req, res) => {
       if (!userZone?.isActive) {
         userZone = null;
       }
+    }
+
+    // Enforce zone presence when user location is available
+    if (hasGeoFilter && !userZone) {
+      return successResponse(res, 200, 'User is outside service zone', {
+        restaurants: [],
+        total: 0,
+        status: 'OUT_OF_SERVICE',
+        filters: {
+          sortBy,
+          cuisine,
+          minRating,
+          maxDeliveryTime,
+          maxDistance,
+          maxPrice,
+          hasOffers
+        }
+      });
     }
 
     // Build query conditions array
@@ -177,6 +196,30 @@ export const getRestaurants = async (req, res) => {
       });
     }
 
+    // Only show restaurants that belong to an active zone
+    let activeZoneIds = null;
+    if (userZone || hasGeoFilter) {
+      const activeZones = await Zone.find({ isActive: true }).select('_id').lean();
+      activeZoneIds = activeZones.map(zone => zone._id);
+      if (activeZoneIds.length === 0) {
+        return successResponse(res, 200, 'No active zones available', {
+          restaurants: [],
+          total: 0,
+          status: 'OUT_OF_SERVICE',
+          filters: {
+            sortBy,
+            cuisine,
+            minRating,
+            maxDeliveryTime,
+            maxDistance,
+            maxPrice,
+            hasOffers
+          }
+        });
+      }
+      queryAndConditions.push({ zoneId: { $in: activeZoneIds } });
+    }
+
     const query = { $and: queryAndConditions };
 
     // Build sort object
@@ -220,8 +263,6 @@ export const getRestaurants = async (req, res) => {
           break;
       }
     }
-
-    const hasGeoFilter = userLat != null && userLng != null && Number.isFinite(userLat) && Number.isFinite(userLng);
 
     const projectionFields = {
       name: 1, slug: 1, cuisines: 1, rating: 1, totalRatings: 1, promo: 1,
@@ -1033,6 +1074,7 @@ export const getRestaurantsWithDishesUnder250 = async (req, res) => {
     } = req.query; // User's zone ID (optional); latitude/longitude for deliveryRange filter
     const userLat = latitude != null ? parseFloat(latitude) : null;
     const userLng = longitude != null ? parseFloat(longitude) : null;
+    const hasGeoFilter = userLat != null && userLng != null && Number.isFinite(userLat) && Number.isFinite(userLng);
 
     // Optional: Zone-based filtering - if zoneId is provided, validate and filter by zone
     let userZone = null;
@@ -1040,7 +1082,28 @@ export const getRestaurantsWithDishesUnder250 = async (req, res) => {
       // Validate zone exists and is active
       userZone = await Zone.findById(zoneId).lean();
       if (!userZone || !userZone.isActive) {
-        return errorResponse(res, 400, 'Invalid or inactive zone. Please detect your zone again.');
+        userZone = null;
+      }
+    }
+
+    if (hasGeoFilter && !userZone) {
+      return successResponse(res, 200, 'User is outside service zone', {
+        restaurants: [],
+        total: 0,
+        status: 'OUT_OF_SERVICE'
+      });
+    }
+
+    let activeZoneIds = null;
+    if (userZone || hasGeoFilter) {
+      const activeZones = await Zone.find({ isActive: true }).select('_id').lean();
+      activeZoneIds = activeZones.map(zone => zone._id);
+      if (activeZoneIds.length === 0) {
+        return successResponse(res, 200, 'No active zones available', {
+          restaurants: [],
+          total: 0,
+          status: 'OUT_OF_SERVICE'
+        });
       }
     }
     const MAX_PRICE = 250;
@@ -1073,12 +1136,18 @@ export const getRestaurantsWithDishesUnder250 = async (req, res) => {
     };
 
     // Get all active restaurants
-    let restaurants = await Restaurant.find({
-      isActive: true
-    }).select('-owner -createdAt -updatedAt').lean().limit(100);
+    const baseQuery = { isActive: true };
+    if (activeZoneIds) {
+      baseQuery.zoneId = { $in: activeZoneIds };
+    }
+
+    let restaurants = await Restaurant.find(baseQuery)
+      .select('-owner -createdAt -updatedAt')
+      .lean()
+      .limit(100);
 
     // Filter by deliveryRange when user coordinates provided
-    if (userLat != null && userLng != null && Number.isFinite(userLat) && Number.isFinite(userLng)) {
+    if (hasGeoFilter) {
       restaurants = restaurants.filter(r => {
         const resLocation = r.location;
         const resLat = resLocation?.latitude ?? resLocation?.coordinates?.[1];

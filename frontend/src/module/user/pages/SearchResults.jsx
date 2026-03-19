@@ -204,6 +204,11 @@ export default function SearchResults() {
   useEffect(() => {
     const fetchRestaurants = async () => {
       try {
+        if (isOutOfService) {
+          setRestaurantsData([]);
+          setLoadingRestaurants(false);
+          return;
+        }
         setLoadingRestaurants(true);
         const params = {};
         if (zoneId) params.zoneId = zoneId;
