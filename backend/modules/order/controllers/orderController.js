@@ -557,7 +557,7 @@ export const createOrder = async (req, res) => {
  */
 export const verifyOrderPayment = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user?._id || req.user?.id;
     const {
       orderId,
       razorpayOrderId,
@@ -829,7 +829,7 @@ export const getUserOrders = async (req, res) => {
  */
 export const getOrderDetails = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user?._id || req.user?.id;
     const {
       id
     } = req.params;
@@ -891,7 +891,7 @@ export const getOrderDetails = async (req, res) => {
  */
 export const cancelOrder = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user?._id || req.user?.id;
     const {
       id
     } = req.params;
@@ -1027,13 +1027,13 @@ export const calculateOrder = async (req, res) => {
     let finalDeliveryAddress = deliveryAddress;
 
     // If addressId is provided, fetch it from user profile
-    if (addressId && req.user && req.user.id) {
+    if (addressId && req.user && (req.user._id || req.user.id)) {
       try {
         // Dynamic import to avoid circular dependency
         const {
           default: User
         } = await import('../../auth/models/User.js');
-        const user = await User.findById(req.user.id);
+        const user = await User.findById(req.user._id || req.user.id);
         if (user && user.addresses) {
           const foundAddress = user.addresses.id(addressId);
           if (foundAddress) {

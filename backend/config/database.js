@@ -16,6 +16,7 @@ export const connectDB = async () => {
     const conn = await mongoose.connect(process.env.MONGODB_URI, {
       family: 4 // Force IPv4 to avoid ENOTFOUND errors
     });
+    console.log('mongodb     : connected...');
     // Handle connection events
     mongoose.connection.on('error', err => {
       logger.error(`MongoDB connection error: ${err}`);

@@ -273,15 +273,17 @@ export async function notifyDeliveryBoyNewOrder(order, deliveryPartnerId) {
         console.warn(`⚠️ No delivery partners are currently connected to the app!`);
       }
 
-      // Still broadcast to all delivery sockets as fallback
-      console.warn(`⚠️ Broadcasting to all delivery sockets as fallback (in case they connect later)`);
-      deliveryNamespace.emit('new_order', orderNotification);
-      deliveryNamespace.emit('play_notification_sound', {
-        type: 'new_order',
-        orderId: order.orderId,
-        message: `New order assigned: ${order.orderId}`
-      });
-      notificationSent = true;
+      // Optional fallback broadcast (disabled by default to avoid showing orders to wrong partners)
+      if (process.env.DELIVERY_BROADCAST_FALLBACK === 'true') {
+        console.warn(`⚠️ Broadcasting to all delivery sockets as fallback (in case they connect later)`);
+        deliveryNamespace.emit('new_order', orderNotification);
+        deliveryNamespace.emit('play_notification_sound', {
+          type: 'new_order',
+          orderId: order.orderId,
+          message: `New order assigned: ${order.orderId}`
+        });
+        notificationSent = true;
+      }
     } else {}
     if (notificationSent) {} else {
       console.error(`❌ Failed to send notification - no sockets found and broadcast failed`);

@@ -4,6 +4,8 @@ import DeliveryWallet from '../models/DeliveryWallet.js';
 import DeliveryWithdrawalRequest from '../models/DeliveryWithdrawalRequest.js';
 import Order from '../../order/models/Order.js';
 import BusinessSettings from '../../admin/models/BusinessSettings.js';
+import DeliveryBoyCommission from '../../admin/models/DeliveryBoyCommission.js';
+import OrderSettlement from '../../order/models/OrderSettlement.js';
 import AdminWallet from '../../admin/models/AdminWallet.js';
 import { validate } from '../../../shared/middleware/validate.js';
 import Joi from 'joi';
@@ -43,6 +45,142 @@ export const getWallet = asyncHandler(async (req, res) => {
         totalWithdrawn: 0,
         totalEarned: 0
       });
+    }
+
+    // Recompute totals from transactions if totals look empty but transactions exist (legacy/backfill fix)
+    try {
+      const hasTransactions = Array.isArray(wallet.transactions) && wallet.transactions.length > 0;
+      const totalsEmpty = (Number(wallet.totalBalance) || 0) === 0 && (Number(wallet.totalEarned) || 0) === 0;
+      if (hasTransactions && totalsEmpty) {
+        let totalBalance = 0;
+        let totalEarned = 0;
+        let totalWithdrawn = 0;
+        let cashInHand = 0;
+        for (const t of wallet.transactions) {
+          if (t.status !== 'Completed') continue;
+          const amount = Number(t.amount) || 0;
+          if (t.type === 'payment' || t.type === 'bonus' || t.type === 'refund') {
+            totalBalance += amount;
+            totalEarned += amount;
+            if (t.paymentCollected) cashInHand += amount;
+          } else if (t.type === 'withdrawal') {
+            totalBalance -= amount;
+            totalWithdrawn += amount;
+            if (t.paymentCollected) cashInHand -= amount;
+          } else if (t.type === 'deduction') {
+            totalBalance -= amount;
+            cashInHand -= amount;
+          } else if (t.type === 'deposit') {
+            cashInHand -= amount;
+          }
+        }
+        wallet.totalBalance = Math.max(0, totalBalance);
+        wallet.totalEarned = Math.max(0, totalEarned);
+        wallet.totalWithdrawn = Math.max(0, totalWithdrawn);
+        wallet.cashInHand = Math.max(0, Number.isFinite(cashInHand) ? cashInHand : 0);
+        wallet.markModified('totalBalance');
+        wallet.markModified('totalEarned');
+        wallet.markModified('totalWithdrawn');
+        wallet.markModified('cashInHand');
+        await wallet.save();
+      }
+    } catch (recalcError) {
+      console.warn('⚠️ Wallet totals recompute failed:', recalcError?.message || recalcError);
+    }
+
+    // Backfill wallet transactions if totals are zero but delivered orders exist (legacy data fix)
+    try {
+      const hasTransactions = Array.isArray(wallet.transactions) && wallet.transactions.length > 0;
+      const totalsEmpty = (Number(wallet.totalBalance) || 0) === 0 && (Number(wallet.totalEarned) || 0) === 0;
+      if (!hasTransactions || totalsEmpty) {
+        const deliveryIdStr = delivery._id?.toString?.() || String(delivery._id);
+        const deliveredOrders = await Order.find({
+          $expr: {
+            $and: [
+              {
+                $eq: [
+                  { $toString: { $ifNull: ['$deliveryPartnerId', ''] } },
+                  deliveryIdStr
+                ]
+              },
+              {
+                $or: [
+                  { $in: [{ $toLower: { $ifNull: ['$status', ''] } }, ['delivered', 'completed']] },
+                  { $eq: [{ $toLower: { $ifNull: ['$deliveryState.status', ''] } }, 'delivered'] },
+                  { $eq: [{ $toLower: { $ifNull: ['$deliveryState.currentPhase', ''] } }, 'completed'] }
+                ]
+              }
+            ]
+          }
+        }).select('orderId pricing deliveryState assignmentInfo payment restaurantId address').lean();
+
+        if (deliveredOrders.length > 0) {
+          const orderIds = deliveredOrders.map(o => o._id);
+          const settlements = await OrderSettlement.find({ orderId: { $in: orderIds } })
+            .select('orderId deliveryPartnerEarning.totalEarning')
+            .lean();
+          const settlementMap = new Map(
+            settlements.map(s => [String(s.orderId), Number(s?.deliveryPartnerEarning?.totalEarning) || 0])
+          );
+
+          let backfillCount = 0;
+          for (const order of deliveredOrders) {
+            const orderIdStr = String(order._id);
+            const existing = wallet.transactions?.find(
+              t => t?.type === 'payment' && t?.orderId && String(t.orderId) === orderIdStr
+            );
+            if (existing) continue;
+
+            let amount = settlementMap.get(orderIdStr) || 0;
+            if (!amount || amount <= 0) {
+              let distance = 0;
+              if (order?.deliveryState?.routeToDelivery?.distance) {
+                distance = Number(order.deliveryState.routeToDelivery.distance) || 0;
+              } else if (order?.assignmentInfo?.distance) {
+                distance = Number(order.assignmentInfo.distance) || 0;
+              }
+              if (distance > 0) {
+                try {
+                  const commissionResult = await DeliveryBoyCommission.calculateCommission(distance);
+                  amount = Number(commissionResult?.commission) || 0;
+                } catch {
+                  amount = 0;
+                }
+              }
+              if (!amount || amount <= 0) {
+                amount = Number(order?.pricing?.deliveryFee) || 0;
+              }
+            }
+
+            if (amount > 0) {
+              wallet.addTransaction({
+                amount,
+                type: 'payment',
+                status: 'Completed',
+                description: `Backfill delivery earnings for Order #${order.orderId || orderIdStr}`,
+                orderId: order._id,
+                paymentCollected: false,
+                metadata: { source: 'wallet_backfill' }
+              });
+              backfillCount += 1;
+            }
+
+            // Backfill COD cash in hand if wallet has zero cash and order was COD
+            const paymentMethod = (order?.payment?.method || '').toString().toLowerCase();
+            const isCashOrder = paymentMethod === 'cash' || paymentMethod === 'cod';
+            const codAmount = Number(order?.pricing?.total) || 0;
+            if (isCashOrder && codAmount > 0 && Number(wallet.cashInHand || 0) === 0) {
+              wallet.cashInHand = Number(wallet.cashInHand || 0) + codAmount;
+            }
+          }
+
+          if (backfillCount > 0) {
+            await wallet.save();
+          }
+        }
+      }
+    } catch (backfillError) {
+      console.warn('⚠️ Wallet backfill failed:', backfillError?.message || backfillError);
     }
 
     // Calculate pending withdrawals

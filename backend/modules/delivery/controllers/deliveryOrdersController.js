@@ -1529,6 +1529,41 @@ export const completeDelivery = asyncHandler(async (req, res) => {
       const settlement = await OrderSettlement.findOne({
         orderId: orderMongoId
       }).lean();
+      // Ensure delivery wallet is updated even when escrow flow handles payouts
+      try {
+        const earningsAmount = Number(settlement?.deliveryPartnerEarning?.totalEarning) || 0;
+        if (earningsAmount > 0) {
+          const wallet = await DeliveryWallet.findOrCreateByDeliveryId(delivery._id);
+          const orderIdForTransaction = orderMongoId?.toString ? orderMongoId.toString() : orderMongoId;
+          const existingTransaction = wallet.transactions?.find(
+            t => t.orderId && t.orderId.toString() === orderIdForTransaction && t.type === 'payment'
+          );
+          if (!existingTransaction) {
+            wallet.addTransaction({
+              amount: earningsAmount,
+              type: 'payment',
+              status: 'Completed',
+              description: `Delivery earnings for Order #${orderIdForLog}`,
+              orderId: orderMongoId || order._id,
+              paymentCollected: false
+            });
+            await wallet.save();
+          }
+        }
+
+        // COD: add cash collected (order total) to cashInHand
+        const codAmount = Number(order.pricing?.total) || 0;
+        const paymentMethod = (order.payment?.method || '').toString().toLowerCase();
+        const isCashOrder = paymentMethod === 'cash' || paymentMethod === 'cod';
+        if (isCashOrder && codAmount > 0) {
+          await DeliveryWallet.updateOne(
+            { deliveryId: delivery._id },
+            { $inc: { cashInHand: codAmount } }
+          );
+        }
+      } catch (walletEscrowError) {
+        logger.error('❌ Error adding earning to wallet (escrow flow):', walletEscrowError);
+      }
       const orderIdForNotification = orderMongoId?.toString ? orderMongoId.toString() : orderMongoId;
       Promise.all([(async () => {
         try {

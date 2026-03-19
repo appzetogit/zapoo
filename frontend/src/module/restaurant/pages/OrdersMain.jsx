@@ -398,6 +398,7 @@ export default function OrdersMain() {
   const [cancelReason, setCancelReason] = useState("");
   const [orderToCancel, setOrderToCancel] = useState(null);
   const audioRef = useRef(null);
+  const audioUnlockedRef = useRef(false);
   const shownOrdersRef = useRef(new Set()); // Track orders already shown in popup
   const [restaurantStatus, setRestaurantStatus] = useState({
     isActive: null,
@@ -625,6 +626,31 @@ export default function OrdersMain() {
       audioRef.current.currentTime = 0;
     }
   }, [showNewOrderPopup, isMuted]);
+
+  // Unlock audio on first user interaction (required by many browsers)
+  useEffect(() => {
+    const unlockAudio = () => {
+      if (!audioRef.current || audioUnlockedRef.current) return;
+      audioRef.current.muted = true;
+      const playPromise = audioRef.current.play();
+      if (playPromise && typeof playPromise.then === "function") {
+        playPromise.then(() => {
+          audioRef.current.pause();
+          audioRef.current.currentTime = 0;
+          audioRef.current.muted = false;
+          audioUnlockedRef.current = true;
+        }).catch(() => { });
+      }
+    };
+    window.addEventListener("click", unlockAudio, { once: true });
+    window.addEventListener("touchstart", unlockAudio, { once: true });
+    window.addEventListener("keydown", unlockAudio, { once: true });
+    return () => {
+      window.removeEventListener("click", unlockAudio);
+      window.removeEventListener("touchstart", unlockAudio);
+      window.removeEventListener("keydown", unlockAudio);
+    };
+  }, []);
 
   // Countdown timer
   useEffect(() => {
@@ -1227,7 +1253,7 @@ export default function OrdersMain() {
         }} exit={{
           opacity: 0
         }}>
-          <motion.div className="w-[95%] max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden" initial={{
+          <motion.div className="w-[95%] max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden h-[90vh] max-h-[90vh] flex flex-col" initial={{
             scale: 0.9,
             opacity: 0
           }} animate={{
@@ -1262,7 +1288,7 @@ export default function OrdersMain() {
             </div>
 
             {/* Content */}
-            <div className="px-6 py-5 max-h-[70vh] overflow-y-auto custom-scrollbar">
+            <div className="px-6 py-5 flex-1 min-h-0 overflow-y-auto overscroll-contain custom-scrollbar">
               {/* Item Summary and Date */}
               <div className="mb-6">
                 <h4 className="text-[16px] font-extrabold text-gray-900 tracking-tight">
@@ -1375,7 +1401,7 @@ export default function OrdersMain() {
               </div>
 
               {/* Accept and Reject buttons */}
-              <div className="space-y-4 px-1">
+              <div className="space-y-4 px-1 sticky bottom-0 bg-white pt-3 pb-4">
                 <div className="relative rounded-xl overflow-hidden shadow-lg shadow-blue-100">
                   <button onClick={handleAcceptOrder} className="w-full bg-[#1A68FF] text-white py-4 font-extrabold text-[15px] hover:bg-blue-600 transition-colors flex items-center justify-center gap-2 relative z-10">
                     Accept ({formatTime(countdown)})
@@ -1680,8 +1706,10 @@ function OrderCard({
   restaurantMongoId,
   onSelect,
   onCancel,
+  onMarkReady,
 }) {
-  const isReady = status === "Ready";
+  const displayStatus = status === "confirmed" ? "preparing" : status;
+  const isReady = displayStatus === "ready" || displayStatus === "Ready";
 
   const handleCallDeliveryPartner = async (e) => {
     e.stopPropagation();
@@ -1714,7 +1742,7 @@ function OrderCard({
     </button>}
     <div onClick={() => onSelect?.({
       orderId,
-      status,
+      status: displayStatus,
       customerName,
       type,
       tableOrToken,
@@ -1747,7 +1775,7 @@ function OrderCard({
           <div className="flex flex-col items-end gap-1">
             <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium border ${isReady ? "border-green-500 text-green-600" : "border-gray-800 text-gray-900"}`}>
               <span className={`h-1.5 w-1.5 rounded-full ${isReady ? "bg-green-500" : "bg-gray-800"}`} />
-              {status}
+              {displayStatus}
             </span>
             <span className="text-[11px] text-gray-500 text-right">
               {timePlaced}
@@ -1770,7 +1798,7 @@ function OrderCard({
               {tableOrToken ? ` • ${tableOrToken}` : ""}
             </p>
             {/* Delivery Assignment Status - Only show for preparing orders */}
-            {status === "preparing" && (
+            {displayStatus === "preparing" && (
               <div className="flex items-center gap-1.5 flex-wrap">
                 <span
                   className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${
@@ -1808,13 +1836,29 @@ function OrderCard({
             )}
           </div>
           {/* Hide ETA for ready orders */}
-          {status !== "ready" && eta && (
+          {displayStatus !== "ready" && eta && (
             <div className="flex items-baseline gap-1">
               <span className="text-[11px] text-gray-500">ETA</span>
               <span className="text-xs font-medium text-black">{eta}</span>
             </div>
           )}
         </div>
+
+        {/* Action row */}
+        {(displayStatus === "preparing") && onMarkReady && (
+          <div className="mt-2">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onMarkReady({ orderId, mongoId, status });
+              }}
+              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold py-2 rounded-lg transition-colors"
+            >
+              Mark as Ready
+            </button>
+          </div>
+        )}
       </div>
     </div>
   </div>;
@@ -1829,6 +1873,31 @@ function PreparingOrders({
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [markingReadyIds, setMarkingReadyIds] = useState(new Set());
+
+  const handleMarkReady = async ({ orderId, mongoId, status }) => {
+    const id = mongoId || orderId;
+    if (!id) return;
+    if (markingReadyIds.has(id)) return;
+    setMarkingReadyIds(prev => new Set(prev).add(id));
+    try {
+      if (status === 'confirmed') {
+        await restaurantAPI.markOrderPreparing(id);
+      }
+      await restaurantAPI.markOrderReady(id);
+      toast.success('Order marked as ready');
+      setOrders(prev => prev.filter(o => (o.mongoId || o.orderId) !== id));
+    } catch (error) {
+      const msg = error.response?.data?.message || error.message || 'Failed to mark order ready';
+      toast.error(msg);
+    } finally {
+      setMarkingReadyIds(prev => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }
+  };
   useEffect(() => {
     let isMounted = true;
     let intervalId = null;
@@ -2042,6 +2111,7 @@ function PreparingOrders({
             restaurantMongoId={restaurantMongoId}
             onSelect={onSelectOrder}
             onCancel={onCancel}
+            onMarkReady={handleMarkReady}
           />
         );
       })}

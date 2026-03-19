@@ -56,7 +56,7 @@ export const getRestaurantOrders = asyncHandler(async (req, res) => {
 
     // Build query - search for orders with any matching restaurantId variation
     // Use $in for multiple variations and also try direct match as fallback
-    const query = {
+    const baseRestaurantFilter = {
       $or: [{
         restaurantId: {
           $in: restaurantIdVariations
@@ -68,9 +68,24 @@ export const getRestaurantOrders = asyncHandler(async (req, res) => {
       }]
     };
 
+    // Do not show unpaid online orders to restaurant (Razorpay/UPI/Card before verification)
+    const paymentVisibilityFilter = {
+      $or: [{
+        'payment.method': { $in: ['cash', 'wallet'] }
+      }, {
+        'payment.status': 'completed'
+      }, {
+        'payment.method': { $exists: false }
+      }]
+    };
+
+    const query = {
+      $and: [baseRestaurantFilter, paymentVisibilityFilter]
+    };
+
     // If status filter is provided, add it to query
     if (status && status !== 'all') {
-      query.status = status;
+      query.$and.push({ status });
     }
     const skip = (parseInt(page) - 1) * parseInt(limit);
 

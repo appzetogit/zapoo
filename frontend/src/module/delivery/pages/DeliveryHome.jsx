@@ -553,6 +553,10 @@ export default function DeliveryHome() {
   const [newOrderAcceptButtonProgress, setNewOrderAcceptButtonProgress] = useState(0);
   const [newOrderIsAnimatingToComplete, setNewOrderIsAnimatingToComplete] = useState(false);
   const newOrderPopupRef = useRef(null);
+  const pendingRestoreTimeoutRef = useRef(null);
+  const skipInitialPendingRestoreRef = useRef(true);
+  const newOrderRef = useRef(null);
+  const validatedPendingOrderIdsRef = useRef(new Set());
   const newOrderSwipeStartY = useRef(0);
   const newOrderIsSwiping = useRef(false);
   const [newOrderDragY, setNewOrderDragY] = useState(0);
@@ -1234,6 +1238,56 @@ export default function DeliveryHome() {
     }
   }, [showNewOrderPopup]);
 
+  // Validate pending popup against backend (in case order was already delivered/cancelled)
+  useEffect(() => {
+    if (!showNewOrderPopup || !selectedRestaurant) return;
+    if (showPaymentPage || showCustomerReviewPopup || showOrderDeliveredAnimation) return;
+
+    const orderId = selectedRestaurant?.id || selectedRestaurant?.orderId;
+    if (!orderId) return;
+    if (validatedPendingOrderIdsRef.current.has(String(orderId))) return;
+    validatedPendingOrderIdsRef.current.add(String(orderId));
+
+    const validatePending = async () => {
+      try {
+        const resp = await deliveryAPI.getOrderDetails(orderId);
+        const order = resp?.data?.data?.order || resp?.data?.data;
+        const status = order?.status || '';
+        const phase = order?.deliveryState?.currentPhase || '';
+        const isDelivered = status === 'delivered' || status === 'completed' || phase === 'completed' || phase === 'delivered';
+        const isCancelled = status === 'cancelled';
+        if (isDelivered || isCancelled) {
+          setShowNewOrderPopup(false);
+          setSelectedRestaurant(null);
+          localStorage.removeItem('deliveryPendingOrder');
+          localStorage.removeItem('deliveryAtDropOrderId');
+          if (typeof clearNewOrder === 'function') {
+            clearNewOrder();
+          }
+          acceptedOrderIdsRef.current.clear();
+        }
+      } catch (err) {
+        const status = err?.response?.status;
+        if (status === 403 || status === 404) {
+          setShowNewOrderPopup(false);
+          setSelectedRestaurant(null);
+          localStorage.removeItem('deliveryPendingOrder');
+          localStorage.removeItem('deliveryAtDropOrderId');
+          if (typeof clearNewOrder === 'function') {
+            clearNewOrder();
+          }
+          acceptedOrderIdsRef.current.clear();
+        }
+      }
+    };
+    validatePending();
+  }, [showNewOrderPopup, selectedRestaurant, showPaymentPage, showCustomerReviewPopup, showOrderDeliveredAnimation, clearNewOrder]);
+
+  // Keep latest newOrder in a ref (used during refresh restore timing)
+  useEffect(() => {
+    newOrderRef.current = newOrder || null;
+  }, [newOrder]);
+
   // Auto-dismiss order popup when another delivery partner accepts it
   useEffect(() => {
     if (!orderTaken) return;
@@ -1243,6 +1297,7 @@ export default function DeliveryHome() {
       acceptedOrderIdsRef.current.add(takenId);
       setShowNewOrderPopup(false);
       clearNewOrder();
+      localStorage.removeItem('deliveryPendingOrder');
       toast.info('This order was accepted by another delivery partner.');
     }
     clearOrderTaken();
@@ -1266,6 +1321,7 @@ export default function DeliveryHome() {
     setNewOrderDragY(0); // Reset drag position
     setRejectReason("");
     setCountdownSeconds(300);
+    localStorage.removeItem('deliveryPendingOrder');
     // Here you would typically send the rejection to your backend
   };
   const handleRejectCancel = () => {
@@ -1275,29 +1331,76 @@ export default function DeliveryHome() {
 
   // Reset popup state on page load/refresh - ensure no popup shows on refresh
   useEffect(() => {
-    // Clear any popup state on mount
+    // Restore pending new-order popup after refresh (if still pending)
+    try {
+      const savedPending = localStorage.getItem('deliveryPendingOrder');
+      if (savedPending) {
+        const pending = JSON.parse(savedPending);
+        const info = pending?.restaurantInfo;
+        const status = info?.orderStatus || info?.status || '';
+        const phase = info?.deliveryPhase || info?.deliveryState?.currentPhase || '';
+        const isDelivered = status === 'delivered' || status === 'completed' || phase === 'completed' || phase === 'delivered';
+        const isCancelled = status === 'cancelled';
+        if (isDelivered || isCancelled) {
+          localStorage.removeItem('deliveryPendingOrder');
+          return;
+        }
+        if (info) {
+          setSelectedRestaurant(info);
+          setShowNewOrderPopup(true);
+          setCountdownSeconds(300);
+          return;
+        }
+      }
+    } catch { /* ignore */ }
+
+    // Default: no pending popup
     setShowNewOrderPopup(false);
-    setSelectedRestaurant(null);
-    setHasAutoShown(false);
-    setCountdownSeconds(300);
 
-    // Clear any timers
-    if (autoShowTimerRef.current) {
-      clearTimeout(autoShowTimerRef.current);
-      autoShowTimerRef.current = null;
-    }
-    if (countdownTimerRef.current) {
-      clearInterval(countdownTimerRef.current);
-      countdownTimerRef.current = null;
-    }
-
-    // Stop and cleanup audio
-    if (alertAudioRef.current) {
-      alertAudioRef.current.pause();
-      alertAudioRef.current.currentTime = 0;
-      alertAudioRef.current = null;
-    }
+    return () => {
+      if (pendingRestoreTimeoutRef.current) {
+        clearTimeout(pendingRestoreTimeoutRef.current);
+        pendingRestoreTimeoutRef.current = null;
+      }
+    };
   }, []); // Only run on mount
+
+  // Ensure pending order popup persists across refresh
+  useEffect(() => {
+    // Skip first run to prevent immediate flash on refresh
+    if (skipInitialPendingRestoreRef.current) {
+      skipInitialPendingRestoreRef.current = false;
+      return;
+    }
+    try {
+      // If a pending order exists, keep showing it and ignore newOrder popup
+      const savedPending = localStorage.getItem('deliveryPendingOrder');
+      if (savedPending) {
+        const pending = JSON.parse(savedPending);
+        const info = pending?.restaurantInfo;
+        const status = info?.orderStatus || info?.status || '';
+        const phase = info?.deliveryPhase || info?.deliveryState?.currentPhase || '';
+        const isDelivered = status === 'delivered' || status === 'completed' || phase === 'completed' || phase === 'delivered';
+        const isCancelled = status === 'cancelled';
+        if (isDelivered || isCancelled) {
+          localStorage.removeItem('deliveryPendingOrder');
+          return;
+        }
+        if (info) {
+          if (!selectedRestaurant) {
+            setSelectedRestaurant(info);
+          }
+          if (!showNewOrderPopup) {
+            setShowNewOrderPopup(true);
+            setCountdownSeconds(300);
+          }
+          return;
+        }
+      }
+      // If a fresh newOrder exists, don't override it with pending storage
+      if (newOrder) return;
+    } catch { /* ignore */ }
+  }, [showNewOrderPopup, selectedRestaurant, newOrder]);
 
   // Get rider location - App open होते ही location fetch करें
   useEffect(() => {
@@ -1949,6 +2052,7 @@ export default function DeliveryHome() {
         }
         
         setShowNewOrderPopup(false);
+        localStorage.removeItem('deliveryPendingOrder');
         setNavigationMode('restaurant');
         setShowDirectionsMap(true);
         return true;
@@ -1958,6 +2062,21 @@ export default function DeliveryHome() {
       }
     } catch (error) {
       console.error('❌ Error in processOrderAcceptance:', error);
+      const status = error?.response?.status;
+      const message = error?.response?.data?.message || error?.message;
+      if (status === 403) {
+        // Order is assigned to another delivery partner or no longer available
+        setShowNewOrderPopup(false);
+        setIsNewOrderPopupMinimized(false);
+        setNewOrderDragY(0);
+        setSelectedRestaurant(null);
+        localStorage.removeItem('deliveryPendingOrder');
+        if (typeof clearNewOrder === 'function') {
+          clearNewOrder();
+        }
+        toast.error(message || 'Order is no longer available for you.');
+        return false;
+      }
       toast.error('Something went wrong. Please try again.');
       return false;
     }
@@ -2311,8 +2430,15 @@ export default function DeliveryHome() {
       // Close reached drop popup
       setShowReachedDropPopup(false);
 
-      // We will open OTP modal instead (handled by useEffect in DeliveryOrderFlowPopups)
-      // setShowOrderDeliveredAnimation(true) // Removed to allow OTP check first
+      // Show delivery complete popup (this triggers review -> completeDelivery flow)
+      setShowOrderDeliveredAnimation(true);
+      // Mark that this order has reached drop to avoid showing earlier popups on refresh
+      try {
+        const orderIdForApi = selectedRestaurant?.id || newOrder?.orderMongoId || newOrder?._id || selectedRestaurant?.orderId || newOrder?.orderId;
+        if (orderIdForApi) {
+          localStorage.setItem('deliveryAtDropOrderId', String(orderIdForApi));
+        }
+      } catch { /* ignore */ }
 
         // API call in background (async, doesn't block popup)
         ;
@@ -3127,6 +3253,37 @@ export default function DeliveryHome() {
   // Show new order popup when order is received from Socket.IO
   useEffect(() => {
     if (newOrder) {
+      // If a pending order is already stored, keep showing it and ignore new socket orders
+      try {
+        const savedPending = localStorage.getItem('deliveryPendingOrder');
+        if (savedPending) {
+          const pending = JSON.parse(savedPending);
+          const pendingId =
+            pending?.restaurantInfo?.id ||
+            pending?.restaurantInfo?.orderId ||
+            pending?.restaurantInfo?.orderMongoId;
+          const incomingId = newOrder.orderMongoId || newOrder.orderId;
+          if (pending?.restaurantInfo && pendingId && incomingId && pendingId !== incomingId) {
+            // Ignore incoming order while pending popup is active
+            clearNewOrder();
+            return;
+          }
+          if (pending?.restaurantInfo && !pendingId) {
+            clearNewOrder();
+            return;
+          }
+        }
+      } catch { /* ignore */ }
+
+      const newOrderStatus = newOrder.status || newOrder.orderStatus || '';
+      const newOrderPhase = newOrder.deliveryState?.currentPhase || newOrder.deliveryPhase || '';
+      const isDelivered = newOrderStatus === 'delivered' || newOrderStatus === 'completed' || newOrderPhase === 'completed' || newOrderPhase === 'delivered';
+      const isCancelled = newOrderStatus === 'cancelled';
+      if (isDelivered || isCancelled) {
+        clearNewOrder();
+        return;
+      }
+
       const orderId = newOrder.orderMongoId || newOrder.orderId;
 
       // Check if this order has already been accepted
@@ -3213,11 +3370,19 @@ export default function DeliveryHome() {
         customerLat: newOrder.customerLocation?.latitude,
         customerLng: newOrder.customerLocation?.longitude,
         items: newOrder.items || [],
-        total: newOrder.total || 0
+        total: newOrder.total || 0,
+        orderStatus: newOrderStatus,
+        deliveryPhase: newOrderPhase
       };
       setSelectedRestaurant(restaurantData);
       setShowNewOrderPopup(true);
       setCountdownSeconds(300); // Reset countdown to 5 minutes
+      try {
+        localStorage.setItem('deliveryPendingOrder', JSON.stringify({
+          restaurantInfo: restaurantData,
+          createdAt: Date.now(),
+        }));
+      } catch { /* ignore */ }
     }
   }, [newOrder, calculateTimeAway, riderLocation]);
 
@@ -3466,7 +3631,10 @@ export default function DeliveryHome() {
           const deliveryPhase = order.deliveryState?.currentPhase;
 
           // Skip if already delivered or completed
-          if (orderStatus === 'delivered' || deliveryPhase === 'completed') {
+          if (orderStatus === 'delivered' || orderStatus === 'completed' || deliveryPhase === 'completed' || deliveryPhase === 'delivered') {
+            return false;
+          }
+          if (orderStatus === 'cancelled') {
             return false;
           }
 
@@ -3477,6 +3645,17 @@ export default function DeliveryHome() {
           return true;
         });
         if (pendingOrders.length > 0) {
+          // If a pending popup is already stored/shown, don't replace it
+          try {
+            const savedPending = localStorage.getItem('deliveryPendingOrder');
+            if (savedPending) {
+              return;
+            }
+          } catch { /* ignore */ }
+          if (showNewOrderPopup || selectedRestaurant) {
+            return;
+          }
+
           // Show the first pending order as a new order notification
           const firstOrder = pendingOrders[0];
           const orderId = firstOrder.orderId || firstOrder._id?.toString();
@@ -3541,18 +3720,26 @@ export default function DeliveryHome() {
             items: firstOrder.items || [],
             total: firstOrder.pricing?.total || 0,
             payment: firstOrder.payment?.method || 'COD',
-            amount: firstOrder.pricing?.total || 0
+            amount: firstOrder.pricing?.total || 0,
+            orderStatus: firstOrder.status,
+            deliveryPhase: firstOrder.deliveryState?.currentPhase
           };
           setSelectedRestaurant(restaurantData);
           setShowNewOrderPopup(true);
           setCountdownSeconds(300); // Reset countdown to 5 minutes
+          try {
+            localStorage.setItem('deliveryPendingOrder', JSON.stringify({
+              restaurantInfo: restaurantData,
+              createdAt: Date.now(),
+            }));
+          } catch { /* ignore */ }
         } else { }
       } else { }
     } catch (error) {
       console.error('❌ Error fetching assigned orders:', error);
       // Don't show error to user, just log it
     }
-  }, [isOnline, calculateTimeAway]);
+  }, [isOnline, calculateTimeAway, showNewOrderPopup, selectedRestaurant]);
 
   // Fetch assigned orders when delivery person goes online
   useEffect(() => {
@@ -5093,6 +5280,21 @@ export default function DeliveryHome() {
           setSelectedRestaurant(null);
           return;
         }
+        // If this order was already marked as reached drop, restore directly to delivered flow
+        try {
+          const atDropId = localStorage.getItem('deliveryAtDropOrderId');
+          if (atDropId && String(atDropId) === String(orderId)) {
+            if (activeOrderData.restaurantInfo) {
+              setSelectedRestaurant(activeOrderData.restaurantInfo);
+            }
+            setShowReachedDropPopup(false);
+            setShowreachedPickupPopup(false);
+            setShowNewOrderPopup(false);
+            setShowOrderIdConfirmationPopup(false);
+            setShowOrderDeliveredAnimation(true);
+            return;
+          }
+        } catch { /* ignore */ }
 
         // Verify order still exists in database before restoring
         try {
@@ -5105,11 +5307,12 @@ export default function DeliveryHome() {
           const order = orderResponse.data.data;
 
           // Check if order is cancelled or deleted
-          if (order.status === 'cancelled' || order.status === 'delivered') {
-            localStorage.removeItem('deliveryActiveOrder');
-            setSelectedRestaurant(null);
-            return;
-          }
+        if (order.status === 'cancelled' || order.status === 'delivered') {
+          localStorage.removeItem('deliveryActiveOrder');
+          localStorage.removeItem('deliveryAtDropOrderId');
+          setSelectedRestaurant(null);
+          return;
+        }
 
           // Check if order is still assigned to current delivery partner
           // (This check will be done by backend, but we can verify here too)
@@ -5286,6 +5489,8 @@ export default function DeliveryHome() {
   // Utility function to clear order data when order is deleted or cancelled
   const clearOrderData = useCallback(() => {
     localStorage.removeItem('deliveryActiveOrder');
+    localStorage.removeItem('deliveryPendingOrder');
+    localStorage.removeItem('deliveryAtDropOrderId');
     setSelectedRestaurant(null);
     setShowReachedDropPopup(false);
     setShowOrderDeliveredAnimation(false);
@@ -5465,9 +5670,16 @@ export default function DeliveryHome() {
       return;
     }
 
-    // Order is ready: show Reached Pickup popup immediately (no 500m check)
+    const hasAcceptedOrder =
+      Boolean(localStorage.getItem('deliveryActiveOrder')) ||
+      deliveryPhase === 'en_route_to_pickup' ||
+      deliveryPhase === 'at_pickup' ||
+      currentRestaurantInfo?.deliveryState?.status === 'accepted';
 
-    setShowreachedPickupPopup(true);
+    // Order is ready: show Reached Pickup only after acceptance
+    if (hasAcceptedOrder) {
+      setShowreachedPickupPopup(true);
+    }
     clearOrderReady();
   }, [orderReady, selectedRestaurant]);
 
@@ -5656,6 +5868,16 @@ export default function DeliveryHome() {
       return;
     }
 
+    const hasAcceptedOrder =
+      Boolean(localStorage.getItem('deliveryActiveOrder')) ||
+      deliveryPhase === 'en_route_to_pickup' ||
+      deliveryPhase === 'at_pickup' ||
+      selectedRestaurant?.deliveryState?.status === 'accepted';
+
+    if (!hasAcceptedOrder) {
+      return;
+    }
+
     // Only show if order is accepted and on the way to pickup or at pickup
     const isInPickupPhase = deliveryPhase === 'en_route_to_pickup' || deliveryPhase === 'at_pickup' || orderStatus === 'ready' || orderStatus === 'preparing';
     if (!isInPickupPhase) {
@@ -5695,6 +5917,10 @@ export default function DeliveryHome() {
         setSelectedRestaurant(null);
         localStorage.removeItem('deliveryActiveOrder');
         localStorage.removeItem('activeOrder');
+        localStorage.removeItem('deliveryPendingOrder');
+        localStorage.removeItem('deliveryAtDropOrderId');
+        localStorage.removeItem('deliveryPendingOrder');
+        localStorage.removeItem('deliveryAtDropOrderId');
         if (typeof clearNewOrder === 'function') {
           clearNewOrder();
         }
@@ -7176,7 +7402,7 @@ export default function DeliveryHome() {
 
 {/* Order ID Confirmation Popup - shown after Reached Pickup swipe is confirmed */ }
 <BottomPopup isOpen={showOrderIdConfirmationPopup} onClose={() => setShowOrderIdConfirmationPopup(false)} showCloseButton={false} closeOnBackdropClick={false} maxHeight="60vh" showHandle={false} showBackdrop={false} backdropBlocksInteraction={false}>
-  <div className="">
+  <div className="pb-4">
     <div className="text-center mb-6">
       <h2 className="text-xl font-bold text-gray-900 mb-2">
         Confirm Order ID
@@ -7595,6 +7821,8 @@ export default function DeliveryHome() {
               // Close review popup and show payment page
               setShowCustomerReviewPopup(false);
               setShowPaymentPage(true);
+              localStorage.removeItem('deliveryAtDropOrderId');
+              localStorage.removeItem('deliveryPendingOrder');
             } else {
               console.error('❌ Failed to submit review:', response.data);
               toast.error(response.data?.message || 'Failed to submit review. Please try again.');
@@ -7605,11 +7833,13 @@ export default function DeliveryHome() {
             // Still show payment page even if review fails
             setShowCustomerReviewPopup(false);
             setShowPaymentPage(true);
+            localStorage.removeItem('deliveryPendingOrder');
           }
         } else {
           // If no order ID, just show payment page
           setShowCustomerReviewPopup(false);
           setShowPaymentPage(true);
+          localStorage.removeItem('deliveryPendingOrder');
         }
       }} className="w-full bg-green-600 text-white py-4 rounded-xl font-semibold text-lg hover:bg-green-700 transition-colors shadow-lg">
         Submit Review

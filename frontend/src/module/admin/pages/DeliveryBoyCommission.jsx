@@ -437,7 +437,12 @@ export default function DeliveryBoyCommission() {
               </div>
             </div>
 
-            {/* Settings button removed as table settings are not used */}
+            <button
+              onClick={handleAdd}
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg bg-orange-600 text-white hover:bg-orange-700 transition-colors shadow-sm"
+            >
+              + Add Commission
+            </button>
           </div>
 
           <div className="mb-4 flex flex-col sm:flex-row sm:items-center gap-3">
@@ -737,4 +742,3 @@ export default function DeliveryBoyCommission() {
     </div>
   )
 }
-

@@ -529,7 +529,42 @@ io.on('connection', (socket) => {
 // Start server
 const PORT = process.env.PORT || 5000;
 
+function formatStatus(label, value) {
+  const left = `${label}`.padEnd(12);
+  return `${left}: ${value}`;
+}
+
+function printStartupBanner() {
+  const host = process.env.HOST || 'localhost';
+  const nodeEnv = process.env.NODE_ENV || 'development';
+  const mongoState = mongoose.connection.readyState;
+  const mongoStatus =
+    mongoState === 1 ? 'connected...' :
+    mongoState === 2 ? 'connecting...' :
+    mongoState === 3 ? 'disconnecting...' :
+    'disconnected';
+
+  const redisEnabled = String(process.env.REDIS_ENABLED || '').toLowerCase() === 'true';
+  const cloudinaryEnabled = Boolean(process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY);
+
+  const lines = [
+    '------------------------------------------------------------------',
+    formatStatus('mongodb', mongoStatus),
+    formatStatus('backend', `${host} : ${PORT}`),
+    formatStatus('env', nodeEnv),
+    formatStatus('api', `/api`),
+    formatStatus('health', `http://${host}:${PORT}/health`),
+    formatStatus('socket', 'enabled'),
+    formatStatus('redis', redisEnabled ? 'enabled' : 'disabled'),
+    formatStatus('cloudinary', cloudinaryEnabled ? 'configured' : 'not set'),
+    '------------------------------------------------------------------',
+  ];
+
+  lines.forEach(line => console.log(line));
+}
+
 httpServer.listen(PORT, () => {
+  printStartupBanner();
 
   // Initialize scheduled tasks after DB connection is established
   // Wait a bit for DB to connect, then start cron jobs

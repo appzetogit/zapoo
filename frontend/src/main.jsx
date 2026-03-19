@@ -49,7 +49,7 @@ window.__googleMapsLoaded = window.__googleMapsLoaded || false;
     const googleMapsApiKey = await getGoogleMapsApiKey();
     if (googleMapsApiKey) {
       const script = document.createElement('script');
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${googleMapsApiKey}&libraries=places,geometry,drawing,geocoding`;
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${googleMapsApiKey}&libraries=places,geometry,drawing,geocoding&loading=async`;
       script.async = true;
       script.defer = true;
       script.onload = () => {

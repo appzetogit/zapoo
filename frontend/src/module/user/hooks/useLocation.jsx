@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { locationAPI, userAPI } from "@/lib/api";
 import { ref, set, get } from 'firebase/database';
+import { getAuth } from 'firebase/auth';
 import { realtimeDb } from '@/lib/firebaseConfig';
 
 // Module-level geocode cache — shared across hook instances, survives re-renders
@@ -46,8 +47,10 @@ function _getUserId() {
 }
 
 function _syncLocationToFirebase(lat, lng) {
-  const userId = _getUserId();
-  if (!userId) return;
+  const auth = getAuth(realtimeDb.app);
+  const fbUser = auth.currentUser;
+  if (!fbUser) return;
+  const userId = fbUser.uid;
   set(ref(realtimeDb, `users/${userId}/location`), {
     lat, lng, timestamp: Date.now()
   }).catch(() => {});

@@ -279,14 +279,7 @@ export default function RestaurantDetails() {
               calculatedDistance = `${distanceInMeters} m`;
             }
           } else {
-            console.warn('⚠️ Cannot calculate distance - missing coordinates:', {
-              hasUserLocation: !!(userLat && userLng),
-              hasRestaurantLocation: !!(restaurantLat && restaurantLng),
-              userLat,
-              userLng,
-              restaurantLat,
-              restaurantLng
-            });
+            // Avoid noisy warnings when user location isn't available yet (permission/async load).
           }
 
           // Transform API data to match expected format
@@ -676,22 +669,6 @@ export default function RestaurantDetails() {
       isVeg: item.isVeg !== false,
       isRecommended: item.isRecommended === true
     };
-
-    try {
-      // Add to cart logic
-      if (newQuantity > (quantities[item.id] || 0)) {
-        addToCart(cartItem, event);
-      } else if (newQuantity < (quantities[item.id] || 0)) {
-        if (newQuantity === 0) {
-          removeFromCart(item.id);
-        } else {
-          updateQuantity(item.id, newQuantity);
-        }
-      }
-    } catch (err) {
-      console.error('❌ Error updating cart:', err);
-      toast.error('Something went wrong while updating the cart.');
-    }
 
     // Get source position for animation from event target
     // Prefer currentTarget (the button) over target (might be icon inside button)

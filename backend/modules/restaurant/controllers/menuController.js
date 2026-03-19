@@ -33,7 +33,8 @@ export const getMenu = asyncHandler(async (req, res) => {
 // Update menu (upsert)
 export const updateMenu = asyncHandler(async (req, res) => {
   // Restaurant is attached by authenticate middleware
-  const restaurantId = req.restaurant._id;
+  const restaurant = req.restaurant;
+  const restaurantId = restaurant._id;
   const {
     sections
   } = req.body;

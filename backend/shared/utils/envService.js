@@ -154,5 +154,6 @@ export async function getSMSHubIndiaCredentials() {
  * @returns {Promise<string>} Google Maps API Key
  */
 export async function getGoogleMapsApiKey() {
-  return await getEnvVar("VITE_GOOGLE_MAPS_API_KEY");
+  // Prefer server-side key without referrer restrictions; fall back to VITE_ key if needed.
+  return await getEnvVar("GOOGLE_MAPS_API_KEY") || await getEnvVar("VITE_GOOGLE_MAPS_API_KEY");
 }

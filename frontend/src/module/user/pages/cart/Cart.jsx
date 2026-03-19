@@ -1555,22 +1555,24 @@ export default function Cart() {
 
             {/* Confetti Background */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none">
-              {[...Array(50)].map((_, i) => <motion.div key={i} initial={{
-            y: -20,
-            x: Math.random() * 100 + "%",
-            rotate: 0
-          }} animate={{
-            y: "110vh",
-            rotate: 360,
-            x: Math.random() * 100 - 10 + "%"
-          }} transition={{
-            duration: 2 + Math.random() * 2,
-            repeat: Infinity,
-            ease: "linear",
-            delay: Math.random() * 5
-          }} className="absolute w-2 h-4 rounded-sm" style={{
-            backgroundColor: ['#22c55e', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6'][Math.floor(Math.random() * 7)]
-          }} />)}
+              {[...Array(50)].map((_, i) => {
+                const left = Math.random() * 100;
+                const drift = Math.random() * 40 - 20; // small horizontal drift in px
+                const duration = 2 + Math.random() * 2;
+                const delay = Math.random() * 5;
+                const colors = ['#22c55e', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6'];
+                const color = colors[Math.floor(Math.random() * colors.length)];
+                return (
+                  <motion.div
+                    key={i}
+                    initial={{ y: -20, x: 0, rotate: 0 }}
+                    animate={{ y: "110vh", x: drift, rotate: 360 }}
+                    transition={{ duration, repeat: Infinity, ease: "linear", delay }}
+                    className="absolute w-2 h-4 rounded-sm"
+                    style={{ left: `${left}%`, backgroundColor: color }}
+                  />
+                );
+              })}
             </div>
 
             <motion.div initial={{
