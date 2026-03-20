@@ -19,7 +19,7 @@ const daysOfWeek = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const ONBOARDING_STORAGE_KEY = "restaurant_onboarding_data";
 
 // Helper functions for localStorage
-const saveOnboardingToLocalStorage = (step1, step2, step3, step4, currentStep) => {
+const saveOnboardingToLocalStorage = (step1, step2, step3, currentStep) => {
   try {
     // Convert File objects to a serializable format (we'll store file names/paths if available)
     const serializableStep2 = {
@@ -62,7 +62,6 @@ const saveOnboardingToLocalStorage = (step1, step2, step3, step4, currentStep) =
       step1,
       step2: serializableStep2,
       step3: serializableStep3,
-      step4: step4 || {},
       currentStep,
       timestamp: Date.now()
     };
@@ -203,12 +202,14 @@ export default function RestaurantOnboarding() {
     accountHolderName: "",
     accountType: ""
   });
-  const [step4, setStep4] = useState({
-    estimatedDeliveryTime: "",
-    featuredDish: "",
-    featuredPrice: "",
-    offer: ""
-  });
+
+  const normalizeStep = (value) => {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return 1;
+    if (n < 1) return 1;
+    if (n > 3) return 3;
+    return Math.trunc(n);
+  };
 
   // Load from localStorage on mount and check URL parameter
   useEffect(() => {
@@ -268,25 +269,17 @@ export default function RestaurantOnboarding() {
           accountType: localData.step3.accountType || ""
         });
       }
-      if (localData.step4) {
-        setStep4({
-          estimatedDeliveryTime: localData.step4.estimatedDeliveryTime || "",
-          featuredDish: localData.step4.featuredDish || "",
-          featuredPrice: localData.step4.featuredPrice || "",
-          offer: localData.step4.offer || ""
-        });
-      }
       // Only set step from localStorage if URL doesn't have a step parameter
       if (localData.currentStep && !stepParam) {
-        setStep(localData.currentStep);
+        setStep(normalizeStep(localData.currentStep));
       }
     }
   }, [searchParams]);
 
   // Save to localStorage whenever step data changes
   useEffect(() => {
-    saveOnboardingToLocalStorage(step1, step2, step3, step4, step);
-  }, [step1, step2, step3, step4, step]);
+    saveOnboardingToLocalStorage(step1, step2, step3, step);
+  }, [step1, step2, step3, step]);
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -354,18 +347,16 @@ export default function RestaurantOnboarding() {
               accountType: data.step3.bank?.accountType || ""
             });
           }
-          if (data.step4) {
-            setStep4({
-              estimatedDeliveryTime: data.step4.estimatedDeliveryTime || "",
-              featuredDish: data.step4.featuredDish || "",
-              featuredPrice: data.step4.featuredPrice || "",
-              offer: data.step4.offer || ""
-            });
-          }
-
           // Determine which step to show based on completeness
           const stepToShow = determineStepToShow(data);
-          setStep(stepToShow);
+          if (stepToShow == null) {
+            // Onboarding already complete (step 3 is final) - show trial offer flow
+            clearOnboardingFromLocalStorage();
+            setShowTrialOffer(true);
+            setStep(3);
+          } else {
+            setStep(normalizeStep(stepToShow));
+          }
         }
       } catch (err) {
         // Handle error gracefully - if it's a 401 (unauthorized), the user might need to login again
@@ -520,22 +511,6 @@ export default function RestaurantOnboarding() {
     }
     return errors;
   };
-  const validateStep4 = () => {
-    const errors = [];
-    if (!step4.estimatedDeliveryTime || !step4.estimatedDeliveryTime.trim()) {
-      errors.push("Estimated delivery time is required");
-    }
-    if (!step4.featuredDish || !step4.featuredDish.trim()) {
-      errors.push("Featured dish name is required");
-    }
-    if (!step4.featuredPrice || step4.featuredPrice === "" || isNaN(parseFloat(step4.featuredPrice)) || parseFloat(step4.featuredPrice) <= 0) {
-      errors.push("Featured dish price is required and must be greater than 0");
-    }
-    if (!step4.offer || !step4.offer.trim()) {
-      errors.push("Special offer/promotion is required");
-    }
-    return errors;
-  };
   const validateStep3 = () => {
     const errors = [];
     if (!step3.panNumber?.trim()) {
@@ -632,17 +607,16 @@ export default function RestaurantOnboarding() {
 
   const handleNext = async () => {
     setError("");
+    const effectiveStep = normalizeStep(step);
 
     // Validate current step before proceeding
     let validationErrors = [];
-    if (step === 1) {
+    if (effectiveStep === 1) {
       validationErrors = validateStep1();
-    } else if (step === 2) {
+    } else if (effectiveStep === 2) {
       validationErrors = validateStep2();
-    } else if (step === 3) {
+    } else if (effectiveStep === 3) {
       validationErrors = validateStep3();
-    } else if (step === 4) {
-      validationErrors = validateStep4();
     }
     if (validationErrors.length > 0) {
       // Show error toast for each validation error
@@ -657,14 +631,14 @@ export default function RestaurantOnboarding() {
     }
     setSaving(true);
     try {
-      if (step === 1) {
+      if (effectiveStep === 1) {
         const payload = {
           step1,
           completedSteps: 1
         };
         await api.put("/restaurant/onboarding", payload);
         setStep(2);
-      } else if (step === 2) {
+      } else if (effectiveStep === 2) {
         const menuUploads = [];
         // Upload menu images if they are File objects
         for (const file of step2.menuImages.filter(f => f instanceof File)) {
@@ -745,7 +719,7 @@ export default function RestaurantOnboarding() {
         } else {
           throw new Error('Failed to save step2 data');
         }
-      } else if (step === 3) {
+      } else if (effectiveStep === 3) {
         // Upload PAN image if it's a File object
         let panImageUpload = null;
         if (step3.panImage instanceof File) {
@@ -861,24 +835,7 @@ export default function RestaurantOnboarding() {
         };
         const response = await api.put("/restaurant/onboarding", payload);
         if (response?.data?.data?.onboarding) { }
-        setStep(4);
-      } else if (step === 4) {
-        const payload = {
-          step4: {
-            estimatedDeliveryTime: step4.estimatedDeliveryTime,
-            featuredDish: step4.featuredDish,
-            featuredPrice: parseFloat(step4.featuredPrice) || 249,
-            offer: step4.offer
-          },
-          completedSteps: 4
-        };
-        const response = await api.put("/restaurant/onboarding", payload);
-        // Verify response is successful
-        if (!response || !response.data) {
-          throw new Error('Invalid response from server');
-        }
-
-        // Clear localStorage when onboarding is complete
+        // Step 4 removed; onboarding completes after step 3.
         clearOnboardingFromLocalStorage();
 
         // Show trial offer after completing all steps
@@ -1438,46 +1395,12 @@ export default function RestaurantOnboarding() {
       </div>
     </section>
   </div>;
-  const renderStep4 = () => <div className="space-y-6">
-    <section className="bg-white p-4 sm:p-6 rounded-md space-y-4">
-      <h2 className="text-lg font-semibold text-blue-600">Restaurant Display Information</h2>
-      <p className="text-sm text-gray-600">
-        Add information that will be displayed to customers on the home page
-      </p>      <div>
-        <Label className="text-xs text-gray-700">Estimated Delivery Time*</Label>
-        <Input value={step4.estimatedDeliveryTime || ""} onChange={e => setStep4({
-          ...step4,
-          estimatedDeliveryTime: e.target.value
-        })} className="mt-1 bg-white text-sm text-black placeholder:text-gray-400" placeholder="e.g. 30-40 mins" />
-      </div>
-      <div>
-        <Label className="text-xs text-gray-700">Featured Dish Name*</Label>
-        <Input value={step4.featuredDish || ""} onChange={e => setStep4({
-          ...step4,
-          featuredDish: e.target.value
-        })} className="mt-1 bg-white text-sm text-black placeholder:text-gray-400" placeholder="Name of your popular dish" />
-      </div>
-      <div>
-        <Label className="text-xs text-gray-700">Featured Dish Price (₹)*</Label>
-        <Input type="number" value={step4.featuredPrice || ""} onChange={e => setStep4({
-          ...step4,
-          featuredPrice: e.target.value
-        })} className="mt-1 bg-white text-sm text-black placeholder:text-gray-400" placeholder="0.00" />
-      </div>
-      <div>
-        <Label className="text-xs text-gray-700">Special Offer/Promotion*</Label>
-        <Input value={step4.offer || ""} onChange={e => setStep4({
-          ...step4,
-          offer: e.target.value
-        })} className="mt-1 bg-white text-sm text-black placeholder:text-gray-400" placeholder="e.g. 20% off on first order" />
-      </div>
-    </section>
-  </div>;
+  // Step 4 removed (display fields no longer required)
   const renderStep = () => {
     if (step === 1) return renderStep1();
     if (step === 2) return renderStep2();
     if (step === 3) return renderStep3();
-    return renderStep4();
+    return renderStep3();
   };
   return <LocalizationProvider dateAdapter={AdapterDateFns}>
     <div className="min-h-screen bg-gray-100 flex flex-col">
@@ -1486,7 +1409,7 @@ export default function RestaurantOnboarding() {
         <div className="flex items-center gap-3">
 
           <div className="text-xs text-gray-600">
-            Step {step} of 4
+            Step {step} of 3
           </div>
         </div>
       </header>
@@ -1505,7 +1428,7 @@ export default function RestaurantOnboarding() {
             Back
           </Button>
           <Button onClick={handleNext} disabled={saving} className="text-sm bg-blue-600 text-white px-6 hover:bg-blue-700">
-            {step === 4 ? saving ? "Saving..." : "Finish" : saving ? "Saving..." : "Continue"}
+            {step === 3 ? saving ? "Saving..." : "Finish" : saving ? "Saving..." : "Continue"}
           </Button>
         </div>
       </footer>

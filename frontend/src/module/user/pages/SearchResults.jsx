@@ -14,6 +14,7 @@ import { X } from "lucide-react";
 
 // Import shared food images - prevents duplication
 import { foodImages } from "@/constants/images";
+import DynamicEtaText from "../components/DynamicEtaText";
 
 // Filter options
 const filterOptions = [{
@@ -873,7 +874,12 @@ export default function SearchResults() {
                   {(restaurant.deliveryTime || restaurant.distance) && <div className="flex items-center gap-1 text-sm lg:text-base text-gray-500 dark:text-gray-400 mb-2 lg:mb-3">
                     {restaurant.deliveryTime && <>
                       <Clock className="h-4 w-4 lg:h-5 lg:w-5" strokeWidth={1.5} />
-                      <span className="font-medium">{restaurant.deliveryTime}</span>
+                      <span className="font-medium">
+                        <DynamicEtaText
+                          restaurantId={restaurant.id}
+                          fallback={restaurant.deliveryTime}
+                        />
+                      </span>
                     </>}
                     {restaurant.deliveryTime && restaurant.distance && <span className="mx-1">|</span>}
                     {restaurant.distance && <span className="font-medium">{restaurant.distance}</span>}

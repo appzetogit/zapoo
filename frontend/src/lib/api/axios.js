@@ -253,6 +253,10 @@ apiClient.interceptors.response.use(response => {
       lowerMessage.includes("plan does not include") ||
       lowerMessage.includes("active subscription is required"));
 
+  if (isSubscription403 && typeof window !== "undefined") {
+    window.dispatchEvent(new Event("noPlanPopupToggle"));
+  }
+
   // For subscription-blocked GET calls, return a handled response so screens don't spam catch logs.
   if (isSubscription403 && (originalRequest?.method || "get").toLowerCase() === "get") {
     return {

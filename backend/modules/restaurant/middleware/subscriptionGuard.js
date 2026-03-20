@@ -18,14 +18,22 @@ export const checkFeatureAccess = (feature) => {
     // The main auth middleware already handles JIT expiry check, 
     // but we check here too for safety.
     const now = new Date();
-    const isExpiredByDate = subscription?.endDate ? new Date(subscription.endDate) <= now : true;
+    // If endDate is missing (legacy/incomplete data), don't treat it as expired here.
+    // Status is still required to be "active".
+    const isExpiredByDate = subscription?.endDate ? new Date(subscription.endDate) <= now : false;
     if (!subscription || subscription.status !== 'active' || isExpiredByDate) {
       return errorResponse(res, 403, 'An active subscription is required to access this feature.');
     }
 
     // If subscription is active, check features
     // In our model, features are stored as an array of strings
-    if (Array.isArray(subscription.features) && subscription.features.includes(feature)) {
+    // Some flows (e.g., admin extend) may not persist a snapshot to subscription.features.
+    // Fall back to the populated plan's features when snapshot is missing/empty.
+    const snapshotFeatures = Array.isArray(subscription.features) ? subscription.features : [];
+    const planFeatures = Array.isArray(subscription.planId?.features) ? subscription.planId.features : [];
+    const effectiveFeatures = snapshotFeatures.length > 0 ? snapshotFeatures : planFeatures;
+
+    if (Array.isArray(effectiveFeatures) && effectiveFeatures.includes(feature)) {
       return next();
     }
 

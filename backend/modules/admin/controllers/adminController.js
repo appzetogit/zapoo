@@ -88,8 +88,27 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
       {
         $lookup: {
           from: "ordersettlements", // Collection name is usually lowercase plural
-          localField: "_id",
-          foreignField: "orderId",
+          let: {
+            orderId: "$_id"
+          },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $eq: [
+                    {
+                      $toString: {
+                        $ifNull: ["$orderId", ""]
+                      }
+                    },
+                    {
+                      $toString: "$$orderId"
+                    }
+                  ]
+                }
+              }
+            }
+          ],
           as: "settlement"
         }
       },
@@ -98,30 +117,60 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
         $group: {
           _id: null,
           totalRevenue: { $sum: "$pricing.total" },
-          totalCommission: { $sum: "$settlement.adminEarning.commission" },
-          totalPlatformFee: { $sum: "$settlement.adminEarning.platformFee" },
-          totalDeliveryFee: { $sum: "$settlement.adminEarning.deliveryFee" },
-          totalGST: { $sum: "$settlement.adminEarning.gst" },
-          totalRecommendedFee: { $sum: "$settlement.adminEarning.recommendedItemFee" },
+          totalCommission: { $sum: { $ifNull: ["$settlement.adminEarning.commission", 0] } },
+          totalPlatformFee: { $sum: { $ifNull: ["$settlement.adminEarning.platformFee", 0] } },
+          totalDeliveryFee: { $sum: { $ifNull: ["$settlement.adminEarning.deliveryFee", 0] } },
+          totalGST: { $sum: { $ifNull: ["$settlement.adminEarning.gst", 0] } },
+          totalRecommendedFee: { $sum: { $ifNull: ["$settlement.adminEarning.recommendedItemFee", 0] } },
           count: { $sum: 1 },
           // Last 30 days sub-metrics (if needed for the specific 'total' display)
           last30DaysRevenue: {
             $sum: { $cond: [{ $gte: ["$createdAt", last30Days] }, "$pricing.total", 0] }
           },
           last30DaysCommission: {
-            $sum: { $cond: [{ $gte: ["$createdAt", last30Days] }, "$settlement.adminEarning.commission", 0] }
+            $sum: {
+              $cond: [
+                { $gte: ["$createdAt", last30Days] },
+                { $ifNull: ["$settlement.adminEarning.commission", 0] },
+                0
+              ]
+            }
           },
           last30DaysPlatformFee: {
-            $sum: { $cond: [{ $gte: ["$createdAt", last30Days] }, "$settlement.adminEarning.platformFee", 0] }
+            $sum: {
+              $cond: [
+                { $gte: ["$createdAt", last30Days] },
+                { $ifNull: ["$settlement.adminEarning.platformFee", 0] },
+                0
+              ]
+            }
           },
           last30DaysDeliveryFee: {
-            $sum: { $cond: [{ $gte: ["$createdAt", last30Days] }, "$settlement.adminEarning.deliveryFee", 0] }
+            $sum: {
+              $cond: [
+                { $gte: ["$createdAt", last30Days] },
+                { $ifNull: ["$settlement.adminEarning.deliveryFee", 0] },
+                0
+              ]
+            }
           },
           last30DaysGST: {
-            $sum: { $cond: [{ $gte: ["$createdAt", last30Days] }, "$settlement.adminEarning.gst", 0] }
+            $sum: {
+              $cond: [
+                { $gte: ["$createdAt", last30Days] },
+                { $ifNull: ["$settlement.adminEarning.gst", 0] },
+                0
+              ]
+            }
           },
           last30DaysRecommendedFee: {
-            $sum: { $cond: [{ $gte: ["$createdAt", last30Days] }, "$settlement.adminEarning.recommendedItemFee", 0] }
+            $sum: {
+              $cond: [
+                { $gte: ["$createdAt", last30Days] },
+                { $ifNull: ["$settlement.adminEarning.recommendedItemFee", 0] },
+                0
+              ]
+            }
           }
         }
       }
@@ -317,8 +366,27 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
       {
         $lookup: {
           from: "ordersettlements",
-          localField: "_id",
-          foreignField: "orderId",
+          let: {
+            orderId: "$_id"
+          },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $eq: [
+                    {
+                      $toString: {
+                        $ifNull: ["$orderId", ""]
+                      }
+                    },
+                    {
+                      $toString: "$$orderId"
+                    }
+                  ]
+                }
+              }
+            }
+          ],
           as: "settlement"
         }
       },
@@ -330,7 +398,7 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
             month: { $month: "$deliveredAt" }
           },
           revenue: { $sum: "$pricing.total" },
-          commission: { $sum: "$settlement.adminEarning.commission" },
+          commission: { $sum: { $ifNull: ["$settlement.adminEarning.commission", 0] } },
           orders: { $sum: 1 }
         }
       },
@@ -1214,7 +1282,7 @@ export const getRestaurantJoinRequests = asyncHandler(async (req, res) => {
     const query = {};
 
     // Status filter
-    // Pending = restaurants with ALL onboarding steps completed (step 4) but not yet active
+    // Pending = restaurants with onboarding completed (step 3) but not yet active
     // Rejected = restaurants that have rejectionReason
     if (status === "pending") {
       // Build conditions array for $and - ensures all conditions are met
@@ -1231,12 +1299,12 @@ export const getRestaurantJoinRequests = asyncHandler(async (req, res) => {
         }]
       }];
 
-      // Only show restaurants that have completed ALL onboarding steps (all 4 steps)
-      // Check if onboarding.completedSteps is 4, OR if restaurant has all required data filled
+      // Only show restaurants that have completed onboarding (step 3)
+      // Check if onboarding.completedSteps >= 3, OR if restaurant has all required data filled (step1-3)
       // This handles both cases: restaurants with proper tracking AND restaurants that completed onboarding before tracking was added
       const completionCheck = {
         $or: [{
-          "onboarding.completedSteps": 4
+          "onboarding.completedSteps": { $gte: 3 }
         },
         // Fallback: If completedSteps is not 4 (or doesn't exist), check if restaurant has all main fields filled
         // This matches restaurants that have completed onboarding even if completedSteps field wasn't set to 4
@@ -1270,20 +1338,12 @@ export const getRestaurantJoinRequests = asyncHandler(async (req, res) => {
           },
           // Has open days (array with items)
           {
-            estimatedDeliveryTime: {
+            "onboarding.step2.profileImageUrl": {
               $exists: true,
               $ne: null,
-              $ne: ""
+              $ne: {}
             }
-          },
-          // Has delivery time (from step 4)
-          {
-            featuredDish: {
-              $exists: true,
-              $ne: null,
-              $ne: ""
-            }
-          } // Has featured dish (from step 4)
+          } // Has profile image from step 2
           ]
         }]
       };
@@ -1296,16 +1356,10 @@ export const getRestaurantJoinRequests = asyncHandler(async (req, res) => {
       };
       // For rejected, also check if onboarding is complete
       query.$or = [{
-        "onboarding.completedSteps": 4
+        "onboarding.completedSteps": { $gte: 3 }
       }, {
         $and: [{
           name: {
-            $exists: true,
-            $ne: null,
-            $ne: ""
-          }
-        }, {
-          estimatedDeliveryTime: {
             $exists: true,
             $ne: null,
             $ne: ""

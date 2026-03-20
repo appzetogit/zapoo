@@ -16,6 +16,7 @@ import { API_BASE_URL } from "@/lib/api/config";
 import { initRazorpayPayment } from "@/lib/utils/razorpay";
 import { toast } from "sonner";
 import { getCompanyNameAsync } from "@/lib/utils/businessSettings";
+import DynamicEtaText from "../../components/DynamicEtaText";
 
 // Removed hardcoded suggested items - now fetching approved addons from backend
 // Coupons will be fetched from backend based on items in cart
@@ -160,6 +161,9 @@ export default function Cart() {
   // Priority: restaurantData > cart[0].restaurantId
   // DO NOT use cart[0].restaurant as slug fallback - it creates wrong slugs
   const restaurantId = cart.length > 0 ? restaurantData?._id || restaurantData?.restaurantId || cart[0]?.restaurantId || null : null;
+  const etaItems = useMemo(() => {
+    return (cart || []).map((it) => ({ itemId: it.itemId, quantity: it.quantity }));
+  }, [cart]);
 
   // Stable restaurant ID for addons fetch (memoized to prevent dependency array issues)
   // Prefer restaurantData IDs (more reliable) over slug from cart
@@ -1046,7 +1050,12 @@ export default function Cart() {
               <div className="min-w-0">
                 <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400">{restaurantName}</p>
                 <p className="text-sm md:text-base font-medium text-gray-800 dark:text-white truncate">
-                  {restaurantData?.estimatedDeliveryTime || "10-15 mins"} to <span className="font-semibold">Location</span>
+                  <DynamicEtaText
+                    restaurantId={restaurantId}
+                    items={etaItems}
+                    fallback={restaurantData?.estimatedDeliveryTime || "10-15 mins"}
+                  />{" "}
+                  to <span className="font-semibold">Location</span>
                   <span className="text-gray-400 dark:text-gray-500 ml-1 text-xs md:text-sm">{defaultAddress ? formatFullAddress(defaultAddress) || defaultAddress?.formattedAddress || defaultAddress?.address || defaultAddress?.city || "Select address" : "Select address"}</span>
                 </p>
               </div>
@@ -1252,7 +1261,16 @@ export default function Cart() {
                 <div className="flex items-center gap-3 md:gap-4">
                   <Clock className="h-4 w-4 md:h-5 md:w-5 text-gray-500 dark:text-gray-400" />
                   <div className="flex-1">
-                    <p className="text-sm md:text-base text-gray-800 dark:text-gray-200">Delivery in <span className="font-semibold">{restaurantData?.estimatedDeliveryTime || "10-15 mins"}</span></p>
+                    <p className="text-sm md:text-base text-gray-800 dark:text-gray-200">
+                      Delivery in{" "}
+                      <span className="font-semibold">
+                        <DynamicEtaText
+                          restaurantId={restaurantId}
+                          items={etaItems}
+                          fallback={restaurantData?.estimatedDeliveryTime || "10-15 mins"}
+                        />
+                      </span>
+                    </p>
                   </div>
                 </div>
               </div>
@@ -1677,7 +1695,13 @@ export default function Cart() {
                   <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest leading-none mb-1">Estimated Time</p>
                   <div className="flex items-center gap-1.5 font-bold text-gray-800 dark:text-gray-100">
                     <Clock className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />
-                    <span className="text-sm">{restaurantData?.estimatedDeliveryTime || "25-30 mins"}</span>
+                    <span className="text-sm">
+                      <DynamicEtaText
+                        restaurantId={restaurantId}
+                        items={etaItems}
+                        fallback={restaurantData?.estimatedDeliveryTime || "25-30 mins"}
+                      />
+                    </span>
                   </div>
                 </div>
               </motion.div>

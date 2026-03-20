@@ -16,6 +16,7 @@ import { scheduleItemAvailability, cancelScheduledAvailability, getItemSchedule 
 import { getInventory, updateInventory, getInventoryByRestaurantId } from './controllers/inventoryController.js';
 import { addStaff, getStaff, getStaffById, updateStaff, deleteStaff } from './controllers/staffManagementController.js';
 import { createOffer, getOffers, getOfferById, updateOfferStatus, deleteOffer, getCouponsByItemId, getCouponsByItemIdPublic, getPublicOffers } from './controllers/offerController.js';
+import { getRecommendedPreview } from './controllers/recommendedPreviewController.js';
 import categoryRoutes from './routes/categoryRoutes.js';
 import restaurantOrderRoutes from './routes/restaurantOrderRoutes.js';
 import outletTimingsRoutes from './routes/outletTimingsRoutes.js';
@@ -152,6 +153,7 @@ router.get('/rm/call-history', authenticate, checkFeatureAccess('relationship_ma
 // Restaurant routes (public - for user module)
 router.get('/list', getRestaurants);
 router.get('/under-250', getRestaurantsWithDishesUnder250);
+router.post('/recommended-preview', getRecommendedPreview);
 // Menu and inventory routes must come before /:id to avoid route conflicts
 router.get('/:restaurantId/offers/item/:itemId/coupons', getCouponsByItemIdPublic);
 router.get('/:restaurantId/outlet-timings', getOutletTimingsByRestaurantId);

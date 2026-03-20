@@ -5,6 +5,7 @@ import {
   getETAHistory,
   getOrderEvents,
   recalculateETA,
+  quoteETA,
   handleRestaurantAccepted,
   handleRiderAssigned,
   handleRiderReachedRestaurant,
@@ -21,6 +22,7 @@ const router = express.Router();
 router.get('/orders/:orderId/eta', getLiveETA);
 router.get('/orders/:orderId/eta/history', getETAHistory);
 router.get('/orders/:orderId/events', getOrderEvents);
+router.post('/orders/quote-eta', quoteETA);
 
 // Protected routes
 router.post('/orders/calculate-eta', authenticate, calculateInitialETA);

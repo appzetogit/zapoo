@@ -65,7 +65,7 @@ export default function FeatureLockedScreen({ requiredFeature }) {
                 onClick={() => navigate("/restaurant/subscription")}
                 className="w-full rounded-2xl bg-slate-900 text-white py-3 text-sm font-semibold hover:bg-black transition-colors inline-flex items-center justify-center gap-2"
               >
-                Subscribe now
+                View subscription plans
                 <ArrowRight className="w-4 h-4" />
               </button>
               <button

@@ -18,6 +18,7 @@ import { useProfile } from "../../context/ProfileContext";
 import AddToCartAnimation from "../../components/AddToCartAnimation";
 import { getCompanyNameAsync } from "@/lib/utils/businessSettings";
 import { isModuleAuthenticated } from "@/lib/utils/auth";
+import DynamicEtaText from "../../components/DynamicEtaText";
 export default function RestaurantDetails() {
   const {
     slug
@@ -1220,7 +1221,12 @@ export default function RestaurantDetails() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
               <Clock className="h-4 w-4" />
-              <span>{restaurant?.deliveryTime || "25-30 mins"}</span>
+              <span>
+                <DynamicEtaText
+                  restaurantId={restaurant?._id || restaurant?.restaurantId}
+                  fallback={restaurant?.deliveryTime || "25-30 mins"}
+                />
+              </span>
             </div>
           </div>
 

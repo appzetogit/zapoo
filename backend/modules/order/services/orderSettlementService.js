@@ -47,7 +47,12 @@ export const calculateOrderSettlement = async (orderId) => {
       if (zone?.tierId) {
         const tier = await Tier.findById(zone.tierId).select('name deliveryPricing.distanceSlabs').lean();
         if (tier) {
-          tierMeta = { id: tier._id, name: tier.name };
+          // Needed for settlement snapshot/debug + tier-based delivery commission.
+          tierMeta = {
+            id: tier._id,
+            name: tier.name,
+            distanceSlabs: tier.deliveryPricing?.distanceSlabs || null
+          };
         }
       }
     }
@@ -160,7 +165,7 @@ export const calculateOrderSettlement = async (orderId) => {
         feeSettings: {
           platformFee: feeSettings?.platformFee,
           gstRate: feeSettings?.gstRate,
-          distanceSlabs: tierDistanceSlabs,
+          distanceSlabs: tierMeta?.distanceSlabs,
           tier: tierMeta
         },
         pricingSnapshot: {

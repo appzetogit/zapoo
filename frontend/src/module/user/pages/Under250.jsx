@@ -19,6 +19,7 @@ import OptimizedImage from "@/components/OptimizedImage"
 import api from "@/lib/api"
 import { restaurantAPI } from "@/lib/api"
 import { isModuleAuthenticated } from "@/lib/utils/auth"
+import DynamicEtaText from "../components/DynamicEtaText"
 
 export default function Under250() {
   const { location } = useLocation()
@@ -540,7 +541,12 @@ export default function Under250() {
                     </h3>
                     <div className="flex items-center gap-2 text-sm md:text-base lg:text-lg text-gray-500 dark:text-gray-400">
                       <Clock className="h-4 w-4 md:h-5 md:w-5 lg:h-6 lg:w-6" strokeWidth={1.5} />
-                      <span className="font-medium">{restaurant.deliveryTime}</span>
+                      <span className="font-medium">
+                        <DynamicEtaText
+                          restaurantId={restaurant.id}
+                          fallback={restaurant.deliveryTime}
+                        />
+                      </span>
                     </div>
                   </div>
                   <div className="flex flex-col items-end">

@@ -2,10 +2,13 @@ import { asyncHandler } from '../../../shared/middleware/asyncHandler.js';
 import { successResponse, errorResponse } from '../../../shared/utils/response.js';
 import etaCalculationService from '../services/etaCalculationService.js';
 import etaEventService from '../services/etaEventService.js';
+import googleMapsService from '../services/googleMapsService.js';
 import Order from '../models/Order.js';
 import ETALog from '../models/ETALog.js';
 import OrderEvent from '../models/OrderEvent.js';
 import mongoose from 'mongoose';
+import Restaurant from '../../restaurant/models/Restaurant.js';
+import { computeOrderPreparationTimeMinutes, computeRestaurantBaselinePreparationMinutes } from '../services/preparationTimeService.js';
 
 /**
  * Helper function to find order by MongoDB _id or custom orderId
@@ -47,7 +50,8 @@ export const calculateInitialETA = asyncHandler(async (req, res) => {
   const {
     restaurantId,
     restaurantLocation,
-    userLocation
+    userLocation,
+    prepTimeMinutes
   } = req.body;
 
   if (!restaurantId || !restaurantLocation || !userLocation) {
@@ -57,10 +61,92 @@ export const calculateInitialETA = asyncHandler(async (req, res) => {
   const eta = await etaCalculationService.calculateInitialETA({
     restaurantId,
     restaurantLocation,
-    userLocation
+    userLocation,
+    prepTimeMinutes: prepTimeMinutes || 0
   });
 
   return successResponse(res, 200, 'ETA calculated successfully', eta);
+});
+
+/**
+ * Quote ETA for listing/cart (public)
+ * POST /api/orders/quote-eta
+ */
+export const quoteETA = asyncHandler(async (req, res) => {
+  const { restaurantId, userLocation, items } = req.body || {};
+
+  if (!restaurantId) {
+    return errorResponse(res, 400, 'restaurantId is required');
+  }
+  if (!userLocation || userLocation.latitude === undefined || userLocation.longitude === undefined) {
+    return errorResponse(res, 400, 'userLocation { latitude, longitude } is required');
+  }
+
+  const rid = String(restaurantId);
+  const restaurant = await Restaurant.findOne({
+    $or: [
+      ...(mongoose.Types.ObjectId.isValid(rid) && rid.length === 24 ? [{ _id: new mongoose.Types.ObjectId(rid) }] : []),
+      { restaurantId: rid },
+      { slug: rid }
+    ]
+  }).select('location deliveryRange isActive').lean();
+  if (!restaurant) {
+    return errorResponse(res, 404, 'Restaurant not found');
+  }
+  if (restaurant.isActive === false) {
+    return errorResponse(res, 403, 'Restaurant is inactive');
+  }
+
+  const restaurantLat = restaurant.location?.latitude ?? restaurant.location?.coordinates?.[1];
+  const restaurantLng = restaurant.location?.longitude ?? restaurant.location?.coordinates?.[0];
+  if (!restaurantLat || !restaurantLng) {
+    return errorResponse(res, 400, 'Restaurant location not set');
+  }
+
+  const restaurantLocation = { latitude: restaurantLat, longitude: restaurantLng };
+  const normalizedUserLocation = {
+    latitude: Number(userLocation.latitude),
+    longitude: Number(userLocation.longitude)
+  };
+
+  const reasonFlags = [];
+
+  // Preparation time: cart items -> menu-based aggregation, else baseline from menu
+  let prep;
+  if (Array.isArray(items) && items.length > 0) {
+    prep = await computeOrderPreparationTimeMinutes({ restaurantObjectId: restaurant._id.toString(), items });
+  } else {
+    prep = await computeRestaurantBaselinePreparationMinutes({ restaurantObjectId: restaurant._id.toString() });
+  }
+
+  // Compute travel once (used for response + out-of-range + ETA override)
+  const travel = await googleMapsService.getTravelTime(restaurantLocation, normalizedUserLocation);
+  const distanceKm = Number(travel?.distance || 0);
+  const travelMinutes = Number(travel?.duration || 0);
+  if (distanceKm > Number(restaurant.deliveryRange || 0) && Number(restaurant.deliveryRange || 0) > 0) {
+    reasonFlags.push('OUT_OF_RANGE');
+  }
+
+  const eta = await etaCalculationService.calculateInitialETA({
+    restaurantId: restaurant._id.toString(),
+    restaurantLocation,
+    userLocation: normalizedUserLocation,
+    prepTimeMinutes: prep.prepMinutes,
+    travelOverrides: {
+      restaurantToUser: travel
+    }
+  });
+
+  return successResponse(res, 200, 'ETA quoted successfully', {
+    minETA: eta.minETA,
+    maxETA: eta.maxETA,
+    distanceKm,
+    travelMinutes,
+    prepMinutes: prep.prepMinutes,
+    prepSource: prep.source,
+    breakdown: eta.breakdown || {},
+    reasonFlags
+  });
 });
 
 /**

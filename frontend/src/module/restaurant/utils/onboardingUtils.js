@@ -65,8 +65,8 @@ const isStepComplete = (stepData, stepNumber) => {
 export const determineStepToShow = (data) => {
   if (!data) return 1
 
-  // If completedSteps is 4, onboarding is complete (admin-created restaurants)
-  if (data.completedSteps === 4) {
+  // Onboarding is considered complete once step 3 is done
+  if (Number(data.completedSteps || 0) >= 3) {
     return null
   }
 

@@ -37,7 +37,12 @@ export async function processAutoReadyOrders() {
       // Calculate elapsed time in minutes
       const elapsedMs = now - new Date(preparingTimestamp);
       const elapsedMinutes = Math.floor(elapsedMs / 60000);
-      const estimatedTime = order.estimatedDeliveryTime || 0;
+      // IMPORTANT: 'estimatedDeliveryTime' includes travel time.
+      // Auto-ready should depend on kitchen prep time (+ restaurant-added time), not delivery ETA.
+      const estimatedTime = Math.max(
+        1,
+        Number(order.preparationTime || 0) + Number(order.eta?.additionalTime || 0)
+      );
 
       // Check if ETA has elapsed (with 5 second buffer to account for cron interval)
       if (elapsedMinutes >= estimatedTime) {

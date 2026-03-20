@@ -39,6 +39,8 @@ import exploreGourmet from "@/assets/explore more icons/gourmet.png";
 import exploreTop10 from "@/assets/explore more icons/top 10.png";
 import exploreCollection from "@/assets/explore more icons/collection.png";
 import ZoneAdBanner from "../components/ZoneAdBanner";
+import DynamicEtaText from "../components/DynamicEtaText";
+import RecommendedItemsBadge from "../components/RecommendedItemsBadge";
 
 // Banner images for hero carousel - will be fetched from API
 
@@ -164,6 +166,7 @@ export default function Home() {
   const [top10Restaurants, setTop10Restaurants] = useState([]);
   const [loadingTop10, setLoadingTop10] = useState(true);
   const isHandlingSwitchOff = useRef(false);
+  const [recommendedPreviewByRestaurantId, setRecommendedPreviewByRestaurantId] = useState({});
 
   // Swipe functionality for hero banner carousel
   const touchStartX = useRef(0);
@@ -926,6 +929,35 @@ export default function Home() {
     }
     return filtered;
   }, [restaurantsData, activeFilters, selectedCuisine, sortBy]);
+
+  // Fetch recommended preview items for visible restaurants (batch)
+  useEffect(() => {
+    const ids = (filteredRestaurants || [])
+      .map((r) => String(r?._id || r?.id || ""))
+      .filter((id) => id && id.length === 24);
+    const uniqueIds = [...new Set(ids)].slice(0, 60);
+    if (uniqueIds.length === 0) {
+      setRecommendedPreviewByRestaurantId({});
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await api.post("/restaurant/recommended-preview", {
+          restaurantIds: uniqueIds,
+        });
+        const previews = res?.data?.data?.previews || {};
+        if (!cancelled) setRecommendedPreviewByRestaurantId(previews);
+      } catch (_) {
+        if (!cancelled) setRecommendedPreviewByRestaurantId({});
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [filteredRestaurants]);
 
   // Featured foods removed - will be handled by restaurants data from API
   const filteredFeaturedFoods = useMemo(() => {
@@ -1825,7 +1857,10 @@ export default function Home() {
                         <div className="flex items-center gap-1">
                           <Zap className="w-3.5 h-3.5 text-[#1A9F4F] fill-current" />
                           <span className="text-xs sm:text-sm font-semibold text-[#1A9F4F]">
-                            {restaurant.estimatedDeliveryTime || '20-25'} mins
+                            <DynamicEtaText
+                              restaurantId={restaurant._id || restaurant.restaurantId}
+                              fallback={restaurant.estimatedDeliveryTime || '20-25 mins'}
+                            />
                           </span>
                         </div>
                         <span className="w-1 h-1 rounded-full bg-gray-300" />
@@ -1926,11 +1961,12 @@ export default function Home() {
                           <div className="relative">
                             <RestaurantImageCarousel restaurant={restaurant} priority={index < 3} />
 
-                            {/* Featured Dish Badge - Top Left */}
+                            {/* Recommended items badge (replaces featured dish pill) - Top Left */}
                             <div className="absolute top-3 left-3 md:top-4 md:left-4 flex items-center z-10 transform transition-transform duration-300 group-hover:scale-105 group-hover:-translate-y-0.5">
-                              <div className="bg-gray-800/90 backdrop-blur-sm text-white px-2 py-1 md:px-4 md:py-1.5 rounded-md text-xs font-medium flex items-center shadow-lg">
-                                {restaurant.featuredDish} · ₹{restaurant.featuredPrice}
-                              </div>
+                              <RecommendedItemsBadge
+                                items={recommendedPreviewByRestaurantId[String(restaurant?._id || restaurant?.id)]}
+                                fallbackText={`${restaurant.featuredDish} · ₹${restaurant.featuredPrice}`}
+                              />
                             </div>
 
                             {/* Bookmark Icon - Top Right */}
@@ -1951,32 +1987,44 @@ export default function Home() {
                           {/* Content Section */}
                           <div className="transform transition-transform duration-300 group-hover:-translate-y-1">
                             <CardContent className="p-3 sm:p-4 lg:p-5 pt-3 sm:pt-4 lg:pt-5 flex flex-col flex-grow">
-                              {/* Restaurant Name & Rating */}
-                              <div className="flex items-start justify-between gap-2 mb-2 lg:mb-3">
+                              {/* Restaurant Name + Rating (like screenshot) */}
+                              <div className="flex items-start justify-between gap-2 mb-1.5">
                                 <div className="flex-1 min-w-0">
-                                  <h3 className="text-md sm:text-md lg:text-xl font-bold text-gray-900 dark:text-white line-clamp-1 lg:line-clamp-2 transition-colors duration-300 group-hover:text-green-600">
+                                  <h3 className="text-xl sm:text-2xl font-extrabold text-gray-900 dark:text-white line-clamp-1">
                                     {restaurant.name}
                                   </h3>
                                 </div>
-                                <div className="flex-shrink-0 bg-orange-600 text-white px-2 py-1 lg:px-3 lg:py-1.5 rounded-lg flex items-center gap-1 transform transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6">
-                                  <span className="text-sm lg:text-base font-bold">{restaurant.rating}</span>
-                                  <Star className="h-3 w-3 lg:h-4 lg:w-4 fill-white text-white" />
+
+                                <div className="flex flex-col items-end flex-shrink-0">
+                                  <div className="flex items-center gap-1 bg-white dark:bg-[#141414] border border-emerald-600 text-emerald-700 dark:text-emerald-400 px-2.5 py-1 rounded-full">
+                                    <Star className="h-4 w-4 fill-current" />
+                                    <span className="text-sm font-bold">{restaurant.rating}</span>
+                                  </div>
+                                  <span className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
+                                    {restaurant.totalRatings ? `By ${restaurant.totalRatings >= 1000 ? `${(restaurant.totalRatings / 1000).toFixed(0)}K+` : `${restaurant.totalRatings}+`}` : "By 0+"}
+                                  </span>
                                 </div>
                               </div>
 
-                              {/* Delivery Time & Distance */}
-                              <div className="flex items-center gap-1 text-sm lg:text-base text-gray-500 mb-2 lg:mb-3 transition-opacity duration-300 opacity-70 group-hover:opacity-100">
-                                <Clock className="h-4 w-4 lg:h-5 lg:w-5 text-gray-500 dark:text-gray-400" strokeWidth={1.5} />
-                                <span className="font-medium dark:text-gray-300 text-gray-700">{restaurant.deliveryTime}</span>
-                                <span className="mx-1">|</span>
-                                <span className="font-medium dark:text-gray-300 text-gray-700">{restaurant.distance}</span>
+                              {/* ETA + Distance (like screenshot) */}
+                              <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 mb-1.5">
+                                <Zap className="w-4 h-4 text-emerald-600 fill-current" />
+                                <span className="font-semibold text-emerald-700 dark:text-emerald-400">
+                                  {restaurant.deliveryTime}
+                                </span>
+                                <span className="text-gray-400">|</span>
+                                <span className="font-semibold">{restaurant.distance}</span>
                               </div>
 
-                              {/* Offer Badge */}
-                              {restaurant.offer && <div className="flex items-center gap-2 text-sm lg:text-base mt-auto transform transition-transform duration-300 group-hover:translate-x-1">
-                                  <BadgePercent className="h-4 w-4 lg:h-5 lg:w-5 text-black" strokeWidth={2} />
-                                  <span className="text-gray-700 dark:text-gray-300 font-medium">{restaurant.offer}</span>
-                                </div>}
+                              {/* Offer line */}
+                              {restaurant.offer && (
+                                <div className="flex items-center gap-2 text-sm mt-auto">
+                                  <BadgePercent className="h-4 w-4 text-blue-600 dark:text-blue-400" strokeWidth={2} />
+                                  <span className="text-gray-700 dark:text-gray-300 font-medium line-clamp-1">
+                                    {restaurant.offer}
+                                  </span>
+                                </div>
+                              )}
                             </CardContent>
                           </div>
 

@@ -40,36 +40,27 @@ class ETACalculationService {
       restaurantId,
       restaurantLocation,
       userLocation,
-      riderLocation = null // Optional: if rider is already assigned
+      riderLocation = null, // Optional: if rider is already assigned
+      prepTimeMinutes = 0, // Preparation time for this specific order/cart
+      travelOverrides = null // Optional: precomputed travel times/distances
     } = orderData;
 
     try {
       // 1. Get restaurant data
-      const restaurant = await Restaurant.findOne({
-        $or: [
-          ...(mongoose.Types.ObjectId.isValid(restaurantId) && String(restaurantId).length === 24
-            ? [{ _id: restaurantId }]
-            : []),
-          { restaurantId: restaurantId },
-          { slug: restaurantId }
-        ]
-      });
+      const restaurant = await this.resolveRestaurant(restaurantId);
       if (!restaurant) {
         throw new Error('Restaurant not found');
       }
 
-      // 2. Calculate restaurant preparation time
-      const restaurantPrepTime = await this.getRestaurantPrepTime(restaurantId, restaurant);
+      // 2. Calculate restaurant load delay (pending orders)
+      const restaurantLoadDelay = await this.getRestaurantLoadDelay(restaurant._id);
 
-      // 3. Calculate restaurant load delay (pending orders)
-      const restaurantLoadDelay = await this.getRestaurantLoadDelay(restaurantId);
-
-      // 4. Calculate rider assignment time
+      // 3. Calculate rider assignment time
       const riderAssignmentTime = riderLocation
         ? 0 // Already assigned
         : this.getRiderAssignmentTime();
 
-      // 5. Calculate travel times
+      // 4. Calculate travel times
       let travelTimeRiderToRestaurant = 0;
       let travelTimeRestaurantToUser = 0;
       let totalDistance = 0;
@@ -77,17 +68,15 @@ class ETACalculationService {
 
       if (riderLocation) {
         // Rider is assigned, calculate actual travel times
-        const riderToRestaurant = await googleMapsService.getTravelTime(
-          riderLocation,
-          restaurantLocation
-        );
+        const riderToRestaurant = travelOverrides?.riderToRestaurant
+          ? travelOverrides.riderToRestaurant
+          : await googleMapsService.getTravelTime(riderLocation, restaurantLocation);
         travelTimeRiderToRestaurant = riderToRestaurant.duration;
         trafficLevel = riderToRestaurant.trafficLevel;
 
-        const restaurantToUser = await googleMapsService.getTravelTime(
-          restaurantLocation,
-          userLocation
-        );
+        const restaurantToUser = travelOverrides?.restaurantToUser
+          ? travelOverrides.restaurantToUser
+          : await googleMapsService.getTravelTime(restaurantLocation, userLocation);
         travelTimeRestaurantToUser = restaurantToUser.duration;
         totalDistance = riderToRestaurant.distance + restaurantToUser.distance;
 
@@ -98,10 +87,9 @@ class ETACalculationService {
         }
       } else {
         // No rider assigned yet, estimate travel time
-        const estimatedTravel = await googleMapsService.getTravelTime(
-          restaurantLocation,
-          userLocation
-        );
+        const estimatedTravel = travelOverrides?.restaurantToUser
+          ? travelOverrides.restaurantToUser
+          : await googleMapsService.getTravelTime(restaurantLocation, userLocation);
         travelTimeRestaurantToUser = estimatedTravel.duration;
         totalDistance = estimatedTravel.distance;
         trafficLevel = estimatedTravel.trafficLevel;
@@ -110,31 +98,31 @@ class ETACalculationService {
         travelTimeRiderToRestaurant = Math.ceil(estimatedTravel.duration * 0.3); // 30% of total
       }
 
-      // 6. Apply traffic multiplier
+      // 5. Apply traffic multiplier
       const trafficMultiplier = ETACalculationService.TRAFFIC_MULTIPLIERS[trafficLevel] || 1.0;
       const adjustedTravelTime = Math.ceil(
         (travelTimeRiderToRestaurant + travelTimeRestaurantToUser) * trafficMultiplier
       );
 
-      // 7. Calculate buffer time based on distance
+      // 6. Calculate buffer time based on distance
       const bufferTime = totalDistance >= 5
         ? ETACalculationService.BUFFER_TIMES.long
         : ETACalculationService.BUFFER_TIMES.short;
 
-      // 8. Calculate total ETA
+      // 7. Calculate total ETA
       const totalETA =
-        restaurantPrepTime +
+        Math.max(0, Number(prepTimeMinutes) || 0) +
         restaurantLoadDelay +
         riderAssignmentTime +
         adjustedTravelTime +
         bufferTime;
 
-      // 9. Calculate min/max ETA range
+      // 8. Calculate min/max ETA range
       const minETA = Math.max(1, totalETA - ETACalculationService.ETA_RANGE);
       const maxETA = totalETA + ETACalculationService.ETA_RANGE;
 
       const breakdown = {
-        restaurantPrepTime,
+        prepTimeMinutes: Math.max(0, Number(prepTimeMinutes) || 0),
         restaurantLoadDelay,
         riderAssignmentTime,
         travelTimeRiderToRestaurant,
@@ -267,7 +255,8 @@ class ETACalculationService {
                 latitude: order.deliveryPartnerId.availability.currentLocation.coordinates[1],
                 longitude: order.deliveryPartnerId.availability.currentLocation.coordinates[0]
               }
-              : null
+              : null,
+            prepTimeMinutes: (Number(order.preparationTime || 0) + Number(order.eta?.additionalTime || 0))
           });
           reason = 'MANUAL_UPDATE';
       }
@@ -326,7 +315,8 @@ class ETACalculationService {
         userLocation: {
           latitude: order.address.location.coordinates[1],
           longitude: order.address.location.coordinates[0]
-        }
+        },
+        prepTimeMinutes: (Number(order.preparationTime || 0) + Number(order.eta?.additionalTime || 0))
       });
     }
 
@@ -340,7 +330,8 @@ class ETACalculationService {
       restaurantId: order.restaurantId,
       restaurantLocation,
       userLocation,
-      riderLocation
+      riderLocation,
+      prepTimeMinutes: (Number(order.preparationTime || 0) + Number(order.eta?.additionalTime || 0))
     });
   }
 
@@ -461,7 +452,7 @@ class ETACalculationService {
    * Get restaurant preparation time
    */
   async getRestaurantPrepTime(restaurantId, passedRestaurant = null) {
-    const restaurant = passedRestaurant || await Restaurant.findOne({ restaurantId }).lean();
+    const restaurant = passedRestaurant || await this.resolveRestaurant(restaurantId);
     if (!restaurant) return 15; // Default 15 minutes
 
     // Parse estimatedDeliveryTime string like "25-30 mins" or use default
@@ -503,7 +494,7 @@ class ETACalculationService {
    * Get restaurant location
    */
   async getRestaurantLocation(restaurantId, passedRestaurant = null) {
-    const restaurant = passedRestaurant || await Restaurant.findOne({ restaurantId }).lean();
+    const restaurant = passedRestaurant || await this.resolveRestaurant(restaurantId);
     if (!restaurant || !restaurant.location) {
       throw new Error('Restaurant location not found');
     }
@@ -555,6 +546,18 @@ class ETACalculationService {
       status: order.status,
       formatted: `${remainingMin}-${remainingMax} mins`
     };
+  }
+
+  async resolveRestaurant(restaurantIdOrObjectId) {
+    if (!restaurantIdOrObjectId) return null;
+    const id = String(restaurantIdOrObjectId);
+    if (mongoose.Types.ObjectId.isValid(id) && id.length === 24) {
+      return await Restaurant.findById(id).lean();
+    }
+    // Priority: business `restaurantId` first, then `slug`.
+    const byRestaurantId = await Restaurant.findOne({ restaurantId: id }).lean();
+    if (byRestaurantId) return byRestaurantId;
+    return await Restaurant.findOne({ slug: id }).lean();
   }
 }
 

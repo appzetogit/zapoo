@@ -80,10 +80,10 @@ export default function NoPlanPopup() {
             <div className="flex-1">
               <p className="text-xs font-bold uppercase tracking-wider text-amber-600">No Active Plan</p>
               <h3 className="text-base font-bold text-gray-900 mt-0.5">
-                Unlock premium features for your restaurant
+                Subscription required to continue
               </h3>
               <p className="text-xs text-gray-600 mt-1">
-                Choose a plan to access Growth tools and advanced analytics.
+                Your plan is inactive or expired. Choose a subscription plan to unlock restaurant features.
               </p>
             </div>
           </div>
@@ -95,7 +95,7 @@ export default function NoPlanPopup() {
               onClick={handleSeePlans}
               className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 transition-colors"
             >
-              See plans
+              View subscription plans
             </button>
             {!trialUsed && (
               <button

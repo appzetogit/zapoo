@@ -7,6 +7,7 @@ import { heroBannerAPI } from "@/lib/api"
 import { useLocation } from "../hooks/useLocation"
 import { useZone } from "../hooks/useZone"
 import { toast } from "sonner"
+import DynamicEtaText from "../components/DynamicEtaText"
 
 // Import banner
 import top10Banner from "@/assets/top10pagebanner.png"
@@ -198,7 +199,12 @@ export default function Top10() {
                         {/* Delivery Time & Distance */}
                         <div className="flex items-center gap-1 text-sm text-gray-500 dark:text-gray-400 mb-2">
                           <Clock className="h-4 w-4" strokeWidth={1.5} />
-                          <span className="font-medium">{restaurant.estimatedDeliveryTime || restaurant.deliveryTime || '25-30 mins'}</span>
+                          <span className="font-medium">
+                            <DynamicEtaText
+                              restaurantId={restaurantId}
+                              fallback={restaurant.estimatedDeliveryTime || restaurant.deliveryTime || '25-30 mins'}
+                            />
+                          </span>
                           <span className="mx-1">|</span>
                           <span className="font-medium">{restaurant.distance || '1.2 km'}</span>
                         </div>

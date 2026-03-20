@@ -54,7 +54,9 @@ export default function ProtectedRoute({ children, requiredRole, loginPath }) {
 
     const path = location.pathname;
     const isAllowedPath = allowedWithoutSubscription.some((prefix) => path.startsWith(prefix));
-    const needsSubscription = gatedRestaurantPaths.some((prefix) => path.startsWith(prefix));
+    const isRestaurantHome = path === "/restaurant";
+    const needsSubscription =
+      isRestaurantHome || gatedRestaurantPaths.some((prefix) => path.startsWith(prefix));
 
     if (!needsSubscription || isAllowedPath) {
       setHasActiveSubscription(true);
@@ -152,20 +154,18 @@ export default function ProtectedRoute({ children, requiredRole, loginPath }) {
   if (requiredRole === "restaurant") {
     const path = location.pathname;
     const isAllowedPath = allowedWithoutSubscription.some((prefix) => path.startsWith(prefix));
-    const needsSubscription = gatedRestaurantPaths.some((prefix) => path.startsWith(prefix));
+    const isRestaurantHome = path === "/restaurant";
+    const needsSubscription =
+      isRestaurantHome || gatedRestaurantPaths.some((prefix) => path.startsWith(prefix));
+    const shouldRenderNoPlanPopup = needsSubscription && !isAllowedPath && !hasActiveSubscription;
     if (featureLock) {
       return <FeatureLockedScreen requiredFeature={featureLock} />;
     }
-  }
-
-  if (requiredRole === "restaurant") {
-    const path = location.pathname;
-    const isOnboarding = path.startsWith("/restaurant/onboarding");
 
     return (
       <div className="theme-blue h-full w-full">
-        {children}
-        {!isOnboarding && <NoPlanPopup />}
+        {!shouldRenderNoPlanPopup && children}
+        {shouldRenderNoPlanPopup && <NoPlanPopup />}
       </div>
     );
   }

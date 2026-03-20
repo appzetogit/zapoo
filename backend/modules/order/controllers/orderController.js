@@ -15,6 +15,7 @@ import etaCalculationService from '../services/etaCalculationService.js';
 import etaWebSocketService from '../services/etaWebSocketService.js';
 import OrderEvent from '../models/OrderEvent.js';
 import UserWallet from '../../user/models/UserWallet.js';
+import { computeOrderPreparationTimeMinutes } from '../services/preparationTimeService.js';
 const logger = winston.createLogger({
   level: 'info',
   format: winston.format.json(),
@@ -225,24 +226,13 @@ export const createOrder = async (req, res) => {
       }
     });
 
-    // Parse preparation time from order items
-    // Extract maximum preparation time from items (e.g., "20-25 mins" -> 25)
-    let maxPreparationTime = 0;
-    if (items && Array.isArray(items)) {
-      items.forEach(item => {
-        if (item.preparationTime) {
-          const prepTimeStr = String(item.preparationTime).trim();
-          // Parse formats like "20-25 mins", "20-25", "25 mins", "25"
-          const match = prepTimeStr.match(/(\d+)(?:\s*-\s*(\d+))?/);
-          if (match) {
-            const minTime = parseInt(match[1], 10);
-            const maxTime = match[2] ? parseInt(match[2], 10) : minTime;
-            maxPreparationTime = Math.max(maxPreparationTime, maxTime);
-          }
-        }
-      });
-    }
-    order.preparationTime = maxPreparationTime;
+    // Compute preparation time server-side from Menu (do not trust client values)
+    const prepResult = await computeOrderPreparationTimeMinutes({
+      restaurantObjectId: restaurant._id?.toString?.() || assignedRestaurantId,
+      items
+    });
+    order.preparationTime = prepResult.prepMinutes;
+
     // Calculate initial ETA
     try {
       const restaurantLocation = restaurant.location ? {
@@ -257,14 +247,14 @@ export const createOrder = async (req, res) => {
         const etaResult = await etaCalculationService.calculateInitialETA({
           restaurantId: assignedRestaurantId,
           restaurantLocation,
-          userLocation
+          userLocation,
+          prepTimeMinutes: order.preparationTime
         });
 
-        // Add preparation time to ETA (use max preparation time)
-        const finalMinETA = etaResult.minETA + maxPreparationTime;
-        const finalMaxETA = etaResult.maxETA + maxPreparationTime;
+        const finalMinETA = etaResult.minETA;
+        const finalMaxETA = etaResult.maxETA;
 
-        // Update order with ETA (including preparation time)
+        // Update order with ETA
         order.eta = {
           min: finalMinETA,
           max: finalMaxETA,
@@ -282,7 +272,8 @@ export const createOrder = async (req, res) => {
               min: finalMinETA,
               max: finalMaxETA
             },
-            preparationTime: maxPreparationTime
+            preparationTime: order.preparationTime,
+            preparationTimeSource: prepResult.source
           },
           timestamp: new Date()
         });

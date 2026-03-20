@@ -14,6 +14,7 @@ import { restaurantAPI, adminAPI } from "@/lib/api"
 import { useProfile } from "../context/ProfileContext"
 import { useLocation } from "../hooks/useLocation"
 import { useZone } from "../hooks/useZone"
+import DynamicEtaText from "../components/DynamicEtaText"
 
 // Filter options
 const filterOptions = [
@@ -1039,7 +1040,12 @@ export default function CategoryPage() {
                         {/* Delivery Time & Distance */}
                         <div className="flex items-center gap-1 text-sm md:text-base lg:text-lg text-gray-500 dark:text-gray-400 mb-2 lg:mb-3">
                           <Clock className="h-4 w-4 md:h-5 md:w-5 lg:h-6 lg:w-6" strokeWidth={1.5} />
-                          <span className="font-medium">{restaurant.deliveryTime || 'Not available'}</span>
+                          <span className="font-medium">
+                            <DynamicEtaText
+                              restaurantId={restaurant.id}
+                              fallback={restaurant.deliveryTime || 'Not available'}
+                            />
+                          </span>
                           {restaurant.distance && (
                             <>
                               <span className="mx-1">|</span>

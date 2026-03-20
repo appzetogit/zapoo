@@ -66,7 +66,7 @@ export default function SubscriptionFeatureOverlay({
                     >
                         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full hover:translate-x-full transition-transform duration-1000" />
                         <Crown className="w-4 h-4 text-amber-400 fill-amber-400" />
-                        Unlock Premium
+                        View subscription plans
                     </motion.button>
 
                     <motion.button
