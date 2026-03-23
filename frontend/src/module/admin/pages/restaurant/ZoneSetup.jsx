@@ -180,6 +180,14 @@ export default function ZoneSetup() {
                       {zone.isActive ? "Active" : "Inactive"}
                     </span>
                   </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-600">Zone Area:</span>
+                    <span className="font-medium text-slate-900">
+                      {zone.area !== undefined && zone.area !== null && zone.area !== ""
+                        ? `${zone.area} km2`
+                        : "N/A"}
+                    </span>
+                  </div>
 
                 </div>
               </div>

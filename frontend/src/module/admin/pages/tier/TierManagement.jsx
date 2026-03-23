@@ -61,6 +61,30 @@ export default function TierManagement() {
 
   const onSubmit = async (data) => {
     try {
+      const baseDistanceValue = Number(data.baseDistance ?? 3);
+      const safeBaseDistance = Number.isFinite(baseDistanceValue) ? baseDistanceValue : 3;
+      const baseSlabMax = safeBaseDistance > 0 ? safeBaseDistance : null;
+      const defaultDistanceSlabs = [
+        {
+          name: baseSlabMax === null ? "Base 0-∞km" : `Base 0-${baseSlabMax}km`,
+          minKm: 0,
+          maxKm: baseSlabMax,
+          isBaseSlab: true,
+          adminPerKmRate: 0,
+          isActive: true,
+        },
+      ];
+      if (baseSlabMax !== null) {
+        defaultDistanceSlabs.push({
+          name: `${baseSlabMax}+ km`,
+          minKm: baseSlabMax,
+          maxKm: null,
+          isBaseSlab: false,
+          adminPerKmRate: 0,
+          isActive: true,
+        });
+      }
+
       const formattedData = {
         ...data,
         minArea: parseFloat(data.minArea),
@@ -70,7 +94,7 @@ export default function TierManagement() {
         baseFee: parseFloat(data.baseFee || 0),
         freeDeliveryThreshold: parseFloat(data.freeDeliveryThreshold || 0),
         platformFee: parseFloat(data.platformFee || 0),
-        baseDistance: parseFloat(data.baseDistance || 3),
+        baseDistance: safeBaseDistance,
         extraKmCharge: parseFloat(data.extraKmCharge || 10),
         recommendedItemFee: parseFloat(data.recommendedItemFee || 0),
       };
@@ -79,6 +103,7 @@ export default function TierManagement() {
         await tierAPI.updateTier(editingTier._id, formattedData);
         toast.success("Tier updated successfully");
       } else {
+        formattedData.distanceSlabs = defaultDistanceSlabs;
         await tierAPI.createTier(formattedData);
         toast.success("Tier created successfully");
       }

@@ -132,6 +132,19 @@ export const createTier = async (req, res) => {
       console.error("Error syncing delivery commission rules for new tier:", syncError);
     }
 
+    // Re-evaluate zone tiers after creating a new tier so eligible zones get assigned
+    try {
+      const allZonesToUpdate = await Zone.find({});
+      for (const z of allZonesToUpdate) {
+        await z.recalculateBoundaryAreaAndTier();
+        if (z.isModified()) {
+          await z.save();
+        }
+      }
+    } catch (zoneRecalcError) {
+      console.error("Error re-evaluating zones after tier create:", zoneRecalcError);
+    }
+
     return successResponse(res, 201, "Tier created successfully", tier);
   } catch (error) {
     console.error("Error creating tier:", error);

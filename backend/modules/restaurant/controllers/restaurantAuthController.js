@@ -863,6 +863,7 @@ export const getCurrentRestaurant = asyncHandler(async (req, res) => {
       ownerEmail: r.ownerEmail,
       ownerPhone: r.ownerPhone,
       // Include additional restaurant details
+<<<<<<< Updated upstream
       cuisines: r.cuisines,
       openDays: r.openDays,
       location: r.location,
@@ -871,6 +872,17 @@ export const getCurrentRestaurant = asyncHandler(async (req, res) => {
       menuImages: r.menuImages,
       slug: r.slug,
       isAcceptingOrders: r.isAcceptingOrders,
+=======
+      cuisines: req.restaurant.cuisines,
+      openDays: req.restaurant.openDays,
+      location: req.restaurant.location,
+      primaryContactNumber: req.restaurant.primaryContactNumber,
+      deliveryTimings: req.restaurant.deliveryTimings,
+      menuImages: req.restaurant.menuImages,
+      slug: req.restaurant.slug,
+      isAcceptingOrders: req.restaurant.isAcceptingOrders,
+      deliveryRange: req.restaurant.deliveryRange,
+>>>>>>> Stashed changes
       // Include verification status
       rejectionReason: r.rejectionReason || null,
       approvedAt: r.approvedAt || null,
