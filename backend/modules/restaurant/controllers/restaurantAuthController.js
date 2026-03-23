@@ -1,5 +1,7 @@
 import Restaurant from '../models/Restaurant.js';
 import SubscriptionPlan from '../../admin/models/SubscriptionPlan.js';
+import Zone from '../../admin/models/Zone.js';
+import Tier from '../../admin/models/Tier.js';
 import otpService from '../../auth/services/otpService.js';
 import jwtService from '../../auth/services/jwtService.js';
 import firebaseAuthService from '../../auth/services/firebaseAuthService.js';
@@ -820,38 +822,67 @@ export const logout = asyncHandler(async (req, res) => {
  * GET /api/restaurant/auth/me
  */
 export const getCurrentRestaurant = asyncHandler(async (req, res) => {
-  // Restaurant is attached by authenticate middleware
+  const r = req.restaurant;
+  let zoneName = null;
+  let tierName = null;
+  let zoneIdOut = r.zoneId ? String(r.zoneId) : null;
+  let tierIdOut = r.tierId ? String(r.tierId) : null;
+  try {
+    let zoneDoc = null;
+    if (r.zoneId) {
+      zoneDoc = await Zone.findById(r.zoneId).select('name zoneName tierId').lean();
+      if (zoneDoc) {
+        zoneName = zoneDoc.zoneName || zoneDoc.name || null;
+      }
+    }
+    const effectiveTierId = r.tierId || zoneDoc?.tierId;
+    if (effectiveTierId) {
+      tierIdOut = String(effectiveTierId);
+      const tierDoc = await Tier.findById(effectiveTierId).select('name').lean();
+      if (tierDoc) {
+        tierName = tierDoc.name || null;
+      }
+    }
+  } catch (err) {
+    logger.warn(`getCurrentRestaurant: could not resolve zone/tier: ${err.message}`);
+  }
+
   return successResponse(res, 200, 'Restaurant retrieved successfully', {
     restaurant: {
-      id: req.restaurant._id,
-      restaurantId: req.restaurant.restaurantId,
-      name: req.restaurant.name,
-      email: req.restaurant.email,
-      phone: req.restaurant.phone,
-      phoneVerified: req.restaurant.phoneVerified,
-      signupMethod: req.restaurant.signupMethod,
-      profileImage: req.restaurant.profileImage,
-      isActive: req.restaurant.isActive,
-      onboarding: req.restaurant.onboarding,
-      ownerName: req.restaurant.ownerName,
-      ownerEmail: req.restaurant.ownerEmail,
-      ownerPhone: req.restaurant.ownerPhone,
+      id: r._id,
+      restaurantId: r.restaurantId,
+      name: r.name,
+      email: r.email,
+      phone: r.phone,
+      phoneVerified: r.phoneVerified,
+      signupMethod: r.signupMethod,
+      profileImage: r.profileImage,
+      isActive: r.isActive,
+      onboarding: r.onboarding,
+      ownerName: r.ownerName,
+      ownerEmail: r.ownerEmail,
+      ownerPhone: r.ownerPhone,
       // Include additional restaurant details
-      cuisines: req.restaurant.cuisines,
-      openDays: req.restaurant.openDays,
-      location: req.restaurant.location,
-      primaryContactNumber: req.restaurant.primaryContactNumber,
-      deliveryTimings: req.restaurant.deliveryTimings,
-      menuImages: req.restaurant.menuImages,
-      slug: req.restaurant.slug,
-      isAcceptingOrders: req.restaurant.isAcceptingOrders,
+      cuisines: r.cuisines,
+      openDays: r.openDays,
+      location: r.location,
+      primaryContactNumber: r.primaryContactNumber,
+      deliveryTimings: r.deliveryTimings,
+      menuImages: r.menuImages,
+      slug: r.slug,
+      isAcceptingOrders: r.isAcceptingOrders,
       // Include verification status
-      rejectionReason: req.restaurant.rejectionReason || null,
-      approvedAt: req.restaurant.approvedAt || null,
-      rejectedAt: req.restaurant.rejectedAt || null,
-      businessModel: req.restaurant.businessModel,
-      subscription: req.restaurant.subscription,
-      relationshipManager: req.restaurant.relationshipManager
+      rejectionReason: r.rejectionReason || null,
+      approvedAt: r.approvedAt || null,
+      rejectedAt: r.rejectedAt || null,
+      businessModel: r.businessModel,
+      subscription: r.subscription,
+      relationshipManager: r.relationshipManager,
+      // Zone / tier (for outlet info & delivery pricing context)
+      zoneId: zoneIdOut,
+      tierId: tierIdOut,
+      zoneName,
+      tierName
     }
   });
 });

@@ -15,6 +15,7 @@ import {
   X,
   Trash2,
   Truck,
+  Layers,
 } from "lucide-react"
 import {
   Dialog,
@@ -907,6 +908,70 @@ export default function OutletInfo() {
             >
               Edit
             </button>
+          </div>
+        </motion.div>
+
+        {/* Zone (admin-assigned service area) */}
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.13 }}
+          className="bg-blue-100/50 rounded-lg p-4 border border-blue-300"
+        >
+          <div className="flex items-start justify-between">
+            <div className="flex-1 min-w-0">
+              <p className="text-xs text-gray-500 font-normal mb-1">Zone</p>
+              <div className="flex items-start gap-2">
+                <Layers className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-base font-semibold text-gray-900">
+                    {loading
+                      ? "Loading..."
+                      : (restaurantData?.zoneName?.trim() ||
+                        (restaurantData?.zoneId
+                          ? "Assigned (name unavailable)"
+                          : "Not assigned"))}
+                  </p>
+                  {!loading && restaurantData?.zoneId && !restaurantData?.zoneName?.trim() && (
+                    <p className="text-xs text-gray-500 font-normal mt-0.5 truncate" title={restaurantData.zoneId}>
+                      ID …{String(restaurantData.zoneId).slice(-8)}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Delivery tier (distance slabs & platform fees from this tier) */}
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.14 }}
+          className="bg-blue-100/50 rounded-lg p-4 border border-blue-300"
+        >
+          <div className="flex items-start justify-between">
+            <div className="flex-1 min-w-0">
+              <p className="text-xs text-gray-500 font-normal mb-1">Delivery tier</p>
+              <div className="flex items-start gap-2">
+                <Layers className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-base font-semibold text-gray-900">
+                    {loading
+                      ? "Loading..."
+                      : (restaurantData?.tierName?.trim() ||
+                        (restaurantData?.tierId
+                          ? "Assigned (name unavailable)"
+                          : "Not assigned"))}
+                  </p>
+                  {!loading && restaurantData?.tierId && !restaurantData?.tierName?.trim() && (
+                    <p className="text-xs text-gray-500 font-normal mt-0.5 truncate" title={restaurantData.tierId}>
+                      ID …{String(restaurantData.tierId).slice(-8)}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
         </motion.div>
 

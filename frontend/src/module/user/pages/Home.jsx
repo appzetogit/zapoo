@@ -41,6 +41,7 @@ import exploreCollection from "@/assets/explore more icons/collection.png";
 import ZoneAdBanner from "../components/ZoneAdBanner";
 import DynamicEtaText from "../components/DynamicEtaText";
 import RecommendedItemsBadge, { ActiveRecommendedItemBadge } from "../components/RecommendedItemsBadge";
+import { isRestaurantDeliverableNow } from "../utils/restaurantAvailability";
 
 // Banner images for hero carousel - will be fetched from API
 
@@ -713,6 +714,11 @@ export default function Home() {
         params.trusted = 'true';
       }
 
+      // Veg mode filter: only pure veg restaurants (no Non-Veg dishes)
+      if (vegMode && vegModeOption === 'pure-veg') {
+        params.pureVeg = 'true';
+      }
+
       // Optional: Add zoneId if available (for sorting/filtering, but show all restaurants)
       if (zoneId) {
         params.zoneId = zoneId;
@@ -771,11 +777,14 @@ export default function Home() {
           const restaurantLat = restaurantLocation?.latitude || (restaurantLocation?.coordinates && Array.isArray(restaurantLocation.coordinates) ? restaurantLocation.coordinates[1] : null);
           const restaurantLng = restaurantLocation?.longitude || (restaurantLocation?.coordinates && Array.isArray(restaurantLocation.coordinates) ? restaurantLocation.coordinates[0] : null);
 
-          // Calculate distance if both user and restaurant coordinates are available
+          // Prefer API geo distance when present ($geoNear), else haversine from coords
           let distanceInKm = null;
-          if (userLat && userLng && restaurantLat && restaurantLng && !isNaN(userLat) && !isNaN(userLng) && !isNaN(restaurantLat) && !isNaN(restaurantLng)) {
+          if (restaurant.distanceMeters != null && Number.isFinite(Number(restaurant.distanceMeters))) {
+            distanceInKm = Number(restaurant.distanceMeters) / 1000;
+          } else if (userLat && userLng && restaurantLat && restaurantLng && !isNaN(userLat) && !isNaN(userLng) && !isNaN(restaurantLat) && !isNaN(restaurantLng)) {
             distanceInKm = calculateDistance(userLat, userLng, restaurantLat, restaurantLng);
-            // Format distance: show 1 decimal place if >= 1km, otherwise show in meters
+          }
+          if (distanceInKm != null && Number.isFinite(distanceInKm)) {
             if (distanceInKm >= 1) {
               distance = `${distanceInKm.toFixed(1)} km`;
             } else {
@@ -825,7 +834,13 @@ export default function Home() {
             // Store location for distance recalculation
             isActive: restaurant.isActive !== false,
             // Default to true if not specified
-            isAcceptingOrders: restaurant.isAcceptingOrders !== false // Default to true if not specified
+            isAcceptingOrders: restaurant.isAcceptingOrders !== false, // Default to true if not specified
+            openDays: restaurant.openDays,
+            deliveryTimings: restaurant.deliveryTimings,
+            deliveryRange:
+              restaurant.deliveryRange != null && Number.isFinite(Number(restaurant.deliveryRange))
+                ? Number(restaurant.deliveryRange)
+                : 5
           };
         });
 
@@ -859,7 +874,7 @@ export default function Home() {
     } finally {
       setLoadingRestaurants(false);
     }
-  }, [zoneId, location?.latitude, location?.longitude, isOutOfService]);
+  }, [zoneId, location?.latitude, location?.longitude, isOutOfService, vegMode, vegModeOption]);
 
   // Fetch restaurants when appliedFilters change
   useEffect(() => {
@@ -1007,6 +1022,18 @@ export default function Home() {
     }
     return filtered;
   }, [restaurantsData, activeFilters, selectedCuisine, sortBy]);
+
+  const userHasLocation =
+    location?.latitude != null &&
+    location?.longitude != null &&
+    !Number.isNaN(Number(location.latitude)) &&
+    !Number.isNaN(Number(location.longitude));
+
+  const featuredGridRestaurants = useMemo(() => {
+    return filteredRestaurants.filter((r) =>
+      isRestaurantDeliverableNow(r, { userHasLocation })
+    );
+  }, [filteredRestaurants, userHasLocation]);
 
   // Fetch recommended preview items for visible restaurants (batch)
   useEffect(() => {
@@ -1345,13 +1372,9 @@ export default function Home() {
                     duration: 0.4,
                     ease: "easeOut"
                   }}>
-                          {currentBanner?.subtitle && <span className="font-semibold text-xs text-orange-500 tracking-wide uppercase block mb-0.5">
-                              {currentBanner.subtitle}
-                            </span>}
                           {currentBanner?.title && <h2 className="text-2xl font-extrabold text-gray-900 dark:text-white leading-tight mb-1">
                               {currentBanner.title}
                             </h2>}
-                          {currentBanner?.description && <p className="text-gray-500 dark:text-gray-400 text-xs mb-2 line-clamp-2">{currentBanner.description}</p>}
                         </motion.div>
                       </AnimatePresence>
                     </div>
@@ -1442,13 +1465,9 @@ export default function Home() {
                     duration: 0.5,
                     ease: "easeOut"
                   }}>
-                          {currentBanner?.subtitle && <span className="text-orange-500 font-semibold text-sm uppercase tracking-wider mb-1">
-                              {currentBanner.subtitle}
-                            </span>}
                           {currentBanner?.title && <h2 className="text-3xl lg:text-4xl font-extrabold text-gray-900 dark:text-white leading-tight mb-2">
                               {currentBanner.title}
                             </h2>}
-                          {currentBanner?.description && <p className="text-gray-500 dark:text-gray-400 text-sm mb-4 line-clamp-3">{currentBanner.description}</p>}
                           <button className="inline-flex items-center gap-2 bg-orange-500 text-white text-sm font-semibold px-5 py-2 rounded-full w-fit shadow pointer-events-none">
                             {currentBanner?.ctaText || 'Order Now'}
                           </button>
@@ -1975,7 +1994,7 @@ export default function Home() {
         }}>
             <div className="flex flex-col gap-0.5 lg:gap-1">
               <h2 className="text-xs sm:text-sm lg:text-base font-semibold text-gray-400 tracking-widest uppercase">
-                {filteredRestaurants.length} Restaurants Delivering to You
+                {featuredGridRestaurants.length} Restaurants Delivering to You
               </h2>
               <span className="text-base sm:text-lg lg:text-2xl text-gray-500 font-normal">Featured</span>
             </div>
@@ -1999,7 +2018,7 @@ export default function Home() {
                 </motion.div>}
             </AnimatePresence>
             <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3  gap-3 sm:gap-4 lg:gap-5 xl:gap-6 pt-1 sm:pt-1.5 lg:pt-2 items-stretch ${isLoadingFilterResults || loadingRestaurants ? 'opacity-50' : 'opacity-100'} transition-opacity duration-300`}>
-              {filteredRestaurants.map((restaurant, index) => {
+              {featuredGridRestaurants.map((restaurant, index) => {
               const restaurantSlug = restaurant.slug || restaurant.name.toLowerCase().replace(/\s+/g, "-");
               // Direct favorite check - isFavorite is already memoized in context
               const favorite = isFavorite(restaurantSlug);
@@ -2034,7 +2053,7 @@ export default function Home() {
               }}>
                     <div className="h-full group">
                       <Link to={`/user/restaurants/${restaurantSlug}`} className="h-full flex">
-                        <Card className={`overflow-hidden gap-0 cursor-pointer border-0 dark:border-gray-800 group bg-white dark:bg-[#1a1a1a] border-background transition-all duration-500 py-0 rounded-md flex flex-col h-full w-full relative ${isOutOfService ? 'grayscale opacity-75' : ''}`}>
+                        <Card className="overflow-hidden gap-0 cursor-pointer border-0 dark:border-gray-800 group bg-white dark:bg-[#1a1a1a] border-background transition-all duration-500 py-0 rounded-md flex flex-col h-full w-full relative">
                           {/* Image Section with Carousel */}
                           <div className="relative">
                             <RestaurantImageCarousel

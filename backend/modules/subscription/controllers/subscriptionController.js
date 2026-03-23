@@ -20,6 +20,16 @@ const getPlanAmountForRestaurant = (plan, restaurant) => {
   return plan?.pricing?.tier1 || 0;
 };
 
+const hasActiveSubscription = (restaurant) => {
+  if (!restaurant?.subscription) return false;
+  const now = new Date();
+  return (
+    restaurant.subscription.status === "active" &&
+    restaurant.subscription.endDate &&
+    new Date(restaurant.subscription.endDate) > now
+  );
+};
+
 /**
  * Get all active subscription plans
  */
@@ -103,9 +113,41 @@ export const subscribe = async (req, res) => {
       });
     }
 
+    const alreadyActive = hasActiveSubscription(restaurant);
+    const isCurrentPlan =
+      restaurant.subscription?.planId?.toString() === plan._id.toString();
+
     const amount = getPlanAmountForRestaurant(plan, restaurant);
 
     if (amount === 0) {
+      if (alreadyActive && !isCurrentPlan) {
+        restaurant.queuedSubscription = {
+          planId: plan._id,
+          durationInDays: plan.durationInDays || 30,
+          amount,
+          features: plan.features,
+          purchasedAt: new Date(),
+          startAfter: restaurant.subscription.endDate,
+          paymentId: `FREE_${Date.now()}`,
+          paymentStatus: "completed",
+          paymentDate: new Date(),
+          status: "pending",
+        };
+        await restaurant.save();
+
+        return res.status(200).json({
+          success: true,
+          message:
+            "This is not your current active plan. It will activate automatically when your current plan expires.",
+          data: {
+            deferredActivation: true,
+            currentPlan: restaurant.subscription,
+            queuedSubscription: restaurant.queuedSubscription,
+            plan,
+          },
+        });
+      }
+
       const startDate = new Date();
       const endDate = new Date();
       endDate.setDate(startDate.getDate() + (plan.durationInDays || 30));
@@ -162,6 +204,10 @@ export const subscribe = async (req, res) => {
 
     res.status(200).json({
       success: true,
+      message:
+        alreadyActive && !isCurrentPlan
+          ? "Current plan is active. New plan will be activated automatically after expiry once payment is completed."
+          : "Subscription order created successfully",
       data: {
         razorpay: {
           orderId: razorpayOrder.id,
@@ -282,7 +328,9 @@ export const createSubscriptionOrder = subscribe;
 export const getMySubscription = async (req, res) => {
   try {
     const restaurantId = req.user._id || req.user.id;
-    const restaurant = await Restaurant.findById(restaurantId).populate("subscription.planId");
+    const restaurant = await Restaurant.findById(restaurantId)
+      .populate("subscription.planId")
+      .populate("queuedSubscription.planId");
 
     if (!restaurant) {
       return res.status(404).json({
@@ -302,6 +350,10 @@ export const getMySubscription = async (req, res) => {
     res.status(200).json({
       success: true,
       data: restaurant.subscription,
+      queuedSubscription:
+        restaurant.queuedSubscription?.status === "pending"
+          ? restaurant.queuedSubscription
+          : null,
     });
   } catch (error) {
     console.error("Error fetching subscription:", error);
@@ -634,6 +686,40 @@ export const verifySubscriptionPayment = async (req, res) => {
     }
 
     const amount = getPlanAmountForRestaurant(plan, restaurant);
+    const alreadyActive = hasActiveSubscription(restaurant);
+    const isCurrentPlan =
+      restaurant.subscription?.planId?.toString() === plan._id.toString();
+
+    if (alreadyActive && !isCurrentPlan) {
+      restaurant.queuedSubscription = {
+        planId: plan._id,
+        durationInDays: plan.durationInDays || 30,
+        amount,
+        features: plan.features,
+        purchasedAt: new Date(),
+        startAfter: restaurant.subscription.endDate,
+        paymentId: razorpay_payment_id,
+        razorpayOrderId: razorpay_order_id,
+        razorpayPaymentId: razorpay_payment_id,
+        razorpaySignature: razorpay_signature,
+        paymentStatus: "completed",
+        paymentDate: new Date(),
+        status: "pending",
+      };
+      await restaurant.save();
+
+      return res.status(200).json({
+        success: true,
+        message:
+          "This is not your current active plan. It has been purchased and will activate automatically after your current plan expires.",
+        data: {
+          deferredActivation: true,
+          currentPlan: restaurant.subscription,
+          queuedSubscription: restaurant.queuedSubscription,
+        },
+      });
+    }
+
     const startDate = new Date();
     const endDate = new Date();
     endDate.setDate(startDate.getDate() + (plan.durationInDays || 30));

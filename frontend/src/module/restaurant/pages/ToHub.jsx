@@ -7,11 +7,14 @@ import { FaHistory, FaExclamationTriangle, FaStar, FaCommentDots, FaLink, FaCog 
 import { AreaChart, Area, Line, Bar, ComposedChart, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, LineChart } from "recharts";
 import BottomNavOrders from "../components/BottomNavOrders";
 import SubscriptionFeatureOverlay from "../components/SubscriptionFeatureOverlay";
+import SubscriptionExpiryBanner from "../components/SubscriptionExpiryBanner";
+import useSubscriptionExpiryNotice from "../hooks/useSubscriptionExpiryNotice";
 import { restaurantAPI } from "@/lib/api";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, eachDayOfInterval, eachMonthOfInterval, format, isSameDay, isSameMonth } from "date-fns";
 export default function ToHub() {
   const navigate = useNavigate();
+  const expiryNotice = useSubscriptionExpiryNotice();
   const [activeTopTab, setActiveTopTab] = useState("my-feed");
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [restaurantData, setRestaurantData] = useState(null);
@@ -2651,6 +2654,18 @@ export default function ToHub() {
           </div>
         </div>
       </div>
+
+      {expiryNotice.isVisible && !expiryNotice.loading && (
+        <div className="px-4">
+          <SubscriptionExpiryBanner
+            daysLeft={expiryNotice.daysLeft}
+            isExpired={expiryNotice.isExpired}
+            type={expiryNotice.type}
+            planName={expiryNotice.planName}
+            onBuyNow={() => navigate("/restaurant/subscription")}
+          />
+        </div>
+      )}
 
       <AnimatePresence mode="wait">
         <motion.div ref={contentContainerRef} key={activeTopTab} initial={{

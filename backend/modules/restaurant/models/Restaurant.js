@@ -390,6 +390,61 @@ const restaurantSchema = new mongoose.Schema(
       },
       features: [String], // Snapshot of features at time of subscription
     },
+    // Purchased subscription that should start when current plan expires
+    queuedSubscription: {
+      planId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "SubscriptionPlan",
+        default: null,
+      },
+      durationInDays: {
+        type: Number,
+        default: null,
+      },
+      amount: {
+        type: Number,
+        default: 0,
+      },
+      features: [String],
+      purchasedAt: {
+        type: Date,
+        default: null,
+      },
+      startAfter: {
+        type: Date,
+        default: null,
+      },
+      paymentId: {
+        type: String,
+        default: null,
+      },
+      razorpayOrderId: {
+        type: String,
+        default: null,
+      },
+      razorpayPaymentId: {
+        type: String,
+        default: null,
+      },
+      razorpaySignature: {
+        type: String,
+        default: null,
+      },
+      paymentStatus: {
+        type: String,
+        enum: ["pending", "completed", "failed", "refunded"],
+        default: "pending",
+      },
+      paymentDate: {
+        type: Date,
+        default: null,
+      },
+      status: {
+        type: String,
+        enum: ["pending", "active", "cancelled"],
+        default: "pending",
+      },
+    },
     // Zone mapping (tierId denormalized from Zone.tierId for quick reads / reporting)
     zoneId: {
       type: mongoose.Schema.Types.ObjectId,

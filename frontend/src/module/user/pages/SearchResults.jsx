@@ -15,6 +15,10 @@ import { X } from "lucide-react";
 // Import shared food images - prevents duplication
 import { foodImages } from "@/constants/images";
 import DynamicEtaText from "../components/DynamicEtaText";
+import {
+  getSearchUnavailableLabel,
+  isRestaurantDeliverableNow,
+} from "../utils/restaurantAvailability";
 
 // Filter options
 const filterOptions = [{
@@ -49,6 +53,11 @@ export default function SearchResults() {
     zoneId,
     isOutOfService
   } = useZone(location);
+  const userHasLocation =
+    location?.latitude != null &&
+    location?.longitude != null &&
+    Number.isFinite(Number(location.latitude)) &&
+    Number.isFinite(Number(location.longitude));
   const [searchQuery, setSearchQuery] = useState(query);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [activeFilters, setActiveFilters] = useState(new Set());
@@ -205,15 +214,27 @@ export default function SearchResults() {
   useEffect(() => {
     const fetchRestaurants = async () => {
       try {
-        if (isOutOfService) {
+        const hasExplicitQuery = query.trim().length > 0;
+        // Keep old browse behavior for out-of-service users, but allow explicit search.
+        if (isOutOfService && !hasExplicitQuery) {
           setRestaurantsData([]);
           setLoadingRestaurants(false);
           return;
         }
         setLoadingRestaurants(true);
-        const params = {};
+        const params = {
+          includeBeyondDeliveryRange: "true",
+        };
+        if (query.trim().length > 0) {
+          params.includeInactiveForSearch = "true";
+        }
         if (zoneId) params.zoneId = zoneId;
-        if (location?.latitude != null && location?.longitude != null) {
+        // If currently out of service and no resolved zoneId, avoid geo-based empty response.
+        if (
+          location?.latitude != null &&
+          location?.longitude != null &&
+          (!isOutOfService || zoneId)
+        ) {
           params.latitude = location.latitude;
           params.longitude = location.longitude;
         }
@@ -247,6 +268,22 @@ export default function SearchResults() {
             return false;
           };
 
+          const calculateDistance = (lat1, lng1, lat2, lng2) => {
+            const R = 6371;
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLng = (lng2 - lng1) * Math.PI / 180;
+            const a =
+              Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(lat1 * Math.PI / 180) *
+                Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLng / 2) *
+                Math.sin(dLng / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c;
+          };
+          const userLat = location?.latitude;
+          const userLng = location?.longitude;
+
           // First transform restaurants without menu data - USE ONLY BACKEND DATA
           // Filter out restaurants with only default/mock data
           const restaurantsWithIds = restaurantsArray.filter(restaurant => {
@@ -257,6 +294,41 @@ export default function SearchResults() {
             let deliveryTime = restaurant.estimatedDeliveryTime || null;
             let distance = restaurant.distance || null;
             let offer = restaurant.offer || null;
+
+            const restaurantLocation = restaurant.location;
+            const restaurantLat =
+              restaurantLocation?.latitude ||
+              (restaurantLocation?.coordinates && Array.isArray(restaurantLocation.coordinates)
+                ? restaurantLocation.coordinates[1]
+                : null);
+            const restaurantLng =
+              restaurantLocation?.longitude ||
+              (restaurantLocation?.coordinates && Array.isArray(restaurantLocation.coordinates)
+                ? restaurantLocation.coordinates[0]
+                : null);
+
+            let distanceInKm = null;
+            if (restaurant.distanceMeters != null && Number.isFinite(Number(restaurant.distanceMeters))) {
+              distanceInKm = Number(restaurant.distanceMeters) / 1000;
+            } else if (
+              userLat != null &&
+              userLng != null &&
+              restaurantLat != null &&
+              restaurantLng != null &&
+              !Number.isNaN(userLat) &&
+              !Number.isNaN(userLng) &&
+              !Number.isNaN(restaurantLat) &&
+              !Number.isNaN(restaurantLng)
+            ) {
+              distanceInKm = calculateDistance(userLat, userLng, restaurantLat, restaurantLng);
+            }
+            if (distanceInKm != null && Number.isFinite(distanceInKm)) {
+              if (distanceInKm >= 1) {
+                distance = `${distanceInKm.toFixed(1)} km`;
+              } else {
+                distance = `${Math.round(distanceInKm * 1000)} m`;
+              }
+            }
 
             // Filter out default values
             if (isDefaultValue(deliveryTime, 'deliveryTime')) {
@@ -295,6 +367,7 @@ export default function SearchResults() {
               // Use backend rating or null
               deliveryTime: deliveryTime,
               distance: distance,
+              distanceInKm,
               image: image,
               images: allImages,
               priceRange: restaurant.priceRange || null,
@@ -308,7 +381,16 @@ export default function SearchResults() {
               restaurantId: restaurantId,
               hasPaneer: false,
               // Will be updated after menu fetch
-              category: 'all'
+              category: 'all',
+              isActive: restaurant.isActive !== false,
+              isAcceptingOrders: restaurant.isAcceptingOrders !== false,
+              openDays: restaurant.openDays,
+              deliveryTimings: restaurant.deliveryTimings,
+              deliveryRange:
+                restaurant.deliveryRange != null && Number.isFinite(Number(restaurant.deliveryRange))
+                  ? Number(restaurant.deliveryRange)
+                  : 5,
+              location: restaurant.location,
             };
           });
 
@@ -391,7 +473,7 @@ export default function SearchResults() {
       }
     };
     fetchRestaurants();
-  }, [zoneId, isOutOfService]);
+  }, [zoneId, isOutOfService, location?.latitude, location?.longitude, query]);
 
   // Update search query when URL changes
   useEffect(() => {
@@ -550,6 +632,7 @@ export default function SearchResults() {
     const categoryKeywordsList = selectedCategory !== 'all' ? categoryKeywords[selectedCategory] || [] : [];
 
     restaurantsData.forEach(restaurant => {
+      const searchAvailable = isRestaurantDeliverableNow(restaurant, { userHasLocation });
       if (restaurant.menu && restaurant.menu.sections) {
         restaurant.menu.sections.forEach(section => {
           if (section.items) {
@@ -574,7 +657,8 @@ export default function SearchResults() {
                   restaurantId: restaurant.id,
                   restaurantSlug: restaurant.slug,
                   rating: restaurant.rating,
-                  deliveryTime: restaurant.deliveryTime
+                  deliveryTime: restaurant.deliveryTime,
+                  searchAvailable,
                 });
               }
             });
@@ -584,7 +668,7 @@ export default function SearchResults() {
     });
 
     return dishes;
-  }, [query, selectedCategory, restaurantsData, categoryKeywords]);
+  }, [query, selectedCategory, restaurantsData, categoryKeywords, userHasLocation]);
   const filteredAllRestaurants = useMemo(() => {
     const sourceData = restaurantsData.length > 0 ? restaurantsData : [];
     let filtered = [...sourceData];
@@ -645,9 +729,7 @@ export default function SearchResults() {
     return filtered;
   }, [query, selectedCategory, activeFilters, restaurantsData, categoryKeywords, loadingCategories]);
 
-  // Check if should show grayscale (user out of service)
-  const shouldShowGrayscale = isOutOfService;
-  return <div className={`min-h-screen bg-white dark:bg-[#0a0a0a] ${shouldShowGrayscale ? 'grayscale opacity-75' : ''}`}>
+  return <div className="min-h-screen bg-white dark:bg-[#0a0a0a]">
     {/* Sticky Header */}
     <div className="sticky top-0 z-20 bg-white dark:bg-[#1a1a1a] shadow-sm">
       <div className="max-w-7xl mx-auto">
@@ -739,9 +821,16 @@ export default function SearchResults() {
             const targetUrl = isDish
               ? `/user/restaurants/${item.restaurantSlug}`
               : `/user/restaurants/${item.slug || item.name.toLowerCase().replace(/\s+/g, '-')}`;
+            const cardUnavailable =
+              query.trim() || selectedCategory !== 'all'
+                ? item.searchAvailable === false
+                : !isRestaurantDeliverableNow(item, { userHasLocation });
+            const labelRestaurant = isDish
+              ? restaurantsData.find((r) => String(r.id) === String(item.restaurantId))
+              : item;
 
             return <Link key={item.id} to={targetUrl} className="block">
-              <div className={`group ${shouldShowGrayscale ? 'grayscale opacity-75' : ''}`}>
+              <div className={`group ${cardUnavailable ? 'grayscale opacity-75' : ''}`}>
                 {/* Image Container */}
                 <div className="relative aspect-square rounded-xl overflow-hidden mb-2 bg-gray-200 dark:bg-gray-800 border border-gray-100 dark:border-gray-800 shadow-sm group-hover:shadow-md transition-shadow">
                   {item.image ? <img src={item.image} alt={item.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" onError={e => {
@@ -780,6 +869,14 @@ export default function SearchResults() {
                     <Star className="h-2 w-2 fill-green-600 text-green-600" />
                     <span className="text-[10px] font-bold text-green-600">{item.rating}</span>
                   </div>}
+                  {cardUnavailable && labelRestaurant && (
+                    <p className="text-[10px] text-amber-700 dark:text-amber-500 font-medium line-clamp-2 mt-0.5">
+                      {getSearchUnavailableLabel(labelRestaurant, {
+                        distanceInKm: labelRestaurant.distanceInKm,
+                        userHasLocation,
+                      })}
+                    </p>
+                  )}
                 </div>
               </div>
             </Link>;
@@ -798,8 +895,15 @@ export default function SearchResults() {
           {filteredAllRestaurants.map(restaurant => {
             const restaurantSlug = restaurant.name.toLowerCase().replace(/\s+/g, "-");
             const isFavorite = favorites.has(restaurant.id);
+            const deliverable = isRestaurantDeliverableNow(restaurant, { userHasLocation });
+            const unavailableReason = deliverable
+              ? null
+              : getSearchUnavailableLabel(restaurant, {
+                  distanceInKm: restaurant.distanceInKm,
+                  userHasLocation,
+                });
             return <Link key={restaurant.id} to={`/user/restaurants/${restaurant.slug || restaurantSlug}`} className="h-full flex">
-              <Card className={`overflow-hidden cursor-pointer border-0 dark:border-gray-800 group bg-white dark:bg-[#1a1a1a] shadow-md hover:shadow-xl transition-all duration-300 py-0 rounded-md flex flex-col h-full w-full ${shouldShowGrayscale ? 'grayscale opacity-75' : ''}`}>
+              <Card className={`overflow-hidden cursor-pointer border-0 dark:border-gray-800 group bg-white dark:bg-[#1a1a1a] shadow-md hover:shadow-xl transition-all duration-300 py-0 rounded-md flex flex-col h-full w-full ${!deliverable ? 'grayscale opacity-75' : ''}`}>
                 {/* Image Section */}
                 <div className="relative h-44 sm:h-52 md:h-60 lg:h-64 xl:h-72 w-full overflow-hidden rounded-t-md flex-shrink-0 bg-gray-200 dark:bg-gray-800">
                   {restaurant.image ? <img src={restaurant.image} alt={restaurant.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" onError={e => {
@@ -863,6 +967,11 @@ export default function SearchResults() {
                       <h3 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 dark:text-white line-clamp-1 lg:line-clamp-2">
                         {restaurant.name}
                       </h3>
+                      {unavailableReason && (
+                        <p className="text-xs font-medium text-amber-700 dark:text-amber-500 mt-1 line-clamp-2">
+                          {unavailableReason}
+                        </p>
+                      )}
                     </div>
                     {restaurant.rating && <div className="flex-shrink-0 bg-green-600 text-white px-2 py-1 lg:px-3 lg:py-1.5 rounded-lg flex items-center gap-1">
                       <span className="text-sm lg:text-base font-bold">{restaurant.rating}</span>

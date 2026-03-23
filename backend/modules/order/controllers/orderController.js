@@ -154,9 +154,16 @@ export const createOrder = async (req, res) => {
       const maxRange = restaurant.deliveryRange || 5;
 
       if (distance > maxRange) {
+        logger.warn('Order rejected: delivery address beyond restaurant deliveryRange', {
+          restaurantId: restaurant._id?.toString(),
+          restaurantName: restaurant.name,
+          maxRangeKm: maxRange,
+          distanceKm: Number(distance.toFixed(2))
+        });
         return res.status(403).json({
           success: false,
-          message: `This restaurant only delivers up to ${maxRange}km. Your location is ${distance.toFixed(1)}km away.`
+          code: 'OUT_OF_DELIVERY_RANGE',
+          message: 'Out of delivery range. Please update your delivery address or try another restaurant.'
         });
       }
     }

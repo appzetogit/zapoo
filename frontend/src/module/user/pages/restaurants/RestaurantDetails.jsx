@@ -992,10 +992,26 @@ export default function RestaurantDetails() {
     return Math.max(0, item.price || 0);
   };
 
+  // Normalize dish diet type from multiple backend formats.
+  // Supports: "Veg", "Non-Veg", "Non Veg", lowercase variants, and boolean isVeg fallback.
+  const getDietType = (item) => {
+    const raw = String(item?.foodType || "").trim().toLowerCase();
+    if (raw) {
+      if (raw.includes("non")) return "non-veg";
+      if (raw === "veg" || raw.includes("vegetarian")) return "veg";
+      if (raw.includes("egg")) return "non-veg";
+    }
+    if (typeof item?.isVeg === "boolean") {
+      return item.isVeg ? "veg" : "non-veg";
+    }
+    return null;
+  };
+
   // Filter menu items based on active filters
   const filterMenuItems = items => {
     if (!items) return items;
     return items.filter(item => {
+      const dietType = getDietType(item);
       // Under 250 filter (when coming from Under 250 page)
       if (showOnlyUnder250) {
         const finalPrice = getFinalPrice(item);
@@ -1012,17 +1028,17 @@ export default function RestaurantDetails() {
       // VegMode filter - when vegMode is ON, show only Veg items
       // When vegMode is false/null/undefined, show all items (Veg and Non-Veg)
       if (vegMode === true) {
-        if (item.foodType !== "Veg") return false;
+        if (dietType !== "veg") return false;
       }
 
       // Veg/Non-veg filter (local filter override)
       if (filters.vegNonVeg === "veg") {
         // Show only veg items
-        if (item.foodType !== "Veg") return false;
+        if (dietType !== "veg") return false;
       }
       if (filters.vegNonVeg === "non-veg") {
         // Show only non-veg items
-        if (item.foodType !== "Non-Veg") return false;
+        if (dietType !== "non-veg") return false;
       }
       return true;
     });
@@ -1382,7 +1398,7 @@ export default function RestaurantDetails() {
                       {sortMenuItems(filterMenuItems(section.items)).map(item => {
                 const quantity = quantities[item.id] || 0;
                 // Determine veg/non-veg based on foodType
-                const isVeg = item.foodType === "Veg";
+                const isVeg = getDietType(item) !== "non-veg";
 
                 // Debug: Log preparationTime for troubleshooting
                 if (item.preparationTime) {}
@@ -1542,7 +1558,7 @@ export default function RestaurantDetails() {
                                 {sortMenuItems(filterMenuItems(subsection.items)).map(item => {
                       const quantity = quantities[item.id] || 0;
                       // Determine veg/non-veg based on foodType
-                      const isVeg = item.foodType === "Veg";
+                      const isVeg = getDietType(item) !== "non-veg";
 
                       // Debug: Log preparationTime for troubleshooting
                       if (item.preparationTime) {}

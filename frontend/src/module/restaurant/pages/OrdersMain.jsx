@@ -13,6 +13,8 @@ import { useRestaurantNotifications } from "../hooks/useRestaurantNotifications"
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import SubscriptionRenewalPopup from "../components/SubscriptionRenewalPopup";
+import SubscriptionExpiryBanner from "../components/SubscriptionExpiryBanner";
+import useSubscriptionExpiryNotice from "../hooks/useSubscriptionExpiryNotice";
 const STORAGE_KEY = "restaurant_online_status";
 
 // Top filter tabs
@@ -371,6 +373,7 @@ function CancelledOrders({
 }
 export default function OrdersMain() {
   const navigate = useNavigate();
+  const expiryNotice = useSubscriptionExpiryNotice();
   const [activeFilter, setActiveFilter] = useState("preparing");
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -1178,6 +1181,8 @@ export default function OrdersMain() {
             background: #999;
           }
         `}</style>
+
+      {expiryNotice.isVisible && !expiryNotice.loading && <SubscriptionExpiryBanner daysLeft={expiryNotice.daysLeft} isExpired={expiryNotice.isExpired} type={expiryNotice.type} planName={expiryNotice.planName} onBuyNow={() => navigate("/restaurant/subscription")} />}
 
       {/* Verification Pending Card - Show if onboarding is complete (all 4 steps) and restaurant is not active */}
       {!restaurantStatus.isLoading && !restaurantStatus.isActive && restaurantStatus.onboarding?.completedSteps === 4 && <motion.div initial={{

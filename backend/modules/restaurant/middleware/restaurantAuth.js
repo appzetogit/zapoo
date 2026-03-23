@@ -95,9 +95,53 @@ export const authenticate = async (req, res, next) => {
         restaurant.subscription && 
         restaurant.subscription.endDate && 
         new Date(restaurant.subscription.endDate) < new Date()) {
+      const queued = restaurant.queuedSubscription;
+      const hasQueuedPlan =
+        queued &&
+        queued.status === 'pending' &&
+        queued.planId &&
+        queued.durationInDays;
+
+      if (hasQueuedPlan) {
+        const startDate = new Date();
+        const endDate = new Date(startDate);
+        endDate.setDate(startDate.getDate() + queued.durationInDays);
+
+        restaurant.subscription = {
+          planId: queued.planId,
+          startDate,
+          endDate,
+          status: 'active',
+          autoRenew: true,
+          paymentId: queued.paymentId,
+          razorpayOrderId: queued.razorpayOrderId,
+          razorpayPaymentId: queued.razorpayPaymentId,
+          razorpaySignature: queued.razorpaySignature,
+          paymentStatus: queued.paymentStatus || 'completed',
+          paymentDate: queued.paymentDate || startDate,
+          amount: queued.amount || 0,
+          features: queued.features || [],
+        };
+        restaurant.queuedSubscription = {
+          planId: null,
+          durationInDays: null,
+          amount: 0,
+          features: [],
+          purchasedAt: null,
+          startAfter: null,
+          paymentId: null,
+          razorpayOrderId: null,
+          razorpayPaymentId: null,
+          razorpaySignature: null,
+          paymentStatus: 'pending',
+          paymentDate: null,
+          status: 'cancelled',
+        };
+        await restaurant.save();
+      }
       
       // Update status in memory for this request
-      if (restaurant.subscription.status !== 'expired') {
+      if (!hasQueuedPlan && restaurant.subscription.status !== 'expired') {
         console.warn('⚠️ Restaurant subscription has expired JIT:', {
           restaurantId: restaurant._id,
           endDate: restaurant.subscription.endDate,

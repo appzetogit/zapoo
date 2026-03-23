@@ -1,8 +1,15 @@
-import { useState, useEffect, useRef } from "react"
-import { useNavigate } from "react-router-dom"
-import { X, Search, Clock } from "lucide-react"
+import { useState, useEffect, useRef, useMemo } from "react"
+import { useNavigate, Link } from "react-router-dom"
+import { X, Search, Clock, Loader2, MapPin } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { restaurantAPI } from "@/lib/api"
+import { useLocation } from "../hooks/useLocation"
+import { useZone } from "../hooks/useZone"
+import {
+  getSearchUnavailableLabel,
+  isRestaurantDeliverableNow,
+} from "../utils/restaurantAvailability"
 
 // Import shared food images - prevents duplication
 import { foodImages } from "@/constants/images"
@@ -30,10 +37,102 @@ const categories = [
 // Use only unique categories (no duplicates)
 const allFoodsWithWhiteBg = categories
 
+function restaurantMatchesQuery(restaurant, q) {
+  const lower = q.trim().toLowerCase()
+  if (!lower) return false
+  if (restaurant.name?.toLowerCase().includes(lower)) return true
+  const slug = (restaurant.slug || "").toLowerCase()
+  if (slug.includes(lower.replace(/\s+/g, "-"))) return true
+  if (Array.isArray(restaurant.cuisines)) {
+    if (restaurant.cuisines.some((c) => String(c).toLowerCase().includes(lower))) return true
+  }
+  return false
+}
+
+function transformRestaurantForOverlay(restaurant, userLat, userLng) {
+  const calculateDistance = (lat1, lng1, lat2, lng2) => {
+    const R = 6371
+    const dLat = (lat2 - lat1) * Math.PI / 180
+    const dLng = (lng2 - lng1) * Math.PI / 180
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * Math.PI / 180) *
+        Math.cos(lat2 * Math.PI / 180) *
+        Math.sin(dLng / 2) *
+        Math.sin(dLng / 2)
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+    return R * c
+  }
+  const restaurantLocation = restaurant.location
+  const restaurantLat =
+    restaurantLocation?.latitude ||
+    (restaurantLocation?.coordinates && Array.isArray(restaurantLocation.coordinates)
+      ? restaurantLocation.coordinates[1]
+      : null)
+  const restaurantLng =
+    restaurantLocation?.longitude ||
+    (restaurantLocation?.coordinates && Array.isArray(restaurantLocation.coordinates)
+      ? restaurantLocation.coordinates[0]
+      : null)
+
+  let distanceInKm = null
+  if (restaurant.distanceMeters != null && Number.isFinite(Number(restaurant.distanceMeters))) {
+    distanceInKm = Number(restaurant.distanceMeters) / 1000
+  } else if (
+    userLat != null &&
+    userLng != null &&
+    restaurantLat != null &&
+    restaurantLng != null &&
+    !Number.isNaN(userLat) &&
+    !Number.isNaN(userLng) &&
+    !Number.isNaN(restaurantLat) &&
+    !Number.isNaN(restaurantLng)
+  ) {
+    distanceInKm = calculateDistance(userLat, userLng, restaurantLat, restaurantLng)
+  }
+
+  const restaurantId = restaurant.restaurantId || restaurant._id
+  const slug = restaurant.slug || restaurant.name?.toLowerCase().replace(/\s+/g, "-")
+  const image =
+    restaurant.profileImage?.url ||
+    (Array.isArray(restaurant.coverImages) && restaurant.coverImages[0]?.url) ||
+    foodImages[0]
+
+  return {
+    id: restaurantId,
+    name: restaurant.name,
+    slug,
+    image,
+    distanceInKm,
+    isActive: restaurant.isActive !== false,
+    isAcceptingOrders: restaurant.isAcceptingOrders !== false,
+    openDays: restaurant.openDays,
+    deliveryTimings: restaurant.deliveryTimings,
+    deliveryRange:
+      restaurant.deliveryRange != null && Number.isFinite(Number(restaurant.deliveryRange))
+        ? Number(restaurant.deliveryRange)
+        : 5,
+    location: restaurant.location,
+  }
+}
+
 export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchChange }) {
   const navigate = useNavigate()
   const inputRef = useRef(null)
   const [filteredFoods, setFilteredFoods] = useState(allFoodsWithWhiteBg)
+  const [restaurantMatches, setRestaurantMatches] = useState([])
+  const [restaurantLoading, setRestaurantLoading] = useState(false)
+  const { location } = useLocation()
+  const { zoneId, isOutOfService } = useZone(location)
+
+  const userHasLocation = useMemo(
+    () =>
+      location?.latitude != null &&
+      location?.longitude != null &&
+      Number.isFinite(Number(location.latitude)) &&
+      Number.isFinite(Number(location.longitude)),
+    [location?.latitude, location?.longitude]
+  )
 
   useEffect(() => {
     if (isOpen && inputRef.current) {
@@ -69,6 +168,56 @@ export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchCh
       setFilteredFoods(filtered)
     }
   }, [searchValue])
+
+  // Live restaurant name / cuisine suggestions (same broad list as /user/search — includes out-of-range & inactive)
+  useEffect(() => {
+    if (!isOpen) return
+    const q = searchValue.trim()
+    if (q.length < 1) {
+      setRestaurantMatches([])
+      setRestaurantLoading(false)
+      return
+    }
+    const handle = setTimeout(async () => {
+      try {
+        setRestaurantLoading(true)
+        const params = {
+          includeBeyondDeliveryRange: "true",
+          includeInactiveForSearch: "true",
+          limit: 80,
+        }
+        if (zoneId) params.zoneId = zoneId
+        // If user is currently out of service zone, avoid geo-filter lockout
+        // and still allow explicit text search suggestions.
+        if (userHasLocation && (!isOutOfService || zoneId)) {
+          params.latitude = location.latitude
+          params.longitude = location.longitude
+        }
+        const res = await restaurantAPI.getRestaurants(params)
+        const list = res?.data?.data?.restaurants || []
+        const userLat = userHasLocation ? Number(location.latitude) : null
+        const userLng = userHasLocation ? Number(location.longitude) : null
+        const transformed = list
+          .filter((r) => restaurantMatchesQuery(r, q))
+          .map((r) => transformRestaurantForOverlay(r, userLat, userLng))
+        setRestaurantMatches(transformed)
+      } catch {
+        setRestaurantMatches([])
+      } finally {
+        setRestaurantLoading(false)
+      }
+    }, 320)
+
+    return () => clearTimeout(handle)
+  }, [
+    searchValue,
+    isOpen,
+    zoneId,
+    isOutOfService,
+    userHasLocation,
+    location?.latitude,
+    location?.longitude,
+  ])
 
   const handleSuggestionClick = (suggestion) => {
     onSearchChange(suggestion)
@@ -155,6 +304,70 @@ export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchCh
           </div>
         </div>
 
+        {/* Live restaurant matches (typing) */}
+        {searchValue.trim().length > 0 && (
+          <div className="mb-8" style={{ animation: "fadeIn 0.25s ease-out both" }}>
+            <h3 className="text-sm sm:text-base font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+              <MapPin className="h-4 w-4 text-primary-orange" />
+              Restaurants
+              {restaurantLoading && <Loader2 className="h-4 w-4 animate-spin text-gray-400" />}
+            </h3>
+            {!restaurantLoading && restaurantMatches.length === 0 && (
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">No matching restaurant names in your area.</p>
+            )}
+            <ul className="space-y-2">
+              {restaurantMatches.map((r) => {
+                const deliverable = isRestaurantDeliverableNow(r, { userHasLocation })
+                const reason = !deliverable
+                  ? getSearchUnavailableLabel(r, { distanceInKm: r.distanceInKm, userHasLocation })
+                  : null
+                const slug = r.slug || r.name?.toLowerCase().replace(/\s+/g, "-")
+                return (
+                  <li key={String(r.id)}>
+                    <Link
+                      to={`/user/restaurants/${slug}`}
+                      onClick={() => {
+                        onClose()
+                        onSearchChange("")
+                      }}
+                      className={`flex items-center gap-3 rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50/80 dark:bg-[#141414] p-3 hover:border-orange-200 dark:hover:border-orange-900 transition-colors ${
+                        !deliverable ? "grayscale opacity-80" : ""
+                      }`}
+                    >
+                      <div className="h-14 w-14 flex-shrink-0 overflow-hidden rounded-lg bg-gray-200 dark:bg-gray-800">
+                        <img
+                          src={r.image}
+                          alt=""
+                          className="h-full w-full object-cover"
+                          loading="lazy"
+                          onError={(e) => {
+                            e.target.src = foodImages[0]
+                          }}
+                        />
+                      </div>
+                      <div className="min-w-0 flex-1 text-left">
+                        <p className="font-semibold text-gray-900 dark:text-white truncate">{r.name}</p>
+                        {reason && (
+                          <p className="text-xs font-medium text-amber-700 dark:text-amber-500 line-clamp-2 mt-0.5">
+                            {reason}
+                          </p>
+                        )}
+                        {deliverable && r.distanceInKm != null && (
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                            {r.distanceInKm >= 1
+                              ? `${r.distanceInKm.toFixed(1)} km away`
+                              : `${Math.round(r.distanceInKm * 1000)} m away`}
+                          </p>
+                        )}
+                      </div>
+                    </Link>
+                  </li>
+                )
+              })}
+            </ul>
+          </div>
+        )}
+
         {/* Food Grid */}
         <div
           style={{
@@ -162,45 +375,70 @@ export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchCh
           }}
         >
           <h3 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white mb-4 sm:mb-6">
-            {searchValue.trim() === "" ? "All Dishes" : `Search Results (${filteredFoods.length})`}
+            {searchValue.trim() === ""
+              ? "All Dishes"
+              : `Dishes & categories (${filteredFoods.length})`}
           </h3>
-          {filteredFoods.length > 0 ? (
-            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3 sm:gap-4 md:gap-5 lg:gap-6">
-              {filteredFoods.map((food, index) => (
-                <div
-                  key={food.id}
-                  className="flex flex-col items-center gap-2 sm:gap-3 cursor-pointer group"
-                  style={{
-                    animation: `slideUp 0.3s ease-out ${0.25 + 0.05 * (index % 12)}s both`
-                  }}
-                  onClick={() => handleFoodClick(food)}
-                >
-                  <div className="relative w-full aspect-square rounded-full overflow-hidden transition-all duration-200 shadow-md group-hover:shadow-lg bg-white dark:bg-[#1a1a1a] p-1 sm:p-1.5">
-                    <img
-                      src={food.image}
-                      alt={food.name}
-                      className="w-full h-full object-cover rounded-full"
-                      loading="lazy"
-                      onError={(e) => {
-                        e.target.src = foodImages[0]
-                      }}
-                    />
-                  </div>
-                  <div className="px-1 sm:px-2 text-center">
-                    <span className="text-xs sm:text-sm font-semibold text-gray-800 dark:text-gray-200 group-hover:text-primary-orange dark:group-hover:text-orange-400 transition-colors line-clamp-2">
-                      {food.name}
-                    </span>
-                  </div>
+          {(() => {
+            const typed = searchValue.trim().length > 0
+            const totalHits = filteredFoods.length + restaurantMatches.length
+            const showEmpty =
+              typed && !restaurantLoading && totalHits === 0
+
+            if (showEmpty) {
+              return (
+                <div className="text-center py-12 sm:py-16">
+                  <Search className="h-12 w-12 sm:h-16 sm:w-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+                  <p className="text-gray-600 dark:text-gray-400 text-base sm:text-lg font-semibold">
+                    No results found for "{searchValue}"
+                  </p>
+                  <p className="text-sm sm:text-base text-gray-500 dark:text-gray-500 mt-2">
+                    Try a different search term
+                  </p>
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-12 sm:py-16">
-              <Search className="h-12 w-12 sm:h-16 sm:w-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
-              <p className="text-gray-600 dark:text-gray-400 text-base sm:text-lg font-semibold">No results found for "{searchValue}"</p>
-              <p className="text-sm sm:text-base text-gray-500 dark:text-gray-500 mt-2">Try a different search term</p>
-            </div>
-          )}
+              )
+            }
+
+            if (filteredFoods.length === 0 && typed) {
+              return null
+            }
+
+            if (filteredFoods.length === 0) {
+              return null
+            }
+
+            return (
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3 sm:gap-4 md:gap-5 lg:gap-6">
+                {filteredFoods.map((food, index) => (
+                  <div
+                    key={food.id}
+                    className="flex flex-col items-center gap-2 sm:gap-3 cursor-pointer group"
+                    style={{
+                      animation: `slideUp 0.3s ease-out ${0.25 + 0.05 * (index % 12)}s both`,
+                    }}
+                    onClick={() => handleFoodClick(food)}
+                  >
+                    <div className="relative w-full aspect-square rounded-full overflow-hidden transition-all duration-200 shadow-md group-hover:shadow-lg bg-white dark:bg-[#1a1a1a] p-1 sm:p-1.5">
+                      <img
+                        src={food.image}
+                        alt={food.name}
+                        className="w-full h-full object-cover rounded-full"
+                        loading="lazy"
+                        onError={(e) => {
+                          e.target.src = foodImages[0]
+                        }}
+                      />
+                    </div>
+                    <div className="px-1 sm:px-2 text-center">
+                      <span className="text-xs sm:text-sm font-semibold text-gray-800 dark:text-gray-200 group-hover:text-primary-orange dark:group-hover:text-orange-400 transition-colors line-clamp-2">
+                        {food.name}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )
+          })()}
         </div>
       </div>
       <style>{`

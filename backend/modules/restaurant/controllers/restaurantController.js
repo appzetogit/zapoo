@@ -78,11 +78,18 @@ export const getRestaurants = async (req, res) => {
       hasOffers,
       zoneId, // User's zone ID (optional - if provided, filters by zone)
       latitude,
-      longitude
+      longitude,
+      includeInactiveForSearch,
+      includeBeyondDeliveryRange,
+      pureVeg
     } = req.query;
+    const pureVegOnly = pureVeg === 'true';
     const userLat = latitude != null ? parseFloat(latitude) : null;
     const userLng = longitude != null ? parseFloat(longitude) : null;
     const hasGeoFilter = userLat != null && userLng != null && Number.isFinite(userLat) && Number.isFinite(userLng);
+    // Search page only: include inactive / beyond deliveryRange (client greys + labels)
+    const allowInactive = includeInactiveForSearch === 'true';
+    const skipDeliveryRangeMatch = includeBeyondDeliveryRange === 'true';
 
     // Optional: Zone-based filtering - if zoneId is provided, validate and filter by zone
     let userZone = null;
@@ -107,25 +114,27 @@ export const getRestaurants = async (req, res) => {
           maxDeliveryTime,
           maxDistance,
           maxPrice,
-          hasOffers
+          hasOffers,
+          pureVeg: pureVegOnly
         }
       });
     }
 
-    // Build query conditions array
-    const queryAndConditions = [
-      { isActive: true },
-      {
-        $or: [
-          { businessModel: 'Commission Base' },
-          {
-            businessModel: { $ne: 'Commission Base' },
-            'subscription.status': 'active',
-            'subscription.endDate': { $gt: new Date() }
-          }
-        ]
-      }
-    ];
+    // Build query conditions array (omit isActive when allowInactive — explicit search UX)
+    const queryAndConditions = [];
+    if (!allowInactive) {
+      queryAndConditions.push({ isActive: true });
+    }
+    queryAndConditions.push({
+      $or: [
+        { businessModel: 'Commission Base' },
+        {
+          businessModel: { $ne: 'Commission Base' },
+          'subscription.status': 'active',
+          'subscription.endDate': { $gt: new Date() }
+        }
+      ]
+    });
 
     // Cuisine filter
     if (cuisine) {
@@ -177,6 +186,20 @@ export const getRestaurants = async (req, res) => {
       });
     }
 
+    if (pureVegOnly) {
+      const nonVegRestaurantIds = await Menu.distinct('restaurant', {
+        isActive: true,
+        $or: [
+          { 'sections.items.foodType': 'Non-Veg' },
+          { 'sections.subsections.items.foodType': 'Non-Veg' }
+        ]
+      });
+
+      if (nonVegRestaurantIds.length > 0) {
+        queryAndConditions.push({ _id: { $nin: nonVegRestaurantIds } });
+      }
+    }
+
     // Only show restaurants that belong to an active zone
     let activeZoneIds = null;
     if (userZone || hasGeoFilter) {
@@ -194,7 +217,8 @@ export const getRestaurants = async (req, res) => {
             maxDeliveryTime,
             maxDistance,
             maxPrice,
-            hasOffers
+            hasOffers,
+            pureVeg: pureVegOnly
           }
         });
       }
@@ -250,6 +274,7 @@ export const getRestaurants = async (req, res) => {
       profileImage: 1, location: 1, avgDeliveryTime: 1, avgPriceValue: 1,
       isActive: 1, isAcceptingOrders: 1, featuredDish: 1, featuredPrice: 1,
       offer: 1, estimatedDeliveryTime: 1, distance: 1, deliveryRange: 1,
+      deliveryTimings: 1, openDays: 1,
       // Cart needs this for correct free-delivery fallback vs custom slab pricing
       deliveryPricingConfig: 1
     };
@@ -260,28 +285,33 @@ export const getRestaurants = async (req, res) => {
     if (hasGeoFilter) {
       const settings = await BusinessSettings.getSettings();
       const maxRangeMeters = (settings.maxDeliveryRange || 20) * 1000;
+      // Widen geo cap when search needs out-of-range outlets; per-restaurant deliveryRange is still surfaced to the client
+      const geoMaxMeters = skipDeliveryRangeMatch
+        ? Math.max(maxRangeMeters, 150 * 1000)
+        : maxRangeMeters;
 
-      const basePipeline = [
-        {
-          $geoNear: {
-            near: { type: "Point", coordinates: [userLng, userLat] },
-            distanceField: "distanceMeters",
-            spherical: true,
-            maxDistance: maxRangeMeters,
-            query: query
-          }
-        },
-        {
-          $match: {
-            $expr: {
-              $lte: [
-                "$distanceMeters",
-                { $multiply: [{ $ifNull: ["$deliveryRange", 5] }, 1000] }
-              ]
-            }
+      const geoNearStage = {
+        $geoNear: {
+          near: { type: "Point", coordinates: [userLng, userLat] },
+          distanceField: "distanceMeters",
+          spherical: true,
+          maxDistance: geoMaxMeters,
+          query: query
+        }
+      };
+      const deliveryRangeMatchStage = {
+        $match: {
+          $expr: {
+            $lte: [
+              "$distanceMeters",
+              { $multiply: [{ $ifNull: ["$deliveryRange", 5] }, 1000] }
+            ]
           }
         }
-      ];
+      };
+      const basePipeline = skipDeliveryRangeMatch
+        ? [geoNearStage]
+        : [geoNearStage, deliveryRangeMatchStage];
 
       const [restaurantsResult, countResult] = await Promise.all([
         Restaurant.aggregate([
@@ -300,7 +330,7 @@ export const getRestaurants = async (req, res) => {
       restaurants = restaurantsResult;
       total = countResult[0]?.total || 0;
     } else {
-      const projection = 'name slug cuisines rating totalRatings promo profileImage location avgDeliveryTime avgPriceValue isActive isAcceptingOrders featuredDish featuredPrice offer estimatedDeliveryTime distance deliveryRange deliveryPricingConfig';
+      const projection = 'name slug cuisines rating totalRatings promo profileImage location avgDeliveryTime avgPriceValue isActive isAcceptingOrders featuredDish featuredPrice offer estimatedDeliveryTime distance deliveryRange deliveryTimings openDays deliveryPricingConfig';
       restaurants = await Restaurant.find(query)
         .select(projection)
         .sort(sortObj)
@@ -320,7 +350,8 @@ export const getRestaurants = async (req, res) => {
         maxDeliveryTime,
         maxDistance,
         maxPrice,
-        hasOffers
+        hasOffers,
+        pureVeg: pureVegOnly
       }
     });
   } catch (error) {
@@ -370,7 +401,7 @@ export const getRestaurantById = async (req, res) => {
     };
 
     // Strict field projection for public restaurant profile (deliveryPricingConfig for cart pricing fallback)
-    const projection = 'name slug cuisines rating totalRatings promo profileImage location avgDeliveryTime avgPriceValue isActive isAcceptingOrders featuredDish featuredPrice offer distance deliveryRange estimatedDeliveryTime cuisines deliveryPricingConfig';
+    const projection = 'name slug cuisines rating totalRatings promo profileImage location avgDeliveryTime avgPriceValue isActive isAcceptingOrders featuredDish featuredPrice offer distance deliveryRange estimatedDeliveryTime cuisines deliveryTimings openDays deliveryPricingConfig';
 
     const restaurant = await Restaurant.findOne(queryConditions)
       .select(projection)

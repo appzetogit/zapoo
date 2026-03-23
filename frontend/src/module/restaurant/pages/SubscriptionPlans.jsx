@@ -24,8 +24,10 @@ export default function SubscriptionPlans() {
     const [plans, setPlans] = useState([]);
     const [loading, setLoading] = useState(true);
     const [currentSubscription, setCurrentSubscription] = useState(null);
+    const [queuedSubscription, setQueuedSubscription] = useState(null);
     const [processingId, setProcessingId] = useState(null);
     const [trialUsed, setTrialUsed] = useState(false);
+    const [pendingPlanConfirm, setPendingPlanConfirm] = useState(null);
 
     useEffect(() => {
         fetchData();
@@ -47,6 +49,7 @@ export default function SubscriptionPlans() {
             if (subRes.data.success && subRes.data.data) {
                 setCurrentSubscription(subRes.data.data);
             }
+            setQueuedSubscription(subRes?.data?.queuedSubscription || null);
             const restaurant = restaurantRes?.data?.data?.restaurant || restaurantRes?.data?.restaurant;
             setTrialUsed(!!restaurant?.trialUsed);
         } catch (error) {
@@ -57,25 +60,10 @@ export default function SubscriptionPlans() {
         }
     };
 
-    const handleSubscribe = async (plan) => {
-        if (plan.needsRMCall) {
-            try {
-                setProcessingId(plan._id);
-                const res = await subscriptionAPI.requestRMCall({ planId: plan._id });
-                if (res.data.success) {
-                    toast.success("Request sent! Our Relationship Manager will contact you shortly.");
-                    await fetchData();
-                }
-            } catch (error) {
-                console.error("RM request error:", error);
-                toast.error("Failed to send request");
-            } finally {
-                setProcessingId(null);
-            }
-            return;
-        }
-
+    const startSubscriptionFlow = async (plan) => {
+        if (!plan?._id) return;
         try {
+            setPendingPlanConfirm(null);
             setProcessingId(plan._id);
 
             // Step 1: Create the Razorpay order (or activate free plan)
@@ -83,6 +71,10 @@ export default function SubscriptionPlans() {
 
             if (!res.data.success) {
                 throw new Error(res.data.message || "Failed to initiate subscription");
+            }
+
+            if (res?.data?.message && res?.data?.data?.deferredActivation) {
+                toast.info(res.data.message);
             }
 
             // If no razorpay data, it was a free plan — already activated
@@ -121,7 +113,10 @@ export default function SubscriptionPlans() {
                             });
 
                             if (verifyRes.data.success) {
-                                toast.success(`🎉 Successfully subscribed to ${plan.name}!`);
+                                toast.success(
+                                    verifyRes?.data?.message ||
+                                    `🎉 Successfully subscribed to ${plan.name}!`
+                                );
                                 await fetchData();
                                 resolve();
                             } else {
@@ -149,6 +144,36 @@ export default function SubscriptionPlans() {
         }
     };
 
+    const handleSubscribe = async (plan) => {
+        const activePlanId = currentSubscription?.planId?._id || currentSubscription?.planId;
+        const hasActiveSubscription = !!activePlanId && currentSubscription?.status === "active";
+        const isCurrentPlan = activePlanId?.toString() === plan?._id?.toString();
+
+        if (plan.needsRMCall) {
+            try {
+                setProcessingId(plan._id);
+                const res = await subscriptionAPI.requestRMCall({ planId: plan._id });
+                if (res.data.success) {
+                    toast.success("Request sent! Our Relationship Manager will contact you shortly.");
+                    await fetchData();
+                }
+            } catch (error) {
+                console.error("RM request error:", error);
+                toast.error("Failed to send request");
+            } finally {
+                setProcessingId(null);
+            }
+            return;
+        }
+
+        if (hasActiveSubscription && !isCurrentPlan) {
+            setPendingPlanConfirm(plan);
+            return;
+        }
+
+        await startSubscriptionFlow(plan);
+    };
+
     const handleClaimTrial = async () => {
         try {
             setProcessingId("trial");
@@ -164,24 +189,6 @@ export default function SubscriptionPlans() {
             toast.error(message);
         } finally {
             setProcessingId(null);
-        }
-    };
-
-    const handleCancel = async () => {
-        if (confirm("Are you sure you want to cancel auto-renewal? Your benefits will continue until the end of the current period.")) {
-            try {
-                setProcessingId("cancel");
-                const res = await subscriptionAPI.cancelSubscription();
-                if (res.data.success) {
-                    toast.success("Subscription auto-renewal cancelled");
-                    fetchData();
-                }
-            } catch (error) {
-                console.error("Cancellation error:", error);
-                toast.error("Failed to cancel subscription");
-            } finally {
-                setProcessingId(null);
-            }
         }
     };
 
@@ -255,26 +262,21 @@ export default function SubscriptionPlans() {
                                     <p className="text-gray-600 text-sm mt-0.5">
                                         You are on <span className="font-semibold text-orange-600">{currentSubscription.planId?.name}</span>.
                                         {" "}
-                                        {currentSubscription.autoRenew
-                                            ? `Renews ${new Date(currentSubscription.endDate).toLocaleDateString()}`
-                                            : `Expires ${new Date(currentSubscription.endDate).toLocaleDateString()}`}
+                                        {`Expires ${new Date(currentSubscription.endDate).toLocaleDateString()}`}
                                     </p>
                                 </div>
                             </div>
-                            <div className="flex gap-2 shrink-0">
-                                {currentSubscription.autoRenew && (
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 hover:border-red-300"
-                                        onClick={handleCancel}
-                                        disabled={processingId === "cancel"}
-                                    >
-                                        {processingId === "cancel" ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
-                                        Cancel Renewal
-                                    </Button>
-                                )}
-                            </div>
+                        </div>
+                    </Card>
+                )}
+
+                {queuedSubscription && (
+                    <Card className="border-blue-200 bg-blue-50/60">
+                        <div className="p-4 sm:p-5">
+                            <h3 className="text-sm font-bold text-blue-900">Upcoming Plan Purchased</h3>
+                            <p className="text-sm text-blue-800 mt-1">
+                                This is not your current plan. <span className="font-semibold">{queuedSubscription?.planId?.name || "New plan"}</span> will be activated once your current plan expires.
+                            </p>
                         </div>
                     </Card>
                 )}
@@ -371,6 +373,39 @@ export default function SubscriptionPlans() {
                     </p>
                 </div>
             </div>
+
+            {pendingPlanConfirm && (
+                <div className="fixed inset-0 z-[70] bg-black/40 backdrop-blur-[1px] px-4 flex items-center justify-center">
+                    <div className="w-full max-w-md rounded-2xl bg-white border border-gray-200 shadow-2xl p-4 sm:p-5">
+                        <h3 className="text-base sm:text-lg font-bold text-gray-900">Current plan is still active</h3>
+                        <p className="text-sm text-gray-600 mt-2 leading-relaxed">
+                            If you continue, <span className="font-semibold">{pendingPlanConfirm.name}</span> will be
+                            purchased now and activated automatically after your current plan expires.
+                        </p>
+                        <div className="mt-4 flex items-center justify-end gap-2">
+                            <Button
+                                variant="outline"
+                                className="h-9 px-4"
+                                onClick={() => setPendingPlanConfirm(null)}
+                                disabled={processingId === pendingPlanConfirm._id}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                className="h-9 px-4 bg-gray-900 hover:bg-black text-white"
+                                onClick={() => startSubscriptionFlow(pendingPlanConfirm)}
+                                disabled={processingId === pendingPlanConfirm._id}
+                            >
+                                {processingId === pendingPlanConfirm._id ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                    "Continue"
+                                )}
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <BottomNavOrders />
         </div>
