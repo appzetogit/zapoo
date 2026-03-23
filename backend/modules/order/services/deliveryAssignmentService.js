@@ -353,6 +353,13 @@ export async function assignOrderToDeliveryBoy(order, restaurantLat, restaurantL
 
     await order.save();
 
+    try {
+      const { calculateOrderSettlement } = await import('./orderSettlementService.js');
+      await calculateOrderSettlement(order._id);
+    } catch (settlementErr) {
+      console.error('⚠️ Settlement recalc after auto-assign failed:', settlementErr.message);
+    }
+
     // Trigger ETA recalculation for rider assigned event
     try {
       const etaEventService = (await import('./etaEventService.js')).default;

@@ -1,4 +1,5 @@
 import React, { useMemo, useRef } from "react";
+import { Star } from "lucide-react";
 
 function formatPrice(p) {
   const n = Number(p);
@@ -14,6 +15,7 @@ function clampItems(items, max = 5) {
 function ItemTextOnly({ item }) {
   return (
     <div className="flex items-center gap-2 whitespace-nowrap">
+      <Star className="w-3 h-3 fill-current text-[#FF5200]" />
       <span className="text-white text-xs font-medium leading-tight">
         {(item?.name || "").trim() || "Item"}
       </span>
@@ -87,3 +89,19 @@ export default function RecommendedItemsBadge({ items, fallbackText }) {
   );
 }
 
+export function ActiveRecommendedItemBadge({ item, fallbackText }) {
+  if (!item) {
+    if (!fallbackText) return null;
+    return (
+      <div className="bg-black/60 backdrop-blur-sm text-white px-3 py-1.5 rounded-full text-xs font-medium flex items-center shadow-lg">
+        {fallbackText}
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-[calc(100%-0.5rem)] inline-flex items-center rounded-full bg-black/65 px-3 py-1.5 text-white shadow-lg backdrop-blur-md">
+      <ItemTextOnly item={item} />
+    </div>
+  );
+}

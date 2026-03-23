@@ -3,6 +3,13 @@ import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Trash2, Check, ChevronDown, Edit as EditIcon, Plus, X, Camera, ThumbsUp, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "@/components/ui/select";
 // Removed getAllFoods and saveFood - now using menu API
 import api from "@/lib/api";
 import { restaurantAPI, uploadAPI } from "@/lib/api";
@@ -61,10 +68,23 @@ export default function ItemDetailsPage() {
   const [categories, setCategories] = useState([]);
   const [loadingCategories, setLoadingCategories] = useState(true);
   const [loadingItem, setLoadingItem] = useState(false);
-  const maxNameLength = 70;
-  const maxDescriptionLength = 1000;
-  const descriptionLength = itemDescription.length;
-  const minDescriptionLength = 5;
+  const maxNameLength = 40;
+  const maxDescriptionWords = 100;
+  const getWordCount = (text) => {
+    const trimmed = String(text || "").trim();
+    if (!trimmed) return 0;
+    return trimmed.split(/\s+/).filter(Boolean).length;
+  };
+
+  const limitWords = (text, maxWords) => {
+    const trimmed = String(text || "").trim();
+    if (!trimmed) return "";
+    const words = trimmed.split(/\s+/).filter(Boolean);
+    if (words.length <= maxWords) return trimmed;
+    return words.slice(0, maxWords).join(" ");
+  };
+
+  const descriptionWordCount = getWordCount(itemDescription);
   const nameLength = itemName.length;
 
   // Fetch item data from menu API when editing
@@ -81,7 +101,7 @@ export default function ItemDetailsPage() {
         setServesInfo(item.servesInfo || "");
         setItemSizeQuantity(item.itemSizeQuantity || "");
         setItemSizeUnit(item.itemSizeUnit || "piece");
-        setItemDescription(item.description || "");
+        setItemDescription(limitWords(item.description || "", maxDescriptionWords));
         setFoodType(item.foodType === "Veg" ? "Veg" : item.foodType === "Egg" ? "Egg" : "Non-Veg");
         setBasePrice(item.price?.toString() || "0");
         setPreparationTime(item.preparationTime || "");
@@ -172,7 +192,7 @@ export default function ItemDetailsPage() {
             setServesInfo(foundItem.servesInfo || "");
             setItemSizeQuantity(foundItem.itemSizeQuantity || "");
             setItemSizeUnit(foundItem.itemSizeUnit || "piece");
-            setItemDescription(foundItem.description || "");
+            setItemDescription(limitWords(foundItem.description || "", maxDescriptionWords));
             setFoodType(foundItem.foodType === "Veg" ? "Veg" : foundItem.foodType === "Egg" ? "Egg" : "Non-Veg");
             setBasePrice(foundItem.price?.toString() || "0");
             setPreparationTime(foundItem.preparationTime || "");
@@ -903,17 +923,20 @@ export default function ItemDetailsPage() {
             Item description
           </label>
           <div className="relative">
-            <textarea value={itemDescription} onChange={e => setItemDescription(e.target.value)} maxLength={maxDescriptionLength} rows={4} placeholder="Eg: Yummy veg paneer burger with a soft patty, veggies, cheese, and special sauce" className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none" />
+            <textarea
+              value={itemDescription}
+              onChange={(e) => setItemDescription(limitWords(e.target.value, maxDescriptionWords))}
+              rows={4}
+              placeholder="Eg: Yummy veg paneer burger with a soft patty, veggies, cheese, and special sauce"
+              className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+            />
             <button className="absolute right-3 top-3 p-1 rounded-full hover:bg-gray-100">
               <EditIcon className="w-4 h-4 text-gray-500" />
             </button>
           </div>
           <div className="flex items-center justify-between mt-1">
-            <span className={`text-xs ${descriptionLength < minDescriptionLength ? "text-red-500" : "text-gray-500"}`}>
-              {descriptionLength < minDescriptionLength ? "Min 5 characters required" : ""}
-            </span>
             <span className="text-xs text-gray-500">
-              {descriptionLength} / {maxDescriptionLength}
+              {descriptionWordCount} / {maxDescriptionWords} words
             </span>
           </div>
           {/* Dietary Options */}
@@ -965,16 +988,21 @@ export default function ItemDetailsPage() {
             {/* Preparation Time */}
             <div className="relative">
               <label className="block text-xs text-gray-600 mb-1">Preparation Time</label>
-              <div className="relative">
-                <select value={preparationTime} onChange={e => setPreparationTime(e.target.value)} className="w-full pl-4 pr-10 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none">
-                  <option value="">Select timing</option>
-                  <option value="10-20 mins">10-20 mins</option>
-                  <option value="20-25 mins">20-25 mins</option>
-                  <option value="25-35 mins">25-35 mins</option>
-                  <option value="35-45 mins">35-45 mins</option>
-                </select>
-                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 pointer-events-none" />
-              </div>
+              <Select value={preparationTime || undefined} onValueChange={setPreparationTime}>
+                <SelectTrigger className="w-full border border-gray-300 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-[#1a1a1a] text-gray-900 dark:text-white">
+                  <SelectValue placeholder="Select timing" />
+                </SelectTrigger>
+                <SelectContent
+                  className="bg-white dark:bg-[#1a1a1a] border-gray-200 dark:border-gray-700 max-h-[260px] overflow-y-auto"
+                  position="popper"
+                  align="start"
+                >
+                  <SelectItem value="10-20 mins">10-20 mins</SelectItem>
+                  <SelectItem value="20-25 mins">20-25 mins</SelectItem>
+                  <SelectItem value="25-35 mins">25-35 mins</SelectItem>
+                  <SelectItem value="35-45 mins">35-45 mins</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             {/* <div>
                 <label className="block text-xs text-gray-600 mb-1">GST</label>

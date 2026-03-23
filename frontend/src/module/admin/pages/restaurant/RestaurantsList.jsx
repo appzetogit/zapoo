@@ -91,6 +91,8 @@ export default function RestaurantsList() {
             ownerName: restaurant.ownerName || "N/A",
             ownerPhone: restaurant.ownerPhone || restaurant.phone || "N/A",
             zone: restaurant.location?.area || restaurant.location?.city || restaurant.zone || "N/A",
+            zoneName: restaurant.zoneId?.name || restaurant.location?.area || restaurant.location?.city || restaurant.zone || "N/A",
+            tierName: restaurant.zoneId?.tierId?.name || "N/A",
             cuisine: Array.isArray(restaurant.cuisines) && restaurant.cuisines.length > 0 ? restaurant.cuisines[0] : restaurant.cuisine || "N/A",
             status: restaurant.isActive !== false,
             // Default to true if not set
@@ -635,6 +637,13 @@ export default function RestaurantsList() {
                       </p>
                     </div>
                   </div>
+                  {restaurantDetails?.email && <div className="flex items-center gap-3">
+                    <Mail className="w-5 h-5 text-slate-400" />
+                    <div>
+                      <p className="text-xs text-slate-500">Restaurant Email</p>
+                      <p className="text-sm font-medium text-slate-900">{restaurantDetails.email}</p>
+                    </div>
+                  </div>}
                   {restaurantDetails?.ownerEmail && <div className="flex items-center gap-3">
                     <Mail className="w-5 h-5 text-slate-400" />
                     <div>
@@ -662,18 +671,29 @@ export default function RestaurantsList() {
                       </p>
                     </div>
                   </div>}
+                  <div className="flex items-start gap-3">
+                    <MapPin className="w-5 h-5 text-slate-400 mt-0.5" />
+                    <div>
+                      <p className="text-xs text-slate-500">Zone</p>
+                      <p className="text-sm font-medium text-slate-900">
+                        {restaurantDetails.zoneName || selectedRestaurant.zoneName || restaurantDetails?.zoneId?.name || "N/A"}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <MapPin className="w-5 h-5 text-slate-400 mt-0.5" />
+                    <div>
+                      <p className="text-xs text-slate-500">Tier</p>
+                      <p className="text-sm font-medium text-slate-900">
+                        {restaurantDetails.tierName || selectedRestaurant.tierName || restaurantDetails?.zoneId?.tierId?.name || "N/A"}
+                      </p>
+                    </div>
+                  </div>
                   {restaurantDetails?.primaryContactNumber && <div className="flex items-center gap-3">
                     <Phone className="w-5 h-5 text-slate-400" />
                     <div>
                       <p className="text-xs text-slate-500">Primary Contact</p>
                       <p className="text-sm font-medium text-slate-900">{restaurantDetails.primaryContactNumber}</p>
-                    </div>
-                  </div>}
-                  {restaurantDetails?.email && <div className="flex items-center gap-3">
-                    <Mail className="w-5 h-5 text-slate-400" />
-                    <div>
-                      <p className="text-xs text-slate-500">Restaurant Email</p>
-                      <p className="text-sm font-medium text-slate-900">{restaurantDetails.email}</p>
                     </div>
                   </div>}
                 </div>

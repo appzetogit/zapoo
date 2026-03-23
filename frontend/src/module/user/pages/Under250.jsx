@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "react-router-dom"
-import { useState, useMemo, useCallback, useEffect, useRef } from "react"
+import { useState, useMemo, useCallback, useEffect } from "react"
 import { Star, Clock, MapPin, ArrowDownUp, Timer, ArrowRight, ChevronDown, Bookmark, Share2, Plus, Minus, X } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { toast } from "sonner"
@@ -34,8 +34,6 @@ export default function Under250() {
   const [selectedItem, setSelectedItem] = useState(null)
   const [quantities, setQuantities] = useState({})
   const [bookmarkedItems, setBookmarkedItems] = useState(new Set())
-  const [viewCartButtonBottom, setViewCartButtonBottom] = useState("bottom-20")
-  const lastScrollY = useRef(0)
   const [categories, setCategories] = useState([])
   const [loadingCategories, setLoadingCategories] = useState(true)
   const [bannerImage, setBannerImage] = useState(null)
@@ -239,33 +237,6 @@ export default function Under250() {
     })
     setQuantities(cartQuantities)
   }, [cart])
-
-  // Scroll detection for view cart button positioning
-  useEffect(() => {
-    const handleScroll = () => {
-      const currentScrollY = window.scrollY
-      const scrollDifference = Math.abs(currentScrollY - lastScrollY.current)
-
-      // Only update if scroll difference is significant (avoid flickering)
-      if (scrollDifference < 5) {
-        return
-      }
-
-      // Scroll down -> bottom-0, Scroll up -> bottom-20
-      if (currentScrollY > lastScrollY.current) {
-        // Scrolling down
-        setViewCartButtonBottom("bottom-0")
-      } else if (currentScrollY < lastScrollY.current) {
-        // Scrolling up
-        setViewCartButtonBottom("bottom-20")
-      }
-
-      lastScrollY.current = currentScrollY
-    }
-
-    window.addEventListener("scroll", handleScroll, { passive: true })
-    return () => window.removeEventListener("scroll", handleScroll)
-  }, [])
 
   // Helper function to update item quantity in bothlocal state and cart
   const updateItemQuantity = (item, newQuantity, event = null, restaurantName = null) => {
@@ -993,7 +964,7 @@ export default function Under250() {
       </AnimatePresence>
 
       {/* Add to Cart Animation */}
-      <AddToCartAnimation dynamicBottom={viewCartButtonBottom} />
+      <AddToCartAnimation bottomOffset={10} hideWhileScrolling={true} showAfterScrollDelay={180} />
     </div>
   )
 }

@@ -4,6 +4,7 @@ import {
   approveWithdrawalRequest,
   rejectWithdrawalRequest,
 } from "../../restaurant/controllers/withdrawalController.js";
+import { getRestaurantDeliveryDiagnostics } from "../controllers/restaurantDeliveryDiagnosticsController.js";
 import {
   getDashboardStats,
   getAdmins,
@@ -281,6 +282,7 @@ router.put("/restaurants/:id/status", updateRestaurantStatus);
 // router.put("/restaurants/:id/dining-settings", updateRestaurantDiningSettings); (Dining removed)
 router.delete("/restaurants/:id", deleteRestaurant);
 router.post("/restaurants/:id/extend-subscription", extendRestaurantSubscription);
+router.get("/restaurants/:id/delivery-diagnostics", getRestaurantDeliveryDiagnostics);
 
 // Category Management
 router.get("/categories", getCategories);

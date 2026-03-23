@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 
 import { CheckCircle, MapPin, CreditCard, ArrowLeft } from "lucide-react"
@@ -7,18 +7,26 @@ import AnimatedPage from "../../components/AnimatedPage"
 import ScrollReveal from "../../components/ScrollReveal"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { useCart } from "../../context/CartContext"
 import { useProfile } from "../../context/ProfileContext"
-import { useOrders } from "../../context/OrdersContext"
+import { orderAPI } from "@/lib/api"
+import { initRazorpayPayment } from "@/lib/utils/razorpay"
+import { getCompanyNameAsync } from "@/lib/utils/businessSettings"
+import { toast } from "sonner"
+
+function normalizeCheckoutPaymentMethod(pm) {
+  if (!pm) return "razorpay"
+  const t = String(pm.type || "").toLowerCase()
+  if (t === "wallet") return "wallet"
+  if (t === "cash" || t === "cod") return "cash"
+  return "razorpay"
+}
 
 export default function Checkout() {
   const navigate = useNavigate()
   const { cart, clearCart } = useCart()
-  const { getDefaultAddress, getDefaultPaymentMethod, addresses, paymentMethods } = useProfile()
-  const { createOrder } = useOrders()
+  const { getDefaultAddress, getDefaultPaymentMethod, addresses, paymentMethods, userProfile } = useProfile()
   const [selectedAddress, setSelectedAddress] = useState(getDefaultAddress()?.id || "")
   const [selectedPayment, setSelectedPayment] = useState(getDefaultPaymentMethod()?.id || "")
   const [isPlacingOrder, setIsPlacingOrder] = useState(false)
@@ -27,46 +35,50 @@ export default function Checkout() {
     deliveryFee: 0,
     platformFee: 0,
     gst: 0,
-    total: 0
+    total: 0,
+    discount: 0,
+    couponCode: null,
   })
   const [isCalculating, setIsCalculating] = useState(false)
 
   const defaultAddress = addresses.find(addr => addr.id === selectedAddress) || getDefaultAddress()
   const defaultPayment = paymentMethods.find(pm => pm.id === selectedPayment) || getDefaultPaymentMethod()
 
-  // Initial calculation and updates
   useEffect(() => {
     const calculatePricing = async () => {
-      if (cart.length === 0) return
+      if (cart.length === 0 || !selectedAddress) return
 
       setIsCalculating(true)
       try {
         const items = cart.map(item => ({
-          ...item,
-          price: item.price * 83 // Convert to INR if stored in USD
-        }));
+          itemId: item.id,
+          name: item.name,
+          price: item.price,
+          quantity: item.quantity || 1,
+          image: item.image,
+          description: item.description,
+          isVeg: item.isVeg !== false,
+          isRecommended: Boolean(item.isRecommended),
+        }))
 
-        const response = await fetch(`${import.meta.env.VITE_API_URL || '/api'}/order/calculate`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            items,
-            addressId: selectedAddress,
-            restaurantId: cart[0]?.restaurantId // Assuming cart items have restaurantId
-          })
-        });
+        const response = await orderAPI.calculateOrder({
+          items,
+          restaurantId: cart[0]?.restaurantId,
+          addressId: selectedAddress,
+          deliveryFleet: "standard",
+        })
 
-        const data = await response.json();
-        if (data.success) {
+        const p = response?.data?.data?.pricing
+        if (response?.data?.success && p) {
           setPricing({
-            subtotal: data.data.pricing.subtotal,
-            deliveryFee: data.data.pricing.deliveryFee,
-            platformFee: data.data.pricing.platformFee,
-            gst: data.data.pricing.tax, // Backend returns 'tax' as GST
-            total: data.data.pricing.total
-          });
+            subtotal: p.subtotal,
+            deliveryFee: p.deliveryFee,
+            platformFee: p.platformFee,
+            gst: p.tax,
+            total: p.total,
+            discount: p.discount || 0,
+            couponCode: p.appliedCoupon?.code || null,
+          })
         }
       } catch (error) {
         console.error("Error calculating pricing:", error)
@@ -78,49 +90,140 @@ export default function Checkout() {
     calculatePricing()
   }, [cart, selectedAddress])
 
-  // Simple fallback if backend calc fails or pending (optional, but good for UX)
-  // For now, we rely on the state initialized to 0 or previous value.
-
   const handlePlaceOrder = async () => {
     if (!selectedAddress || !selectedPayment) {
-      alert("Please select a delivery address and payment method")
+      toast.error("Please select a delivery address and payment method")
       return
     }
 
     if (cart.length === 0) {
-      alert("Your cart is empty")
+      toast.error("Your cart is empty")
+      return
+    }
+
+    if (!defaultAddress) {
+      toast.error("Invalid delivery address")
+      return
+    }
+
+    const restaurantId = cart[0]?.restaurantId
+    if (!restaurantId) {
+      toast.error("Missing restaurant — open checkout from the restaurant cart.")
       return
     }
 
     setIsPlacingOrder(true)
 
-    // Simulate API call - In real app, avoid this timeout and use actual API
-    // We already have useOrders hook which likely does the API call.
     try {
-      const orderId = await createOrder({
-        items: cart.map(item => ({
-          id: item.id,
-          name: item.name,
-          price: item.price * 83, // Send converted price
-          quantity: item.quantity,
-          image: item.image
-        })),
+      const paymentMethod = normalizeCheckoutPaymentMethod(defaultPayment)
+      const items = cart.map(item => ({
+        itemId: item.id,
+        name: item.name,
+        price: item.price,
+        quantity: item.quantity || 1,
+        image: item.image || "",
+        description: item.description || "",
+        isVeg: item.isVeg !== false,
+        isRecommended: Boolean(item.isRecommended),
+      }))
+
+      const orderPricing = {
+        subtotal: pricing.subtotal,
+        deliveryFee: pricing.deliveryFee,
+        tax: pricing.gst,
+        platformFee: pricing.platformFee,
+        discount: pricing.discount,
+        total: pricing.total,
+        couponCode: pricing.couponCode,
+      }
+
+      const orderResponse = await orderAPI.createOrder({
+        items,
         address: defaultAddress,
-        paymentMethod: defaultPayment,
-        restaurant: cart[0]?.restaurant || cart[0]?.name || "Multiple Restaurants",
-        // Pass the calculated pricing elements to backend? 
-        // Usually backend recalculates on creation to be safe.
-        // But we can pass them for validation.
+        restaurantId,
+        restaurantName: cart[0]?.restaurant,
+        pricing: orderPricing,
+        paymentMethod,
+        deliveryFleet: "standard",
+        sendCutlery: true,
       })
 
-      clearCart()
-      setIsPlacingOrder(false)
-      if (orderId) {
-        navigate(`/user/orders/${orderId}?confirmed=true`)
+      const { order, razorpay } = orderResponse.data.data
+
+      if (paymentMethod === "cash") {
+        toast.success("Order placed with Cash on Delivery")
+        clearCart()
+        navigate(`/user/orders/${order?.orderId || order?.id}?confirmed=true`)
+        setIsPlacingOrder(false)
+        return
       }
+
+      if (paymentMethod === "wallet") {
+        toast.success("Order placed with Wallet")
+        clearCart()
+        navigate(`/user/orders/${order?.orderId || order?.id}?confirmed=true`)
+        setIsPlacingOrder(false)
+        return
+      }
+
+      if (!razorpay?.orderId || !razorpay?.key) {
+        throw new Error(razorpay ? "Razorpay is not configured." : "Failed to start payment")
+      }
+
+      const userPhone = userProfile?.phone || defaultAddress?.phone || ""
+      const formattedPhone = userPhone.replace(/\D/g, "").slice(-10)
+      const companyName = await getCompanyNameAsync()
+
+      await initRazorpayPayment({
+        key: razorpay.key,
+        amount: razorpay.amount,
+        currency: razorpay.currency || "INR",
+        order_id: razorpay.orderId,
+        name: companyName,
+        description: `Order ${order.orderId} - ₹${(razorpay.amount / 100).toFixed(2)}`,
+        prefill: {
+          name: userProfile?.name || "",
+          email: userProfile?.email || "",
+          contact: formattedPhone,
+        },
+        notes: {
+          orderId: order.orderId,
+          userId: userProfile?.id || "",
+          restaurantId: String(restaurantId),
+        },
+        handler: async (response) => {
+          try {
+            const verifyResponse = await orderAPI.verifyPayment({
+              orderId: order.id,
+              razorpayOrderId: response.razorpay_order_id,
+              razorpayPaymentId: response.razorpay_payment_id,
+              razorpaySignature: response.razorpay_signature,
+            })
+            if (verifyResponse.data.success) {
+              toast.success("Payment successful")
+              clearCart()
+              navigate(`/user/orders/${order.orderId}?confirmed=true`)
+            } else {
+              throw new Error(verifyResponse.data.message || "Verification failed")
+            }
+          } catch (err) {
+            console.error(err)
+            toast.error(err?.response?.data?.message || err.message || "Payment verification failed")
+          } finally {
+            setIsPlacingOrder(false)
+          }
+        },
+        onError: (error) => {
+          if (error?.code !== "PAYMENT_CANCELLED" && error?.message !== "PAYMENT_CANCELLED") {
+            toast.error(error?.description || error?.message || "Payment failed")
+          }
+          setIsPlacingOrder(false)
+        },
+        onClose: () => setIsPlacingOrder(false),
+      })
     } catch (err) {
       console.error("Order creation failed", err)
-      alert("Failed to place order")
+      toast.error(err?.response?.data?.message || err.message || "Failed to place order")
       setIsPlacingOrder(false)
     }
   }
@@ -305,11 +408,11 @@ export default function Checkout() {
                         <div className="flex-1">
                           <p className="font-medium text-sm md:text-base dark:text-gray-200">{item.name}</p>
                           <p className="text-xs md:text-sm text-muted-foreground">
-                            ₹{(item.price * 83).toFixed(0)} × {item.quantity}
+                            ₹{Number(item.price || 0).toFixed(0)} × {item.quantity}
                           </p>
                         </div>
                         <p className="font-semibold text-sm md:text-base dark:text-gray-200">
-                          ₹{(item.price * 83 * item.quantity).toFixed(0)}
+                          ₹{(Number(item.price || 0) * (item.quantity || 1)).toFixed(0)}
                         </p>
                       </div>
                     ))}

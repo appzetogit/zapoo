@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { locationAPI, userAPI } from "@/lib/api";
+import { USER_LOCATION_UPDATED_EVENT } from "../constants/locationEvents.js";
 import { ref, set, get } from 'firebase/database';
 import { getAuth } from 'firebase/auth';
 import { realtimeDb } from '@/lib/firebaseConfig';
@@ -1581,6 +1582,23 @@ export function useLocation() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    const onUpdated = e => {
+      const d = e.detail;
+      if (!d || typeof d !== "object") return;
+      if (d.latitude == null && d.longitude == null) return;
+      setLocation(prev => ({
+        ...(prev || {}),
+        ...d
+      }));
+      setPermissionGranted(true);
+      setLoading(false);
+    };
+    window.addEventListener(USER_LOCATION_UPDATED_EVENT, onUpdated);
+    return () => window.removeEventListener(USER_LOCATION_UPDATED_EVENT, onUpdated);
+  }, []);
+
   return {
     location,
     loading,

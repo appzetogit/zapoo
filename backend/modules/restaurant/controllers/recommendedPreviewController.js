@@ -75,7 +75,18 @@ export async function getRecommendedPreview(req, res) {
     const items = flattenMenuItems(menu.sections || []);
 
     const recommended = items
-      .filter((it) => it && it.isRecommended === true)
+      .filter((it) => {
+        if (!it) return false;
+        const status = it.recommendationStatus;
+        const pendingSpecial =
+          it.isRecommendationRequest === true &&
+          (status === "pending" || status === "approved");
+
+        // Recommended shown for:
+        // - admin-approved specials (`isRecommended === true`)
+        // - restaurant special requests that are still pending/approved
+        return it.isRecommended === true || pendingSpecial;
+      })
       .filter((it) => it.isAvailable !== false)
       .filter((it) => (it.approvalStatus === 'approved' || !it.approvalStatus))
       .slice(0, 50) // safety cap before mapping/slicing to limit

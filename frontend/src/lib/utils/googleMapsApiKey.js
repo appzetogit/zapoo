@@ -1,41 +1,27 @@
+import { API_BASE_URL } from "@/lib/api/config.js"
+
 /**
  * Google Maps API Key Utility
  *
- * Fetches the API key from Firebase Realtime Database (REST, no SDK needed)
- * instead of hitting the backend admin API.
+ * Source of truth: Admin ENV Setup (MongoDB) via backend public endpoint.
+ * - GET `${API_BASE_URL}/env/public`
+ * - returns: { data: { VITE_GOOGLE_MAPS_API_KEY: string } }
  *
- * Cost benefit:
- *  - 1 Firebase REST GET per page session (≈ 0 cost on free tier)
- *  - Cached in module memory — zero subsequent calls
- *  - Key updateable in Firebase Console without redeployment
- *
- * Firebase RTDB path: /config/googleMapsApiKey
- * Required RTDB rule: { "rules": { "config": { ".read": true } } }
+ * Notes:
+ * - Firebase RTDB and frontend env fallbacks are intentionally removed.
+ * - Module-level caching prevents repeated network calls per page/session.
  */
-
-const FIREBASE_RTDB_URL =
-  import.meta.env.VITE_FIREBASE_DATABASE_URL ||
-  'https://zapoo-d23ea-default-rtdb.asia-southeast1.firebasedatabase.app';
-const ENV_API_KEY =
-  import.meta.env.VITE_GOOGLE_MAPS_API_KEY ||
-  import.meta.env.VITE_MAPS_API_KEY ||
-  '';
 
 let cachedApiKey = null;
 let apiKeyPromise = null;
 let missingKeyWarned = false;
 
 /**
- * Get Google Maps API Key from Firebase RTDB (REST endpoint).
+ * Get Google Maps API Key from backend admin ENV (MongoDB) public endpoint.
  * Uses module-level caching — only one network request per page session.
  * @returns {Promise<string>} Google Maps API Key or empty string on failure
  */
 export async function getGoogleMapsApiKey() {
-  if (ENV_API_KEY) {
-    cachedApiKey = ENV_API_KEY;
-    return ENV_API_KEY;
-  }
-
   // Return cached key if available
   if (cachedApiKey) {
     return cachedApiKey;
@@ -48,33 +34,33 @@ export async function getGoogleMapsApiKey() {
 
   apiKeyPromise = (async () => {
     try {
-      const url = `${FIREBASE_RTDB_URL}/config/googleMapsApiKey.json`;
+      const url = `${API_BASE_URL}/env/public`;
       const response = await fetch(url);
 
       if (!response.ok) {
-        console.warn(`⚠️ Firebase RTDB: Failed to fetch Maps API key (HTTP ${response.status})`);
+        console.warn(`⚠️ Env public: Failed to fetch Maps API key (HTTP ${response.status})`);
         return '';
       }
 
-      const data = await response.json();
+      const json = await response.json();
+      const key = json?.data?.VITE_GOOGLE_MAPS_API_KEY;
 
-      if (data && typeof data === 'string' && data.length > 0) {
-        cachedApiKey = data;
+      if (typeof key === "string" && key.length > 0) {
+        cachedApiKey = key;
         return cachedApiKey;
       }
 
       if (!missingKeyWarned) {
         console.warn(
-          '⚠️ Google Maps API key not found in Firebase RTDB.\n' +
-          '   Set it at: Firebase Console → Realtime Database → /config/googleMapsApiKey\n' +
-          '   or add VITE_GOOGLE_MAPS_API_KEY in frontend env.'
+          '⚠️ Google Maps API key not found in Admin ENV Setup (MongoDB).\n' +
+          '   Admin → System → ENV Setup → set "Google Maps API Key".'
         );
         missingKeyWarned = true;
       }
       return '';
     } catch (error) {
       if (!missingKeyWarned) {
-        console.warn('⚠️ Failed to fetch Google Maps API key from Firebase RTDB:', error.message);
+        console.warn('⚠️ Failed to fetch Google Maps API key from Admin ENV public endpoint:', error.message);
         missingKeyWarned = true;
       }
       return '';

@@ -7,6 +7,12 @@ import mongoose from 'mongoose';
 
 const roundCurrency = (value) => Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
 
+/** Treat common truthy shapes from JSON / older clients */
+const isRestaurantCustomDeliveryEnabled = (restaurant) => {
+  const v = restaurant?.deliveryPricingConfig?.isEnabled;
+  return v === true || v === 'true' || v === 1 || v === '1';
+};
+
 const isInRange = (value, min, max) => {
   if (value < min) return false;
   if (max === null || max === undefined) return true;
@@ -96,18 +102,35 @@ const findBaseDistanceSlab = (distanceSlabs) => {
 };
 
 const calculateDistanceFromAddresses = (restaurant, deliveryAddress) => {
-  if (deliveryAddress?.location?.coordinates && restaurant?.location?.coordinates) {
-    return calculateDistance(
-      restaurant.location.coordinates,
-      deliveryAddress.location.coordinates
-    );
+  const resCoords = restaurant?.location?.coordinates;
+  const resLat = restaurant?.location?.latitude ?? resCoords?.[1];
+  const resLng = restaurant?.location?.longitude ?? resCoords?.[0];
+
+  let delLng;
+  let delLat;
+  const delLoc = deliveryAddress?.location;
+  if (delLoc?.coordinates?.length >= 2) {
+    delLng = Number(delLoc.coordinates[0]);
+    delLat = Number(delLoc.coordinates[1]);
+  } else if (delLoc?.latitude != null && delLoc?.longitude != null) {
+    delLng = Number(delLoc.longitude);
+    delLat = Number(delLoc.latitude);
+  } else if (deliveryAddress?.longitude != null && deliveryAddress?.latitude != null) {
+    delLng = Number(deliveryAddress.longitude);
+    delLat = Number(deliveryAddress.latitude);
   }
 
-  if (deliveryAddress?.location?.latitude && restaurant?.location?.latitude) {
-    return calculateDistance(
-      [restaurant.location.longitude, restaurant.location.latitude],
-      [deliveryAddress.location.longitude, deliveryAddress.location.latitude]
-    );
+  if (
+    resLat != null &&
+    resLng != null &&
+    delLat != null &&
+    delLng != null &&
+    Number.isFinite(resLat) &&
+    Number.isFinite(resLng) &&
+    Number.isFinite(delLat) &&
+    Number.isFinite(delLng)
+  ) {
+    return calculateDistance([resLng, resLat], [delLng, delLat]);
   }
 
   return 0;
@@ -132,10 +155,11 @@ const calculateRestaurantCustomerDeliveryFee = ({
   distanceKm,
   restaurant,
   matchedDistanceSlab,
+  distanceSlabs = [],
 }) => {
   const config = restaurant?.deliveryPricingConfig;
 
-  if (!config?.isEnabled) {
+  if (!isRestaurantCustomDeliveryEnabled(restaurant)) {
     return {
       customerDeliveryFee: 0,
       customerPerKmRate: 0,
@@ -152,10 +176,32 @@ const calculateRestaurantCustomerDeliveryFee = ({
     };
   }
 
-  const matchedRateRule = (config.customerDeliveryRates || []).find((rate) =>
+  let matchedRateRule = (config.customerDeliveryRates || []).find((rate) =>
     String(rate.distanceSlabId) === String(matchedDistanceSlab._id) &&
     String(rate.orderValueSlabId) === String(matchedOrderValueSlab._id)
   );
+
+  // If tier distance slabs were recreated, rate rows may still reference old distanceSlabIds.
+  // When there is exactly one rate row for this order-value slab, use it if either:
+  // - that row's distanceSlabId is not in the current tier (stale refs), or
+  // - the tier has only one active distance slab (unambiguous).
+  if (!matchedRateRule && matchedDistanceSlab && matchedOrderValueSlab) {
+    const ratesForOrderSlab = (config.customerDeliveryRates || []).filter(
+      (rate) => String(rate.orderValueSlabId) === String(matchedOrderValueSlab._id)
+    );
+    if (ratesForOrderSlab.length === 1) {
+      const only = ratesForOrderSlab[0];
+      const activeTierSlabIds = new Set(
+        (distanceSlabs || []).filter((s) => s.isActive !== false).map((s) => String(s._id))
+      );
+      const onlyDistId = String(only.distanceSlabId || '');
+      const staleDistanceSlabRef = Boolean(onlyDistId && !activeTierSlabIds.has(onlyDistId));
+      const singleActiveTierSlab = activeTierSlabIds.size === 1;
+      if (staleDistanceSlabRef || singleActiveTierSlab) {
+        matchedRateRule = only;
+      }
+    }
+  }
 
   const customerPerKmRate = Number(matchedRateRule?.perKmRate || 0);
   const customerDeliveryFee = roundCurrency(distanceKm * customerPerKmRate);
@@ -317,6 +363,8 @@ export const calculateOrderPricing = async ({
 
     let discount = 0;
     let appliedCoupon = null;
+    /** Full offer doc when a coupon applies (for waivesDeliveryFee, etc.) */
+    let offerForCoupon = null;
 
     if (couponCode && restaurant) {
       try {
@@ -367,6 +415,7 @@ export const calculateOrderPricing = async ({
                   originalPrice: couponItem.originalPrice,
                   discountedPrice: couponItem.discountedPrice,
                 };
+                offerForCoupon = offer;
               }
             }
           }
@@ -387,7 +436,7 @@ export const calculateOrderPricing = async ({
     const baseDistanceSlab = findBaseDistanceSlab(distanceSlabs);
 
     const {
-      customerDeliveryFee,
+      customerDeliveryFee: customerDeliveryFeeBeforeWaivers,
       customerPerKmRate,
       matchedOrderValueSlab,
     } = calculateRestaurantCustomerDeliveryFee({
@@ -395,6 +444,7 @@ export const calculateOrderPricing = async ({
       distanceKm,
       restaurant,
       matchedDistanceSlab,
+      distanceSlabs,
     });
 
     const {
@@ -411,6 +461,24 @@ export const calculateOrderPricing = async ({
     const platformFee = roundCurrency(calculateTierPlatformFee(tier, feeSettings.platformFee));
     const gst = await calculateGST(subtotal, discount, restaurant, feeSettings);
 
+    /** After distance/order-value rules; may be zeroed by coupon or global threshold (threshold skipped when custom restaurant pricing is enabled) */
+    let finalCustomerDeliveryFee = roundCurrency(customerDeliveryFeeBeforeWaivers);
+    let freeDeliveryReason = null;
+    const netAfterDiscount = Math.max(subtotal - discount, 0);
+
+    if (appliedCoupon && offerForCoupon?.waivesDeliveryFee === true) {
+      finalCustomerDeliveryFee = 0;
+      freeDeliveryReason = 'coupon';
+    } else if (!isRestaurantCustomDeliveryEnabled(restaurant)) {
+      // Global free-delivery threshold applies only when restaurant is NOT using
+      // custom per-km / slab matrix (matrix is source of truth when enabled).
+      const threshold = Number(feeSettings.freeDeliveryThreshold || 0);
+      if (threshold > 0 && netAfterDiscount >= threshold) {
+        finalCustomerDeliveryFee = 0;
+        freeDeliveryReason = 'threshold';
+      }
+    }
+
     let internalRecommendedFee = 0;
     let recommendedFeePerItem = Number(feeSettings.recommendedItemFee || 0);
 
@@ -426,14 +494,43 @@ export const calculateOrderPricing = async ({
       });
     }
 
-    const total = roundCurrency(subtotal - discount + customerDeliveryFee + gst);
+    const total = roundCurrency(subtotal - discount + finalCustomerDeliveryFee + platformFee + gst);
     const restaurantPayableToAdmin = roundCurrency(adminDeliveryCost + platformFee + gst);
     const savings = roundCurrency(discount);
+
+    const pricingDiagnostics = [];
+    if (isRestaurantCustomDeliveryEnabled(restaurant)) {
+      if (!restaurant.zoneId) {
+        pricingDiagnostics.push({ code: 'NO_ZONE', message: 'Restaurant has no zone — tier slabs unavailable.' });
+      }
+      if (!tier) {
+        pricingDiagnostics.push({ code: 'NO_TIER', message: 'Could not resolve tier from zone — check zone.tierId.' });
+      }
+      if (distanceSlabs.length === 0) {
+        pricingDiagnostics.push({ code: 'NO_TIER_SLABS', message: 'Tier has no distance slabs — configure tier delivery pricing.' });
+      }
+      if (!matchedDistanceSlab) {
+        pricingDiagnostics.push({ code: 'NO_DISTANCE_SLAB', message: 'No distance slab matched for this trip.' });
+      }
+      if (!matchedOrderValueSlab) {
+        pricingDiagnostics.push({ code: 'NO_ORDER_VALUE_SLAB', message: 'Cart subtotal does not match any order-value slab.' });
+      }
+      if (
+        finalCustomerDeliveryFee === 0 &&
+        freeDeliveryReason === null &&
+        customerDeliveryFeeBeforeWaivers === 0
+      ) {
+        pricingDiagnostics.push({
+          code: 'ZERO_DELIVERY_BEFORE_WAIVERS',
+          message: 'Customer delivery is ₹0 before waivers — enable pricing, fill rate grid, or check slabs.',
+        });
+      }
+    }
 
     return {
       subtotal: roundCurrency(subtotal),
       discount: roundCurrency(discount),
-      deliveryFee: customerDeliveryFee,
+      deliveryFee: finalCustomerDeliveryFee,
       platformFee,
       tax: gst,
       total,
@@ -447,7 +544,7 @@ export const calculateOrderPricing = async ({
       appliedCoupon: appliedCoupon ? {
         code: appliedCoupon.code,
         discount: discount,
-        freeDelivery: false
+        freeDelivery: freeDeliveryReason === 'coupon' || freeDeliveryReason === 'threshold',
       } : null,
       pricingMeta: {
         tierId: tier?._id || null,
@@ -476,11 +573,14 @@ export const calculateOrderPricing = async ({
           : null,
         customerPerKmRate: roundCurrency(customerPerKmRate),
         adminPerKmRate: roundCurrency(Number(matchedDistanceSlab?.adminPerKmRate || 0)),
+        freeDeliveryReason,
+        customerDeliveryFeeBeforeWaivers: roundCurrency(customerDeliveryFeeBeforeWaivers),
+        pricingDiagnostics,
       },
       breakdown: {
         itemTotal: roundCurrency(subtotal),
         discountAmount: roundCurrency(discount),
-        customerDeliveryFee,
+        customerDeliveryFee: finalCustomerDeliveryFee,
         gstCollected: gst,
         customerTotal: total,
         adminDeliveryCost,

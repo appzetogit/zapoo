@@ -14,6 +14,57 @@ const logger = winston.createLogger({
 });
 
 /**
+ * Update user's currentLocation from saved address (single save with addresses[]).
+ * Ensures DB reflects delivery pin even if PUT /user/location fails on the client.
+ */
+function setUserCurrentLocationFromAddressCoords(user, fields) {
+  const {
+    street,
+    city,
+    state,
+    zipCode,
+    additionalDetails,
+    latitude,
+    longitude
+  } = fields;
+  if (latitude === undefined || longitude === undefined || latitude === null || longitude === null) {
+    return;
+  }
+  if (latitude === '' || longitude === '') {
+    return;
+  }
+  const latNum = parseFloat(latitude);
+  const lngNum = parseFloat(longitude);
+  if (Number.isNaN(latNum) || Number.isNaN(lngNum)) return;
+  if (latNum < -90 || latNum > 90 || lngNum < -180 || lngNum > 180) return;
+
+  const s = street != null ? String(street) : '';
+  const c = city != null ? String(city) : '';
+  const st = state != null ? String(state) : '';
+  const formattedParts = [additionalDetails, s, c, st, zipCode].filter(
+    x => x != null && String(x).trim() !== ''
+  );
+  const formattedAddress = formattedParts.map(x => String(x).trim()).join(', ');
+
+  user.currentLocation = {
+    latitude: latNum,
+    longitude: lngNum,
+    address: `${s}, ${c}`.replace(/^,\s*/, '').replace(/,\s*$/, '').trim() || formattedAddress,
+    city: c,
+    state: st,
+    formattedAddress: formattedAddress || `${s}, ${c}, ${st}`.replace(/^,\s*|,\s*$/g, '').trim(),
+    lastUpdated: new Date(),
+    location: {
+      type: 'Point',
+      coordinates: [lngNum, latNum]
+    }
+  };
+  if (zipCode != null && String(zipCode).trim() !== '') {
+    user.currentLocation.postalCode = String(zipCode).trim();
+  }
+}
+
+/**
  * Get user profile
  * GET /api/user/profile
  */
@@ -188,7 +239,9 @@ export const updateUserLocation = asyncHandler(async (req, res) => {
       accuracy,
       postalCode,
       street,
-      streetNumber
+      streetNumber,
+      /** When true, bypass 5s throttle (manual address save / saved-address pick) */
+      skipLocationThrottle
     } = req.body;
 
     // Validate required fields
@@ -215,12 +268,28 @@ export const updateUserLocation = asyncHandler(async (req, res) => {
       return errorResponse(res, 404, 'User not found');
     }
 
-    // Throttling: Ignore updates if they occur within 5 seconds of the last update
+    // Throttle only rapid duplicate coordinates (live GPS spam). Moving the pin / new address
+    // must always persist even if lastUpdated was <5s ago (continuous watch updates lastUpdated).
+    const bypassThrottle =
+      skipLocationThrottle === true || skipLocationThrottle === 'true';
     const lastUpdate = user.currentLocation?.lastUpdated;
-    if (lastUpdate && new Date() - new Date(lastUpdate) < 5000) {
+    const prevLat = user.currentLocation?.latitude;
+    const prevLng = user.currentLocation?.longitude;
+    const within5s =
+      lastUpdate && new Date() - new Date(lastUpdate) < 5000;
+    const COORD_EPS = 0.00025; // ~25m latitude; good enough to treat as "same spot"
+    const sameAsStored =
+      prevLat != null &&
+      prevLng != null &&
+      !Number.isNaN(Number(prevLat)) &&
+      !Number.isNaN(Number(prevLng)) &&
+      Math.abs(latNum - Number(prevLat)) < COORD_EPS &&
+      Math.abs(lngNum - Number(prevLng)) < COORD_EPS;
+
+    if (!bypassThrottle && within5s && sameAsStored) {
       return successResponse(res, 200, 'Location update throttled', {
         location: user.currentLocation,
-        message: 'Rate limit: Update skipped'
+        message: 'Rate limit: duplicate location skipped'
       });
     }
 
@@ -358,11 +427,14 @@ export const addUserAddress = asyncHandler(async (req, res) => {
       isDefault: isDefault === true || (user.addresses || []).length === 0
     };
 
-    // Add location coordinates if provided
-    if (latitude && longitude) {
-      const latNum = parseFloat(latitude);
-      const lngNum = parseFloat(longitude);
-      if (!isNaN(latNum) && !isNaN(lngNum)) {
+    let latNum;
+    let lngNum;
+    if (latitude != null && longitude != null && latitude !== '' && longitude !== '') {
+      const pLat = parseFloat(latitude);
+      const pLng = parseFloat(longitude);
+      if (!Number.isNaN(pLat) && !Number.isNaN(pLng)) {
+        latNum = pLat;
+        lngNum = pLng;
         newAddress.location = {
           type: 'Point',
           coordinates: [lngNum, latNum] // [longitude, latitude]
@@ -379,7 +451,25 @@ export const addUserAddress = asyncHandler(async (req, res) => {
 
     // Add address
     user.addresses.push(newAddress);
+
+    if (latNum != null && lngNum != null && !Number.isNaN(latNum) && !Number.isNaN(lngNum)) {
+      setUserCurrentLocationFromAddressCoords(user, {
+        street,
+        city,
+        state,
+        zipCode,
+        additionalDetails,
+        latitude: latNum,
+        longitude: lngNum
+      });
+    }
+
     await user.save();
+
+    const redisAfterAddress = getRedisClient();
+    if (redisAfterAddress) {
+      await redisAfterAddress.del(`user_session:${user._id}`).catch(e => logger.warn(`[Redis] ${e.message}`));
+    }
 
     // Get the added address with _id
     const addedAddress = user.addresses[user.addresses.length - 1];
@@ -460,7 +550,33 @@ export const updateUserAddress = asyncHandler(async (req, res) => {
       }
       address.isDefault = false;
     }
+
+    let syncLat = latitude;
+    let syncLng = longitude;
+    if (
+      (syncLat === undefined || syncLng === undefined) &&
+      address.location?.coordinates?.length === 2
+    ) {
+      syncLng = address.location.coordinates[0];
+      syncLat = address.location.coordinates[1];
+    }
+    setUserCurrentLocationFromAddressCoords(user, {
+      street: address.street,
+      city: address.city,
+      state: address.state,
+      zipCode: address.zipCode,
+      additionalDetails: address.additionalDetails,
+      latitude: syncLat,
+      longitude: syncLng
+    });
+
     await user.save();
+
+    const redisAfterAddressUpdate = getRedisClient();
+    if (redisAfterAddressUpdate) {
+      await redisAfterAddressUpdate.del(`user_session:${user._id}`).catch(e => logger.warn(`[Redis] ${e.message}`));
+    }
+
     const addressResponse = {
       ...address.toObject(),
       id: address._id.toString()

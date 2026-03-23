@@ -182,6 +182,7 @@ export const createZone = asyncHandler(async (req, res) => {
     if (zone.createdBy) {
       await zone.populate('createdBy', 'name email');
     }
+    await zone.populate('tierId', 'name rank minArea maxArea');
 
     return successResponse(res, 201, 'Zone created successfully', {
       zone
@@ -227,6 +228,13 @@ export const updateZone = asyncHandler(async (req, res) => {
 
     // Update zone
     Object.assign(zone, updateData);
+
+    // Mongoose often does not mark document-array coordinates as modified after Object.assign,
+    // so the new polygon may not persist and pre-save area/tier logic may not run.
+    if (coordinatesChanged) {
+      zone.markModified('coordinates');
+    }
+
     await zone.save();
 
     // Re-validate restaurant assignments when polygon changes
@@ -275,6 +283,7 @@ export const updateZone = asyncHandler(async (req, res) => {
     if (zone.createdBy) {
       await zone.populate('createdBy', 'name email');
     }
+    await zone.populate('tierId', 'name rank minArea maxArea');
 
     return successResponse(res, 200, 'Zone updated successfully', {
       zone

@@ -126,61 +126,60 @@ zoneSchema.index({ isActive: 1 });
 zoneSchema.index({ boundary: '2dsphere' }); // For spatial queries
 zoneSchema.index({ serviceLocation: 'text', name: 'text' }); // For text search
 
-// Pre-save middleware to create GeoJSON boundary AND calculate Area/Tier
-zoneSchema.pre('save', async function (next) {
-  try {
-    if (this.coordinates && this.coordinates.length >= 3) {
-      // 1. Convert to GeoJSON format
-      // GeoJSON requires [lng, lat]
-      const geoJsonCoords = this.coordinates.map(coord => [coord.longitude, coord.latitude]);
+/**
+ * Rebuild GeoJSON boundary, recalculate area (sq km), and assign tier from active tiers.
+ * Safe to call before save(); pre-save also runs this so persisted zones stay consistent.
+ */
+zoneSchema.methods.recalculateBoundaryAreaAndTier = async function recalculateBoundaryAreaAndTier() {
+  if (!this.coordinates || this.coordinates.length < 3) {
+    return;
+  }
 
-      // Close the polygon by adding the first point at the end if not already closed
-      if (geoJsonCoords[0][0] !== geoJsonCoords[geoJsonCoords.length - 1][0] ||
-        geoJsonCoords[0][1] !== geoJsonCoords[geoJsonCoords.length - 1][1]) {
-        geoJsonCoords.push(geoJsonCoords[0]);
-      }
+  const geoJsonCoords = this.coordinates.map(coord => [coord.longitude, coord.latitude]);
 
-      this.boundary = {
-        type: 'Polygon',
-        coordinates: [geoJsonCoords]
-      };
+  if (geoJsonCoords[0][0] !== geoJsonCoords[geoJsonCoords.length - 1][0] ||
+    geoJsonCoords[0][1] !== geoJsonCoords[geoJsonCoords.length - 1][1]) {
+    geoJsonCoords.push(geoJsonCoords[0]);
+  }
 
-      // 2. Calculate Area (in sq km)
-      // Turf calculates in square meters
-      const poly = turf.polygon([geoJsonCoords]);
-      const areaInSqMeters = turf.area(poly);
-      const areaInSqKm = areaInSqMeters / 1000000;
+  this.boundary = {
+    type: 'Polygon',
+    coordinates: [geoJsonCoords]
+  };
 
-      this.area = parseFloat(areaInSqKm.toFixed(2)); // Round to 2 decimals
+  const poly = turf.polygon([geoJsonCoords]);
+  const areaInSqMeters = turf.area(poly);
+  const areaInSqKm = areaInSqMeters / 1000000;
+  this.area = parseFloat(areaInSqKm.toFixed(2));
 
-      // 3. Assign Tier
-      // Find a tier where minArea <= area <= maxArea
-      // Sort by rank ascending to pick the lowest rank (e.g., if overlap, though shouldn't happen)
-      // or to pick consistent one.
-      const tier = await Tier.findOne({
-        minArea: { $lte: this.area },
-        maxArea: { $gte: this.area }
-      }).sort({ rank: 1 });
+  const tier = await Tier.findOne({
+    isActive: true,
+    minArea: { $lte: this.area },
+    maxArea: { $gte: this.area }
+  }).sort({ rank: 1 });
 
-      if (tier) {
-        this.tierId = tier._id;
+  if (tier) {
+    this.tierId = tier._id;
 
-        // Inherit pricing from Tier if not overridden
-        if (!this.deliveryPricing || !this.deliveryPricing.isOverridden) {
-          if (tier.deliveryPricing) {
-            this.deliveryPricing = {
-              basePay: tier.deliveryPricing.basePay,
-              baseFee: tier.deliveryPricing.baseFee,
-              freeDeliveryThreshold: tier.deliveryPricing.freeDeliveryThreshold,
-              isOverridden: false,
-              lastUpdated: new Date()
-            };
-          }
-        }
-      } else {
-        this.tierId = null;
+    if (!this.deliveryPricing || !this.deliveryPricing.isOverridden) {
+      if (tier.deliveryPricing) {
+        this.deliveryPricing = {
+          basePay: tier.deliveryPricing.basePay,
+          baseFee: tier.deliveryPricing.baseFee,
+          freeDeliveryThreshold: tier.deliveryPricing.freeDeliveryThreshold,
+          isOverridden: false,
+          lastUpdated: new Date()
+        };
       }
     }
+  } else {
+    this.tierId = null;
+  }
+};
+
+zoneSchema.pre('save', async function (next) {
+  try {
+    await this.recalculateBoundaryAreaAndTier();
     next();
   } catch (error) {
     next(error);

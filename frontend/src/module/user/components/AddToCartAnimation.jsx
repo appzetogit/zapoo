@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useEffect, useRef, useState } from 'react';
 import { gsap } from 'gsap';
+import { createPortal } from 'react-dom';
 
 /**
  * AddToCartAnimation Component
@@ -21,7 +22,9 @@ export default function AddToCartAnimation({
   pillClassName = '',
   hideOnPages = true,
   linkTo = '/cart',
-  dynamicBottom = null
+  dynamicBottom = null,
+  hideWhileScrolling = false,
+  showAfterScrollDelay = 180
 }) {
   const {
     items,
@@ -38,12 +41,49 @@ export default function AddToCartAnimation({
   const removedThumbnailRef = useRef(null);
   const flyingThumbnailRef = useRef(null);
   const prevItemsRef = useRef(items);
+  const scrollResumeTimerRef = useRef(null);
+  const [isScrollTemporarilyHidden, setIsScrollTemporarilyHidden] = useState(false);
+  const [isPortalReady, setIsPortalReady] = useState(false);
 
   // Hide pill on cart pages, order pages, and account page (if enabled)
   const iscartPage = location.pathname === '/cart' || location.pathname === '/user/cart' || location.pathname.startsWith('/cart/') || location.pathname.startsWith('/user/cart/');
   const isOrderPage = location.pathname.startsWith('/orders/');
   const isAccountPage = location.pathname === '/account';
   const shouldHidePill = hideOnPages && (iscartPage || isOrderPage || isAccountPage);
+
+  useEffect(() => {
+    setIsPortalReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hideWhileScrolling) {
+      setIsScrollTemporarilyHidden(false);
+      return undefined;
+    }
+
+    const handleScroll = () => {
+      setIsScrollTemporarilyHidden(true);
+
+      if (scrollResumeTimerRef.current) {
+        clearTimeout(scrollResumeTimerRef.current);
+      }
+
+      scrollResumeTimerRef.current = setTimeout(() => {
+        setIsScrollTemporarilyHidden(false);
+      }, showAfterScrollDelay);
+    };
+
+    window.addEventListener('scroll', handleScroll, {
+      passive: true
+    });
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      if (scrollResumeTimerRef.current) {
+        clearTimeout(scrollResumeTimerRef.current);
+      }
+    };
+  }, [hideWhileScrolling, showAfterScrollDelay]);
 
   // Handle removal animation when product is removed
   useEffect(() => {
@@ -382,7 +422,11 @@ export default function AddToCartAnimation({
   // Get up to 3 most recently added items for thumbnails
   // Since items are added to the end of the array, we take the last 3
   const thumbnailItems = items.slice(-3).reverse();
-  return <>
+  if (!isPortalReady) {
+    return null;
+  }
+
+  return createPortal(<>
       {/* Removed product thumbnail - flying back to source */}
       {removedProduct && <div ref={removedThumbnailRef} className="w-8 h-8 rounded-full border-2 border-white overflow-hidden bg-white flex-shrink-0 shadow-lg" style={{
       borderRadius: '50%',
@@ -405,24 +449,23 @@ export default function AddToCartAnimation({
 
       <AnimatePresence>
         {itemCount > 0 && !shouldHidePill && <motion.div initial={{
-        y: 60,
+        y: 0,
         opacity: 0,
         scale: 0.8
       }} animate={{
         y: 0,
-        opacity: 1,
-        scale: 1
+        opacity: isScrollTemporarilyHidden ? 0 : 1,
+        scale: isScrollTemporarilyHidden ? 0.92 : 1
       }} exit={{
-        y: 60,
+        y: 0,
         opacity: 0,
         scale: 0.8
       }} transition={{
-        type: 'spring',
-        stiffness: 400,
-        damping: 30,
-        mass: 0.8
+        duration: isScrollTemporarilyHidden ? 0.18 : 0.26,
+        ease: isScrollTemporarilyHidden ? 'easeInOut' : 'easeOut'
       }} style={{
-        bottom: dynamicBottom ? undefined : `${bottomOffset || 20}px`
+        bottom: dynamicBottom ? undefined : `${bottomOffset || 20}px`,
+        pointerEvents: isScrollTemporarilyHidden ? 'none' : 'auto'
       }} className={`fixed ${dynamicBottom || ''} left-0 right-0 z-[60] flex justify-center px-4 pb-4 md:pb-6 transition-all duration-300 ease-in-out bg-transparent`}>
             <button ref={linkRef} onClick={e => {
           e.preventDefault();
@@ -487,5 +530,5 @@ export default function AddToCartAnimation({
             </button>
           </motion.div>}
       </AnimatePresence>
-    </>;
+    </>, document.body);
 }

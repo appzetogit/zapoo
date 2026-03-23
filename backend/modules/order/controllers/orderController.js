@@ -197,7 +197,7 @@ export const createOrder = async (req, res) => {
         image: item.image,
         description: item.description,
         isVeg: item.isVeg,
-        isRecommended: item.isRecommended || false
+        isRecommended: item.isRecommended === true
       })),
       address,
       pricing: {

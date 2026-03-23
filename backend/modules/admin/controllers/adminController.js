@@ -16,6 +16,7 @@ import winston from "winston";
 import mongoose from "mongoose";
 import { uploadToCloudinary } from "../../../shared/utils/cloudinaryService.js";
 import { initializeCloudinary } from "../../../config/cloudinary.js";
+import { applyZoneTierToRestaurantById } from "../services/restaurantZoneAssignmentService.js";
 const logger = winston.createLogger({
   level: "info",
   format: winston.format.json(),
@@ -1201,9 +1202,17 @@ export const getRestaurants = asyncHandler(async (req, res) => {
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
     // Fetch restaurants
-    // Fetch restaurants with projection
+    // Fetch restaurants with projection (including populated zone/tier info for UI)
     const restaurants = await Restaurant.find(query)
-      .select("name ownerName ownerPhone email phone isActive location cuisines createdAt profileImage businessModel approvedAt onboarding.completedSteps")
+      .select("name ownerName ownerPhone email phone isActive location cuisines createdAt profileImage businessModel approvedAt onboarding.completedSteps zoneId")
+      .populate({
+        path: "zoneId",
+        select: "name tierId",
+        populate: {
+          path: "tierId",
+          select: "name",
+        },
+      })
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit))
@@ -1526,6 +1535,11 @@ export const approveRestaurant = asyncHandler(async (req, res) => {
     restaurant.rejectionReason = undefined; // Clear any previous rejection
 
     await restaurant.save();
+    try {
+      await applyZoneTierToRestaurantById(restaurant._id);
+    } catch (zoneErr) {
+      logger.warn(`Zone/tier assignment on approve failed: ${zoneErr.message}`);
+    }
     return successResponse(res, 200, "Restaurant approved successfully", {
       restaurant: {
         id: restaurant._id.toString(),
@@ -1986,6 +2000,11 @@ export const createRestaurant = asyncHandler(async (req, res) => {
 
     // Create restaurant
     const restaurant = await Restaurant.create(restaurantData);
+    try {
+      await applyZoneTierToRestaurantById(restaurant._id);
+    } catch (zoneErr) {
+      logger.warn(`Zone/tier assignment for admin-created restaurant failed: ${zoneErr.message}`);
+    }
     // Prepare response data
     const responseData = {
       restaurant: {

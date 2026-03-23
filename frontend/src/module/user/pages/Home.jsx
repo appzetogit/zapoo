@@ -40,7 +40,7 @@ import exploreTop10 from "@/assets/explore more icons/top 10.png";
 import exploreCollection from "@/assets/explore more icons/collection.png";
 import ZoneAdBanner from "../components/ZoneAdBanner";
 import DynamicEtaText from "../components/DynamicEtaText";
-import RecommendedItemsBadge from "../components/RecommendedItemsBadge";
+import RecommendedItemsBadge, { ActiveRecommendedItemBadge } from "../components/RecommendedItemsBadge";
 
 // Banner images for hero carousel - will be fetched from API
 
@@ -50,14 +50,59 @@ const placeholders = ["Search \"burger\"", "Search \"biryani\"", "Search \"pizza
 // Restaurant Image Carousel Component
 const RestaurantImageCarousel = React.memo(({
   restaurant,
+  recommendedItems = [],
   priority = false
 }) => {
-  const images = useMemo(() => restaurant.images || [restaurant.image], [restaurant]);
+  const restaurantImages = useMemo(() => {
+    const baseImages = Array.isArray(restaurant.images) && restaurant.images.length ? restaurant.images : [restaurant.image];
+    return baseImages.filter(Boolean);
+  }, [restaurant]);
+  const recommendedSlides = useMemo(() => {
+    if (!Array.isArray(recommendedItems) || recommendedItems.length === 0) return [];
+    return recommendedItems
+      .filter(Boolean)
+      .map((item, index) => ({
+        id: item.itemId || `${item.name || "recommended"}-${index}`,
+        image: item.image || restaurantImages[0] || restaurant.image,
+        name: item.name || "",
+        price: item.price,
+        isRecommended: true,
+      }))
+      .filter((item) => Boolean(item.image));
+  }, [recommendedItems, restaurant.image, restaurantImages]);
+  const gallerySlides = useMemo(() => {
+    if (recommendedSlides.length > 0) return recommendedSlides;
+    return restaurantImages.map((image, index) => ({
+      id: `${restaurant._id || restaurant.id || restaurant.name}-gallery-${index}`,
+      image,
+      isRecommended: false,
+    }));
+  }, [recommendedSlides, restaurantImages, restaurant]);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [direction, setDirection] = useState(1);
   const touchStartX = useRef(0);
   const touchEndX = useRef(0);
   const isSwiping = useRef(false);
-  if (!images || images.length === 0) {
+  const fallbackText = restaurant.featuredDish
+    ? `${restaurant.featuredDish}${restaurant.featuredPrice ? ` · ₹${restaurant.featuredPrice}` : ""}`
+    : "";
+
+  useEffect(() => {
+    setCurrentIndex(0);
+  }, [restaurant._id, restaurant.id, gallerySlides.length]);
+
+  useEffect(() => {
+    if (gallerySlides.length <= 1) return undefined;
+
+    const intervalId = window.setInterval(() => {
+      setDirection(1);
+      setCurrentIndex((prev) => (prev + 1) % gallerySlides.length);
+    }, 3500);
+
+    return () => window.clearInterval(intervalId);
+  }, [gallerySlides.length]);
+
+  if (!gallerySlides || gallerySlides.length === 0) {
     return <div className="relative h-48 sm:h-56 md:h-60 lg:h-64 xl:h-72 w-full overflow-hidden rounded-t-md flex-shrink-0 bg-gray-200">
         <OptimizedImage src="https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&h=600&fit=crop" alt={restaurant.name} className="w-full h-full" sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw" objectFit="cover" placeholder="blur" priority={priority} />
       </div>;
@@ -86,10 +131,12 @@ const RestaurantImageCarousel = React.memo(({
     if (Math.abs(diff) > minSwipeDistance) {
       if (diff > 0) {
         // Swipe left - next image
-        setCurrentIndex(prev => (prev + 1) % images.length);
+        setDirection(1);
+        setCurrentIndex(prev => (prev + 1) % gallerySlides.length);
       } else {
         // Swipe right - previous image
-        setCurrentIndex(prev => (prev - 1 + images.length) % images.length);
+        setDirection(-1);
+        setCurrentIndex(prev => (prev - 1 + gallerySlides.length) % gallerySlides.length);
       }
     }
 
@@ -98,16 +145,35 @@ const RestaurantImageCarousel = React.memo(({
     touchStartX.current = 0;
     touchEndX.current = 0;
   };
+  const activeSlide = gallerySlides[currentIndex] || null;
+  const activeRecommendedItem = activeSlide?.isRecommended ? recommendedSlides[currentIndex] || null : null;
   return <div className="relative h-48 sm:h-56 md:h-60 lg:h-64 xl:h-72 w-full overflow-hidden rounded-t-md flex-shrink-0 group" onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
-      <div className="absolute inset-0 transition-transform duration-500 ease-out group-hover:scale-110">
-        <OptimizedImage src={images[currentIndex]} alt={`${restaurant.name} - Image ${currentIndex + 1}`} className="w-full h-full" priority={priority && currentIndex === 0} sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw" objectFit="cover" placeholder="blur" />
+      <AnimatePresence initial={false} custom={direction} mode="wait">
+        <motion.div
+          key={activeSlide?.id || currentIndex}
+          custom={direction}
+          initial={{ opacity: 0, x: direction > 0 ? 32 : -32, scale: 1.02 }}
+          animate={{ opacity: 1, x: 0, scale: 1 }}
+          exit={{ opacity: 0, x: direction > 0 ? -24 : 24, scale: 0.985 }}
+          transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+          className="absolute inset-0"
+        >
+          <div className="absolute inset-0 transition-transform duration-700 ease-out group-hover:scale-110">
+            <OptimizedImage src={activeSlide?.image} alt={activeRecommendedItem?.name ? `${restaurant.name} - ${activeRecommendedItem.name}` : `${restaurant.name} - Image ${currentIndex + 1}`} className="w-full h-full" priority={priority && currentIndex === 0} sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw" objectFit="cover" placeholder="blur" />
+          </div>
+        </motion.div>
+      </AnimatePresence>
+
+      <div className="absolute top-3 left-3 md:top-4 md:left-4 z-10 transform transition-transform duration-300 group-hover:scale-105 group-hover:-translate-y-0.5">
+        {recommendedSlides.length > 0 ? <ActiveRecommendedItemBadge item={activeRecommendedItem} fallbackText={fallbackText} /> : <RecommendedItemsBadge fallbackText={fallbackText} />}
       </div>
 
-      {/* Image Indicators - only show if more than 1 image */}
-      {images.length > 1 && <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 flex items-center z-10 -space-x-2">
-          {images.map((_, index) => <button key={index} onClick={e => {
+      {/* Image Indicators - only show if more than 1 slide */}
+      {gallerySlides.length > 1 && <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 flex items-center z-10 -space-x-2">
+          {gallerySlides.map((slide, index) => <button key={slide.id || index} onClick={e => {
         e.preventDefault();
         e.stopPropagation();
+        setDirection(index >= currentIndex ? 1 : -1);
         setCurrentIndex(index);
       }} className="w-10 h-10 flex items-center justify-center focus:outline-none group/btn rounded-full" aria-label={`Go to image ${index + 1}`}>
               <div className={`h-1.5 rounded-full transition-all duration-300 ${index === currentIndex ? "w-6 bg-white" : "w-1.5 bg-white/50 group-hover/btn:bg-white/75"}`} />
@@ -682,6 +748,16 @@ export default function Home() {
         const userLat = location?.latitude;
         const userLng = location?.longitude;
 
+        const isDefaultOfferValue = (value) => {
+          if (!value) return false;
+          const normalized = String(value).trim();
+          return [
+            "Flat ₹50 OFF above ₹199",
+            "Flat 50% OFF",
+            "Flat ₹40 OFF above ₹149",
+          ].includes(normalized);
+        };
+
         // Transform API data to match expected format
         const transformedRestaurants = restaurantsArray.map((restaurant, index) => {
           // Use restaurant data if available, otherwise use defaults
@@ -720,6 +796,8 @@ export default function Home() {
           // Use cover images first, then fallback to menu images, then profile image
           const allImages = coverImages.length > 0 ? coverImages : fallbackImages.length > 0 ? fallbackImages : restaurant.profileImage?.url ? [restaurant.profileImage.url] : ["https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&h=600&fit=crop"];
 
+          const offer = typeof restaurant.offer === "string" ? restaurant.offer.trim() : restaurant.offer;
+
           // Keep single image for backward compatibility
           const image = allImages[0];
           return {
@@ -739,7 +817,7 @@ export default function Home() {
             featuredDish: restaurant.featuredDish || (restaurant.cuisines && restaurant.cuisines.length > 0 ? `${restaurant.cuisines[0]} Special` : "Special Dish"),
             featuredPrice: restaurant.featuredPrice || 249,
             // Use from API or default
-            offer: restaurant.offer || "Flat ₹50 OFF above ₹199",
+            offer: offer && !isDefaultOfferValue(offer) ? offer : null,
             // Use from API or default
             slug: restaurant.slug,
             restaurantId: restaurant.restaurantId,
@@ -1959,15 +2037,11 @@ export default function Home() {
                         <Card className={`overflow-hidden gap-0 cursor-pointer border-0 dark:border-gray-800 group bg-white dark:bg-[#1a1a1a] border-background transition-all duration-500 py-0 rounded-md flex flex-col h-full w-full relative ${isOutOfService ? 'grayscale opacity-75' : ''}`}>
                           {/* Image Section with Carousel */}
                           <div className="relative">
-                            <RestaurantImageCarousel restaurant={restaurant} priority={index < 3} />
-
-                            {/* Recommended items badge (replaces featured dish pill) - Top Left */}
-                            <div className="absolute top-3 left-3 md:top-4 md:left-4 flex items-center z-10 transform transition-transform duration-300 group-hover:scale-105 group-hover:-translate-y-0.5">
-                              <RecommendedItemsBadge
-                                items={recommendedPreviewByRestaurantId[String(restaurant?._id || restaurant?.id)]}
-                                fallbackText={`${restaurant.featuredDish} · ₹${restaurant.featuredPrice}`}
-                              />
-                            </div>
+                            <RestaurantImageCarousel
+                              restaurant={restaurant}
+                              recommendedItems={recommendedPreviewByRestaurantId[String(restaurant?._id || restaurant?.id)]}
+                              priority={index < 3}
+                            />
 
                             {/* Bookmark Icon - Top Right */}
                             <div className="absolute top-3 right-3 md:top-4 md:right-4 z-10 transform transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6">

@@ -61,7 +61,11 @@ export const calculateOrderSettlement = async (orderId) => {
       subtotal: roundCurrency(order.pricing.subtotal || 0),
       discount: roundCurrency(order.pricing.discount || 0),
       deliveryFee: roundCurrency(order.pricing.deliveryFee || 0),
-      platformFee: 0,
+      platformFee: roundCurrency(
+        order.pricing.platformFee !== undefined && order.pricing.platformFee !== null
+          ? order.pricing.platformFee
+          : feeSettings?.platformFee || 0
+      ),
       gst: roundCurrency(order.pricing.tax || 0),
       packagingFee: 0,
       total: roundCurrency(order.pricing.total || 0)
@@ -78,7 +82,9 @@ export const calculateOrderSettlement = async (orderId) => {
     const payableToAdmin = roundCurrency(adminDeliveryCost + platformFee + gstCollected);
     const recommendedItemFee = roundCurrency(order.pricing.internalRecommendedFee || 0);
 
-    const restaurantGrossCollection = roundCurrency(foodPrice + userPayment.deliveryFee + userPayment.gst);
+    const restaurantGrossCollection = roundCurrency(
+      foodPrice + userPayment.deliveryFee + userPayment.platformFee + userPayment.gst
+    );
     const restaurantNetEarning = roundCurrency(restaurantGrossCollection - payableToAdmin - recommendedItemFee);
 
     const restaurantEarning = {
@@ -103,22 +109,40 @@ export const calculateOrderSettlement = async (orderId) => {
       status: 'pending'
     };
 
-    if (order.deliveryPartnerId && order.assignmentInfo?.distance !== undefined && order.assignmentInfo?.distance !== null) {
-      const distance = order.assignmentInfo.distance;
-      const deliveryCommission = await DeliveryBoyCommission.calculateCommission(
-        distance,
-        tierMeta?.name || null
-      );
-      const baseEarning = deliveryCommission.commission;
+    /** Canonical trip distance (restaurant ↔ customer), same as pricing slabs */
+    const settlementDeliveryKm = Math.max(0, Number(order.pricing?.distanceKm) || 0);
+    const pickupLegKm =
+      order.assignmentInfo?.distance !== undefined && order.assignmentInfo?.distance !== null
+        ? Number(order.assignmentInfo.distance)
+        : null;
 
-      deliveryPartnerEarning = {
-        basePayout: deliveryCommission.breakdown.basePayout,
-        distance: distance,
-        commissionPerKm: deliveryCommission.breakdown.commissionPerKm,
-        distanceCommission: deliveryCommission.breakdown.distanceCommission,
-        totalEarning: roundCurrency(baseEarning),
-        status: 'pending'
-      };
+    if (order.deliveryPartnerId && settlementDeliveryKm > 0) {
+      try {
+        const deliveryCommission = await DeliveryBoyCommission.calculateCommission(
+          settlementDeliveryKm,
+          tierMeta?.name || null
+        );
+        const baseEarning = deliveryCommission.commission;
+
+        deliveryPartnerEarning = {
+          basePayout: deliveryCommission.breakdown.basePayout,
+          distance: settlementDeliveryKm,
+          commissionPerKm: deliveryCommission.breakdown.commissionPerKm,
+          distanceCommission: deliveryCommission.breakdown.distanceCommission,
+          totalEarning: roundCurrency(baseEarning),
+          status: 'pending'
+        };
+      } catch (commissionErr) {
+        console.error('Delivery commission settlement error:', commissionErr.message);
+        deliveryPartnerEarning = {
+          basePayout: 0,
+          distance: settlementDeliveryKm,
+          commissionPerKm: 0,
+          distanceCommission: 0,
+          totalEarning: 0,
+          status: 'pending'
+        };
+      }
     }
 
     const deliveryMargin = roundCurrency(adminDeliveryCost - deliveryPartnerEarning.totalEarning);
@@ -179,7 +203,8 @@ export const calculateOrderSettlement = async (orderId) => {
         deliveryCommission: deliveryPartnerEarning.distance > 0 ? {
           distance: deliveryPartnerEarning.distance,
           basePayout: deliveryPartnerEarning.basePayout,
-          commissionPerKm: deliveryPartnerEarning.commissionPerKm
+          commissionPerKm: deliveryPartnerEarning.commissionPerKm,
+          pickupLegKm
         } : null,
         calculatedAt: now
       }
@@ -229,6 +254,14 @@ export const getOrderSettlement = async (orderId) => {
  */
 export const updateSettlementOnStatusChange = async (orderId, newStatus) => {
   try {
+    if (newStatus === 'delivered') {
+      try {
+        await calculateOrderSettlement(orderId);
+      } catch (recalcErr) {
+        console.error('Settlement recalc on delivered failed:', recalcErr.message);
+      }
+    }
+
     const settlement = await OrderSettlement.findOne({ orderId });
     if (!settlement) {
       return;

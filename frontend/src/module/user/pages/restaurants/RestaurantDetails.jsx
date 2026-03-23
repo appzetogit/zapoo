@@ -19,6 +19,21 @@ import AddToCartAnimation from "../../components/AddToCartAnimation";
 import { getCompanyNameAsync } from "@/lib/utils/businessSettings";
 import { isModuleAuthenticated } from "@/lib/utils/auth";
 import DynamicEtaText from "../../components/DynamicEtaText";
+
+const PLACEHOLDER_OFFER_TEXTS = new Set([
+  "UPTO 50% OFF",
+  "FLAT 50% OFF",
+  "FLAT ₹50 OFF ABOVE ₹199",
+  "FLAT ₹40 OFF ABOVE ₹149",
+]);
+
+const isRealOfferText = (value) => {
+  if (typeof value !== "string") return false;
+  const normalized = value.trim();
+  if (!normalized) return false;
+  return !PLACEHOLDER_OFFER_TEXTS.has(normalized.toUpperCase());
+};
+
 export default function RestaurantDetails() {
   const {
     slug
@@ -299,7 +314,7 @@ export default function RestaurantDetails() {
             priceRange: apiRestaurant?.priceRange || "$$",
             offers: Array.isArray(apiRestaurant?.offers) ? apiRestaurant.offers : [],
             // Will be populated from menu/offers API later
-            offerText: apiRestaurant?.offer || "FLAT 50% OFF",
+            offerText: isRealOfferText(apiRestaurant?.offer) ? apiRestaurant.offer.trim() : "",
             offerCount: apiRestaurant?.offerCount ?? 0,
             restaurantOffers: {
               goldOffer: {
@@ -388,12 +403,17 @@ export default function RestaurantDetails() {
                 // Only include items that are both recommended (isRecommended === true) AND available (isAvailable !== false)
                 const recommendedItems = [];
                 menuSections.forEach(section => {
+                  const isSpecialItem = (item) => {
+                    if (!item) return false;
+                    const pendingSpecial =
+                      item.isRecommendationRequest === true &&
+                      (item.recommendationStatus === "pending" || item.recommendationStatus === "approved");
+                    return item.isRecommended === true || pendingSpecial;
+                  };
                   // Check direct items - only include if isRecommended is explicitly true (strict check) AND item is available
                   if (section.items && Array.isArray(section.items)) {
                     section.items.forEach(item => {
-                      // Strict check: isRecommended must be exactly boolean true
-                      // This will exclude: false, undefined, null, 0, "", and any other falsy values
-                      if (item.isRecommended && item.isAvailable !== false) {
+                      if (isSpecialItem(item) && item.isAvailable !== false) {
                         recommendedItems.push(item);
                       }
                     });
@@ -403,9 +423,7 @@ export default function RestaurantDetails() {
                     section.subsections.forEach(subsection => {
                       if (subsection.items && Array.isArray(subsection.items)) {
                         subsection.items.forEach(item => {
-                          // Strict check: isRecommended must be exactly boolean true
-                          // This will exclude: false, undefined, null, 0, "", and any other falsy values
-                          if (item.isRecommended && item.isAvailable !== false) {
+                          if (isSpecialItem(item) && item.isAvailable !== false) {
                             recommendedItems.push(item);
                           }
                         });
@@ -1072,7 +1090,11 @@ export default function RestaurantDetails() {
   };
 
   // Highlight offers/texts for the blue offer line
-  const highlightOffers = ["Upto 50% OFF", restaurant?.offerText || "", ...(Array.isArray(restaurant?.offers) ? restaurant.offers.map(offer => offer?.title || "") : [])];
+  const highlightOffers = [
+    restaurant?.offerText || "",
+    ...(Array.isArray(restaurant?.offers) ? restaurant.offers.map(offer => offer?.title || "") : [])
+  ].map((offer) => (typeof offer === "string" ? offer.trim() : ""))
+    .filter(isRealOfferText);
 
   // Auto-rotate images every 3 seconds
   useEffect(() => {
@@ -1087,6 +1109,7 @@ export default function RestaurantDetails() {
 
   // Auto-rotate highlight offer text every 2 seconds
   useEffect(() => {
+    if (highlightOffers.length <= 1) return undefined;
     const interval = setInterval(() => {
       setHighlightIndex(prev => (prev + 1) % highlightOffers.length);
     }, 2000);
@@ -1231,7 +1254,7 @@ export default function RestaurantDetails() {
           </div>
 
           {/* Offers */}
-          <div className="flex items-center justify-between">
+          {highlightOffers.length > 0 && <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-sm overflow-hidden">
               <Tag className="h-4 w-4 text-blue-600" />
               <div className="relative h-5 overflow-hidden">
@@ -1253,7 +1276,7 @@ export default function RestaurantDetails() {
                 </AnimatePresence>
               </div>
             </div>
-          </div>
+          </div>}
 
           {/* Filter/Category Buttons */}
           <div className="border-y border-gray-200 py-3 -mx-4 px-4 overflow-x-auto scrollbar-hide">
@@ -1378,10 +1401,12 @@ export default function RestaurantDetails() {
 
                               <div className="flex items-center gap-2">
                                 <h3 className="font-bold text-gray-800 dark:text-white text-lg leading-tight">{item.name}</h3>
-                                {item.isRecommended && <Badge className="bg-orange-100 text-[#FF5200] border-none text-[10px] h-5 py-0 px-1.5 flex items-center gap-1 font-bold">
+                                {(item.isRecommended === true || (item.isRecommendationRequest === true && (item.recommendationStatus === "pending" || item.recommendationStatus === "approved"))) && (
+                                  <Badge className="bg-orange-100 text-[#FF5200] border-none text-[10px] h-5 py-0 px-1.5 flex items-center gap-1 font-bold">
                                     <Star className="w-3 h-3 fill-current" />
-                                    MUST TRY
-                                  </Badge>}
+                                    {item.isRecommended === true ? "MUST TRY" : "REQUESTED"}
+                                  </Badge>
+                                )}
                               </div>
 
                               {/* Highly Reordered Progress Bar - Show if customisable */}
@@ -1536,10 +1561,12 @@ export default function RestaurantDetails() {
 
                                         <div className="flex items-center gap-2">
                                           <h3 className="font-bold text-gray-800 dark:text-white text-lg leading-tight">{item.name}</h3>
-                                          {item.isRecommended && <Badge className="bg-orange-100 text-[#FF5200] border-none text-[10px] h-5 py-0 px-1.5 flex items-center gap-1 font-bold">
+                                          {(item.isRecommended === true || (item.isRecommendationRequest === true && (item.recommendationStatus === "pending" || item.recommendationStatus === "approved"))) && (
+                                            <Badge className="bg-orange-100 text-[#FF5200] border-none text-[10px] h-5 py-0 px-1.5 flex items-center gap-1 font-bold">
                                               <Star className="w-3 h-3 fill-current" />
-                                              MUST TRY
-                                            </Badge>}
+                                              {item.isRecommended === true ? "MUST TRY" : "REQUESTED"}
+                                            </Badge>
+                                          )}
                                         </div>
 
                                         {/* Highly Reordered Progress Bar - Show if customisable */}
@@ -2402,6 +2429,6 @@ export default function RestaurantDetails() {
           </AnimatePresence>, document.body)}
 
       {/* Add to Cart Animation Component */}
-      <AddToCartAnimation bottomOffset={150} linkTo="/cart" hideOnPages={true} />
+      <AddToCartAnimation bottomOffset={88} linkTo="/cart" hideOnPages={true} hideWhileScrolling={true} />
     </AnimatedPage>;
 }

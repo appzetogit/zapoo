@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useLayoutEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { ChevronLeft, Search, ChevronRight, Plus, MapPin, MoreHorizontal, Navigation, Home, Building2, Briefcase, Phone, X, Crosshair } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,36 @@ import { useLocation as useGeoLocation } from "../hooks/useLocation";
 import { useProfile } from "../context/ProfileContext";
 import { toast } from "sonner";
 import { locationAPI, userAPI } from "@/lib/api";
-import { Loader } from '@googlemaps/js-api-loader';
+import { ensureGoogleMapsLoaded } from "@/lib/utils/googleMapsLoader.js";
+import { USER_LOCATION_UPDATED_EVENT } from "../constants/locationEvents.js";
+
+async function persistGlobalUserLocationFromOverlay(payload) {
+  try {
+    await userAPI.updateLocation({
+      latitude: Number(payload.latitude),
+      longitude: Number(payload.longitude),
+      address: payload.address || "",
+      city: payload.city || "",
+      state: payload.state || "",
+      area: payload.area || "",
+      formattedAddress: payload.formattedAddress || payload.address || "",
+      postalCode: payload.zipCode || payload.postalCode || undefined,
+      skipLocationThrottle: true
+    });
+  } catch (err) {
+    const status = err?.response?.status;
+    console.warn("[persistGlobalUserLocationFromOverlay]", err?.response?.data || err?.message);
+    if (status !== 401 && status !== 403) {
+      toast.error("Address saved, but syncing location to server failed. Try again in a moment.", {
+        id: "location-sync"
+      });
+    }
+  }
+  localStorage.setItem("userLocation", JSON.stringify(payload));
+  window.dispatchEvent(new CustomEvent(USER_LOCATION_UPDATED_EVENT, {
+    detail: payload
+  }));
+}
 
 // Google Maps implementation - Leaflet components removed
 
@@ -78,6 +107,17 @@ export default function LocationSelectorOverlay({
   const locationUpdateTimeoutRef = useRef(null); // Timeout for location updates
   const [currentAddress, setCurrentAddress] = useState("");
   const [GOOGLE_MAPS_API_KEY, setGOOGLE_MAPS_API_KEY] = useState(null);
+  const placesServiceDivRef = useRef(null);
+  const searchWrapAddressFormRef = useRef(null);
+  const searchWrapListRef = useRef(null);
+  const autocompleteServiceRef = useRef(null);
+  const placesServiceRef = useRef(null);
+  const sessionTokenRef = useRef(null);
+  const predictionsDebounceRef = useRef(null);
+  const [placesJsReady, setPlacesJsReady] = useState(false);
+  const [placePredictions, setPlacePredictions] = useState([]);
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
 
   // Load Google Maps API key from backend
   useEffect(() => {
@@ -89,6 +129,99 @@ export default function LocationSelectorOverlay({
       });
     });
   }, []);
+
+  // Load Maps + Places when overlay opens (list view has no map; still need Places for search)
+  useEffect(() => {
+    if (!isOpen || !GOOGLE_MAPS_API_KEY) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        await ensureGoogleMapsLoaded(GOOGLE_MAPS_API_KEY);
+        if (!cancelled) setPlacesJsReady(true);
+      } catch (e) {
+        console.warn("Google Places / Maps load failed:", e?.message || e);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, GOOGLE_MAPS_API_KEY]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setPlacePredictions([]);
+      setSuggestionsOpen(false);
+      setSuggestionsLoading(false);
+      if (predictionsDebounceRef.current) {
+        clearTimeout(predictionsDebounceRef.current);
+        predictionsDebounceRef.current = null;
+      }
+    }
+  }, [isOpen]);
+
+  useLayoutEffect(() => {
+    if (!isOpen || !placesJsReady || !window.google?.maps?.places) return;
+    const node = placesServiceDivRef.current;
+    if (!node) return;
+    autocompleteServiceRef.current = new window.google.maps.places.AutocompleteService();
+    placesServiceRef.current = new window.google.maps.places.PlacesService(node);
+    sessionTokenRef.current = new window.google.maps.places.AutocompleteSessionToken();
+  }, [isOpen, placesJsReady, showAddressForm]);
+
+  useEffect(() => {
+    if (!suggestionsOpen) return;
+    const onDown = e => {
+      const a = searchWrapAddressFormRef.current;
+      const b = searchWrapListRef.current;
+      const t = e.target;
+      if (a?.contains(t) || b?.contains(t)) return;
+      setSuggestionsOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [suggestionsOpen]);
+
+  useEffect(() => {
+    if (!isOpen || !placesJsReady) return;
+    const q = searchValue.trim();
+    if (q.length < 2) {
+      setPlacePredictions([]);
+      setSuggestionsLoading(false);
+      return;
+    }
+    setSuggestionsLoading(true);
+    if (predictionsDebounceRef.current) clearTimeout(predictionsDebounceRef.current);
+    predictionsDebounceRef.current = setTimeout(() => {
+      const svc = autocompleteServiceRef.current;
+      const token = sessionTokenRef.current;
+      const google = window.google;
+      if (!svc || !token || !google?.maps?.places) {
+        setSuggestionsLoading(false);
+        return;
+      }
+      svc.getPlacePredictions({
+        input: q,
+        sessionToken: token,
+        componentRestrictions: {
+          country: "in"
+        }
+      }, (predictions, status) => {
+        setSuggestionsLoading(false);
+        if (status !== google.maps.places.PlacesServiceStatus.OK || !predictions?.length) {
+          setPlacePredictions([]);
+          return;
+        }
+        setPlacePredictions(predictions);
+        setSuggestionsOpen(true);
+      });
+    }, 280);
+    return () => {
+      if (predictionsDebounceRef.current) {
+        clearTimeout(predictionsDebounceRef.current);
+        predictionsDebounceRef.current = null;
+      }
+    };
+  }, [searchValue, isOpen, placesJsReady]);
 
   // Handle initialLabel
   useEffect(() => {
@@ -367,7 +500,60 @@ export default function LocationSelectorOverlay({
     }
   }, [location?.latitude ?? null, location?.longitude ?? null, location?.accuracy ?? null]);
 
+  const teardownAddressFormMap = () => {
+    if (watchPositionIdRef.current !== null) {
+      try {
+        navigator.geolocation.clearWatch(watchPositionIdRef.current);
+      } catch {
+        /* ignore */
+      }
+      watchPositionIdRef.current = null;
+    }
+    if (greenMarkerRef.current) {
+      try {
+        greenMarkerRef.current.setMap(null);
+      } catch {
+        /* ignore */
+      }
+      greenMarkerRef.current = null;
+    }
+    if (userLocationMarkerRef.current) {
+      try {
+        userLocationMarkerRef.current.setMap(null);
+      } catch {
+        /* ignore */
+      }
+      userLocationMarkerRef.current = null;
+    }
+    if (blueDotCircleRef.current) {
+      try {
+        blueDotCircleRef.current.setMap(null);
+      } catch {
+        /* ignore */
+      }
+      blueDotCircleRef.current = null;
+    }
+    if (googleMapRef.current && window.google?.maps?.event) {
+      try {
+        window.google.maps.event.clearInstanceListeners(googleMapRef.current);
+      } catch {
+        /* ignore */
+      }
+    }
+    googleMapRef.current = null;
+    const el = mapContainerRef.current;
+    if (el) {
+      try {
+        el.innerHTML = "";
+      } catch {
+        /* ignore */
+      }
+    }
+    setMapLoading(false);
+  };
+
   // Initialize Google Maps with Loader (ZOMATO-STYLE)
+  // NOTE: Do not depend on live GPS (location lat/lng) — that re-creates Maps and stacks iframes.
   useEffect(() => {
     if (!showAddressForm || !mapContainerRef.current || !GOOGLE_MAPS_API_KEY) {
       return;
@@ -376,29 +562,19 @@ export default function LocationSelectorOverlay({
     setMapLoading(true);
     const initializeGoogleMap = async () => {
       try {
-        let google = window.google;
-        if (!google || !google.maps) {
-          let attempts = 0;
-          while (!window.google?.maps && attempts < 50) {
-            await new Promise(r => setTimeout(r, 100));
-            attempts++;
-          }
-          google = window.google;
-        }
-        if (!google || !google.maps) {
-          const loader = new Loader({
-            apiKey: GOOGLE_MAPS_API_KEY,
-            version: "weekly",
-            libraries: ["places", "geocoding"]
-          });
-          google = await loader.load();
+        await ensureGoogleMapsLoaded(GOOGLE_MAPS_API_KEY);
+        const google = window.google;
+        if (!google?.maps) {
+          if (isMounted) setMapLoading(false);
+          return;
         }
         if (!isMounted || !mapContainerRef.current) return;
 
-        // Initial location (Indore center or current location)
-        const initialLocation = location?.latitude && location?.longitude ? {
-          lat: location.latitude,
-          lng: location.longitude
+        // Initial center only when opening the form (avoid re-init on every GPS tick)
+        const loc = location;
+        const initialLocation = loc?.latitude && loc?.longitude ? {
+          lat: loc.latitude,
+          lng: loc.longitude
         } : {
           lat: 22.7196,
           lng: 75.8577
@@ -583,31 +759,9 @@ export default function LocationSelectorOverlay({
     initializeGoogleMap();
     return () => {
       isMounted = false;
-      // Cleanup geolocation watch
-      if (watchPositionIdRef.current !== null) {
-        navigator.geolocation.clearWatch(watchPositionIdRef.current);
-        watchPositionIdRef.current = null;
-      }
-      // Cleanup markers
-      if (greenMarkerRef.current) {
-        greenMarkerRef.current.setMap(null);
-      }
-      if (userLocationMarkerRef.current) {
-        try {
-          userLocationMarkerRef.current.setMap(null);
-        } catch (e) {
-          console.warn("Error cleaning up blue dot marker:", e);
-        }
-      }
-      if (blueDotCircleRef.current) {
-        try {
-          blueDotCircleRef.current.setMap(null);
-        } catch (e) {
-          console.warn("Error cleaning up accuracy circle:", e);
-        }
-      }
+      teardownAddressFormMap();
     };
-  }, [showAddressForm, GOOGLE_MAPS_API_KEY, location?.latitude, location?.longitude]);
+  }, [showAddressForm, GOOGLE_MAPS_API_KEY]);
   useEffect(() => {
     if (isOpen && inputRef.current) {
       setTimeout(() => inputRef.current?.focus(), 100);
@@ -869,7 +1023,7 @@ export default function LocationSelectorOverlay({
     });
   };
 
-  // Google Maps loading is handled by the Loader in the initialization useEffect above
+  // Google Maps loading is handled by ensureGoogleMapsLoaded in overlay + map effects above
 
   // OLD OLA MAPS INITIALIZATION - REMOVED (Replaced with Google Maps Loader above)
   // All old Ola Maps/Leaflet code has been removed and replaced with Google Maps Loader implementation
@@ -1510,6 +1664,64 @@ export default function LocationSelectorOverlay({
       }
     }, 500); // 500ms debounce delay
   };
+
+  const handleSelectPlacePrediction = prediction => {
+    const ps = placesServiceRef.current;
+    const google = window.google;
+    if (!ps || !prediction?.place_id || !google?.maps?.places) return;
+    setSuggestionsOpen(false);
+    setPlacePredictions([]);
+    const token = sessionTokenRef.current;
+    ps.getDetails({
+      placeId: prediction.place_id,
+      fields: ["geometry", "formatted_address", "address_components", "name"],
+      sessionToken: token
+    }, (place, status) => {
+      if (!window.google?.maps?.places) return;
+      sessionTokenRef.current = new window.google.maps.places.AutocompleteSessionToken();
+      if (status !== window.google.maps.places.PlacesServiceStatus.OK || !place?.geometry?.location) {
+        toast.error("Could not load this place");
+        return;
+      }
+      const lat = place.geometry.location.lat();
+      const lng = place.geometry.location.lng();
+      const label = (prediction.structured_formatting?.main_text || place.name || prediction.description?.split(",")[0] || "").trim();
+      setSearchValue(label || (place.formatted_address || "").split(",")[0]?.trim() || "");
+
+      lastReverseGeocodeCoordsRef.current = null;
+      setMapPosition([lat, lng]);
+
+      if (googleMapRef.current && greenMarkerRef.current) {
+        try {
+          googleMapRef.current.panTo({
+            lat,
+            lng
+          });
+          googleMapRef.current.setZoom(17);
+          greenMarkerRef.current.setPosition({
+            lat,
+            lng
+          });
+        } catch {
+          /* ignore */
+        }
+      }
+
+      // Only update map + form; global user location persists on "Save address"
+      handleMapMoveEnd(lat, lng);
+    });
+  };
+
+  const renderPlaceSuggestions = () => suggestionsOpen && (placePredictions.length > 0 || suggestionsLoading) && <ul className="absolute left-0 right-0 top-full z-[20000] mt-1 max-h-60 overflow-y-auto rounded-xl border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-[#1a1a1a]" role="listbox">
+        {suggestionsLoading && placePredictions.length === 0 ? <li className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">Searching…</li> : null}
+        {placePredictions.map(p => <li key={p.place_id} role="option">
+            <button type="button" className="w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800" onMouseDown={e => e.preventDefault()} onClick={() => handleSelectPlacePrediction(p)}>
+              <span className="font-medium text-gray-900 dark:text-white">{p.structured_formatting?.main_text}</span>
+              {p.structured_formatting?.secondary_text ? <span className="block truncate text-xs text-gray-500 dark:text-gray-400">{p.structured_formatting.secondary_text}</span> : null}
+            </button>
+          </li>)}
+      </ul>;
+
   const handleUseCurrentLocationForAddress = async () => {
     try {
       if (!navigator.geolocation) {
@@ -1825,6 +2037,19 @@ export default function LocationSelectorOverlay({
         }
       }
 
+      const trimmedAdditional = (addressFormData.additionalDetails || "").trim();
+      const locationPayload = {
+        city: trimmedCity,
+        state: trimmedState,
+        address: `${trimmedStreet}, ${trimmedCity}`,
+        area: trimmedAdditional,
+        zipCode: addressToSave.zipCode,
+        latitude: addressToSave.latitude,
+        longitude: addressToSave.longitude,
+        formattedAddress: [trimmedAdditional, trimmedStreet, trimmedCity, trimmedState, addressToSave.zipCode].filter(Boolean).join(", ")
+      };
+      await persistGlobalUserLocationFromOverlay(locationPayload);
+
       // Reset form
       setAddressFormData({
         id: null,
@@ -1871,6 +2096,7 @@ export default function LocationSelectorOverlay({
     }
   };
   const handleCancelAddressForm = () => {
+    teardownAddressFormMap();
     setShowAddressForm(false);
     setAddressFormData({
       street: "",
@@ -1892,13 +2118,15 @@ export default function LocationSelectorOverlay({
       if (latitude && longitude) {
         // Update location in backend
         await userAPI.updateLocation({
-          latitude,
-          longitude,
+          latitude: Number(latitude),
+          longitude: Number(longitude),
           address: `${address.street}, ${address.city}`,
           city: address.city,
           state: address.state,
           area: address.additionalDetails || "",
-          formattedAddress: `${address.street}, ${address.city}, ${address.state}`
+          formattedAddress: `${address.street}, ${address.city}, ${address.state}`,
+          postalCode: address.zipCode || undefined,
+          skipLocationThrottle: true
         });
       }
 
@@ -1914,6 +2142,9 @@ export default function LocationSelectorOverlay({
         formattedAddress: `${address.street}, ${address.city}, ${address.state}`
       };
       localStorage.setItem("userLocation", JSON.stringify(locationData));
+      window.dispatchEvent(new CustomEvent(USER_LOCATION_UPDATED_EVENT, {
+        detail: locationData
+      }));
 
       // Update map position to show selected address
       setMapPosition([latitude, longitude]);
@@ -2031,6 +2262,9 @@ export default function LocationSelectorOverlay({
   // If showing address form, render full-screen address form
   if (showAddressForm) {
     return <div className="fixed inset-0 z-10000 bg-white dark:bg-[#0a0a0a] flex flex-col h-screen max-h-screen overflow-hidden">
+        <div ref={placesServiceDivRef} className="pointer-events-none absolute h-px w-px overflow-hidden" style={{
+        clip: "rect(0,0,0,0)"
+      }} aria-hidden />
         {/* Header */}
         <div className="shrink-0 bg-white dark:bg-[#1a1a1a] border-b border-gray-100 dark:border-gray-800 px-4 py-3">
           <div className="flex items-center gap-4">
@@ -2043,9 +2277,14 @@ export default function LocationSelectorOverlay({
 
         {/* Search Bar */}
         <div className="shrink-0 bg-white dark:bg-[#1a1a1a] px-4 py-3 border-b border-gray-100 dark:border-gray-800">
-          <div className="relative">
+          <div ref={searchWrapAddressFormRef} className="relative">
             <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-green-600 z-10" />
-            <Input value={searchValue} onChange={e => setSearchValue(e.target.value)} placeholder="Search for area, street name..." className="pl-12 pr-4 h-12 w-full bg-gray-50 dark:bg-[#2a2a2a] border-gray-200 dark:border-gray-700 focus:border-green-600 dark:focus:border-green-600 rounded-xl" />
+            <Input value={searchValue} onChange={e => setSearchValue(e.target.value)} onFocus={() => {
+            if (placePredictions.length > 0) setSuggestionsOpen(true);
+          }} onKeyDown={e => {
+            if (e.key === "Escape") setSuggestionsOpen(false);
+          }} placeholder="Search for area, street name..." className="pl-12 pr-4 h-12 w-full bg-gray-50 dark:bg-[#2a2a2a] border-gray-200 dark:border-gray-700 focus:border-green-600 dark:focus:border-green-600 rounded-xl" autoComplete="off" />
+            {renderPlaceSuggestions()}
           </div>
         </div>
 
@@ -2185,9 +2424,12 @@ export default function LocationSelectorOverlay({
         </div>
       </div>;
   }
-  return <div className="fixed inset-0 z-9999 flex flex-col bg-white dark:bg-[#0a0a0a]" style={{
+  return <div className="fixed inset-0 z-[10000] flex min-h-[100dvh] flex-col bg-white dark:bg-[#0a0a0a] isolate overscroll-none" style={{
     animation: 'fadeIn 0.3s ease-out'
   }}>
+      <div ref={placesServiceDivRef} className="pointer-events-none absolute h-px w-px overflow-hidden" style={{
+    clip: "rect(0,0,0,0)"
+  }} aria-hidden />
       {/* Header */}
       <div className="shrink-0 bg-white dark:bg-[#1a1a1a] border-b border-gray-100 dark:border-gray-800 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
@@ -2205,9 +2447,14 @@ export default function LocationSelectorOverlay({
 
       {/* Search Bar */}
       <div className="shrink-0 bg-white dark:bg-[#1a1a1a] px-4 sm:px-6 lg:px-8 py-3 max-w-7xl mx-auto w-full">
-        <div className="relative">
+        <div ref={searchWrapListRef} className="relative">
           <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-primary-orange z-10" />
-          <Input ref={inputRef} value={searchValue} onChange={e => setSearchValue(e.target.value)} placeholder="Search for area, street name..." className="pl-12 pr-4 h-12 w-full bg-gray-50 dark:bg-[#2a2a2a] border-gray-200 dark:border-gray-700 focus:border-primary-orange dark:focus:border-primary-orange rounded-xl text-base dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400" />
+          <Input ref={inputRef} value={searchValue} onChange={e => setSearchValue(e.target.value)} onFocus={() => {
+        if (placePredictions.length > 0) setSuggestionsOpen(true);
+      }} onKeyDown={e => {
+        if (e.key === "Escape") setSuggestionsOpen(false);
+      }} placeholder="Search for area, street name..." className="pl-12 pr-4 h-12 w-full bg-gray-50 dark:bg-[#2a2a2a] border-gray-200 dark:border-gray-700 focus:border-primary-orange dark:focus:border-primary-orange rounded-xl text-base dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400" autoComplete="off" />
+          {renderPlaceSuggestions()}
         </div>
       </div>
 

@@ -390,10 +390,15 @@ const restaurantSchema = new mongoose.Schema(
       },
       features: [String], // Snapshot of features at time of subscription
     },
-    // Zone mapping
+    // Zone mapping (tierId denormalized from Zone.tierId for quick reads / reporting)
     zoneId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Zone",
+      default: null,
+    },
+    tierId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Tier",
       default: null,
     },
     deliveryPricingConfig: {
@@ -436,6 +441,7 @@ restaurantSchema.index({ isActive: 1, createdAt: -1 });
 // Zone-based regional queries
 restaurantSchema.index({ zoneId: 1, isActive: 1 });
 restaurantSchema.index({ zoneId: 1, createdAt: -1 });
+restaurantSchema.index({ tierId: 1, isActive: 1 });
 
 // Subscription and Admin management
 restaurantSchema.index({ "subscription.planId": 1, "subscription.status": 1 });

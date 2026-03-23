@@ -1,6 +1,11 @@
 import Restaurant from "../models/Restaurant.js";
 import { successResponse, errorResponse } from "../../../shared/utils/response.js";
 import { createRestaurantFromOnboarding } from "./restaurantController.js";
+import {
+  applyZoneTierToRestaurantById,
+  assertRestaurantPinInsideActiveZone,
+  RESTAURANT_LOCATION_OUTSIDE_ZONE_MESSAGE
+} from "../../admin/services/restaurantZoneAssignmentService.js";
 
 // Get current restaurant's onboarding data
 export const getOnboarding = async (req, res) => {
@@ -40,6 +45,18 @@ export const upsertOnboarding = async (req, res) => {
     const existingRestaurant = await Restaurant.findById(restaurantId).lean();
     const existingOnboarding = existingRestaurant?.onboarding || {};
     const previousCompletedSteps = typeof existingOnboarding.completedSteps === "number" ? existingOnboarding.completedSteps : 0;
+
+    let prospectiveCompletedSteps = previousCompletedSteps;
+    if (typeof completedSteps === "number" && completedSteps !== null && completedSteps !== undefined) {
+      prospectiveCompletedSteps = completedSteps;
+    }
+    if (step1?.location && prospectiveCompletedSteps >= 1) {
+      const pinCheck = await assertRestaurantPinInsideActiveZone(step1.location);
+      if (!pinCheck.ok) {
+        return errorResponse(res, 400, pinCheck.message);
+      }
+    }
+
     const update = {};
 
     // Step1: Always update if provided
@@ -119,40 +136,17 @@ export const upsertOnboarding = async (req, res) => {
           });
         }
 
-        // ─── AUTO ZONE DETECTION ─────────────────────────────────────────────
-        // When location is saved, detect which zone the restaurant falls into
-        // and automatically assign restaurant.zoneId
-        if (step1.location?.latitude && step1.location?.longitude) {
-          try {
-            const Zone = (await import("../../admin/models/Zone.js")).default;
-            const lat = parseFloat(step1.location.latitude);
-            const lng = parseFloat(step1.location.longitude);
-            const activeZones = await Zone.find({
-              isActive: true
-            });
-            let detectedZone = null;
-            for (const zone of activeZones) {
-              // Use the Zone model's built-in containsPoint() method
-              if (zone.containsPoint(lat, lng)) {
-                detectedZone = zone;
-                break;
-              }
-            }
-            if (detectedZone) {
-              await Restaurant.findByIdAndUpdate(restaurantId, {
-                $set: {
-                  zoneId: detectedZone._id
-                }
-              });
-            } else {
-              console.warn(`⚠️ Restaurant location (${lat}, ${lng}) does not fall within any active zone. zoneId not set.`);
-            }
-          } catch (zoneDetectError) {
-            console.error("⚠️ Error during auto zone detection:", zoneDetectError);
-            // Don't fail the request, just log the error
+        // GeoJSON $geoIntersects on zone.boundary (works with coordinates[] or lat/lng on location)
+        try {
+          const { zoneId, tierId } = await applyZoneTierToRestaurantById(restaurantId);
+          if (!zoneId) {
+            console.warn(
+              "⚠️ Restaurant location is not inside any active zone — zoneId/tierId cleared or unset."
+            );
           }
+        } catch (zoneDetectError) {
+          console.error("⚠️ Error during auto zone/tier assignment:", zoneDetectError);
         }
-        // ─────────────────────────────────────────────────────────────────────
       } catch (step1UpdateError) {
         console.error("⚠️ Error updating restaurant schema with step1 data:", step1UpdateError);
         // Don't fail the request, just log the error
@@ -326,6 +320,9 @@ export const createRestaurantFromOnboardingManual = async (req, res) => {
       });
     } catch (error) {
       console.error("Error updating restaurant:", error);
+      if (error.message === RESTAURANT_LOCATION_OUTSIDE_ZONE_MESSAGE) {
+        return errorResponse(res, 400, error.message);
+      }
       return errorResponse(res, 500, `Failed to update restaurant: ${error.message}`);
     }
   } catch (error) {

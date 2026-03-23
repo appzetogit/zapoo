@@ -337,6 +337,13 @@ export const acceptOrder = asyncHandler(async (req, res) => {
         };
         await orderDoc.save();
 
+        try {
+          const { calculateOrderSettlement } = await import('../../order/services/orderSettlementService.js');
+          await calculateOrderSettlement(orderDoc._id);
+        } catch (settlementErr) {
+          console.error('⚠️ Settlement recalc after delivery accept failed:', settlementErr.message);
+        }
+
         // Broadcast order_taken to all other notified delivery partners (non-blocking)
         try {
           const { getIO } = await import('../../../server.js');
@@ -1410,13 +1417,16 @@ export const completeDelivery = asyncHandler(async (req, res) => {
         } else {
           // Calculate earnings even if order is already delivered (for consistency)
           let deliveryDistance = 0;
-          if (order.deliveryState?.routeToDelivery?.distance) {
+          if (order.pricing?.distanceKm != null && Number(order.pricing.distanceKm) > 0) {
+            deliveryDistance = Number(order.pricing.distanceKm);
+          } else if (order.deliveryState?.routeToDelivery?.distance) {
             deliveryDistance = order.deliveryState.routeToDelivery.distance;
           } else if (order.assignmentInfo?.distance) {
             deliveryDistance = order.assignmentInfo.distance;
           }
           if (deliveryDistance > 0) {
-            const commissionResult = await DeliveryBoyCommission.calculateCommission(deliveryDistance);
+            const tierName = order.pricing?.pricingMeta?.tierName || null;
+            const commissionResult = await DeliveryBoyCommission.calculateCommission(deliveryDistance, tierName);
             earnings = {
               amount: commissionResult.commission,
               breakdown: commissionResult.breakdown
@@ -1508,6 +1518,13 @@ export const completeDelivery = asyncHandler(async (req, res) => {
       } catch (paymentUpdateError) {
         console.warn('⚠️ Could not update COD payment status:', paymentUpdateError.message);
       }
+    }
+
+    try {
+      const { updateSettlementOnStatusChange } = await import('../../order/services/orderSettlementService.js');
+      await updateSettlementOnStatusChange(orderMongoId, 'delivered');
+    } catch (settlementPreReleaseErr) {
+      console.error('⚠️ Settlement update on delivered failed:', settlementPreReleaseErr.message);
     }
 
     // Release escrow and distribute funds
@@ -1608,16 +1625,14 @@ export const completeDelivery = asyncHandler(async (req, res) => {
     // Get delivery distance (in km) from order
     let deliveryDistance = 0;
 
-    // Priority 1: Get distance from routeToDelivery (most accurate)
-    if (order.deliveryState?.routeToDelivery?.distance) {
+    // Priority 0: Snapshot at order time (restaurant ↔ customer), same as pricing/settlement slabs
+    if (order.pricing?.distanceKm != null && Number(order.pricing.distanceKm) > 0) {
+      deliveryDistance = Number(order.pricing.distanceKm);
+    } else if (order.deliveryState?.routeToDelivery?.distance) {
       deliveryDistance = order.deliveryState.routeToDelivery.distance;
-    }
-    // Priority 2: Get distance from assignmentInfo
-    else if (order.assignmentInfo?.distance) {
+    } else if (order.assignmentInfo?.distance) {
       deliveryDistance = order.assignmentInfo.distance;
-    }
-    // Priority 3: Calculate distance from restaurant to customer if coordinates available
-    else if (order.restaurantId?.location?.coordinates && order.address?.location?.coordinates) {
+    } else if (order.restaurantId?.location?.coordinates && order.address?.location?.coordinates) {
       const [restaurantLng, restaurantLat] = order.restaurantId.location.coordinates;
       const [customerLng, customerLat] = order.address.location.coordinates;
 
@@ -1633,8 +1648,8 @@ export const completeDelivery = asyncHandler(async (req, res) => {
     let totalEarning = 0;
     let commissionBreakdown = null;
     try {
-      // Use DeliveryBoyCommission model to calculate commission based on distance
-      const commissionResult = await DeliveryBoyCommission.calculateCommission(deliveryDistance);
+      const tierName = order.pricing?.pricingMeta?.tierName || null;
+      const commissionResult = await DeliveryBoyCommission.calculateCommission(deliveryDistance, tierName);
       totalEarning = commissionResult.commission;
       commissionBreakdown = commissionResult.breakdown;
     } catch (commissionError) {

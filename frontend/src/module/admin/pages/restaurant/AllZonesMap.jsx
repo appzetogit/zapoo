@@ -141,7 +141,7 @@ export default function AllZonesMap() {
       zoom: 5,
       mapTypeControl: true,
       mapTypeControlOptions: {
-        style: google.maps.MapTypeControlStyle.HORIZONTAL_BAR,
+        style: google.maps.MapTypeControlStyle?.HORIZONTAL_BAR,
         position: google.maps.ControlPosition.TOP_RIGHT,
         mapTypeIds: [google.maps.MapTypeId.ROADMAP, google.maps.MapTypeId.SATELLITE]
       },

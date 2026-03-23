@@ -133,8 +133,16 @@ export const updateMenu = asyncHandler(async (req, res) => {
           approvedBy: existingItem?.approvedBy || item.approvedBy,
           rejectedAt: existingItem?.rejectedAt || item.rejectedAt,
           // Preserve recommendation fields or handle new request
-          isRecommendationRequest: item.isRecommendationRequest || existingItem?.isRecommendationRequest || false,
-          recommendationStatus: existingItem?.recommendationStatus || item.recommendationStatus || 'none',
+          // Use boolean-safe logic so restaurant can toggle request ON/OFF.
+          isRecommendationRequest: typeof item.isRecommendationRequest === 'boolean'
+            ? item.isRecommendationRequest
+            : (existingItem?.isRecommendationRequest ?? false),
+          // Keep approved intact; otherwise derive pending/none from request.
+          recommendationStatus: existingItem?.recommendationStatus === 'approved'
+            ? 'approved'
+            : (typeof item.isRecommendationRequest === 'boolean'
+              ? (item.isRecommendationRequest ? 'pending' : 'none')
+              : (existingItem?.recommendationStatus || item.recommendationStatus || 'none')),
           isRecommended: existingItem?.isRecommended || item.isRecommended || false
         };
       }) : [],
@@ -209,8 +217,16 @@ export const updateMenu = asyncHandler(async (req, res) => {
               approvedBy: existingItem?.approvedBy || item.approvedBy,
               rejectedAt: existingItem?.rejectedAt || item.rejectedAt,
               // Preserve recommendation fields or handle new request
-              isRecommendationRequest: item.isRecommendationRequest || existingItem?.isRecommendationRequest || false,
-              recommendationStatus: existingItem?.recommendationStatus || item.recommendationStatus || 'none',
+              // Use boolean-safe logic so restaurant can toggle request ON/OFF.
+              isRecommendationRequest: typeof item.isRecommendationRequest === 'boolean'
+                ? item.isRecommendationRequest
+                : (existingItem?.isRecommendationRequest ?? false),
+              // Keep approved intact; otherwise derive pending/none from request.
+              recommendationStatus: existingItem?.recommendationStatus === 'approved'
+                ? 'approved'
+                : (typeof item.isRecommendationRequest === 'boolean'
+                  ? (item.isRecommendationRequest ? 'pending' : 'none')
+                  : (existingItem?.recommendationStatus || item.recommendationStatus || 'none')),
               isRecommended: existingItem?.isRecommended || item.isRecommended || false
             };
           }) : []

@@ -62,6 +62,11 @@ const offerSchema = new mongoose.Schema(
       enum: ['all', 'breakfast', 'lunch', 'dinner', 'snacks'],
       default: 'all',
     },
+    /** When true, applying this offer's coupon zeroes customer delivery fee (server-side). */
+    waivesDeliveryFee: {
+      type: Boolean,
+      default: false,
+    },
     minOrderValue: {
       type: Number,
       default: 0,

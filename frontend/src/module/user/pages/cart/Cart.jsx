@@ -51,6 +51,43 @@ const formatFullAddress = address => {
   }
   return "";
 };
+
+/** Align with backend: coords as [lng, lat], also accept root-level lat/lng from saved addresses */
+const normalizeDeliveryAddressForOrder = address => {
+  if (!address || typeof address !== "object") return address;
+  const copy = {
+    ...address
+  };
+  let lng;
+  let lat;
+  const loc = copy.location;
+  if (Array.isArray(loc?.coordinates) && loc.coordinates.length >= 2) {
+    lng = Number(loc.coordinates[0]);
+    lat = Number(loc.coordinates[1]);
+  } else if (loc?.longitude != null && loc?.latitude != null) {
+    lng = Number(loc.longitude);
+    lat = Number(loc.latitude);
+  } else if (copy.longitude != null && copy.latitude != null) {
+    lng = Number(copy.longitude);
+    lat = Number(copy.latitude);
+  }
+  if (Number.isFinite(lng) && Number.isFinite(lat)) {
+    copy.location = {
+      ...(typeof loc === "object" && loc ? loc : {}),
+      type: loc?.type || "Point",
+      coordinates: [lng, lat],
+      longitude: lng,
+      latitude: lat
+    };
+  }
+  return copy;
+};
+
+const isRestaurantCustomDeliveryPricingEnabled = restaurant => {
+  const v = restaurant?.deliveryPricingConfig?.isEnabled;
+  return v === true || v === "true" || v === 1 || v === "1";
+};
+
 export default function Cart() {
   const navigate = useNavigate();
 
@@ -142,19 +179,22 @@ export default function Cart() {
   });
   const cartCount = getCartCount();
   const savedAddress = getDefaultAddress();
-  // Priority: Use live location if available, otherwise use saved address
-  const defaultAddress = currentLocation?.formattedAddress && currentLocation.formattedAddress !== "Select location" ? {
-    ...savedAddress,
-    formattedAddress: currentLocation.formattedAddress,
-    address: currentLocation.address || currentLocation.formattedAddress,
-    street: currentLocation.street || currentLocation.address,
-    city: currentLocation.city,
-    state: currentLocation.state,
-    zipCode: currentLocation.postalCode,
-    location: currentLocation.latitude && currentLocation.longitude ? {
-      coordinates: [currentLocation.longitude, currentLocation.latitude]
-    } : savedAddress?.location
-  } : savedAddress;
+  // Priority: Use live location if available, otherwise use saved address; always normalize coords for pricing API
+  const defaultAddress = useMemo(() => {
+    const merged = currentLocation?.formattedAddress && currentLocation.formattedAddress !== "Select location" ? {
+      ...savedAddress,
+      formattedAddress: currentLocation.formattedAddress,
+      address: currentLocation.address || currentLocation.formattedAddress,
+      street: currentLocation.street || currentLocation.address,
+      city: currentLocation.city,
+      state: currentLocation.state,
+      zipCode: currentLocation.postalCode,
+      location: currentLocation.latitude && currentLocation.longitude ? {
+        coordinates: [Number(currentLocation.longitude), Number(currentLocation.latitude)]
+      } : savedAddress?.location
+    } : savedAddress;
+    return normalizeDeliveryAddressForOrder(merged);
+  }, [savedAddress, currentLocation]);
   const defaultPayment = getDefaultPaymentMethod();
 
   // Get restaurant ID from cart or restaurant data
@@ -455,7 +495,8 @@ export default function Cart() {
           quantity: item.quantity || 1,
           image: item.image,
           description: item.description,
-          isVeg: item.isVeg !== false
+          isVeg: item.isVeg !== false,
+          isRecommended: Boolean(item.isRecommended)
         }));
         const response = await orderAPI.calculateOrder({
           items,
@@ -487,7 +528,7 @@ export default function Cart() {
       }
     };
     calculatePricing();
-  }, [cart, defaultAddress, appliedCoupon, couponCode, deliveryFleet, restaurantId]);
+  }, [cart, defaultAddress, appliedCoupon, couponCode, deliveryFleet, restaurantId, restaurantData]);
 
   // Fetch wallet balance
   useEffect(() => {
@@ -531,13 +572,41 @@ export default function Cart() {
 
   // Use backend pricing if available, otherwise fallback to database settings
   const subtotal = pricing?.subtotal || cart.reduce((sum, item) => sum + (item.price || 0) * (item.quantity || 1), 0);
-  const deliveryFee = pricing?.deliveryFee ?? (subtotal >= feeSettings.freeDeliveryThreshold || appliedCoupon?.freeDelivery ? 0 : feeSettings.deliveryFee);
+  const customDeliveryOn = isRestaurantCustomDeliveryPricingEnabled(restaurantData);
+  const hasApiDeliveryFee = pricing != null && pricing.deliveryFee != null && Number.isFinite(Number(pricing.deliveryFee));
+  let deliveryFee;
+  if (hasApiDeliveryFee) {
+    deliveryFee = Number(pricing.deliveryFee);
+  } else if (appliedCoupon?.freeDelivery) {
+    deliveryFee = 0;
+  } else if (customDeliveryOn) {
+    // Do not use global free-delivery threshold for slab pricing — avoids false "FREE" when API is slow/errors
+    deliveryFee = loadingPricing && !pricing ? null : Number(feeSettings.deliveryFee);
+  } else if (subtotal >= feeSettings.freeDeliveryThreshold) {
+    deliveryFee = 0;
+  } else {
+    deliveryFee = Number(feeSettings.deliveryFee);
+  }
+  const deliveryFeeForTotals = deliveryFee != null ? deliveryFee : Number(feeSettings.deliveryFee);
   const platformFee = pricing?.platformFee || feeSettings.platformFee;
   const gstCharges = pricing?.tax || Math.round(subtotal * (feeSettings.gstRate / 100));
   const discount = pricing?.discount || (appliedCoupon ? Math.min(appliedCoupon.discount, subtotal * 0.5) : 0);
-  const totalBeforeDiscount = subtotal + deliveryFee + platformFee + gstCharges;
+  const totalBeforeDiscount = subtotal + deliveryFeeForTotals + platformFee + gstCharges;
   const total = pricing?.total || totalBeforeDiscount - discount;
   const savings = pricing?.savings || discount + (subtotal > 500 ? 32 : 0);
+
+  const pricingMeta = pricing?.pricingMeta;
+  const deliveryPricingMisconfigured = Boolean(
+    pricing &&
+    Number(pricing.deliveryFee) === 0 &&
+    !pricingMeta?.freeDeliveryReason &&
+    Array.isArray(pricingMeta?.pricingDiagnostics) &&
+    pricingMeta.pricingDiagnostics.length > 0
+  );
+  const deliveryPricingWarningMessage = deliveryPricingMisconfigured
+    ? (pricingMeta?.pricingDiagnostics?.[0]?.message ||
+      'Delivery could not be priced. Check zone, distance slabs, and the delivery rate grid in restaurant settings.')
+    : '';
 
   // Restaurant name from data or cart
   const restaurantName = restaurantData?.name || cart[0]?.restaurant || "Restaurant";
@@ -564,13 +633,15 @@ export default function Cart() {
 
       // Update location in backend
       await userAPI.updateLocation({
-        latitude,
-        longitude,
+        latitude: Number(latitude),
+        longitude: Number(longitude),
         address: `${address.street}, ${address.city}`,
         city: address.city,
         state: address.state,
         area: address.additionalDetails || "",
-        formattedAddress: address.additionalDetails ? `${address.additionalDetails}, ${address.street}, ${address.city}, ${address.state}${address.zipCode ? ` ${address.zipCode}` : ''}` : `${address.street}, ${address.city}, ${address.state}${address.zipCode ? ` ${address.zipCode}` : ''}`
+        formattedAddress: address.additionalDetails ? `${address.additionalDetails}, ${address.street}, ${address.city}, ${address.state}${address.zipCode ? ` ${address.zipCode}` : ''}` : `${address.street}, ${address.city}, ${address.state}${address.zipCode ? ` ${address.zipCode}` : ''}`,
+        postalCode: address.zipCode || undefined,
+        skipLocationThrottle: true
       });
 
       // Update the location in localStorage
@@ -610,7 +681,8 @@ export default function Cart() {
             quantity: item.quantity || 1,
             image: item.image,
             description: item.description,
-            isVeg: item.isVeg !== false
+            isVeg: item.isVeg !== false,
+            isRecommended: Boolean(item.isRecommended)
           }));
           const response = await orderAPI.calculateOrder({
             items,
@@ -642,7 +714,8 @@ export default function Cart() {
           quantity: item.quantity || 1,
           image: item.image,
           description: item.description,
-          isVeg: item.isVeg !== false
+          isVeg: item.isVeg !== false,
+          isRecommended: Boolean(item.isRecommended)
         }));
         const response = await orderAPI.calculateOrder({
           items,
@@ -676,7 +749,7 @@ export default function Cart() {
       // Ensure couponCode is included in pricing
       const orderPricing = pricing || {
         subtotal,
-        deliveryFee,
+        deliveryFee: deliveryFeeForTotals,
         tax: gstCharges,
         platformFee,
         discount,
@@ -698,7 +771,8 @@ export default function Cart() {
         quantity: item.quantity || 1,
         image: item.image || "",
         description: item.description || "",
-        isVeg: item.isVeg !== false
+        isVeg: item.isVeg !== false,
+        isRecommended: Boolean(item.isRecommended)
       }));
       // Check API base URL before making request (for debugging)
       const fullUrl = `${API_BASE_URL}${API_ENDPOINTS.ORDER.CREATE}`;
@@ -1376,9 +1450,14 @@ export default function Cart() {
                     <div className="flex justify-between text-sm md:text-base">
                       <span className="text-gray-600 dark:text-gray-400">Delivery Fee</span>
                       <span className={deliveryFee === 0 ? "text-red-600 dark:text-red-400" : "text-gray-800 dark:text-gray-200"}>
-                        {deliveryFee === 0 ? "FREE" : `₹${deliveryFee}`}
+                        {deliveryFee === null ? "…" : deliveryFee === 0 ? "FREE" : `₹${deliveryFee}`}
                       </span>
                     </div>
+                    {deliveryPricingMisconfigured && (
+                      <p className="text-xs text-amber-700 dark:text-amber-400 leading-snug">
+                        {deliveryPricingWarningMessage}
+                      </p>
+                    )}
                     <div className="flex justify-between text-sm md:text-base">
                       <span className="text-gray-600 dark:text-gray-400">Platform Fee</span>
                       <span className="text-gray-800 dark:text-gray-200">₹{platformFee}</span>
@@ -1414,9 +1493,14 @@ export default function Cart() {
                     <div className="flex justify-between text-sm md:text-base">
                       <span className="text-gray-600 dark:text-gray-400">Delivery Fee</span>
                       <span className={deliveryFee === 0 ? "text-red-600 dark:text-red-400" : "text-gray-800 dark:text-gray-200"}>
-                        {deliveryFee === 0 ? "FREE" : `₹${deliveryFee}`}
+                        {deliveryFee === null ? "…" : deliveryFee === 0 ? "FREE" : `₹${deliveryFee}`}
                       </span>
                     </div>
+                    {deliveryPricingMisconfigured && (
+                      <p className="text-xs text-amber-700 dark:text-amber-400 leading-snug">
+                        {deliveryPricingWarningMessage}
+                      </p>
+                    )}
                     <div className="flex justify-between text-sm md:text-base">
                       <span className="text-gray-600 dark:text-gray-400">Platform Fee</span>
                       <span className="text-gray-800 dark:text-gray-200">₹{platformFee}</span>

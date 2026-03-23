@@ -9,6 +9,11 @@ import { initializeCloudinary } from '../../../config/cloudinary.js';
 import asyncHandler from '../../../shared/middleware/asyncHandler.js';
 import mongoose from 'mongoose';
 import { calculateDistance } from '../../order/services/orderCalculationService.js';
+import {
+  resolveZoneAndTierForLocation,
+  applyZoneTierToRestaurantById,
+  assertRestaurantPinInsideActiveZone
+} from '../../admin/services/restaurantZoneAssignmentService.js';
 
 /**
  * Check if a point is within a zone polygon using ray casting algorithm
@@ -56,30 +61,6 @@ function isRestaurantInAnyZone(restaurantLat, restaurantLng, activeZones) {
     }
   }
   return false;
-}
-
-/**
- * Get restaurant's zoneId based on location
- * @param {number} restaurantLat - Restaurant latitude
- * @param {number} restaurantLng - Restaurant longitude
- * @param {Array} activeZones - Array of active zones
- * @returns {string|null} Zone ID or null
- */
-function getRestaurantZoneId(restaurantLat, restaurantLng, activeZones) {
-  if (!restaurantLat || !restaurantLng) return null;
-  for (const zone of activeZones) {
-    if (!zone.coordinates || zone.coordinates.length < 3) continue;
-    let isInZone = false;
-    if (typeof zone.containsPoint === 'function') {
-      isInZone = zone.containsPoint(restaurantLat, restaurantLng);
-    } else {
-      isInZone = isPointInZone(restaurantLat, restaurantLng, zone.coordinates);
-    }
-    if (isInZone) {
-      return zone._id.toString();
-    }
-  }
-  return null;
 }
 
 // Get all restaurants (for user module)
@@ -268,7 +249,9 @@ export const getRestaurants = async (req, res) => {
       name: 1, slug: 1, cuisines: 1, rating: 1, totalRatings: 1, promo: 1,
       profileImage: 1, location: 1, avgDeliveryTime: 1, avgPriceValue: 1,
       isActive: 1, isAcceptingOrders: 1, featuredDish: 1, featuredPrice: 1,
-      offer: 1, estimatedDeliveryTime: 1, distance: 1, deliveryRange: 1
+      offer: 1, estimatedDeliveryTime: 1, distance: 1, deliveryRange: 1,
+      // Cart needs this for correct free-delivery fallback vs custom slab pricing
+      deliveryPricingConfig: 1
     };
 
     let restaurants;
@@ -317,7 +300,7 @@ export const getRestaurants = async (req, res) => {
       restaurants = restaurantsResult;
       total = countResult[0]?.total || 0;
     } else {
-      const projection = 'name slug cuisines rating totalRatings promo profileImage location avgDeliveryTime avgPriceValue isActive isAcceptingOrders featuredDish featuredPrice offer estimatedDeliveryTime distance deliveryRange';
+      const projection = 'name slug cuisines rating totalRatings promo profileImage location avgDeliveryTime avgPriceValue isActive isAcceptingOrders featuredDish featuredPrice offer estimatedDeliveryTime distance deliveryRange deliveryPricingConfig';
       restaurants = await Restaurant.find(query)
         .select(projection)
         .sort(sortObj)
@@ -386,8 +369,8 @@ export const getRestaurantById = async (req, res) => {
       ]
     };
 
-    // Strict field projection for public restaurant profile
-    const projection = 'name slug cuisines rating totalRatings promo profileImage location avgDeliveryTime avgPriceValue isActive isAcceptingOrders featuredDish featuredPrice offer distance deliveryRange estimatedDeliveryTime cuisines';
+    // Strict field projection for public restaurant profile (deliveryPricingConfig for cart pricing fallback)
+    const projection = 'name slug cuisines rating totalRatings promo profileImage location avgDeliveryTime avgPriceValue isActive isAcceptingOrders featuredDish featuredPrice offer distance deliveryRange estimatedDeliveryTime cuisines deliveryPricingConfig';
 
     const restaurant = await Restaurant.findOne(queryConditions)
       .select(projection)
@@ -497,7 +480,13 @@ export const createRestaurantFromOnboarding = async (onboardingData, restaurantI
     existing.ownerEmail = step1.ownerEmail || existing.ownerEmail;
     existing.ownerPhone = step1.ownerPhone || existing.ownerPhone;
     existing.primaryContactNumber = step1.primaryContactNumber || existing.primaryContactNumber;
-    if (step1.location) existing.location = step1.location;
+    if (step1.location) {
+      const pinCheck = await assertRestaurantPinInsideActiveZone(step1.location);
+      if (!pinCheck.ok) {
+        throw new Error(pinCheck.message);
+      }
+      existing.location = step1.location;
+    }
 
     // Update step2 data - always update even if empty arrays
     if (step2) {
@@ -552,6 +541,13 @@ export const createRestaurantFromOnboarding = async (onboardingData, restaurantI
         throw saveError;
       }
     }
+
+    try {
+      await applyZoneTierToRestaurantById(existing._id);
+    } catch (zoneErr) {
+      console.error('⚠️ Zone/tier assignment after onboarding save failed:', zoneErr.message);
+    }
+
     return existing;
   } catch (error) {
     console.error('Error creating restaurant from onboarding:', error);
@@ -650,15 +646,18 @@ export const updateRestaurantProfile = asyncHandler(async (req, res) => {
         if (!location.longitude) location.longitude = location.coordinates[0];
         if (!location.latitude) location.latitude = location.coordinates[1];
       }
+
+      const pinCheck = await assertRestaurantPinInsideActiveZone(location);
+      if (!pinCheck.ok) {
+        return errorResponse(res, 400, pinCheck.message);
+      }
+
       updateData.location = location;
 
-      const lat = location.latitude || location.coordinates?.[1];
-      const lng = location.longitude || location.coordinates?.[0];
-      if (lat && lng) {
-        const activeZones = await Zone.find({ isActive: true }).lean();
-        const detectedZoneId = getRestaurantZoneId(lat, lng, activeZones);
-        updateData.zoneId = detectedZoneId || null;
-      }
+      const { zoneId: detectedZoneId, tierId: detectedTierId } =
+        await resolveZoneAndTierForLocation(location);
+      updateData.zoneId = detectedZoneId || null;
+      updateData.tierId = detectedTierId || null;
     }
 
     // Update owner details if provided
@@ -697,7 +696,9 @@ export const updateRestaurantProfile = asyncHandler(async (req, res) => {
         ownerName: restaurant.ownerName,
         ownerEmail: restaurant.ownerEmail,
         ownerPhone: restaurant.ownerPhone,
-        deliveryRange: restaurant.deliveryRange
+        deliveryRange: restaurant.deliveryRange,
+        zoneId: restaurant.zoneId,
+        tierId: restaurant.tierId
       }
     });
   } catch (error) {
@@ -908,6 +909,13 @@ export const updateDeliveryPricingConfig = asyncHandler(async (req, res) => {
     if (!restaurant) {
       return errorResponse(res, 404, 'Restaurant not found');
     }
+    if (!restaurant.zoneId) {
+      return errorResponse(
+        res,
+        400,
+        'Restaurant must be assigned to a zone before configuring distance-based delivery pricing. Contact platform admin.'
+      );
+    }
     let distanceSlabs = [];
     if (restaurant.zoneId) {
       const zone = await Zone.findById(restaurant.zoneId).select('tierId').lean();
@@ -959,8 +967,12 @@ export const updateDeliveryPricingConfig = asyncHandler(async (req, res) => {
         return errorResponse(res, 400, 'Each delivery rate must have perKmRate >= 0');
       }
     }
+    const hasRates = Array.isArray(customerDeliveryRates) && customerDeliveryRates.length > 0;
+    const resolvedEnabled =
+      typeof isEnabled === 'boolean' ? isEnabled : hasRates ? true : false;
+
     restaurant.deliveryPricingConfig = {
-      isEnabled: isEnabled !== false,
+      isEnabled: resolvedEnabled,
       orderValueSlabs: normalizedOrderValueSlabs,
       customerDeliveryRates: customerDeliveryRates.map(rate => ({
         _id: rate._id,

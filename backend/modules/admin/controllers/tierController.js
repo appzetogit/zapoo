@@ -86,7 +86,10 @@ export const createTier = async (req, res) => {
     if (existingName) {
       return errorResponse(res, 400, "Tier with this name already exists");
     }
-    if (distanceSlabs !== undefined) {
+    if (distanceSlabs === undefined || !Array.isArray(distanceSlabs) || distanceSlabs.length === 0) {
+      return errorResponse(res, 400, "distanceSlabs is required and must be a non-empty array");
+    }
+    {
       const validationError = validateDistanceSlabs(distanceSlabs);
       if (validationError) {
         return errorResponse(res, 400, validationError);
@@ -112,7 +115,7 @@ export const createTier = async (req, res) => {
         freeDeliveryThreshold: req.body.freeDeliveryThreshold || 0,
         baseDistance: baseDistance || 3,
         extraKmCharge: extraKmCharge || 10,
-        distanceSlabs: distanceSlabs !== undefined ? normalizeDistanceSlabs(distanceSlabs) : []
+        distanceSlabs: normalizeDistanceSlabs(distanceSlabs)
       },
       recommendedItemFee: recommendedItemFee || 0,
       platformFee: platformFee || 0
@@ -296,7 +299,10 @@ export const updateTier = async (req, res) => {
     if (minArea !== undefined || maxArea !== undefined) {
       const allZonesToUpdate = await Zone.find({});
       for (const z of allZonesToUpdate) {
-        await z.save(); // pre-save reassigns tiers correctly
+        await z.recalculateBoundaryAreaAndTier();
+        if (z.isModified()) {
+          await z.save();
+        }
       }
     }
     return successResponse(res, 200, "Tier updated successfully", tier);
