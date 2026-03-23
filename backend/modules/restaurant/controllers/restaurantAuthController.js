@@ -871,6 +871,7 @@ export const getCurrentRestaurant = asyncHandler(async (req, res) => {
       menuImages: r.menuImages,
       slug: r.slug,
       isAcceptingOrders: r.isAcceptingOrders,
+      deliveryRange: r.deliveryRange,
       // Include verification status
       rejectionReason: r.rejectionReason || null,
       approvedAt: r.approvedAt || null,
