@@ -1676,7 +1676,7 @@ export default function LocationSelectorOverlay({
       placeId: prediction.place_id,
       fields: ["geometry", "formatted_address", "address_components", "name"],
       sessionToken: token
-    }, (place, status) => {
+    }, async (place, status) => {
       if (!window.google?.maps?.places) return;
       sessionTokenRef.current = new window.google.maps.places.AutocompleteSessionToken();
       if (status !== window.google.maps.places.PlacesServiceStatus.OK || !place?.geometry?.location) {
@@ -1687,6 +1687,36 @@ export default function LocationSelectorOverlay({
       const lng = place.geometry.location.lng();
       const label = (prediction.structured_formatting?.main_text || place.name || prediction.description?.split(",")[0] || "").trim();
       setSearchValue(label || (place.formatted_address || "").split(",")[0]?.trim() || "");
+      const addressComponents = place.address_components || [];
+      const getComponent = types => addressComponents.find(comp => types.some(t => comp.types.includes(t)))?.long_name || "";
+      const city = getComponent(["locality"]) || getComponent(["administrative_area_level_2"]) || "";
+      const state = getComponent(["administrative_area_level_1"]) || "";
+      const postalCode = getComponent(["postal_code"]) || "";
+      const streetNumber = getComponent(["street_number"]);
+      const route = getComponent(["route"]);
+      const pointOfInterest = getComponent(["point_of_interest"]) || getComponent(["premise"]) || getComponent(["sublocality_level_1"]) || "";
+      const street = `${streetNumber ? `${streetNumber} ` : ""}${route || pointOfInterest || label}`.trim();
+      const formattedWithoutCountry = (place.formatted_address || "").replace(/,\s*India\s*$/i, "").trim();
+      const locationPayload = {
+        latitude: lat,
+        longitude: lng,
+        city: city || "",
+        state: state || "",
+        area: pointOfInterest || "",
+        address: street || label || formattedWithoutCountry || `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
+        zipCode: postalCode || "",
+        formattedAddress: formattedWithoutCountry || [street, city, state, postalCode].filter(Boolean).join(", ")
+      };
+      setCurrentAddress(locationPayload.formattedAddress || locationPayload.address);
+      setAddressFormData(prev => ({
+        ...prev,
+        street: street || prev.street,
+        city: city || prev.city,
+        state: state || prev.state,
+        zipCode: postalCode || prev.zipCode,
+        additionalDetails: formattedWithoutCountry || prev.additionalDetails
+      }));
+      await persistGlobalUserLocationFromOverlay(locationPayload);
 
       lastReverseGeocodeCoordsRef.current = null;
       setMapPosition([lat, lng]);
@@ -1707,7 +1737,7 @@ export default function LocationSelectorOverlay({
         }
       }
 
-      // Only update map + form; global user location persists on "Save address"
+      // Keep reverse-geocode sync so form/map stay consistent with selected point.
       handleMapMoveEnd(lat, lng);
     });
   };
