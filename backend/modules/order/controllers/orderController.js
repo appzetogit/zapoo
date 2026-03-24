@@ -1021,6 +1021,19 @@ export const calculateOrder = async (req, res) => {
       });
     }
 
+    const hasUsableCoords = (addr) => {
+      if (!addr || typeof addr !== 'object') return false;
+      const coords = addr?.location?.coordinates;
+      if (Array.isArray(coords) && coords.length >= 2) {
+        const lng = Number(coords[0]);
+        const lat = Number(coords[1]);
+        if (Number.isFinite(lat) && Number.isFinite(lng) && !(lat === 0 && lng === 0)) return true;
+      }
+      const lat = Number(addr?.location?.latitude ?? addr?.latitude);
+      const lng = Number(addr?.location?.longitude ?? addr?.longitude);
+      return Number.isFinite(lat) && Number.isFinite(lng) && !(lat === 0 && lng === 0);
+    };
+
     // Get delivery address
     let finalDeliveryAddress = deliveryAddress;
 
@@ -1040,6 +1053,33 @@ export const calculateOrder = async (req, res) => {
         }
       } catch (err) {
         console.error('Error fetching user address:', err);
+      }
+    }
+
+    // Fallback: if address payload lacks usable coordinates, use user's currentLocation coordinates.
+    if (!hasUsableCoords(finalDeliveryAddress) && req.user && (req.user._id || req.user.id)) {
+      try {
+        const { default: User } = await import('../../auth/models/User.js');
+        const user = await User.findById(req.user._id || req.user.id).select('currentLocation').lean();
+        const c = user?.currentLocation;
+        const lat = Number(c?.latitude ?? c?.location?.coordinates?.[1]);
+        const lng = Number(c?.longitude ?? c?.location?.coordinates?.[0]);
+        if (Number.isFinite(lat) && Number.isFinite(lng) && !(lat === 0 && lng === 0)) {
+          finalDeliveryAddress = {
+            ...(finalDeliveryAddress || {}),
+            location: {
+              ...(finalDeliveryAddress?.location || {}),
+              type: 'Point',
+              coordinates: [lng, lat],
+              latitude: lat,
+              longitude: lng
+            },
+            latitude: lat,
+            longitude: lng
+          };
+        }
+      } catch (err) {
+        console.error('Error resolving fallback currentLocation for pricing:', err);
       }
     }
 

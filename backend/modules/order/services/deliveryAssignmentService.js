@@ -24,6 +24,44 @@ function calculateDistance(lat1, lng1, lat2, lng2) {
 }
 
 /**
+ * Keep only riders who have no active assigned order.
+ * Active order = any order not in delivered/cancelled.
+ * @param {Array<Object>} partners
+ * @returns {Promise<Array<Object>>}
+ */
+async function filterIdleDeliveryPartners(partners) {
+  if (!Array.isArray(partners) || partners.length === 0) return [];
+
+  const partnerIdStrings = partners
+    .map(p => (p?._id?.toString ? p._id.toString() : String(p?._id || '')))
+    .filter(Boolean);
+  if (partnerIdStrings.length === 0) return [];
+
+  const objectIds = partnerIdStrings
+    .filter(id => mongoose.Types.ObjectId.isValid(id))
+    .map(id => new mongoose.Types.ObjectId(id));
+
+  const activeOrders = await Order.find({
+    status: { $nin: ['delivered', 'cancelled'] },
+    $or: [
+      { deliveryPartnerId: { $in: partnerIdStrings } },
+      ...(objectIds.length > 0 ? [{ deliveryPartnerId: { $in: objectIds } }] : [])
+    ]
+  }).select('deliveryPartnerId').lean();
+
+  const busyIds = new Set(
+    activeOrders
+      .map(o => (o?.deliveryPartnerId?.toString ? o.deliveryPartnerId.toString() : String(o?.deliveryPartnerId || '')))
+      .filter(Boolean)
+  );
+
+  return partners.filter(p => {
+    const id = p?._id?.toString ? p._id.toString() : String(p?._id || '');
+    return id && !busyIds.has(id);
+  });
+}
+
+/**
  * Find all nearest available delivery boys within priority distance (for priority notification)
  * @param {number} restaurantLat - Restaurant latitude
  * @param {number} restaurantLng - Restaurant longitude
@@ -98,6 +136,7 @@ export async function findNearestDeliveryBoys(restaurantLat, restaurantLng, rest
         ...dbPartnerMap[p._id.toString()]
       }));
     }
+    deliveryPartners = await filterIdleDeliveryPartners(deliveryPartners);
     if (!deliveryPartners || deliveryPartners.length === 0) {
       return [];
     }
@@ -246,6 +285,7 @@ export async function findNearestDeliveryBoy(restaurantLat, restaurantLng, resta
         ...dbPartnerMap[p._id.toString()]
       }));
     }
+    deliveryPartners = await filterIdleDeliveryPartners(deliveryPartners);
     if (!deliveryPartners || deliveryPartners.length === 0) {
       return null;
     }

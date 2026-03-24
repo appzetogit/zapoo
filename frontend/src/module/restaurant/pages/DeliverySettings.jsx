@@ -31,7 +31,6 @@ export default function DeliverySettings() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [isEnabled, setIsEnabled] = useState(false);
   const [tierInfo, setTierInfo] = useState(null);
   const [distanceSlabs, setDistanceSlabs] = useState([]);
   const [orderValueSlabs, setOrderValueSlabs] = useState([]);
@@ -78,7 +77,6 @@ export default function DeliverySettings() {
           : [];
 
       setDistanceSlabs(fetchedDistanceSlabs);
-      setIsEnabled(Boolean(cfg.isEnabled));
 
       if (fetchedOrderSlabs.length) {
         setOrderValueSlabs(
@@ -222,7 +220,6 @@ export default function DeliverySettings() {
       });
 
       const payload = {
-        isEnabled,
         orderValueSlabs: normalizedOrderValueSlabs,
         customerDeliveryRates: activeDistanceSlabs.flatMap((d) =>
           orderValueSlabs.map((o) => {
@@ -261,9 +258,9 @@ export default function DeliverySettings() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="bg-white border-b border-slate-200 px-4 py-3 sticky top-0 z-20">
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
+    <div className="min-h-screen bg-slate-50 pb-24 md:pb-0">
+      <div className="bg-white border-b border-slate-200 px-3 py-3 sticky top-0 z-20">
+        <div className="max-w-3xl mx-auto flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <button onClick={() => navigate(-1)} className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors" aria-label="Go back">
               <ArrowLeft className="w-5 h-5 text-slate-900" />
@@ -273,23 +270,18 @@ export default function DeliverySettings() {
               <p className="text-xs text-slate-500">Configure customer-facing per-km pricing matrix</p>
             </div>
           </div>
-          <Button onClick={handleSave} disabled={saving} className="bg-blue-600 hover:bg-blue-700 text-white">
+          <Button onClick={handleSave} disabled={saving} className="hidden md:inline-flex bg-blue-600 hover:bg-blue-700 text-white h-9 px-3 text-sm">
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
             Save
           </Button>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto p-4 space-y-6">
+      <div className="max-w-3xl mx-auto p-3 sm:p-4 space-y-4 sm:space-y-6">
         <div className="bg-white border border-slate-200 rounded-xl p-4">
-          <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
-            <input
-              type="checkbox"
-              checked={isEnabled}
-              onChange={(e) => setIsEnabled(e.target.checked)}
-            />
-            Enable custom customer delivery pricing
-          </label>
+          <p className="text-sm font-medium text-slate-700">
+            Customer delivery pricing uses your order-value slabs and per-km matrix.
+          </p>
           {tierInfo?.name ? (
             <p className="text-xs text-slate-500 mt-2">
               Active tier: {tierInfo.name}
@@ -300,19 +292,19 @@ export default function DeliverySettings() {
         <div className="bg-white border border-slate-200 rounded-xl p-4">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-base font-semibold text-slate-900">Order Value Slabs</h2>
-            <Button variant="outline" onClick={addOrderValueSlab}>
+            <Button variant="outline" onClick={addOrderValueSlab} className="h-9 px-3 text-sm">
               <Plus className="w-4 h-4 mr-2" />
               Add Slab
             </Button>
           </div>
           <div className="space-y-3">
             {orderValueSlabs.map((slab, idx) => (
-              <div key={slab._id} className="grid grid-cols-1 md:grid-cols-5 gap-3 items-end border border-slate-200 rounded-lg p-3">
+              <div key={slab._id} className="grid grid-cols-1 md:grid-cols-5 gap-3 items-end border border-slate-200 rounded-lg p-3 sm:p-4">
                 <div>
                   <label className="text-xs text-slate-500">Label</label>
                   <input
                     type="text"
-                    className="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"
+                    className="w-full border border-slate-300 rounded px-3 py-2.5 text-sm"
                     value={slab.label}
                     onChange={(e) => updateOrderValueSlab(idx, "label", e.target.value)}
                     placeholder="e.g. 50-149"
@@ -323,7 +315,7 @@ export default function DeliverySettings() {
                   <input
                     type="number"
                     min="0"
-                    className="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"
+                    className="w-full border border-slate-300 rounded px-3 py-2.5 text-sm"
                     value={slab.minOrderValue}
                     onChange={(e) => updateOrderValueSlab(idx, "minOrderValue", e.target.value)}
                   />
@@ -333,16 +325,16 @@ export default function DeliverySettings() {
                   <input
                     type="number"
                     min="0"
-                    className="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"
+                    className="w-full border border-slate-300 rounded px-3 py-2.5 text-sm"
                     value={slab.maxOrderValue ?? ""}
                     onChange={(e) => updateOrderValueSlab(idx, "maxOrderValue", e.target.value === "" ? null : e.target.value)}
                     placeholder="Leave empty for open ended"
                   />
                 </div>
-                <div className="md:col-span-2 flex justify-end">
+                <div className="md:col-span-2 flex justify-start md:justify-end">
                   <Button
                     variant="ghost"
-                    className="text-red-600 hover:text-red-700"
+                    className="text-red-600 hover:text-red-700 h-9 px-3 w-full sm:w-auto"
                     onClick={() => removeOrderValueSlab(idx)}
                     disabled={orderValueSlabs.length === 1}
                   >
@@ -364,8 +356,48 @@ export default function DeliverySettings() {
           {!activeDistanceSlabs.length ? (
             <p className="text-sm text-red-600">No active distance slabs available for your tier configuration.</p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full border border-slate-200 rounded-lg">
+            <>
+              <div className="space-y-3 md:hidden">
+                {activeDistanceSlabs.map((d) => (
+                  <div key={d._id} className="border border-slate-200 rounded-lg p-3 sm:p-4">
+                    <div className="mb-2">
+                      <div className="font-medium text-slate-900 text-sm">{d.name}</div>
+                      <div className="text-xs text-slate-500">
+                        {d.minKm} to {d.maxKm === null ? "Open" : d.maxKm} km
+                        {d.isBaseSlab ? " (Base slab)" : ""}
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      {orderValueSlabs.map((o) => {
+                        const key = getRateKey(d._id, o._id);
+                        return (
+                          <div key={key} className="flex items-center gap-2">
+                            <label className="text-xs text-slate-600 min-w-0 flex-1">
+                              {o.label || "Unlabeled"} (Rs/km)
+                            </label>
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.1"
+                              value={rateMap[key] ?? 0}
+                              onChange={(e) =>
+                                setRateMap((prev) => ({
+                                  ...prev,
+                                  [key]: e.target.value,
+                                }))
+                              }
+                              className="w-24 sm:w-28 border border-slate-300 rounded px-2 py-2.5 text-sm"
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="overflow-x-auto hidden md:block">
+                <table className="w-full border border-slate-200 rounded-lg">
                 <thead className="bg-slate-50">
                   <tr>
                     <th className="px-3 py-2 text-left text-xs font-semibold text-slate-700 border-b">Distance Slab</th>
@@ -401,7 +433,7 @@ export default function DeliverySettings() {
                                   [key]: e.target.value,
                                 }))
                               }
-                              className="w-28 border border-slate-300 rounded px-2 py-1.5 text-sm"
+                              className="w-28 border border-slate-300 rounded px-2 py-2 text-sm"
                             />
                           </td>
                         );
@@ -409,9 +441,20 @@ export default function DeliverySettings() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
-            </div>
+                </table>
+              </div>
+            </>
           )}
+        </div>
+      </div>
+
+      {/* Mobile save bar */}
+      <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-slate-200 bg-white p-3 md:hidden">
+        <div className="max-w-3xl mx-auto">
+          <Button onClick={handleSave} disabled={saving} className="w-full bg-blue-600 hover:bg-blue-700 text-white h-11 text-sm font-medium">
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+            Save Delivery Pricing
+          </Button>
         </div>
       </div>
     </div>

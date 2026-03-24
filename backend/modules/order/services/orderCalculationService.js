@@ -3,6 +3,7 @@ import Offer from '../../restaurant/models/Offer.js';
 import FeeSettings from '../../admin/models/FeeSettings.js';
 import Zone from '../../admin/models/Zone.js';
 import Tier from '../../admin/models/Tier.js';
+import { resolveZoneAndTierForLocation } from '../../admin/services/restaurantZoneAssignmentService.js';
 import mongoose from 'mongoose';
 
 const roundCurrency = (value) => Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
@@ -10,13 +11,53 @@ const roundCurrency = (value) => Math.round((Number(value || 0) + Number.EPSILON
 /** Treat common truthy shapes from JSON / older clients */
 const isRestaurantCustomDeliveryEnabled = (restaurant) => {
   const v = restaurant?.deliveryPricingConfig?.isEnabled;
-  return v === true || v === 'true' || v === 1 || v === '1';
+  if (v === true || v === 'true' || v === 1 || v === '1') return true;
+
+  // Safety fallback: if pricing grid data exists, treat custom pricing as enabled
+  // even if legacy/stale isEnabled flag is false.
+  const orderSlabs = restaurant?.deliveryPricingConfig?.orderValueSlabs;
+  const rates = restaurant?.deliveryPricingConfig?.customerDeliveryRates;
+  const hasConfiguredGrid = Array.isArray(orderSlabs) && orderSlabs.length > 0 &&
+    Array.isArray(rates) && rates.length > 0;
+  return hasConfiguredGrid;
 };
 
 const isInRange = (value, min, max) => {
   if (value < min) return false;
   if (max === null || max === undefined) return true;
   return value <= max;
+};
+
+const isValidCoordinatePair = (lat, lng) => {
+  const nLat = Number(lat);
+  const nLng = Number(lng);
+  if (!Number.isFinite(nLat) || !Number.isFinite(nLng)) return false;
+  if (Math.abs(nLat) > 90 || Math.abs(nLng) > 180) return false;
+  // Treat default empty-point coordinates as invalid.
+  if (nLat === 0 && nLng === 0) return false;
+  return true;
+};
+
+const extractLatLng = (entity, candidates = []) => {
+  for (const c of candidates) {
+    const scope = c.path ? c.path.split('.').reduce((acc, key) => (acc ? acc[key] : undefined), entity) : entity;
+    if (!scope) continue;
+
+    // GeoJSON [lng, lat]
+    if (Array.isArray(scope.coordinates) && scope.coordinates.length >= 2) {
+      const lng = Number(scope.coordinates[0]);
+      const lat = Number(scope.coordinates[1]);
+      if (isValidCoordinatePair(lat, lng)) return { lat, lng };
+    }
+
+    // Explicit latitude/longitude
+    if (scope.latitude != null && scope.longitude != null) {
+      const lat = Number(scope.latitude);
+      const lng = Number(scope.longitude);
+      if (isValidCoordinatePair(lat, lng)) return { lat, lng };
+    }
+  }
+  return null;
 };
 
 const getDefaultDistanceSlabs = () => ([
@@ -73,13 +114,33 @@ const findOrderValueSlab = (orderValueSlabs, subtotal) => {
   if (!Array.isArray(orderValueSlabs) || orderValueSlabs.length === 0) return null;
 
   const sortedSlabs = [...orderValueSlabs].sort((a, b) => Number(a.minOrderValue || 0) - Number(b.minOrderValue || 0));
-  return sortedSlabs.find((slab) =>
+  const exactMatch = sortedSlabs.find((slab) =>
     isInRange(
       subtotal,
       Number(slab.minOrderValue || 0),
       slab.maxOrderValue === null || slab.maxOrderValue === undefined ? null : Number(slab.maxOrderValue)
     )
-  ) || null;
+  );
+  if (exactMatch) return exactMatch;
+
+  // Fallback behavior:
+  // If slabs are configured but there is a gap/misaligned min value (e.g. first slab starts at 149
+  // and cart is 120), pick the nearest applicable slab instead of charging zero delivery.
+  const firstSlab = sortedSlabs[0] || null;
+  if (!firstSlab) return null;
+  if (subtotal < Number(firstSlab.minOrderValue || 0)) return firstSlab;
+
+  // For in-between gaps, use the nearest lower slab by minOrderValue.
+  let nearestLower = firstSlab;
+  for (const slab of sortedSlabs) {
+    const min = Number(slab.minOrderValue || 0);
+    if (min <= subtotal) {
+      nearestLower = slab;
+    } else {
+      break;
+    }
+  }
+  return nearestLower || firstSlab;
 };
 
 const findDistanceSlab = (distanceSlabs, distanceKm) => {
@@ -102,52 +163,83 @@ const findBaseDistanceSlab = (distanceSlabs) => {
 };
 
 const calculateDistanceFromAddresses = (restaurant, deliveryAddress) => {
-  const resCoords = restaurant?.location?.coordinates;
-  const resLat = restaurant?.location?.latitude ?? resCoords?.[1];
-  const resLng = restaurant?.location?.longitude ?? resCoords?.[0];
+  const restaurantPoint = extractLatLng(restaurant, [
+    { path: 'location' },
+    { path: 'onboarding.step1.location' },
+    { path: '' },
+  ]);
+  const deliveryPoint = extractLatLng(deliveryAddress, [
+    { path: 'location' },
+    { path: '' },
+    { path: 'currentLocation' },
+  ]);
 
-  let delLng;
-  let delLat;
-  const delLoc = deliveryAddress?.location;
-  if (delLoc?.coordinates?.length >= 2) {
-    delLng = Number(delLoc.coordinates[0]);
-    delLat = Number(delLoc.coordinates[1]);
-  } else if (delLoc?.latitude != null && delLoc?.longitude != null) {
-    delLng = Number(delLoc.longitude);
-    delLat = Number(delLoc.latitude);
-  } else if (deliveryAddress?.longitude != null && deliveryAddress?.latitude != null) {
-    delLng = Number(deliveryAddress.longitude);
-    delLat = Number(deliveryAddress.latitude);
-  }
-
-  if (
-    resLat != null &&
-    resLng != null &&
-    delLat != null &&
-    delLng != null &&
-    Number.isFinite(resLat) &&
-    Number.isFinite(resLng) &&
-    Number.isFinite(delLat) &&
-    Number.isFinite(delLng)
-  ) {
-    return calculateDistance([resLng, resLat], [delLng, delLat]);
-  }
-
-  return 0;
+  if (!restaurantPoint || !deliveryPoint) return null;
+  return calculateDistance(
+    [restaurantPoint.lng, restaurantPoint.lat],
+    [deliveryPoint.lng, deliveryPoint.lat]
+  );
 };
 
 const resolveTierAndZone = async (restaurant) => {
-  if (!restaurant?.zoneId) {
-    return { zone: null, tier: null };
+  let zone = null;
+  let zoneTierId = null;
+  const restaurantTierId = restaurant?.tierId ? String(restaurant.tierId) : null;
+
+  if (restaurant?.zoneId) {
+    zone = await Zone.findById(restaurant.zoneId).lean();
+    zoneTierId = zone?.tierId ? String(zone.tierId) : null;
   }
 
-  const zone = await Zone.findById(restaurant.zoneId).lean();
-  if (!zone?.tierId) {
-    return { zone, tier: null };
+  const tierMismatchDetected = Boolean(zoneTierId && restaurantTierId && zoneTierId !== restaurantTierId);
+  if (tierMismatchDetected) {
+    console.warn(
+      `[calculateOrderPricing] Tier mismatch detected for restaurant ${restaurant?._id || restaurant?.restaurantId || 'unknown'}: zone.tierId=${zoneTierId}, restaurant.tierId=${restaurantTierId}`
+    );
   }
 
-  const tier = await Tier.findById(zone.tierId).lean();
-  return { zone, tier };
+  let resolvedTierId = zoneTierId || restaurantTierId || null;
+
+  // Self-heal for pricing path:
+  // if tier mapping is missing but restaurant has a valid pin, resolve zone/tier by location.
+  if (!resolvedTierId && restaurant?.location) {
+    try {
+      const relink = await resolveZoneAndTierForLocation(restaurant.location);
+      const relinkZoneId = relink?.zoneId ? String(relink.zoneId) : null;
+      const relinkTierId = relink?.tierId ? String(relink.tierId) : null;
+      if (relinkTierId) {
+        resolvedTierId = relinkTierId;
+        if (restaurant?._id) {
+          Restaurant.findByIdAndUpdate(
+            restaurant._id,
+            {
+              $set: {
+                zoneId: relinkZoneId || null,
+                tierId: relinkTierId
+              }
+            },
+            { new: false }
+          ).catch((err) => {
+            console.warn(`[calculateOrderPricing] Failed to persist zone/tier relink for restaurant ${restaurant._id}: ${err.message}`);
+          });
+        }
+      }
+    } catch (err) {
+      console.warn(`[calculateOrderPricing] Zone/tier relink by location failed: ${err.message}`);
+    }
+  }
+
+  if (!resolvedTierId) {
+    return { zone, tier: null, tierResolutionSource: null, tierMismatchDetected };
+  }
+
+  const tier = await Tier.findById(resolvedTierId).lean();
+  return {
+    zone,
+    tier,
+    tierResolutionSource: zoneTierId ? 'zone' : 'restaurant',
+    tierMismatchDetected
+  };
 };
 
 const calculateRestaurantCustomerDeliveryFee = ({
@@ -426,9 +518,13 @@ export const calculateOrderPricing = async ({
     }
 
     const feeSettings = await getFeeSettings();
-    const { tier } = await resolveTierAndZone(restaurant);
+    const {
+      tier,
+      tierResolutionSource,
+      tierMismatchDetected
+    } = await resolveTierAndZone(restaurant);
     const distanceKmRaw = calculateDistanceFromAddresses(restaurant, deliveryAddress);
-    const distanceKm = roundCurrency(distanceKmRaw);
+    const distanceKm = Number.isFinite(distanceKmRaw) ? roundCurrency(distanceKmRaw) : 0;
 
     const tierDistanceSlabs = getTierDistanceSlabs(tier);
     const distanceSlabs = tierDistanceSlabs;
@@ -515,6 +611,12 @@ export const calculateOrderPricing = async ({
       if (!matchedOrderValueSlab) {
         pricingDiagnostics.push({ code: 'NO_ORDER_VALUE_SLAB', message: 'Cart subtotal does not match any order-value slab.' });
       }
+      if (!Number.isFinite(distanceKmRaw)) {
+        pricingDiagnostics.push({
+          code: 'MISSING_DISTANCE_COORDS',
+          message: 'Distance could not be resolved from restaurant/address coordinates. Verify saved address coordinates.',
+        });
+      }
       if (
         finalCustomerDeliveryFee === 0 &&
         freeDeliveryReason === null &&
@@ -573,6 +675,8 @@ export const calculateOrderPricing = async ({
           : null,
         customerPerKmRate: roundCurrency(customerPerKmRate),
         adminPerKmRate: roundCurrency(Number(matchedDistanceSlab?.adminPerKmRate || 0)),
+        tierResolutionSource,
+        tierMismatchDetected,
         freeDeliveryReason,
         customerDeliveryFeeBeforeWaivers: roundCurrency(customerDeliveryFeeBeforeWaivers),
         pricingDiagnostics,

@@ -63,6 +63,52 @@ function isRestaurantInAnyZone(restaurantLat, restaurantLng, activeZones) {
   return false;
 }
 
+async function resolveTierForRestaurant(restaurant, context = 'restaurantController') {
+  if (!restaurant) {
+    return {
+      zone: null,
+      tier: null,
+      resolvedTierId: null,
+      tierResolutionSource: null,
+      tierMismatchDetected: false
+    };
+  }
+
+  let zone = null;
+  let zoneTierId = null;
+  const restaurantTierId = restaurant.tierId ? String(restaurant.tierId) : null;
+
+  if (restaurant.zoneId) {
+    zone = await Zone.findById(restaurant.zoneId).select('tierId').lean();
+    zoneTierId = zone?.tierId ? String(zone.tierId) : null;
+  }
+
+  const tierMismatchDetected = Boolean(zoneTierId && restaurantTierId && zoneTierId !== restaurantTierId);
+  if (tierMismatchDetected) {
+    console.warn(`[${context}] Tier mismatch detected for restaurant ${restaurant._id}: zone.tierId=${zoneTierId}, restaurant.tierId=${restaurantTierId}`);
+  }
+
+  const resolvedTierId = zoneTierId || restaurantTierId || null;
+  if (!resolvedTierId) {
+    return {
+      zone,
+      tier: null,
+      resolvedTierId: null,
+      tierResolutionSource: null,
+      tierMismatchDetected
+    };
+  }
+
+  const tier = await Tier.findById(resolvedTierId).select('name deliveryPricing.distanceSlabs').lean();
+  return {
+    zone,
+    tier,
+    resolvedTierId,
+    tierResolutionSource: zoneTierId ? 'zone' : 'restaurant',
+    tierMismatchDetected
+  };
+}
+
 // Get all restaurants (for user module)
 export const getRestaurants = async (req, res) => {
   try {
@@ -923,18 +969,45 @@ export const uploadMenuImage = asyncHandler(async (req, res) => {
  */
 export const getDeliveryPricingConfig = asyncHandler(async (req, res) => {
   try {
-    const restaurant = await Restaurant.findById(req.restaurant._id).select('deliveryPricingConfig zoneId').lean();
+    let restaurant = await Restaurant.findById(req.restaurant._id).select('deliveryPricingConfig zoneId tierId location').lean();
     if (!restaurant) {
       return errorResponse(res, 404, 'Restaurant not found');
     }
-    let distanceSlabs = [];
-    let tier = null;
-    if (restaurant.zoneId) {
-      const zone = await Zone.findById(restaurant.zoneId).select('tierId').lean();
-      if (zone?.tierId) {
-        tier = await Tier.findById(zone.tierId).select('name deliveryPricing.distanceSlabs').lean();
-        distanceSlabs = Array.isArray(tier?.deliveryPricing?.distanceSlabs) ? tier.deliveryPricing.distanceSlabs : [];
+    let tierResolution = await resolveTierForRestaurant(restaurant, 'getDeliveryPricingConfig');
+    let tier = tierResolution.tier;
+    let distanceSlabs = Array.isArray(tier?.deliveryPricing?.distanceSlabs)
+      ? tier.deliveryPricing.distanceSlabs
+      : [];
+
+    // If no slabs resolved, attempt one-time relink from current location -> zone/tier.
+    if (!distanceSlabs.length && restaurant?.location) {
+      try {
+        await applyZoneTierToRestaurantById(restaurant._id);
+        restaurant = await Restaurant.findById(req.restaurant._id).select('deliveryPricingConfig zoneId tierId location').lean();
+        tierResolution = await resolveTierForRestaurant(restaurant, 'getDeliveryPricingConfig:afterRelink');
+        tier = tierResolution.tier;
+        distanceSlabs = Array.isArray(tier?.deliveryPricing?.distanceSlabs)
+          ? tier.deliveryPricing.distanceSlabs
+          : [];
+      } catch (relinkErr) {
+        console.warn(`[getDeliveryPricingConfig] Auto relink failed for restaurant ${restaurant?._id}: ${relinkErr.message}`);
       }
+    }
+
+    // Self-heal stale restaurant.tierId when zone.tierId exists and differs/missing.
+    if (
+      restaurant.zoneId &&
+      tierResolution.tierResolutionSource === 'zone' &&
+      tierResolution.resolvedTierId &&
+      String(restaurant.tierId || '') !== String(tierResolution.resolvedTierId)
+    ) {
+      Restaurant.findByIdAndUpdate(
+        restaurant._id,
+        { tierId: tierResolution.resolvedTierId },
+        { new: false }
+      ).catch((healErr) => {
+        console.warn(`[getDeliveryPricingConfig] Failed to self-heal restaurant.tierId for ${restaurant._id}: ${healErr.message}`);
+      });
     }
     if (!distanceSlabs.length) {
       distanceSlabs = [];
@@ -950,7 +1023,9 @@ export const getDeliveryPricingConfig = asyncHandler(async (req, res) => {
         id: tier._id,
         name: tier.name
       } : null,
-      distanceSlabs
+      distanceSlabs,
+      tierResolutionSource: tierResolution.tierResolutionSource,
+      tierMismatchDetected: tierResolution.tierMismatchDetected
     });
   } catch (error) {
     console.error('Error fetching delivery pricing config:', error);
@@ -973,20 +1048,42 @@ export const updateDeliveryPricingConfig = asyncHandler(async (req, res) => {
     if (!restaurant) {
       return errorResponse(res, 404, 'Restaurant not found');
     }
-    if (!restaurant.zoneId) {
+    if (!restaurant.zoneId && !restaurant.tierId) {
       return errorResponse(
         res,
         400,
-        'Restaurant must be assigned to a zone before configuring distance-based delivery pricing. Contact platform admin.'
+        'Restaurant must be assigned to a zone/tier before configuring distance-based delivery pricing. Contact platform admin.'
       );
     }
-    let distanceSlabs = [];
-    if (restaurant.zoneId) {
-      const zone = await Zone.findById(restaurant.zoneId).select('tierId').lean();
-      if (zone?.tierId) {
-        const tier = await Tier.findById(zone.tierId).select('deliveryPricing.distanceSlabs').lean();
-        distanceSlabs = Array.isArray(tier?.deliveryPricing?.distanceSlabs) ? tier.deliveryPricing.distanceSlabs : [];
+    let tierResolution = await resolveTierForRestaurant(restaurant, 'updateDeliveryPricingConfig');
+    let distanceSlabs = Array.isArray(tierResolution?.tier?.deliveryPricing?.distanceSlabs)
+      ? tierResolution.tier.deliveryPricing.distanceSlabs
+      : [];
+    if (!distanceSlabs.length && restaurant?.location) {
+      try {
+        await applyZoneTierToRestaurantById(restaurant._id);
+        const refreshed = await Restaurant.findById(restaurant._id).select('zoneId tierId location').lean();
+        tierResolution = await resolveTierForRestaurant(refreshed, 'updateDeliveryPricingConfig:afterRelink');
+        distanceSlabs = Array.isArray(tierResolution?.tier?.deliveryPricing?.distanceSlabs)
+          ? tierResolution.tier.deliveryPricing.distanceSlabs
+          : [];
+        if (refreshed?.tierId && String(restaurant.tierId || '') !== String(refreshed.tierId)) {
+          restaurant.tierId = refreshed.tierId;
+        }
+        if (refreshed?.zoneId && String(restaurant.zoneId || '') !== String(refreshed.zoneId)) {
+          restaurant.zoneId = refreshed.zoneId;
+        }
+      } catch (relinkErr) {
+        console.warn(`[updateDeliveryPricingConfig] Auto relink failed for restaurant ${restaurant?._id}: ${relinkErr.message}`);
       }
+    }
+    if (
+      restaurant.zoneId &&
+      tierResolution.tierResolutionSource === 'zone' &&
+      tierResolution.resolvedTierId &&
+      String(restaurant.tierId || '') !== String(tierResolution.resolvedTierId)
+    ) {
+      restaurant.tierId = tierResolution.resolvedTierId;
     }
     if (!distanceSlabs.length) {
       distanceSlabs = [];
