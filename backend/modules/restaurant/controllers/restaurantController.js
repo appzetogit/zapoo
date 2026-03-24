@@ -101,24 +101,8 @@ export const getRestaurants = async (req, res) => {
       }
     }
 
-    // Enforce zone presence when user location is available
-    if (hasGeoFilter && !userZone) {
-      return successResponse(res, 200, 'User is outside service zone', {
-        restaurants: [],
-        total: 0,
-        status: 'OUT_OF_SERVICE',
-        filters: {
-          sortBy,
-          cuisine,
-          minRating,
-          maxDeliveryTime,
-          maxDistance,
-          maxPrice,
-          hasOffers,
-          pureVeg: pureVegOnly
-        }
-      });
-    }
+    // NOTE: Do not block listing when user is outside any zone.
+    // Only restaurant's zone must be active; customer can be in any zone.
 
     // Build query conditions array (omit isActive when allowInactive — explicit search UX)
     const queryAndConditions = [];
@@ -201,29 +185,26 @@ export const getRestaurants = async (req, res) => {
     }
 
     // Only show restaurants that belong to an active zone
-    let activeZoneIds = null;
-    if (userZone || hasGeoFilter) {
-      const activeZones = await Zone.find({ isActive: true }).select('_id').lean();
-      activeZoneIds = activeZones.map(zone => zone._id);
-      if (activeZoneIds.length === 0) {
-        return successResponse(res, 200, 'No active zones available', {
-          restaurants: [],
-          total: 0,
-          status: 'OUT_OF_SERVICE',
-          filters: {
-            sortBy,
-            cuisine,
-            minRating,
-            maxDeliveryTime,
-            maxDistance,
-            maxPrice,
-            hasOffers,
-            pureVeg: pureVegOnly
-          }
-        });
-      }
-      queryAndConditions.push({ zoneId: { $in: activeZoneIds } });
+    const activeZones = await Zone.find({ isActive: true }).select('_id').lean();
+    const activeZoneIds = activeZones.map(zone => zone._id);
+    if (activeZoneIds.length === 0) {
+      return successResponse(res, 200, 'No active zones available', {
+        restaurants: [],
+        total: 0,
+        status: 'OUT_OF_SERVICE',
+        filters: {
+          sortBy,
+          cuisine,
+          minRating,
+          maxDeliveryTime,
+          maxDistance,
+          maxPrice,
+          hasOffers,
+          pureVeg: pureVegOnly
+        }
+      });
     }
+    queryAndConditions.push({ zoneId: { $in: activeZoneIds } });
 
     const query = { $and: queryAndConditions };
 
@@ -329,6 +310,58 @@ export const getRestaurants = async (req, res) => {
 
       restaurants = restaurantsResult;
       total = countResult[0]?.total || 0;
+
+      // Fallback: include restaurants that have lat/lng but missing GeoJSON coordinates
+      try {
+        const missingCoordQuery = {
+          $and: [
+            ...query.$and,
+            { "location.latitude": { $ne: null } },
+            { "location.longitude": { $ne: null } },
+            {
+              $or: [
+                { "location.coordinates": { $exists: false } },
+                { "location.coordinates": { $size: 0 } },
+                { "location.coordinates.0": 0, "location.coordinates.1": 0 }
+              ]
+            }
+          ]
+        };
+
+        const missingCoordRestaurants = await Restaurant.find(missingCoordQuery)
+          .select(projectionFields)
+          .lean();
+
+        if (missingCoordRestaurants.length > 0) {
+          const existingIds = new Set(restaurants.map(r => String(r._id)));
+          const maxRangeKm = maxRangeMeters / 1000;
+          const extra = missingCoordRestaurants
+            .map(r => {
+              const lat = Number(r.location?.latitude);
+              const lng = Number(r.location?.longitude);
+              if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+              const distanceKm = calculateDistance([userLng, userLat], [lng, lat]);
+              const rangeKm = Number(r.deliveryRange) || 5;
+              if (distanceKm > maxRangeKm) return null;
+              if (!skipDeliveryRangeMatch && distanceKm > rangeKm) return null;
+              return {
+                ...r,
+                distanceMeters: distanceKm * 1000
+              };
+            })
+            .filter(Boolean)
+            .filter(r => !existingIds.has(String(r._id)));
+
+          if (extra.length > 0) {
+            restaurants = [...restaurants, ...extra]
+              .sort((a, b) => (a.distanceMeters ?? 0) - (b.distanceMeters ?? 0))
+              .slice(0, parseInt(limit));
+            total += extra.length;
+          }
+        }
+      } catch (fallbackErr) {
+        console.warn("⚠️ Geo fallback for missing coordinates failed:", fallbackErr.message);
+      }
     } else {
       const projection = 'name slug cuisines rating totalRatings promo profileImage location avgDeliveryTime avgPriceValue isActive isAcceptingOrders featuredDish featuredPrice offer estimatedDeliveryTime distance deliveryRange deliveryTimings openDays deliveryPricingConfig';
       restaurants = await Restaurant.find(query)
@@ -1119,35 +1152,15 @@ export const getRestaurantsWithDishesUnder250 = async (req, res) => {
     const userLng = longitude != null ? parseFloat(longitude) : null;
     const hasGeoFilter = userLat != null && userLng != null && Number.isFinite(userLat) && Number.isFinite(userLng);
 
-    // Optional: Zone-based filtering - if zoneId is provided, validate and filter by zone
-    let userZone = null;
-    if (zoneId) {
-      // Validate zone exists and is active
-      userZone = await Zone.findById(zoneId).lean();
-      if (!userZone || !userZone.isActive) {
-        userZone = null;
-      }
-    }
-
-    if (hasGeoFilter && !userZone) {
-      return successResponse(res, 200, 'User is outside service zone', {
+    // NOTE: Customer can be outside zone; only restaurant must be in active zone.
+    const activeZones = await Zone.find({ isActive: true }).select('_id').lean();
+    const activeZoneIds = activeZones.map(zone => zone._id);
+    if (activeZoneIds.length === 0) {
+      return successResponse(res, 200, 'No active zones available', {
         restaurants: [],
         total: 0,
         status: 'OUT_OF_SERVICE'
       });
-    }
-
-    let activeZoneIds = null;
-    if (userZone || hasGeoFilter) {
-      const activeZones = await Zone.find({ isActive: true }).select('_id').lean();
-      activeZoneIds = activeZones.map(zone => zone._id);
-      if (activeZoneIds.length === 0) {
-        return successResponse(res, 200, 'No active zones available', {
-          restaurants: [],
-          total: 0,
-          status: 'OUT_OF_SERVICE'
-        });
-      }
     }
     const MAX_PRICE = 250;
 
@@ -1179,10 +1192,7 @@ export const getRestaurantsWithDishesUnder250 = async (req, res) => {
     };
 
     // Get all active restaurants
-    const baseQuery = { isActive: true };
-    if (activeZoneIds) {
-      baseQuery.zoneId = { $in: activeZoneIds };
-    }
+    const baseQuery = { isActive: true, zoneId: { $in: activeZoneIds } };
 
     let restaurants = await Restaurant.find(baseQuery)
       .select('-owner -createdAt -updatedAt')

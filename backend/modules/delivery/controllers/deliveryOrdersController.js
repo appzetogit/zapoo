@@ -410,8 +410,41 @@ export const acceptOrder = asyncHandler(async (req, res) => {
         return errorResponse(res, 500, 'Failed to assign order. Please try again.');
       }
     } else if (orderDeliveryPartnerId !== currentDeliveryId) {
-      console.error(`❌ Order ${order.orderId} is assigned to ${orderDeliveryPartnerId}, but current delivery partner is ${currentDeliveryId}`);
-      return errorResponse(res, 403, 'Order is assigned to another delivery partner');
+      // If the assigned partner is offline (stale assignment), allow takeover
+      try {
+        const { getDb } = await import('../../../config/firebaseConfig.js');
+        const db = getDb();
+        const assignedSnap = await db.ref(`delivery_boys/${orderDeliveryPartnerId}`).once('value');
+        const assignedData = assignedSnap.val();
+        const assignedOnline = assignedData?.status === 'online';
+
+        if (!assignedOnline) {
+          const orderDoc = await Order.findById(order._id || orderId);
+          if (!orderDoc) {
+            return errorResponse(res, 404, 'Order not found');
+          }
+          orderDoc.deliveryPartnerId = delivery._id;
+          orderDoc.assignmentInfo = {
+            ...(orderDoc.assignmentInfo || {}),
+            deliveryPartnerId: currentDeliveryId,
+            assignedAt: new Date(),
+            assignedBy: 'delivery_accept_override',
+            acceptedFromNotification: true
+          };
+          await orderDoc.save();
+
+          order = await Order.findById(orderDoc._id)
+            .populate('restaurantId', 'name location address phone ownerPhone')
+            .populate('userId', 'name phone')
+            .lean();
+        } else {
+          console.error(`❌ Order ${order.orderId} is assigned to ${orderDeliveryPartnerId}, but current delivery partner is ${currentDeliveryId}`);
+          return errorResponse(res, 403, 'Order is assigned to another delivery partner');
+        }
+      } catch (overrideError) {
+        console.error(`❌ Error checking assigned partner status: ${overrideError.message}`);
+        return errorResponse(res, 403, 'Order is assigned to another delivery partner');
+      }
     } else {}
     // Check if order is in valid state to accept
     // 'confirmed' = restaurant accepted & notifications sent; 'preparing'/'ready' = food is being made

@@ -77,10 +77,11 @@ export default function ItemDetailsPage() {
   };
 
   const limitWords = (text, maxWords) => {
-    const trimmed = String(text || "").trim();
+    const raw = String(text || "");
+    const trimmed = raw.trim();
     if (!trimmed) return "";
     const words = trimmed.split(/\s+/).filter(Boolean);
-    if (words.length <= maxWords) return trimmed;
+    if (words.length <= maxWords) return raw;
     return words.slice(0, maxWords).join(" ");
   };
 

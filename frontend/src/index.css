@@ -184,6 +184,38 @@
   animation: scroll 15s linear infinite;
 }
 
+/* Google Places Autocomplete (location search dropdown) */
+.pac-container {
+  z-index: 9999 !important;
+  border-radius: 10px !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.12) !important;
+  font-family: "Outfit", system-ui, sans-serif !important;
+  box-sizing: border-box !important;
+  min-width: 240px !important;
+  max-width: calc(100vw - 32px) !important;
+}
+
+.pac-item {
+  padding: 10px 12px !important;
+  cursor: pointer !important;
+  font-size: 13px !important;
+}
+
+.pac-item:hover,
+.pac-item.pac-item-selected {
+  background: #f8fafc !important;
+}
+
+.pac-item-query {
+  font-weight: 600 !important;
+  color: #0f172a !important;
+}
+
+.pac-matched {
+  color: #ef4444 !important;
+}
+
 
 /* Custom Animations for Dashboard Cards */
 @keyframes fade-in {

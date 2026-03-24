@@ -159,11 +159,6 @@ export default function Under250() {
   useEffect(() => {
     const fetchRestaurantsUnder250 = async () => {
       try {
-        if (isOutOfService) {
-          setUnder250Restaurants([])
-          setLoadingRestaurants(false)
-          return
-        }
         setLoadingRestaurants(true)
         const params = {}
         if (zoneId) params.zoneId = zoneId

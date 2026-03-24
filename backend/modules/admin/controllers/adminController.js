@@ -1204,7 +1204,7 @@ export const getRestaurants = asyncHandler(async (req, res) => {
     // Fetch restaurants
     // Fetch restaurants with projection (including populated zone/tier info for UI)
     const restaurants = await Restaurant.find(query)
-      .select("name ownerName ownerPhone email phone isActive location cuisines createdAt profileImage businessModel approvedAt onboarding.completedSteps zoneId")
+      .select("name ownerName ownerPhone email phone isActive location cuisines createdAt profileImage businessModel approvedAt onboarding.completedSteps zoneId deliveryRange")
       .populate({
         path: "zoneId",
         select: "name tierId",

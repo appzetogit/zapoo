@@ -12,6 +12,8 @@ export default function AllZonesMap() {
   const zonesPolygonsRef = useRef([])
   const infoWindowsRef = useRef([])
   const restaurantMarkersRef = useRef([])
+  const restaurantRangeCirclesRef = useRef([])
+  const restaurantRangeLabelsRef = useRef([])
   
   const [googleMapsApiKey, setGoogleMapsApiKey] = useState("")
   const [mapLoading, setMapLoading] = useState(true)
@@ -19,6 +21,7 @@ export default function AllZonesMap() {
   const [restaurants, setRestaurants] = useState([])
   const [loading, setLoading] = useState(true)
   const [locationSearch, setLocationSearch] = useState("")
+  const [showRestaurantRanges, setShowRestaurantRanges] = useState(true)
   const autocompleteInputRef = useRef(null)
   const autocompleteRef = useRef(null)
 
@@ -63,6 +66,17 @@ export default function AllZonesMap() {
       }
     }
   }, [zones, mapLoading, restaurants])
+
+  // Toggle range visibility without re-rendering markers/zones
+  useEffect(() => {
+    const map = mapInstanceRef.current
+    restaurantRangeCirclesRef.current.forEach(circle => {
+      if (circle) circle.setMap(showRestaurantRanges ? map : null)
+    })
+    restaurantRangeLabelsRef.current.forEach(label => {
+      if (label) label.setMap(showRestaurantRanges ? map : null)
+    })
+  }, [showRestaurantRanges])
 
   const fetchZones = async () => {
     try {
@@ -286,6 +300,14 @@ export default function AllZonesMap() {
       if (marker) marker.setMap(null)
     })
     restaurantMarkersRef.current = []
+    restaurantRangeCirclesRef.current.forEach(circle => {
+      if (circle) circle.setMap(null)
+    })
+    restaurantRangeCirclesRef.current = []
+    restaurantRangeLabelsRef.current.forEach(label => {
+      if (label) label.setMap(null)
+    })
+    restaurantRangeLabelsRef.current = []
 
     restaurants.forEach(restaurant => {
       if (!restaurant.location) return
@@ -331,6 +353,53 @@ export default function AllZonesMap() {
         zIndex: 1000, // Show above zones
       })
 
+      // Draw delivery range circle (in km)
+      const rangeRaw = Number(restaurant.deliveryRange);
+      let safeRangeKm = Number.isFinite(rangeRaw) && rangeRaw > 0 ? rangeRaw : 5;
+      // Normalize if value looks like meters (e.g., 5000) instead of km
+      if (safeRangeKm > 200) {
+        safeRangeKm = safeRangeKm / 1000;
+      }
+      const rangeCircle = new google.maps.Circle({
+        map: showRestaurantRanges ? map : null,
+          center: { lat, lng },
+          radius: safeRangeKm * 1000,
+          strokeColor: "#ef4444",
+          strokeOpacity: 0.6,
+          strokeWeight: 1.5,
+          fillColor: "#ef4444",
+          fillOpacity: 0.08,
+          clickable: false,
+          zIndex: 2
+      })
+      restaurantRangeCirclesRef.current.push(rangeCircle)
+
+      // Range label at the top of the circle
+      if (google.maps.geometry?.spherical?.computeOffset) {
+        const labelPosition = google.maps.geometry.spherical.computeOffset(
+          new google.maps.LatLng(lat, lng),
+          safeRangeKm * 1000,
+          0
+        )
+        const labelMarker = new google.maps.Marker({
+          position: labelPosition,
+          map: showRestaurantRanges ? map : null,
+          icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            scale: 0
+          },
+          label: {
+            text: `${safeRangeKm} km`,
+            color: "#ef4444",
+            fontSize: "12px",
+            fontWeight: "600"
+          },
+          clickable: false,
+          zIndex: 3
+        })
+        restaurantRangeLabelsRef.current.push(labelMarker)
+      }
+
       // Create info window
       const infoWindow = new google.maps.InfoWindow({
         content: `
@@ -340,6 +409,9 @@ export default function AllZonesMap() {
             </h3>
             <div style="font-size: 13px; color: #64748b; line-height: 1.6;">
               ${restaurant.location?.formattedAddress || restaurant.location?.address || restaurant.location?.area || 'Location not specified'}
+            </div>
+            <div style="margin-top: 8px; font-size: 12px; color: #94a3b8;">
+              <strong>Range:</strong> ${safeRangeKm} km
             </div>
             ${restaurant.ownerName ? `
               <div style="margin-top: 8px; font-size: 12px; color: #94a3b8;">
@@ -389,16 +461,41 @@ export default function AllZonesMap() {
 
         {/* Search Bar */}
         <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-4 mb-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
-            <input
-              ref={autocompleteInputRef}
-              type="text"
-              placeholder="Search location on map..."
-              value={locationSearch}
-              onChange={(e) => setLocationSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+          <div className="flex items-center gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
+              <input
+                ref={autocompleteInputRef}
+                type="text"
+                placeholder="Search location on map..."
+                value={locationSearch}
+                onChange={(e) => setLocationSearch(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowRestaurantRanges((prev) => !prev)}
+              className={`group flex items-center gap-2 px-3.5 py-2.5 rounded-xl border text-xs font-semibold transition-all shadow-sm ${
+                showRestaurantRanges
+                  ? "bg-gradient-to-r from-red-50 to-rose-50 border-red-200 text-red-700 hover:from-red-100 hover:to-rose-100"
+                  : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
+              }`}
+              title={showRestaurantRanges ? "Hide restaurant ranges" : "Show restaurant ranges"}
+            >
+              <span className="whitespace-nowrap text-[11px] tracking-wide uppercase">Ranges</span>
+              <span
+                className={`relative inline-flex h-4 w-8 items-center rounded-full transition-colors ${
+                  showRestaurantRanges ? "bg-red-500" : "bg-slate-300"
+                }`}
+              >
+                <span
+                  className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform shadow ${
+                    showRestaurantRanges ? "translate-x-4" : "translate-x-1"
+                  }`}
+                />
+              </span>
+            </button>
           </div>
         </div>
 
@@ -459,6 +556,11 @@ export default function AllZonesMap() {
                     Click on any <span className="font-semibold text-red-600">red marker</span> to view restaurant name and details. Total restaurants: <strong>{restaurants.length}</strong>
                   </p>
                 )}
+                {restaurants.length > 0 && (
+                  <p>
+                    Each <span className="font-semibold text-red-600">red circle</span> shows the restaurant delivery range radius.
+                  </p>
+                )}
               </div>
             </div>
           )}
@@ -467,4 +569,3 @@ export default function AllZonesMap() {
     </div>
   )
 }
-

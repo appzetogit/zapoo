@@ -652,11 +652,6 @@ export default function Home() {
   // Fetch restaurants from API with filters
   const fetchRestaurants = useCallback(async (filters = {}) => {
     try {
-      if (isOutOfService) {
-        setRestaurantsData([]);
-        setLoadingRestaurants(false);
-        return;
-      }
       setLoadingRestaurants(true);
 
       // Build query parameters from filters
