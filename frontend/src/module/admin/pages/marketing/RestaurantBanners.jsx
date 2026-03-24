@@ -182,7 +182,7 @@ export default function RestaurantBanners() {
                 )}
 
                 <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
-                    <DialogContent className="max-w-md bg-white border-0 shadow-2xl p-0 overflow-hidden rounded-2xl">
+                    <DialogContent className="max-w-5xl bg-white border-0 shadow-2xl p-0 overflow-hidden rounded-2xl">
                         <DialogHeader className="p-6 bg-slate-50 border-b border-slate-100">
                             <DialogTitle className="text-slate-900 flex items-center gap-2">
                                 <ImageIcon className="w-5 h-5 text-orange-500" />
@@ -190,55 +190,142 @@ export default function RestaurantBanners() {
                             </DialogTitle>
                         </DialogHeader>
 
-                        <div className="p-6">
-                            <input
-                                type="file"
-                                ref={fileInputRef}
-                                onChange={handleFileSelect}
-                                accept="image/*"
-                                className="hidden"
-                            />
+                        <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-0">
+                            <div className="p-6">
+                                <input
+                                    type="file"
+                                    ref={fileInputRef}
+                                    onChange={handleFileSelect}
+                                    accept="image/*"
+                                    className="hidden"
+                                />
 
-                            <div
-                                onClick={() => fileInputRef.current.click()}
-                                className={`
+                                <div
+                                    onClick={() => fileInputRef.current.click()}
+                                    className={`
                   relative border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center cursor-pointer transition-all min-h-[200px]
                   ${previewUrl ? 'border-orange-500 bg-orange-50' : 'border-slate-200 hover:border-orange-300 hover:bg-slate-50'}
                 `}
-                            >
-                                {previewUrl ? (
-                                    <div className="relative w-full h-full flex flex-col items-center">
-                                        <img
-                                            src={previewUrl}
-                                            alt="Preview"
-                                            className="max-h-40 rounded-lg shadow-sm mb-3 object-contain"
-                                        />
-                                        <p className="text-sm font-bold text-orange-600">{selectedFile?.name}</p>
-                                        <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center text-white text-xs font-bold">
-                                            Click to Change
+                                >
+                                    {previewUrl ? (
+                                        <div className="relative w-full h-full flex flex-col items-center">
+                                            <img
+                                                src={previewUrl}
+                                                alt="Preview"
+                                                className="max-h-40 rounded-lg shadow-sm mb-3 object-contain"
+                                            />
+                                            <p className="text-sm font-bold text-orange-600">{selectedFile?.name}</p>
+                                            <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center text-white text-xs font-bold">
+                                                Click to Change
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mb-3">
+                                                <Upload className="w-6 h-6 text-slate-400" />
+                                            </div>
+                                            <p className="text-sm font-bold text-slate-900">Select Banner Image</p>
+                                            <p className="text-xs text-slate-500 mt-1">Recommended size: 1200x600px</p>
+                                        </>
+                                    )}
+                                </div>
+
+                                <div className="mt-6 bg-orange-50 rounded-xl p-4 border border-orange-100">
+                                    <div className="flex gap-3">
+                                        <div className="shrink-0 p-1 bg-white rounded-full h-fit shadow-sm">
+                                            <AlertCircle className="w-4 h-4 text-orange-500" />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <p className="text-xs font-bold text-orange-900 uppercase tracking-wider">Note</p>
+                                            <p className="text-[11px] text-orange-800 leading-relaxed font-medium">
+                                                Uploading this banner will immediately activate the ad if the start date has passed, or schedule it for the future.
+                                            </p>
                                         </div>
                                     </div>
-                                ) : (
-                                    <>
-                                        <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mb-3">
-                                            <Upload className="w-6 h-6 text-slate-400" />
-                                        </div>
-                                        <p className="text-sm font-bold text-slate-900">Select Banner Image</p>
-                                        <p className="text-xs text-slate-500 mt-1">Recommended size: 1200x600px</p>
-                                    </>
-                                )}
+                                </div>
                             </div>
 
-                            <div className="mt-6 bg-orange-50 rounded-xl p-4 border border-orange-100">
-                                <div className="flex gap-3">
-                                    <div className="shrink-0 p-1 bg-white rounded-full h-fit shadow-sm">
-                                        <AlertCircle className="w-4 h-4 text-orange-500" />
+                            <div className="p-6 pr-8 bg-slate-50 border-l border-slate-100">
+                                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Mobile Preview</p>
+                                <div className="mx-auto w-[300px] h-[620px] rounded-[32px] bg-white border border-slate-200 shadow-[0_10px_40px_rgba(15,23,42,0.15)] overflow-hidden relative">
+                                    {/* Top bar */}
+                                    <div className="h-10 px-3 flex items-center justify-between bg-white border-b border-slate-100">
+                                        <div className="flex items-center gap-2">
+                                            <div className="h-5 w-5 rounded-full bg-slate-200 animate-pulse" />
+                                            <div className="h-3 w-24 rounded-full bg-slate-200 animate-pulse" />
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <div className="h-5 w-5 rounded-full bg-slate-200 animate-pulse" />
+                                            <div className="h-5 w-5 rounded-full bg-slate-200 animate-pulse" />
+                                            <div className="h-5 w-5 rounded-full bg-slate-200 animate-pulse" />
+                                        </div>
                                     </div>
-                                    <div className="space-y-1">
-                                        <p className="text-xs font-bold text-orange-900 uppercase tracking-wider">Note</p>
-                                        <p className="text-[11px] text-orange-800 leading-relaxed font-medium">
-                                            Uploading this banner will immediately activate the ad if the start date has passed, or schedule it for the future.
-                                        </p>
+
+                                    <div className="p-3 space-y-3">
+                                        {/* Search row */}
+                                        <div className="flex items-center gap-2">
+                                            <div className="flex-1 h-8 rounded-full bg-slate-200 animate-pulse" />
+                                            <div className="h-6 w-10 rounded-full bg-emerald-200 animate-pulse" />
+                                        </div>
+
+                                        {/* Hero banner skeleton */}
+                                        <div className="h-32 rounded-2xl bg-slate-200 animate-pulse relative overflow-hidden">
+                                            <div className="absolute left-3 top-3 h-6 w-16 rounded-full bg-orange-200 animate-pulse" />
+                                        </div>
+
+                                        {/* Banner preview slot - actual look */}
+                                        <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                                            {previewUrl ? (
+                                                <>
+                                                    <div className="w-full aspect-[16/6]">
+                                                        <img
+                                                            src={previewUrl}
+                                                            alt="Customer preview"
+                                                            className="w-full h-full object-cover"
+                                                        />
+                                                    </div>
+                                                    <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/30 to-transparent" />
+                                                    <div className="absolute inset-0 p-3 flex flex-col justify-center text-white">
+                                                        <div className="inline-flex items-center gap-1 bg-white/20 text-[10px] font-bold px-2 py-0.5 rounded-full w-fit">
+                                                            AD
+                                                        </div>
+                                                        <div className="mt-1 text-sm font-bold line-clamp-1">
+                                                            {selectedAd?.title || "Sponsored"}
+                                                        </div>
+                                                        <div className="text-[11px] text-white/90 line-clamp-2">
+                                                            {selectedAd?.description || "Promoted content"}
+                                                        </div>
+                                                    </div>
+                                                </>
+                                            ) : (
+                                                <div className="w-full aspect-[16/6] bg-slate-200 animate-pulse" />
+                                            )}
+                                        </div>
+
+                                        {/* Meals under 200 + chips */}
+                                        <div className="flex gap-2">
+                                            <div className="h-16 w-16 rounded-xl bg-blue-200 animate-pulse" />
+                                            <div className="flex-1 grid grid-cols-3 gap-2">
+                                                <div className="h-10 rounded-full bg-slate-200 animate-pulse" />
+                                                <div className="h-10 rounded-full bg-slate-200 animate-pulse" />
+                                                <div className="h-10 rounded-full bg-slate-200 animate-pulse" />
+                                            </div>
+                                        </div>
+
+                                        {/* Filter chips */}
+                                        <div className="grid grid-cols-3 gap-2">
+                                            <div className="h-8 rounded-full bg-slate-200 animate-pulse" />
+                                            <div className="h-8 rounded-full bg-slate-200 animate-pulse" />
+                                            <div className="h-8 rounded-full bg-slate-200 animate-pulse" />
+                                        </div>
+                                    </div>
+
+                                    {/* Bottom nav */}
+                                    <div className="absolute bottom-0 left-0 right-0 h-10 border-t border-slate-100 bg-white flex items-center justify-around">
+                                        <div className="h-4 w-6 rounded-full bg-slate-200 animate-pulse" />
+                                        <div className="h-4 w-6 rounded-full bg-slate-200 animate-pulse" />
+                                        <div className="h-4 w-6 rounded-full bg-slate-200 animate-pulse" />
+                                        <div className="h-4 w-6 rounded-full bg-slate-200 animate-pulse" />
                                     </div>
                                 </div>
                             </div>
