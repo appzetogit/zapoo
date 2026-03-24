@@ -366,6 +366,15 @@ export default function DeliverySettings() {
                         {d.minKm} to {d.maxKm === null ? "Open" : d.maxKm} km
                         {d.isBaseSlab ? " (Base slab)" : ""}
                       </div>
+                      <div className="text-xs text-slate-600 mt-1">
+                        {d.isBaseSlab
+                          ? `Admin charge: Rs ${Number(tierInfo?.baseFee || 0)}`
+                          : `Admin rate: ${
+                            Number.isFinite(Number(d.adminPerKmRate))
+                              ? `Rs ${Number(d.adminPerKmRate)}/km`
+                              : "Not configured"
+                          }`}
+                      </div>
                     </div>
                     <div className="space-y-2">
                       {orderValueSlabs.map((o) => {
@@ -416,6 +425,15 @@ export default function DeliverySettings() {
                         <div className="text-xs text-slate-500">
                           {d.minKm} to {d.maxKm === null ? "Open" : d.maxKm} km
                           {d.isBaseSlab ? " (Base slab)" : ""}
+                        </div>
+                        <div className="text-xs text-slate-600 mt-1">
+                          {d.isBaseSlab
+                            ? `Admin charge: Rs ${Number(tierInfo?.baseFee || 0)}`
+                            : `Admin rate: ${
+                              Number.isFinite(Number(d.adminPerKmRate))
+                                ? `Rs ${Number(d.adminPerKmRate)}/km`
+                                : "Not configured"
+                            }`}
                         </div>
                       </td>
                       {orderValueSlabs.map((o) => {

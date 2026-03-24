@@ -99,7 +99,7 @@ async function resolveTierForRestaurant(restaurant, context = 'restaurantControl
     };
   }
 
-  const tier = await Tier.findById(resolvedTierId).select('name deliveryPricing.distanceSlabs').lean();
+  const tier = await Tier.findById(resolvedTierId).select('name deliveryPricing.distanceSlabs deliveryPricing.basePay deliveryPricing.baseFee').lean();
   return {
     zone,
     tier,
@@ -1021,7 +1021,12 @@ export const getDeliveryPricingConfig = asyncHandler(async (req, res) => {
       },
       tier: tier ? {
         id: tier._id,
-        name: tier.name
+        name: tier.name,
+        baseFee: Number(
+          tier?.deliveryPricing?.basePay ??
+          tier?.deliveryPricing?.baseFee ??
+          0
+        )
       } : null,
       distanceSlabs,
       tierResolutionSource: tierResolution.tierResolutionSource,

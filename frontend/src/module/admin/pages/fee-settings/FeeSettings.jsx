@@ -147,7 +147,7 @@ export default function FeeSettings() {
         name: buildSlabName(newDistanceSlab.minKm, newDistanceSlab.maxKm),
         minKm: Number(newDistanceSlab.minKm),
         maxKm: newDistanceSlab.maxKm === "" ? null : Number(newDistanceSlab.maxKm),
-        adminPerKmRate: Number(newDistanceSlab.adminPerKmRate ?? 0),
+        adminPerKmRate: newDistanceSlab.isBaseSlab ? 0 : Number(newDistanceSlab.adminPerKmRate ?? 0),
         isBaseSlab: Boolean(newDistanceSlab.isBaseSlab),
         isActive: Boolean(newDistanceSlab.isActive),
       },
@@ -160,12 +160,21 @@ export default function FeeSettings() {
     setSelectedTierSlabs((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleToggleBaseSlab = (index) => {
+  const handleToggleBaseSlab = (index, checked) => {
     setSelectedTierSlabs((prev) =>
-      prev.map((s, i) => ({
-        ...s,
-        isBaseSlab: i === index,
-      })),
+      prev.map((s, i) => {
+        if (i === index) {
+          return {
+            ...s,
+            isBaseSlab: Boolean(checked),
+            adminPerKmRate: checked ? 0 : s.adminPerKmRate,
+          };
+        }
+        if (checked) {
+          return { ...s, isBaseSlab: false };
+        }
+        return s;
+      }),
     );
   };
 
@@ -218,7 +227,7 @@ export default function FeeSettings() {
         name: slab.name || buildSlabName(slab.minKm, slab.maxKm),
         minKm: Number(slab.minKm),
         maxKm: slab.maxKm === "" || slab.maxKm === null ? null : Number(slab.maxKm),
-        adminPerKmRate: Number(slab.adminPerKmRate || 0),
+        adminPerKmRate: slab.isBaseSlab ? 0 : Number(slab.adminPerKmRate || 0),
         isBaseSlab: slab.isBaseSlab === true,
         isActive: slab.isActive !== false,
       }));
@@ -353,15 +362,15 @@ export default function FeeSettings() {
                                   step="0.1"
                                   value={slab.adminPerKmRate}
                                   onChange={(e) => handleDistanceSlabFieldChange(index, "adminPerKmRate", e.target.value)}
-                                  className="w-full px-2 py-1 text-sm border border-slate-300 rounded"
+                                  disabled={Boolean(slab.isBaseSlab)}
+                                  className="w-full px-2 py-1 text-sm border border-slate-300 rounded disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
                                 />
                               </td>
                               <td className="px-4 py-3 border-b border-slate-100">
                                 <input
-                                  type="radio"
-                                  name="baseSlab"
+                                  type="checkbox"
                                   checked={Boolean(slab.isBaseSlab)}
-                                  onChange={() => handleToggleBaseSlab(index)}
+                                  onChange={(e) => handleToggleBaseSlab(index, e.target.checked)}
                                 />
                               </td>
                               <td className="px-4 py-3 border-b border-slate-100">
@@ -411,14 +420,21 @@ export default function FeeSettings() {
                       step="0.1"
                       value={newDistanceSlab.adminPerKmRate}
                       onChange={(e) => setNewDistanceSlab((prev) => ({ ...prev, adminPerKmRate: e.target.value }))}
-                      className="px-3 py-2 text-sm border border-slate-300 rounded-lg"
+                      disabled={Boolean(newDistanceSlab.isBaseSlab)}
+                      className="px-3 py-2 text-sm border border-slate-300 rounded-lg disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
                       placeholder="Admin per km"
                     />
                     <label className="text-sm flex items-center gap-2">
                       <input
                         type="checkbox"
                         checked={newDistanceSlab.isBaseSlab}
-                        onChange={(e) => setNewDistanceSlab((prev) => ({ ...prev, isBaseSlab: e.target.checked }))}
+                        onChange={(e) =>
+                          setNewDistanceSlab((prev) => ({
+                            ...prev,
+                            isBaseSlab: e.target.checked,
+                            adminPerKmRate: e.target.checked ? 0 : prev.adminPerKmRate,
+                          }))
+                        }
                       />
                       Base slab
                     </label>
