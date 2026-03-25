@@ -3932,9 +3932,36 @@ export default function DeliveryHome() {
       window.deliveryMapInstance = null;
     }
     // Load Google Maps if not already loaded
+    const waitForGoogleMapsConstructors = async () => {
+      let attempts = 0;
+      const maxAttempts = 50; // 5 seconds max wait
+
+      while (
+        (!window.google?.maps?.Map ||
+          !window.google?.maps?.Marker ||
+          !window.google?.maps?.InfoWindow) &&
+        attempts < maxAttempts
+      ) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        attempts++;
+      }
+
+      return Boolean(
+        window.google?.maps?.Map &&
+        window.google?.maps?.Marker &&
+        window.google?.maps?.InfoWindow
+      );
+    };
+
     const loadGoogleMapsIfNeeded = async () => {
       // Check if already loaded
       if (window.google && window.google.maps) {
+        const constructorsReady = await waitForGoogleMapsConstructors();
+        if (!constructorsReady) {
+          console.error('❌ Google Maps namespace exists, but constructors are not ready');
+          setMapLoading(false);
+          return;
+        }
         // Wait a bit to ensure ref is available
         await new Promise(resolve => setTimeout(resolve, 100));
         initializeGoogleMap();
@@ -3952,6 +3979,12 @@ export default function DeliveryHome() {
           attempts++;
         }
         if (window.google && window.google.maps) {
+          const constructorsReady = await waitForGoogleMapsConstructors();
+          if (!constructorsReady) {
+            console.error('❌ Google Maps script loaded, but constructors are still unavailable');
+            setMapLoading(false);
+            return;
+          }
           await initializeGoogleMap();
           return;
         }
@@ -3971,6 +4004,12 @@ export default function DeliveryHome() {
             await loader.load();
             window.__googleMapsLoaded = true;
             window.__googleMapsLoading = false;
+            const constructorsReady = await waitForGoogleMapsConstructors();
+            if (!constructorsReady) {
+              console.error('❌ Google Maps loader resolved, but constructors are still unavailable');
+              setMapLoading(false);
+              return;
+            }
             await initializeGoogleMap();
           } else {
             console.error('❌ No Google Maps API key found');
@@ -3993,6 +4032,12 @@ export default function DeliveryHome() {
           attempts++;
         }
         if (window.google && window.google.maps) {
+          const constructorsReady = await waitForGoogleMapsConstructors();
+          if (!constructorsReady) {
+            console.error('❌ Google Maps became available, but constructors are still unavailable');
+            setMapLoading(false);
+            return;
+          }
           await initializeGoogleMap();
         } else {
           console.error('❌ Google Maps failed to load');
@@ -4017,6 +4062,12 @@ export default function DeliveryHome() {
         // MapTypeId might still not be available, but we have a fallback
         if (!window.google.maps.MapTypeId) {
           console.warn('⚠️ MapTypeId not available, will use string fallback');
+        }
+        const constructorsReady = await waitForGoogleMapsConstructors();
+        if (!constructorsReady) {
+          console.error('❌ Google Maps API namespace exists, but Map constructor is still unavailable');
+          setMapLoading(false);
+          return;
         }
         await initializeGoogleMap();
       } else {
@@ -4310,7 +4361,7 @@ export default function DeliveryHome() {
     if (showHomeSections) return;
     if (!riderLocation || riderLocation.length !== 2) return;
     if (window.deliveryMapInstance) return; // Map already initialized
-    if (!window.google || !window.google.maps) return; // Google Maps not loaded yet
+    if (!window.google || !window.google.maps || !window.google.maps.Map) return; // Google Maps not loaded yet
     if (!mapContainerRef.current) return; // Container not ready
 
     // Map initialization will happen in the main useEffect, but we can trigger it

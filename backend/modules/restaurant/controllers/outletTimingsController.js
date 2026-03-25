@@ -156,7 +156,12 @@ export const upsertOutletTimings = asyncHandler(async (req, res) => {
 
     await Restaurant.findByIdAndUpdate(
       restaurantId,
-      { $set: { openDays: openDayAbbr } },
+      {
+        $set: {
+          openDays: openDayAbbr,
+          'onboarding.step2.openDays': openDayAbbr
+        }
+      },
       { new: true },
     );
   } catch (e) {
@@ -235,7 +240,12 @@ export const updateDayTiming = asyncHandler(async (req, res) => {
 
     await Restaurant.findByIdAndUpdate(
       restaurantId,
-      { $set: { openDays: openDayAbbr } },
+      {
+        $set: {
+          openDays: openDayAbbr,
+          'onboarding.step2.openDays': openDayAbbr
+        }
+      },
       { new: true },
     );
   } catch (e) {
@@ -287,4 +297,3 @@ export const deleteOutletTimings = asyncHandler(async (req, res) => {
 
   return successResponse(res, 200, 'Outlet timings deleted successfully');
 });
-

@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import confetti from "canvas-confetti";
 import AnimatedPage from "../../components/AnimatedPage";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { useCart } from "../../context/CartContext";
 import { useProfile } from "../../context/ProfileContext";
 import { useOrders } from "../../context/OrdersContext";
@@ -141,6 +142,7 @@ export default function Cart() {
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState("razorpay"); // razorpay | cash | wallet
   const [walletBalance, setWalletBalance] = useState(0);
   const [isLoadingWallet, setIsLoadingWallet] = useState(false);
+  const [showPaymentSheet, setShowPaymentSheet] = useState(false);
   const [deliveryFleet, setDeliveryFleet] = useState("standard");
   const [showFleetOptions, setShowFleetOptions] = useState(false);
   const [note, setNote] = useState("");
@@ -196,6 +198,23 @@ export default function Cart() {
     return normalizeDeliveryAddressForOrder(merged);
   }, [savedAddress, currentLocation]);
   const defaultPayment = getDefaultPaymentMethod();
+  const paymentOptions = [{
+    value: "razorpay",
+    label: "Razorpay",
+    description: "Pay online instantly",
+    accent: "bg-blue-600 text-white"
+  }, {
+    value: "wallet",
+    label: "Wallet",
+    description: walletBalance > 0 ? `Balance available: Rs ${walletBalance.toFixed(0)}` : "Use your wallet balance",
+    accent: "bg-emerald-100 text-emerald-700"
+  }, {
+    value: "cash",
+    label: "Cash on Delivery",
+    description: "Pay when your order arrives",
+    accent: "bg-orange-100 text-orange-700"
+  }];
+  const selectedPaymentOption = paymentOptions.find(option => option.value === selectedPaymentMethod) || paymentOptions[0];
 
   // Get restaurant ID from cart or restaurant data
   // Priority: restaurantData > cart[0].restaurantId
@@ -502,7 +521,6 @@ export default function Cart() {
           items,
           restaurantId: restaurantData?.restaurantId || restaurantData?._id || restaurantId || null,
           deliveryAddress: defaultAddress,
-          addressId: defaultAddress?._id || defaultAddress?.id || defaultAddress?.addressId || null,
           couponCode: appliedCoupon?.code || couponCode || null,
           deliveryFleet: deliveryFleet || 'standard'
         });
@@ -912,7 +930,6 @@ export default function Cart() {
       const orderPayload = {
         items: orderItems,
         address: defaultAddress,
-        addressId: defaultAddress?._id || defaultAddress?.id || defaultAddress?.addressId || null,
         restaurantId: finalRestaurantId,
         restaurantName: finalRestaurantName,
         pricing: orderPricing,
@@ -1533,7 +1550,7 @@ export default function Cart() {
           <div className="px-4 md:px-6 py-3 md:py-4">
             <div className="w-full max-w-md md:max-w-lg mx-auto">
               {/* Pay Using */}
-              <div className="flex items-center justify-between mb-2 md:mb-3">
+              <div className="flex items-center justify-between gap-3 mb-2 md:mb-3">
                 <div className="flex items-center gap-2">
                   <CreditCard className="h-4 w-4 text-gray-600 dark:text-gray-300" />
                   <div className="leading-tight">
@@ -1546,14 +1563,19 @@ export default function Cart() {
                   </div>
                 </div>
 
-                <div className="relative">
-                  <select value={selectedPaymentMethod} onChange={e => setSelectedPaymentMethod(e.target.value)} className="appearance-none bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200 rounded-lg px-3 py-2 pr-9 text-sm md:text-base focus:outline-none focus:ring-2 focus:ring-green-500/40">
-                    <option value="razorpay">Razorpay</option>
-                    <option value="wallet">Wallet {walletBalance > 0 ? `(₹${walletBalance.toFixed(0)})` : ''}</option>
-                    <option value="cash">COD</option>
-                  </select>
-                  <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500 dark:text-gray-400" />
-                </div>
+                <button type="button" onClick={() => setShowPaymentSheet(true)} className="min-w-[152px] rounded-2xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-left shadow-sm transition-all hover:border-green-200 hover:bg-white focus:outline-none focus:ring-2 focus:ring-green-500/30 dark:border-gray-700 dark:bg-gray-900 dark:hover:border-green-700 dark:hover:bg-gray-950">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">
+                        {selectedPaymentOption.label}
+                      </p>
+                      <p className="truncate text-[11px] text-gray-500 dark:text-gray-400">
+                        Tap to change
+                      </p>
+                    </div>
+                    <ChevronDown className="h-4 w-4 shrink-0 text-gray-500 dark:text-gray-400" />
+                  </div>
+                </button>
               </div>
 
               <Button size="lg" onClick={handlePlaceOrder} disabled={isPlacingOrder || selectedPaymentMethod === "wallet" && walletBalance < total} className="w-full bg-green-700 hover:bg-green-800 dark:bg-green-600 dark:hover:bg-green-700 text-white px-6 md:px-10 h-14 md:h-16 rounded-lg md:rounded-xl text-base md:text-lg font-bold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed">
@@ -1570,6 +1592,54 @@ export default function Cart() {
           </div>
         </div>
       </div>
+
+
+      <Dialog open={showPaymentSheet} onOpenChange={setShowPaymentSheet}>
+        <DialogContent showCloseButton={false} className="left-0 right-0 top-auto bottom-0 z-[80] max-w-none translate-x-0 translate-y-0 rounded-t-[28px] rounded-b-none border-0 bg-white p-0 shadow-[0_-24px_60px_rgba(15,23,42,0.22)] sm:left-1/2 sm:right-auto sm:top-1/2 sm:bottom-auto sm:max-w-md sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-[28px] dark:bg-[#171717]">
+          <div className="mx-auto mt-3 h-1.5 w-12 rounded-full bg-gray-300 dark:bg-gray-700" />
+          <div className="px-5 pb-5 pt-4">
+            <DialogTitle className="text-base font-semibold text-gray-900 dark:text-white">
+              Choose Payment Method
+            </DialogTitle>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              Pick the option that feels best for checkout on mobile.
+            </p>
+
+            <div className="mt-4 space-y-3">
+              {paymentOptions.map(option => {
+              const isActive = selectedPaymentMethod === option.value;
+              return <button key={option.value} type="button" onClick={() => {
+                setSelectedPaymentMethod(option.value);
+                setShowPaymentSheet(false);
+              }} className={`w-full rounded-2xl border px-4 py-3 text-left transition-all ${isActive ? "border-green-600 bg-green-50 shadow-[0_12px_24px_rgba(22,163,74,0.12)] dark:border-green-500 dark:bg-green-950/40" : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:bg-[#111111] dark:hover:border-gray-600 dark:hover:bg-[#1a1a1a]"}`}>
+                    <div className="flex items-start gap-3">
+                      <div className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl text-sm font-semibold ${option.accent}`}>
+                        {option.value === "wallet" ? <Wallet className="h-4 w-4" /> : option.value === "cash" ? <Building2 className="h-4 w-4" /> : <CreditCard className="h-4 w-4" />}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                            {option.label}
+                          </p>
+                          {isActive && <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-green-600 text-white dark:bg-green-500">
+                              <Check className="h-3.5 w-3.5" />
+                            </span>}
+                        </div>
+                        <p className="mt-1 text-xs leading-5 text-gray-500 dark:text-gray-400">
+                          {option.description}
+                        </p>
+                      </div>
+                    </div>
+                  </button>;
+            })}
+            </div>
+
+            <button type="button" onClick={() => setShowPaymentSheet(false)} className="mt-4 w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-[#202020]">
+              Cancel
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Placing Order Modal */}
       {showPlacingOrder && <div className="fixed inset-0 z-[60] h-screen w-screen overflow-hidden">
@@ -2002,3 +2072,4 @@ export default function Cart() {
       `}</style>
     </div>;
 }
+

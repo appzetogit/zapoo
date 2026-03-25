@@ -39,7 +39,6 @@ export const createOrder = async (req, res) => {
     const {
       items,
       address,
-      addressId: bodyAddressId,
       restaurantId,
       restaurantName,
       pricing,
@@ -87,64 +86,6 @@ export const createOrder = async (req, res) => {
     }
     let assignedRestaurantId = restaurantId;
     let assignedRestaurantName = restaurantName;
-
-    const hasUsableCoords = (addr) => {
-      if (!addr || typeof addr !== 'object') return false;
-      const coords = addr?.location?.coordinates;
-      if (Array.isArray(coords) && coords.length >= 2) {
-        const lng = Number(coords[0]);
-        const lat = Number(coords[1]);
-        if (Number.isFinite(lat) && Number.isFinite(lng) && !(lat === 0 && lng === 0)) return true;
-      }
-      const lat = Number(addr?.location?.latitude ?? addr?.latitude);
-      const lng = Number(addr?.location?.longitude ?? addr?.longitude);
-      return Number.isFinite(lat) && Number.isFinite(lng) && !(lat === 0 && lng === 0);
-    };
-
-    // Resolve address from user profile when possible (ensures coords are present)
-    let finalAddress = address;
-    const effectiveAddressId = bodyAddressId || address?._id || address?.id || address?.addressId;
-    if (effectiveAddressId && req.user && (req.user._id || req.user.id)) {
-      try {
-        const { default: User } = await import('../../auth/models/User.js');
-        const user = await User.findById(req.user._id || req.user.id);
-        if (user && user.addresses) {
-          const foundAddress = user.addresses.id(effectiveAddressId);
-          if (foundAddress) {
-            finalAddress = foundAddress.toObject();
-          }
-        }
-      } catch (err) {
-        console.error('Error fetching user address for order:', err);
-      }
-    }
-
-    // Fallback: if address payload lacks usable coordinates, use user's currentLocation coordinates.
-    if (!hasUsableCoords(finalAddress) && req.user && (req.user._id || req.user.id)) {
-      try {
-        const { default: User } = await import('../../auth/models/User.js');
-        const user = await User.findById(req.user._id || req.user.id).select('currentLocation').lean();
-        const c = user?.currentLocation;
-        const lat = Number(c?.latitude ?? c?.location?.coordinates?.[1]);
-        const lng = Number(c?.longitude ?? c?.location?.coordinates?.[0]);
-        if (Number.isFinite(lat) && Number.isFinite(lng) && !(lat === 0 && lng === 0)) {
-          finalAddress = {
-            ...(finalAddress || {}),
-            location: {
-              ...(finalAddress?.location || {}),
-              type: 'Point',
-              coordinates: [lng, lat],
-              latitude: lat,
-              longitude: lng
-            },
-            latitude: lat,
-            longitude: lng
-          };
-        }
-      } catch (err) {
-        console.error('Error resolving fallback currentLocation for order:', err);
-      }
-    }
 
     // Log incoming restaurant data for debugging
 
@@ -206,8 +147,8 @@ export const createOrder = async (req, res) => {
     }
 
     // NEW: Calculate distance and validate restaurant's deliveryRange
-    const userLat = finalAddress?.location?.latitude || finalAddress?.location?.coordinates?.[1];
-    const userLng = finalAddress?.location?.longitude || finalAddress?.location?.coordinates?.[0];
+    const userLat = address.location?.latitude || address.location?.coordinates?.[1];
+    const userLng = address.location?.longitude || address.location?.coordinates?.[0];
     if (userLat && userLng) {
       const distance = calculateDistance([restaurantLng, restaurantLat], [userLng, userLat]);
       const maxRange = restaurant.deliveryRange || 5;
@@ -243,7 +184,7 @@ export const createOrder = async (req, res) => {
       items,
       restaurantId: assignedRestaurantId,
       passedRestaurant: restaurant, // Use pre-fetched object
-      deliveryAddress: finalAddress,
+      deliveryAddress: address,
       couponCode: pricing.couponCode,
       deliveryFleet: deliveryFleet || 'standard'
     });
@@ -265,7 +206,7 @@ export const createOrder = async (req, res) => {
         isVeg: item.isVeg,
         isRecommended: item.isRecommended === true
       })),
-      address: finalAddress,
+      address,
       pricing: {
         subtotal: pricingData.subtotal,
         discount: pricingData.discount,
@@ -305,9 +246,9 @@ export const createOrder = async (req, res) => {
         latitude: restaurant.location.latitude,
         longitude: restaurant.location.longitude
       } : null;
-      const userLocation = finalAddress?.location?.coordinates ? {
-        latitude: finalAddress.location.coordinates[1],
-        longitude: finalAddress.location.coordinates[0]
+      const userLocation = address.location?.coordinates ? {
+        latitude: address.location.coordinates[1],
+        longitude: address.location.coordinates[0]
       } : null;
       if (restaurantLocation && userLocation) {
         const etaResult = await etaCalculationService.calculateInitialETA({

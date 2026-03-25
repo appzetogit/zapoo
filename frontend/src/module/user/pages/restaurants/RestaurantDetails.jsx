@@ -103,7 +103,13 @@ export default function RestaurantDetails() {
   useEffect(() => {
     const fetchRestaurant = async () => {
       if (!slug) return;
-      // Do not block restaurant view when user is outside zone.
+      if (isOutOfService) {
+        setRestaurant(null);
+        setRestaurantError('You are outside the service zone. Please select a location within the service area.');
+        setOutOfRange(false);
+        setLoadingRestaurant(false);
+        return;
+      }
 
       // Prevent re-fetching if we've already fetched for this slug and zoneId hasn't changed meaningfully
       // Only re-fetch if slug changed or if we're waiting for zoneId and it just became available
@@ -632,6 +638,11 @@ export default function RestaurantDetails() {
     }
 
     // CRITICAL: Check if user is in service zone or restaurant is available
+    if (isOutOfService) {
+      toast.error('You are outside the service zone. Please select a location within the service area.');
+      return;
+    }
+
     if (outOfRange) {
       toast.error('This restaurant does not deliver to your current address. Change your delivery location to order.');
       return;
@@ -1174,7 +1185,7 @@ export default function RestaurantDetails() {
   }
 
   // Only show grayscale when user is out of service (not based on restaurant availability)
-  const shouldShowGrayscale = outOfRange;
+  const shouldShowGrayscale = isOutOfService;
   return <AnimatedPage id="scrollingelement" className={`min-h-screen bg-white dark:bg-[#0a0a0a] flex flex-col transition-all duration-300 ${shouldShowGrayscale ? 'grayscale opacity-75' : ''}`}>
       {/* Header - Back, Search, Menu (like reference image) */}
       <div className="px-4 sm:px-6 md:px-8 lg:px-10 xl:px-12 pt-3 md:pt-4 lg:pt-5 pb-2 md:pb-3 bg-white dark:bg-[#1a1a1a]">

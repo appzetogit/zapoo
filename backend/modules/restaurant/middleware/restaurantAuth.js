@@ -64,13 +64,17 @@ export const authenticate = async (req, res, next) => {
     // Routes: /api/restaurant/inventory
     const isInventoryRoute = requestPath.includes('/inventory') || reqPath === '/inventory' || reqPath.startsWith('/inventory/');
 
+    // Check for outlet timings routes - restaurants need to manage open days even when inactive
+    // Routes: /api/restaurant/outlet-timings, /api/restaurant/outlet-timings/day/:day, etc.
+    const isOutletTimingsRoute = requestPath.includes('/outlet-timings') || reqPath === '/outlet-timings' || reqPath.startsWith('/outlet-timings/');
+
     // Debug logging for inactive restaurants
     if (!restaurant.isActive) {}
 
     // Allow access to onboarding, profile, menu, and inventory routes even if inactive
     // These are essential for restaurant setup and management
     // Also allow access to getCurrentRestaurant endpoint (used to check status)
-    if (!restaurant.isActive && !isOnboardingRoute && !isProfileRoute && !isMenuRoute && !isInventoryRoute) {
+    if (!restaurant.isActive && !isOnboardingRoute && !isProfileRoute && !isMenuRoute && !isInventoryRoute && !isOutletTimingsRoute) {
       console.error('❌ Restaurant account is inactive - access denied:', {
         restaurantId: restaurant._id,
         restaurantName: restaurant.name,
@@ -84,7 +88,8 @@ export const authenticate = async (req, res, next) => {
           isOnboardingRoute,
           isProfileRoute,
           isMenuRoute,
-          isInventoryRoute
+          isInventoryRoute,
+          isOutletTimingsRoute
         }
       });
       return errorResponse(res, 401, 'Restaurant account is inactive. Please wait for admin approval.');

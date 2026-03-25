@@ -18,12 +18,24 @@ loadBusinessSettings().catch(() => {
 window.__googleMapsLoading = window.__googleMapsLoading || false;
 window.__googleMapsLoaded = window.__googleMapsLoaded || false;
 
+async function waitForGoogleMapsConstructors() {
+  let attempts = 0;
+  const maxAttempts = 50;
+
+  while (!window.google?.maps?.Map && attempts < maxAttempts) {
+    await new Promise(resolve => setTimeout(resolve, 100));
+    attempts++;
+  }
+
+  return Boolean(window.google?.maps?.Map);
+}
+
 // Load Google Maps API dynamically from backend database
 // Only load if not already loaded to prevent multiple loads
 (async () => {
   // Check if Google Maps is already loaded
   if (window.google && window.google.maps) {
-    window.__googleMapsLoaded = true;
+    window.__googleMapsLoaded = await waitForGoogleMapsConstructors();
     return;
   }
 
@@ -33,8 +45,8 @@ window.__googleMapsLoaded = window.__googleMapsLoaded || false;
     window.__googleMapsLoading = true;
 
     // Wait for script to load
-    existingScript.addEventListener('load', () => {
-      window.__googleMapsLoaded = true;
+    existingScript.addEventListener('load', async () => {
+      window.__googleMapsLoaded = await waitForGoogleMapsConstructors();
       window.__googleMapsLoading = false;
     });
     return;
@@ -52,8 +64,8 @@ window.__googleMapsLoaded = window.__googleMapsLoaded || false;
       script.src = `https://maps.googleapis.com/maps/api/js?key=${googleMapsApiKey}&libraries=places,geometry,drawing,geocoding&loading=async`;
       script.async = true;
       script.defer = true;
-      script.onload = () => {
-        window.__googleMapsLoaded = true;
+      script.onload = async () => {
+        window.__googleMapsLoaded = await waitForGoogleMapsConstructors();
         window.__googleMapsLoading = false;
       };
       script.onerror = () => {
