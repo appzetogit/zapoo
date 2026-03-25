@@ -502,6 +502,7 @@ export default function Cart() {
           items,
           restaurantId: restaurantData?.restaurantId || restaurantData?._id || restaurantId || null,
           deliveryAddress: defaultAddress,
+          addressId: defaultAddress?._id || defaultAddress?.id || defaultAddress?.addressId || null,
           couponCode: appliedCoupon?.code || couponCode || null,
           deliveryFleet: deliveryFleet || 'standard'
         });
@@ -911,6 +912,7 @@ export default function Cart() {
       const orderPayload = {
         items: orderItems,
         address: defaultAddress,
+        addressId: defaultAddress?._id || defaultAddress?.id || defaultAddress?.addressId || null,
         restaurantId: finalRestaurantId,
         restaurantName: finalRestaurantName,
         pricing: orderPricing,
