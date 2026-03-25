@@ -140,6 +140,7 @@ export default function Checkout() {
       const orderResponse = await orderAPI.createOrder({
         items,
         address: defaultAddress,
+        addressId: selectedAddress || defaultAddress?._id || defaultAddress?.id || null,
         restaurantId,
         restaurantName: cart[0]?.restaurant,
         pricing: orderPricing,
