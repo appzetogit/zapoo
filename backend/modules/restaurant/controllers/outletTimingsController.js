@@ -147,6 +147,22 @@ export const upsertOutletTimings = asyncHandler(async (req, res) => {
     });
   }
 
+  // Sync Restaurant.openDays based on OutletTimings.isOpen
+  // Restaurant.openDays stores 3-letter abbreviations: Mon, Tue, Wed, ...
+  try {
+    const openDayAbbr = (outletTimings?.timings || [])
+      .filter(t => t?.isOpen === true && typeof t.day === "string")
+      .map(t => t.day.substring(0, 3));
+
+    await Restaurant.findByIdAndUpdate(
+      restaurantId,
+      { $set: { openDays: openDayAbbr } },
+      { new: true },
+    );
+  } catch (e) {
+    // Don't block outlet timing update if restaurant sync fails
+  }
+
   return successResponse(res, 200, 'Outlet timings updated successfully', {
     outletTimings
   });
@@ -210,6 +226,21 @@ export const updateDayTiming = asyncHandler(async (req, res) => {
   }
 
   await outletTimings.save();
+
+  // Sync Restaurant.openDays based on OutletTimings.isOpen
+  try {
+    const openDayAbbr = (outletTimings?.timings || [])
+      .filter(t => t?.isOpen === true && typeof t.day === "string")
+      .map(t => t.day.substring(0, 3));
+
+    await Restaurant.findByIdAndUpdate(
+      restaurantId,
+      { $set: { openDays: openDayAbbr } },
+      { new: true },
+    );
+  } catch (e) {
+    // non-blocking sync
+  }
 
   return successResponse(res, 200, `${day} timing updated successfully`, {
     outletTimings

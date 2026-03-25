@@ -73,6 +73,70 @@ export default function RestaurantStatus() {
     };
   }, []);
 
+  // Hydrate outlet timings cache from backend (source of truth).
+  // Use public GET /restaurant/:restaurantId/outlet-timings to avoid conflict with /restaurant/:id.
+  useEffect(() => {
+    if (!restaurantData) return;
+    const restaurantId = restaurantData?.id || restaurantData?._id;
+    if (!restaurantId) return;
+
+    const hydrateOutletTimings = async () => {
+      try {
+        const res = await restaurantAPI.getOutletTimingsByRestaurantId(restaurantId);
+        const outletTimings =
+          res?.data?.data?.outletTimings || res?.data?.outletTimings;
+        const timingsArr = outletTimings?.timings;
+        if (!Array.isArray(timingsArr) || timingsArr.length === 0) return;
+
+        const toHHmmFromAny = (input) => {
+          if (!input || typeof input !== "string") return "09:00";
+          const s = input.trim();
+          if (/^\d{1,2}:\d{2}$/.test(s)) {
+            const [hRaw, mRaw] = s.split(":");
+            const h = Math.max(0, Math.min(23, Number(hRaw)));
+            const m = Math.max(0, Math.min(59, Number(mRaw)));
+            return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+          }
+          const m = s.match(/^(\d{1,2}):(\d{2})\s*([AaPp][Mm])$/);
+          if (m) {
+            let hh = Number(m[1]);
+            const mm = Number(m[2]);
+            const period = String(m[3]).toLowerCase();
+            hh = Math.max(1, Math.min(12, hh || 9));
+            const mins = Math.max(0, Math.min(59, mm || 0));
+            let h24 = hh % 12;
+            if (period === "pm") h24 += 12;
+            return `${String(h24).padStart(2, "0")}:${String(mins).padStart(2, "0")}`;
+          }
+          return "09:00";
+        };
+
+        const dayNames = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+        const normalized = {};
+        dayNames.forEach((d) => {
+          normalized[d] = { isOpen: true, openingTime: "09:00", closingTime: "22:00" };
+        });
+        for (const t of timingsArr) {
+          const day = t?.day;
+          if (!day || !normalized[day]) continue;
+          normalized[day] = {
+            isOpen: t?.isOpen !== undefined ? Boolean(t.isOpen) : true,
+            openingTime: toHHmmFromAny(t?.openingTime),
+            closingTime: toHHmmFromAny(t?.closingTime),
+          };
+        }
+
+        localStorage.setItem("restaurant_outlet_timings", JSON.stringify(normalized));
+        setOutletTimings(normalized);
+        window.dispatchEvent(new Event("outletTimingsUpdated"));
+      } catch (e) {
+        // ignore - local cache fallback
+      }
+    };
+
+    hydrateOutletTimings();
+  }, [restaurantData]);
+
   // Check if restaurant is currently open based on timings
   useEffect(() => {
     if (!restaurantData) return;

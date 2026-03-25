@@ -186,6 +186,7 @@ export const API_ENDPOINTS = {
     BY_ID: "/restaurant/:id",
     BY_OWNER: "/restaurant/owner/me",
     CHALLENGES: "/restaurant/challenges",
+    OUTLET_TIMINGS: "/restaurant/outlet-timings",
   },
   // Marketing / Advertisement endpoints
   MARKETING: {

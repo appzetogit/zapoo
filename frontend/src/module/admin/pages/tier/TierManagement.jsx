@@ -61,49 +61,18 @@ export default function TierManagement() {
 
   const onSubmit = async (data) => {
     try {
-      const baseDistanceValue = Number(data.baseDistance ?? 3);
-      const safeBaseDistance = Number.isFinite(baseDistanceValue) ? baseDistanceValue : 3;
-      const baseSlabMax = safeBaseDistance > 0 ? safeBaseDistance : null;
-      const defaultDistanceSlabs = [
-        {
-          name: baseSlabMax === null ? "Base 0-∞km" : `Base 0-${baseSlabMax}km`,
-          minKm: 0,
-          maxKm: baseSlabMax,
-          isBaseSlab: true,
-          adminPerKmRate: 0,
-          isActive: true,
-        },
-      ];
-      if (baseSlabMax !== null) {
-        defaultDistanceSlabs.push({
-          name: `${baseSlabMax}+ km`,
-          minKm: baseSlabMax,
-          maxKm: null,
-          isBaseSlab: false,
-          adminPerKmRate: 0,
-          isActive: true,
-        });
-      }
-
       const formattedData = {
         ...data,
         minArea: parseFloat(data.minArea),
         maxArea: parseFloat(data.maxArea),
         rank: parseInt(data.rank),
         basePay: parseFloat(data.basePay || 0),
-        baseFee: parseFloat(data.baseFee || 0),
-        freeDeliveryThreshold: parseFloat(data.freeDeliveryThreshold || 0),
-        platformFee: parseFloat(data.platformFee || 0),
-        baseDistance: safeBaseDistance,
-        extraKmCharge: parseFloat(data.extraKmCharge || 10),
-        recommendedItemFee: parseFloat(data.recommendedItemFee || 0),
       };
 
       if (editingTier) {
         await tierAPI.updateTier(editingTier._id, formattedData);
         toast.success("Tier updated successfully");
       } else {
-        formattedData.distanceSlabs = defaultDistanceSlabs;
         await tierAPI.createTier(formattedData);
         toast.success("Tier created successfully");
       }
@@ -126,12 +95,6 @@ export default function TierManagement() {
     setValue("description", tier.description);
     setValue("rank", tier.rank);
     setValue("basePay", tier.deliveryPricing?.basePay || 0);
-    setValue("baseFee", tier.deliveryPricing?.baseFee || 0);
-    setValue("freeDeliveryThreshold", tier.deliveryPricing?.freeDeliveryThreshold || 0);
-    setValue("baseDistance", tier.deliveryPricing?.baseDistance || 3);
-    setValue("extraKmCharge", tier.deliveryPricing?.extraKmCharge || 10);
-    setValue("platformFee", tier.platformFee || 0);
-    setValue("recommendedItemFee", tier.recommendedItemFee || 0);
     setIsDialogOpen(true);
   };
 
@@ -153,12 +116,6 @@ export default function TierManagement() {
     reset({
       rank: tiers.length + 1,
       basePay: 0,
-      baseFee: 0,
-      freeDeliveryThreshold: 0,
-      baseDistance: 3,
-      extraKmCharge: 10,
-      platformFee: 0,
-      recommendedItemFee: 0,
       isActive: true,
     });
     setIsDialogOpen(true);
@@ -238,9 +195,7 @@ export default function TierManagement() {
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-col gap-1 text-sm">
-                          <span className="text-neutral-900 font-medium">Base Fee: Rs {tier.deliveryPricing?.baseFee || 0}</span>
-                          <span className="text-neutral-500 text-xs">Base Pay: Rs {tier.deliveryPricing?.basePay || 0}</span>
-                          <span className="text-neutral-500 text-xs">Free above Rs {tier.deliveryPricing?.freeDeliveryThreshold || 0}</span>
+                          <span className="text-neutral-900 font-medium">Base Pay: Rs {tier.deliveryPricing?.basePay || 0}</span>
                         </div>
                       </TableCell>
                       <TableCell>
@@ -304,20 +259,7 @@ export default function TierManagement() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label htmlFor="platformFee" className="text-sm text-neutral-700 font-medium">Platform Fee (Rs)</Label>
-                  <Input
-                    id="platformFee"
-                    type="number"
-                    min="0"
-                    step="0.1"
-                    placeholder="0"
-                    className="h-9 border-neutral-200 focus:border-orange-500 focus:ring-orange-500/20 appearance-none"
-                    onWheel={(e) => e.target.blur()}
-                    {...register("platformFee", { required: "Required", min: 0 })}
-                  />
-                </div>
+              <div className="grid grid-cols-1 gap-4">
                 <div className="space-y-1">
                   <Label htmlFor="rank" className="text-xs text-neutral-700 font-semibold uppercase tracking-wider">Priority Rank</Label>
                   <Input
@@ -330,23 +272,9 @@ export default function TierManagement() {
                 </div>
               </div>
 
-              <div className="space-y-1.5">
-                <Label htmlFor="recommendedItemFee" className="text-sm text-neutral-700 font-medium">Recommended Item Fee (Rs)</Label>
-                <Input
-                  id="recommendedItemFee"
-                  type="number"
-                  min="0"
-                  step="0.1"
-                  placeholder="0"
-                  className="h-9 border-neutral-200 focus:border-orange-500 focus:ring-orange-500/20 appearance-none"
-                  onWheel={(e) => e.target.blur()}
-                  {...register("recommendedItemFee", { min: 0 })}
-                />
-              </div>
-
               <div className="bg-neutral-50/50 p-3 rounded-lg border border-neutral-100 space-y-3">
                 <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Delivery Pricing</p>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 gap-3">
                   <div className="space-y-1">
                     <Label htmlFor="basePay" className="text-xs text-neutral-700 font-medium">Base Pay (Rs)</Label>
                     <Input
@@ -359,59 +287,6 @@ export default function TierManagement() {
                       {...register("basePay", { required: "Required", min: 0 })}
                     />
                   </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="baseFee" className="text-xs text-neutral-700 font-medium">Base Fee (Rs)</Label>
-                    <Input
-                      id="baseFee"
-                      type="number"
-                      min="0"
-                      placeholder="0"
-                      className="h-9 bg-white border-neutral-200 focus:border-orange-500"
-                      onWheel={(e) => e.target.blur()}
-                      {...register("baseFee", { required: "Required", min: 0 })}
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <Label htmlFor="baseDistance" className="text-xs text-neutral-700 font-medium">Base Dist. (km)</Label>
-                    <Input
-                      id="baseDistance"
-                      type="number"
-                      min="0"
-                      step="0.1"
-                      placeholder="3"
-                      className="h-9 bg-white border-neutral-200 focus:border-orange-500"
-                      onWheel={(e) => e.target.blur()}
-                      {...register("baseDistance", { required: "Required", min: 0 })}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="extraKmCharge" className="text-xs text-neutral-700 font-medium">Extra km (Rs)</Label>
-                    <Input
-                      id="extraKmCharge"
-                      type="number"
-                      min="0"
-                      placeholder="10"
-                      className="h-9 bg-white border-neutral-200 focus:border-orange-500"
-                      onWheel={(e) => e.target.blur()}
-                      {...register("extraKmCharge", { required: "Required", min: 0 })}
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <Label htmlFor="freeDeliveryThreshold" className="text-xs text-neutral-700 font-medium">Free Above (Rs)</Label>
-                  <Input
-                    id="freeDeliveryThreshold"
-                    type="number"
-                    min="0"
-                    placeholder="0"
-                    className="h-9 bg-white border-neutral-200 focus:border-orange-500"
-                    onWheel={(e) => e.target.blur()}
-                    {...register("freeDeliveryThreshold", { required: "Required", min: 0 })}
-                  />
                 </div>
               </div>
 

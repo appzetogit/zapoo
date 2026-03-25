@@ -8,6 +8,8 @@ import { MobileTimePicker } from "@mui/x-date-pickers/MobileTimePicker";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import { useCompanyName } from "@/lib/hooks/useCompanyName";
+import { restaurantAPI } from "@/lib/api";
+import { getUserIdFromToken } from "@/lib/utils/auth";
 const STORAGE_KEY = "restaurant_outlet_timings";
 
 // Helper function to convert "HH:mm" string to Date object
@@ -41,6 +43,62 @@ const formatTime12Hour = time24 => {
   const minutesStr = minutes.toString().padStart(2, '0');
   return `${hours12}:${minutesStr} ${period}`;
 };
+
+const toHHmmFromAny = (input) => {
+  if (!input || typeof input !== "string") return "09:00";
+  const s = input.trim();
+  // Already "HH:mm"
+  if (/^\d{1,2}:\d{2}$/.test(s)) {
+    const [hRaw, mRaw] = s.split(":");
+    const h = Math.max(0, Math.min(23, Number(hRaw)));
+    const m = Math.max(0, Math.min(59, Number(mRaw)));
+    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+  }
+  // "hh:mm AM/PM" (with optional spaces)
+  const m = s.match(/^(\d{1,2}):(\d{2})\s*([AaPp][Mm])$/);
+  if (m) {
+    let hh = Number(m[1]);
+    const mm = Number(m[2]);
+    const period = String(m[3]).toLowerCase();
+    hh = Math.max(1, Math.min(12, hh || 9));
+    const mins = Math.max(0, Math.min(59, mm || 0));
+    let h24 = hh % 12;
+    if (period === "pm") h24 += 12;
+    return `${String(h24).padStart(2, "0")}:${String(mins).padStart(2, "0")}`;
+  }
+  return "09:00";
+};
+
+const timingsArrayToDaysObject = (timings) => {
+  const base = getDefaultDays();
+  if (!Array.isArray(timings)) return base;
+  const out = { ...base };
+  for (const t of timings) {
+    const day = t?.day;
+    if (!day || typeof day !== "string") continue;
+    if (!out[day]) continue;
+    out[day] = {
+      isOpen: t?.isOpen !== undefined ? Boolean(t.isOpen) : true,
+      openingTime: toHHmmFromAny(t?.openingTime),
+      closingTime: toHHmmFromAny(t?.closingTime),
+    };
+  }
+  return out;
+};
+
+const daysObjectToTimingsArray = (daysObj) => {
+  const dayOrder = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+  return dayOrder.map((day) => {
+    const d = daysObj?.[day] || {};
+    return {
+      day,
+      isOpen: d?.isOpen !== undefined ? Boolean(d.isOpen) : true,
+      openingTime: toHHmmFromAny(d?.openingTime),
+      closingTime: toHHmmFromAny(d?.closingTime),
+    };
+  });
+};
+
 const getDefaultDays = () => ({
   Monday: {
     isOpen: true,
@@ -83,6 +141,8 @@ export default function OutletTimings() {
   const navigate = useNavigate();
   const [expandedDay, setExpandedDay] = useState("Monday");
   const isInternalUpdate = useRef(false);
+  const skipNextPersistToBackend = useRef(false);
+  const persistTimerRef = useRef(null);
   const [days, setDays] = useState(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -133,6 +193,55 @@ export default function OutletTimings() {
     return getDefaultDays();
   });
 
+  // Hydrate from backend (source of truth) and sync local cache
+  useEffect(() => {
+    let mounted = true;
+    const hydrate = async () => {
+      try {
+        // Avoid backend route conflict for authenticated GET.
+        // Use public GET /restaurant/:restaurantId/outlet-timings instead.
+        let restaurantId = null;
+
+        const token =
+          localStorage.getItem("restaurant_accessToken") ||
+          localStorage.getItem("accessToken");
+        if (token) {
+          restaurantId = getUserIdFromToken(token);
+        }
+
+        if (!restaurantId) {
+          // Fallback: try to fetch current restaurant (requires auth)
+          try {
+            const rRes = await restaurantAPI.getCurrentRestaurant();
+            const restaurant =
+              rRes?.data?.data?.restaurant || rRes?.data?.restaurant;
+            restaurantId = restaurant?.id || restaurant?._id;
+          } catch (e) {
+            // ignore; we can still fall back to localStorage
+          }
+        }
+
+        if (!restaurantId) return;
+
+        const res = await restaurantAPI.getOutletTimingsByRestaurantId(restaurantId);
+        const outletTimings =
+          res?.data?.data?.outletTimings || res?.data?.outletTimings;
+
+        const normalized = timingsArrayToDaysObject(outletTimings?.timings);
+        if (!mounted) return;
+        skipNextPersistToBackend.current = true;
+        isInternalUpdate.current = true; // ensure localStorage sync + event fire
+        setDays(normalized);
+      } catch (e) {
+        // Keep localStorage cache if backend fails (offline-safe)
+      }
+    };
+    hydrate();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   // Save to localStorage whenever days change (but only if it's an internal update)
   useEffect(() => {
     if (isInternalUpdate.current) {
@@ -143,9 +252,31 @@ export default function OutletTimings() {
       } catch (error) {
         console.error("Error saving outlet timings:", error);
       }
+
+      // Persist to backend (debounced). Skip once if this update came from backend hydration.
+      const shouldSkip = skipNextPersistToBackend.current;
+      skipNextPersistToBackend.current = false;
+      if (!shouldSkip) {
+        if (persistTimerRef.current) clearTimeout(persistTimerRef.current);
+        persistTimerRef.current = setTimeout(async () => {
+          try {
+            const timingsPayload = daysObjectToTimingsArray(days);
+            await restaurantAPI.upsertOutletTimings(timingsPayload);
+          } catch (e) {
+            // If backend fails, keep local changes cached; next successful save will sync.
+          }
+        }, 400);
+      }
+
       isInternalUpdate.current = false;
     }
   }, [days]);
+
+  useEffect(() => {
+    return () => {
+      if (persistTimerRef.current) clearTimeout(persistTimerRef.current);
+    };
+  }, []);
 
   // Listen for updates from other components
   useEffect(() => {

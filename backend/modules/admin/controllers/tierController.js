@@ -1,5 +1,6 @@
 import Tier from "../models/Tier.js";
 import Zone from "../models/Zone.js";
+import FeeSettings from "../models/FeeSettings.js";
 import { errorResponse, successResponse } from "../../../shared/utils/response.js";
 import { syncCommissionRulesForTier } from "../services/deliveryCommissionSyncService.js";
 const normalizeDistanceSlabs = (distanceSlabs = []) => distanceSlabs.map(slab => ({
@@ -52,6 +53,19 @@ const checkTierOverlap = async (minArea, maxArea, excludeTierId = null) => {
   return await Tier.findOne(query);
 };
 
+const getActiveFeeSettingsForTierSync = async () => {
+  const feeSettings = await FeeSettings.findOne({ isActive: true })
+    .sort({ createdAt: -1 })
+    .lean();
+
+  return {
+    deliveryFee: Number(feeSettings?.deliveryFee ?? 25),
+    freeDeliveryThreshold: Number(feeSettings?.freeDeliveryThreshold ?? 149),
+    platformFee: Number(feeSettings?.platformFee ?? 5),
+    recommendedItemFee: Number(feeSettings?.recommendedItemFee ?? 0),
+  };
+};
+
 /**
  * Create a new Tier
  */
@@ -71,6 +85,8 @@ export const createTier = async (req, res) => {
       distanceSlabs
     } = req.body;
 
+    const feeSettings = await getActiveFeeSettingsForTierSync();
+
     // Check if rank already exists
     const existingRank = await Tier.findOne({
       rank
@@ -86,11 +102,9 @@ export const createTier = async (req, res) => {
     if (existingName) {
       return errorResponse(res, 400, "Tier with this name already exists");
     }
-    if (distanceSlabs === undefined || !Array.isArray(distanceSlabs) || distanceSlabs.length === 0) {
-      return errorResponse(res, 400, "distanceSlabs is required and must be a non-empty array");
-    }
-    {
-      const validationError = validateDistanceSlabs(distanceSlabs);
+    const safeDistanceSlabs = Array.isArray(distanceSlabs) ? distanceSlabs : [];
+    if (safeDistanceSlabs.length > 0) {
+      const validationError = validateDistanceSlabs(safeDistanceSlabs);
       if (validationError) {
         return errorResponse(res, 400, validationError);
       }
@@ -111,14 +125,14 @@ export const createTier = async (req, res) => {
       rank,
       deliveryPricing: {
         basePay: basePay || 0,
-        baseFee: req.body.baseFee || 0,
-        freeDeliveryThreshold: req.body.freeDeliveryThreshold || 0,
+        baseFee: feeSettings.deliveryFee,
+        freeDeliveryThreshold: feeSettings.freeDeliveryThreshold,
         baseDistance: baseDistance || 3,
         extraKmCharge: extraKmCharge || 10,
-        distanceSlabs: normalizeDistanceSlabs(distanceSlabs)
+        distanceSlabs: normalizeDistanceSlabs(safeDistanceSlabs)
       },
-      recommendedItemFee: recommendedItemFee || 0,
-      platformFee: platformFee || 0
+      recommendedItemFee: feeSettings.recommendedItemFee,
+      platformFee: feeSettings.platformFee
     });
 
     // Sync delivery commission rules for this tier based on its distance slabs
@@ -200,6 +214,9 @@ export const updateTier = async (req, res) => {
       return errorResponse(res, 404, "Tier not found");
     }
 
+    const prevBaseFee = tier.deliveryPricing?.baseFee;
+    const prevFreeDeliveryThreshold = tier.deliveryPricing?.freeDeliveryThreshold;
+
     // Check for duplicate name if changing
     if (name && name !== tier.name) {
       const existingName = await Tier.findOne({
@@ -249,29 +266,42 @@ export const updateTier = async (req, res) => {
       }
     }
 
-    // Update delivery pricing
-    if (baseFee !== undefined || freeDeliveryThreshold !== undefined || baseDistance !== undefined || extraKmCharge !== undefined || basePay !== undefined || distanceSlabs !== undefined) {
-      if (!tier.deliveryPricing) {
-        tier.deliveryPricing = {};
-      }
+    // Update delivery pricing (distance slabs can be updated without touching fees)
+    if (
+      baseDistance !== undefined ||
+      extraKmCharge !== undefined ||
+      basePay !== undefined ||
+      distanceSlabs !== undefined
+    ) {
+      if (!tier.deliveryPricing) tier.deliveryPricing = {};
       if (basePay !== undefined) tier.deliveryPricing.basePay = basePay;
-      if (baseFee !== undefined) tier.deliveryPricing.baseFee = baseFee;
-      if (freeDeliveryThreshold !== undefined) tier.deliveryPricing.freeDeliveryThreshold = freeDeliveryThreshold;
       if (baseDistance !== undefined) tier.deliveryPricing.baseDistance = baseDistance;
       if (extraKmCharge !== undefined) tier.deliveryPricing.extraKmCharge = extraKmCharge;
       if (distanceSlabs !== undefined) tier.deliveryPricing.distanceSlabs = normalizeDistanceSlabs(distanceSlabs);
     }
 
+    // Set fees only when the caller provides them.
+    // This prevents tier fees from being overwritten by unrelated updates
+    // (e.g. TierManagement updating only basePay).
+    if (!tier.deliveryPricing) tier.deliveryPricing = {};
+    if (baseFee !== undefined) tier.deliveryPricing.baseFee = Number(baseFee);
+    if (freeDeliveryThreshold !== undefined) tier.deliveryPricing.freeDeliveryThreshold = Number(freeDeliveryThreshold);
+
     // Update tier-based banner limit
     if (maxBanners !== undefined) {
       tier.maxBanners = Math.max(1, parseInt(maxBanners) || 1);
     }
+
     if (recommendedItemFee !== undefined) {
       tier.recommendedItemFee = Number(recommendedItemFee);
     }
     if (platformFee !== undefined) {
       tier.platformFee = Number(platformFee);
     }
+
+    const feeSettingsChanged =
+      (baseFee !== undefined && Number(prevBaseFee ?? 0) !== Number(baseFee)) ||
+      (freeDeliveryThreshold !== undefined && Number(prevFreeDeliveryThreshold ?? 0) !== Number(freeDeliveryThreshold));
     await tier.save();
 
     // Sync delivery commission rules whenever tier delivery pricing / slabs change
@@ -286,7 +316,14 @@ export const updateTier = async (req, res) => {
     }
 
     // Propagate pricing to non-overridden zones
-    if (baseFee !== undefined || freeDeliveryThreshold !== undefined || baseDistance !== undefined || extraKmCharge !== undefined || basePay !== undefined) {
+    if (
+      baseFee !== undefined ||
+      freeDeliveryThreshold !== undefined ||
+      baseDistance !== undefined ||
+      extraKmCharge !== undefined ||
+      basePay !== undefined ||
+      feeSettingsChanged
+    ) {
       await Zone.updateMany({
         tierId: id,
         $or: [{

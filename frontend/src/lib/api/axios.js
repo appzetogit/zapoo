@@ -116,6 +116,7 @@ apiClient.interceptors.request.use(config => {
     requestUrl.includes("/restaurant/list") ||
     requestUrl.includes("/restaurant/under-250") ||
     (requestUrl.includes("/restaurant/") &&
+      !requestUrl.includes("/restaurant/outlet-timings") &&
       !requestUrl.includes("/restaurant/orders") &&
       !requestUrl.includes("/restaurant/auth") &&
       !requestUrl.includes("/restaurant/menu") &&

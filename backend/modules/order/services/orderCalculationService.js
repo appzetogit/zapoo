@@ -351,6 +351,8 @@ const calculateAdminDeliveryCost = ({
 };
 
 const calculateTierPlatformFee = (tier, defaultPlatformFee) => {
+  // Tier wise platform fee should be stored on the Tier itself.
+  // Fallback to FeeSettings if tier doesn't have the value (legacy safety).
   if (tier?.platformFee !== undefined && tier?.platformFee !== null) {
     return Number(tier.platformFee);
   }
@@ -527,7 +529,11 @@ export const calculateOrderPricing = async ({
     const distanceKm = Number.isFinite(distanceKmRaw) ? roundCurrency(distanceKmRaw) : 0;
 
     const tierDistanceSlabs = getTierDistanceSlabs(tier);
-    const distanceSlabs = tierDistanceSlabs;
+    // If a new tier was created before FeeSettings distance slabs were configured,
+    // fall back to FeeSettings defaults so delivery fee computation doesn't become 0.
+    const distanceSlabs = Array.isArray(tierDistanceSlabs) && tierDistanceSlabs.length > 0
+      ? tierDistanceSlabs
+      : feeSettings.distanceSlabs;
     const matchedDistanceSlab = findDistanceSlab(distanceSlabs, distanceKm) || findBaseDistanceSlab(distanceSlabs);
     const baseDistanceSlab = findBaseDistanceSlab(distanceSlabs);
 
@@ -568,7 +574,10 @@ export const calculateOrderPricing = async ({
     } else if (!isRestaurantCustomDeliveryEnabled(restaurant)) {
       // Global free-delivery threshold applies only when restaurant is NOT using
       // custom per-km / slab matrix (matrix is source of truth when enabled).
-      const threshold = Number(feeSettings.freeDeliveryThreshold || 0);
+      const tierFreeThreshold = tier?.deliveryPricing?.freeDeliveryThreshold;
+      const threshold = Number.isFinite(Number(tierFreeThreshold))
+        ? Number(tierFreeThreshold)
+        : Number(feeSettings.freeDeliveryThreshold || 0);
       if (threshold > 0 && netAfterDiscount >= threshold) {
         finalCustomerDeliveryFee = 0;
         freeDeliveryReason = 'threshold';

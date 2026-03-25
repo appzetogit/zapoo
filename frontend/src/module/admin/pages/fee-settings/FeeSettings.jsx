@@ -234,7 +234,13 @@ export default function FeeSettings() {
 
       const [globalRes] = await Promise.all([
         adminAPI.createOrUpdateFeeSettings(globalPayload),
-        tierAPI.updateTier(selectedTierId, { distanceSlabs: tierSlabsPayload }),
+        tierAPI.updateTier(selectedTierId, {
+          distanceSlabs: tierSlabsPayload,
+          platformFee: Number(feeSettings.platformFee),
+          recommendedItemFee: Number(feeSettings.recommendedItemFee || 0),
+          baseFee: Number(feeSettings.deliveryFee),
+          freeDeliveryThreshold: Number(feeSettings.freeDeliveryThreshold),
+        }),
       ]);
 
       if (globalRes?.data?.success) {

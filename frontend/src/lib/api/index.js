@@ -386,6 +386,21 @@ export const restaurantAPI = {
     });
   },
 
+  // Outlet timings
+  getOutletTimings: () => {
+    return apiClient.get(API_ENDPOINTS.RESTAURANT.OUTLET_TIMINGS);
+  },
+
+  // Public outlet timings (by restaurant id, no route conflict with /restaurant/:id)
+  getOutletTimingsByRestaurantId: (restaurantId) => {
+    if (!restaurantId) throw new Error("restaurantId is required");
+    return apiClient.get(`/restaurant/${restaurantId}/outlet-timings`);
+  },
+
+  upsertOutletTimings: (timings) => {
+    return apiClient.put(API_ENDPOINTS.RESTAURANT.OUTLET_TIMINGS, { timings });
+  },
+
   // Delivery pricing config
   getDeliveryPricing: () => {
     return apiClient.get(API_ENDPOINTS.RESTAURANT.DELIVERY_PRICING);

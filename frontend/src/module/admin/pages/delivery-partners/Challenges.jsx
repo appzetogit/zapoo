@@ -181,6 +181,28 @@ const getSafeRewardType = (targetType, rewardType) => {
   return options[0]?.value || "wallet_credit"
 }
 
+const computeAutoWindowForFrequency = (frequency, now = new Date()) => {
+  const start = new Date(now)
+  const end = new Date(start)
+
+  if (frequency === "daily") {
+    end.setTime(start.getTime() + 24 * 60 * 60 * 1000 - 1)
+  } else if (frequency === "weekly") {
+    end.setTime(start.getTime() + 7 * 24 * 60 * 60 * 1000 - 1)
+  } else if (frequency === "monthly") {
+    const month = end.getMonth()
+    end.setMonth(month + 1)
+    end.setTime(end.getTime() - 1)
+  }
+
+  return { start, end }
+}
+
+const formatDateTime = (d) => {
+  if (!d) return ""
+  return new Date(d).toLocaleString()
+}
+
 export default function Challenges() {
   const [tiers, setTiers] = useState([])
   const [templates, setTemplates] = useState([])
@@ -205,6 +227,12 @@ export default function Challenges() {
   const [expandedProgressId, setExpandedProgressId] = useState(null)
   const [progressData, setProgressData] = useState({})
   const [progressLoading, setProgressLoading] = useState(false)
+
+  // Auto validity preview for daily/weekly/monthly (only recomputed when admin changes frequency)
+  const [autoWindowPreview, setAutoWindowPreview] = useState(() =>
+    computeAutoWindowForFrequency(initialForm.frequency, new Date()),
+  )
+  const [isAutoWindowLocked, setIsAutoWindowLocked] = useState(false)
 
   const availableTemplates = useMemo(() => {
     const fromApi = templates.filter((t) => t.targetType === selectedType)
@@ -294,6 +322,8 @@ export default function Challenges() {
     setIsFormOpen(false)
     setApplyAllTiers(true)
     setForm(initialForm)
+    setIsAutoWindowLocked(false)
+    setAutoWindowPreview(computeAutoWindowForFrequency(initialForm.frequency, new Date()))
   }
 
   const handleTierSelect = (e) => {
@@ -307,6 +337,7 @@ export default function Challenges() {
     setSelectedTemplateName("")
     setEditingId("")
     setApplyAllTiers(true)
+    setIsAutoWindowLocked(false)
     setForm({
       ...initialForm,
       reward_type: getSafeRewardType(type, initialForm.reward_type),
@@ -318,6 +349,7 @@ export default function Challenges() {
     setEditingId("")
     setIsFormOpen(true)
     setApplyAllTiers(true)
+    setIsAutoWindowLocked(false)
     setForm((prev) => ({
       ...initialForm,
       title: getTemplateTitle(template),
@@ -349,9 +381,24 @@ export default function Challenges() {
       tier_ids: tierIds,
     })
 
+    // Lock preview to stored validity when editing.
+    // This prevents misleading "recomputed now" values until admin changes frequency.
+    setIsAutoWindowLocked(true)
+    setAutoWindowPreview({
+      start: challenge.startDate ? new Date(challenge.startDate) : computeAutoWindowForFrequency(challenge.frequency || "daily").start,
+      end: challenge.endDate ? new Date(challenge.endDate) : computeAutoWindowForFrequency(challenge.frequency || "daily").end,
+    })
+
     setIsFormOpen(true)
     window.scrollTo({ top: 0, behavior: "smooth" })
   }
+
+  // Recompute preview only when modal is open and admin changes frequency
+  useEffect(() => {
+    if (!isFormOpen) return
+    if (isAutoWindowLocked) return
+    setAutoWindowPreview(computeAutoWindowForFrequency(form.frequency, new Date()))
+  }, [form.frequency, isFormOpen, isAutoWindowLocked])
 
   const submit = async (e) => {
     e.preventDefault()
@@ -730,13 +777,21 @@ export default function Challenges() {
                     <label className="block text-xs font-semibold text-slate-600 mb-1">Challenge Frequency</label>
                     <select
                       value={form.frequency}
-                      onChange={(e) => setForm((prev) => ({ ...prev, frequency: e.target.value }))}
+                      onChange={(e) => {
+                        setIsAutoWindowLocked(false)
+                        setForm((prev) => ({ ...prev, frequency: e.target.value }))
+                      }}
                       className="w-full px-3 py-2 border border-slate-300 rounded-lg"
                     >
                       {FREQUENCY_OPTIONS.map((opt) => (
                         <option key={opt.value} value={opt.value}>{opt.label}</option>
                       ))}
                     </select>
+                    {autoWindowPreview?.start && autoWindowPreview?.end && (
+                      <p className="text-[11px] text-slate-500 mt-2">
+                        Validity (auto): {formatDateTime(autoWindowPreview.start)} → {formatDateTime(autoWindowPreview.end)}
+                      </p>
+                    )}
                   </div>
                 </div>
 
