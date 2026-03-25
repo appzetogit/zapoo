@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { Bell, Send, Clock, CheckCircle2, XCircle, AlertCircle, ImagePlus, X, Trash2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Bell, Send, Clock, CheckCircle2, XCircle, AlertCircle, ImagePlus, X, Trash2, ArrowLeft } from 'lucide-react';
 import apiClient from '@/lib/api';
 
 const STATUS_CONFIG = {
@@ -9,6 +10,7 @@ const STATUS_CONFIG = {
 };
 
 export default function RestaurantNotificationRequest() {
+    const navigate = useNavigate();
     const [form, setForm] = useState({ title: '', description: '' });
     const [quota, setQuota] = useState({ used: 0, limit: 2, remaining: 2 });
     const [requests, setRequests] = useState([]);
@@ -154,6 +156,14 @@ export default function RestaurantNotificationRequest() {
 
                 {/* Header */}
                 <div className="flex items-center gap-3">
+                    <button
+                        type="button"
+                        onClick={() => navigate(-1)}
+                        className="p-1.5 -ml-1 rounded-lg hover:bg-slate-200/80 transition-colors shrink-0"
+                        aria-label="Go back"
+                    >
+                        <ArrowLeft className="w-5 h-5 text-slate-700" />
+                    </button>
                     <Bell className="w-6 h-6 text-[#FF5200]" />
                     <h1 className="text-2xl font-bold text-slate-900">Notify Customers</h1>
                 </div>

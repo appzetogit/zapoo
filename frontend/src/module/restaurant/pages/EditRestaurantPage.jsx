@@ -14,14 +14,11 @@ import {
 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import BottomNavbar from "../components/BottomNavbar"
-import MenuOverlay from "../components/MenuOverlay"
 import { getRestaurantData, updateRestaurantData } from "../utils/restaurantManagement"
 
 export default function EditRestaurantPage() {
   const navigate = useNavigate()
   const [activeLanguage, setActiveLanguage] = useState("english")
-  const [showMenu, setShowMenu] = useState(false)
 
   // Lenis smooth scrolling
   useEffect(() => {
@@ -143,8 +140,8 @@ export default function EditRestaurantPage() {
     // Save restaurant data to localStorage
     try {
       updateRestaurantData(formData)
-      // Navigate back to restaurant details page
-      navigate("/restaurant/details")
+      // Navigate back to restaurant home
+      navigate("/restaurant")
     } catch (error) {
       console.error("Error saving restaurant data:", error)
       alert("Error saving restaurant data. Please try again.")
@@ -157,7 +154,7 @@ export default function EditRestaurantPage() {
       <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-4">
           <button
-            onClick={() => navigate("/restaurant/details")}
+            onClick={() => navigate("/restaurant")}
             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
           >
             <ArrowLeft className="w-5 h-5 text-gray-600" />
@@ -422,10 +419,6 @@ export default function EditRestaurantPage() {
       </div>
 
       {/* Bottom Navigation Bar - Mobile Only */}
-      <BottomNavbar onMenuClick={() => setShowMenu(true)} />
-
-      {/* Menu Overlay */}
-      <MenuOverlay showMenu={showMenu} setShowMenu={setShowMenu} />
     </div>
   )
 }

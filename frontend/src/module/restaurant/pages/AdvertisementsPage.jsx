@@ -6,15 +6,12 @@ import { useNavigate } from "react-router-dom";
 import Lenis from "lenis";
 import { ArrowLeft, MoreVertical, ChevronRight, Plus, Eye, Edit, Pause, Copy, Trash2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-import BottomNavbar from "../components/BottomNavbar";
-import MenuOverlay from "../components/MenuOverlay";
 import { initRazorpayPayment } from "@/lib/utils/razorpay";
 import { getCompanyNameAsync } from "@/lib/utils/businessSettings";
 export default function AdvertisementsPage() {
   const navigate = useNavigate();
   const [activeFilter, setActiveFilter] = useState("all");
   const [openMenuId, setOpenMenuId] = useState(null);
-  const [showMenu, setShowMenu] = useState(false);
   const [loading, setLoading] = useState(true);
   const [advertisements, setAdvertisements] = useState([]);
   const [processingPayment, setProcessingPayment] = useState(false);
@@ -390,9 +387,5 @@ export default function AdvertisementsPage() {
       </motion.button>
 
       {/* Bottom Navigation Bar */}
-      <BottomNavbar onMenuClick={() => setShowMenu(true)} />
-
-      {/* Menu Overlay */}
-      <MenuOverlay showMenu={showMenu} setShowMenu={setShowMenu} />
     </div>;
 }

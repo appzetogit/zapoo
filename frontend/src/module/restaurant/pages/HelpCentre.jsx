@@ -21,7 +21,7 @@ const helpTopics = [
     icon: Power,
     title: "Outlet online / offline status",
     subtitle: "Current status & details",
-    path: "/restaurant/delivery-settings"
+    path: "/restaurant/status"
   },
   {
     id: 2,

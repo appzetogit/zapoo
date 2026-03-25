@@ -16,15 +16,12 @@ import {
 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import BottomNavbar from "../components/BottomNavbar"
-import MenuOverlay from "../components/MenuOverlay"
 import { getFoodById, saveFood } from "../utils/foodManagement"
 
 export default function EditFoodPage() {
   const navigate = useNavigate()
   const { id } = useParams()
   const isNewFood = id === "new" || !id
-  const [showMenu, setShowMenu] = useState(false)
 
   // Lenis smooth scrolling
   useEffect(() => {
@@ -730,10 +727,6 @@ export default function EditFoodPage() {
       </div>
 
       {/* Bottom Navigation Bar - Mobile Only */}
-      <BottomNavbar onMenuClick={() => setShowMenu(true)} />
-
-      {/* Menu Overlay */}
-      <MenuOverlay showMenu={showMenu} setShowMenu={setShowMenu} />
     </div>
   )
 }

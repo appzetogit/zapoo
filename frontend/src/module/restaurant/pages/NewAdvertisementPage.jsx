@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { marketingAPI } from "@/lib/api";
-import BottomNavbar from "../components/BottomNavbar";
 export default function NewAdvertisementPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -327,7 +326,6 @@ export default function NewAdvertisementPage() {
         </div>
       </div>
 
-      <BottomNavbar />
 
       <Dialog open={!!conflictError} onOpenChange={() => setConflictError(null)}>
         <DialogContent className="w-[90%] sm:w-full sm:max-w-[340px] p-0 gap-0 overflow-hidden rounded-xl border-0 shadow-xl">

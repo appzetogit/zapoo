@@ -45,7 +45,7 @@ export default function ProtectedRoute({ children, requiredRole, loginPath }) {
   );
 
   const allowedWithoutSubscription = useMemo(
-    () => ["/restaurant/subscription", "/restaurant/onboarding", "/restaurant/details", "/restaurant/edit"],
+    () => ["/restaurant/subscription", "/restaurant/onboarding", "/restaurant/edit"],
     []
   );
 

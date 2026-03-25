@@ -10,14 +10,10 @@ import Loader from "@/components/Loader"
 const UserRouter = lazy(() => import("@/module/user/components/UserRouter"))
 
 // Restaurant Module
-const RestaurantOrdersPage = lazy(() => import("@/module/restaurant/pages/OrdersPage"))
 const AllOrdersPage = lazy(() => import("@/module/restaurant/pages/AllOrdersPage"))
-const RestaurantDetailsPage = lazy(() => import("@/module/restaurant/pages/RestaurantDetailsPage"))
 const EditRestaurantPage = lazy(() => import("@/module/restaurant/pages/EditRestaurantPage"))
 const FoodDetailsPage = lazy(() => import("@/module/restaurant/pages/FoodDetailsPage"))
 const EditFoodPage = lazy(() => import("@/module/restaurant/pages/EditFoodPage"))
-const AllFoodPage = lazy(() => import("@/module/restaurant/pages/AllFoodPage"))
-const WalletPage = lazy(() => import("@/module/restaurant/pages/WalletPage"))
 const RestaurantNotifications = lazy(() => import("@/module/restaurant/pages/Notifications"))
 const RestaurantNotificationRequest = lazy(() => import("@/module/restaurant/pages/NotificationRequest"))
 const OrderDetails = lazy(() => import("@/module/restaurant/pages/OrderDetails"))
@@ -37,23 +33,9 @@ const AdvertisementsPage = lazy(() => import("@/module/restaurant/pages/Advertis
 const AdDetailsPage = lazy(() => import("@/module/restaurant/pages/AdDetailsPage"))
 const NewAdvertisementPage = lazy(() => import("@/module/restaurant/pages/NewAdvertisementPage"))
 const EditAdvertisementPage = lazy(() => import("@/module/restaurant/pages/EditAdvertisementPage"))
-const CouponListPage = lazy(() => import("@/module/restaurant/pages/CouponListPage"))
-const AddCouponPage = lazy(() => import("@/module/restaurant/pages/AddCouponPage"))
-const EditCouponPage = lazy(() => import("@/module/restaurant/pages/EditCouponPage"))
-const ReviewsPage = lazy(() => import("@/module/restaurant/pages/ReviewsPage"))
-const UpdateReplyPage = lazy(() => import("@/module/restaurant/pages/UpdateReplyPage"))
-const SettingsPage = lazy(() => import("@/module/restaurant/pages/SettingsPage"))
-const PrivacyPolicyPage = lazy(() => import("@/module/restaurant/pages/PrivacyPolicyPage"))
-const TermsAndConditionsPage = lazy(() => import("@/module/restaurant/pages/TermsAndConditionsPage"))
-const RestaurantConfigPage = lazy(() => import("@/module/restaurant/pages/RestaurantConfigPage"))
-const RestaurantCategoriesPage = lazy(() => import("@/module/restaurant/pages/RestaurantCategoriesPage"))
 const MenuCategoriesPage = lazy(() => import("@/module/restaurant/pages/MenuCategoriesPage"))
-const BusinessPlanPage = lazy(() => import("@/module/restaurant/pages/BusinessPlanPage"))
-const ConversationListPage = lazy(() => import("@/module/restaurant/pages/ConversationListPage"))
-const ChatDetailPage = lazy(() => import("@/module/restaurant/pages/ChatDetailPage"))
 const RestaurantStatus = lazy(() => import("@/module/restaurant/pages/RestaurantStatus"))
 const ExploreMore = lazy(() => import("@/module/restaurant/pages/ExploreMore"))
-const DeliverySettings = lazy(() => import("@/module/restaurant/pages/DeliverySettings"))
 const RushHour = lazy(() => import("@/module/restaurant/pages/RushHour"))
 const SwitchOutlet = lazy(() => import("@/module/restaurant/pages/SwitchOutlet"))
 const OutletTimings = lazy(() => import("@/module/restaurant/pages/OutletTimings"))
@@ -180,14 +162,6 @@ export default function App() {
           }
         />
         <Route
-          path="/restaurant/orders"
-          element={
-            <ProtectedRoute requiredRole="restaurant" loginPath="/restaurant/login">
-              <RestaurantOrdersPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
           path="/restaurant/orders/all"
           element={
             <ProtectedRoute requiredRole="restaurant" loginPath="/restaurant/login">
@@ -204,26 +178,10 @@ export default function App() {
           }
         />
         <Route
-          path="/restaurant/details"
-          element={
-            <ProtectedRoute requiredRole="restaurant" loginPath="/restaurant/login">
-              <RestaurantDetailsPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
           path="/restaurant/edit"
           element={
             <ProtectedRoute requiredRole="restaurant" loginPath="/restaurant/login">
               <EditRestaurantPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/restaurant/food/all"
-          element={
-            <ProtectedRoute requiredRole="restaurant" loginPath="/restaurant/login">
-              <AllFoodPage />
             </ProtectedRoute>
           }
         />
@@ -251,15 +209,6 @@ export default function App() {
             </ProtectedRoute>
           }
         />
-        <Route
-          path="/restaurant/wallet"
-          element={
-            <ProtectedRoute requiredRole="restaurant" loginPath="/restaurant/login">
-              <WalletPage />
-            </ProtectedRoute>
-          }
-        />
-
         {/* Restaurant Protected Routes - Continued */}
         <Route
           path="/restaurant/advertisements"
@@ -294,63 +243,6 @@ export default function App() {
           }
         />
         <Route
-          path="/restaurant/coupon"
-          element={
-            <ProtectedRoute requiredRole="restaurant" loginPath="/restaurant/login">
-              <CouponListPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/restaurant/coupon/new"
-          element={
-            <ProtectedRoute requiredRole="restaurant" loginPath="/restaurant/login">
-              <AddCouponPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/restaurant/coupon/:id/edit"
-          element={
-            <ProtectedRoute requiredRole="restaurant" loginPath="/restaurant/login">
-              <EditCouponPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/restaurant/reviews"
-          element={
-            <ProtectedRoute requiredRole="restaurant" loginPath="/restaurant/login">
-              <ReviewsPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/restaurant/reviews/:id/reply"
-          element={
-            <ProtectedRoute requiredRole="restaurant" loginPath="/restaurant/login">
-              <UpdateReplyPage />
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/restaurant/settings"
-          element={
-            <ProtectedRoute requiredRole="restaurant" loginPath="/restaurant/login">
-              <SettingsPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/restaurant/delivery-settings"
-          element={
-            <ProtectedRoute requiredRole="restaurant" loginPath="/restaurant/login">
-              <DeliverySettings />
-            </ProtectedRoute>
-          }
-        />
-        <Route
           path="/restaurant/rush-hour"
           element={
             <ProtectedRoute requiredRole="restaurant" loginPath="/restaurant/login">
@@ -359,67 +251,10 @@ export default function App() {
           }
         />
         <Route
-          path="/restaurant/privacy"
-          element={
-            <ProtectedRoute requiredRole="restaurant" loginPath="/restaurant/login">
-              <PrivacyPolicyPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/restaurant/terms"
-          element={
-            <ProtectedRoute requiredRole="restaurant" loginPath="/restaurant/login">
-              <TermsAndConditionsPage />
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/restaurant/config"
-          element={
-            <ProtectedRoute requiredRole="restaurant" loginPath="/restaurant/login">
-              <RestaurantConfigPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/restaurant/categories"
-          element={
-            <ProtectedRoute requiredRole="restaurant" loginPath="/restaurant/login">
-              <RestaurantCategoriesPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
           path="/restaurant/menu-categories"
           element={
             <ProtectedRoute requiredRole="restaurant" loginPath="/restaurant/login">
               <MenuCategoriesPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/restaurant/business-plan"
-          element={
-            <ProtectedRoute requiredRole="restaurant" loginPath="/restaurant/login">
-              <BusinessPlanPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/restaurant/conversation"
-          element={
-            <ProtectedRoute requiredRole="restaurant" loginPath="/restaurant/login">
-              <ConversationListPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/restaurant/conversation/:conversationId"
-          element={
-            <ProtectedRoute requiredRole="restaurant" loginPath="/restaurant/login">
-              <ChatDetailPage />
             </ProtectedRoute>
           }
         />

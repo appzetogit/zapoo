@@ -608,11 +608,6 @@ export default function ExploreMore() {
     route: "/restaurant/contact-details"
   }];
   const settingsItems = [{
-    id: 3,
-    label: "Delivery settings",
-    icon: Truck,
-    route: "/restaurant/delivery-settings"
-  }, {
     id: 4,
     label: "Zone Setup",
     icon: MapPin,

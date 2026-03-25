@@ -18,7 +18,6 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { toast } from "sonner"
 import { marketingAPI } from "@/lib/api"
-import BottomNavbar from "../components/BottomNavbar"
 
 // Returns today's date in YYYY-MM-DD format
 const todayStr = () => new Date().toISOString().split("T")[0]
@@ -445,7 +444,6 @@ export default function EditAdvertisementPage() {
         </div>
       </div>
 
-      <BottomNavbar />
     </div>
   )
 }

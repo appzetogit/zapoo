@@ -50,22 +50,38 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
     }
 
     // Filter by Tier if specified
-    let zoneFilter = {};
-    let restaurantFilter = {
-      isActive: true
-    };
+    let orderScopeFilter = {};
+    let restaurantScopeFilter = {};
     if (tierId && tierId !== "all") {
       const zones = await Zone.find({
         tierId
       }).select("_id").lean();
       const zoneIds = zones.map(z => z._id);
-      zoneFilter = {
+      const zoneIdStrings = zoneIds.map((id) => String(id));
+      restaurantScopeFilter = {
         zoneId: {
           $in: zoneIds
         }
       };
-      restaurantFilter.zoneId = {
-        $in: zoneIds
+
+      // Some historical orders may not have zoneId populated.
+      // Scope orders by zone OR by mapped restaurants in those zones.
+      const tierRestaurants = await Restaurant.find(restaurantScopeFilter)
+        .select("_id restaurantId slug")
+        .lean();
+      const scopedOrderRestaurantIds = [...new Set(
+        (tierRestaurants || []).flatMap((r) => [
+          r?._id ? String(r._id) : null,
+          r?.restaurantId ? String(r.restaurantId) : null,
+          r?.slug ? String(r.slug) : null,
+        ].filter(Boolean))
+      )];
+
+      orderScopeFilter = {
+        $or: [
+          { zoneId: { $in: zoneIdStrings } },
+          { restaurantId: { $in: scopedOrderRestaurantIds } }
+        ]
       };
     }
 
@@ -73,7 +89,7 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
     const orderMatch = {
       status: "delivered",
       "pricing.total": { $exists: true },
-      ...zoneFilter
+      ...orderScopeFilter
     };
 
     // Period specific match
@@ -184,9 +200,6 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
     };
 
     // 2. Aggregated counters for orders, restaurants, and users
-    const restaurantScopeFilter = tierId && tierId !== "all"
-      ? { zoneId: restaurantFilter.zoneId }
-      : {};
     const last24Hours = new Date(now.getTime() - 24 * 60 * 60 * 1000);
     const pendingRestaurantRequestsQuery = {
       isActive: false,
@@ -218,7 +231,7 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
 
     const [orderCounts, restaurantStatsAgg, userStatsAgg] = await Promise.all([
       Order.aggregate([
-        { $match: { ...zoneFilter, ...(startDate ? { createdAt: { $gte: startDate } } : {}) } },
+        { $match: { ...orderScopeFilter, ...(startDate ? { createdAt: { $gte: startDate } } : {}) } },
         { $group: { _id: "$status", count: { $sum: 1 } } }
       ]),
       Restaurant.aggregate([
@@ -340,7 +353,7 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
           }
         }
       ]),
-      Order.countDocuments({ ...zoneFilter, createdAt: { $gte: last24Hours } })
+      Order.countDocuments({ ...orderScopeFilter, createdAt: { $gte: last24Hours } })
     ]);
 
     const totalFoods = menuStats[0]?.foodCount?.[0]?.total || 0;
@@ -361,7 +374,7 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
         $match: {
           status: "delivered",
           deliveredAt: { $gte: twelveMonthsAgo },
-          ...zoneFilter
+          ...orderScopeFilter
         }
       },
       {

@@ -13,14 +13,11 @@ import { Button } from "@/components/ui/button"
 import { marketingAPI } from "@/lib/api"
 import { toast } from "sonner"
 import { Loader2 } from "lucide-react"
-import BottomNavbar from "../components/BottomNavbar"
-import MenuOverlay from "../components/MenuOverlay"
 import { Card, CardContent } from "@/components/ui/card"
 
 export default function AdDetailsPage() {
   const navigate = useNavigate()
   const { id } = useParams()
-  const [showMenu, setShowMenu] = useState(false)
   const [adData, setAdData] = useState(null)
   const [loading, setLoading] = useState(true)
 
@@ -284,10 +281,6 @@ export default function AdDetailsPage() {
       </div>
 
       {/* Bottom Navigation Bar */}
-      <BottomNavbar onMenuClick={() => setShowMenu(true)} />
-
-      {/* Menu Overlay */}
-      <MenuOverlay showMenu={showMenu} setShowMenu={setShowMenu} />
     </div>
   )
 }

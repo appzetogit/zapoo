@@ -14,8 +14,6 @@ import {
 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import BottomNavbar from "../components/BottomNavbar"
-import MenuOverlay from "../components/MenuOverlay"
 import { formatCurrency, usdToInr } from "../utils/currency"
 import { getFoodById, saveFood } from "../utils/foodManagement"
 
@@ -23,7 +21,6 @@ export default function FoodDetailsPage() {
   const navigate = useNavigate()
   const { id } = useParams()
   const [activeTab, setActiveTab] = useState("overview")
-  const [showMenu, setShowMenu] = useState(false)
   const [showStockModal, setShowStockModal] = useState(false)
   const [stockData, setStockData] = useState({
     mainStock: 0,
@@ -244,7 +241,7 @@ export default function FoodDetailsPage() {
       <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="px-4 py-3 flex items-center gap-4">
           <button
-            onClick={() => navigate("/restaurant/details")}
+            onClick={() => navigate("/restaurant")}
             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
           >
             <ArrowLeft className="w-5 h-5 text-gray-600" />
@@ -589,10 +586,6 @@ export default function FoodDetailsPage() {
       </div>
 
       {/* Bottom Navigation Bar - Mobile Only */}
-      <BottomNavbar onMenuClick={() => setShowMenu(true)} />
-
-      {/* Menu Overlay */}
-      <MenuOverlay showMenu={showMenu} setShowMenu={setShowMenu} />
 
       {/* Update Stock Modal */}
       <AnimatePresence>

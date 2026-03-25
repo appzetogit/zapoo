@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { DateRangeCalendar } from "@/components/ui/date-range-calendar";
 import { Bell, HelpCircle, Menu, Search, TrendingUp, BarChart3, Users, CalendarRange, Download, MoreVertical, ChevronLeft, ChevronRight, Wand2, X, MapPin, Megaphone } from "lucide-react";
-import { FaHistory, FaExclamationTriangle, FaStar, FaCommentDots, FaLink, FaCog } from "react-icons/fa";
+import { FaExclamationTriangle, FaStar, FaCommentDots, FaLink } from "react-icons/fa";
 import { AreaChart, Area, Line, Bar, ComposedChart, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, LineChart } from "recharts";
 import BottomNavOrders from "../components/BottomNavOrders";
 import SubscriptionFeatureOverlay from "../components/SubscriptionFeatureOverlay";
@@ -357,11 +357,6 @@ export default function ToHub() {
     }
 
     links.push(...[{
-      id: "order-history",
-      label: "Order history",
-      icon: FaHistory,
-      route: "/restaurant/orders/all"
-    }, {
       id: "complaints",
       label: "Complaints",
       icon: FaExclamationTriangle,
@@ -381,11 +376,6 @@ export default function ToHub() {
       label: "Zone Setup",
       icon: MapPin,
       route: "/restaurant/zone-setup"
-    }, {
-      id: "settings",
-      label: "Settings",
-      icon: FaCog,
-      route: "/restaurant/delivery-settings"
     }]);
 
     return links;
