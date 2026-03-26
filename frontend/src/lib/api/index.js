@@ -1583,7 +1583,12 @@ export const adminAPI = {
     // Add text fields
     Object.keys(data).forEach((key) => {
       if (key !== "logo") {
-        formData.append(key, data[key]);
+        const value = data[key];
+        if (value && typeof value === "object" && !(value instanceof File)) {
+          formData.append(key, JSON.stringify(value));
+        } else {
+          formData.append(key, value);
+        }
       }
     });
 

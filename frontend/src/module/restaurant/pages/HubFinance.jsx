@@ -1,9 +1,10 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Bell, Menu, ChevronDown, Calendar, Download, ArrowRight, FileText, Wallet, X } from "lucide-react";
+import { Bell, Menu, ChevronDown, Calendar, Download, ArrowRight, FileText, Wallet, X, AlertTriangle } from "lucide-react";
 import BottomNavOrders from "../components/BottomNavOrders";
 import { restaurantAPI } from "@/lib/api";
+import { loadBusinessSettings } from "@/lib/utils/businessSettings";
 export default function HubFinance() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -25,6 +26,9 @@ export default function HubFinance() {
   const [showWithdrawalModal, setShowWithdrawalModal] = useState(false);
   const [withdrawalAmount, setWithdrawalAmount] = useState('');
   const [submittingWithdrawal, setSubmittingWithdrawal] = useState(false);
+  const [withdrawalWindows, setWithdrawalWindows] = useState(null);
+  const [walletBalance, setWalletBalance] = useState(0);
+  const [walletLoading, setWalletLoading] = useState(false);
 
   // Fetch finance data on mount
   useEffect(() => {
@@ -45,6 +49,40 @@ export default function HubFinance() {
       }
     };
     fetchFinanceData();
+  }, []);
+
+  useEffect(() => {
+    const fetchWalletBalance = async () => {
+      try {
+        setWalletLoading(true);
+        const response = await restaurantAPI.getWallet();
+        const data = response?.data?.data || response?.data;
+        setWalletBalance(Number(data?.wallet?.totalBalance) || 0);
+      } catch (_) {
+        setWalletBalance(0);
+      } finally {
+        setWalletLoading(false);
+      }
+    };
+    fetchWalletBalance();
+  }, []);
+
+  // Load withdrawal window settings (public)
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const settings = await loadBusinessSettings({ force: true });
+        if (mounted) {
+          setWithdrawalWindows(settings?.withdrawalWindows || null);
+        }
+      } catch (_) {
+        if (mounted) setWithdrawalWindows(null);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   // Fetch restaurant data for header display
@@ -575,6 +613,33 @@ export default function HubFinance() {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [showDownloadMenu]);
+  const isSameDay = (a, b) =>
+    a && b &&
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate();
+
+  const isRestaurantWithdrawalDay = (date = new Date()) => date.getDate() % 3 === 0;
+
+  const restaurantWindow = withdrawalWindows?.restaurant;
+  const today = new Date();
+  const defaultAllowed = isRestaurantWithdrawalDay(today);
+  const openDates = restaurantWindow?.openDates || [];
+  const closedDates = restaurantWindow?.closedDates || [];
+  const isInList = (list) => list.some((d) => isSameDay(new Date(d), today));
+  let isAllowedToday = defaultAllowed;
+  if (isInList(closedDates)) {
+    isAllowedToday = false;
+  } else if (isInList(openDates)) {
+    isAllowedToday = true;
+  }
+
+  const bannerText = isAllowedToday
+    ? "Withdrawals open today."
+    : "Withdrawals are allowed only on calendar days 3, 6, 9, 12…";
+  const withdrawableBalance = Number(walletBalance) || 0;
+  const hasWithdrawableBalance = withdrawableBalance > 0;
+
   return <div className="min-h-screen bg-gray-100 flex flex-col">
       {/* Navbar */}
       <div className="sticky bg-white top-0 z-40 px-4 py-3 border-b border-gray-200">
@@ -634,20 +699,25 @@ export default function HubFinance() {
       {/* Content */}
       <div className="flex-1 overflow-y-auto px-4 py-6">
         {activeTab === "payouts" && <div className="space-y-6">
-            {/* Current cycle */}
+            <div className={`rounded-lg px-4 py-3 flex items-start gap-3 ${isAllowedToday ? "bg-green-100 text-green-900" : "bg-yellow-400 text-black"}`}>
+              <AlertTriangle className="h-5 w-5 mt-0.5" />
+              <div className="text-sm leading-tight">
+                <p className="font-semibold">{isAllowedToday ? "Withdrawals open today" : "Withdraw currently disabled"}</p>
+                <p className="text-xs">{bannerText}</p>
+              </div>
+            </div>
+            {/* Available balance */}
             <div>
-              <h2 className="text-base font-bold text-gray-900 mb-3">Current cycle</h2>
+              <h2 className="text-base font-bold text-gray-900 mb-3">Available balance</h2>
               <div className="bg-white rounded-lg p-4">
-                {loading ? <div className="py-8 text-center text-gray-500">Loading...</div> : <>
+                {loading || walletLoading ? <div className="py-8 text-center text-gray-500">Loading...</div> : <>
                     <p className="text-4xl font-bold text-gray-900 mb-2">
-                      ₹{(financeData?.currentCycle?.estimatedPayout || 0).toLocaleString('en-IN', {
+                      ₹{(withdrawableBalance || 0).toLocaleString('en-IN', {
                   minimumFractionDigits: 2,
                   maximumFractionDigits: 2
                 })}
                     </p>
-                    <p className="text-sm text-gray-600 mb-4">
-                      {financeData?.currentCycle?.totalOrders || 0} {financeData?.currentCycle?.totalOrders === 1 ? 'order' : 'orders'}
-                    </p>
+                    <p className="text-sm text-gray-600 mb-4">Updated after each delivered order.</p>
 
                     {/* Recommended Item Performance */}
                     {financeData?.currentCycle?.recommendedItems && <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-100">
@@ -707,7 +777,11 @@ export default function HubFinance() {
                         <p className="text-[9px] text-gray-400 mt-2 italic">* Admin platform fee is charged for boosting item visibility to more customers.</p>
                       </div>}
 
-                    {(financeData?.currentCycle?.estimatedPayout || 0) > 0 && <button onClick={() => setShowWithdrawalModal(true)} className="w-full bg-[#3B82F6] text-white py-3 px-4 rounded-lg font-semibold flex items-center justify-center gap-2 hover:bg-blue-700 transition-colors mt-4">
+                    {hasWithdrawableBalance && <button
+                        onClick={() => isAllowedToday && setShowWithdrawalModal(true)}
+                        disabled={!isAllowedToday}
+                        className={`w-full py-3 px-4 rounded-lg font-semibold flex items-center justify-center gap-2 transition-colors mt-4 ${isAllowedToday ? "bg-[#3B82F6] text-white hover:bg-blue-700" : "bg-gray-300 text-gray-500 cursor-default"}`}
+                      >
                         <Wallet className="h-5 w-5" />
                         Withdraw
                       </button>}
@@ -991,7 +1065,7 @@ export default function HubFinance() {
 
                 <div className="mb-4">
                   <p className="text-sm text-gray-600 mb-2">
-                    Available Balance: <span className="font-semibold text-gray-900">₹{(financeData?.currentCycle?.estimatedPayout || 0).toLocaleString('en-IN', {
+                    Available Balance: <span className="font-semibold text-gray-900">₹{(withdrawableBalance || 0).toLocaleString('en-IN', {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2
                   })}</span>
@@ -999,8 +1073,8 @@ export default function HubFinance() {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Enter Amount to Withdraw
                   </label>
-                  <input type="number" min="0.01" max={financeData?.currentCycle?.estimatedPayout || 0} step="0.01" value={withdrawalAmount} onChange={e => setWithdrawalAmount(e.target.value)} placeholder="0.00" className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3B82F6] focus:border-transparent outline-none" />
-                  {withdrawalAmount && parseFloat(withdrawalAmount) > (financeData?.currentCycle?.estimatedPayout || 0) && <p className="text-sm text-red-600 mt-1">Amount cannot exceed available balance</p>}
+                  <input type="number" min="0.01" max={withdrawableBalance} step="0.01" value={withdrawalAmount} onChange={e => setWithdrawalAmount(e.target.value)} placeholder="0.00" className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3B82F6] focus:border-transparent outline-none" />
+                  {withdrawalAmount && parseFloat(withdrawalAmount) > withdrawableBalance && <p className="text-sm text-red-600 mt-1">Amount cannot exceed available balance</p>}
                 </div>
 
                 <div className="flex gap-3">
@@ -1016,7 +1090,7 @@ export default function HubFinance() {
                   alert('Please enter a valid amount');
                   return;
                 }
-                if (amount > (financeData?.currentCycle?.estimatedPayout || 0)) {
+                if (amount > withdrawableBalance) {
                   alert('Amount cannot exceed available balance');
                   return;
                 }
@@ -1032,6 +1106,11 @@ export default function HubFinance() {
                     if (financeResponse.data?.success && financeResponse.data?.data) {
                       setFinanceData(financeResponse.data.data);
                     }
+                    try {
+                      const walletResponse = await restaurantAPI.getWallet();
+                      const data = walletResponse?.data?.data || walletResponse?.data;
+                      setWalletBalance(Number(data?.wallet?.totalBalance) || 0);
+                    } catch (_) {}
                   } else {
                     alert(response.data?.message || 'Failed to submit withdrawal request');
                   }
@@ -1041,7 +1120,7 @@ export default function HubFinance() {
                 } finally {
                   setSubmittingWithdrawal(false);
                 }
-              }} disabled={submittingWithdrawal || !withdrawalAmount || parseFloat(withdrawalAmount) <= 0 || parseFloat(withdrawalAmount) > (financeData?.currentCycle?.estimatedPayout || 0)} className="flex-1 px-4 py-3 bg-[#3B82F6] text-white rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed">
+              }} disabled={!isAllowedToday || submittingWithdrawal || !withdrawalAmount || parseFloat(withdrawalAmount) <= 0 || parseFloat(withdrawalAmount) > withdrawableBalance} className="flex-1 px-4 py-3 bg-[#3B82F6] text-white rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed">
                     {submittingWithdrawal ? 'Submitting...' : 'Submit Request'}
                   </button>
                 </div>

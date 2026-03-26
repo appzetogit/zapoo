@@ -24,6 +24,7 @@ export const getBusinessSettingsPublic = asyncHandler(async (req, res) => {
         companyName: settings?.companyName || "Appzeto Food",
         logo: settings?.logo || { url: "", publicId: "" },
         maxDeliveryRange: settings?.maxDeliveryRange ?? 20,
+        withdrawalWindows: settings?.withdrawalWindows || null,
       },
     );
   } catch (error) {
@@ -37,6 +38,7 @@ export const getBusinessSettingsPublic = asyncHandler(async (req, res) => {
         companyName: "Appzeto Food",
         logo: { url: "", publicId: "" },
         maxDeliveryRange: 20,
+        withdrawalWindows: null,
       },
     );
   }
@@ -67,7 +69,7 @@ export const getBusinessSettings = asyncHandler(async (req, res) => {
  */
 export const updateBusinessSettings = asyncHandler(async (req, res) => {
   try {
-    const {
+    let {
       companyName,
       email,
       phoneCountryCode,
@@ -78,8 +80,22 @@ export const updateBusinessSettings = asyncHandler(async (req, res) => {
       region,
       maintenanceMode,
       maxDeliveryRange,
-      withdrawalWindow,
+      withdrawalWindows,
     } = req.body;
+    if (typeof withdrawalWindows === "string") {
+      try {
+        withdrawalWindows = JSON.parse(withdrawalWindows);
+      } catch (_) {
+        withdrawalWindows = null;
+      }
+    }
+    if (typeof maintenanceMode === "string") {
+      try {
+        maintenanceMode = JSON.parse(maintenanceMode);
+      } catch (_) {
+        maintenanceMode = undefined;
+      }
+    }
 
     // Get existing settings
     let settings = await BusinessSettings.findOne();
@@ -110,24 +126,59 @@ export const updateBusinessSettings = asyncHandler(async (req, res) => {
       const parsed = Number(maxDeliveryRange);
       if (Number.isFinite(parsed) && parsed >= 1) settings.maxDeliveryRange = parsed;
     }
-    if (withdrawalWindow !== undefined && withdrawalWindow !== null) {
-      const mode = withdrawalWindow.mode;
-      if (["default", "open", "closed"].includes(mode)) {
-        settings.withdrawalWindow.mode = mode;
-      }
-      if (withdrawalWindow.startDate) {
-        settings.withdrawalWindow.startDate = new Date(withdrawalWindow.startDate);
-      } else if (withdrawalWindow.startDate === null) {
-        settings.withdrawalWindow.startDate = null;
-      }
-      if (withdrawalWindow.endDate) {
-        settings.withdrawalWindow.endDate = new Date(withdrawalWindow.endDate);
-      } else if (withdrawalWindow.endDate === null) {
-        settings.withdrawalWindow.endDate = null;
-      }
-      if (withdrawalWindow.message !== undefined) {
-        settings.withdrawalWindow.message = String(withdrawalWindow.message || "").trim();
-      }
+    if (withdrawalWindows !== undefined && withdrawalWindows !== null) {
+      const parseYmd = (value) => {
+        if (!value) return null;
+        if (value instanceof Date && !Number.isNaN(value.getTime())) {
+          return new Date(value.getFullYear(), value.getMonth(), value.getDate());
+        }
+        if (typeof value === "string") {
+          const parts = value.split("-").map(Number);
+          if (parts.length === 3 && parts.every((n) => Number.isFinite(n))) {
+            const [y, m, d] = parts;
+            return new Date(y, m - 1, d);
+          }
+          const d = new Date(value);
+          if (!Number.isNaN(d.getTime())) {
+            return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+          }
+        }
+        return null;
+      };
+      const uniqueDates = (dates) => {
+        const seen = new Set();
+        const result = [];
+        (dates || []).forEach((d) => {
+          const dateOnly = parseYmd(d);
+          if (!dateOnly) return;
+          const key = `${dateOnly.getFullYear()}-${dateOnly.getMonth()}-${dateOnly.getDate()}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            result.push(dateOnly);
+          }
+        });
+        return result;
+      };
+      const sanitize = (windowCfg) => {
+        if (!windowCfg) return { openDates: [], closedDates: [] };
+        const openDates = uniqueDates(windowCfg.openDates);
+        const closedDates = uniqueDates(windowCfg.closedDates);
+        // Backward compatibility: map legacy mode/overrideDate into arrays
+        if ((!openDates.length && !closedDates.length) && windowCfg.mode && windowCfg.overrideDate) {
+          const legacyDate = parseYmd(windowCfg.overrideDate);
+          if (legacyDate) {
+            if (windowCfg.mode === "open") openDates.push(legacyDate);
+            if (windowCfg.mode === "closed") closedDates.push(legacyDate);
+          }
+        }
+        return { openDates, closedDates };
+      };
+      const deliveryCfg = sanitize(withdrawalWindows.delivery);
+      const restaurantCfg = sanitize(withdrawalWindows.restaurant);
+      settings.withdrawalWindows = {
+        delivery: deliveryCfg,
+        restaurant: restaurantCfg,
+      };
     }
     if (maintenanceMode !== undefined) {
       settings.maintenanceMode.isEnabled = maintenanceMode.isEnabled || false;

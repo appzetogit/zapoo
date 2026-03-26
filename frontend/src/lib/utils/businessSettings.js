@@ -12,16 +12,21 @@ let cachedSettings = null;
 /**
  * Load business settings from backend (public endpoint - no auth required)
  */
-export const loadBusinessSettings = async () => {
+export const loadBusinessSettings = async (options = {}) => {
   try {
-    if (cachedSettings) {
+    const {
+      ttl = 5 * 60 * 1000,
+      force = false,
+    } = options;
+
+    if (cachedSettings && !force) {
       return cachedSettings;
     }
 
     const response = await getCachedResource(
       "business-settings:public",
       () => apiClient.get(API_ENDPOINTS.ADMIN.BUSINESS_SETTINGS_PUBLIC),
-      { ttl: 5 * 60 * 1000 }
+      { ttl, force }
     );
     const settings = response?.data?.data || response?.data;
 

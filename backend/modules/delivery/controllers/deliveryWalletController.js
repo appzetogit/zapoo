@@ -449,23 +449,21 @@ export const createWithdrawalRequest = asyncHandler(async (req, res) => {
     }
 
     const settings = await BusinessSettings.getSettings().catch(() => null);
-    const windowCfg = settings?.withdrawalWindow;
+    const windowCfg = settings?.withdrawalWindows?.delivery;
     const now = new Date();
-    const inWindow = (() => {
-      if (!windowCfg) return false;
-      const start = windowCfg.startDate ? new Date(windowCfg.startDate) : null;
-      const end = windowCfg.endDate ? new Date(windowCfg.endDate) : null;
-      if (start && now < start) return false;
-      if (end && now > end) return false;
-      return true;
-    })();
-    if (windowCfg?.mode === 'closed' && (inWindow || (!windowCfg.startDate && !windowCfg.endDate))) {
+    const isSameDay = (a, b) =>
+      a && b &&
+      a.getFullYear() === b.getFullYear() &&
+      a.getMonth() === b.getMonth() &&
+      a.getDate() === b.getDate();
+    const openDates = windowCfg?.openDates || [];
+    const closedDates = windowCfg?.closedDates || [];
+    const isInList = (list) => list.some((d) => isSameDay(new Date(d), now));
+    if (isInList(closedDates)) {
       return errorResponse(res, 400, 'Withdrawal window is temporarily closed');
     }
-    if (windowCfg?.mode !== 'open' || (!inWindow && (windowCfg.startDate || windowCfg.endDate))) {
-      if (!isSunday()) {
-        return errorResponse(res, 400, 'Withdrawal requests are allowed only on Sundays');
-      }
+    if (!isInList(openDates) && !isSunday()) {
+      return errorResponse(res, 400, 'Withdrawal requests are allowed only on Sundays');
     }
 
     // Find or create wallet

@@ -99,25 +99,27 @@ const businessSettingsSchema = new mongoose.Schema(
       default: 2,
       min: 0,
     },
-    // Withdrawal window override (admin can force open/close for a date range)
-    withdrawalWindow: {
-      mode: {
-        type: String,
-        enum: ["default", "open", "closed"],
-        default: "default",
+    // Withdrawal window overrides (separate for delivery + restaurant)
+    withdrawalWindows: {
+      delivery: {
+        openDates: {
+          type: [Date],
+          default: [],
+        },
+        closedDates: {
+          type: [Date],
+          default: [],
+        },
       },
-      startDate: {
-        type: Date,
-        default: null,
-      },
-      endDate: {
-        type: Date,
-        default: null,
-      },
-      message: {
-        type: String,
-        default: "",
-        trim: true,
+      restaurant: {
+        openDates: {
+          type: [Date],
+          default: [],
+        },
+        closedDates: {
+          type: [Date],
+          default: [],
+        },
       },
     },
     updatedBy: {
@@ -150,6 +152,42 @@ businessSettingsSchema.statics.getSettings = async function () {
         deliveryCashLimit: 750,
         deliveryWithdrawalLimit: 100,
       });
+    }
+    if (!settings.withdrawalWindows) {
+      settings.withdrawalWindows = {
+        delivery: { openDates: [], closedDates: [] },
+        restaurant: { openDates: [], closedDates: [] },
+      };
+      await settings.save();
+    } else {
+      let changed = false;
+      if (!settings.withdrawalWindows.delivery) {
+        settings.withdrawalWindows.delivery = { openDates: [], closedDates: [] };
+        changed = true;
+      } else {
+        if (!Array.isArray(settings.withdrawalWindows.delivery.openDates)) {
+          settings.withdrawalWindows.delivery.openDates = [];
+          changed = true;
+        }
+        if (!Array.isArray(settings.withdrawalWindows.delivery.closedDates)) {
+          settings.withdrawalWindows.delivery.closedDates = [];
+          changed = true;
+        }
+      }
+      if (!settings.withdrawalWindows.restaurant) {
+        settings.withdrawalWindows.restaurant = { openDates: [], closedDates: [] };
+        changed = true;
+      } else {
+        if (!Array.isArray(settings.withdrawalWindows.restaurant.openDates)) {
+          settings.withdrawalWindows.restaurant.openDates = [];
+          changed = true;
+        }
+        if (!Array.isArray(settings.withdrawalWindows.restaurant.closedDates)) {
+          settings.withdrawalWindows.restaurant.closedDates = [];
+          changed = true;
+        }
+      }
+      if (changed) await settings.save();
     }
     return settings;
   } catch (error) {

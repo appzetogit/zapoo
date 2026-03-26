@@ -6,6 +6,7 @@ import { formatCurrency } from "../../restaurant/utils/currency";
 import { deliveryAPI } from "@/lib/api";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { loadBusinessSettings } from "@/lib/utils/businessSettings";
 export default function PocketBalancePage() {
   const navigate = useNavigate();
   const [walletState, setWalletState] = useState({
@@ -20,6 +21,7 @@ export default function PocketBalancePage() {
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [withdrawSubmitting, setWithdrawSubmitting] = useState(false);
+  const [withdrawalWindows, setWithdrawalWindows] = useState(null);
 
   // Fetch wallet data from API (cashInHand = Cash collected from backend)
   const fetchWalletData = async () => {
@@ -62,6 +64,22 @@ export default function PocketBalancePage() {
       window.removeEventListener('storage', handleWalletUpdate);
       document.removeEventListener('visibilitychange', handleVisibility);
       clearInterval(interval);
+    };
+  }, []);
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const settings = await loadBusinessSettings({ force: true });
+        if (mounted) {
+          setWithdrawalWindows(settings?.withdrawalWindows || null);
+        }
+      } catch (_) {
+        if (mounted) setWithdrawalWindows(null);
+      }
+    })();
+    return () => {
+      mounted = false;
     };
   }, []);
   const balances = calculateDeliveryBalances(walletState);
@@ -111,10 +129,29 @@ export default function PocketBalancePage() {
   // Withdrawable amount = pocket balance (includes bonus + earnings)
   const withdrawableAmount = pocketBalance > 0 ? pocketBalance : 0;
 
-  const isSunday = new Date().getDay() === 0;
+  const isSameDay = (a, b) =>
+    a && b &&
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate();
+  const today = new Date();
+  const isSunday = today.getDay() === 0;
+  const deliveryWindow = withdrawalWindows?.delivery;
+  const openDates = deliveryWindow?.openDates || [];
+  const closedDates = deliveryWindow?.closedDates || [];
+  const isInList = (list) => list.some((d) => isSameDay(new Date(d), today));
+  let withdrawalAllowedToday = isSunday;
+  if (isInList(closedDates)) {
+    withdrawalAllowedToday = false;
+  } else if (isInList(openDates)) {
+    withdrawalAllowedToday = true;
+  }
 
-  // Withdrawal allowed only when withdrawable amount >= withdrawal limit and on Sunday
-  const canWithdraw = withdrawableAmount >= withdrawalLimit && withdrawableAmount > 0 && isSunday;
+  // Withdrawal allowed only when withdrawable amount >= withdrawal limit and allowed today
+  const canWithdraw = withdrawableAmount >= withdrawalLimit && withdrawableAmount > 0 && withdrawalAllowedToday;
+  const bannerText = withdrawalAllowedToday
+    ? "Withdrawals open today."
+    : "Withdrawals are allowed only on Sundays.";
 
   // Debug logging (cashInHand = Cash collected from backend)
 
@@ -204,27 +241,23 @@ export default function PocketBalancePage() {
         <h1 className="text-lg font-semibold">Pocket balance</h1>
       </div>
 
-      {/* Warning Banner – when withdraw disabled */}
-      {!canWithdraw && <div className="bg-yellow-400 p-4 flex items-start gap-3 text-black">
-          <AlertTriangle size={20} />
-          <div className="text-sm leading-tight">
-            <p className="font-semibold">Withdraw currently disabled</p>
-            <p className="text-xs">
-              {!isSunday
-                ? "Withdrawals are allowed only on Sundays."
-                : withdrawableAmount <= 0
-                  ? "Withdrawable amount is ₹0"
-                  : `Withdrawable amount is minimum (${formatCurrency(withdrawalLimit)}).`}
-            </p>
-          </div>
-        </div>}
+      {/* Withdrawal Window Banner */}
+      <div className={`px-4 py-3 flex items-start gap-3 ${withdrawalAllowedToday ? "bg-green-100 text-green-900" : "bg-yellow-400 text-black"}`}>
+        <AlertTriangle size={20} className="mt-0.5" />
+        <div className="text-sm leading-tight">
+          <p className="font-semibold">
+            {withdrawalAllowedToday ? "Withdrawals open today" : "Withdraw currently disabled"}
+          </p>
+          <p className="text-xs">{bannerText}</p>
+        </div>
+      </div>
 
       {/* Withdraw Section */}
       <div className="px-5 py-6 flex flex-col items-center text-center">
         <p className="text-sm text-gray-600 mb-1">Withdraw amount</p>
         <p className="text-4xl font-bold mb-5">{formatCurrency(withdrawableAmount)}</p>
 
-        <button disabled={!canWithdraw} onClick={() => canWithdraw && openWithdrawModal()} className={`w-full font-medium py-3 rounded-lg ${canWithdraw ? "bg-black text-white hover:bg-gray-800" : "bg-gray-200 text-gray-500 cursor-not-allowed"}`}>
+        <button disabled={!canWithdraw} onClick={() => canWithdraw && openWithdrawModal()} className={`w-full font-medium py-3 rounded-lg ${canWithdraw ? "bg-black text-white hover:bg-gray-800" : "bg-gray-200 text-gray-500 cursor-default"}`}>
           Withdraw
         </button>
       </div>
