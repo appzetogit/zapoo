@@ -1,8 +1,8 @@
 import RestaurantComplaint from '../../admin/models/RestaurantComplaint.js';
-import Order from '../../order/models/Order.js';
 import Restaurant from '../../restaurant/models/Restaurant.js';
 import { successResponse, errorResponse } from '../../../shared/utils/response.js';
 import { asyncHandler } from '../../../shared/middleware/asyncHandler.js';
+import { findOrderByIdentifier } from '../../order/utils/findOrderByIdentifier.js';
 
 /**
  * Submit a complaint for an order
@@ -34,7 +34,12 @@ export const submitComplaint = asyncHandler(async (req, res) => {
     }
 
     // Get order details
-    const order = await Order.findById(orderId).populate('restaurantId', 'name').lean();
+    const order = await findOrderByIdentifier(orderId, {
+      populate: {
+        path: 'restaurantId',
+        select: 'name'
+      }
+    });
     if (!order) {
       return errorResponse(res, 404, 'Order not found');
     }

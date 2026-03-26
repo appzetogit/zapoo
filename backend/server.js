@@ -38,6 +38,7 @@ import analyticsRoutes from './modules/analytics/index.js';
 import adminRoutes from './modules/admin/index.js';
 import categoryPublicRoutes from './modules/admin/routes/categoryPublicRoutes.js';
 import feeSettingsPublicRoutes from './modules/admin/routes/feeSettingsPublicRoutes.js';
+import { findOrderByIdentifier } from './modules/order/utils/findOrderByIdentifier.js';
 import envPublicRoutes from './modules/admin/routes/envPublicRoutes.js';
 import aboutPublicRoutes from './modules/admin/routes/aboutPublicRoutes.js';
 import businessSettingsPublicRoutes from './modules/admin/routes/businessSettingsPublicRoutes.js';
@@ -450,18 +451,12 @@ io.on('connection', (socket) => {
 
       // Send current location immediately when customer joins
       try {
-        // Dynamic import to avoid circular dependencies
-        const { default: Order } = await import('./modules/order/models/Order.js');
-
-        const order = await Order.findById(orderId)
-          .populate({
+        const order = await findOrderByIdentifier(orderId, {
+          populate: {
             path: 'deliveryPartnerId',
-            select: 'availability',
-            populate: {
-              path: 'availability.currentLocation'
-            }
-          })
-          .lean();
+            select: 'availability'
+          }
+        });
 
         if (order?.deliveryPartnerId?.availability?.currentLocation) {
           const coords = order.deliveryPartnerId.availability.currentLocation.coordinates;
@@ -487,15 +482,12 @@ io.on('connection', (socket) => {
     if (!orderId) return;
 
     try {
-      // Dynamic import to avoid circular dependencies
-      const { default: Order } = await import('./modules/order/models/Order.js');
-
-      const order = await Order.findById(orderId)
-        .populate({
+      const order = await findOrderByIdentifier(orderId, {
+        populate: {
           path: 'deliveryPartnerId',
           select: 'availability'
-        })
-        .lean();
+        }
+      });
 
       if (order?.deliveryPartnerId?.availability?.currentLocation) {
         const coords = order.deliveryPartnerId.availability.currentLocation.coordinates;

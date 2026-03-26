@@ -15,6 +15,32 @@ import DeliveryTrackingMap from "../../components/DeliveryTrackingMap";
 import { orderAPI, restaurantAPI } from "@/lib/api";
 import circleIcon from "@/assets/circleicon.png";
 
+const hasOrderBeenPickedUp = apiOrder => {
+  const deliveryStatus = apiOrder?.deliveryState?.status;
+  const currentPhase = apiOrder?.deliveryState?.currentPhase;
+
+  return apiOrder?.status === 'out_for_delivery' ||
+    deliveryStatus === 'reached_pickup' ||
+    deliveryStatus === 'order_confirmed' ||
+    deliveryStatus === 'en_route_to_delivery' ||
+    currentPhase === 'at_pickup' ||
+    currentPhase === 'en_route_to_delivery' ||
+    currentPhase === 'at_delivery' ||
+    currentPhase === 'completed' ||
+    Boolean(apiOrder?.deliveryState?.reachedPickupAt) ||
+    Boolean(apiOrder?.deliveryState?.orderIdConfirmedAt);
+};
+
+const deriveTrackingUiStatus = apiOrder => {
+  if (!apiOrder) return 'placed';
+  if (apiOrder.status === 'cancelled') return 'cancelled';
+  if (apiOrder.status === 'delivered') return 'delivered';
+  if (hasOrderBeenPickedUp(apiOrder)) return 'pickup';
+  if (apiOrder.status === 'ready') return 'ready';
+  if (apiOrder.status === 'preparing') return 'preparing';
+  return 'placed';
+};
+
 // Animated checkmark component
 const AnimatedCheckmark = ({
   delay = 0
@@ -245,6 +271,7 @@ export default function OrderTracking() {
               deliveryState: apiOrder.deliveryState || null
             };
             setOrder(transformedOrder);
+            setOrderStatus(deriveTrackingUiStatus(apiOrder));
           }
         }
       } catch (err) {
@@ -351,19 +378,7 @@ export default function OrderTracking() {
             deliveryState: apiOrder.deliveryState || null
           };
           setOrder(transformedOrder);
-
-          // Update orderStatus based on API order status
-          if (apiOrder.status === 'cancelled') {
-            setOrderStatus('cancelled');
-          } else if (apiOrder.status === 'preparing') {
-            setOrderStatus('preparing');
-          } else if (apiOrder.status === 'ready') {
-            setOrderStatus('pickup');
-          } else if (apiOrder.status === 'out_for_delivery') {
-            setOrderStatus('pickup');
-          } else if (apiOrder.status === 'delivered') {
-            setOrderStatus('delivered');
-          }
+          setOrderStatus(deriveTrackingUiStatus(apiOrder));
         } else {
           throw new Error('Order not found');
         }
@@ -553,22 +568,13 @@ export default function OrderTracking() {
             name: apiOrder.deliveryPartnerId.name || 'Delivery Partner',
             avatar: null
           } : null,
-          tracking: apiOrder.tracking || {}
+          deliveryPartnerId: apiOrder.deliveryPartnerId?._id || apiOrder.deliveryPartnerId || apiOrder.assignmentInfo?.deliveryPartnerId || null,
+          assignmentInfo: apiOrder.assignmentInfo || null,
+          tracking: apiOrder.tracking || {},
+          deliveryState: apiOrder.deliveryState || null
         };
         setOrder(transformedOrder);
-
-        // Update order status for UI
-        if (apiOrder.status === 'cancelled') {
-          setOrderStatus('cancelled');
-        } else if (apiOrder.status === 'preparing') {
-          setOrderStatus('preparing');
-        } else if (apiOrder.status === 'ready') {
-          setOrderStatus('pickup');
-        } else if (apiOrder.status === 'out_for_delivery') {
-          setOrderStatus('pickup');
-        } else if (apiOrder.status === 'delivered') {
-          setOrderStatus('delivered');
-        }
+        setOrderStatus(deriveTrackingUiStatus(apiOrder));
       }
     } catch (err) {
       console.error('Error refreshing order:', err);
@@ -608,6 +614,11 @@ export default function OrderTracking() {
     preparing: {
       title: "Preparing your order",
       subtitle: `Arriving in ${estimatedTime} mins`,
+      color: "bg-green-700"
+    },
+    ready: {
+      title: "Order is ready",
+      subtitle: "Waiting for delivery partner pickup",
       color: "bg-green-700"
     },
     pickup: {
@@ -752,11 +763,29 @@ export default function OrderTracking() {
       <div className="max-w-4xl mx-auto px-4 md:px-6 lg:px-8 py-4 md:py-6 space-y-4 md:space-y-6 pb-24 md:pb-32">
         {/* Food Cooking Status - Show until delivery partner accepts pickup */}
         {(() => {
-        // Check if delivery partner has accepted pickup
-        // Delivery partner accepts when status is 'ready' or 'out_for_delivery' or tracking shows outForDelivery
-        const hasAcceptedPickup = order?.tracking?.outForDelivery?.status === true || order?.tracking?.out_for_delivery?.status === true || order?.status === 'out_for_delivery' || order?.status === 'ready';
+        const hasAcceptedPickup = hasOrderBeenPickedUp(order);
+        const isReadyForPickup = order?.status === 'ready' && !hasAcceptedPickup;
 
-        // Show "Food is Cooking" until delivery partner accepts pickup
+        if (isReadyForPickup) {
+          return <motion.div className="bg-white rounded-xl p-4 shadow-sm" initial={{
+            opacity: 0,
+            y: 20
+          }} animate={{
+            opacity: 1,
+            y: 0
+          }} transition={{
+            delay: 0.3
+          }}>
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center overflow-hidden">
+                    <img src={circleIcon} alt="Order ready" className="w-full h-full object-cover" />
+                  </div>
+                  <p className="font-semibold text-gray-900">Order is ready for pickup</p>
+                </div>
+              </motion.div>;
+        }
+
+        // Show "Food is Cooking" until the delivery partner actually picks up the order
         if (!hasAcceptedPickup) {
           return <motion.div className="bg-white rounded-xl p-4 shadow-sm" initial={{
             opacity: 0,

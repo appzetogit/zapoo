@@ -3,26 +3,19 @@ import { successResponse, errorResponse } from '../../../shared/utils/response.j
 import etaCalculationService from '../services/etaCalculationService.js';
 import etaEventService from '../services/etaEventService.js';
 import googleMapsService from '../services/googleMapsService.js';
-import Order from '../models/Order.js';
 import ETALog from '../models/ETALog.js';
 import OrderEvent from '../models/OrderEvent.js';
-import mongoose from 'mongoose';
 import Restaurant from '../../restaurant/models/Restaurant.js';
 import { computeOrderPreparationTimeMinutes, computeRestaurantBaselinePreparationMinutes } from '../services/preparationTimeService.js';
+import { findOrderByIdentifier } from '../utils/findOrderByIdentifier.js';
+import mongoose from 'mongoose';
 
 /**
  * Helper function to find order by MongoDB _id or custom orderId
  */
 async function findOrderById(orderIdParam) {
   const select = '_id orderId eta estimatedDeliveryTime';
-  let order = null;
-  if (mongoose.Types.ObjectId.isValid(orderIdParam) && orderIdParam.length === 24) {
-    order = await Order.findById(orderIdParam).select(select).lean();
-  }
-  if (!order) {
-    order = await Order.findOne({ orderId: orderIdParam }).select(select).lean();
-  }
-  return order;
+  return findOrderByIdentifier(orderIdParam, { select });
 }
 
 /**

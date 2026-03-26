@@ -1,236 +1,280 @@
-import { useMemo, useState, useEffect } from "react";
-import { FileText, Package } from "lucide-react";
-import { adminAPI } from "@/lib/api";
-import { toast } from "sonner";
-import OrdersTopbar from "../../components/orders/OrdersTopbar";
-import OrdersTable from "../../components/orders/OrdersTable";
-import FilterPanel from "../../components/orders/FilterPanel";
-import ViewOrderDialog from "../../components/orders/ViewOrderDialog";
-import SettingsDialog from "../../components/orders/SettingsDialog";
-import RefundModal from "../../components/orders/RefundModal";
-import { useOrdersManagement } from "../../components/orders/useOrdersManagement";
-import { Loader2 } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react"
+import { FileText, Loader2, Package } from "lucide-react"
+import { adminAPI } from "@/lib/api"
+import { toast } from "sonner"
+import OrdersTopbar from "../../components/orders/OrdersTopbar"
+import OrdersTable from "../../components/orders/OrdersTable"
+import FilterPanel from "../../components/orders/FilterPanel"
+import ViewOrderDialog from "../../components/orders/ViewOrderDialog"
+import SettingsDialog from "../../components/orders/SettingsDialog"
+import RefundModal from "../../components/orders/RefundModal"
+import { useOrdersManagement } from "../../components/orders/useOrdersManagement"
 
-// Status configuration with titles, colors, and icons
+const PAGE_SIZE = 10
+
 const statusConfig = {
-  "all": {
+  all: {
     title: "All Orders",
     color: "emerald",
-    icon: FileText
+    icon: FileText,
   },
-  "pending": {
+  pending: {
     title: "Pending Orders",
     color: "amber",
-    icon: Package
+    icon: Package,
   },
-  "accepted": {
+  accepted: {
     title: "Accepted Orders",
     color: "green",
-    icon: Package
+    icon: Package,
   },
-  "processing": {
+  processing: {
     title: "Processing Orders",
     color: "orange",
-    icon: Package
+    icon: Package,
   },
   "food-on-the-way": {
     title: "Food On The Way Orders",
     color: "amber",
-    icon: Package
+    icon: Package,
   },
-  "delivered": {
+  delivered: {
     title: "Delivered Orders",
     color: "emerald",
-    icon: Package
+    icon: Package,
   },
-  "canceled": {
+  canceled: {
     title: "Canceled Orders",
     color: "rose",
-    icon: Package
+    icon: Package,
   },
   "restaurant-cancelled": {
     title: "Restaurant Cancelled Orders",
     color: "red",
-    icon: Package
+    icon: Package,
   },
   "payment-failed": {
     title: "Payment Failed Orders",
     color: "red",
-    icon: Package
+    icon: Package,
   },
-  "refunded": {
+  refunded: {
     title: "Refunded Orders",
     color: "sky",
-    icon: Package
+    icon: Package,
   },
   "offline-payments": {
     title: "Offline Payments",
     color: "slate",
-    icon: Package
-  }
-};
-export default function OrdersPage({
-  statusKey = "all"
-}) {
-  const config = statusConfig[statusKey] || statusConfig["all"];
-  const [orders, setOrders] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [totalCount, setTotalCount] = useState(0);
-  const [processingRefund, setProcessingRefund] = useState(null);
-  const [refundModalOpen, setRefundModalOpen] = useState(false);
-  const [selectedOrderForRefund, setSelectedOrderForRefund] = useState(null);
+    icon: Package,
+  },
+}
 
-  // Fetch orders from backend API
-  useEffect(() => {
-    const fetchOrders = async () => {
-      try {
-        setIsLoading(true);
-        const params = {
-          page: 1,
-          limit: 1000,
-          // Fetch all orders for now (can be optimized with pagination later)
-          status: statusKey === "all" ? undefined : statusKey === "restaurant-cancelled" ? "cancelled" : statusKey,
-          cancelledBy: statusKey === "restaurant-cancelled" ? "restaurant" : undefined
-        };
-        const response = await adminAPI.getOrders(params);
-        if (response.data?.success && response.data?.data?.orders) {
-          setOrders(response.data.data.orders);
-          setTotalCount(response.data.data.pagination?.total || response.data.data.orders.length);
-        } else {
-          console.error("Failed to fetch orders:", response.data);
-          toast.error("Failed to fetch orders");
-          setOrders([]);
-        }
-      } catch (error) {
-        console.error("Error fetching orders:", error);
-        toast.error(error.response?.data?.message || "Failed to fetch orders");
-        setOrders([]);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchOrders();
-  }, [statusKey]);
+export default function OrdersPage({ statusKey = "all" }) {
+  const config = statusConfig[statusKey] || statusConfig.all
+  const prefetchedPagesRef = useRef(new Map())
 
-  // Handle refund button click - show modal for wallet payments, confirm dialog for others
-  const handleRefund = order => {
-    const isWalletPayment = order.paymentType === "Wallet" || order.payment?.method === "wallet";
-    if (isWalletPayment) {
-      // Show modal for wallet refunds
-      setSelectedOrderForRefund(order);
-      setRefundModalOpen(true);
-    } else {
-      // For non-wallet payments, use the old confirm dialog flow
-      const confirmMessage = `Are you sure you want to process refund for order ${order.orderId}?\n\nThis will initiate a Razorpay refund to the customer's original payment method.`;
-      if (!confirm(confirmMessage)) {
-        return;
-      }
-      processRefund(order, null); // null amount means use default
-    }
-  };
+  const [orders, setOrders] = useState([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [isPageLoading, setIsPageLoading] = useState(false)
+  const [isPrefetching, setIsPrefetching] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
+  const [totalPages, setTotalPages] = useState(1)
+  const [processingRefund, setProcessingRefund] = useState(null)
+  const [refundModalOpen, setRefundModalOpen] = useState(false)
+  const [selectedOrderForRefund, setSelectedOrderForRefund] = useState(null)
 
-  // Process refund with amount
-  const processRefund = async (order, refundAmount = null) => {
-    // Try using MongoDB _id first (more reliable for route matching), then fallback to orderId string
-    // Backend accepts either MongoDB ObjectId (24 chars) or orderId string
-    // Using MongoDB _id is more reliable for route matching (no dashes/special chars)
-    const orderIdToUse = order.id || order._id || order.orderId;
-    if (!orderIdToUse) {
-      console.error('❌ No orderId found in order object:', order);
-      toast.error('Order ID not found. Please refresh the page and try again.');
-      return;
-    }
-    try {
-      setProcessingRefund(orderIdToUse);
-      // Include refundAmount in request body if provided (ensure it's a number)
-      const requestData = refundAmount !== null ? {
-        refundAmount: parseFloat(refundAmount)
-      } : {};
-      const response = await adminAPI.processRefund(orderIdToUse, requestData);
-      if (response.data?.success) {
-        const isWalletPayment = order.paymentType === "Wallet" || order.payment?.method === "wallet";
-        toast.success(response.data?.message || (isWalletPayment ? `Wallet refund of ₹${refundAmount || order.totalAmount} processed successfully for order ${order.orderId}` : `Refund initiated successfully for order ${order.orderId}`));
-        // Update the order in the local state immediately to show "Refunded" status
-        setOrders(prevOrders => prevOrders.map(o => o.id === order.id || o.orderId === order.orderId ? {
-          ...o,
-          refundStatus: 'processed'
-        } // Wallet refunds are instant, so mark as processed
-        : o));
-        // Refresh the orders list to get updated data
-        const params = {
-          page: 1,
-          limit: 1000,
-          status: statusKey === "all" ? undefined : statusKey === "restaurant-cancelled" ? "cancelled" : statusKey,
-          cancelledBy: statusKey === "restaurant-cancelled" ? "restaurant" : undefined
-        };
-        const refreshResponse = await adminAPI.getOrders(params);
-        if (refreshResponse.data?.success && refreshResponse.data?.data?.orders) {
-          setOrders(refreshResponse.data.data.orders);
-          setTotalCount(refreshResponse.data.data.pagination?.total || refreshResponse.data.data.orders.length);
-        }
+  const buildOrdersParams = useCallback(
+    (page) => ({
+      page,
+      limit: PAGE_SIZE,
+      status: statusKey === "all" ? undefined : statusKey === "restaurant-cancelled" ? "cancelled" : statusKey,
+      cancelledBy: statusKey === "restaurant-cancelled" ? "restaurant" : undefined,
+    }),
+    [statusKey],
+  )
+
+  const fetchPage = useCallback(
+    async (page, options = {}) => {
+      const { background = false } = options
+
+      if (background) {
+        setIsPrefetching(true)
+      } else if (page === 1) {
+        setIsLoading(true)
       } else {
-        toast.error(response.data?.message || "Failed to process refund");
+        setIsPageLoading(true)
+      }
+
+      try {
+        const response = await adminAPI.getOrders(buildOrdersParams(page))
+        const pageOrders = response.data?.data?.orders || []
+        const pagination = response.data?.data?.pagination || {}
+        const pageData = {
+          orders: pageOrders,
+          total: pagination.total || pageOrders.length,
+          pages: pagination.pages || 1,
+          limit: pagination.limit || PAGE_SIZE,
+        }
+
+        if (background) {
+          prefetchedPagesRef.current.set(page, pageData)
+          return pageData
+        }
+
+        setOrders(pageData.orders)
+        setTotalCount(pageData.total)
+        setTotalPages(pageData.pages)
+        return pageData
+      } catch (error) {
+        if (!background) {
+          console.error("Error fetching orders:", error)
+          toast.error(error.response?.data?.message || "Failed to fetch orders")
+          setOrders([])
+          setTotalCount(0)
+          setTotalPages(1)
+        }
+        throw error
+      } finally {
+        if (background) {
+          setIsPrefetching(false)
+        } else {
+          setIsLoading(false)
+          setIsPageLoading(false)
+        }
+      }
+    },
+    [buildOrdersParams],
+  )
+
+  const prefetchNextPage = useCallback(
+    async (page, pages) => {
+      const nextPage = page + 1
+      if (nextPage > pages || prefetchedPagesRef.current.has(nextPage)) {
+        return
+      }
+
+      try {
+        await fetchPage(nextPage, { background: true })
+      } catch (error) {
+        console.error(`Error prefetching page ${nextPage}:`, error)
+      }
+    },
+    [fetchPage],
+  )
+
+  useEffect(() => {
+    prefetchedPagesRef.current.clear()
+    setCurrentPage(1)
+    fetchPage(1)
+  }, [fetchPage])
+
+  useEffect(() => {
+    if (!isLoading && !isPageLoading && totalPages > 1) {
+      prefetchNextPage(currentPage, totalPages)
+    }
+  }, [currentPage, isLoading, isPageLoading, prefetchNextPage, totalPages])
+
+  const handlePageChange = async (page) => {
+    if (page === currentPage || page < 1 || page > totalPages) {
+      return
+    }
+
+    setCurrentPage(page)
+
+    const prefetched = prefetchedPagesRef.current.get(page)
+    if (prefetched) {
+      setOrders(prefetched.orders)
+      setTotalCount(prefetched.total)
+      setTotalPages(prefetched.pages)
+      prefetchedPagesRef.current.delete(page)
+      return
+    }
+
+    await fetchPage(page)
+  }
+
+  const handleRefund = (order) => {
+    const isWalletPayment = order.paymentType === "Wallet" || order.payment?.method === "wallet"
+    if (isWalletPayment) {
+      setSelectedOrderForRefund(order)
+      setRefundModalOpen(true)
+    } else {
+      const confirmMessage = `Are you sure you want to process refund for order ${order.orderId}?\n\nThis will initiate a Razorpay refund to the customer's original payment method.`
+      if (!confirm(confirmMessage)) {
+        return
+      }
+      processRefund(order, null)
+    }
+  }
+
+  const processRefund = async (order, refundAmount = null) => {
+    const orderIdToUse = order.id || order._id || order.orderId
+    if (!orderIdToUse) {
+      toast.error("Order ID not found. Please refresh the page and try again.")
+      return
+    }
+
+    try {
+      setProcessingRefund(orderIdToUse)
+      const requestData = refundAmount !== null ? { refundAmount: parseFloat(refundAmount) } : {}
+      const response = await adminAPI.processRefund(orderIdToUse, requestData)
+      if (response.data?.success) {
+        const isWalletPayment = order.paymentType === "Wallet" || order.payment?.method === "wallet"
+        toast.success(
+          response.data?.message ||
+            (isWalletPayment
+              ? `Wallet refund of Rs.${refundAmount || order.totalAmount} processed successfully for order ${order.orderId}`
+              : `Refund initiated successfully for order ${order.orderId}`),
+        )
+
+        setOrders((prevOrders) =>
+          prevOrders.map((existingOrder) =>
+            existingOrder.id === order.id || existingOrder.orderId === order.orderId
+              ? { ...existingOrder, refundStatus: "processed" }
+              : existingOrder,
+          ),
+        )
+      } else {
+        toast.error(response.data?.message || "Failed to process refund")
       }
     } catch (error) {
-      console.error("❌ Error processing refund:", error);
+      console.error("Error processing refund:", error)
 
-      // Log full error details for debugging
-      const errorDetails = {
-        message: error.message,
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        data: error.response?.data,
-        url: error.config?.url,
-        baseURL: error.config?.baseURL,
-        fullURL: error.config?.baseURL + error.config?.url,
-        orderId: orderIdToUse,
-        refundAmount: refundAmount,
-        order: {
-          id: order.id,
-          orderId: order.orderId,
-          _id: order._id
-        },
-        stack: error.stack
-      };
-      console.error("❌ Error details:", JSON.stringify(errorDetails, null, 2));
-
-      // Show more specific error message
-      let errorMessage = "Failed to process refund";
+      let errorMessage = "Failed to process refund"
       if (error.response) {
-        // Server responded with error
         if (error.response.status === 404) {
-          errorMessage = `Order not found (ID: ${orderIdToUse}). Please check if the order exists.`;
+          errorMessage = `Order not found (ID: ${orderIdToUse}). Please check if the order exists.`
         } else if (error.response.status === 400) {
-          errorMessage = error.response.data?.message || "Invalid request. Please check the refund amount.";
+          errorMessage = error.response.data?.message || "Invalid request. Please check the refund amount."
         } else if (error.response.status === 500) {
-          errorMessage = error.response.data?.message || "Server error. Please try again later.";
+          errorMessage = error.response.data?.message || "Server error. Please try again later."
         } else if (error.response.data?.message) {
-          errorMessage = error.response.data.message;
+          errorMessage = error.response.data.message
         } else {
-          errorMessage = `Error ${error.response.status}: ${error.response.statusText || "Unknown error"}`;
+          errorMessage = `Error ${error.response.status}: ${error.response.statusText || "Unknown error"}`
         }
       } else if (error.request) {
-        // Request was made but no response received
-        errorMessage = "Network error. Please check your internet connection and try again.";
+        errorMessage = "Network error. Please check your internet connection and try again."
       } else {
-        // Error in setting up the request
-        errorMessage = error.message || "Failed to process refund";
+        errorMessage = error.message || "Failed to process refund"
       }
-      console.error("❌ Final error message:", errorMessage);
-      toast.error(errorMessage);
-    } finally {
-      setProcessingRefund(null);
-      setRefundModalOpen(false);
-      setSelectedOrderForRefund(null);
-    }
-  };
 
-  // Handle refund confirmation from modal
-  const handleRefundConfirm = amount => {
-    if (selectedOrderForRefund) {
-      processRefund(selectedOrderForRefund, amount);
+      toast.error(errorMessage)
+    } finally {
+      setProcessingRefund(null)
+      setRefundModalOpen(false)
+      setSelectedOrderForRefund(null)
     }
-  };
+  }
+
+  const handleRefundConfirm = (amount) => {
+    if (selectedOrderForRefund) {
+      processRefund(selectedOrderForRefund, amount)
+    }
+  }
+
   const {
     searchQuery,
     setSearchQuery,
@@ -254,22 +298,75 @@ export default function OrdersPage({
     handleViewOrder,
     handlePrintOrder,
     toggleColumn,
-    resetColumns
-  } = useOrdersManagement(orders, statusKey, config.title);
+    resetColumns,
+  } = useOrdersManagement(orders, statusKey, config.title)
+
   if (isLoading) {
-    return <div className="p-4 lg:p-6 bg-slate-50 min-h-screen w-full max-w-full overflow-x-hidden flex items-center justify-center">
+    return (
+      <div className="p-4 lg:p-6 bg-slate-50 min-h-screen w-full max-w-full overflow-x-hidden flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
           <p className="text-gray-600">Loading orders...</p>
         </div>
-      </div>;
+      </div>
+    )
   }
-  return <div className="p-4 lg:p-6 bg-slate-50 min-h-screen w-full max-w-full overflow-x-hidden">
-      <OrdersTopbar title={config.title} count={count} searchQuery={searchQuery} setSearchQuery={setSearchQuery} onFilterClick={() => setIsFilterOpen(true)} activeFiltersCount={activeFiltersCount} onExport={handleExport} onSettingsClick={() => setIsSettingsOpen(true)} />
-      <FilterPanel isOpen={isFilterOpen} onClose={() => setIsFilterOpen(false)} filters={filters} setFilters={setFilters} onApply={handleApplyFilters} onReset={handleResetFilters} restaurants={restaurants} />
-      <SettingsDialog isOpen={isSettingsOpen} onOpenChange={setIsSettingsOpen} visibleColumns={visibleColumns} toggleColumn={toggleColumn} resetColumns={resetColumns} />
+
+  return (
+    <div className="p-4 lg:p-6 bg-slate-50 min-h-screen w-full max-w-full overflow-x-hidden">
+      <OrdersTopbar
+        title={config.title}
+        count={totalCount || count}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        onFilterClick={() => setIsFilterOpen(true)}
+        activeFiltersCount={activeFiltersCount}
+        onExport={handleExport}
+        onSettingsClick={() => setIsSettingsOpen(true)}
+      />
+
+      <FilterPanel
+        isOpen={isFilterOpen}
+        onClose={() => setIsFilterOpen(false)}
+        filters={filters}
+        setFilters={setFilters}
+        onApply={handleApplyFilters}
+        onReset={handleResetFilters}
+        restaurants={restaurants}
+      />
+
+      <SettingsDialog
+        isOpen={isSettingsOpen}
+        onOpenChange={setIsSettingsOpen}
+        visibleColumns={visibleColumns}
+        toggleColumn={toggleColumn}
+        resetColumns={resetColumns}
+      />
+
       <ViewOrderDialog isOpen={isViewOrderOpen} onOpenChange={setIsViewOrderOpen} order={selectedOrder} />
-      <RefundModal isOpen={refundModalOpen} onOpenChange={setRefundModalOpen} order={selectedOrderForRefund} onConfirm={handleRefundConfirm} isProcessing={processingRefund !== null} />
-      <OrdersTable orders={filteredOrders} visibleColumns={visibleColumns} onViewOrder={handleViewOrder} onPrintOrder={handlePrintOrder} onRefund={handleRefund} />
-    </div>;
+
+      <RefundModal
+        isOpen={refundModalOpen}
+        onOpenChange={setRefundModalOpen}
+        order={selectedOrderForRefund}
+        onConfirm={handleRefundConfirm}
+        isProcessing={processingRefund !== null}
+      />
+
+      <OrdersTable
+        orders={filteredOrders}
+        visibleColumns={visibleColumns}
+        onViewOrder={handleViewOrder}
+        onPrintOrder={handlePrintOrder}
+        onRefund={handleRefund}
+        currentPage={currentPage}
+        totalPages={totalPages}
+        totalItems={totalCount}
+        itemsPerPage={PAGE_SIZE}
+        onPageChange={handlePageChange}
+        isPageLoading={isPageLoading}
+        isPrefetching={isPrefetching}
+      />
+    </div>
+  )
 }
