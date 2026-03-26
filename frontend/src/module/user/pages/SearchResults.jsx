@@ -1,7 +1,6 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { useSearchParams, Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, Star, Clock, Search, SlidersHorizontal, ChevronDown, Bookmark, BadgePercent, Mic, Loader2 } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { ArrowLeft, Search, SlidersHorizontal, ChevronDown, Mic, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import StickyCartCard from "../components/StickyCartCard";
@@ -14,10 +13,9 @@ import { X } from "lucide-react";
 
 // Import shared food images - prevents duplication
 import { foodImages } from "@/constants/images";
-import DynamicEtaText from "../components/DynamicEtaText";
 import {
-  getSearchUnavailableLabel,
-  isRestaurantDeliverableNow,
+  isOpenForDeliveryNow,
+  isWithinDeliveryRangeKm,
 } from "../utils/restaurantAvailability";
 
 // Filter options
@@ -61,7 +59,6 @@ export default function SearchResults() {
   const [searchQuery, setSearchQuery] = useState(query);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [activeFilters, setActiveFilters] = useState(new Set());
-  const [favorites, setFavorites] = useState(new Set());
   const categoryScrollRef = useRef(null);
   const [restaurantsData, setRestaurantsData] = useState([]);
   const [loadingRestaurants, setLoadingRestaurants] = useState(true);
@@ -502,17 +499,6 @@ export default function SearchResults() {
       return newSet;
     });
   };
-  const toggleFavorite = id => {
-    setFavorites(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(id)) {
-        newSet.delete(id);
-      } else {
-        newSet.add(id);
-      }
-      return newSet;
-    });
-  };
   const handleSearchFocus = useCallback(() => {
     // No-op or open search overlay if needed, but here we are already on the search page
   }, []);
@@ -576,63 +562,22 @@ export default function SearchResults() {
     }
   };
 
-  // Filter restaurants based on search query, selected category, and filters
-  const filteredRecommended = useMemo(() => {
-    const sourceData = restaurantsData.length > 0 ? restaurantsData : [];
-    let filtered = [...sourceData];
-
-    // Apply search query and category filtering
-    if (query.trim() || (selectedCategory && selectedCategory !== 'all')) {
-      const lowerQuery = query.toLowerCase();
-      filtered = filtered.filter(r => {
-        const nameMatch = r.name?.toLowerCase().includes(lowerQuery);
-        const cuisineMatch = r.cuisine?.toLowerCase().includes(lowerQuery);
-        const dishMatch = r.featuredDish?.toLowerCase().includes(lowerQuery);
-
-        // Match category
-        const categoryMatch = selectedCategory && selectedCategory !== 'all' && (
-          r.category === selectedCategory ||
-          (r.hasPaneer && selectedCategory === 'paneer-tikka') ||
-          (r.menu && checkCategoryInMenu(r.menu, selectedCategory))
-        );
-
-        if (query.trim() && selectedCategory && selectedCategory !== 'all') {
-          return nameMatch || cuisineMatch || dishMatch || categoryMatch;
-        } else if (query.trim()) {
-          return nameMatch || cuisineMatch || dishMatch;
-        } else {
-          return categoryMatch;
-        }
-      });
-    }
-
-    // Apply other filters
-    if (activeFilters.has('under-30-mins')) {
-      filtered = filtered.filter(r => {
-        if (!r.deliveryTime) return false;
-        const timeMatch = r.deliveryTime.match(/(\d+)/);
-        return timeMatch && parseInt(timeMatch[1]) <= 30;
-      });
-    }
-    if (activeFilters.has('rating-4-plus')) {
-      filtered = filtered.filter(r => r.rating && r.rating >= 4.0);
-    }
-    if (activeFilters.has('flat-50-off')) {
-      filtered = filtered.filter(r => r.offer && r.offer.includes('50%'));
-    }
-    return filtered;
-  }, [query, selectedCategory, activeFilters, restaurantsData]);
-
-  // Derived matching dishes across all restaurants
+  // Derived matching dishes across all restaurants (per-restaurant, in-range + open only)
   const matchingDishes = useMemo(() => {
-    if (!query.trim() && selectedCategory === 'all') return [];
+    if (!searchQuery.trim() && selectedCategory === 'all') return [];
 
-    const lowerQuery = query.toLowerCase();
+    const lowerQuery = searchQuery.toLowerCase();
     const dishes = [];
     const categoryKeywordsList = selectedCategory !== 'all' ? categoryKeywords[selectedCategory] || [] : [];
 
     restaurantsData.forEach(restaurant => {
-      const searchAvailable = isRestaurantDeliverableNow(restaurant, { userHasLocation });
+      const inRange = isWithinDeliveryRangeKm(restaurant.distanceInKm, restaurant.deliveryRange, { userHasLocation });
+      const isOpen = isOpenForDeliveryNow({
+        openDays: restaurant.openDays,
+        deliveryTimings: restaurant.deliveryTimings,
+      });
+      if (!inRange || !isOpen) return;
+
       if (restaurant.menu && restaurant.menu.sections) {
         restaurant.menu.sections.forEach(section => {
           if (section.items) {
@@ -658,7 +603,6 @@ export default function SearchResults() {
                   restaurantSlug: restaurant.slug,
                   rating: restaurant.rating,
                   deliveryTime: restaurant.deliveryTime,
-                  searchAvailable,
                 });
               }
             });
@@ -668,66 +612,25 @@ export default function SearchResults() {
     });
 
     return dishes;
-  }, [query, selectedCategory, restaurantsData, categoryKeywords, userHasLocation]);
-  const filteredAllRestaurants = useMemo(() => {
-    const sourceData = restaurantsData.length > 0 ? restaurantsData : [];
-    let filtered = [...sourceData];
+  }, [searchQuery, selectedCategory, restaurantsData, categoryKeywords, userHasLocation]);
 
-    // Apply search query and category filtering
-    if (query.trim() || selectedCategory && selectedCategory !== 'all') {
-      const lowerQuery = query.toLowerCase();
-      filtered = filtered.filter(r => {
-        const nameMatch = r.name?.toLowerCase().includes(lowerQuery);
-        const cuisineMatch = r.cuisine?.toLowerCase().includes(lowerQuery);
-        const dishMatch = r.featuredDish?.toLowerCase().includes(lowerQuery);
+  const matchingRestaurants = useMemo(() => {
+    if (!searchQuery.trim() && selectedCategory === 'all') return [];
+    const lowerQuery = searchQuery.toLowerCase();
+    return (restaurantsData || []).filter(r => {
+      const inRange = isWithinDeliveryRangeKm(r.distanceInKm, r.deliveryRange, { userHasLocation });
+      if (!inRange) return false;
+      const nameMatch = r.name?.toLowerCase().includes(lowerQuery);
+      const cuisineMatch = r.cuisine?.toLowerCase().includes(lowerQuery);
+      return Boolean(nameMatch || cuisineMatch);
+    }).map(r => ({
+      ...r,
+      isClosed: !isOpenForDeliveryNow({ openDays: r.openDays, deliveryTimings: r.deliveryTimings })
+    }));
+  }, [searchQuery, selectedCategory, restaurantsData, userHasLocation]);
+  // Filtered restaurant lists removed (blank search view + focused suggestions)
 
-        // Also search in menu items
-        let menuMatch = false;
-        if (r.menu && r.menu.sections) {
-          for (const section of r.menu.sections) {
-            if (section.items) {
-              for (const item of section.items) {
-                if (item.name?.toLowerCase().includes(lowerQuery) || item.category?.toLowerCase().includes(lowerQuery)) {
-                  menuMatch = true;
-                  break;
-                }
-              }
-            }
-            if (menuMatch) break;
-          }
-        }
-
-        // Match category
-        const categoryMatch = selectedCategory && selectedCategory !== 'all' && (r.category === selectedCategory || r.hasPaneer && selectedCategory === 'paneer-tikka' || r.menu && checkCategoryInMenu(r.menu, selectedCategory));
-        if (query.trim() && selectedCategory && selectedCategory !== 'all') {
-          return nameMatch || cuisineMatch || dishMatch || menuMatch || categoryMatch;
-        } else if (query.trim()) {
-          return nameMatch || cuisineMatch || dishMatch || menuMatch;
-        } else {
-          return categoryMatch;
-        }
-      });
-    }
-
-    // Apply filters
-    if (activeFilters.has('under-30-mins')) {
-      filtered = filtered.filter(r => {
-        if (!r.deliveryTime) return false;
-        const timeMatch = r.deliveryTime.match(/(\d+)/);
-        return timeMatch && parseInt(timeMatch[1]) <= 30;
-      });
-    }
-    if (activeFilters.has('rating-4-plus')) {
-      filtered = filtered.filter(r => r.rating && r.rating >= 4.0);
-    }
-    if (activeFilters.has('under-250')) {
-      filtered = filtered.filter(r => r.featuredPrice && r.featuredPrice <= 250);
-    }
-    if (activeFilters.has('flat-50-off')) {
-      filtered = filtered.filter(r => r.offer && r.offer.includes('50%'));
-    }
-    return filtered;
-  }, [query, selectedCategory, activeFilters, restaurantsData, categoryKeywords, loadingCategories]);
+  const isBlankSearch = !searchQuery.trim() && selectedCategory === 'all';
 
   return <div className="min-h-screen bg-white dark:bg-[#0a0a0a]">
     {/* Sticky Header */}
@@ -756,7 +659,7 @@ export default function SearchResults() {
         </div>
 
         {/* Browse Category Section */}
-        <div ref={categoryScrollRef} className="flex gap-3 sm:gap-4 lg:gap-5 overflow-x-auto scrollbar-hide px-4 sm:px-6 md:px-8 lg:px-10 py-3 md:py-4 bg-white dark:bg-[#1a1a1a] border-b border-gray-100 dark:border-gray-800" style={{
+        {!isBlankSearch && <div ref={categoryScrollRef} className="flex gap-3 sm:gap-4 lg:gap-5 overflow-x-auto scrollbar-hide px-4 sm:px-6 md:px-8 lg:px-10 py-3 md:py-4 bg-white dark:bg-[#1a1a1a] border-b border-gray-100 dark:border-gray-800" style={{
           scrollbarWidth: "none",
           msOverflowStyle: "none"
         }}>
@@ -773,10 +676,10 @@ export default function SearchResults() {
               </span>
             </button>;
           })}
-        </div>
+        </div>}
 
         {/* Filters */}
-        <div className="flex items-center gap-2 sm:gap-3 lg:gap-4 overflow-x-auto scrollbar-hide px-4 sm:px-6 md:px-8 lg:px-10 py-3 md:py-4 bg-white dark:bg-[#1a1a1a] border-b border-gray-100 dark:border-gray-800" style={{
+        {!isBlankSearch && <div className="flex items-center gap-2 sm:gap-3 lg:gap-4 overflow-x-auto scrollbar-hide px-4 sm:px-6 md:px-8 lg:px-10 py-3 md:py-4 bg-white dark:bg-[#1a1a1a] border-b border-gray-100 dark:border-gray-800" style={{
           scrollbarWidth: "none",
           msOverflowStyle: "none"
         }}>
@@ -796,7 +699,7 @@ export default function SearchResults() {
               <span className={`text-sm font-bold ${isActive ? 'text-white' : 'text-black dark:text-white'}`}>{filter.label}</span>
             </Button>;
           })}
-        </div>
+        </div>}
       </div>
     </div>
 
@@ -808,219 +711,74 @@ export default function SearchResults() {
         <span className="ml-3 text-gray-600">Loading restaurants...</span>
       </div>}
 
-      {/* DISHES / RECOMMENDED Section */}
-      {!loadingRestaurants && (query.trim() || selectedCategory !== 'all' ? matchingDishes.length > 0 : filteredRecommended.length > 0) && <section>
-        <h2 className="text-xs sm:text-sm font-semibold text-gray-400 dark:text-gray-500 tracking-widest uppercase mb-4">
-          {query.trim() || selectedCategory !== 'all' ? `MATCHING DISHES (${matchingDishes.length})` : 'RECOMMENDED FOR YOU'}
-        </h2>
+      {/* Matching results */}
+      {!loadingRestaurants && !isBlankSearch && (
+        <section>
+          <h2 className="text-xs sm:text-sm font-semibold text-gray-400 dark:text-gray-500 tracking-widest uppercase mb-4">
+            MATCHING DISHES & RESTAURANTS
+          </h2>
 
-        {/* Squared Cards Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4 lg:gap-5">
-          {(query.trim() || selectedCategory !== 'all' ? matchingDishes : filteredRecommended.slice(0, 6)).map(item => {
-            const isDish = !!item.restaurantName;
-            const targetUrl = isDish
-              ? `/user/restaurants/${item.restaurantSlug}`
-              : `/user/restaurants/${item.slug || item.name.toLowerCase().replace(/\s+/g, '-')}`;
-            const cardUnavailable =
-              query.trim() || selectedCategory !== 'all'
-                ? item.searchAvailable === false
-                : !isRestaurantDeliverableNow(item, { userHasLocation });
-            const labelRestaurant = isDish
-              ? restaurantsData.find((r) => String(r.id) === String(item.restaurantId))
-              : item;
-
-            return <Link key={item.id} to={targetUrl} className="block">
-              <div className={`group ${cardUnavailable ? 'grayscale opacity-75' : ''}`}>
-                {/* Image Container */}
-                <div className="relative aspect-square rounded-xl overflow-hidden mb-2 bg-gray-200 dark:bg-gray-800 border border-gray-100 dark:border-gray-800 shadow-sm group-hover:shadow-md transition-shadow">
-                  {item.image ? <img src={item.image} alt={item.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" onError={e => {
-                    e.target.style.display = 'none';
-                  }} /> : <div className="w-full h-full flex items-center justify-center">
-                    <span className="text-2xl">🍽️</span>
-                  </div>}
-
-                  {/* Price Badge for Dishes */}
-                  {isDish && item.price && <div className="absolute bottom-1 right-1 bg-white/90 dark:bg-black/80 backdrop-blur-sm px-1.5 py-0.5 rounded text-[10px] font-bold text-gray-900 dark:text-white border border-gray-100 dark:border-gray-800">
-                    ₹{item.price}
-                  </div>}
-
-                  {/* Offer Badge */}
-                  {item.offer && <div className="absolute top-1.5 left-1.5 bg-blue-600 text-white text-[10px] font-semibold px-1.5 py-0.5 rounded">
-                    {item.offer}
-                  </div>}
-                </div>
-
-                {/* Info */}
-                <div className="space-y-0.5">
-                  <h3 className="font-bold text-gray-900 dark:text-white text-xs line-clamp-1 group-hover:text-primary-orange transition-colors">
-                    {item.name}
-                  </h3>
-                  {isDish ? (
-                    <p className="text-[10px] font-medium text-gray-500 dark:text-gray-400 line-clamp-1 flex items-center gap-1">
-                      at <span className="text-gray-700 dark:text-gray-300">{item.restaurantName}</span>
-                    </p>
-                  ) : (
-                    item.deliveryTime && <div className="flex items-center gap-1 text-gray-500 dark:text-gray-400 text-[10px]">
-                      <Clock className="h-2.5 w-2.5" />
-                      <span>{item.deliveryTime}</span>
-                    </div>
-                  )}
-                  {!isDish && item.rating && <div className="flex items-center gap-1">
-                    <Star className="h-2 w-2 fill-green-600 text-green-600" />
-                    <span className="text-[10px] font-bold text-green-600">{item.rating}</span>
-                  </div>}
-                  {cardUnavailable && labelRestaurant && (
-                    <p className="text-[10px] text-amber-700 dark:text-amber-500 font-medium line-clamp-2 mt-0.5">
-                      {getSearchUnavailableLabel(labelRestaurant, {
-                        distanceInKm: labelRestaurant.distanceInKm,
-                        userHasLocation,
-                      })}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </Link>;
-          })}
-        </div>
-      </section>}
-
-      {/* ALL RESTAURANTS Section */}
-      <section>
-        <h2 className="text-xs sm:text-sm font-semibold text-gray-400 dark:text-gray-500 tracking-widest uppercase mb-4">
-          ALL RESTAURANTS
-        </h2>
-
-        {/* Large Restaurant Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-5 lg:gap-6">
-          {filteredAllRestaurants.map(restaurant => {
-            const restaurantSlug = restaurant.name.toLowerCase().replace(/\s+/g, "-");
-            const isFavorite = favorites.has(restaurant.id);
-            const deliverable = isRestaurantDeliverableNow(restaurant, { userHasLocation });
-            const unavailableReason = deliverable
-              ? null
-              : getSearchUnavailableLabel(restaurant, {
-                  distanceInKm: restaurant.distanceInKm,
-                  userHasLocation,
-                });
-            return <Link key={restaurant.id} to={`/user/restaurants/${restaurant.slug || restaurantSlug}`} className="h-full flex">
-              <Card className={`overflow-hidden cursor-pointer border-0 dark:border-gray-800 group bg-white dark:bg-[#1a1a1a] shadow-md hover:shadow-xl transition-all duration-300 py-0 rounded-md flex flex-col h-full w-full ${!deliverable ? 'grayscale opacity-75' : ''}`}>
-                {/* Image Section */}
-                <div className="relative h-44 sm:h-52 md:h-60 lg:h-64 xl:h-72 w-full overflow-hidden rounded-t-md flex-shrink-0 bg-gray-200 dark:bg-gray-800">
-                  {restaurant.image ? <img src={restaurant.image} alt={restaurant.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" onError={e => {
-                    e.target.style.display = 'none';
-                  }} /> : <div className="w-full h-full flex items-center justify-center bg-gray-200 dark:bg-gray-800">
-                    <span className="text-4xl">🍽️</span>
-                  </div>}
-
-                  {/* Dish/Offer Badge - Top Left */}
-                  {(() => {
-                    let displayText = null;
-
-                    // 1. If query matches a specific dish in this restaurant
-                    if (query.trim() && restaurant.menu) {
-                      const matchedItem = findMatchingItemInMenu(restaurant.menu, query);
-                      if (matchedItem) {
-                        displayText = `${matchedItem.name} · ₹${matchedItem.price}`;
-                      }
-                    }
-
-                    // 2. If category is selected, show matching dish
-                    if (!displayText && selectedCategory && selectedCategory !== 'all' && restaurant.menu) {
-                      const categoryDishInfo = getCategoryDishFromMenu(restaurant.menu, selectedCategory);
-                      if (categoryDishInfo) {
-                        displayText = `${categoryDishInfo.name} · ₹${categoryDishInfo.price}`;
-                      }
-                    }
-
-                    // 3. Fallback to featured dish
-                    if (!displayText && restaurant.featuredDish && restaurant.featuredPrice) {
-                      displayText = `${restaurant.featuredDish} · ₹${restaurant.featuredPrice}`;
-                    }
-
-                    return displayText ? <div className="absolute top-3 left-3">
-                      <div className="bg-gray-800/80 backdrop-blur-sm text-white px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium border border-white/10">
-                        {displayText}
-                      </div>
-                    </div> : null;
-                  })()}
-
-                  {/* Ad Badge */}
-                  {restaurant.isAd && <div className="absolute top-3 right-14 bg-black/50 text-white text-[10px] px-2 py-0.5 rounded">
-                    Ad
-                  </div>}
-
-                  {/* Bookmark Icon - Top Right */}
-                  <Button variant="ghost" size="icon" className="absolute top-3 right-3 h-9 w-9 bg-white/90 dark:bg-[#1a1a1a]/90 backdrop-blur-sm rounded-lg hover:bg-white dark:hover:bg-[#2a2a2a] transition-colors" onClick={e => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    toggleFavorite(restaurant.id);
-                  }}>
-                    <Bookmark className={`h-5 w-5 ${isFavorite ? "fill-gray-800 dark:fill-gray-200 text-gray-800 dark:text-gray-200" : "text-gray-600 dark:text-gray-400"}`} strokeWidth={2} />
-                  </Button>
-                </div>
-
-                {/* Content Section */}
-                <CardContent className="p-3 sm:p-4 lg:p-5 flex flex-col flex-grow">
-                  {/* Restaurant Name & Rating */}
-                  <div className="flex items-start justify-between gap-2 mb-2 lg:mb-3">
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 dark:text-white line-clamp-1 lg:line-clamp-2">
-                        {restaurant.name}
-                      </h3>
-                      {unavailableReason && (
-                        <p className="text-xs font-medium text-amber-700 dark:text-amber-500 mt-1 line-clamp-2">
-                          {unavailableReason}
-                        </p>
+          <div className="space-y-3">
+            {matchingDishes.map(item => {
+              const targetUrl = `/user/restaurants/${item.restaurantSlug}?dish=${encodeURIComponent(item.name)}`;
+              return (
+                <Link key={item.id} to={targetUrl} className="block">
+                  <div className="flex items-center gap-3 p-3 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#1a1a1a] shadow-sm hover:shadow-md transition-shadow">
+                    <div className="w-11 h-11 rounded-full overflow-hidden bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+                      {item.image ? (
+                        <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-lg">🍽️</span>
                       )}
                     </div>
-                    {restaurant.rating && <div className="flex-shrink-0 bg-green-600 text-white px-2 py-1 lg:px-3 lg:py-1.5 rounded-lg flex items-center gap-1">
-                      <span className="text-sm lg:text-base font-bold">{restaurant.rating}</span>
-                      <Star className="h-3 w-3 lg:h-4 lg:w-4 fill-white text-white" />
-                    </div>}
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-gray-900 dark:text-white text-sm truncate">{item.name}</div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400 truncate">Dish · {item.restaurantName}</div>
+                    </div>
                   </div>
+                </Link>
+              );
+            })}
 
-                  {/* Delivery Time & Distance - Only show if data exists */}
-                  {(restaurant.deliveryTime || restaurant.distance) && <div className="flex items-center gap-1 text-sm lg:text-base text-gray-500 dark:text-gray-400 mb-2 lg:mb-3">
-                    {restaurant.deliveryTime && <>
-                      <Clock className="h-4 w-4 lg:h-5 lg:w-5" strokeWidth={1.5} />
-                      <span className="font-medium">
-                        <DynamicEtaText
-                          restaurantId={restaurant.id}
-                          fallback={restaurant.deliveryTime}
-                        />
-                      </span>
-                    </>}
-                    {restaurant.deliveryTime && restaurant.distance && <span className="mx-1">|</span>}
-                    {restaurant.distance && <span className="font-medium">{restaurant.distance}</span>}
-                  </div>}
+            {matchingRestaurants.map(restaurant => {
+              const restaurantSlug = restaurant.slug || restaurant.name.toLowerCase().replace(/\s+/g, "-");
+              const disabled = restaurant.isClosed;
+              const content = (
+                <div className={`flex items-center gap-3 p-3 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#1a1a1a] shadow-sm transition-shadow ${disabled ? 'grayscale opacity-70 cursor-not-allowed' : 'hover:shadow-md'}`}>
+                  <div className="w-11 h-11 rounded-full overflow-hidden bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+                    {restaurant.image ? (
+                      <img src={restaurant.image} alt={restaurant.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-lg">🍽️</span>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-gray-900 dark:text-white text-sm truncate">{restaurant.name}</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 truncate">{restaurant.cuisine || "Restaurant"}</div>
+                  </div>
+                  {disabled && (
+                    <span className="text-[10px] font-semibold text-gray-500 border border-gray-200 rounded-full px-2 py-0.5">
+                      Closed
+                    </span>
+                  )}
+                </div>
+              );
+              return disabled ? (
+                <div key={restaurant.id}>{content}</div>
+              ) : (
+                <Link key={restaurant.id} to={`/user/restaurants/${restaurant.slug || restaurantSlug}`} className="block">
+                  {content}
+                </Link>
+              );
+            })}
 
-                  {/* Offer Badge */}
-                  {restaurant.offer && <div className="flex items-center gap-2 text-sm lg:text-base mt-auto">
-                    <BadgePercent className="h-4 w-4 lg:h-5 lg:w-5 text-blue-600 dark:text-blue-400" strokeWidth={2} />
-                    <span className="text-gray-700 dark:text-gray-300 font-medium">{restaurant.offer}</span>
-                  </div>}
-                </CardContent>
-              </Card>
-            </Link>;
-          })}
-
-          {/* Empty State */}
-          {filteredAllRestaurants.length === 0 && <div className="text-center py-12">
-            <p className="text-gray-500 dark:text-gray-400">
-              {query ? `No restaurants found for "${query}"` : "No restaurants found with selected filters"}
-            </p>
-            <Button variant="outline" className="mt-4 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800" onClick={() => {
-              setActiveFilters(new Set());
-              setSearchQuery("");
-              setSelectedCategory('all');
-              setSearchParams({});
-            }}>
-              Clear all filters
-            </Button>
-          </div>}
-        </div>
-      </section>
+            {matchingDishes.length === 0 && matchingRestaurants.length === 0 && (
+              <div className="text-sm text-gray-500">No matches found.</div>
+            )}
+          </div>
+        </section>
+      )}
     </div>
-    <StickyCartCard />
+    {!isBlankSearch && <StickyCartCard />}
   </div>;
 }

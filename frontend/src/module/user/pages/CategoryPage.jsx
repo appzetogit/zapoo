@@ -15,6 +15,7 @@ import { useProfile } from "../context/ProfileContext"
 import { useLocation } from "../hooks/useLocation"
 import { useZone } from "../hooks/useZone"
 import DynamicEtaText from "../components/DynamicEtaText"
+import { isRestaurantDeliverableNow } from "../utils/restaurantAvailability"
 
 // Filter options
 const filterOptions = [
@@ -33,6 +34,11 @@ export default function CategoryPage() {
   const { vegMode } = useProfile()
   const { location } = useLocation()
   const { zoneId, isOutOfService } = useZone(location)
+  const userHasLocation =
+    location?.latitude != null &&
+    location?.longitude != null &&
+    !Number.isNaN(Number(location.latitude)) &&
+    !Number.isNaN(Number(location.longitude))
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCategory, setSelectedCategory] = useState(category?.toLowerCase() || 'all')
   const [activeFilters, setActiveFilters] = useState(new Set())
@@ -68,7 +74,7 @@ export default function CategoryPage() {
           
           // Transform API categories to match expected format
           const transformedCategories = [
-            { id: 'all', name: "All", image: foodImages[7] || foodImages[0], slug: 'all' },
+            { id: 'all', name: "All", image: foodImages[6] || foodImages[0], slug: 'all' },
             ...categoriesArray.map((cat) => ({
               id: cat.slug || cat.id,
               name: cat.name,
@@ -94,12 +100,12 @@ export default function CategoryPage() {
           setCategoryKeywords(keywordsMap)
         } else {
           // Keep default "All" category on error
-          setCategories([{ id: 'all', name: "All", image: foodImages[7] || foodImages[0], slug: 'all' }])
+          setCategories([{ id: 'all', name: "All", image: foodImages[6] || foodImages[0], slug: 'all' }])
         }
       } catch (error) {
         console.error('Error fetching categories:', error)
         // Keep default "All" category on error
-        setCategories([{ id: 'all', name: "All", image: foodImages[7] || foodImages[0], slug: 'all' }])
+        setCategories([{ id: 'all', name: "All", image: foodImages[6] || foodImages[0], slug: 'all' }])
       } finally {
         setLoadingCategories(false)
       }
@@ -190,6 +196,65 @@ export default function CategoryPage() {
     return matchingDishes
   }
 
+  // Helper to get ALL dishes from menu (for "All" category)
+  const getAllDishesFromMenu = (menu) => {
+    if (!menu || !menu.sections || !Array.isArray(menu.sections)) {
+      return []
+    }
+
+    const allDishes = []
+
+    for (const section of menu.sections) {
+      if (section.items && Array.isArray(section.items)) {
+        for (const item of section.items) {
+          const originalPrice = item.originalPrice || item.price || 0
+          const discountPercent = item.discountPercent || 0
+          const finalPrice = discountPercent > 0
+            ? Math.round(originalPrice * (1 - discountPercent / 100))
+            : originalPrice
+
+          const dishImage = item.image?.url || item.image || section.image?.url || section.image || null
+
+          allDishes.push({
+            name: item.name,
+            price: finalPrice,
+            image: dishImage,
+            originalPrice: originalPrice,
+            itemId: item._id || item.id || `${item.name}-${finalPrice}`,
+            foodType: item.foodType,
+          })
+        }
+      }
+
+      if (section.subsections && Array.isArray(section.subsections)) {
+        for (const subsection of section.subsections) {
+          if (subsection.items && Array.isArray(subsection.items)) {
+            for (const item of subsection.items) {
+              const originalPrice = item.originalPrice || item.price || 0
+              const discountPercent = item.discountPercent || 0
+              const finalPrice = discountPercent > 0
+                ? Math.round(originalPrice * (1 - discountPercent / 100))
+                : originalPrice
+
+              const dishImage = item.image?.url || item.image || subsection.image?.url || subsection.image || section.image?.url || section.image || null
+
+              allDishes.push({
+                name: item.name,
+                price: finalPrice,
+                image: dishImage,
+                originalPrice: originalPrice,
+                itemId: item._id || item.id || `${item.name}-${finalPrice}`,
+                foodType: item.foodType,
+              })
+            }
+          }
+        }
+      }
+    }
+
+    return allDishes
+  }
+
   // Helper function to get FIRST featured dish for a category from menu (for backward compatibility)
   const getCategoryDishFromMenu = (menu, categoryId) => {
     const allDishes = getAllCategoryDishesFromMenu(menu, categoryId)
@@ -217,6 +282,24 @@ export default function CategoryPage() {
         if (response.data && response.data.success && response.data.data && response.data.data.restaurants) {
           const restaurantsArray = response.data.data.restaurants
           
+          // Calculate distance helper function (same as Home)
+          const calculateDistance = (lat1, lng1, lat2, lng2) => {
+            const R = 6371
+            const dLat = (lat2 - lat1) * Math.PI / 180
+            const dLng = (lng2 - lng1) * Math.PI / 180
+            const a =
+              Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(lat1 * Math.PI / 180) *
+                Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLng / 2) *
+                Math.sin(dLng / 2)
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+            return R * c
+          }
+
+          const userLat = location?.latitude
+          const userLng = location?.longitude
+
           // Helper function to check if value is a default/mock value
           const isDefaultValue = (value, fieldName) => {
             if (!value) return false
@@ -284,6 +367,55 @@ export default function CategoryPage() {
                 featuredPrice = null
               }
               
+              const restaurantLocation = restaurant.location
+              const restaurantLat =
+                restaurantLocation?.latitude ||
+                (restaurantLocation?.coordinates && Array.isArray(restaurantLocation.coordinates)
+                  ? restaurantLocation.coordinates[1]
+                  : null)
+              const restaurantLng =
+                restaurantLocation?.longitude ||
+                (restaurantLocation?.coordinates && Array.isArray(restaurantLocation.coordinates)
+                  ? restaurantLocation.coordinates[0]
+                  : null)
+
+              let distanceInKm = null
+              if (restaurant.distanceMeters != null && Number.isFinite(Number(restaurant.distanceMeters))) {
+                distanceInKm = Number(restaurant.distanceMeters) / 1000
+              } else if (
+                userLat &&
+                userLng &&
+                restaurantLat &&
+                restaurantLng &&
+                !Number.isNaN(userLat) &&
+                !Number.isNaN(userLng) &&
+                !Number.isNaN(restaurantLat) &&
+                !Number.isNaN(restaurantLng)
+              ) {
+                distanceInKm = calculateDistance(userLat, userLng, restaurantLat, restaurantLng)
+              } else if (Number.isFinite(Number(restaurant.distanceInKm))) {
+                distanceInKm = Number(restaurant.distanceInKm)
+              } else if (distance) {
+                const match = String(distance).match(/(\d+(\.\d+)?)/)
+                distanceInKm = match ? Number(match[1]) : null
+              }
+
+              if (distanceInKm != null && Number.isFinite(distanceInKm)) {
+                if (distanceInKm >= 1) {
+                  distance = `${distanceInKm.toFixed(1)} km`
+                } else {
+                  const distanceInMeters = Math.round(distanceInKm * 1000)
+                  distance = `${distanceInMeters} m`
+                }
+              }
+
+              const deliveryRange =
+                restaurant.deliveryRange != null && Number.isFinite(Number(restaurant.deliveryRange))
+                  ? Number(restaurant.deliveryRange)
+                  : restaurant.deliveryRangeKm != null && Number.isFinite(Number(restaurant.deliveryRangeKm))
+                    ? Number(restaurant.deliveryRangeKm)
+                    : null
+
               return {
                 id: restaurantId,
                 name: restaurant.name,
@@ -291,6 +423,8 @@ export default function CategoryPage() {
                 rating: restaurant.rating || null,
                 deliveryTime: deliveryTime,
                 distance: distance,
+                distanceInKm: distanceInKm,
+                deliveryRange: deliveryRange,
                 image: image,
                 images: allImages,
                 priceRange: restaurant.priceRange || null,
@@ -299,6 +433,10 @@ export default function CategoryPage() {
                 offer: offer,
                 slug: restaurant.slug || restaurant.name?.toLowerCase().replace(/\s+/g, '-'),
                 restaurantId: restaurantId,
+                isActive: restaurant.isActive,
+                isAcceptingOrders: restaurant.isAcceptingOrders,
+                openDays: restaurant.openDays,
+                deliveryTimings: restaurant.deliveryTimings,
                 hasPaneer: false,
                 category: 'all',
               }
@@ -541,18 +679,64 @@ export default function CategoryPage() {
     }
 
     return filtered
-  }, [selectedCategory, activeFilters, searchQuery, restaurantsData, categoryKeywords, vegMode])
+  }, [selectedCategory, activeFilters, searchQuery, restaurantsData, categoryKeywords, vegMode, userHasLocation])
 
   const filteredAllRestaurants = useMemo(() => {
     const sourceData = restaurantsData.length > 0 ? restaurantsData : []
     let filtered = [...sourceData]
+    const baseRestaurants = filtered.filter(r =>
+      isRestaurantDeliverableNow(r, { userHasLocation })
+    )
 
     // Filter by category - Dynamic filtering based on menu items
     // If category is selected, expand restaurants into dish cards (one card per matching dish)
-    if (selectedCategory && selectedCategory !== 'all') {
+    if (selectedCategory === 'all') {
+      const expandedDishes = []
+
+      baseRestaurants.forEach(r => {
+        if (r.menu) {
+          const allDishes = getAllDishesFromMenu(r.menu)
+          if (allDishes.length > 0) {
+            allDishes.forEach((dish, index) => {
+              if (vegMode && dish.foodType !== "Veg") {
+                return
+              }
+              expandedDishes.push({
+                ...r,
+                id: `${r.id}-dish-${dish.itemId || index}`,
+                dishId: dish.itemId || `${r.id}-dish-${index}`,
+                categoryDish: dish,
+                categoryDishName: dish.name,
+                categoryDishPrice: dish.price,
+                categoryDishImage: dish.image || r.image,
+              })
+            })
+            return
+          }
+        }
+
+        if (r.featuredDish) {
+          expandedDishes.push({
+            ...r,
+            id: `${r.id}-dish-featured`,
+            dishId: `${r.id}-dish-featured`,
+            categoryDish: {
+              name: r.featuredDish,
+              price: r.featuredPrice || 0,
+              image: r.image || null,
+            },
+            categoryDishName: r.featuredDish,
+            categoryDishPrice: r.featuredPrice || 0,
+            categoryDishImage: r.image || null,
+          })
+        }
+      })
+
+      filtered = expandedDishes
+    } else if (selectedCategory && selectedCategory !== 'all') {
       const expandedDishes = []
       
-      filtered.forEach(r => {
+      baseRestaurants.forEach(r => {
         if (r.menu) {
           const hasCategoryItem = checkCategoryInMenu(r.menu, selectedCategory)
           if (hasCategoryItem) {
@@ -749,80 +933,49 @@ export default function CategoryPage() {
       {/* Filters */}
       <div className="bg-white dark:bg-[#1a1a1a] border-b border-gray-100 dark:border-gray-800">
         <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col md:flex-row md:flex-wrap gap-2 px-4 md:px-6 py-3">
-            {/* Row 1 */}
-            <div 
-              className="flex items-center gap-2 overflow-x-auto md:overflow-x-visible scrollbar-hide pb-1 md:pb-0"
-              style={{
-                scrollbarWidth: "none",
-                msOverflowStyle: "none",
-              }}
+          <div
+            className="flex items-center gap-2 px-4 md:px-6 py-3 overflow-x-auto scrollbar-hide"
+            style={{
+              scrollbarWidth: "none",
+              msOverflowStyle: "none",
+            }}
+          >
+            <Button
+              variant="outline"
+              onClick={() => setIsFilterOpen(true)}
+              className="h-7 md:h-8 px-2.5 md:px-3 rounded-md flex items-center gap-1.5 whitespace-nowrap shrink-0 transition-all bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800"
             >
-              <Button
-                variant="outline"
-                onClick={() => setIsFilterOpen(true)}
-                className="h-7 md:h-8 px-2.5 md:px-3 rounded-md flex items-center gap-1.5 whitespace-nowrap shrink-0 transition-all bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800"
-              >
-                <SlidersHorizontal className="h-3.5 w-3.5 md:h-4 md:w-4" />
-                <span className="text-xs md:text-sm font-bold text-black dark:text-white">Filters</span>
-              </Button>
-              {[
-                { id: 'under-30-mins', label: 'Under 30 mins' },
-                { id: 'delivery-under-45', label: 'Under 45 mins' },
-                { id: 'rating-4-plus', label: 'Rating 4.0+' },
-                { id: 'rating-45-plus', label: 'Rating 4.5+' },
-              ].map((filter) => {
-                const isActive = activeFilters.has(filter.id)
-                return (
-                  <Button
-                    key={filter.id}
-                    variant="outline"
-                    onClick={() => toggleFilter(filter.id)}
-                    className={`h-7 md:h-8 px-2.5 md:px-3 rounded-md flex items-center gap-1.5 whitespace-nowrap shrink-0 transition-all ${
-                      isActive
-                        ? 'bg-green-600 text-white border border-green-600 hover:bg-green-600/90'
-                        : 'bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800'
-                    }`}
-                  >
-                    <span className={`text-xs md:text-sm text-black dark:text-white font-bold ${isActive ? 'text-white' : 'text-black dark:text-white'}`}>{filter.label}</span>
-                  </Button>
-                )
-              })}
-            </div>
-            
-            {/* Row 2 */}
-            <div 
-              className="flex items-center gap-2 overflow-x-auto md:overflow-x-visible scrollbar-hide pb-1 md:pb-0"
-              style={{
-                scrollbarWidth: "none",
-                msOverflowStyle: "none",
-              }}
-            >
-              {[
-                { id: 'distance-under-1km', label: 'Under 1km', icon: MapPin },
-                { id: 'distance-under-2km', label: 'Under 2km', icon: MapPin },
-                { id: 'flat-50-off', label: 'Flat 50% OFF' },
-                { id: 'under-250', label: 'Under ₹250' },
-              ].map((filter) => {
-                const Icon = filter.icon
-                const isActive = activeFilters.has(filter.id)
-                return (
-                  <Button
-                    key={filter.id}
-                    variant="outline"
-                    onClick={() => toggleFilter(filter.id)}
-                    className={`h-7 md:h-8 px-2.5 md:px-3 rounded-md flex items-center gap-1.5 whitespace-nowrap shrink-0 transition-all ${
-                      isActive
-                        ? 'bg-green-600 text-white border border-green-600 hover:bg-green-600/90'
-                        : 'bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800'
-                    }`}
-                  >
-                    {Icon && <Icon className={`h-3.5 w-3.5 md:h-4 md:w-4 ${isActive ? 'text-white' : 'text-gray-900 dark:text-white'}`} />}
-                    <span className={`text-xs md:text-sm font-bold ${isActive ? 'text-white' : 'text-black dark:text-white'}`}>{filter.label}</span>
-                  </Button>
-                )
-              })}
-            </div>
+              <SlidersHorizontal className="h-3.5 w-3.5 md:h-4 md:w-4" />
+              <span className="text-xs md:text-sm font-bold text-black dark:text-white">Filters</span>
+            </Button>
+            {[
+              { id: 'under-30-mins', label: 'Under 30 mins' },
+              { id: 'delivery-under-45', label: 'Under 45 mins' },
+              { id: 'rating-4-plus', label: 'Rating 4.0+' },
+              { id: 'rating-45-plus', label: 'Rating 4.5+' },
+              { id: 'distance-under-1km', label: 'Under 1km', icon: MapPin },
+              { id: 'distance-under-2km', label: 'Under 2km', icon: MapPin },
+              { id: 'flat-50-off', label: 'Flat 50% OFF' },
+              { id: 'under-250', label: 'Under ₹250' },
+            ].map((filter) => {
+              const Icon = filter.icon
+              const isActive = activeFilters.has(filter.id)
+              return (
+                <Button
+                  key={filter.id}
+                  variant="outline"
+                  onClick={() => toggleFilter(filter.id)}
+                  className={`h-7 md:h-8 px-2.5 md:px-3 rounded-md flex items-center gap-1.5 whitespace-nowrap shrink-0 transition-all ${
+                    isActive
+                      ? 'bg-green-600 text-white border border-green-600 hover:bg-green-600/90'
+                      : 'bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800'
+                  }`}
+                >
+                  {Icon && <Icon className={`h-3.5 w-3.5 md:h-4 md:w-4 ${isActive ? 'text-white' : 'text-gray-900 dark:text-white'}`} />}
+                  <span className={`text-xs md:text-sm font-bold ${isActive ? 'text-white' : 'text-black dark:text-white'}`}>{filter.label}</span>
+                </Button>
+              )
+            })}
           </div>
         </div>
       </div>
@@ -830,97 +983,7 @@ export default function CategoryPage() {
       {/* Content */}
       <div className="px-4 sm:px-6 md:px-8 lg:px-10 xl:px-12 py-4 sm:py-6 md:py-8 lg:py-10 space-y-6 md:space-y-8 lg:space-y-10">
         <div className="max-w-7xl mx-auto">
-          {/* RECOMMENDED FOR YOU Section - Hide when "All" category is selected */}
-          {filteredRecommended.length > 0 && selectedCategory !== 'all' && (
-            <section>
-              <h2 className="text-xs sm:text-sm md:text-base font-semibold text-gray-400 dark:text-gray-500 tracking-widest uppercase mb-4 md:mb-6">
-                RECOMMENDED FOR YOU
-              </h2>
-
-              {/* Small Restaurant Cards - Grid - Show all dishes when category is selected */}
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3 md:gap-4">
-                {(selectedCategory && selectedCategory !== 'all' 
-                  ? filteredRecommended 
-                  : filteredRecommended.slice(0, 6)
-                ).map((restaurant) => {
-                  return (
-                  <Link 
-                    key={restaurant.id}
-                    to={`/user/restaurants/${restaurant.name.toLowerCase().replace(/\s+/g, '-')}`}
-                    className="block"
-                  >
-                    <div className={`group ${shouldShowGrayscale ? 'grayscale opacity-75' : ''}`}>
-                      {/* Image Container */}
-                      <div className="relative aspect-square rounded-xl md:rounded-2xl overflow-hidden mb-2">
-                        {/* Use category dish image if available, otherwise restaurant image */}
-                        {restaurant.categoryDishImage ? (
-                          <img 
-                            src={restaurant.categoryDishImage}
-                            alt={restaurant.categoryDishName || restaurant.name}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                            onError={(e) => {
-                              // Fallback to restaurant image if dish image fails
-                              if (restaurant.image) {
-                                e.target.src = restaurant.image
-                              } else {
-                                // Show emoji placeholder
-                                e.target.style.display = 'none'
-                                const placeholder = document.createElement('div')
-                                placeholder.className = 'w-full h-full flex items-center justify-center bg-gray-100 dark:bg-gray-800 text-6xl'
-                                placeholder.textContent = '🍽️'
-                                e.target.parentElement.appendChild(placeholder)
-                              }
-                            }}
-                          />
-                        ) : restaurant.image ? (
-                        <img 
-                          src={restaurant.image}
-                          alt={restaurant.name}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                            onError={(e) => {
-                              // Show emoji placeholder
-                              e.target.style.display = 'none'
-                              const placeholder = document.createElement('div')
-                              placeholder.className = 'w-full h-full flex items-center justify-center bg-gray-100 dark:bg-gray-800 text-6xl'
-                              placeholder.textContent = '🍽️'
-                              e.target.parentElement.appendChild(placeholder)
-                            }}
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center bg-gray-100 dark:bg-gray-800 text-6xl">
-                            🍽️
-                          </div>
-                        )}
-
-                        {/* Offer Badge */}
-                        {restaurant.offer && (
-                        <div className="absolute top-1.5 left-1.5 bg-blue-600 text-white text-[10px] md:text-xs font-semibold px-1.5 py-0.5 rounded">
-                          {restaurant.offer}
-                        </div>
-                        )}
-
-                        {/* Rating Badge (NOW ON IMAGE, bottom-left with white border) */}
-                        <div className="absolute bottom-0 left-0 bg-green-600 border-[4px] rounded-md border-white text-white text-[11px] md:text-xs font-bold px-1.5 py-0.5 flex items-center gap-0.5">
-                          {restaurant.rating}
-                          <Star className="h-2.5 w-2.5 md:h-3 md:w-3 fill-white" />
-                        </div>
-                      </div>
-
-                      {/* Restaurant Info - Show category dish name if available, otherwise restaurant name */}
-                      <h3 className="font-semibold text-gray-900 dark:text-white text-xs md:text-sm line-clamp-1">
-                        {restaurant.categoryDishName || restaurant.name}
-                      </h3>
-                      <div className="flex items-center gap-1 text-gray-500 dark:text-gray-400 text-[10px] md:text-xs">
-                        <Clock className="h-2.5 w-2.5 md:h-3 md:w-3" />
-                        <span>{restaurant.deliveryTime || 'Not available'}</span>
-                      </div>
-                    </div>
-                  </Link>
-                  )
-                })}
-              </div>
-            </section>
-          )}
+          {/* Recommended section removed per request */}
 
           {/* ALL RESTAURANTS Section */}
           <section className="relative">

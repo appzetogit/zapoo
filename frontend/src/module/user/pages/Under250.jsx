@@ -1,6 +1,6 @@
 import { Link, useNavigate } from "react-router-dom"
 import { useState, useMemo, useCallback, useEffect } from "react"
-import { Star, Clock, MapPin, ArrowDownUp, Timer, ArrowRight, ChevronDown, Bookmark, Share2, Plus, Minus, X } from "lucide-react"
+import { Star, Clock, MapPin, ArrowDownUp, Timer, ArrowRight, ChevronDown, Bookmark, Share2, Plus, Minus, X, Loader2 } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { toast } from "sonner"
 import AnimatedPage from "../components/AnimatedPage"
@@ -13,11 +13,11 @@ import { useCart } from "../context/CartContext"
 import PageNavbar from "../components/PageNavbar"
 import { foodImages } from "@/constants/images"
 import zapooFoodLogo from "@/assets/zapoo_logo.png"
-import offerImage from "@/assets/offerimage.png"
 import AddToCartAnimation from "../components/AddToCartAnimation"
 import OptimizedImage from "@/components/OptimizedImage"
 import api from "@/lib/api"
 import { restaurantAPI } from "@/lib/api"
+import { isOpenForDeliveryNow } from "../utils/restaurantAvailability"
 import { isModuleAuthenticated } from "@/lib/utils/auth"
 import DynamicEtaText from "../components/DynamicEtaText"
 
@@ -84,6 +84,16 @@ export default function Under250() {
   // Sort and filter restaurants based on selected sort and filters
   const sortedAndFilteredRestaurants = useMemo(() => {
     let filtered = [...under250Restaurants]
+
+    // Apply availability filter (open + accepting orders)
+    filtered = filtered.filter((restaurant) => {
+      const accepting = restaurant.isAcceptingOrders !== false
+      const openNow = isOpenForDeliveryNow({
+        openDays: restaurant.openDays,
+        deliveryTimings: restaurant.deliveryTimings,
+      })
+      return accepting && openNow
+    })
 
     // Apply "Under 30 mins" filter
     if (under30MinsFilter) {
@@ -168,7 +178,87 @@ export default function Under250() {
         }
         const response = await restaurantAPI.getRestaurantsUnder250(params)
         if (response.data.success && response.data.data.restaurants) {
-          setUnder250Restaurants(response.data.data.restaurants)
+          const restaurantsArray = response.data.data.restaurants
+          const userLat = location?.latitude
+          const userLng = location?.longitude
+          const calculateDistance = (lat1, lng1, lat2, lng2) => {
+            const R = 6371
+            const dLat = (lat2 - lat1) * Math.PI / 180
+            const dLng = (lng2 - lng1) * Math.PI / 180
+            const a =
+              Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(lat1 * Math.PI / 180) *
+                Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLng / 2) *
+                Math.sin(dLng / 2)
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+            return R * c
+          }
+
+          const normalized = restaurantsArray.map((restaurant) => {
+            const restaurantLocation = restaurant.location
+            const restaurantLat =
+              restaurantLocation?.latitude ||
+              (restaurantLocation?.coordinates && Array.isArray(restaurantLocation.coordinates)
+                ? restaurantLocation.coordinates[1]
+                : null)
+            const restaurantLng =
+              restaurantLocation?.longitude ||
+              (restaurantLocation?.coordinates && Array.isArray(restaurantLocation.coordinates)
+                ? restaurantLocation.coordinates[0]
+                : null)
+
+            let distanceInKm = null
+            if (restaurant.distanceMeters != null && Number.isFinite(Number(restaurant.distanceMeters))) {
+              distanceInKm = Number(restaurant.distanceMeters) / 1000
+            } else if (
+              userLat &&
+              userLng &&
+              restaurantLat &&
+              restaurantLng &&
+              !Number.isNaN(userLat) &&
+              !Number.isNaN(userLng) &&
+              !Number.isNaN(restaurantLat) &&
+              !Number.isNaN(restaurantLng)
+            ) {
+              distanceInKm = calculateDistance(userLat, userLng, restaurantLat, restaurantLng)
+            } else if (Number.isFinite(Number(restaurant.distanceInKm))) {
+              distanceInKm = Number(restaurant.distanceInKm)
+            } else if (restaurant.distance) {
+              const match = String(restaurant.distance).match(/(\d+(\.\d+)?)/)
+              distanceInKm = match ? Number(match[1]) : null
+            }
+
+            let distance = restaurant.distance || null
+            if (distanceInKm != null && Number.isFinite(distanceInKm)) {
+              if (distanceInKm >= 1) {
+                distance = `${distanceInKm.toFixed(1)} km`
+              } else {
+                const distanceInMeters = Math.round(distanceInKm * 1000)
+                distance = `${distanceInMeters} m`
+              }
+            }
+
+            const deliveryRange =
+              restaurant.deliveryRange != null && Number.isFinite(Number(restaurant.deliveryRange))
+                ? Number(restaurant.deliveryRange)
+                : restaurant.deliveryRangeKm != null && Number.isFinite(Number(restaurant.deliveryRangeKm))
+                  ? Number(restaurant.deliveryRangeKm)
+                  : null
+
+            return {
+              ...restaurant,
+              distanceInKm,
+              distance,
+              deliveryRange,
+              isActive: restaurant.isActive,
+              isAcceptingOrders: restaurant.isAcceptingOrders,
+              openDays: restaurant.openDays,
+              deliveryTimings: restaurant.deliveryTimings,
+            }
+          })
+
+          setUnder250Restaurants(normalized)
         } else {
           setUnder250Restaurants([])
         }
@@ -356,31 +446,71 @@ export default function Under250() {
   const shouldShowGrayscale = isOutOfService
 
   return (
-
     <div className={`relative min-h-screen bg-white dark:bg-[#0a0a0a] ${shouldShowGrayscale ? 'grayscale opacity-75' : ''}`}>
-      {/* Banner Section with Navbar */}
-      <div className="relative w-full overflow-hidden min-h-[39vh] lg:min-h-[50vh] md:pt-16">
-        {/* Banner Image */}
-        {bannerImage && (
-          <div className="absolute top-0 left-0 right-0 bottom-0 z-0">
-            <OptimizedImage
-              src={bannerImage}
-              alt="Under 250 Banner"
-              className="w-full h-full"
-              objectFit="cover"
-              priority={true}
-              sizes="100vw"
-            />
-          </div>
-        )}
-        {!bannerImage && !loadingBanner && (
-          <div className="absolute top-0 left-0 right-0 bottom-0 z-0 bg-gradient-to-br from-green-100 to-blue-100 dark:from-green-900 dark:to-blue-900" />
-        )}
+      {/* Sticky Navbar Section - same as Home */}
+      <motion.div
+        className="md:hidden sticky top-0 z-50 bg-white dark:bg-[#0a0a0a]"
+        initial={{ y: -100 }}
+        animate={{ y: 0 }}
+        transition={{ duration: 0.5, ease: "easeOut" }}
+      >
+        <PageNavbar textColor="black" zIndex={50} />
+      </motion.div>
 
-        {/* Navbar */}
-        <div className="relative z-20 pt-2 sm:pt-3 lg:pt-4">
-          <PageNavbar textColor="black" zIndex={20} showProfile={true} />
+      {/* Banner Section */}
+      <div className="relative w-full overflow-hidden min-h-[39vh] lg:min-h-[50vh] md:pt-16">
+        <div className="relative z-10 w-full pt-3 sm:pt-4">
+          <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+            {loadingBanner ? (
+              <div className="w-full rounded-2xl bg-gray-100 dark:bg-gray-900 flex items-center justify-center" style={{ minHeight: '220px' }}>
+                <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+              </div>
+            ) : (
+              <div className="relative w-full rounded-2xl overflow-hidden shadow-md border border-gray-100 dark:border-gray-800 bg-white dark:bg-[#1a1a1a]" style={{ minHeight: '220px' }}>
+                {/* Top: Text */}
+                <div className="px-5 pt-5 pb-3 bg-white dark:bg-[#1a1a1a] relative z-10 min-h-[110px]">
+                  <h2 className="text-2xl font-extrabold text-gray-900 dark:text-white leading-tight mb-1">
+                    Modern &amp; Trendy
+                  </h2>
+                </div>
+
+                {/* CTA Badge */}
+                <div
+                  className="absolute left-5 z-20"
+                  style={{ top: '105px' }}
+                >
+                  <div
+                    className="flex flex-col items-center justify-center bg-orange-500 text-white font-bold text-[10px] leading-tight rounded-full shadow-lg px-3 py-3 text-center uppercase pointer-events-none"
+                    style={{ width: '72px', height: '72px' }}
+                  >
+                    Order<br />Now
+                  </div>
+                </div>
+
+                {/* Bottom: Image with curved top */}
+                <div className="relative w-full overflow-hidden bg-white dark:bg-[#1a1a1a]" style={{ aspectRatio: '16/7', marginTop: '-2px' }}>
+                  {bannerImage ? (
+                    <img
+                      src={bannerImage}
+                      alt="Under 250 Banner"
+                      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                      loading="eager"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-green-100 to-blue-100 dark:from-green-900 dark:to-blue-900" />
+                  )}
+
+                  {/* Curved white overlay at top */}
+                  <div
+                    className="absolute inset-x-0 top-0 z-10 bg-white dark:bg-[#1a1a1a] pointer-events-none"
+                    style={{ height: '36px', borderRadius: '0 0 50% 50% / 0 0 100% 100%' }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
         </div>
+
       </div>
 
       {/* Content Section */}
@@ -396,29 +526,6 @@ export default function Under250() {
               overflowY: "hidden",
             }}
           >
-            {/* All Button */}
-            <div className="flex-shrink-0">
-              <motion.div
-                className="flex flex-col items-center gap-2 w-[62px] sm:w-24 md:w-28"
-                whileHover={{ scale: 1.1, y: -4 }}
-                whileTap={{ scale: 0.95 }}
-                transition={{ type: "spring", stiffness: 300, damping: 20 }}
-              >
-                <div className="w-14 h-14 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-full overflow-hidden shadow-md transition-all">
-                  <OptimizedImage
-                    src={offerImage}
-                    alt="All"
-                    className="w-full h-full bg-white rounded-full"
-                    objectFit="cover"
-                    sizes="(max-width: 640px) 62px, (max-width: 768px) 96px, 112px"
-                    placeholder="blur"
-                  />
-                </div>
-                <span className="text-xs sm:text-sm md:text-base font-semibold text-gray-800 dark:text-gray-200 text-center pb-1">
-                  All
-                </span>
-              </motion.div>
-            </div>
             {categories.map((category, index) => {
               const isActive = activeCategory === category.id
               const categorySlug = category.slug || category.name.toLowerCase().replace(/\s+/g, '-')

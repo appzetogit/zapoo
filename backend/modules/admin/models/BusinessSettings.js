@@ -99,6 +99,27 @@ const businessSettingsSchema = new mongoose.Schema(
       default: 2,
       min: 0,
     },
+    // Withdrawal window override (admin can force open/close for a date range)
+    withdrawalWindow: {
+      mode: {
+        type: String,
+        enum: ["default", "open", "closed"],
+        default: "default",
+      },
+      startDate: {
+        type: Date,
+        default: null,
+      },
+      endDate: {
+        type: Date,
+        default: null,
+      },
+      message: {
+        type: String,
+        default: "",
+        trim: true,
+      },
+    },
     updatedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Admin",

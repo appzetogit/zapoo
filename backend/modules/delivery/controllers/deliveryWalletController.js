@@ -448,8 +448,24 @@ export const createWithdrawalRequest = asyncHandler(async (req, res) => {
       return errorResponse(res, 400, validationError.details[0].message);
     }
 
-    if (!isSunday()) {
-      return errorResponse(res, 400, 'Withdrawal requests are allowed only on Sundays');
+    const settings = await BusinessSettings.getSettings().catch(() => null);
+    const windowCfg = settings?.withdrawalWindow;
+    const now = new Date();
+    const inWindow = (() => {
+      if (!windowCfg) return false;
+      const start = windowCfg.startDate ? new Date(windowCfg.startDate) : null;
+      const end = windowCfg.endDate ? new Date(windowCfg.endDate) : null;
+      if (start && now < start) return false;
+      if (end && now > end) return false;
+      return true;
+    })();
+    if (windowCfg?.mode === 'closed' && (inWindow || (!windowCfg.startDate && !windowCfg.endDate))) {
+      return errorResponse(res, 400, 'Withdrawal window is temporarily closed');
+    }
+    if (windowCfg?.mode !== 'open' || (!inWindow && (windowCfg.startDate || windowCfg.endDate))) {
+      if (!isSunday()) {
+        return errorResponse(res, 400, 'Withdrawal requests are allowed only on Sundays');
+      }
     }
 
     // Find or create wallet
@@ -458,7 +474,6 @@ export const createWithdrawalRequest = asyncHandler(async (req, res) => {
     // Check minimum withdrawal amount (from BusinessSettings)
     let minWithdrawalAmount = 100;
     try {
-      const settings = await BusinessSettings.getSettings();
       const wl = Number(settings?.deliveryWithdrawalLimit);
       if (Number.isFinite(wl) && wl >= 0) minWithdrawalAmount = wl;
     } catch (e) {/* keep default */}

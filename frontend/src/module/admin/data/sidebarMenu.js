@@ -350,6 +350,12 @@ export const sidebarMenuData = [
         icon: "Settings",
       },
       {
+        type: "link",
+        label: "Withdrawal Window",
+        path: "/admin/withdrawal-window",
+        icon: "Wallet",
+      },
+      {
         type: "expandable",
         label: "Pages & Social Media",
         icon: "Link",

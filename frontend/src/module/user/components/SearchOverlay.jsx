@@ -1,41 +1,19 @@
 import { useState, useEffect, useRef, useMemo } from "react"
 import { useNavigate, Link } from "react-router-dom"
-import { X, Search, Clock, Loader2, MapPin } from "lucide-react"
+import { X, Search, Loader2, MapPin, ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { restaurantAPI } from "@/lib/api"
 import { useLocation } from "../hooks/useLocation"
 import { useZone } from "../hooks/useZone"
 import {
-  getSearchUnavailableLabel,
-  isRestaurantDeliverableNow,
+  isOpenForDeliveryNow,
+  isWithinDeliveryRangeKm,
 } from "../utils/restaurantAvailability"
 
 // Import shared food images - prevents duplication
 import { foodImages } from "@/constants/images"
 
-// Recent search suggestions
-const recentSuggestions = [
-  "Biryani", "Cake", "Chhole Bhature", "Chicken Tanduri", "Donuts", "Dosa", "French Fries", "Idli"
-]
-
-// Categories matching the home page browse section - only unique categories
-const categories = [
-  { id: 1, name: "Biryani", image: foodImages[0] },
-  { id: 2, name: "Cake", image: foodImages[1] },
-  { id: 3, name: "Chhole Bhature", image: foodImages[2] },
-  { id: 4, name: "Chicken Tanduri", image: foodImages[3] },
-  { id: 5, name: "Donuts", image: foodImages[4] },
-  { id: 6, name: "Dosa", image: foodImages[5] },
-  { id: 7, name: "French Fries", image: foodImages[6] },
-  { id: 8, name: "Idli", image: foodImages[7] },
-  { id: 9, name: "Momos", image: foodImages[8] },
-  { id: 10, name: "Samosa", image: foodImages[9] },
-  { id: 11, name: "Starters", image: foodImages[10] },
-]
-
-// Use only unique categories (no duplicates)
-const allFoodsWithWhiteBg = categories
 
 function restaurantMatchesQuery(restaurant, q) {
   const lower = q.trim().toLowerCase()
@@ -91,7 +69,9 @@ function transformRestaurantForOverlay(restaurant, userLat, userLng) {
     distanceInKm = calculateDistance(userLat, userLng, restaurantLat, restaurantLng)
   }
 
-  const restaurantId = restaurant.restaurantId || restaurant._id
+  const mongoId = restaurant?._id?.toString ? restaurant._id.toString() : restaurant?._id
+  const restaurantId = restaurant.restaurantId || mongoId
+  const rawRestaurantId = restaurant.restaurantId || null
   const slug = restaurant.slug || restaurant.name?.toLowerCase().replace(/\s+/g, "-")
   const image =
     restaurant.profileImage?.url ||
@@ -100,6 +80,8 @@ function transformRestaurantForOverlay(restaurant, userLat, userLng) {
 
   return {
     id: restaurantId,
+    mongoId,
+    restaurantId: rawRestaurantId,
     name: restaurant.name,
     slug,
     image,
@@ -119,8 +101,8 @@ function transformRestaurantForOverlay(restaurant, userLat, userLng) {
 export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchChange }) {
   const navigate = useNavigate()
   const inputRef = useRef(null)
-  const [filteredFoods, setFilteredFoods] = useState(allFoodsWithWhiteBg)
   const [restaurantMatches, setRestaurantMatches] = useState([])
+  const [allRestaurants, setAllRestaurants] = useState([])
   const [restaurantLoading, setRestaurantLoading] = useState(false)
   const { location } = useLocation()
   const { zoneId, isOutOfService } = useZone(location)
@@ -158,23 +140,13 @@ export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchCh
     }
   }, [isOpen, onClose])
 
-  useEffect(() => {
-    if (searchValue.trim() === "") {
-      setFilteredFoods(allFoodsWithWhiteBg)
-    } else {
-      const filtered = allFoodsWithWhiteBg.filter((food) =>
-        food.name.toLowerCase().includes(searchValue.toLowerCase())
-      )
-      setFilteredFoods(filtered)
-    }
-  }, [searchValue])
-
   // Live restaurant name / cuisine suggestions (same broad list as /user/search — includes out-of-range & inactive)
   useEffect(() => {
     if (!isOpen) return
     const q = searchValue.trim()
     if (q.length < 1) {
       setRestaurantMatches([])
+      setAllRestaurants([])
       setRestaurantLoading(false)
       return
     }
@@ -197,12 +169,38 @@ export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchCh
         const list = res?.data?.data?.restaurants || []
         const userLat = userHasLocation ? Number(location.latitude) : null
         const userLng = userHasLocation ? Number(location.longitude) : null
-        const transformed = list
-          .filter((r) => restaurantMatchesQuery(r, q))
-          .map((r) => transformRestaurantForOverlay(r, userLat, userLng))
-        setRestaurantMatches(transformed)
+        const transformed = list.map((r) => transformRestaurantForOverlay(r, userLat, userLng))
+        setRestaurantMatches(transformed.filter((r) => restaurantMatchesQuery(r, q)))
+
+        const eligibleForMenu = transformed.filter((r) => {
+          const inRange = isWithinDeliveryRangeKm(r.distanceInKm, r.deliveryRange, { userHasLocation })
+          const isOpen = isOpenForDeliveryNow({ openDays: r.openDays, deliveryTimings: r.deliveryTimings })
+          return inRange && isOpen
+        })
+
+        // Fetch menus for dish suggestions (only eligible restaurants)
+        const withMenus = await Promise.all(
+          eligibleForMenu.map(async (r) => {
+            try {
+              const menuRes = await restaurantAPI.getMenuByRestaurantId(r.mongoId || r.restaurantId || r.id)
+              const menu = menuRes?.data?.data?.menu || null
+              return { ...r, menu }
+            } catch {
+              return { ...r, menu: null }
+            }
+          })
+        )
+
+        const menuMap = new Map(withMenus.map((r) => [String(r.id), r.menu]))
+        setAllRestaurants(
+          transformed.map((r) => ({
+            ...r,
+            menu: menuMap.get(String(r.id)) || null
+          }))
+        )
       } catch {
         setRestaurantMatches([])
+        setAllRestaurants([])
       } finally {
         setRestaurantLoading(false)
       }
@@ -219,10 +217,57 @@ export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchCh
     location?.longitude,
   ])
 
-  const handleSuggestionClick = (suggestion) => {
-    onSearchChange(suggestion)
-    inputRef.current?.focus()
-  }
+  const matchingDishes = useMemo(() => {
+    if (!searchValue.trim()) return []
+    const lower = searchValue.toLowerCase()
+    const results = []
+    allRestaurants.forEach((restaurant) => {
+      const inRange = isWithinDeliveryRangeKm(restaurant.distanceInKm, restaurant.deliveryRange, { userHasLocation })
+      const isOpen = isOpenForDeliveryNow({
+        openDays: restaurant.openDays,
+        deliveryTimings: restaurant.deliveryTimings,
+      })
+      if (!inRange || !isOpen) return
+      const menu = restaurant.menu
+      if (!menu || !menu.sections) return
+      menu.sections.forEach((section) => {
+        if (!section.items) return
+        section.items.forEach((item) => {
+          const itemNameLower = (item.name || "").toLowerCase()
+          const itemCategoryLower = (item.category || "").toLowerCase()
+          if (itemNameLower.includes(lower) || itemCategoryLower.includes(lower)) {
+            results.push({
+              id: `${restaurant.id}-${item.id || item.name}`,
+              name: item.name,
+              image: item.image || restaurant.image,
+              restaurantName: restaurant.name,
+              restaurantSlug: restaurant.slug,
+            })
+          }
+        })
+        if (section.subsections) {
+          section.subsections.forEach((sub) => {
+            if (!sub.items) return
+            sub.items.forEach((item) => {
+              const itemNameLower = (item.name || "").toLowerCase()
+              const itemCategoryLower = (item.category || "").toLowerCase()
+              if (itemNameLower.includes(lower) || itemCategoryLower.includes(lower)) {
+                results.push({
+                  id: `${restaurant.id}-${item.id || item.name}`,
+                  name: item.name,
+                  image: item.image || restaurant.image,
+                  restaurantName: restaurant.name,
+                  restaurantSlug: restaurant.slug,
+                })
+              }
+            })
+          })
+        }
+      })
+    })
+    return results
+  }, [searchValue, allRestaurants, userHasLocation])
+
 
   const handleSearchSubmit = (e) => {
     e.preventDefault()
@@ -233,11 +278,6 @@ export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchCh
     }
   }
 
-  const handleFoodClick = (food) => {
-    navigate(`/user/search?q=${encodeURIComponent(food.name)}`)
-    onClose()
-    onSearchChange("")
-  }
 
   if (!isOpen) return null
 
@@ -251,7 +291,14 @@ export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchCh
       {/* Header with Search Bar */}
       <div className="flex-shrink-0 bg-white dark:bg-[#1a1a1a] border-b border-gray-100 dark:border-gray-800 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <form onSubmit={handleSearchSubmit} className="flex items-center gap-4">
+          <form onSubmit={handleSearchSubmit} className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="h-10 w-10 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            >
+              <ArrowLeft className="h-5 w-5 text-gray-700 dark:text-gray-300" />
+            </button>
             <div className="flex-1 relative">
               <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground dark:text-gray-400 z-10" />
               <Input
@@ -276,170 +323,99 @@ export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchCh
       </div>
 
       <div className="flex-1 overflow-y-auto max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 scrollbar-hide bg-white dark:bg-[#0a0a0a]">
-        {/* Suggestions Row */}
-        <div
-          className="mb-6"
-          style={{
-            animation: 'slideDown 0.3s ease-out 0.1s both'
-          }}
-        >
-          <h3 className="text-sm sm:text-base font-semibold text-gray-700 dark:text-gray-300 mb-4 flex items-center gap-2">
-            <Clock className="h-4 w-4 text-primary-orange" />
-            Recent Searches
-          </h3>
-          <div className="flex gap-2 sm:gap-3 flex-wrap">
-            {recentSuggestions.slice(0, 8).map((suggestion, index) => (
-              <button
-                key={suggestion}
-                onClick={() => handleSuggestionClick(suggestion)}
-                className="inline-flex items-center gap-2 px-3 sm:px-4 py-2 rounded-full bg-orange-50 dark:bg-orange-900/20 hover:bg-orange-100 dark:hover:bg-orange-900/30 border border-orange-200 dark:border-orange-800 hover:border-orange-300 dark:hover:border-orange-700 text-gray-700 dark:text-gray-300 hover:text-primary-orange dark:hover:text-orange-400 transition-all duration-200 text-xs sm:text-sm font-medium shadow-sm hover:shadow-md"
-                style={{
-                  animation: `scaleIn 0.3s ease-out ${0.1 + index * 0.02}s both`
-                }}
-              >
-                <Clock className="h-3 w-3 sm:h-4 sm:w-4 text-primary-orange flex-shrink-0" />
-                <span>{suggestion}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Live restaurant matches (typing) */}
         {searchValue.trim().length > 0 && (
-          <div className="mb-8" style={{ animation: "fadeIn 0.25s ease-out both" }}>
+          <div className="mb-6" style={{ animation: "fadeIn 0.25s ease-out both" }}>
             <h3 className="text-sm sm:text-base font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
               <MapPin className="h-4 w-4 text-primary-orange" />
-              Restaurants
+              Matching dishes & restaurants
               {restaurantLoading && <Loader2 className="h-4 w-4 animate-spin text-gray-400" />}
             </h3>
-            {!restaurantLoading && restaurantMatches.length === 0 && (
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">No matching restaurant names in your area.</p>
-            )}
-            <ul className="space-y-2">
-              {restaurantMatches.map((r) => {
-                const deliverable = isRestaurantDeliverableNow(r, { userHasLocation })
-                const reason = !deliverable
-                  ? getSearchUnavailableLabel(r, { distanceInKm: r.distanceInKm, userHasLocation })
-                  : null
-                const slug = r.slug || r.name?.toLowerCase().replace(/\s+/g, "-")
-                return (
-                  <li key={String(r.id)}>
-                    <Link
-                      to={`/user/restaurants/${slug}`}
-                      onClick={() => {
-                        onClose()
-                        onSearchChange("")
-                      }}
-                      className={`flex items-center gap-3 rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50/80 dark:bg-[#141414] p-3 hover:border-orange-200 dark:hover:border-orange-900 transition-colors ${
-                        !deliverable ? "grayscale opacity-80" : ""
-                      }`}
-                    >
-                      <div className="h-14 w-14 flex-shrink-0 overflow-hidden rounded-lg bg-gray-200 dark:bg-gray-800">
-                        <img
-                          src={r.image}
-                          alt=""
-                          className="h-full w-full object-cover"
-                          loading="lazy"
-                          onError={(e) => {
-                            e.target.src = foodImages[0]
-                          }}
-                        />
-                      </div>
-                      <div className="min-w-0 flex-1 text-left">
-                        <p className="font-semibold text-gray-900 dark:text-white truncate">{r.name}</p>
-                        {reason && (
-                          <p className="text-xs font-medium text-amber-700 dark:text-amber-500 line-clamp-2 mt-0.5">
-                            {reason}
-                          </p>
-                        )}
-                        {deliverable && r.distanceInKm != null && (
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                            {r.distanceInKm >= 1
-                              ? `${r.distanceInKm.toFixed(1)} km away`
-                              : `${Math.round(r.distanceInKm * 1000)} m away`}
-                          </p>
-                        )}
-                      </div>
-                    </Link>
-                  </li>
-                )
-              })}
-            </ul>
-          </div>
-        )}
 
-        {/* Food Grid */}
-        <div
-          style={{
-            animation: 'fadeIn 0.3s ease-out 0.2s both'
-          }}
-        >
-          <h3 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white mb-4 sm:mb-6">
-            {searchValue.trim() === ""
-              ? "All Dishes"
-              : `Dishes & categories (${filteredFoods.length})`}
-          </h3>
-          {(() => {
-            const typed = searchValue.trim().length > 0
-            const totalHits = filteredFoods.length + restaurantMatches.length
-            const showEmpty =
-              typed && !restaurantLoading && totalHits === 0
-
-            if (showEmpty) {
-              return (
-                <div className="text-center py-12 sm:py-16">
-                  <Search className="h-12 w-12 sm:h-16 sm:w-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
-                  <p className="text-gray-600 dark:text-gray-400 text-base sm:text-lg font-semibold">
-                    No results found for "{searchValue}"
-                  </p>
-                  <p className="text-sm sm:text-base text-gray-500 dark:text-gray-500 mt-2">
-                    Try a different search term
-                  </p>
-                </div>
-              )
-            }
-
-            if (filteredFoods.length === 0 && typed) {
-              return null
-            }
-
-            if (filteredFoods.length === 0) {
-              return null
-            }
-
-            return (
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3 sm:gap-4 md:gap-5 lg:gap-6">
-                {filteredFoods.map((food, index) => (
-                  <div
-                    key={food.id}
-                    className="flex flex-col items-center gap-2 sm:gap-3 cursor-pointer group"
-                    style={{
-                      animation: `slideUp 0.3s ease-out ${0.25 + 0.05 * (index % 12)}s both`,
-                    }}
-                    onClick={() => handleFoodClick(food)}
-                  >
-                    <div className="relative w-full aspect-square rounded-full overflow-hidden transition-all duration-200 shadow-md group-hover:shadow-lg bg-white dark:bg-[#1a1a1a] p-1 sm:p-1.5">
+            <div className="space-y-3">
+              {matchingDishes.map((item) => (
+                <Link
+                  key={item.id}
+                  to={`/user/restaurants/${item.restaurantSlug}?dish=${encodeURIComponent(item.name)}`}
+                  onClick={() => {
+                    onClose()
+                    onSearchChange("")
+                  }}
+                  className="block"
+                >
+                  <div className="flex items-center gap-3 p-3 rounded-2xl border border-gray-100 dark:border-gray-800 bg-gray-50/80 dark:bg-[#141414] hover:border-orange-200 dark:hover:border-orange-900 transition-colors">
+                    <div className="h-11 w-11 flex-shrink-0 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-800">
                       <img
-                        src={food.image}
-                        alt={food.name}
-                        className="w-full h-full object-cover rounded-full"
+                        src={item.image || foodImages[0]}
+                        alt=""
+                        className="h-full w-full object-cover"
                         loading="lazy"
                         onError={(e) => {
                           e.target.src = foodImages[0]
                         }}
                       />
                     </div>
-                    <div className="px-1 sm:px-2 text-center">
-                      <span className="text-xs sm:text-sm font-semibold text-gray-800 dark:text-gray-200 group-hover:text-primary-orange dark:group-hover:text-orange-400 transition-colors line-clamp-2">
-                        {food.name}
-                      </span>
+                    <div className="min-w-0 flex-1 text-left">
+                      <p className="font-semibold text-gray-900 dark:text-white truncate">{item.name}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 truncate">Dish · {item.restaurantName}</p>
                     </div>
                   </div>
-                ))}
-              </div>
-            )
-          })()}
-        </div>
+                </Link>
+              ))}
+
+              {restaurantMatches.map((r) => {
+                const inRange = isWithinDeliveryRangeKm(r.distanceInKm, r.deliveryRange, { userHasLocation })
+                if (!inRange) return null
+                const isClosed = !isOpenForDeliveryNow({ openDays: r.openDays, deliveryTimings: r.deliveryTimings })
+                const slug = r.slug || r.name?.toLowerCase().replace(/\s+/g, "-")
+                const content = (
+                  <div className={`flex items-center gap-3 rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50/80 dark:bg-[#141414] p-3 transition-colors ${
+                    isClosed ? "grayscale opacity-80 cursor-not-allowed" : "hover:border-orange-200 dark:hover:border-orange-900"
+                  }`}>
+                    <div className="h-14 w-14 flex-shrink-0 overflow-hidden rounded-lg bg-gray-200 dark:bg-gray-800">
+                      <img
+                        src={r.image}
+                        alt=""
+                        className="h-full w-full object-cover"
+                        loading="lazy"
+                        onError={(e) => {
+                          e.target.src = foodImages[0]
+                        }}
+                      />
+                    </div>
+                    <div className="min-w-0 flex-1 text-left">
+                      <p className="font-semibold text-gray-900 dark:text-white truncate">{r.name}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 truncate">Restaurant</p>
+                    </div>
+                    {isClosed && (
+                      <span className="text-[10px] font-semibold text-gray-500 border border-gray-200 rounded-full px-2 py-0.5">
+                        Closed
+                      </span>
+                    )}
+                  </div>
+                )
+                return isClosed ? (
+                  <div key={String(r.id)}>{content}</div>
+                ) : (
+                  <Link
+                    key={String(r.id)}
+                    to={`/user/restaurants/${slug}`}
+                    onClick={() => {
+                      onClose()
+                      onSearchChange("")
+                    }}
+                    className="block"
+                  >
+                    {content}
+                  </Link>
+                )
+              })}
+
+              {matchingDishes.length === 0 && restaurantMatches.length === 0 && !restaurantLoading && (
+                <div className="text-sm text-gray-500">No matches found.</div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
       <style>{`
           @keyframes fadeIn {
@@ -480,4 +456,3 @@ export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchCh
     </div>
   )
 }
-

@@ -1,6 +1,7 @@
 import WithdrawalRequest from "../models/WithdrawalRequest.js";
 import RestaurantWallet from "../models/RestaurantWallet.js";
 import Restaurant from "../models/Restaurant.js";
+import BusinessSettings from "../../admin/models/BusinessSettings.js";
 import { successResponse, errorResponse } from "../../../shared/utils/response.js";
 import asyncHandler from "../../../shared/middleware/asyncHandler.js";
 import winston from "winston";
@@ -34,8 +35,24 @@ export const createWithdrawalRequest = asyncHandler(async (req, res) => {
       return errorResponse(res, 400, "Valid withdrawal amount is required");
     }
 
-    if (!isRestaurantWithdrawalDay()) {
-      return errorResponse(res, 400, "Withdrawal requests are allowed only on calendar days 3, 6, 9, 12, ...");
+    const settings = await BusinessSettings.getSettings().catch(() => null);
+    const windowCfg = settings?.withdrawalWindow;
+    const now = new Date();
+    const inWindow = (() => {
+      if (!windowCfg) return false;
+      const start = windowCfg.startDate ? new Date(windowCfg.startDate) : null;
+      const end = windowCfg.endDate ? new Date(windowCfg.endDate) : null;
+      if (start && now < start) return false;
+      if (end && now > end) return false;
+      return true;
+    })();
+    if (windowCfg?.mode === 'closed' && (inWindow || (!windowCfg.startDate && !windowCfg.endDate))) {
+      return errorResponse(res, 400, "Withdrawal window is temporarily closed");
+    }
+    if (windowCfg?.mode !== 'open' || (!inWindow && (windowCfg.startDate || windowCfg.endDate))) {
+      if (!isRestaurantWithdrawalDay()) {
+        return errorResponse(res, 400, "Withdrawal requests are allowed only on calendar days 3, 6, 9, 12, ...");
+      }
     }
 
     // Get restaurant wallet

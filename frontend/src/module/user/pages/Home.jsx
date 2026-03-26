@@ -1538,36 +1538,6 @@ export default function Home() {
           touchAction: "pan-x pan-y pinch-zoom",
           overflowY: "hidden"
         }}>
-            {/* Offer Image - Static, Centered */}
-            {/* Special Offer Badge - Meals Under 200 */}
-            <motion.div className="flex-shrink-0 flex flex-col items-center gap-2 cursor-pointer group" initial={{
-            opacity: 0,
-            scale: 0.8
-          }} whileInView={{
-            opacity: 1,
-            scale: 1
-          }} viewport={{
-            once: true
-          }} transition={{
-            duration: 0.4
-          }} onClick={() => navigate("/user/under-250")}>
-              <div className="w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center relative">
-                {/* Blue Badge Shape */}
-                <div className="absolute inset-0 bg-[#1e40af] rounded-b-full rounded-t-sm shadow-md border-t-4 border-orange-200 flex flex-col items-center justify-center p-1">
-                  <span className="text-[10px] sm:text-xs font-bold text-white text-center leading-tight">
-                    MEALS UNDER
-                  </span>
-                  <span className="text-sm sm:text-base font-extrabold text-white">
-                    ₹200
-                  </span>
-                  <div className="w-10 h-4 bg-white rounded-full mt-1 flex items-center justify-center">
-                    <span className="text-[8px] font-bold text-[#1e40af]">
-                      Explore
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
             {loadingRealCategories ? <div className="flex items-center justify-center py-4">
                 <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
               </div> : realCategories.length > 0 ? <>

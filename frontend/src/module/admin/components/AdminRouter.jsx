@@ -94,6 +94,7 @@ const AddEmployee = lazy(() => import("../pages/employees/AddEmployee"));
 const EmployeeList = lazy(() => import("../pages/employees/EmployeeList"));
 // Business Settings
 const BusinessSetup = lazy(() => import("../pages/settings/BusinessSetup"));
+const WithdrawalWindow = lazy(() => import("../pages/settings/WithdrawalWindow"));
 const EmailTemplate = lazy(() => import("../pages/settings/EmailTemplate"));
 const ThemeSettings = lazy(() => import("../pages/settings/ThemeSettings"));
 const Gallery = lazy(() => import("../pages/settings/Gallery"));
@@ -279,6 +280,7 @@ export default function AdminRouter() {
 
           {/* BUSINESS SETTINGS */}
           <Route path="business-setup" element={<BusinessSetup />} />
+          <Route path="withdrawal-window" element={<WithdrawalWindow />} />
           <Route path="email-template" element={<EmailTemplate />} />
           <Route path="theme-settings" element={<ThemeSettings />} />
           <Route path="gallery" element={<Gallery />} />

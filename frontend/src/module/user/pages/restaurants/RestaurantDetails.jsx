@@ -42,6 +42,7 @@ export default function RestaurantDetails() {
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const showOnlyUnder250 = searchParams.get('under250') === 'true';
+  const dishParam = searchParams.get('dish') || "";
   const {
     addToCart,
     updateQuantity,
@@ -83,6 +84,19 @@ export default function RestaurantDetails() {
   const [showLargeOrderMenu, setShowLargeOrderMenu] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  useEffect(() => {
+    if (dishParam && dishParam !== searchQuery) {
+      setSearchQuery(dishParam);
+    }
+  }, [dishParam]);
+
+  const handleClearDishFilter = () => {
+    setSearchQuery("");
+    const params = new URLSearchParams(searchParams);
+    params.delete("dish");
+    const next = params.toString();
+    navigate(`${location.pathname}${next ? `?${next}` : ""}`, { replace: true });
+  };
   const [showMenuOptionsSheet, setShowMenuOptionsSheet] = useState(false);
   const [expandedAddButtons, setExpandedAddButtons] = useState(new Set());
   const [expandedSections, setExpandedSections] = useState(new Set([0])); // Default: Recommended section is expanded
@@ -1238,6 +1252,20 @@ export default function RestaurantDetails() {
                   <AlertCircle className="h-3.5 w-3.5" />
                   Out of delivery range — change address to order
                 </Badge>
+              )}
+              {dishParam && (
+                <div className="w-full mt-2 flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-900">
+                  <span className="text-xs sm:text-sm font-medium">
+                    Showing only {dishParam} items
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleClearDishFilter}
+                    className="text-xs sm:text-sm font-semibold text-emerald-700 hover:text-emerald-800"
+                  >
+                    View full menu
+                  </button>
+                </div>
               )}
             </div>
             <div className="flex flex-col items-end">

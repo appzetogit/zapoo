@@ -78,6 +78,7 @@ export const updateBusinessSettings = asyncHandler(async (req, res) => {
       region,
       maintenanceMode,
       maxDeliveryRange,
+      withdrawalWindow,
     } = req.body;
 
     // Get existing settings
@@ -108,6 +109,25 @@ export const updateBusinessSettings = asyncHandler(async (req, res) => {
     if (maxDeliveryRange !== undefined) {
       const parsed = Number(maxDeliveryRange);
       if (Number.isFinite(parsed) && parsed >= 1) settings.maxDeliveryRange = parsed;
+    }
+    if (withdrawalWindow !== undefined && withdrawalWindow !== null) {
+      const mode = withdrawalWindow.mode;
+      if (["default", "open", "closed"].includes(mode)) {
+        settings.withdrawalWindow.mode = mode;
+      }
+      if (withdrawalWindow.startDate) {
+        settings.withdrawalWindow.startDate = new Date(withdrawalWindow.startDate);
+      } else if (withdrawalWindow.startDate === null) {
+        settings.withdrawalWindow.startDate = null;
+      }
+      if (withdrawalWindow.endDate) {
+        settings.withdrawalWindow.endDate = new Date(withdrawalWindow.endDate);
+      } else if (withdrawalWindow.endDate === null) {
+        settings.withdrawalWindow.endDate = null;
+      }
+      if (withdrawalWindow.message !== undefined) {
+        settings.withdrawalWindow.message = String(withdrawalWindow.message || "").trim();
+      }
     }
     if (maintenanceMode !== undefined) {
       settings.maintenanceMode.isEnabled = maintenanceMode.isEnabled || false;
