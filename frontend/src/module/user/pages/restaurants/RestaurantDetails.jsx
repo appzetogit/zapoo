@@ -42,7 +42,11 @@ export default function RestaurantDetails() {
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const showOnlyUnder250 = searchParams.get('under250') === 'true';
+  const locationStateDish =
+    (location && location.state && (location.state.dish || location.state.prefillDish)) || "";
   const dishParam = searchParams.get('dish') || "";
+  const [prefillDish, setPrefillDish] = useState("");
+  const effectiveDish = dishParam || locationStateDish || prefillDish || "";
   const {
     addToCart,
     updateQuantity,
@@ -85,17 +89,31 @@ export default function RestaurantDetails() {
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   useEffect(() => {
-    if (dishParam && dishParam !== searchQuery) {
-      setSearchQuery(dishParam);
+    try {
+      const stored = sessionStorage.getItem("prefillDish");
+      if (stored) {
+        setPrefillDish(stored);
+        sessionStorage.removeItem("prefillDish");
+      }
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    if (effectiveDish && effectiveDish !== searchQuery) {
+      setSearchQuery(effectiveDish);
+      setShowSearch(true);
     }
-  }, [dishParam]);
+  }, [effectiveDish]);
 
   const handleClearDishFilter = () => {
     setSearchQuery("");
     const params = new URLSearchParams(searchParams);
     params.delete("dish");
     const next = params.toString();
-    navigate(`${location.pathname}${next ? `?${next}` : ""}`, { replace: true });
+    navigate(`${location.pathname}${next ? `?${next}` : ""}`, {
+      replace: true,
+      state: {},
+    });
   };
   const [showMenuOptionsSheet, setShowMenuOptionsSheet] = useState(false);
   const [expandedAddButtons, setExpandedAddButtons] = useState(new Set());
@@ -1211,14 +1229,14 @@ export default function RestaurantDetails() {
 
           {/* Right side: Search pill + menu */}
           <div className="flex items-center gap-3">
-            {!showSearch ? <Button variant="outline" className="rounded-full h-10 px-4 border-gray-200 dark:border-gray-800 shadow-sm bg-white dark:bg-[#1a1a1a] flex items-center gap-2 text-gray-900 dark:text-white" onClick={() => setShowSearch(true)}>
+            {!(showSearch || effectiveDish) ? <Button variant="outline" className="rounded-full h-10 px-4 border-gray-200 dark:border-gray-800 shadow-sm bg-white dark:bg-[#1a1a1a] flex items-center gap-2 text-gray-900 dark:text-white" onClick={() => setShowSearch(true)}>
                 <Search className="h-4 w-4" />
                 <span className="text-sm font-medium">Search</span>
               </Button> : <div className="flex items-center gap-2 flex-1 max-w-md">
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <input type="text" placeholder="Search for dishes..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full pl-10 pr-10 py-2 rounded-full border border-gray-200 dark:border-gray-800 shadow-sm bg-white dark:bg-[#1a1a1a] text-sm dark:text-white focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent" autoFocus onBlur={() => {
-                if (!searchQuery) {
+                if (!searchQuery && !effectiveDish) {
                   setShowSearch(false);
                 }
               }} />
@@ -1252,20 +1270,6 @@ export default function RestaurantDetails() {
                   <AlertCircle className="h-3.5 w-3.5" />
                   Out of delivery range — change address to order
                 </Badge>
-              )}
-              {dishParam && (
-                <div className="w-full mt-2 flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-900">
-                  <span className="text-xs sm:text-sm font-medium">
-                    Showing only {dishParam} items
-                  </span>
-                  <button
-                    type="button"
-                    onClick={handleClearDishFilter}
-                    className="text-xs sm:text-sm font-semibold text-emerald-700 hover:text-emerald-800"
-                  >
-                    View full menu
-                  </button>
-                </div>
               )}
             </div>
             <div className="flex flex-col items-end">

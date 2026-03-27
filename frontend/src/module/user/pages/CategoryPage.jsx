@@ -1006,9 +1006,25 @@ export default function CategoryPage() {
               {filteredAllRestaurants.map((restaurant) => {
                 const restaurantSlug = restaurant.name.toLowerCase().replace(/\s+/g, "-")
                 const isFavorite = favorites.has(restaurant.id)
+                const dishName = restaurant.categoryDishName || ""
+                const restaurantUrl = dishName
+                  ? `/user/restaurants/${restaurantSlug}?dish=${encodeURIComponent(dishName)}`
+                  : `/user/restaurants/${restaurantSlug}`
 
                 return (
-                  <Link key={restaurant.id} to={`/user/restaurants/${restaurantSlug}`} className="h-full flex">
+                  <Link
+                    key={restaurant.id}
+                    to={restaurantUrl}
+                    state={dishName ? { prefillDish: dishName } : undefined}
+                    onClick={() => {
+                      if (dishName) {
+                        try {
+                          sessionStorage.setItem("prefillDish", dishName)
+                        } catch {}
+                      }
+                    }}
+                    className="h-full flex"
+                  >
                     <Card className={`overflow-hidden cursor-pointer gap-0 border-0 dark:border-gray-800 group bg-white dark:bg-[#1a1a1a] shadow-md hover:shadow-xl transition-all duration-300 py-0 rounded-md h-full flex flex-col w-full ${
                       shouldShowGrayscale ? 'grayscale opacity-75' : ''
                     }`}>

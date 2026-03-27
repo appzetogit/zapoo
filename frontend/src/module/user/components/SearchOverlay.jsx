@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef, useMemo } from "react"
-import { useNavigate, Link } from "react-router-dom"
-import { X, Search, Loader2, MapPin, ArrowLeft } from "lucide-react"
+import { useNavigate, Link, useLocation as useRouterLocation } from "react-router-dom"
+import { Search, Loader2, MapPin, ArrowLeft, Mic } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { restaurantAPI } from "@/lib/api"
 import { useLocation } from "../hooks/useLocation"
 import { useZone } from "../hooks/useZone"
+import { toast } from "sonner"
 import {
   isOpenForDeliveryNow,
   isWithinDeliveryRangeKm,
@@ -100,12 +101,16 @@ function transformRestaurantForOverlay(restaurant, userLat, userLng) {
 
 export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchChange }) {
   const navigate = useNavigate()
+  const routerLocation = useRouterLocation()
   const inputRef = useRef(null)
   const [restaurantMatches, setRestaurantMatches] = useState([])
   const [allRestaurants, setAllRestaurants] = useState([])
   const [restaurantLoading, setRestaurantLoading] = useState(false)
   const { location } = useLocation()
   const { zoneId, isOutOfService } = useZone(location)
+  const isSpeechSupported =
+    typeof window !== "undefined" &&
+    ("SpeechRecognition" in window || "webkitSpeechRecognition" in window)
 
   const userHasLocation = useMemo(
     () =>
@@ -121,6 +126,13 @@ export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchCh
       inputRef.current.focus()
     }
   }, [isOpen])
+
+  useEffect(() => {
+    if (!isOpen) return
+    if (routerLocation.pathname.startsWith("/user/restaurants/")) {
+      onClose()
+    }
+  }, [routerLocation.pathname, routerLocation.search, isOpen, onClose])
 
   useEffect(() => {
     const handleEscape = (e) => {
@@ -139,6 +151,48 @@ export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchCh
       document.body.style.overflow = "unset"
     }
   }, [isOpen, onClose])
+
+  const handleVoiceSearch = () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+    if (!SpeechRecognition) {
+      // Fallback: focus input so user can use keyboard mic (mobile) if available
+      inputRef.current?.focus()
+      toast.error("Voice search not supported here. Use the keyboard mic if available.")
+      return
+    }
+    const isLocalhost =
+      window.location.hostname === "localhost" ||
+      window.location.hostname === "127.0.0.1"
+    if (window.location.protocol !== "https:" && !isLocalhost) {
+      toast.error("Voice search requires HTTPS.")
+      return
+    }
+    const recognition = new SpeechRecognition()
+    recognition.lang = "en-IN"
+    recognition.interimResults = false
+    recognition.maxAlternatives = 1
+    recognition.onstart = () => {
+      toast("Listening...", {
+        icon: <Mic className="w-4 h-4 text-orange-500 animate-pulse" />,
+      })
+    }
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript
+      onSearchChange(transcript)
+      if (transcript.trim()) {
+        toast.success(`Searching for "${transcript}"`)
+      }
+    }
+    recognition.onerror = (event) => {
+      console.error("Speech recognition error", event.error)
+      if (event.error === "not-allowed") {
+        toast.error("Microphone access denied. Please enable it in browser settings.")
+      } else {
+        toast.error("Could not hear you. Please try again.")
+      }
+    }
+    recognition.start()
+  }
 
   // Live restaurant name / cuisine suggestions (same broad list as /user/search — includes out-of-range & inactive)
   useEffect(() => {
@@ -306,18 +360,20 @@ export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchCh
                 value={searchValue}
                 onChange={(e) => onSearchChange(e.target.value)}
                 placeholder="Search for food, restaurants..."
-                className="pl-12 pr-4 h-12 w-full bg-white dark:bg-[#1a1a1a] border-gray-100 dark:border-gray-800 focus:border-primary-orange dark:focus:border-primary-orange rounded-full text-lg dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400"
+                className="pl-12 pr-12 h-12 w-full bg-white dark:bg-[#1a1a1a] border-gray-100 dark:border-gray-800 focus:border-primary-orange dark:focus:border-primary-orange rounded-full text-lg dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400"
+                x-webkit-speech="true"
+                speech="speech"
               />
+              <button
+                type="button"
+                onClick={handleVoiceSearch}
+                className={`absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-full transition-colors ${isSpeechSupported ? "hover:bg-gray-100 dark:hover:bg-gray-800" : "opacity-60"}`}
+                aria-label="Voice search"
+              >
+                <Mic className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+              </button>
             </div>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              onClick={onClose}
-              className="rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
-            >
-              <X className="h-5 w-5 text-gray-700 dark:text-gray-300" />
-            </Button>
+            {/* Removed top-right close button as requested */}
           </form>
         </div>
       </div>
@@ -336,7 +392,11 @@ export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchCh
                 <Link
                   key={item.id}
                   to={`/user/restaurants/${item.restaurantSlug}?dish=${encodeURIComponent(item.name)}`}
+                  state={{ prefillDish: item.name }}
                   onClick={() => {
+                    try {
+                      sessionStorage.setItem("prefillDish", item.name)
+                    } catch {}
                     onClose()
                     onSearchChange("")
                   }}
