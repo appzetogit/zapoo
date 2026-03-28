@@ -18,7 +18,7 @@ async function getIOInstance() {
  * @param {string} deliveryPartnerId - Delivery partner ID
  * @returns {Promise<{connected: boolean, room: string|null, socketCount: number}>}
  */
-async function checkDeliveryPartnerConnection(deliveryPartnerId) {
+export async function checkDeliveryPartnerConnection(deliveryPartnerId) {
   try {
     const io = await getIOInstance();
     if (!io) {

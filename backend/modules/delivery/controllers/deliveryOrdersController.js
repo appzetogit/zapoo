@@ -11,6 +11,7 @@ import RestaurantCommission from '../../admin/models/RestaurantCommission.js';
 import AdminCommission from '../../admin/models/AdminCommission.js';
 import BusinessSettings from '../../admin/models/BusinessSettings.js';
 import { calculateRoute } from '../../order/services/routeCalculationService.js';
+import { notifyNextDeliveryPartner, clearAssignmentTimer } from '../../order/services/deliveryAssignmentService.js';
 import {
   evaluateChallengesOnOrderCompleted,
   evaluateChallengesOnDeliveryCompleted,
@@ -132,32 +133,31 @@ export const getOrderDetails = asyncHandler(async (req, res) => {
       return String(id);
     };
 
-    // Valid statuses for order acceptance (unassigned orders in these statuses can be viewed/accepted by delivery boy)
-    // 'confirmed' is included because notifications are sent right after restaurant confirmation
-    const validAcceptanceStatuses = ['confirmed', 'preparing', 'ready'];
-
     // If order is assigned to this delivery partner, allow access
     if (orderDeliveryPartnerId === currentDeliveryId) {} else if (!orderDeliveryPartnerId) {
-      // Order not assigned yet - allow access if:
-      // 1. Order is in a valid status for acceptance (preparing/ready), OR
-      // 2. This delivery boy was notified about it
-
-      const isInValidStatus = validAcceptanceStatuses.includes(order.status);
-
-      // Check if this delivery boy was notified
       const assignmentInfo = order.assignmentInfo || {};
-      const priorityIds = assignmentInfo.priorityDeliveryPartnerIds || [];
-      const expandedIds = assignmentInfo.expandedDeliveryPartnerIds || [];
-
-      // Normalize all IDs to strings for comparison
       const normalizedCurrentId = normalizeId(currentDeliveryId);
-      const normalizedPriorityIds = priorityIds.map(normalizeId).filter(Boolean);
-      const normalizedExpandedIds = expandedIds.map(normalizeId).filter(Boolean);
-      const wasNotified = normalizedPriorityIds.includes(normalizedCurrentId) || normalizedExpandedIds.includes(normalizedCurrentId);
-      // Allow access if order is in valid status OR delivery boy was notified
-      if (isInValidStatus || wasNotified) {} else {
-        console.warn(`⚠️ Delivery partner ${currentDeliveryId} cannot access order ${order.orderId} - Status: ${order.status}, Notified: ${wasNotified}`);
-        return errorResponse(res, 403, 'Order not found or not available for you');
+      const notificationPhase = assignmentInfo.notificationPhase;
+
+      if (notificationPhase === 'sequential') {
+        const currentCandidateId = normalizeId(assignmentInfo.currentCandidateId);
+        if (!currentCandidateId || currentCandidateId !== normalizedCurrentId) {
+          console.warn(`⚠️ Delivery partner ${currentDeliveryId} cannot access order ${order.orderId} - Not current candidate`);
+          return errorResponse(res, 403, 'Order not found or not available for you');
+        }
+      } else {
+        // Legacy fallback: allow access if order is in valid status OR delivery boy was notified
+        const validAcceptanceStatuses = ['confirmed', 'preparing', 'ready'];
+        const isInValidStatus = validAcceptanceStatuses.includes(order.status);
+        const priorityIds = assignmentInfo.priorityDeliveryPartnerIds || [];
+        const expandedIds = assignmentInfo.expandedDeliveryPartnerIds || [];
+        const normalizedPriorityIds = priorityIds.map(normalizeId).filter(Boolean);
+        const normalizedExpandedIds = expandedIds.map(normalizeId).filter(Boolean);
+        const wasNotified = normalizedPriorityIds.includes(normalizedCurrentId) || normalizedExpandedIds.includes(normalizedCurrentId);
+        if (isInValidStatus || wasNotified) {} else {
+          console.warn(`⚠️ Delivery partner ${currentDeliveryId} cannot access order ${order.orderId} - Status: ${order.status}, Notified: ${wasNotified}`);
+          return errorResponse(res, 403, 'Order not found or not available for you');
+        }
       }
     } else {
       // Order is assigned to another delivery partner
@@ -253,50 +253,44 @@ export const acceptOrder = asyncHandler(async (req, res) => {
     const orderDeliveryPartnerId = order.deliveryPartnerId?.toString();
     const currentDeliveryId = delivery._id.toString();
 
-    // If order is not assigned, check if this delivery boy was notified (priority-based system)
-    // Also allow acceptance if order is in valid status (preparing/ready) - more permissive
+    // Helper function to normalize ID for comparison
+    const normalizeId = id => {
+      if (!id) return null;
+      if (typeof id === 'string') return id;
+      if (id.toString) return id.toString();
+      return String(id);
+    };
+
+    if (orderDeliveryPartnerId && orderDeliveryPartnerId !== currentDeliveryId) {
+      console.error(`❌ Order ${order.orderId} is assigned to ${orderDeliveryPartnerId}, but current delivery partner is ${currentDeliveryId}`);
+      return errorResponse(res, 403, 'Order is assigned to another delivery partner');
+    }
+
+    // If order is not assigned, only current sequential candidate can accept
     if (!orderDeliveryPartnerId) {
-      // Check if this delivery boy was in the priority or expanded notification list
       const assignmentInfo = order.assignmentInfo || {};
-      const priorityIds = assignmentInfo.priorityDeliveryPartnerIds || [];
-      const expandedIds = assignmentInfo.expandedDeliveryPartnerIds || [];
-
-      // Helper function to normalize ID for comparison
-      const normalizeId = id => {
-        if (!id) return null;
-        if (typeof id === 'string') return id;
-        if (id.toString) return id.toString();
-        return String(id);
-      };
-
-      // Normalize all IDs to strings for comparison
+      const notificationPhase = assignmentInfo.notificationPhase;
       const normalizedCurrentId = normalizeId(currentDeliveryId);
-      const normalizedPriorityIds = priorityIds.map(normalizeId).filter(Boolean);
-      const normalizedExpandedIds = expandedIds.map(normalizeId).filter(Boolean);
-      const wasNotified = normalizedPriorityIds.includes(normalizedCurrentId) || normalizedExpandedIds.includes(normalizedCurrentId);
 
-      // Also allow if order is in valid status (confirmed/preparing/ready) - 'confirmed' means restaurant just accepted & notified delivery boys
-      const isValidStatus = order.status === 'confirmed' || order.status === 'preparing' || order.status === 'ready';
-      if (!wasNotified && !isValidStatus) {
-        console.error(`❌ Order ${order.orderId} is not assigned, delivery partner ${currentDeliveryId} was not notified, and order status is ${order.status}`);
-        console.error(`❌ Full order details:`, {
-          orderId: order.orderId,
-          orderStatus: order.status,
-          deliveryPartnerId: order.deliveryPartnerId,
-          assignmentInfo: JSON.stringify(order.assignmentInfo),
-          priorityIds: normalizedPriorityIds,
-          expandedIds: normalizedExpandedIds,
-          currentDeliveryId: normalizedCurrentId
-        });
-        return errorResponse(res, 403, 'This order is not available for you. It may have been assigned to another delivery partner or you were not notified about it.');
+      if (notificationPhase === 'sequential') {
+        const currentCandidateId = normalizeId(assignmentInfo.currentCandidateId);
+        if (!currentCandidateId || currentCandidateId !== normalizedCurrentId) {
+          console.error(`❌ Order ${order.orderId} not available for delivery partner ${currentDeliveryId} (not current candidate)`);
+          return errorResponse(res, 403, 'This order is not available for you.');
+        }
+      } else {
+        // Legacy fallback: allow acceptance if delivery boy was notified
+        const priorityIds = assignmentInfo.priorityDeliveryPartnerIds || [];
+        const expandedIds = assignmentInfo.expandedDeliveryPartnerIds || [];
+        const normalizedPriorityIds = priorityIds.map(normalizeId).filter(Boolean);
+        const normalizedExpandedIds = expandedIds.map(normalizeId).filter(Boolean);
+        const wasNotified = normalizedPriorityIds.includes(normalizedCurrentId) || normalizedExpandedIds.includes(normalizedCurrentId);
+        if (!wasNotified) {
+          return errorResponse(res, 403, 'This order is not available for you.');
+        }
       }
 
-      // Allow acceptance if delivery boy was notified OR order is in valid status
-      if (wasNotified) {} else if (isValidStatus) {}
-
-      // Proceed with assignment (first come first serve)
-
-      // Reload order as document (not lean) to update it
+      // Proceed with assignment
       let orderDoc;
       try {
         orderDoc = await Order.findOne({
@@ -336,6 +330,7 @@ export const acceptOrder = asyncHandler(async (req, res) => {
           acceptedFromNotification: true
         };
         await orderDoc.save();
+        clearAssignmentTimer(orderDoc._id.toString());
 
         try {
           const { calculateOrderSettlement } = await import('../../order/services/orderSettlementService.js');
@@ -343,36 +338,9 @@ export const acceptOrder = asyncHandler(async (req, res) => {
         } catch (settlementErr) {
           console.error('⚠️ Settlement recalc after delivery accept failed:', settlementErr.message);
         }
-
-        // Broadcast order_taken to all other notified delivery partners (non-blocking)
-        try {
-          const { getIO } = await import('../../../server.js');
-          const io = getIO();
-          if (io) {
-            const deliveryNamespace = io.of('/delivery');
-            const allNotifiedIds = [
-              ...(orderDoc.assignmentInfo?.priorityDeliveryPartnerIds || []),
-              ...(orderDoc.assignmentInfo?.expandedDeliveryPartnerIds || [])
-            ].map(id => id?.toString()).filter(Boolean);
-            const otherPartnerIds = allNotifiedIds.filter(id => id !== currentDeliveryId);
-            if (otherPartnerIds.length > 0) {
-              const takenPayload = {
-                orderId: orderDoc.orderId,
-                orderMongoId: orderDoc._id.toString(),
-                takenBy: currentDeliveryId
-              };
-              otherPartnerIds.forEach(id => {
-                deliveryNamespace.to(`delivery:${id}`).emit('order_taken', takenPayload);
-              });
-            }
-          }
-        } catch (e) {
-          console.warn('⚠️ order_taken broadcast failed (non-blocking):', e.message);
-        }
       } catch (saveError) {
         console.error(`❌ Error saving order assignment: ${saveError.message}`);
         console.error(`❌ Error stack: ${saveError.stack}`);
-        // Log validation errors if present
         if (saveError.errors) {
           console.error(`❌ Validation errors:`, JSON.stringify(saveError.errors, null, 2));
         }
@@ -403,49 +371,12 @@ export const acceptOrder = asyncHandler(async (req, res) => {
         return errorResponse(res, 500, 'Error reloading order. Please try again.');
       }
 
-      // Update orderDeliveryPartnerId after assignment
       const updatedOrderDeliveryPartnerId = order.deliveryPartnerId?.toString();
       if (updatedOrderDeliveryPartnerId !== currentDeliveryId) {
         console.error(`❌ Order assignment failed - order still not assigned to ${currentDeliveryId}, got ${updatedOrderDeliveryPartnerId}`);
         return errorResponse(res, 500, 'Failed to assign order. Please try again.');
       }
-    } else if (orderDeliveryPartnerId !== currentDeliveryId) {
-      // If the assigned partner is offline (stale assignment), allow takeover
-      try {
-        const { getDb } = await import('../../../config/firebaseConfig.js');
-        const db = getDb();
-        const assignedSnap = await db.ref(`delivery_boys/${orderDeliveryPartnerId}`).once('value');
-        const assignedData = assignedSnap.val();
-        const assignedOnline = assignedData?.status === 'online';
-
-        if (!assignedOnline) {
-          const orderDoc = await Order.findById(order._id || orderId);
-          if (!orderDoc) {
-            return errorResponse(res, 404, 'Order not found');
-          }
-          orderDoc.deliveryPartnerId = delivery._id;
-          orderDoc.assignmentInfo = {
-            ...(orderDoc.assignmentInfo || {}),
-            deliveryPartnerId: currentDeliveryId,
-            assignedAt: new Date(),
-            assignedBy: 'delivery_accept_override',
-            acceptedFromNotification: true
-          };
-          await orderDoc.save();
-
-          order = await Order.findById(orderDoc._id)
-            .populate('restaurantId', 'name location address phone ownerPhone')
-            .populate('userId', 'name phone')
-            .lean();
-        } else {
-          console.error(`❌ Order ${order.orderId} is assigned to ${orderDeliveryPartnerId}, but current delivery partner is ${currentDeliveryId}`);
-          return errorResponse(res, 403, 'Order is assigned to another delivery partner');
-        }
-      } catch (overrideError) {
-        console.error(`❌ Error checking assigned partner status: ${overrideError.message}`);
-        return errorResponse(res, 403, 'Order is assigned to another delivery partner');
-      }
-    } else {}
+    }
     // Check if order is in valid state to accept
     // 'confirmed' = restaurant accepted & notifications sent; 'preparing'/'ready' = food is being made
     const validStatuses = ['confirmed', 'preparing', 'ready'];
@@ -790,6 +721,75 @@ export const acceptOrder = asyncHandler(async (req, res) => {
       deliveryId: req.delivery?._id
     });
     return errorResponse(res, 500, error.message || 'Failed to accept order');
+  }
+});
+
+/**
+ * Reject Order (Delivery Boy rejects the offered order)
+ * PATCH /api/delivery/orders/:orderId/reject
+ */
+export const rejectOrder = asyncHandler(async (req, res) => {
+  try {
+    const delivery = req.delivery;
+    const { orderId } = req.params;
+
+    if (!orderId) {
+      return errorResponse(res, 400, 'Invalid order ID');
+    }
+
+    const orderDoc = await Order.findOne({
+      $or: [{ _id: orderId }, { orderId }]
+    });
+    if (!orderDoc) {
+      return errorResponse(res, 404, 'Order not found');
+    }
+
+    if (orderDoc.deliveryPartnerId) {
+      return errorResponse(res, 400, 'Order already assigned');
+    }
+
+    const assignmentInfo = orderDoc.assignmentInfo || {};
+    if (assignmentInfo.notificationPhase !== 'sequential') {
+      return errorResponse(res, 400, 'Order rejection not available for this order');
+    }
+
+    const currentCandidateId = assignmentInfo.currentCandidateId?.toString();
+    const currentDeliveryId = delivery._id.toString();
+    if (!currentCandidateId || currentCandidateId !== currentDeliveryId) {
+      return errorResponse(res, 403, 'Order not available for you');
+    }
+
+    const rejectedSet = new Set(
+      (assignmentInfo.rejectedDeliveryPartnerIds || []).map(id => id?.toString()).filter(Boolean)
+    );
+    rejectedSet.add(currentDeliveryId);
+
+    orderDoc.assignmentInfo = {
+      ...(assignmentInfo || {}),
+      rejectedDeliveryPartnerIds: Array.from(rejectedSet),
+      currentCandidateId: null
+    };
+    await orderDoc.save();
+    clearAssignmentTimer(orderDoc._id.toString());
+
+    // Notify next candidate in sequence
+    try {
+      const restaurantId = orderDoc.restaurantId?._id || orderDoc.restaurantId;
+      const restaurant = await Restaurant.findById(restaurantId).select('location').lean();
+      if (restaurant?.location?.coordinates?.length >= 2) {
+        const [restaurantLng, restaurantLat] = restaurant.location.coordinates;
+        await notifyNextDeliveryPartner(orderDoc, restaurantLat, restaurantLng);
+      }
+    } catch (notifyErr) {
+      console.error('❌ Error notifying next delivery partner after reject:', notifyErr);
+    }
+
+    return successResponse(res, 200, 'Order rejected successfully', {
+      orderId: orderDoc.orderId || orderDoc._id
+    });
+  } catch (error) {
+    console.error('❌ Error rejecting order:', error);
+    return errorResponse(res, 500, 'Failed to reject order');
   }
 });
 

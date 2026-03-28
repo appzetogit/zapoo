@@ -592,6 +592,11 @@ export default function OrderDetails() {
           </div>
         </div>
       </div>
+      {orderData.reason === 'Delivery partner unavailable' && (
+        <div className="mx-4 mt-3 rounded-xl border border-yellow-300 bg-yellow-50 px-3 py-2 text-xs text-yellow-800">
+          Delivery boy not assigned. Order cancelled due to unavailability.
+        </div>
+      )}
 
       {/* Main Content */}
       <div className="px-4 py-4 space-y-4">

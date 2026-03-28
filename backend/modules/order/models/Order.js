@@ -268,7 +268,7 @@ const orderSchema = new mongoose.Schema({
   },
   cancelledBy: {
     type: String,
-    enum: ['user', 'restaurant', 'admin'],
+    enum: ['user', 'restaurant', 'admin', 'system'],
     default: null
   },
   // Customer Review and Rating
@@ -311,9 +311,15 @@ const orderSchema = new mongoose.Schema({
     expandedDeliveryPartnerIds: [String],
     notificationPhase: {
       type: String,
-      enum: ['none', 'priority', 'expanded', 'immediate'],
+      enum: ['none', 'priority', 'expanded', 'immediate', 'sequential'],
       default: 'none'
-    }
+    },
+    // Sequential assignment tracking
+    candidateDeliveryPartnerIds: [String],
+    currentCandidateIndex: Number,
+    currentCandidateId: String,
+    rejectedDeliveryPartnerIds: [String],
+    lastNotifiedAt: Date
   },
   deliveryState: {
     status: {

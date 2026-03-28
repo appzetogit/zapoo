@@ -207,6 +207,24 @@ function smoothLocation(locationHistory) {
   return [avgLat, avgLng];
 }
 
+// Dev-only override for location (desktop testing)
+// Set in console: localStorage.setItem('deliveryDevLocation', JSON.stringify({ enabled:true, lat:22.7196, lng:75.8577 }))
+function getDevLocationOverride() {
+  try {
+    const raw = localStorage.getItem('deliveryDevLocation');
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    if (!data || data.enabled === false) return null;
+    const lat = Number(data.lat ?? data.latitude);
+    const lng = Number(data.lng ?? data.longitude);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+    return { lat, lng };
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Animate marker smoothly from current position to new position
  * @param {Object} marker - Google Maps Marker instance
@@ -1321,10 +1339,20 @@ export default function DeliveryHome() {
   const handleRejectClick = () => {
     setShowRejectPopup(true);
   };
-  const handleRejectConfirm = () => {
+  const handleRejectConfirm = async () => {
     if (alertAudioRef.current) {
       alertAudioRef.current.pause();
       alertAudioRef.current.currentTime = 0;
+    }
+    const orderId = selectedRestaurant?.id || selectedRestaurant?.orderId || newOrder?.orderMongoId || newOrder?.orderId;
+    if (orderId) {
+      try {
+        await deliveryAPI.rejectOrder(orderId);
+      } catch (error) {
+        console.error('❌ Error rejecting order:', error);
+        toast.error(error.response?.data?.message || 'Failed to reject order. Please try again.');
+        return;
+      }
     }
     setShowRejectPopup(false);
     setShowNewOrderPopup(false);
@@ -1640,6 +1668,36 @@ export default function DeliveryHome() {
     }
   }, []); // Run only on mount - get initial location
 
+  // Dev override: push mocked location every 5s if enabled (desktop testing)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const override = getDevLocationOverride();
+      if (!override) return;
+      const newLocation = [override.lat, override.lng];
+      setRiderLocation(newLocation);
+      lastLocationRef.current = newLocation;
+      localStorage.setItem('deliveryBoyLastLocation', JSON.stringify(newLocation));
+      if (window.deliveryMapInstance) {
+        createOrUpdateBikeMarker(override.lat, override.lng, null, true);
+      }
+      if (isOnlineRef.current) {
+        const now = Date.now();
+        const lastSentTime = window.lastLocationSentTime || 0;
+        if (now - lastSentTime >= 5000) {
+          deliveryAPI.updateLocation(override.lat, override.lng, true).then(() => {
+            window.lastLocationSentTime = now;
+            window.lastSentLocation = newLocation;
+          }).catch(error => {
+            if (error.code !== 'ERR_NETWORK' && error.message !== 'Network Error') {
+              console.error('❌ Error sending dev override location:', error);
+            }
+          });
+        }
+      }
+    }, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
   // Watch position updates - ONLY when online (Production Level Implementation)
   useEffect(() => {
     if (!navigator.geolocation) {
@@ -1657,10 +1715,11 @@ export default function DeliveryHome() {
 
     // Watch position updates for live tracking with STABLE TRACKING SYSTEM
     const watchId = navigator.geolocation.watchPosition(position => {
+      const devOverride = getDevLocationOverride();
       // Validate coordinates first
-      const latitude = position.coords.latitude;
-      const longitude = position.coords.longitude;
-      const accuracy = position.coords.accuracy || 0;
+      const latitude = devOverride ? devOverride.lat : position.coords.latitude;
+      const longitude = devOverride ? devOverride.lng : position.coords.longitude;
+      const accuracy = devOverride ? 0 : (position.coords.accuracy || 0);
 
       // Basic validation
       if (typeof latitude !== 'number' || typeof longitude !== 'number' || isNaN(latitude) || isNaN(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
@@ -1676,7 +1735,9 @@ export default function DeliveryHome() {
       // ============================================
 
       // Apply filtering: accuracy, distance jump, speed checks
-      const shouldAccept = shouldAcceptLocation(position, lastValidLocationRef.current, lastLocationTimeRef.current);
+      const shouldAccept = devOverride
+        ? true
+        : shouldAcceptLocation(position, lastValidLocationRef.current, lastLocationTimeRef.current);
       if (!shouldAccept) {
         // Location rejected by filter - but send to backend if it's been > 30 seconds since last update
         // This ensures admin map always shows delivery boy even with poor GPS

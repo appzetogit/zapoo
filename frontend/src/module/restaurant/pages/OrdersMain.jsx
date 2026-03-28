@@ -283,6 +283,7 @@ function CancelledOrders({
       <div className="text-center py-8 text-gray-500 text-sm">Loading...</div>
     </div>;
   }
+  const autoCancelOrder = orders.find(order => order.cancellationReason === 'Delivery partner unavailable');
   return <div className="pt-4 pb-6">
     <div className="flex items-baseline justify-between mb-3">
       <h2 className="text-base font-semibold text-[#3B82F6]">
@@ -290,6 +291,9 @@ function CancelledOrders({
       </h2>
       <span className="text-xs text-gray-500">{orders.length} total</span>
     </div>
+    {autoCancelOrder && <div className="mb-3 rounded-xl border border-yellow-300 bg-yellow-50 px-3 py-2 text-xs text-yellow-800">
+      Delivery boy not assigned. Order cancelled due to unavailability.
+    </div>}
     {orders.length === 0 ? <div className="text-center py-8 text-gray-500 text-sm">
       No cancelled orders yet
     </div> : <div>
