@@ -116,15 +116,6 @@ export default function Navbar() {
             </Button>
           </div>
 
-          {/* Company Logo or Name - Centered between sections */}
-          <Link to="/user" className="flex items-center justify-center flex-shrink-0">
-            <img
-              src="/zapoo-logo.jpg"
-              alt="Zapoo"
-              className="h-8 w-8 sm:h-10 sm:w-10 md:h-12 md:w-12 object-contain"
-            />
-          </Link>
-
           {/* Right Side Actions - Profile, Points, Cart */}
           <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
             {/* Points */}

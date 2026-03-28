@@ -36,7 +36,10 @@ export default function ItemDetailsPage() {
   const [itemDescription, setItemDescription] = useState("");
   const [foodType, setFoodType] = useState("Non-Veg");
   const [basePrice, setBasePrice] = useState("0");
+  const [showCategoryError, setShowCategoryError] = useState(false);
+  const [showBasePriceError, setShowBasePriceError] = useState(false);
   const [preparationTime, setPreparationTime] = useState("");
+  const [showPreparationTimeError, setShowPreparationTimeError] = useState(false);
   const [gst, setGst] = useState("5.0");
   const [isRecommended, setIsRecommended] = useState(false);
   const [isInStock, setIsInStock] = useState(true);
@@ -439,6 +442,7 @@ export default function ItemDetailsPage() {
     const selectedCategory = categories.find(c => c.id === catId);
     setCategory(selectedCategory.name);
     setSubCategory(subCat);
+    setShowCategoryError(false);
     setIsCategoryPopupOpen(false);
   };
   const handleServesSelect = option => {
@@ -457,8 +461,23 @@ export default function ItemDetailsPage() {
     setSelectedTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
   };
   const handleSave = async () => {
+    if (!category.trim()) {
+      setShowCategoryError(true);
+      toast.error("Please select a category");
+      return;
+    }
     if (!itemName.trim()) {
       toast.error("Please enter an item name");
+      return;
+    }
+    if (!basePrice.trim() || Number(basePrice) <= 0) {
+      setShowBasePriceError(true);
+      toast.error("Please enter item price");
+      return;
+    }
+    if (!preparationTime.trim()) {
+      setShowPreparationTimeError(true);
+      toast.error("Please select preparation time");
       return;
     }
     try {
@@ -884,9 +903,9 @@ export default function ItemDetailsPage() {
         {/* Category Selector */}
         <div>
           <label className="block text-sm font-medium text-gray-900 mb-2">
-            Category
+            Category <span className="text-red-500">*</span>
           </label>
-          <button onClick={() => setIsCategoryPopupOpen(true)} className="w-full px-4 py-3 border border-gray-300 rounded-lg text-left flex items-center justify-between bg-white hover:bg-gray-50 transition-all active:scale-[0.99]">
+          <button onClick={() => setIsCategoryPopupOpen(true)} aria-invalid={showCategoryError} className={`w-full px-4 py-3 border rounded-lg text-left flex items-center justify-between bg-white hover:bg-gray-50 transition-all active:scale-[0.99] ${showCategoryError ? "border-red-500" : "border-gray-300"}`}>
             <div className="flex flex-col">
               <span className="text-sm font-semibold text-gray-900">
                 {category}
@@ -897,6 +916,7 @@ export default function ItemDetailsPage() {
             </div>
             <ChevronDown className="w-5 h-5 text-gray-400" />
           </button>
+          {showCategoryError && <p className="mt-1 text-xs text-red-500">Category is required.</p>}
         </div>
 
         {/* Item Name */}
@@ -964,7 +984,7 @@ export default function ItemDetailsPage() {
           </label>
           <div className="space-y-3">
             <div className="relative">
-              <label className="block text-xs text-gray-600 mb-1">Base price</label>
+              <label className="block text-xs text-gray-600 mb-1">Base price <span className="text-red-500">*</span></label>
               <div className="relative">
                 <input type="text" value={basePrice} onChange={e => {
                   // Remove rupee symbol and any non-numeric characters except decimal point
@@ -973,24 +993,32 @@ export default function ItemDetailsPage() {
                   const parts = value.split('.');
                   const cleanedValue = parts.length > 2 ? parts[0] + '.' + parts.slice(1).join('') : value;
                   setBasePrice(cleanedValue);
+                  setShowBasePriceError(false);
                 }} onFocus={e => {
                   // Remove rupee symbol when focused for easier editing
                   if (e.target.value.startsWith('₹')) {
                     e.target.value = e.target.value.replace(/₹\s*/g, '');
                   }
-                }} placeholder="Enter price" className="w-full pl-8 pr-12 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                }} placeholder="Enter price" aria-invalid={showBasePriceError} className={`w-full pl-8 pr-12 py-3 border rounded-lg text-sm text-gray-900 bg-gray-50 focus:outline-none focus:ring-2 focus:border-transparent ${showBasePriceError ? "border-red-500 focus:ring-red-500" : "border-gray-300 focus:ring-blue-500"}`} />
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-600">₹</span>
                 <button className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-gray-100">
                   <EditIcon className="w-4 h-4 text-gray-500" />
                 </button>
               </div>
+              {showBasePriceError && <p className="mt-1 text-xs text-red-500">Item price is required.</p>}
             </div>
 
             {/* Preparation Time */}
             <div className="relative">
-              <label className="block text-xs text-gray-600 mb-1">Preparation Time</label>
-              <Select value={preparationTime || undefined} onValueChange={setPreparationTime}>
-                <SelectTrigger className="w-full border border-gray-300 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-[#1a1a1a] text-gray-900 dark:text-white">
+              <label className="block text-xs text-gray-600 mb-1">Preparation Time <span className="text-red-500">*</span></label>
+              <Select value={preparationTime || undefined} onValueChange={value => {
+                setPreparationTime(value);
+                setShowPreparationTimeError(false);
+              }}>
+                <SelectTrigger
+                  aria-invalid={showPreparationTimeError}
+                  className={`w-full rounded-lg bg-gray-50 dark:bg-[#1a1a1a] text-gray-900 dark:text-white ${showPreparationTimeError ? "border-red-500 focus:ring-red-500" : "border-gray-300 dark:border-gray-700"}`}
+                >
                   <SelectValue placeholder="Select timing" />
                 </SelectTrigger>
                 <SelectContent
@@ -1004,6 +1032,9 @@ export default function ItemDetailsPage() {
                   <SelectItem value="35-45 mins">35-45 mins</SelectItem>
                 </SelectContent>
               </Select>
+              {showPreparationTimeError && (
+                <p className="mt-1 text-xs text-red-500">Preparation time is required.</p>
+              )}
             </div>
             {/* <div>
                 <label className="block text-xs text-gray-600 mb-1">GST</label>

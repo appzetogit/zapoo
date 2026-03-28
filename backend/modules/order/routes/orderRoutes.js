@@ -5,7 +5,8 @@ import {
   getUserOrders,
   getOrderDetails,
   calculateOrder,
-  cancelOrder
+  cancelOrder,
+  updateDeliveryInstructions
 } from '../controllers/orderController.js';
 import { authenticate } from '../../auth/middleware/auth.js';
 
@@ -30,8 +31,10 @@ router.get('/', getUserOrders);
 // Get order details
 router.get('/:id', getOrderDetails);
 
+// Update delivery instructions
+router.patch('/:id/delivery-instructions', updateDeliveryInstructions);
+
 // Cancel order
 router.patch('/:id/cancel', cancelOrder);
 
 export default router;
-

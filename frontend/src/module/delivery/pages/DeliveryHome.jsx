@@ -105,6 +105,17 @@ const mockRestaurants = [{
   tripDistance: "6.9 kms"
 }];
 
+const DELIVERY_UI_STEP = {
+  EN_ROUTE_TO_PICKUP: 'en_route_to_pickup',
+  REACHED_PICKUP: 'reached_pickup',
+  ORDER_ID_CONFIRMATION: 'order_id_confirmation',
+  EN_ROUTE_TO_DELIVERY: 'en_route_to_delivery',
+  REACHED_DROP: 'reached_drop',
+  DELIVERED_ANIMATION: 'delivered_animation',
+  CUSTOMER_REVIEW: 'customer_review',
+  PAYMENT: 'payment'
+};
+
 // ============================================
 // STABLE TRACKING SYSTEM - RAPIDO/UBER STYLE
 // ============================================
@@ -2026,6 +2037,7 @@ export default function DeliveryHome() {
             amount: earningsValue,
             customerName: order.userId?.name,
             customerAddress: order.address?.formattedAddress || '',
+            deliveryInstructions: order.address?.deliveryInstructions || '',
             customerLat: order.address?.location?.coordinates?.[1],
             customerLng: order.address?.location?.coordinates?.[0],
             items: order.items || [],
@@ -2808,6 +2820,7 @@ export default function DeliveryHome() {
                   ...selectedRestaurant,
                   customerName: order.userId?.name || selectedRestaurant.customerName,
                   customerAddress: order.address?.formattedAddress || (order.address?.street ? `${order.address.street}, ${order.address.city || ''}, ${order.address.state || ''}`.trim() : '') || selectedRestaurant.customerAddress,
+                  deliveryInstructions: order.address?.deliveryInstructions || selectedRestaurant.deliveryInstructions || '',
                   customerLat,
                   customerLng
                 };
@@ -3250,6 +3263,131 @@ export default function DeliveryHome() {
     return `${minutes} mins`;
   }, []);
 
+  const getDeliveryUiStep = useCallback((restaurantInfo = selectedRestaurant) => {
+    if (!restaurantInfo) return null;
+    if (showPaymentPage) return DELIVERY_UI_STEP.PAYMENT;
+    if (showCustomerReviewPopup) return DELIVERY_UI_STEP.CUSTOMER_REVIEW;
+    if (showOrderDeliveredAnimation) return DELIVERY_UI_STEP.DELIVERED_ANIMATION;
+    if (showReachedDropPopup) return DELIVERY_UI_STEP.REACHED_DROP;
+    if (showOrderIdConfirmationPopup) return DELIVERY_UI_STEP.ORDER_ID_CONFIRMATION;
+    if (showreachedPickupPopup) return DELIVERY_UI_STEP.REACHED_PICKUP;
+
+    const orderStatus = restaurantInfo?.orderStatus || restaurantInfo?.status || '';
+    const deliveryPhase = restaurantInfo?.deliveryPhase || restaurantInfo?.deliveryState?.currentPhase || '';
+    const deliveryStateStatus = restaurantInfo?.deliveryState?.status || '';
+
+    if (
+      orderStatus === 'out_for_delivery' ||
+      deliveryPhase === 'en_route_to_delivery' ||
+      deliveryPhase === 'at_delivery' ||
+      deliveryStateStatus === 'order_confirmed'
+    ) {
+      return DELIVERY_UI_STEP.EN_ROUTE_TO_DELIVERY;
+    }
+
+    if (deliveryPhase === 'at_pickup' || deliveryStateStatus === 'reached_pickup') {
+      return DELIVERY_UI_STEP.ORDER_ID_CONFIRMATION;
+    }
+
+    if (
+      orderStatus === 'ready' ||
+      deliveryPhase === 'ready' ||
+      deliveryPhase === 'en_route_to_pickup' ||
+      deliveryStateStatus === 'accepted'
+    ) {
+      return orderStatus === 'ready' ? DELIVERY_UI_STEP.REACHED_PICKUP : DELIVERY_UI_STEP.EN_ROUTE_TO_PICKUP;
+    }
+
+    return DELIVERY_UI_STEP.EN_ROUTE_TO_PICKUP;
+  }, [
+    selectedRestaurant,
+    showPaymentPage,
+    showCustomerReviewPopup,
+    showOrderDeliveredAnimation,
+    showReachedDropPopup,
+    showOrderIdConfirmationPopup,
+    showreachedPickupPopup
+  ]);
+
+  const syncActiveOrderStorage = useCallback((restaurantInfo = selectedRestaurant, stepOverride = null) => {
+    if (!restaurantInfo || showNewOrderPopup) return;
+
+    const orderStatus = restaurantInfo?.orderStatus || restaurantInfo?.status || '';
+    const deliveryPhase = restaurantInfo?.deliveryPhase || restaurantInfo?.deliveryState?.currentPhase || '';
+    const deliveryStateStatus = restaurantInfo?.deliveryState?.status || '';
+    const isFinished =
+      orderStatus === 'delivered' ||
+      orderStatus === 'completed' ||
+      deliveryPhase === 'completed' ||
+      deliveryPhase === 'delivered' ||
+      deliveryStateStatus === 'delivered';
+
+    if (isFinished && !showPaymentPage && !showCustomerReviewPopup && !showOrderDeliveredAnimation) {
+      return;
+    }
+
+    try {
+      const existing = JSON.parse(localStorage.getItem('deliveryActiveOrder') || '{}');
+      const orderId = restaurantInfo?.orderId || restaurantInfo?.id || existing.orderId;
+      if (!orderId) return;
+
+      const payload = {
+        ...existing,
+        orderId,
+        acceptedAt: existing.acceptedAt || restaurantInfo?.acceptedAt || new Date().toISOString(),
+        restaurantInfo: {
+          ...(existing.restaurantInfo || {}),
+          ...restaurantInfo
+        },
+        routeCoordinates: routePolyline?.length > 0 ? routePolyline : existing.routeCoordinates || [],
+        hasDirectionsAPI: Boolean(directionsResponseRef.current || existing.hasDirectionsAPI),
+        uiStep: stepOverride || getDeliveryUiStep(restaurantInfo) || existing.uiStep || DELIVERY_UI_STEP.EN_ROUTE_TO_PICKUP,
+        updatedAt: Date.now()
+      };
+
+      localStorage.setItem('deliveryActiveOrder', JSON.stringify(payload));
+    } catch (error) {
+      console.warn('Could not persist active delivery state:', error);
+    }
+  }, [
+    selectedRestaurant,
+    showNewOrderPopup,
+    showPaymentPage,
+    showCustomerReviewPopup,
+    showOrderDeliveredAnimation,
+    routePolyline,
+    getDeliveryUiStep
+  ]);
+
+  const restoreDeliveryUiStep = useCallback(step => {
+    setShowNewOrderPopup(false);
+    setShowreachedPickupPopup(step === DELIVERY_UI_STEP.REACHED_PICKUP);
+    setShowOrderIdConfirmationPopup(step === DELIVERY_UI_STEP.ORDER_ID_CONFIRMATION);
+    setShowReachedDropPopup(step === DELIVERY_UI_STEP.REACHED_DROP);
+    setShowOrderDeliveredAnimation(step === DELIVERY_UI_STEP.DELIVERED_ANIMATION);
+    setShowCustomerReviewPopup(step === DELIVERY_UI_STEP.CUSTOMER_REVIEW);
+    setShowPaymentPage(step === DELIVERY_UI_STEP.PAYMENT);
+  }, []);
+
+  useEffect(() => {
+    if (!selectedRestaurant || showNewOrderPopup) {
+      return;
+    }
+
+    syncActiveOrderStorage();
+  }, [
+    selectedRestaurant,
+    showNewOrderPopup,
+    showreachedPickupPopup,
+    showOrderIdConfirmationPopup,
+    showReachedDropPopup,
+    showOrderDeliveredAnimation,
+    showCustomerReviewPopup,
+    showPaymentPage,
+    routePolyline,
+    syncActiveOrderStorage
+  ]);
+
   // Show new order popup when order is received from Socket.IO
   useEffect(() => {
     if (newOrder) {
@@ -3367,6 +3505,7 @@ export default function DeliveryHome() {
         amount: earnedValue > 0 ? earnedValue : deliveryFee > 0 ? deliveryFee : 0,
         customerName: newOrder.customerName,
         customerAddress: newOrder.customerLocation?.address || 'Customer address',
+        deliveryInstructions: newOrder.customerLocation?.deliveryInstructions || newOrder.address?.deliveryInstructions || '',
         customerLat: newOrder.customerLocation?.latitude,
         customerLng: newOrder.customerLocation?.longitude,
         items: newOrder.items || [],
@@ -3715,6 +3854,7 @@ export default function DeliveryHome() {
             estimatedEarnings: firstOrder.pricing?.deliveryFee || 0,
             customerName: firstOrder.userId?.name || 'Customer',
             customerAddress: firstOrder.address?.formattedAddress || (firstOrder.address?.street ? `${firstOrder.address.street}, ${firstOrder.address.city || ''}, ${firstOrder.address.state || ''}`.trim() : 'Customer address'),
+            deliveryInstructions: firstOrder.address?.deliveryInstructions || '',
             customerLat: firstOrder.address?.location?.coordinates?.[1],
             customerLng: firstOrder.address?.location?.coordinates?.[0],
             items: firstOrder.items || [],
@@ -5331,6 +5471,57 @@ export default function DeliveryHome() {
           setSelectedRestaurant(null);
           return;
         }
+        const deriveStepFromOrder = (order, savedStep) => {
+          const orderStatus = order?.status || activeOrderData.restaurantInfo?.orderStatus || '';
+          const deliveryPhase = order?.deliveryState?.currentPhase || activeOrderData.restaurantInfo?.deliveryPhase || '';
+          const deliveryStateStatus = order?.deliveryState?.status || activeOrderData.restaurantInfo?.deliveryState?.status || '';
+
+          if (savedStep === DELIVERY_UI_STEP.PAYMENT || savedStep === DELIVERY_UI_STEP.CUSTOMER_REVIEW || savedStep === DELIVERY_UI_STEP.DELIVERED_ANIMATION) {
+            return savedStep;
+          }
+          if (
+            orderStatus === 'out_for_delivery' ||
+            deliveryPhase === 'en_route_to_delivery' ||
+            deliveryPhase === 'at_delivery' ||
+            deliveryStateStatus === 'order_confirmed'
+          ) {
+            return savedStep === DELIVERY_UI_STEP.REACHED_DROP ? savedStep : DELIVERY_UI_STEP.EN_ROUTE_TO_DELIVERY;
+          }
+          if (deliveryPhase === 'at_pickup' || deliveryStateStatus === 'reached_pickup') {
+            return DELIVERY_UI_STEP.ORDER_ID_CONFIRMATION;
+          }
+          if (orderStatus === 'ready') {
+            return DELIVERY_UI_STEP.REACHED_PICKUP;
+          }
+          return DELIVERY_UI_STEP.EN_ROUTE_TO_PICKUP;
+        };
+
+        const getRestoredRestaurantInfo = order => {
+          const savedRestaurantInfo = activeOrderData.restaurantInfo || {};
+          const restaurantCoords = order?.restaurantId?.location?.coordinates || [];
+          const customerCoords = order?.address?.location?.coordinates || [];
+          return {
+            ...savedRestaurantInfo,
+            id: order?._id || savedRestaurantInfo.id,
+            orderId: order?.orderId || savedRestaurantInfo.orderId,
+            name: order?.restaurantName || order?.restaurantId?.name || savedRestaurantInfo.name,
+            address: order?.restaurantId?.address || order?.restaurantId?.location?.formattedAddress || savedRestaurantInfo.address,
+            lat: restaurantCoords[1] ?? savedRestaurantInfo.lat,
+            lng: restaurantCoords[0] ?? savedRestaurantInfo.lng,
+            customerName: order?.userId?.name || savedRestaurantInfo.customerName,
+            customerAddress: order?.address?.formattedAddress || savedRestaurantInfo.customerAddress,
+            deliveryInstructions: order?.address?.deliveryInstructions || savedRestaurantInfo.deliveryInstructions || '',
+            customerLat: customerCoords[1] ?? savedRestaurantInfo.customerLat,
+            customerLng: customerCoords[0] ?? savedRestaurantInfo.customerLng,
+            total: order?.pricing?.total ?? savedRestaurantInfo.total,
+            paymentMethod: order?.paymentMethod || savedRestaurantInfo.paymentMethod,
+            orderStatus: order?.status || savedRestaurantInfo.orderStatus,
+            status: order?.status || savedRestaurantInfo.status,
+            deliveryPhase: order?.deliveryState?.currentPhase || savedRestaurantInfo.deliveryPhase,
+            deliveryState: order?.deliveryState || savedRestaurantInfo.deliveryState
+          };
+        };
+
         // If this order was already marked as reached drop, restore directly to delivered flow
         try {
           const atDropId = localStorage.getItem('deliveryAtDropOrderId');
@@ -5338,11 +5529,7 @@ export default function DeliveryHome() {
             if (activeOrderData.restaurantInfo) {
               setSelectedRestaurant(activeOrderData.restaurantInfo);
             }
-            setShowReachedDropPopup(false);
-            setShowreachedPickupPopup(false);
-            setShowNewOrderPopup(false);
-            setShowOrderIdConfirmationPopup(false);
-            setShowOrderDeliveredAnimation(true);
+            restoreDeliveryUiStep(DELIVERY_UI_STEP.DELIVERED_ANIMATION);
             return;
           }
         } catch { /* ignore */ }
@@ -5367,6 +5554,13 @@ export default function DeliveryHome() {
 
           // Check if order is still assigned to current delivery partner
           // (This check will be done by backend, but we can verify here too)
+
+          const restoredRestaurantInfo = getRestoredRestaurantInfo(order);
+          const restoredStep = deriveStepFromOrder(order, activeOrderData.uiStep);
+          setSelectedRestaurant(restoredRestaurantInfo);
+          restoreDeliveryUiStep(restoredStep);
+          activeOrderData.restaurantInfo = restoredRestaurantInfo;
+          activeOrderData.uiStep = restoredStep;
         } catch (verifyError) {
           // If order doesn't exist (404) or any other error, clear localStorage
 
@@ -5391,6 +5585,7 @@ export default function DeliveryHome() {
         // Restore selectedRestaurant state
         if (activeOrderData.restaurantInfo) {
           setSelectedRestaurant(activeOrderData.restaurantInfo);
+          restoreDeliveryUiStep(activeOrderData.uiStep || getDeliveryUiStep(activeOrderData.restaurantInfo));
         }
 
         // Wait for map to be ready
@@ -5401,12 +5596,22 @@ export default function DeliveryHome() {
           }
           // Recalculate route using Directions API (preferred) or use saved coordinates (fallback)
           // Don't restore directionsResponse from localStorage - Google Maps objects can't be serialized
-          if (activeOrderData.restaurantInfo && activeOrderData.restaurantInfo.lat && activeOrderData.restaurantInfo.lng && riderLocation && riderLocation.length === 2) {
+          const restoredStep = activeOrderData.uiStep || getDeliveryUiStep(activeOrderData.restaurantInfo);
+          const shouldRouteToCustomer =
+            restoredStep === DELIVERY_UI_STEP.EN_ROUTE_TO_DELIVERY ||
+            restoredStep === DELIVERY_UI_STEP.REACHED_DROP ||
+            restoredStep === DELIVERY_UI_STEP.DELIVERED_ANIMATION ||
+            restoredStep === DELIVERY_UI_STEP.CUSTOMER_REVIEW ||
+            restoredStep === DELIVERY_UI_STEP.PAYMENT;
+          const destinationLat = shouldRouteToCustomer ? activeOrderData.restaurantInfo?.customerLat : activeOrderData.restaurantInfo?.lat;
+          const destinationLng = shouldRouteToCustomer ? activeOrderData.restaurantInfo?.customerLng : activeOrderData.restaurantInfo?.lng;
+
+          if (activeOrderData.restaurantInfo && destinationLat && destinationLng && riderLocation && riderLocation.length === 2) {
             // Try to recalculate with Directions API first (if flag indicates we had Directions API before)
             if (activeOrderData.hasDirectionsAPI) {
               calculateRouteWithDirectionsAPI(riderLocation, {
-                lat: activeOrderData.restaurantInfo.lat,
-                lng: activeOrderData.restaurantInfo.lng
+                lat: destinationLat,
+                lng: destinationLng
               }).then(result => {
                 if (result && result.routes && result.routes.length > 0) {
                   setDirectionsResponse(result);
@@ -5444,10 +5649,7 @@ export default function DeliveryHome() {
         // Clear localStorage and state if there's an error
         localStorage.removeItem('deliveryActiveOrder');
         setSelectedRestaurant(null);
-        setShowReachedDropPopup(false);
-        setShowOrderDeliveredAnimation(false);
-        setShowCustomerReviewPopup(false);
-        setShowPaymentPage(false);
+        restoreDeliveryUiStep(null);
       }
     };
     restoreActiveOrder();
@@ -7589,6 +7791,14 @@ export default function DeliveryHome() {
         {selectedRestaurant?.customerAddress && <p className="text-xs text-gray-500 ml-13 truncate">
           {selectedRestaurant.customerAddress}
         </p>}
+        {selectedRestaurant?.deliveryInstructions && <div className="ml-13 mt-2 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-amber-700">
+            Delivery instructions
+          </p>
+          <p className="mt-1 text-xs leading-5 text-amber-900">
+            {selectedRestaurant.deliveryInstructions}
+          </p>
+        </div>}
       </div>
 
       {/* Start Navigation Button */}
@@ -7624,6 +7834,14 @@ export default function DeliveryHome() {
       <p className="text-gray-600 mb-2 leading-relaxed">
         {selectedRestaurant?.customerAddress || 'Customer Address'}
       </p>
+      {selectedRestaurant?.deliveryInstructions && <div className="mb-2 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-amber-700">
+          Delivery instructions
+        </p>
+        <p className="mt-1 text-sm leading-6 text-amber-900">
+          {selectedRestaurant.deliveryInstructions}
+        </p>
+      </div>}
       <p className="text-gray-500 text-sm font-medium">
         Order ID: {selectedRestaurant?.orderId || 'ORD1234567890'}
       </p>

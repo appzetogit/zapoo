@@ -15,6 +15,7 @@ const OrderDetectDelivery = lazy(() => import("../pages/OrderDetectDelivery"));
 const Category = lazy(() => import("../pages/categories/Category"));
 const FeeSettings = lazy(() => import("../pages/fee-settings/FeeSettings"));
 const SubscriptionManagement = lazy(() => import("../pages/subscription/SubscriptionManagement"));
+const SubscriptionHistory = lazy(() => import("../pages/subscription/SubscriptionHistory"));
 // Restaurant Management
 const ZoneSetup = lazy(() => import("../pages/restaurant/ZoneSetup"));
 const TierManagement = lazy(() => import("../pages/tier/TierManagement"));
@@ -168,6 +169,7 @@ export default function AdminRouter() {
 
           {/* SUBSCRIPTION MANAGEMENT */}
           <Route path="subscription/plans" element={<SubscriptionManagement />} />
+          <Route path="subscription/history" element={<SubscriptionHistory />} />
 
           {/* RESTAURANT MANAGEMENT */}
           <Route path="zone-setup" element={<ZoneSetup />} />

@@ -113,6 +113,7 @@ export default function AdminHome() {
       return monthNames.map(month => ({
         month,
         commission: 0,
+        subscriptionCollection: 0,
         revenue: 0,
         orders: 0
       }));
@@ -122,6 +123,7 @@ export default function AdminHome() {
     return dashboardData.monthlyData.map(item => ({
       month: item.month,
       commission: item.commission || 0,
+      subscriptionCollection: item.subscriptionCollection || 0,
       revenue: item.revenue || 0,
       orders: item.orders || 0
     }));
@@ -132,13 +134,15 @@ export default function AdminHome() {
   // Calculate totals from real data
   const revenueTotal = dashboardData?.revenue?.total || 0;
   const commissionTotal = dashboardData?.commission?.total || 0;
+  const subscriptionCollectionTotal = dashboardData?.subscriptionCollection?.total || 0;
+  const subscriptionCollectionCount = dashboardData?.subscriptionCollection?.count || 0;
   const ordersTotal = dashboardData?.orders?.total || 0;
   const platformFeeTotal = dashboardData?.platformFee?.total || 0;
   const deliveryFeeTotal = dashboardData?.deliveryFee?.total || 0;
   const gstTotal = dashboardData?.gst?.total || 0;
   const recommendedItemFeeTotal = dashboardData?.recommendedItemFee?.total || 0;
-  // Total revenue = Commission + Platform Fee + Delivery Fee + GST + Recommended Item Fee
-  const totalAdminEarnings = commissionTotal + platformFeeTotal + deliveryFeeTotal + gstTotal + recommendedItemFeeTotal;
+  // Total revenue = Platform Fee + Delivery Fee + GST + Recommended Item Fee
+  const totalAdminEarnings = platformFeeTotal + deliveryFeeTotal + gstTotal + recommendedItemFeeTotal;
   const adminEscrowBalance = adminWalletSummary?.wallet?.escrowBalance || 0;
 
   // Additional stats
@@ -204,7 +208,23 @@ export default function AdminHome() {
       <div className="space-y-6 px-6 py-6">
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <MetricCard title="Gross revenue" value={`₹${revenueTotal.toLocaleString("en-IN")}`} helper="Rolling 12 months" icon={<ShoppingBag className="h-5 w-5 text-emerald-600" />} accent="bg-emerald-200/40" onClick={() => navigate("/admin/transaction-report")} />
-          <MetricCard title="Commission earned" value={`₹${commissionTotal.toLocaleString("en-IN")}`} helper="Restaurant commission" icon={<ArrowUpRight className="h-5 w-5 text-indigo-600" />} accent="bg-indigo-200/40" onClick={() => navigate("/admin/transaction-report")} />
+          <MetricCard title="Subscription collection" value={`₹${subscriptionCollectionTotal.toLocaleString("en-IN")}`} helper={`${subscriptionCollectionCount.toLocaleString("en-IN")} subscription sales`} icon={<ArrowUpRight className="h-5 w-5 text-indigo-600" />} accent="bg-indigo-200/40" onClick={() => {
+          const params = new URLSearchParams();
+          if (selectedTier !== "all") params.set("tierId", selectedTier);
+          if (selectedPeriod && selectedPeriod !== "overall") params.set("period", selectedPeriod);
+          navigate(`/admin/subscription/history${params.toString() ? `?${params.toString()}` : ""}`);
+        }} />
+          {(dashboardData?.subscriptionStats || []).map((plan) => (
+            <MetricCard
+              key={plan._id}
+              title={`${plan.name} Plan`}
+              value={plan.count.toLocaleString("en-IN")}
+              helper="Sold subscriptions"
+              icon={<CreditCard className="h-5 w-5 text-indigo-600" />}
+              accent="bg-indigo-100/40"
+              onClick={() => navigate("/admin/subscription/plans")}
+            />
+          ))}
           <MetricCard title="Orders processed" value={ordersTotal.toLocaleString("en-IN")} helper="Fulfilled & billed" icon={<Activity className="h-5 w-5 text-amber-600" />} accent="bg-amber-200/40" onClick={() => navigate("/admin/orders/all")} />
           <MetricCard title="Platform fee" value={`₹${platformFeeTotal.toLocaleString("en-IN")}`} helper="Total platform fees" icon={<CreditCard className="h-5 w-5 text-purple-600" />} accent="bg-purple-200/40" onClick={() => navigate("/admin/transaction-report")} />
           <MetricCard title="Delivery fee" value={`₹${deliveryFeeTotal.toLocaleString("en-IN")}`} helper="Total delivery fees" icon={<Truck className="h-5 w-5 text-blue-600" />} accent="bg-blue-200/40" onClick={() => navigate("/admin/transaction-report")} />
@@ -213,7 +233,7 @@ export default function AdminHome() {
           <MetricCard title="Total revenue" value={`₹${totalAdminEarnings.toLocaleString("en-IN", {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2
-          })}`} helper={`Commission ₹${commissionTotal.toFixed(2)} + Platform ₹${platformFeeTotal.toFixed(2)} + Delivery ₹${deliveryFeeTotal.toFixed(2)} + GST ₹${gstTotal.toFixed(2)} + Rec ₹${recommendedItemFeeTotal.toFixed(2)}`} icon={<DollarSign className="h-5 w-5 text-green-600" />} accent="bg-green-200/40" onClick={() => navigate("/admin/transaction-report")} />
+          })}`} helper={`Platform ₹${platformFeeTotal.toFixed(2)} + Delivery ₹${deliveryFeeTotal.toFixed(2)} + GST ₹${gstTotal.toFixed(2)} + Rec ₹${recommendedItemFeeTotal.toFixed(2)}`} icon={<DollarSign className="h-5 w-5 text-green-600" />} accent="bg-green-200/40" onClick={() => navigate("/admin/transaction-report")} />
           <MetricCard title="Escrow balance" value={`₹${adminEscrowBalance.toLocaleString("en-IN")}`} helper="Funds held for payouts" icon={<DollarSign className="h-5 w-5 text-amber-600" />} accent="bg-amber-200/40" onClick={() => navigate("/admin/transaction-report")} />
           <MetricCard title="Total restaurants" value={totalRestaurants.toLocaleString("en-IN")} helper="All registered restaurants" icon={<Store className="h-5 w-5 text-blue-600" />} accent="bg-blue-200/40" onClick={() => navigate("/admin/restaurants")} />
           <MetricCard title="Restaurant request pending" value={pendingRestaurantRequests.toLocaleString("en-IN")} helper="Awaiting approval" icon={<UserCheck className="h-5 w-5 text-orange-600" />} accent="bg-orange-200/40" onClick={() => navigate("/admin/restaurants/joining-request")} />
@@ -225,19 +245,6 @@ export default function AdminHome() {
           <MetricCard title="Pending orders" value={pendingOrders.toLocaleString("en-IN")} helper="Orders awaiting processing" icon={<Clock className="h-5 w-5 text-red-600" />} accent="bg-red-200/40" onClick={() => navigate("/admin/orders/pending")} />
           <MetricCard title="Completed orders" value={completedOrders.toLocaleString("en-IN")} helper="Successfully delivered" icon={<CheckCircle className="h-5 w-5 text-emerald-600" />} accent="bg-emerald-200/40" onClick={() => navigate("/admin/orders/delivered")} />
 
-          {/* Subscription Plans Stats */}
-          {console.log('Sub Stats:', dashboardData?.subscriptionStats)}
-          {(dashboardData?.subscriptionStats || []).map((plan) => (
-            <MetricCard
-              key={plan._id}
-              title={`${plan.name} Plan`}
-              value={plan.count.toLocaleString("en-IN")}
-              helper="Active subscribers"
-              icon={<CreditCard className="h-5 w-5 text-indigo-600" />}
-              accent="bg-indigo-100/40"
-              onClick={() => navigate("/admin/subscription/plans")}
-            />
-          ))}
         </div>
 
 
@@ -247,7 +254,7 @@ export default function AdminHome() {
             <CardHeader className="flex flex-col gap-2 border-b border-neutral-200 pb-4">
               <CardTitle className="text-lg text-neutral-900">Revenue trajectory</CardTitle>
               <p className="text-sm text-neutral-500">
-                Commission and gross revenue with monthly order volume
+                Subscription collection and gross revenue with monthly order volume
               </p>
             </CardHeader>
             <CardContent className="pt-4">
@@ -278,7 +285,7 @@ export default function AdminHome() {
                     }} />
                     <Legend />
                     <Area type="monotone" dataKey="revenue" stroke="#0ea5e9" fillOpacity={1} fill="url(#revFill)" name="Gross revenue" />
-                    <Area type="monotone" dataKey="commission" stroke="#a855f7" fillOpacity={1} fill="url(#comFill)" name="Commission" />
+                    <Area type="monotone" dataKey="subscriptionCollection" stroke="#a855f7" fillOpacity={1} fill="url(#comFill)" name="Subscription collection" />
                     <Bar dataKey="orders" fill="#ef4444" radius={[6, 6, 0, 0]} name="Orders" barSize={10} />
                   </AreaChart>
                 </ResponsiveContainer>

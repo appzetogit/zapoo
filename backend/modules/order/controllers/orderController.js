@@ -796,7 +796,7 @@ export const getUserOrders = async (req, res) => {
       .sort({ createdAt: -1 })
       .limit(parseInt(limit))
       .skip(skip)
-      .select('orderId status pricing items address createdAt')
+      .select('orderId status pricing items address createdAt restaurantName restaurantId')
       .populate('restaurantId', 'name slug profileImage address location')
       .lean();
     const total = await Order.countDocuments(query);
@@ -879,6 +879,62 @@ export const getOrderDetails = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch order details'
+    });
+  }
+};
+
+/**
+ * Update delivery instructions for a user order
+ * PATCH /api/order/:id/delivery-instructions
+ */
+export const updateDeliveryInstructions = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    const { id } = req.params;
+    const rawInstructions = req.body?.deliveryInstructions;
+    const deliveryInstructions = typeof rawInstructions === 'string' ? rawInstructions.trim() : '';
+
+    let order = null;
+    if (mongoose.Types.ObjectId.isValid(id) && id.length === 24) {
+      order = await Order.findOne({ _id: id, userId });
+    }
+    if (!order) {
+      order = await Order.findOne({ orderId: id, userId });
+    }
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found'
+      });
+    }
+
+    if (['cancelled', 'delivered'].includes(order.status)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Delivery instructions can no longer be updated for this order'
+      });
+    }
+
+    if (!order.address) {
+      order.address = {};
+    }
+
+    order.address.deliveryInstructions = deliveryInstructions;
+    await order.save();
+
+    return res.json({
+      success: true,
+      message: 'Delivery instructions updated successfully',
+      data: {
+        deliveryInstructions: order.address.deliveryInstructions || ''
+      }
+    });
+  } catch (error) {
+    logger.error(`Error updating delivery instructions: ${error.message}`);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to update delivery instructions'
     });
   }
 };

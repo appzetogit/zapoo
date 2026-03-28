@@ -20,5 +20,6 @@ router.patch("/toggle-plan", async (req, res) => {
   return subscriptionController.togglePlanStatus(req, res);
 });
 router.get("/restaurants", subscriptionController.getRestaurantSubscriptions);
+router.get("/history", subscriptionController.getSubscriptionHistory);
 
 export default router;

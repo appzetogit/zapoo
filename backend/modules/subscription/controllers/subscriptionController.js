@@ -4,6 +4,7 @@ import RestaurantSubscription from "../../restaurant/models/RestaurantSubscripti
 import RelationshipRequest from "../../restaurant/models/RelationshipRequest.js";
 import * as razorpayService from "../../payment/services/razorpayService.js";
 import { getRazorpayCredentials } from "../../../shared/utils/envService.js";
+import mongoose from "mongoose";
 
 const getRestaurantTierKey = (restaurant) => {
   if (restaurant?.zoneId?.tierId?.rank) {
@@ -28,6 +29,155 @@ const hasActiveSubscription = (restaurant) => {
     restaurant.subscription.endDate &&
     new Date(restaurant.subscription.endDate) > now
   );
+};
+
+const buildSubscriptionHistoryPipelines = ({
+  period,
+  paymentStatus = "completed",
+  tierId,
+  planId,
+  search
+} = {}) => {
+  const now = new Date();
+  let startDate = null;
+  if (period === "today") {
+    startDate = new Date(new Date().setHours(0, 0, 0, 0));
+  } else if (period === "week") {
+    startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  } else if (period === "month") {
+    startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  } else if (period === "year") {
+    startDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
+  }
+
+  const baseMatch = {};
+  if (paymentStatus && paymentStatus !== "all") {
+    baseMatch.paymentStatus = paymentStatus;
+  }
+  if (planId && mongoose.Types.ObjectId.isValid(planId)) {
+    baseMatch.planId = new mongoose.Types.ObjectId(planId);
+  }
+  if (startDate) {
+    baseMatch.$or = [
+      { paymentDate: { $gte: startDate } },
+      { paymentDate: { $exists: false }, createdAt: { $gte: startDate } }
+    ];
+  }
+
+  const lookupStages = [
+    {
+      $lookup: {
+        from: "restaurants",
+        localField: "restaurantId",
+        foreignField: "_id",
+        as: "restaurant"
+      }
+    },
+    {
+      $unwind: {
+        path: "$restaurant",
+        preserveNullAndEmptyArrays: true
+      }
+    },
+    {
+      $lookup: {
+        from: "zones",
+        localField: "restaurant.zoneId",
+        foreignField: "_id",
+        as: "zone"
+      }
+    },
+    {
+      $unwind: {
+        path: "$zone",
+        preserveNullAndEmptyArrays: true
+      }
+    },
+    {
+      $lookup: {
+        from: "tiers",
+        localField: "zone.tierId",
+        foreignField: "_id",
+        as: "tier"
+      }
+    },
+    {
+      $unwind: {
+        path: "$tier",
+        preserveNullAndEmptyArrays: true
+      }
+    },
+    {
+      $lookup: {
+        from: "subscriptionplans",
+        localField: "planId",
+        foreignField: "_id",
+        as: "plan"
+      }
+    },
+    {
+      $unwind: {
+        path: "$plan",
+        preserveNullAndEmptyArrays: true
+      }
+    },
+    {
+      $addFields: {
+        effectiveAmount: {
+          $cond: [
+            { $gt: [{ $ifNull: ["$amount", 0] }, 0] },
+            { $ifNull: ["$amount", 0] },
+            {
+              $switch: {
+                branches: [
+                  {
+                    case: { $eq: ["$tier.rank", 1] },
+                    then: { $ifNull: ["$plan.pricing.tier1", 0] }
+                  },
+                  {
+                    case: { $eq: ["$tier.rank", 2] },
+                    then: { $ifNull: ["$plan.pricing.tier2", { $ifNull: ["$plan.pricing.tier1", 0] }] }
+                  },
+                  {
+                    case: { $eq: ["$tier.rank", 3] },
+                    then: { $ifNull: ["$plan.pricing.tier3", { $ifNull: ["$plan.pricing.tier1", 0] }] }
+                  },
+                  {
+                    case: { $eq: ["$tier.rank", 4] },
+                    then: { $ifNull: ["$plan.pricing.tier4", { $ifNull: ["$plan.pricing.tier1", 0] }] }
+                  }
+                ],
+                default: { $ifNull: ["$plan.pricing.tier1", 0] }
+              }
+            }
+          ]
+        },
+        purchaseDate: { $ifNull: ["$paymentDate", "$createdAt"] }
+      }
+    }
+  ];
+
+  const postLookupMatch = {};
+  if (tierId && tierId !== "all" && mongoose.Types.ObjectId.isValid(tierId)) {
+    postLookupMatch["tier._id"] = new mongoose.Types.ObjectId(tierId);
+  }
+  if (search?.trim()) {
+    const regex = new RegExp(search.trim(), "i");
+    postLookupMatch.$or = [
+      { "restaurant.name": regex },
+      { "restaurant.restaurantId": regex },
+      { "restaurant.email": regex },
+      { "restaurant.phone": regex },
+      { razorpayPaymentId: regex },
+      { razorpayOrderId: regex }
+    ];
+  }
+
+  return {
+    baseMatch,
+    lookupStages,
+    postLookupMatch
+  };
 };
 
 /**
@@ -633,6 +783,108 @@ export const getRestaurantSubscriptions = async (req, res) => {
       success: false,
       message: "Failed to fetch restaurant subscriptions",
       error: error.message,
+    });
+  }
+};
+
+/**
+ * List subscription purchase history (Admin)
+ */
+export const getSubscriptionHistory = async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 20,
+      paymentStatus = "completed",
+      period = "overall",
+      tierId,
+      planId,
+      search = ""
+    } = req.query;
+
+    const currentPage = Math.max(parseInt(page, 10) || 1, 1);
+    const perPage = Math.max(parseInt(limit, 10) || 20, 1);
+    const skip = (currentPage - 1) * perPage;
+
+    const {
+      baseMatch,
+      lookupStages,
+      postLookupMatch
+    } = buildSubscriptionHistoryPipelines({
+      period,
+      paymentStatus,
+      tierId,
+      planId,
+      search
+    });
+
+    const historyAgg = await RestaurantSubscription.aggregate([
+      { $match: baseMatch },
+      ...lookupStages,
+      ...(Object.keys(postLookupMatch).length ? [{ $match: postLookupMatch }] : []),
+      { $sort: { purchaseDate: -1, createdAt: -1, _id: -1 } },
+      {
+        $facet: {
+          rows: [
+            { $skip: skip },
+            { $limit: perPage },
+            {
+              $project: {
+                _id: 1,
+                purchaseDate: 1,
+                restaurantName: "$restaurant.name",
+                restaurantCode: "$restaurant.restaurantId",
+                restaurantEmail: "$restaurant.email",
+                restaurantPhone: "$restaurant.phone",
+                planName: "$plan.name",
+                tierName: "$tier.name",
+                tierId: "$tier._id",
+                planId: "$plan._id",
+                amount: { $round: [{ $ifNull: ["$effectiveAmount", 0] }, 2] },
+                paymentStatus: 1,
+                razorpayOrderId: 1,
+                razorpayPaymentId: 1,
+                subscriptionStatus: "$status",
+                durationInDays: "$plan.durationInDays"
+              }
+            }
+          ],
+          meta: [
+            {
+              $group: {
+                _id: null,
+                totalSales: { $sum: 1 },
+                totalCollection: { $sum: { $ifNull: ["$effectiveAmount", 0] } }
+              }
+            }
+          ]
+        }
+      }
+    ]);
+
+    const rows = historyAgg[0]?.rows || [];
+    const meta = historyAgg[0]?.meta?.[0] || { totalSales: 0, totalCollection: 0 };
+
+    return res.status(200).json({
+      success: true,
+      data: rows,
+      pagination: {
+        page: currentPage,
+        limit: perPage,
+        total: meta.totalSales,
+        totalPages: Math.ceil(meta.totalSales / perPage) || 1
+      },
+      summary: {
+        totalSales: meta.totalSales || 0,
+        totalCollection: Math.round((meta.totalCollection || 0) * 100) / 100
+      }
+    });
+  } catch (error) {
+    console.error("Error fetching subscription history:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch subscription history",
+      error: error.message
     });
   }
 };

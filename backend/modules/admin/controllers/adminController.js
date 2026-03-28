@@ -7,6 +7,7 @@ import OrderSettlement from "../../order/models/OrderSettlement.js";
 import AdminWallet from "../models/AdminWallet.js";
 import Zone from "../models/Zone.js";
 import SubscriptionPlan from "../models/SubscriptionPlan.js";
+import RestaurantSubscription from "../../restaurant/models/RestaurantSubscription.js";
 import User from "../../auth/models/User.js";
 import Menu from "../../restaurant/models/Menu.js";
 import { successResponse, errorResponse } from "../../../shared/utils/response.js";
@@ -52,6 +53,7 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
     // Filter by Tier if specified
     let orderScopeFilter = {};
     let restaurantScopeFilter = {};
+    let scopedRestaurantObjectIds = [];
     if (tierId && tierId !== "all") {
       const zones = await Zone.find({
         tierId
@@ -69,6 +71,7 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
       const tierRestaurants = await Restaurant.find(restaurantScopeFilter)
         .select("_id restaurantId slug")
         .lean();
+      scopedRestaurantObjectIds = tierRestaurants.map((restaurant) => restaurant._id).filter(Boolean);
       const scopedOrderRestaurantIds = [...new Set(
         (tierRestaurants || []).flatMap((r) => [
           r?._id ? String(r._id) : null,
@@ -199,6 +202,149 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
       count: 0
     };
 
+    const subscriptionMatch = {
+      paymentStatus: "completed",
+      ...(startDate
+        ? {
+            $or: [
+              { paymentDate: { $gte: startDate } },
+              {
+                paymentDate: { $exists: false },
+                createdAt: { $gte: startDate }
+              }
+            ]
+          }
+        : {})
+    };
+
+    if (tierId && tierId !== "all") {
+      subscriptionMatch.restaurantId = { $in: scopedRestaurantObjectIds };
+    }
+
+    const subscriptionPricingLookupStages = [
+      {
+        $lookup: {
+          from: "restaurants",
+          localField: "restaurantId",
+          foreignField: "_id",
+          as: "restaurant"
+        }
+      },
+      {
+        $unwind: {
+          path: "$restaurant",
+          preserveNullAndEmptyArrays: true
+        }
+      },
+      {
+        $lookup: {
+          from: "zones",
+          localField: "restaurant.zoneId",
+          foreignField: "_id",
+          as: "zone"
+        }
+      },
+      {
+        $unwind: {
+          path: "$zone",
+          preserveNullAndEmptyArrays: true
+        }
+      },
+      {
+        $lookup: {
+          from: "tiers",
+          localField: "zone.tierId",
+          foreignField: "_id",
+          as: "tier"
+        }
+      },
+      {
+        $unwind: {
+          path: "$tier",
+          preserveNullAndEmptyArrays: true
+        }
+      },
+      {
+        $lookup: {
+          from: "subscriptionplans",
+          localField: "planId",
+          foreignField: "_id",
+          as: "plan"
+        }
+      },
+      {
+        $unwind: {
+          path: "$plan",
+          preserveNullAndEmptyArrays: true
+        }
+      },
+      {
+        $addFields: {
+          effectiveAmount: {
+            $cond: [
+              { $gt: [{ $ifNull: ["$amount", 0] }, 0] },
+              { $ifNull: ["$amount", 0] },
+              {
+                $switch: {
+                  branches: [
+                    {
+                      case: { $eq: ["$tier.rank", 1] },
+                      then: { $ifNull: ["$plan.pricing.tier1", 0] }
+                    },
+                    {
+                      case: { $eq: ["$tier.rank", 2] },
+                      then: { $ifNull: ["$plan.pricing.tier2", { $ifNull: ["$plan.pricing.tier1", 0] }] }
+                    },
+                    {
+                      case: { $eq: ["$tier.rank", 3] },
+                      then: { $ifNull: ["$plan.pricing.tier3", { $ifNull: ["$plan.pricing.tier1", 0] }] }
+                    },
+                    {
+                      case: { $eq: ["$tier.rank", 4] },
+                      then: { $ifNull: ["$plan.pricing.tier4", { $ifNull: ["$plan.pricing.tier1", 0] }] }
+                    }
+                  ],
+                  default: { $ifNull: ["$plan.pricing.tier1", 0] }
+                }
+              }
+            ]
+          }
+        }
+      }
+    ];
+
+    const subscriptionCollectionAgg = await RestaurantSubscription.aggregate([
+      { $match: subscriptionMatch },
+      ...subscriptionPricingLookupStages,
+      {
+        $group: {
+          _id: null,
+          totalCollection: { $sum: { $ifNull: ["$effectiveAmount", 0] } },
+          count: { $sum: 1 },
+          last30DaysCollection: {
+            $sum: {
+              $cond: [
+                {
+                  $gte: [
+                    { $ifNull: ["$paymentDate", "$createdAt"] },
+                    last30Days
+                  ]
+                },
+                { $ifNull: ["$effectiveAmount", 0] },
+                0
+              ]
+            }
+          }
+        }
+      }
+    ]);
+
+    const subscriptionCollectionStats = subscriptionCollectionAgg[0] || {
+      totalCollection: 0,
+      count: 0,
+      last30DaysCollection: 0
+    };
+
     // 2. Aggregated counters for orders, restaurants, and users
     const last24Hours = new Date(now.getTime() - 24 * 60 * 60 * 1000);
     const pendingRestaurantRequestsQuery = {
@@ -297,8 +443,8 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
     const totalCustomers = userStats.customers?.[0]?.total || 0;
     const pendingDeliveryBoyRequests = userStats.pendingDelivery?.[0]?.total || 0;
 
-    // 3. Total Foods/Addons and subscription breakdown
-    const [menuStats, allPlans, activeSubscriptionCounts, recentOrders] = await Promise.all([
+    // 3. Total Foods/Addons and subscription sales breakdown
+    const [menuStats, allPlans, soldSubscriptionCounts, recentOrders] = await Promise.all([
       restaurantIds.length > 0
         ? Menu.aggregate([
           { $match: { isActive: true, restaurantId: { $in: restaurantIds } } },
@@ -336,19 +482,27 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
         ])
         : [{ foodCount: [], addonCount: [] }],
       SubscriptionPlan.find({ isActive: true }).select("name").lean(),
-      Restaurant.aggregate([
+      RestaurantSubscription.aggregate([
         {
           $match: {
-            ...restaurantScopeFilter,
-            isActive: true,
-            "subscription.status": "active",
-            "subscription.planId": { $exists: true, $ne: null },
-            ...(startDate ? { "subscription.startDate": { $gte: startDate } } : {})
+            paymentStatus: "completed",
+            ...(tierId && tierId !== "all" ? { restaurantId: { $in: scopedRestaurantObjectIds } } : {}),
+            ...(startDate
+              ? {
+                  $or: [
+                    { paymentDate: { $gte: startDate } },
+                    {
+                      paymentDate: { $exists: false },
+                      createdAt: { $gte: startDate }
+                    }
+                  ]
+                }
+              : {})
           }
         },
         {
           $group: {
-            _id: "$subscription.planId",
+            _id: "$planId",
             count: { $sum: 1 }
           }
         }
@@ -359,7 +513,7 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
     const totalFoods = menuStats[0]?.foodCount?.[0]?.total || 0;
     const totalAddons = menuStats[0]?.addonCount?.[0]?.total || 0;
     const subscriptionCountsMap = new Map(
-      activeSubscriptionCounts.map((entry) => [entry._id?.toString(), entry.count || 0])
+      soldSubscriptionCounts.map((entry) => [entry._id?.toString(), entry.count || 0])
     );
     const subscriptionStats = allPlans.map((plan) => ({
       _id: plan._id,
@@ -419,6 +573,37 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
       { $sort: { "_id.year": 1, "_id.month": 1 } }
     ]);
 
+    const subscriptionMonthlyStats = await RestaurantSubscription.aggregate([
+      {
+        $match: {
+          paymentStatus: "completed",
+          ...(tierId && tierId !== "all" ? { restaurantId: { $in: scopedRestaurantObjectIds } } : {}),
+          $or: [
+            { paymentDate: { $gte: twelveMonthsAgo } },
+            {
+              paymentDate: { $exists: false },
+              createdAt: { $gte: twelveMonthsAgo }
+            }
+          ]
+        }
+      },
+      ...subscriptionPricingLookupStages,
+      {
+        $group: {
+          _id: {
+            year: {
+              $year: { $ifNull: ["$paymentDate", "$createdAt"] }
+            },
+            month: {
+              $month: { $ifNull: ["$paymentDate", "$createdAt"] }
+            }
+          },
+          collection: { $sum: { $ifNull: ["$effectiveAmount", 0] } }
+        }
+      },
+      { $sort: { "_id.year": 1, "_id.month": 1 } }
+    ]);
+
     const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     const monthlyData = [];
     for (let i = 11; i >= 0; i--) {
@@ -426,11 +611,13 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
       const year = d.getFullYear();
       const month = d.getMonth() + 1;
       const match = monthlyStats.find(s => s._id.year === year && s._id.month === month);
+      const subscriptionMatch = subscriptionMonthlyStats.find(s => s._id.year === year && s._id.month === month);
 
       monthlyData.push({
         month: monthNames[d.getMonth()],
         revenue: match ? Math.round(match.revenue * 100) / 100 : 0,
         commission: match ? Math.round(match.commission * 100) / 100 : 0,
+        subscriptionCollection: subscriptionMatch ? Math.round(subscriptionMatch.collection * 100) / 100 : 0,
         orders: match ? match.orders : 0
       });
     }
@@ -444,6 +631,12 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
       commission: {
         total: Math.round(stats.totalCommission * 100) / 100,
         last30Days: Math.round(stats.last30DaysCommission * 100) / 100,
+        currency: "INR"
+      },
+      subscriptionCollection: {
+        total: Math.round(subscriptionCollectionStats.totalCollection * 100) / 100,
+        last30Days: Math.round(subscriptionCollectionStats.last30DaysCollection * 100) / 100,
+        count: subscriptionCollectionStats.count || 0,
         currency: "INR"
       },
       platformFee: {

@@ -6,9 +6,7 @@ import { useLocation } from "../hooks/useLocation";
 import { useCart } from "../context/CartContext";
 import { useLocationSelector } from "./UserLayout";
 import { FaLocationDot } from "react-icons/fa6";
-import { getCachedSettings, loadBusinessSettings } from "@/lib/utils/businessSettings";
 import ThemeToggle from "@/components/ThemeToggle";
-import zapooFoodLogo from "@/assets/zapoo_logo.png";
 export default function PageNavbar({
   textColor = "white",
   zIndex = 20,
@@ -27,8 +25,6 @@ export default function PageNavbar({
     openLocationSelector
   } = useLocationSelector();
   const cartCount = getCartCount();
-  const [logoUrl, setLogoUrl] = useState(null);
-  const [companyName, setCompanyName] = useState(null);
 
   // Auto-trigger location fetch if we have placeholder values (only once on mount)
   useEffect(() => {
@@ -47,63 +43,6 @@ export default function PageNavbar({
       return () => clearTimeout(timeoutId);
     }
   }, []); // Only run once on mount
-
-  // Load business settings logo
-  useEffect(() => {
-    const loadLogo = async () => {
-      try {
-        // First check cache
-        let cached = getCachedSettings();
-        if (cached) {
-          if (cached.logo?.url) {
-            setLogoUrl(cached.logo.url);
-          }
-          if (cached.companyName) {
-            setCompanyName(cached.companyName);
-          }
-        }
-
-        // Always try to load fresh data to ensure we have the latest
-        const settings = await loadBusinessSettings();
-        if (settings) {
-          if (settings.logo?.url) {
-            setLogoUrl(settings.logo.url);
-          }
-          if (settings.companyName) {
-            setCompanyName(settings.companyName);
-          }
-        }
-      } catch (error) {
-        console.error('Error loading logo:', error);
-      }
-    };
-
-    // Load immediately
-    loadLogo();
-
-    // Also try after a small delay to ensure DOM is ready
-    const timeoutId = setTimeout(() => {
-      loadLogo();
-    }, 100);
-
-    // Listen for business settings updates
-    const handleSettingsUpdate = () => {
-      const cached = getCachedSettings();
-      if (cached) {
-        if (cached.logo?.url) {
-          setLogoUrl(cached.logo.url);
-        }
-        if (cached.companyName) {
-          setCompanyName(cached.companyName);
-        }
-      }
-    };
-    window.addEventListener('businessSettingsUpdated', handleSettingsUpdate);
-    return () => {
-      clearTimeout(timeoutId);
-      window.removeEventListener('businessSettingsUpdated', handleSettingsUpdate);
-    };
-  }, []);
 
   // Function to extract location parts for display
   // Main location: First 2 parts only (e.g., "Mama Loca, G-2")
@@ -703,14 +642,6 @@ export default function PageNavbar({
               </div>}
           </Button>
         </div>
-
-        {/* Center: Company Logo or Name - Show on all screen sizes */}
-        <Link to="/user" className="flex items-center justify-center flex-shrink-0">
-          {logoUrl ? <img src={logoUrl} alt="Company Logo" className="h-9 w-9 sm:h-10 sm:w-10 md:h-11 md:w-11 object-contain" crossOrigin="anonymous" onError={e => {
-          // Fallback to default logo if API logo fails
-          e.target.src = zapooFoodLogo;
-        }} /> : <img src={zapooFoodLogo} alt={`${companyName} Logo`} className="h-9 w-9 sm:h-10 sm:w-10 md:h-11 md:w-11 object-contain" />}
-        </Link>
 
         {/* Right: Actions - Hidden on desktop, shown on mobile */}
         <div className="flex md:hidden items-center gap-2 sm:gap-3 flex-shrink-0">

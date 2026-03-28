@@ -2034,6 +2034,9 @@ export const subscriptionAPI = {
   getRestaurantSubscriptions: (params = {}) => {
     return apiClient.get(API_ENDPOINTS.SUBSCRIPTION.ADMIN_RESTAURANTS, { params });
   },
+  getSubscriptionHistory: (params = {}) => {
+    return apiClient.get(API_ENDPOINTS.SUBSCRIPTION.ADMIN_HISTORY, { params });
+  },
 };
 
 // Upload / media helper functions
@@ -2094,6 +2097,16 @@ export const orderAPI = {
   // Get order details
   getOrderDetails: (orderId) => {
     return apiClient.get(API_ENDPOINTS.ORDER.DETAILS.replace(":id", orderId));
+  },
+
+  // Update delivery instructions
+  updateDeliveryInstructions: (orderId, deliveryInstructions) => {
+    return apiClient.patch(
+      API_ENDPOINTS.ORDER.DELIVERY_INSTRUCTIONS.replace(":id", orderId),
+      {
+        deliveryInstructions,
+      }
+    );
   },
 
   // Cancel order

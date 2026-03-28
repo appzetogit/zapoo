@@ -12,7 +12,7 @@ import { useOrders } from "../../context/OrdersContext";
 import { useProfile } from "../../context/ProfileContext";
 import { useLocation as useUserLocation } from "../../hooks/useLocation";
 import DeliveryTrackingMap from "../../components/DeliveryTrackingMap";
-import { orderAPI, restaurantAPI } from "@/lib/api";
+import { orderAPI, restaurantAPI, userAPI } from "@/lib/api";
 import circleIcon from "@/assets/circleicon.png";
 
 const hasOrderBeenPickedUp = apiOrder => {
@@ -172,7 +172,8 @@ const SectionItem = ({
   subtitle,
   onClick,
   showArrow = true,
-  rightContent
+  rightContent,
+  subtitleClassName = "truncate"
 }) => <motion.button onClick={onClick} className="w-full flex items-center gap-3 p-4 hover:bg-gray-50 transition-colors text-left border-b border-dashed border-gray-200 last:border-0" whileTap={{
   scale: 0.99
 }}>
@@ -181,7 +182,7 @@ const SectionItem = ({
     </div>
     <div className="flex-1 min-w-0">
       <p className="font-medium text-gray-900 truncate">{title}</p>
-      {subtitle && <p className="text-sm text-gray-500 truncate">{subtitle}</p>}
+      {subtitle && <p className={`text-sm text-gray-500 ${subtitleClassName}`}>{subtitle}</p>}
     </div>
     {rightContent || showArrow && <ChevronRight className="w-5 h-5 text-gray-400" />}
   </motion.button>;
@@ -195,7 +196,8 @@ export default function OrderTracking() {
     getOrderById
   } = useOrders();
   const {
-    profile,
+    userProfile,
+    updateUserProfile,
     getDefaultAddress
   } = useProfile();
 
@@ -210,7 +212,26 @@ export default function OrderTracking() {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [cancellationReason, setCancellationReason] = useState("");
   const [isCancelling, setIsCancelling] = useState(false);
+  const [showPhoneDialog, setShowPhoneDialog] = useState(false);
+  const [editablePhone, setEditablePhone] = useState("");
+  const [isSavingPhone, setIsSavingPhone] = useState(false);
+  const [showInstructionsDialog, setShowInstructionsDialog] = useState(false);
+  const [deliveryInstructions, setDeliveryInstructions] = useState("");
+  const [isSavingInstructions, setIsSavingInstructions] = useState(false);
   const defaultAddress = getDefaultAddress();
+  const customerName = order?.userName || order?.userId?.fullName || order?.userId?.name || userProfile?.fullName || userProfile?.name || 'Customer';
+  const customerPhone = order?.userPhone || order?.userId?.phone || userProfile?.phone || defaultAddress?.phone || "";
+  const currentDeliveryInstructions = order?.address?.deliveryInstructions || "";
+
+  useEffect(() => {
+    if (!showPhoneDialog) return;
+    setEditablePhone(customerPhone || "");
+  }, [customerPhone, showPhoneDialog]);
+
+  useEffect(() => {
+    if (!showInstructionsDialog) return;
+    setDeliveryInstructions(currentDeliveryInstructions);
+  }, [currentDeliveryInstructions, showInstructionsDialog]);
 
   // Poll for order updates (especially when delivery partner accepts)
   // Only poll if delivery partner is not yet assigned to avoid unnecessary updates
@@ -465,6 +486,50 @@ export default function OrderTracking() {
     // Only restrict if order is already cancelled or delivered (checked above)
 
     setShowCancelDialog(true);
+  };
+  const handleSavePhone = async () => {
+    const trimmedPhone = editablePhone.trim();
+    try {
+      setIsSavingPhone(true);
+      await userAPI.updateProfile({
+        phone: trimmedPhone
+      });
+      updateUserProfile({
+        phone: trimmedPhone || null
+      });
+      setOrder(prev => prev ? {
+        ...prev,
+        userPhone: trimmedPhone || null
+      } : prev);
+      toast.success("Customer number updated");
+      setShowPhoneDialog(false);
+    } catch (error) {
+      console.error("Error updating customer number:", error);
+      toast.error(error?.response?.data?.message || "Failed to update customer number");
+    } finally {
+      setIsSavingPhone(false);
+    }
+  };
+  const handleSaveDeliveryInstructions = async () => {
+    try {
+      setIsSavingInstructions(true);
+      const trimmedInstructions = deliveryInstructions.trim();
+      await orderAPI.updateDeliveryInstructions(orderId, trimmedInstructions);
+      setOrder(prev => prev ? {
+        ...prev,
+        address: {
+          ...(prev.address || {}),
+          deliveryInstructions: trimmedInstructions
+        }
+      } : prev);
+      toast.success(trimmedInstructions ? "Delivery instructions updated" : "Delivery instructions cleared");
+      setShowInstructionsDialog(false);
+    } catch (error) {
+      console.error("Error updating delivery instructions:", error);
+      toast.error(error?.response?.data?.message || "Failed to update delivery instructions");
+    } finally {
+      setIsSavingInstructions(false);
+    }
   };
   const handleConfirmCancel = async () => {
     if (!cancellationReason.trim()) {
@@ -853,7 +918,7 @@ export default function OrderTracking() {
       }} transition={{
         delay: 0.7
       }}>
-          <SectionItem icon={Phone} title={order?.userName || order?.userId?.fullName || order?.userId?.name || profile?.fullName || profile?.name || 'Customer'} subtitle={order?.userPhone || order?.userId?.phone || profile?.phone || defaultAddress?.phone || 'Phone number not available'} rightContent={<span className="text-green-600 font-medium text-sm">Edit</span>} />
+          <SectionItem icon={Phone} title={customerName} subtitle={customerPhone || 'Phone number not available'} onClick={() => setShowPhoneDialog(true)} rightContent={<span className="text-green-600 font-medium text-sm">Edit</span>} />
           <SectionItem icon={HomeIcon} title="Delivery at Location" subtitle={(() => {
           // Priority 1: Use order address formattedAddress (live location address)
           if (order?.address?.formattedAddress && order.address.formattedAddress !== "Select location") {
@@ -891,8 +956,8 @@ export default function OrderTracking() {
             }
           }
           return 'Add delivery address';
-        })()} rightContent={<span className="text-green-600 font-medium text-sm">Edit</span>} />
-          <SectionItem icon={MessageSquare} title="Add delivery instructions" subtitle="" />
+        })()} showArrow={false} subtitleClassName="whitespace-normal break-words leading-5" />
+          <SectionItem icon={MessageSquare} title="Add delivery instructions" subtitle={currentDeliveryInstructions || "Help your delivery partner find you faster"} onClick={() => setShowInstructionsDialog(true)} subtitleClassName={currentDeliveryInstructions ? "whitespace-normal break-words leading-5" : "truncate"} />
         </motion.div>
 
         {/* Restaurant Section */}
@@ -956,6 +1021,83 @@ export default function OrderTracking() {
       </div>
 
       {/* Cancel Order Dialog */}
+      <Dialog open={showPhoneDialog} onOpenChange={setShowPhoneDialog}>
+        <DialogContent className="w-[92%] max-w-[360px] overflow-hidden rounded-[24px] border-0 p-0 shadow-2xl [&>button]:right-4 [&>button]:top-4 [&>button]:h-8 [&>button]:w-8 [&>button]:rounded-full [&>button]:border [&>button]:border-green-100 [&>button]:bg-white [&>button]:text-gray-500 [&>button]:opacity-100">
+          <div className="h-1.5 w-full bg-green-600" />
+          <div className="px-5 pb-5 pt-4">
+            <DialogHeader className="space-y-1 border-b border-green-50 pb-4 text-left">
+              <DialogTitle className="text-lg font-semibold text-gray-900">
+              Edit customer number
+              </DialogTitle>
+              <p className="pr-8 text-sm leading-5 text-gray-500">
+                Keep the pickup contact updated so the delivery partner can reach you easily.
+              </p>
+            </DialogHeader>
+            <div className="space-y-2 pt-4">
+              <label className="block text-sm font-medium text-gray-700">
+                Phone number
+              </label>
+              <div className="rounded-2xl border border-green-100 bg-green-50/50 p-2">
+                <input
+                  type="tel"
+                  value={editablePhone}
+                  onChange={e => setEditablePhone(e.target.value)}
+                  placeholder="Enter phone number"
+                  className="w-full rounded-xl border border-green-200 bg-white px-4 py-3 text-base text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-green-500 focus:ring-2 focus:ring-green-100"
+                  disabled={isSavingPhone}
+                />
+              </div>
+            </div>
+            <div className="mt-5 flex gap-3">
+              <Button type="button" variant="outline" className="h-11 flex-1 rounded-xl border-gray-200 text-gray-700" onClick={() => setShowPhoneDialog(false)} disabled={isSavingPhone}>
+                Cancel
+              </Button>
+              <Button type="button" className="h-11 flex-1 rounded-xl bg-green-600 text-white shadow-sm hover:bg-green-700" onClick={handleSavePhone} disabled={isSavingPhone}>
+                {isSavingPhone ? "Saving..." : "Save"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showInstructionsDialog} onOpenChange={setShowInstructionsDialog}>
+        <DialogContent className="w-[92%] max-w-[380px] overflow-hidden rounded-[24px] border-0 p-0 shadow-2xl [&>button]:right-4 [&>button]:top-4 [&>button]:h-8 [&>button]:w-8 [&>button]:rounded-full [&>button]:border [&>button]:border-green-100 [&>button]:bg-white [&>button]:text-gray-500 [&>button]:opacity-100">
+          <div className="h-1.5 w-full bg-green-600" />
+          <div className="px-5 pb-5 pt-4">
+            <DialogHeader className="space-y-1 border-b border-green-50 pb-4 text-left">
+              <DialogTitle className="text-lg font-semibold text-gray-900">
+                Delivery instructions
+              </DialogTitle>
+              <p className="pr-8 text-sm leading-5 text-gray-500">
+                Add a short note for the delivery partner like landmark, gate number, or entry guidance.
+              </p>
+            </DialogHeader>
+            <div className="space-y-2 pt-4">
+              <label className="block text-sm font-medium text-gray-700">
+                Instructions
+              </label>
+              <div className="rounded-2xl border border-green-100 bg-green-50/50 p-2">
+                <Textarea
+                  value={deliveryInstructions}
+                  onChange={e => setDeliveryInstructions(e.target.value)}
+                  placeholder="Example: Ring bell at flat 302, use side gate near the pharmacy."
+                  className="min-h-[120px] w-full resize-none rounded-xl border border-green-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-green-500 focus:ring-2 focus:ring-green-100"
+                  disabled={isSavingInstructions}
+                />
+              </div>
+            </div>
+            <div className="mt-5 flex gap-3">
+              <Button type="button" variant="outline" className="h-11 flex-1 rounded-xl border-gray-200 text-gray-700" onClick={() => setShowInstructionsDialog(false)} disabled={isSavingInstructions}>
+                Cancel
+              </Button>
+              <Button type="button" className="h-11 flex-1 rounded-xl bg-green-600 text-white shadow-sm hover:bg-green-700" onClick={handleSaveDeliveryInstructions} disabled={isSavingInstructions}>
+                {isSavingInstructions ? "Saving..." : "Save"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
         <DialogContent className="sm:max-w-xl w-[95%] max-w-[600px]">
           <DialogHeader>

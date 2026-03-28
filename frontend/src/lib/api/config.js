@@ -381,6 +381,7 @@ export const API_ENDPOINTS = {
     CREATE: "/order",
     LIST: "/order",
     DETAILS: "/order/:id",
+    DELIVERY_INSTRUCTIONS: "/order/:id/delivery-instructions",
     UPDATE_STATUS: "/order/:id/status",
     VERIFY_PAYMENT: "/order/verify-payment",
     CALCULATE: "/order/calculate",
@@ -435,7 +436,8 @@ export const API_ENDPOINTS = {
     ADMIN_CREATE_PLAN: "/admin/subscriptions/create-plan",
     ADMIN_UPDATE_PRICE: "/admin/subscriptions/update-price",
     ADMIN_TOGGLE_PLAN: "/admin/subscriptions/toggle-plan",
-    ADMIN_RESTAURANTS: "/admin/subscriptions/restaurants"
+    ADMIN_RESTAURANTS: "/admin/subscriptions/restaurants",
+    ADMIN_HISTORY: "/admin/subscriptions/history"
   },
   // Notification endpoints
   NOTIFICATION: {

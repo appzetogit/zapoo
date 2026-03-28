@@ -71,6 +71,11 @@ const orderSchema = new mongoose.Schema({
     },
     street: String,
     additionalDetails: String,
+    deliveryInstructions: {
+      type: String,
+      trim: true,
+      default: ''
+    },
     city: String,
     state: String,
     zipCode: String,
@@ -412,4 +417,3 @@ orderSchema.pre('save', function (next) {
 });
 
 export default mongoose.model('Order', orderSchema);
-
