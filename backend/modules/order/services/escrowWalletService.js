@@ -59,6 +59,10 @@ export const releaseEscrow = async (orderId) => {
     }
 
     if (settlement.escrowStatus !== 'held') {
+      // Idempotent release: if already released, just return settlement
+      if (settlement.escrowStatus === 'released') {
+        return settlement;
+      }
       throw new Error(`Escrow not in held status. Current status: ${settlement.escrowStatus}`);
     }
 

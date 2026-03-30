@@ -1216,6 +1216,18 @@ export const confirmOrderId = asyncHandler(async (req, res) => {
           console.warn('⚠️ Socket.IO not initialized, skipping customer notification');
         }
 
+        // Also send FCM push to user for out_for_delivery
+        try {
+          const {
+            notifyUserOrderUpdate
+          } = await import('../../order/services/userNotificationService.js');
+          if (notifyUserOrderUpdate) {
+            await notifyUserOrderUpdate(updatedOrder._id.toString(), 'out_for_delivery');
+          }
+        } catch (notifError) {
+          console.error('Error sending customer FCM notification:', notifError);
+        }
+
       } catch (notifError) {
         console.error('Error sending customer notification:', notifError);
         // Don't fail the response if notification fails

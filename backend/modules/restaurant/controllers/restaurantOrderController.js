@@ -4,6 +4,7 @@ import Restaurant from '../models/Restaurant.js';
 import { successResponse, errorResponse } from '../../../shared/utils/response.js';
 import asyncHandler from '../../../shared/middleware/asyncHandler.js';
 import { notifyRestaurantOrderUpdate } from '../../order/services/restaurantNotificationService.js';
+import { notifyUserOrderUpdate } from '../../order/services/userNotificationService.js';
 import { notifyNextDeliveryPartner } from '../../order/services/deliveryAssignmentService.js';
 import mongoose from 'mongoose';
 
@@ -287,6 +288,7 @@ export const acceptOrder = asyncHandler(async (req, res) => {
     // Notify about status update
     try {
       await notifyRestaurantOrderUpdate(order._id.toString(), 'confirmed');
+      await notifyUserOrderUpdate(order._id.toString(), 'confirmed');
     } catch (notifError) {
       console.error('Error sending notification:', notifError);
     }
@@ -396,6 +398,7 @@ export const rejectOrder = asyncHandler(async (req, res) => {
     // Notify about status update
     try {
       await notifyRestaurantOrderUpdate(order._id.toString(), 'cancelled');
+      await notifyUserOrderUpdate(order._id.toString(), 'cancelled');
     } catch (notifError) {
       console.error('Error sending notification:', notifError);
     }
@@ -465,6 +468,7 @@ export const markOrderPreparing = asyncHandler(async (req, res) => {
     if (!wasAlreadyPreparing) {
       try {
         await notifyRestaurantOrderUpdate(order._id.toString(), 'preparing');
+        await notifyUserOrderUpdate(order._id.toString(), 'preparing');
       } catch (notifError) {
         console.error('Error sending notification:', notifError);
       }
@@ -604,6 +608,7 @@ export const markOrderReady = asyncHandler(async (req, res) => {
     const populatedOrder = await Order.findById(order._id).populate('restaurantId', 'name location address phone').populate('userId', 'name phone').populate('deliveryPartnerId', 'name phone').lean();
     try {
       await notifyRestaurantOrderUpdate(order._id.toString(), 'ready');
+      await notifyUserOrderUpdate(order._id.toString(), 'ready');
     } catch (notifError) {
       console.error('Error sending restaurant notification:', notifError);
     }

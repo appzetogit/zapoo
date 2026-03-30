@@ -2,6 +2,7 @@ import Order from '../models/Order.js';
 import Payment from '../../payment/models/Payment.js';
 import Restaurant from '../../restaurant/models/Restaurant.js';
 import mongoose from 'mongoose';
+import { sendNotificationToUser } from '../../notification/utils/pushNotificationHelper.js';
 
 // Dynamic import to avoid circular dependency
 let getIO = null;
@@ -179,6 +180,19 @@ export async function notifyRestaurantNewOrder(order, restaurantId, paymentMetho
         message: `Restaurant ${normalizedRestaurantId} (${order.restaurantName}) is not connected. Order notification not sent.`
       };
     }
+
+    // Send FCM notification to restaurant (always send)
+    try {
+      const normalizedRestaurantId = restaurantId?.toString() || restaurantId;
+      await sendNotificationToUser(normalizedRestaurantId, 'restaurant', '🔔 New Order Received!', `Order #${order.orderId} for ₹${order.pricing?.total ?? 0}`, {
+        orderId: order.orderId,
+        orderMongoId: order._id?.toString(),
+        status: order.status,
+        type: 'new_order'
+      });
+    } catch (pushError) {
+      console.error('❌ [FCM] Error sending restaurant new order notification:', pushError);
+    }
     return {
       success: true,
       restaurantId,
@@ -213,6 +227,37 @@ export async function notifyRestaurantOrderUpdate(orderId, status) {
       status,
       updatedAt: new Date()
     });
+
+    // Send FCM notification to restaurant for status update (always send)
+    try {
+      const normalizedStatus = status || order.status;
+      let title = 'Order Update';
+      let body = `Order #${order.orderId} status is now ${normalizedStatus}`;
+      if (normalizedStatus === 'delivered') {
+        title = '✅ Order Delivered!';
+        body = `Order #${order.orderId} has been delivered.`;
+      } else if (normalizedStatus === 'cancelled') {
+        title = '❌ Order Cancelled';
+        body = `Order #${order.orderId} was cancelled.`;
+      } else if (normalizedStatus === 'ready') {
+        title = '🥡 Order Ready';
+        body = `Order #${order.orderId} is ready for pickup.`;
+      } else if (normalizedStatus === 'preparing' || normalizedStatus === 'confirmed') {
+        title = '🍳 Order Accepted';
+        body = `Order #${order.orderId} is being prepared.`;
+      } else if (normalizedStatus === 'out_for_delivery') {
+        title = '🚴 Out for Delivery';
+        body = `Order #${order.orderId} is out for delivery.`;
+      }
+      await sendNotificationToUser(order.restaurantId?.toString() || order.restaurantId, 'restaurant', title, body, {
+        orderId: order.orderId,
+        orderMongoId: order._id?.toString(),
+        status: normalizedStatus,
+        type: 'order_update'
+      });
+    } catch (pushError) {
+      console.error('❌ [FCM] Error sending restaurant status notification:', pushError);
+    }
   } catch (error) {
     console.error('Error notifying restaurant about order update:', error);
     throw error;

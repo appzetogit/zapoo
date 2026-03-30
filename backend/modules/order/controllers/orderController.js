@@ -465,6 +465,21 @@ export const createOrder = async (req, res) => {
         });
       }
 
+      // Notify user about order placement (FCM)
+      try {
+        const {
+          sendNotificationToUser
+        } = await import('../../notification/utils/pushNotificationHelper.js');
+        await sendNotificationToUser(userId, 'user', '✅ Order Placed Successfully!', `Your order #${order.orderId} has been placed. Waiting for restaurant to prepare.`, {
+          orderId: order.orderId,
+          orderMongoId: order._id?.toString(),
+          status: order.status,
+          type: 'new_order'
+        });
+      } catch (fcmError) {
+        logger.error('❌ Error sending FCM notification to user for COD order:', fcmError);
+      }
+
       // Respond to client (no Razorpay details for COD)
       return res.status(201).json({
         success: true,
@@ -711,6 +726,21 @@ export const verifyOrderPayment = async (req, res) => {
       // Don't fail payment verification if notification fails
       // Order is still saved and restaurant can fetch it via API
       // But log it as critical for debugging
+    }
+
+    // Notify user about payment success (FCM)
+    try {
+      const {
+        sendNotificationToUser
+      } = await import('../../notification/utils/pushNotificationHelper.js');
+      await sendNotificationToUser(userId, 'user', '✅ Payment Successful! Order Confirmed', `Your order #${order.orderId} has been confirmed.`, {
+        orderId: order.orderId,
+        orderMongoId: order._id?.toString(),
+        status: order.status,
+        type: 'payment_success'
+      });
+    } catch (pushError) {
+      logger.error('❌ [FCM] Error sending to user:', pushError);
     }
     res.json({
       success: true,

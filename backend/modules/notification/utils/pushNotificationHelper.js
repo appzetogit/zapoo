@@ -138,10 +138,24 @@ export async function sendPushNotification(tokens, payload) {
  */
 export async function sendNotificationToUser(userId, role, title, body, data = {}) {
   try {
+    const defaultClickUrlByRole = {
+      user: '/orders',
+      restaurant: '/orders',
+      delivery: '/delivery',
+      admin: '/admin'
+    };
+    const normalizedRole = role || 'user';
+    const clickUrl = data.clickUrl || defaultClickUrlByRole[normalizedRole] || '/';
+    const enrichedData = {
+      target: normalizedRole,
+      clickUrl,
+      ...data
+    };
+
     const payload = {
       title,
       body,
-      data
+      data: enrichedData
     };
     const tokensRaw = await DeviceToken.find({
       userId,

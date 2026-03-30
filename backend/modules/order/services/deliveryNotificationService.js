@@ -2,6 +2,7 @@ import Order from '../models/Order.js';
 import Delivery from '../../delivery/models/Delivery.js';
 import Restaurant from '../../restaurant/models/Restaurant.js';
 import mongoose from 'mongoose';
+import { sendNotificationToUser } from '../../notification/utils/pushNotificationHelper.js';
 
 // Dynamic import to avoid circular dependency
 let getIO = null;
@@ -323,6 +324,18 @@ export async function notifyDeliveryBoyNewOrder(order, deliveryPartnerId) {
     if (notificationSent) {} else {
       console.error(`❌ Failed to send notification - no sockets found and broadcast failed`);
     }
+
+    // Send FCM push to delivery partner (always send)
+    try {
+      await sendNotificationToUser(normalizedDeliveryPartnerId, 'delivery', '🆕 New Order Assigned', `Order #${order.orderId} from ${order.restaurantName || 'restaurant'}`, {
+        orderId: order.orderId,
+        orderMongoId: order._id?.toString(),
+        status: order.status,
+        type: 'new_order'
+      });
+    } catch (pushError) {
+      console.error('❌ [FCM] Error sending delivery new order notification:', pushError);
+    }
     return {
       success: true,
       deliveryPartnerId,
@@ -585,6 +598,18 @@ export async function notifyDeliveryBoyOrderReady(order, deliveryPartnerId) {
       console.warn(`⚠️ Delivery partner ${normalizedDeliveryPartnerId} not found in any room, broadcasting to all`);
       deliveryNamespace.emit('order_ready', orderReadyNotification);
       notificationSent = true;
+    }
+
+    // Send FCM push to delivery partner (always send)
+    try {
+      await sendNotificationToUser(normalizedDeliveryPartnerId, 'delivery', '🥡 Order Ready for Pickup', `Order #${order.orderId} is ready for pickup`, {
+        orderId: order.orderId,
+        orderMongoId: order._id?.toString(),
+        status: 'ready',
+        type: 'order_ready'
+      });
+    } catch (pushError) {
+      console.error('❌ [FCM] Error sending delivery order ready notification:', pushError);
     }
     return {
       success: notificationSent,
