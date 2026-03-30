@@ -3,9 +3,8 @@ import Restaurant from "../../restaurant/models/Restaurant.js";
 import Delivery from "../../delivery/models/Delivery.js";
 import CallSession from "../models/CallSession.js";
 import {
-  allocateNumberForOrder,
-  NoFreeVirtualNumberError,
-  releaseNumberForOrder,
+  selectVirtualNumberByCity,
+  NoVirtualNumberFoundError,
 } from "../services/numberPoolService.js";
 import { initiateMaskedCall } from "../services/exotelService.js";
 
@@ -160,15 +159,12 @@ export const initiateCall = async (req, res) => {
 
     let virtualNumberDoc;
     try {
-      virtualNumberDoc = await allocateNumberForOrder({
-        orderId: order.orderId,
-        city,
-      });
+      virtualNumberDoc = await selectVirtualNumberByCity({ city });
     } catch (err) {
-      if (err instanceof NoFreeVirtualNumberError) {
+      if (err instanceof NoVirtualNumberFoundError) {
         return res.status(503).json({
           success: false,
-          message: "No free virtual numbers available in this city",
+          message: "No virtual numbers available in this city",
         });
       }
       throw err;
@@ -205,7 +201,6 @@ export const initiateCall = async (req, res) => {
         },
       });
     } catch (err) {
-      await releaseNumberForOrder(order.orderId);
       return res.status(500).json({
         success: false,
         message: "Failed to initiate call",

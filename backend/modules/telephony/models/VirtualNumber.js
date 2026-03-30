@@ -15,29 +15,11 @@ const virtualNumberSchema = new mongoose.Schema(
       trim: true,
       lowercase: true,
     },
-    status: {
-      type: String,
-      enum: ["free", "allocated"],
-      default: "free",
-      index: true,
-    },
-    allocated_order_id: {
-      type: String,
-      index: true,
-      default: null,
-    },
-    allocated_at: {
-      type: Date,
-      default: null,
-      index: true,
-    },
   },
   {
     timestamps: true,
   }
 );
-
-virtualNumberSchema.index({ city: 1, status: 1 });
 
 export default mongoose.model("VirtualNumber", virtualNumberSchema);
 

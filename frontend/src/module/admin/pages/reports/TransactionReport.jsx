@@ -152,6 +152,22 @@ export default function TransactionReport() {
     })
   }
 
+  const tableColumns = [
+    { key: "si", label: "SI", minWidth: "56px", align: "left" },
+    { key: "orderId", label: "Order Id", minWidth: "160px", align: "left" },
+    { key: "restaurant", label: "Restaurant", minWidth: "190px", align: "left" },
+    { key: "customerName", label: "Customer Name", minWidth: "170px", align: "left" },
+    { key: "totalItemAmount", label: "Total Item Amount", minWidth: "140px", align: "right" },
+    { key: "itemDiscount", label: "Item Discount", minWidth: "130px", align: "right" },
+    { key: "couponDiscount", label: "Coupon Discount", minWidth: "140px", align: "right" },
+    { key: "referralDiscount", label: "Referral Discount", minWidth: "140px", align: "right" },
+    { key: "discountedAmount", label: "Discounted Amount", minWidth: "145px", align: "right" },
+    { key: "vatTax", label: "Vat/Tax", minWidth: "120px", align: "right" },
+    { key: "deliveryCharge", label: "Delivery Charge", minWidth: "140px", align: "right" },
+    { key: "recommendedItemFee", label: "Recommended Fee", minWidth: "145px", align: "right" },
+    { key: "orderAmount", label: "Order Amount", minWidth: "145px", align: "right" },
+  ]
+
   const activeFiltersCount = (filters.zone !== "All Zones" ? 1 : 0) + (filters.restaurant !== "All restaurants" ? 1 : 0) + (filters.time !== "All Time" ? 1 : 0)
 
   const formatCurrency = (amount) => {
@@ -370,11 +386,11 @@ export default function TransactionReport() {
 
         {/* Order Transactions Section */}
         <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-3">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
+          <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between mb-3">
             <h2 className="text-base font-bold text-slate-900">Order Transactions {filteredTransactions.length}</h2>
 
-            <div className="flex items-center gap-2">
-              <div className="relative flex-1 sm:flex-initial min-w-[180px]">
+            <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+              <div className="relative min-w-[180px] flex-1 sm:flex-none sm:w-[240px]">
                 <input
                   type="text"
                   placeholder="Search by Order ID"
@@ -425,28 +441,24 @@ export default function TransactionReport() {
 
           {/* Table */}
           <div className="overflow-x-auto scrollbar-hide">
-            <table className="w-full" style={{ tableLayout: 'fixed', width: '100%' }}>
+            <table className="min-w-[1720px] w-max border-separate border-spacing-0">
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
-                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '3%' }}>SI</th>
-                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '7%' }}>Order Id</th>
-                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '10%' }}>Restaurant</th>
-                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '10%' }}>Customer Name</th>
-                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '9%' }}>Total Item Amount</th>
-                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '8%' }}>Item Discount</th>
-                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '8%' }}>Coupon Discount</th>
-                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '8%' }}>Referral Discount</th>
-                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '8%' }}>Discounted Amount</th>
-                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '7%' }}>Vat/Tax</th>
-                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '8%' }}>Delivery Charge</th>
-                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '8%' }}>Recommended Fee</th>
-                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '8%' }}>Order Amount</th>
+                  {tableColumns.map((column) => (
+                    <th
+                      key={column.key}
+                      className={`px-3 py-2 text-[10px] font-bold text-slate-700 uppercase tracking-wider whitespace-nowrap ${column.align === "right" ? "text-right" : "text-left"}`}
+                      style={{ minWidth: column.minWidth }}
+                    >
+                      {column.label}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-slate-100">
                 {filteredTransactions.length === 0 ? (
                   <tr>
-                    <td colSpan={12} className="px-6 py-20 text-center">
+                    <td colSpan={tableColumns.length} className="px-6 py-20 text-center">
                       <div className="flex flex-col items-center justify-center">
                         <p className="text-lg font-semibold text-slate-700 mb-1">No Data Found</p>
                         <p className="text-sm text-slate-500">No transactions match your search</p>
@@ -459,54 +471,54 @@ export default function TransactionReport() {
                       key={transaction.id}
                       className="hover:bg-slate-50 transition-colors"
                     >
-                      <td className="px-1.5 py-1">
-                        <span className="text-[10px] font-medium text-slate-700">{index + 1}</span>
+                      <td className="px-3 py-3 align-top" style={{ minWidth: tableColumns[0].minWidth }}>
+                        <span className="text-xs font-medium text-slate-700 whitespace-nowrap">{index + 1}</span>
                       </td>
-                      <td className="px-1.5 py-1">
-                        <span className="text-[10px] text-slate-700">{transaction.orderId}</span>
+                      <td className="px-3 py-3 align-top" style={{ minWidth: tableColumns[1].minWidth }}>
+                        <span className="text-xs text-slate-700 break-words leading-5 block">{transaction.orderId}</span>
                       </td>
-                      <td className="px-1.5 py-1">
-                        <span className="text-[10px] text-slate-700 truncate block">{transaction.restaurant}</span>
+                      <td className="px-3 py-3 align-top" style={{ minWidth: tableColumns[2].minWidth }}>
+                        <span className="text-xs text-slate-700 break-words leading-5 block">{transaction.restaurant}</span>
                       </td>
-                      <td className="px-1.5 py-1">
-                        <span className={`text-[10px] truncate block ${transaction.customerName === "Invalid Customer Data"
+                      <td className="px-3 py-3 align-top" style={{ minWidth: tableColumns[3].minWidth }}>
+                        <span className={`text-xs break-words leading-5 block ${transaction.customerName === "Invalid Customer Data"
                           ? "text-red-600 font-semibold"
                           : "text-slate-700"
                           }`}>
                           {transaction.customerName}
                         </span>
                       </td>
-                      <td className="px-1.5 py-1">
-                        <span className="text-[10px] text-slate-700">{formatFullCurrency(transaction.totalItemAmount)}</span>
+                      <td className="px-3 py-3 align-top text-right" style={{ minWidth: tableColumns[4].minWidth }}>
+                        <span className="text-xs text-slate-700 whitespace-nowrap">{formatFullCurrency(transaction.totalItemAmount)}</span>
                       </td>
-                      <td className="px-1.5 py-1">
-                        <span className="text-[10px] text-slate-700">{formatFullCurrency(transaction.itemDiscount)}</span>
+                      <td className="px-3 py-3 align-top text-right" style={{ minWidth: tableColumns[5].minWidth }}>
+                        <span className="text-xs text-slate-700 whitespace-nowrap">{formatFullCurrency(transaction.itemDiscount)}</span>
                       </td>
-                      <td className="px-1.5 py-1">
-                        <span className="text-[10px] text-slate-700">{formatFullCurrency(transaction.couponDiscount)}</span>
+                      <td className="px-3 py-3 align-top text-right" style={{ minWidth: tableColumns[6].minWidth }}>
+                        <span className="text-xs text-slate-700 whitespace-nowrap">{formatFullCurrency(transaction.couponDiscount)}</span>
                       </td>
-                      <td className="px-1.5 py-1">
-                        <span className="text-[10px] text-slate-700">{formatFullCurrency(transaction.referralDiscount)}</span>
+                      <td className="px-3 py-3 align-top text-right" style={{ minWidth: tableColumns[7].minWidth }}>
+                        <span className="text-xs text-slate-700 whitespace-nowrap">{formatFullCurrency(transaction.referralDiscount)}</span>
                       </td>
-                      <td className="px-1.5 py-1">
-                        <span className="text-[10px] text-slate-700">
+                      <td className="px-3 py-3 align-top text-right" style={{ minWidth: tableColumns[8].minWidth }}>
+                        <span className="text-xs text-slate-700 whitespace-nowrap">
                           {transaction.discountedAmount >= 1000
                             ? formatCurrency(transaction.discountedAmount)
                             : formatFullCurrency(transaction.discountedAmount)
                           }
                         </span>
                       </td>
-                      <td className="px-1.5 py-1">
-                        <span className="text-[10px] text-slate-700">{formatFullCurrency(transaction.vatTax)}</span>
+                      <td className="px-3 py-3 align-top text-right" style={{ minWidth: tableColumns[9].minWidth }}>
+                        <span className="text-xs text-slate-700 whitespace-nowrap">{formatFullCurrency(transaction.vatTax)}</span>
                       </td>
-                      <td className="px-1.5 py-1">
-                        <span className="text-[10px] text-slate-700">{formatFullCurrency(transaction.deliveryCharge)}</span>
+                      <td className="px-3 py-3 align-top text-right" style={{ minWidth: tableColumns[10].minWidth }}>
+                        <span className="text-xs text-slate-700 whitespace-nowrap">{formatFullCurrency(transaction.deliveryCharge)}</span>
                       </td>
-                      <td className="px-1.5 py-1">
-                        <span className="text-[10px] text-slate-700">{formatFullCurrency(transaction.recommendedItemFee || 0)}</span>
+                      <td className="px-3 py-3 align-top text-right" style={{ minWidth: tableColumns[11].minWidth }}>
+                        <span className="text-xs text-slate-700 whitespace-nowrap">{formatFullCurrency(transaction.recommendedItemFee || 0)}</span>
                       </td>
-                      <td className="px-1.5 py-1">
-                        <span className="text-[10px] font-medium text-slate-900">{formatFullCurrency(transaction.orderAmount)}</span>
+                      <td className="px-3 py-3 align-top text-right" style={{ minWidth: tableColumns[12].minWidth }}>
+                        <span className="text-xs font-medium text-slate-900 whitespace-nowrap">{formatFullCurrency(transaction.orderAmount)}</span>
                       </td>
                     </tr>
                   ))
