@@ -611,13 +611,22 @@ export const markOrderReady = asyncHandler(async (req, res) => {
     // If no delivery partner assigned yet, trigger sequential notification (one-by-one within 5km)
     if (!populatedOrder?.deliveryPartnerId) {
       try {
-        const restaurantCoords = populatedOrder?.restaurantId?.location?.coordinates;
+        let restaurantCoords = populatedOrder?.restaurantId?.location?.coordinates;
+        if (!Array.isArray(restaurantCoords) || restaurantCoords.length < 2) {
+          // Fallback: fetch restaurant from DB if population is missing location
+          const restaurantDoc = await Restaurant.findById(order.restaurantId).select('location.coordinates').lean();
+          restaurantCoords = restaurantDoc?.location?.coordinates;
+        }
+
         if (Array.isArray(restaurantCoords) && restaurantCoords.length >= 2) {
           const [restaurantLng, restaurantLat] = restaurantCoords;
           const freshOrder = await Order.findById(order._id);
           if (freshOrder && !freshOrder.deliveryPartnerId) {
+            console.log('🧭 [DeliveryAssign] Trigger on ready for order', order.orderId || order._id.toString());
             await notifyNextDeliveryPartner(freshOrder, restaurantLat, restaurantLng);
           }
+        } else {
+          console.error('❌ [DeliveryAssign] Restaurant location missing on ready for order', order.orderId || order._id.toString());
         }
       } catch (assignmentError) {
         console.error('❌ Error triggering sequential notification on ready:', assignmentError);

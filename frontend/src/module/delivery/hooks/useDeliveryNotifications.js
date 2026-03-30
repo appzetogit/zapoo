@@ -11,6 +11,7 @@ export const useDeliveryNotifications = () => {
   // Step 1: All refs first (unconditional)
   const socketRef = useRef(null);
   const audioRef = useRef(null);
+  const deliveryPartnerIdRef = useRef(null);
 
   // Step 2: All state hooks (unconditional)
   const [newOrder, setNewOrder] = useState(null);
@@ -66,6 +67,10 @@ export const useDeliveryNotifications = () => {
 
   // Step 4: All effects (unconditional hook calls, conditional logic inside)
   // Track user interaction for autoplay policy
+  useEffect(() => {
+    deliveryPartnerIdRef.current = deliveryPartnerId;
+  }, [deliveryPartnerId]);
+
   useEffect(() => {
     const handleUserInteraction = () => {
       userInteractedRef.current = true;
@@ -239,8 +244,12 @@ export const useDeliveryNotifications = () => {
       return; // Don't try to connect with invalid URL
     }
     if (socketRef.current) {
-      if (socketRef.current.connected && deliveryPartnerId) {
-        socketRef.current.emit('join-delivery', deliveryPartnerId);
+      if (deliveryPartnerId) {
+        if (socketRef.current.connected) {
+          socketRef.current.emit('join-delivery', deliveryPartnerId);
+        } else {
+          socketRef.current.connect();
+        }
       }
       return;
     }
@@ -264,8 +273,9 @@ export const useDeliveryNotifications = () => {
     });
     socketRef.current.on('connect', () => {
       setIsConnected(true);
-      if (deliveryPartnerId) {
-        socketRef.current.emit('join-delivery', deliveryPartnerId);
+      const latestId = deliveryPartnerIdRef.current;
+      if (latestId) {
+        socketRef.current.emit('join-delivery', latestId);
       }
     });
     socketRef.current.on('delivery-room-joined', data => {});
@@ -293,8 +303,9 @@ export const useDeliveryNotifications = () => {
     socketRef.current.on('reconnect_attempt', attemptNumber => {});
     socketRef.current.on('reconnect', attemptNumber => {
       setIsConnected(true);
-      if (deliveryPartnerId) {
-        socketRef.current.emit('join-delivery', deliveryPartnerId);
+      const latestId = deliveryPartnerIdRef.current;
+      if (latestId) {
+        socketRef.current.emit('join-delivery', latestId);
       }
     });
     socketRef.current.on('new_order', orderData => {

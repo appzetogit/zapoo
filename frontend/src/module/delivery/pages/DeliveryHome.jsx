@@ -1344,18 +1344,44 @@ export default function DeliveryHome() {
       alertAudioRef.current.pause();
       alertAudioRef.current.currentTime = 0;
     }
-    const orderId = selectedRestaurant?.id || selectedRestaurant?.orderId || newOrder?.orderMongoId || newOrder?.orderId;
+    const orderId = newOrder?.orderMongoId
+      || newOrder?.orderId
+      || selectedRestaurant?.orderId
+      || selectedRestaurant?.orderMongoId
+      || selectedRestaurant?.id;
     if (orderId) {
       try {
         await deliveryAPI.rejectOrder(orderId);
       } catch (error) {
-        console.error('❌ Error rejecting order:', error);
-        toast.error(error.response?.data?.message || 'Failed to reject order. Please try again.');
-        return;
+        const status = error?.response?.status;
+        const message = error?.response?.data?.message || '';
+        // If order was already assigned or no longer available, just dismiss locally.
+        if (status === 400 || status === 403) {
+          if (message) {
+            toast.info(message);
+          } else {
+            toast.info('Order is no longer available.');
+          }
+        } else {
+          console.error('❌ Error rejecting order:', error);
+          toast.error(message || 'Failed to reject order. Please try again.');
+          return;
+        }
       }
     }
+    // Clear UI state so the rejected order is removed from screen
     setShowRejectPopup(false);
     setShowNewOrderPopup(false);
+    setShowreachedPickupPopup(false);
+    setShowOrderIdConfirmationPopup(false);
+    setShowReachedDropPopup(false);
+    setShowPaymentPage(false);
+    setShowOrderDeliveredAnimation(false);
+    setShowCustomerReviewPopup(false);
+    setSelectedRestaurant(null);
+    if (typeof clearNewOrder === 'function') {
+      clearNewOrder();
+    }
     setIsNewOrderPopupMinimized(false); // Reset minimized state
     setNewOrderDragY(0); // Reset drag position
     setRejectReason("");
@@ -2286,8 +2312,37 @@ export default function DeliveryHome() {
     newOrderSwipeStartY.current = 0;
   };
 
+  const getPickupBlockInfo = () => {
+    const orderStatus = selectedRestaurant?.orderStatus || selectedRestaurant?.status || '';
+    const deliveryPhase = selectedRestaurant?.deliveryPhase || selectedRestaurant?.deliveryState?.currentPhase || '';
+    const deliveryStateStatus = selectedRestaurant?.deliveryState?.status || '';
+    const isCancelled = orderStatus === 'cancelled' || deliveryPhase === 'cancelled' || deliveryStateStatus === 'cancelled';
+    if (isCancelled) {
+      return {
+        blocked: true,
+        reason: 'Order is cancelled. Pickup not allowed.'
+      };
+    }
+    const isPending = orderStatus === 'pending' || deliveryPhase === 'assigned' || deliveryStateStatus === 'assigned' || deliveryStateStatus === 'pending';
+    if (isPending) {
+      return {
+        blocked: true,
+        reason: 'Order is not ready for pickup yet.'
+      };
+    }
+    return {
+      blocked: false,
+      reason: ''
+    };
+  };
+
   // Handle Reached Pickup button swipe
   const handlereachedPickupTouchStart = e => {
+    const pickupBlock = getPickupBlockInfo();
+    if (pickupBlock.blocked) {
+      toast.error(pickupBlock.reason);
+      return;
+    }
     reachedPickupSwipeStartX.current = e.touches[0].clientX;
     reachedPickupSwipeStartY.current = e.touches[0].clientY;
     reachedPickupIsSwiping.current = false;
@@ -2314,6 +2369,12 @@ export default function DeliveryHome() {
     }
   };
   const handlereachedPickupTouchEnd = e => {
+    const pickupBlock = getPickupBlockInfo();
+    if (pickupBlock.blocked) {
+      toast.error(pickupBlock.reason);
+      setreachedPickupButtonProgress(0);
+      return;
+    }
     if (!reachedPickupIsSwiping.current) {
       setreachedPickupButtonProgress(0);
       return;
@@ -2333,6 +2394,14 @@ export default function DeliveryHome() {
       // Close popup after animation, confirm reached pickup, then show order ID confirmation popup
       setTimeout(async () => {
         setShowreachedPickupPopup(false);
+
+        // Block if order is cancelled/pending
+        const pickupBlockAtConfirm = getPickupBlockInfo();
+        if (pickupBlockAtConfirm.blocked) {
+          toast.error(pickupBlockAtConfirm.reason);
+          setShowreachedPickupPopup(false);
+          return;
+        }
 
         // Get order ID - prioritize orderId (string) over id (MongoDB _id) for better compatibility
         // Backend accepts both _id and orderId, but orderId is more reliable
@@ -2762,6 +2831,12 @@ export default function DeliveryHome() {
     // Disable swipe if bill image is not uploaded
     if (!billImageUploaded) {
       toast.error('Please upload bill image first');
+      setOrderIdConfirmButtonProgress(0);
+      return;
+    }
+    const pickupBlock = getPickupBlockInfo();
+    if (pickupBlock.blocked) {
+      toast.error(pickupBlock.reason);
       setOrderIdConfirmButtonProgress(0);
       return;
     }
@@ -7661,12 +7736,19 @@ export default function DeliveryHome() {
 
     {/* Reached Pickup Button with Swipe */}
     <div className="relative w-full">
-      <motion.div ref={reachedPickupButtonRef} className="relative w-full bg-green-600 rounded-full overflow-hidden shadow-xl" style={{
-        touchAction: 'pan-x'
-      }} // Prevent vertical scrolling, allow horizontal pan
-        onTouchStart={handlereachedPickupTouchStart} onTouchMove={handlereachedPickupTouchMove} onTouchEnd={handlereachedPickupTouchEnd} whileTap={{
+      <motion.div
+        ref={reachedPickupButtonRef}
+        className={`relative w-full rounded-full overflow-hidden shadow-xl ${getPickupBlockInfo().blocked ? 'bg-gray-400 opacity-60 cursor-not-allowed' : 'bg-green-600'}`}
+        style={{
+          touchAction: getPickupBlockInfo().blocked ? 'none' : 'pan-x'
+        }} // Prevent vertical scrolling, allow horizontal pan
+        onTouchStart={!getPickupBlockInfo().blocked ? handlereachedPickupTouchStart : undefined}
+        onTouchMove={!getPickupBlockInfo().blocked ? handlereachedPickupTouchMove : undefined}
+        onTouchEnd={!getPickupBlockInfo().blocked ? handlereachedPickupTouchEnd : undefined}
+        whileTap={!getPickupBlockInfo().blocked ? {
           scale: 0.98
-        }}>
+        } : {}}
+      >
         {/* Swipe progress background */}
         <motion.div className="absolute inset-0 bg-green-500 rounded-full" animate={{
           width: `${reachedPickupButtonProgress * 100}%`

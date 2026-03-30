@@ -13,6 +13,24 @@ async function getIOInstance() {
   return getIO ? getIO() : null;
 }
 
+function buildDeliveryRoomVariations(deliveryPartnerId, deliveryId) {
+  const rooms = new Set();
+  const normalizedId = deliveryPartnerId?.toString ? deliveryPartnerId.toString() : (deliveryPartnerId || '');
+  if (normalizedId) {
+    rooms.add(`delivery:${normalizedId}`);
+    if (mongoose.Types.ObjectId.isValid(normalizedId)) {
+      rooms.add(`delivery:${new mongoose.Types.ObjectId(normalizedId).toString()}`);
+    }
+  }
+  if (deliveryPartnerId) {
+    rooms.add(`delivery:${deliveryPartnerId}`);
+  }
+  if (deliveryId) {
+    rooms.add(`delivery:${deliveryId}`);
+  }
+  return Array.from(rooms);
+}
+
 /**
  * Check if delivery partner is connected to socket
  * @param {string} deliveryPartnerId - Delivery partner ID
@@ -30,7 +48,7 @@ export async function checkDeliveryPartnerConnection(deliveryPartnerId) {
     }
     const deliveryNamespace = io.of('/delivery');
     const normalizedId = deliveryPartnerId?.toString() || deliveryPartnerId;
-    const roomVariations = [`delivery:${normalizedId}`, `delivery:${deliveryPartnerId}`, ...(mongoose.Types.ObjectId.isValid(normalizedId) ? [`delivery:${new mongoose.Types.ObjectId(normalizedId).toString()}`] : [])];
+    let roomVariations = buildDeliveryRoomVariations(normalizedId, null);
     for (const room of roomVariations) {
       const sockets = await deliveryNamespace.in(room).fetchSockets();
       if (sockets.length > 0) {
@@ -39,6 +57,23 @@ export async function checkDeliveryPartnerConnection(deliveryPartnerId) {
           room,
           socketCount: sockets.length
         };
+      }
+    }
+    // Fallback: also try deliveryId-based room if available
+    if (mongoose.Types.ObjectId.isValid(normalizedId)) {
+      const delivery = await Delivery.findById(normalizedId).select('deliveryId').lean();
+      if (delivery?.deliveryId) {
+        roomVariations = buildDeliveryRoomVariations(normalizedId, delivery.deliveryId);
+        for (const room of roomVariations) {
+          const sockets = await deliveryNamespace.in(room).fetchSockets();
+          if (sockets.length > 0) {
+            return {
+              connected: true,
+              room,
+              socketCount: sockets.length
+            };
+          }
+        }
       }
     }
     return {
@@ -215,7 +250,7 @@ export async function notifyDeliveryBoyNewOrder(order, deliveryPartnerId) {
     const normalizedDeliveryPartnerId = deliveryPartnerId?.toString() || deliveryPartnerId;
 
     // Try multiple room formats to ensure we find the delivery partner
-    const roomVariations = [`delivery:${normalizedDeliveryPartnerId}`, `delivery:${deliveryPartnerId}`, ...(mongoose.Types.ObjectId.isValid(normalizedDeliveryPartnerId) ? [`delivery:${new mongoose.Types.ObjectId(normalizedDeliveryPartnerId).toString()}`] : [])];
+    const roomVariations = buildDeliveryRoomVariations(normalizedDeliveryPartnerId, deliveryPartner?.deliveryId);
 
     // Get all connected sockets in the delivery partner room
     let socketsInRoom = [];

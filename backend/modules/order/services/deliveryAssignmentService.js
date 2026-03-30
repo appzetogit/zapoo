@@ -9,7 +9,7 @@ import { notifyDeliveryBoyNewOrder, checkDeliveryPartnerConnection } from './del
 import { notifyRestaurantOrderUpdate } from './restaurantNotificationService.js';
 import { calculateCancellationRefund } from './cancellationRefundService.js';
 
-const ASSIGNMENT_TIMEOUT_MS = 30000;
+const ASSIGNMENT_TIMEOUT_MS = 300000; // 5 minutes to accept
 const assignmentTimeouts = new Map();
 
 function clearAssignmentTimeout(orderId) {
@@ -28,6 +28,18 @@ async function autoCancelIfUnassigned(orderId) {
     if (order.deliveryPartnerId) return;
     if (order.status === 'cancelled' || order.status === 'delivered') return;
     if (!['confirmed', 'preparing', 'ready'].includes(order.status)) return;
+    // If there is no active candidate, don't auto-cancel yet
+    if (!order.assignmentInfo?.currentCandidateId) return;
+    // Guard against stale timer if order was just notified
+    const lastNotifiedAt = order.assignmentInfo?.lastNotifiedAt ? new Date(order.assignmentInfo.lastNotifiedAt).getTime() : 0;
+    if (!lastNotifiedAt) {
+      console.warn(`⚠️ [DeliveryAssign] Auto-cancel skipped: missing lastNotifiedAt for order ${order.orderId || orderId}`);
+      return;
+    }
+    const elapsedMs = Date.now() - lastNotifiedAt;
+    if (elapsedMs < ASSIGNMENT_TIMEOUT_MS) {
+      return;
+    }
 
     order.status = 'cancelled';
     order.cancellationReason = 'Delivery partner unavailable';
@@ -225,6 +237,7 @@ export async function findNearestDeliveryBoys(restaurantLat, restaurantLng, rest
     }
 
     // Calculate distance and filter
+    const effectivePriorityDistance = Number(priorityDistance || 0) + 0.5; // small GPS tolerance
     let deliveryPartnersWithDistance = deliveryPartners.map(partner => {
       const location = partner.availability?.currentLocation;
       if (!location || !location.coordinates || location.coordinates.length < 2) {
@@ -250,7 +263,7 @@ export async function findNearestDeliveryBoys(restaurantLat, restaurantLng, rest
         longitude: lng,
         zoneId: partner.zoneId || null
       };
-    }).filter(partner => partner !== null && Number.isFinite(partner.distance) && partner.distance <= priorityDistance).sort((a, b) => a.distance - b.distance);
+    }).filter(partner => partner !== null && Number.isFinite(partner.distance) && partner.distance <= effectivePriorityDistance).sort((a, b) => a.distance - b.distance);
 
     if (deliveryPartners.length > 0 && deliveryPartnersWithDistance.length === 0) {
       try {
@@ -296,7 +309,7 @@ export async function findNearestDeliveryBoys(restaurantLat, restaurantLng, rest
           longitude: lng,
           zoneId: partner.zoneId || null
         };
-      }).filter(p => p && Number.isFinite(p.distance) && p.distance <= priorityDistance)
+      }).filter(p => p && Number.isFinite(p.distance) && p.distance <= effectivePriorityDistance)
         .sort((a, b) => a.distance - b.distance);
     }
 
@@ -454,7 +467,7 @@ export async function findNearestDeliveryBoy(restaurantLat, restaurantLng, resta
     }
 
     // Calculate distance for each delivery partner and filter by zone if applicable
-    const effectiveMaxDistance = Math.min(Number(maxDistance) || 0, 5);
+    const effectiveMaxDistance = Math.min(Number(maxDistance) || 0, 5) + 0.5; // small GPS tolerance
     const deliveryPartnersWithDistance = deliveryPartners.map(partner => {
       const location = partner.availability?.currentLocation;
       if (!location || !location.coordinates || location.coordinates.length < 2) {
@@ -522,6 +535,15 @@ export async function notifyNextDeliveryPartner(orderDoc, restaurantLat, restaur
 
   // Ensure assignmentInfo exists
   if (!orderDoc.assignmentInfo) orderDoc.assignmentInfo = {};
+
+  // If a candidate is already active (and not rejected), don't advance the queue
+  if (orderDoc.assignmentInfo.currentCandidateId) {
+    const currentId = orderDoc.assignmentInfo.currentCandidateId?.toString?.() || String(orderDoc.assignmentInfo.currentCandidateId);
+    const rejectedSet = new Set((orderDoc.assignmentInfo.rejectedDeliveryPartnerIds || []).map(id => id?.toString?.() || String(id)));
+    if (currentId && !rejectedSet.has(currentId)) {
+      return { notified: false, deliveryPartnerId: currentId };
+    }
+  }
 
   // Build candidate list if not present
   if (!Array.isArray(orderDoc.assignmentInfo.candidateDeliveryPartnerIds) || orderDoc.assignmentInfo.candidateDeliveryPartnerIds.length === 0) {
