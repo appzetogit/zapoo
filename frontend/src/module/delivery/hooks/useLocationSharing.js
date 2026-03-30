@@ -29,7 +29,9 @@ export const useLocationSharing = (orderId, enabled = false) => {
   const socketRef = useRef(null);
   const watchIdRef = useRef(null);
   const isSharingRef = useRef(false);
-  const backendUrl = API_BASE_URL.replace('/api', '');
+  let backendUrl = API_BASE_URL.replace('/api', '');
+  // Avoid IPv6 localhost resolution issues in some browsers
+  backendUrl = backendUrl.replace('://localhost', '://127.0.0.1');
   const startSharing = () => {
     if (!orderId) {
       console.error('Order ID is required for location sharing');

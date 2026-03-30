@@ -5,6 +5,69 @@ import Restaurant from '../../restaurant/models/Restaurant.js';
 import DeliveryWallet from '../../delivery/models/DeliveryWallet.js';
 import BusinessSettings from '../../admin/models/BusinessSettings.js';
 import mongoose from 'mongoose';
+import { notifyDeliveryBoyNewOrder, checkDeliveryPartnerConnection } from './deliveryNotificationService.js';
+import { notifyRestaurantOrderUpdate } from './restaurantNotificationService.js';
+import { calculateCancellationRefund } from './cancellationRefundService.js';
+
+const ASSIGNMENT_TIMEOUT_MS = 300000; // 5 minutes to accept
+const assignmentTimeouts = new Map();
+
+function clearAssignmentTimeout(orderId) {
+  const key = String(orderId);
+  const existing = assignmentTimeouts.get(key);
+  if (existing) {
+    clearTimeout(existing);
+    assignmentTimeouts.delete(key);
+  }
+}
+
+async function autoCancelIfUnassigned(orderId) {
+  try {
+    const order = await Order.findById(orderId);
+    if (!order) return;
+    if (order.deliveryPartnerId) return;
+    if (order.status === 'cancelled' || order.status === 'delivered') return;
+    if (!['confirmed', 'preparing', 'ready'].includes(order.status)) return;
+    // If there is no active candidate, don't auto-cancel yet
+    if (!order.assignmentInfo?.currentCandidateId) return;
+    // Guard against stale timer if order was just notified
+    const lastNotifiedAt = order.assignmentInfo?.lastNotifiedAt ? new Date(order.assignmentInfo.lastNotifiedAt).getTime() : 0;
+    if (!lastNotifiedAt) {
+      console.warn(`⚠️ [DeliveryAssign] Auto-cancel skipped: missing lastNotifiedAt for order ${order.orderId || orderId}`);
+      return;
+    }
+    const elapsedMs = Date.now() - lastNotifiedAt;
+    if (elapsedMs < ASSIGNMENT_TIMEOUT_MS) {
+      return;
+    }
+
+    order.status = 'cancelled';
+    order.cancellationReason = 'Delivery partner unavailable';
+    order.cancelledBy = 'system';
+    order.cancelledAt = new Date();
+    await order.save();
+
+    try {
+      await calculateCancellationRefund(order._id, order.cancellationReason);
+    } catch (refundErr) {
+      console.error(`❌ Auto-cancel refund calc failed for order ${order.orderId}:`, refundErr?.message || refundErr);
+    }
+
+    try {
+      await notifyRestaurantOrderUpdate(order._id.toString(), 'cancelled');
+    } catch (notifErr) {
+      console.error(`❌ Auto-cancel notify failed for order ${order.orderId}:`, notifErr?.message || notifErr);
+    }
+  } finally {
+    clearAssignmentTimeout(orderId);
+  }
+}
+
+function scheduleAssignmentTimeout(orderId) {
+  clearAssignmentTimeout(orderId);
+  const timeoutId = setTimeout(() => autoCancelIfUnassigned(orderId), ASSIGNMENT_TIMEOUT_MS);
+  assignmentTimeouts.set(String(orderId), timeoutId);
+}
 
 /**
  * Calculate distance between two coordinates using Haversine formula
@@ -42,7 +105,8 @@ async function filterIdleDeliveryPartners(partners) {
     .map(id => new mongoose.Types.ObjectId(id));
 
   const activeOrders = await Order.find({
-    status: { $nin: ['delivered', 'cancelled'] },
+    // Treat only in-progress delivery statuses as "busy"
+    status: { $in: ['confirmed', 'preparing', 'ready', 'out_for_delivery'] },
     $or: [
       { deliveryPartnerId: { $in: partnerIdStrings } },
       ...(objectIds.length > 0 ? [{ deliveryPartnerId: { $in: objectIds } }] : [])
@@ -105,23 +169,41 @@ export async function findNearestDeliveryBoys(restaurantLat, restaurantLng, rest
     const boysSnapshot = await db.ref('delivery_boys').once('value');
     const boysData = boysSnapshot.val() || {};
 
-    // Convert to array and filter online
-    let deliveryPartners = Object.entries(boysData).filter(([id, data]) => data.status === 'online' && data.lat && data.lng).map(([id, data]) => ({
-      _id: new mongoose.Types.ObjectId(id),
-      availability: {
-        currentLocation: {
-          coordinates: [data.lng, data.lat]
-        }
-      }
-    }));
+    // Convert to array and filter online (be resilient to string coords)
+    let deliveryPartners = Object.entries(boysData)
+      .filter(([id, data]) => {
+        const statusRaw = data?.status ?? data?.isOnline ?? '';
+        const status = String(statusRaw).toLowerCase();
+        const isOnline = status === 'online' || status === 'true' || status === '1' || data?.isOnline === true;
+        return isOnline;
+      })
+      .map(([id, data]) => {
+        const idStr = String(id);
+        const lat = Number(data?.lat);
+        const lng = Number(data?.lng);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+        const objectId = mongoose.Types.ObjectId.isValid(idStr) ? new mongoose.Types.ObjectId(idStr) : null;
+        return {
+          _id: objectId || idStr,
+          _idStr: idStr,
+          availability: {
+            currentLocation: {
+              coordinates: [lng, lat]
+            }
+          }
+        };
+      })
+      .filter(Boolean);
 
-    // Fetch names and zones from MongoDB to augment Firebase data
+    // Fetch names and zones from MongoDB to augment Firebase data (do not hard-drop if not found)
     if (deliveryPartners.length > 0) {
-      const ids = deliveryPartners.map(p => p._id);
+      const ids = deliveryPartners
+        .map(p => (p?._idStr && mongoose.Types.ObjectId.isValid(p._idStr) ? new mongoose.Types.ObjectId(p._idStr) : null))
+        .filter(Boolean);
       const dbPartners = await Delivery.find({
-        _id: {
-          $in: ids
-        },
+        ...(ids.length > 0
+          ? { _id: { $in: ids } }
+          : { _id: { $in: [] } }),
         isActive: true,
         status: {
           $in: ['approved', 'active']
@@ -131,18 +213,32 @@ export async function findNearestDeliveryBoys(restaurantLat, restaurantLng, rest
         acc[p._id.toString()] = p;
         return acc;
       }, {});
-      deliveryPartners = deliveryPartners.filter(p => dbPartnerMap[p._id.toString()]).map(p => ({
-        ...p,
-        ...dbPartnerMap[p._id.toString()]
-      }));
+      deliveryPartners = deliveryPartners.map(p => {
+        const key = p?._idStr || (p?._id?.toString ? p._id.toString() : String(p?._id || ''));
+        const dbInfo = dbPartnerMap[key];
+        if (!dbInfo) {
+          console.warn(`⚠️ [DeliveryAssign] No DB match for delivery boy ${key}. Using Firebase-only data.`);
+        }
+        return {
+          ...p,
+          ...(dbInfo || {})
+        };
+      });
     }
+    const preIdleFilterPartners = deliveryPartners;
     deliveryPartners = await filterIdleDeliveryPartners(deliveryPartners);
     if (!deliveryPartners || deliveryPartners.length === 0) {
-      return [];
+      if (Array.isArray(preIdleFilterPartners) && preIdleFilterPartners.length > 0) {
+        console.warn('⚠️ [DeliveryAssign] All partners filtered as busy. Proceeding without idle filter for this assignment.');
+        deliveryPartners = preIdleFilterPartners;
+      } else {
+        return [];
+      }
     }
 
     // Calculate distance and filter
-    const deliveryPartnersWithDistance = deliveryPartners.map(partner => {
+    const effectivePriorityDistance = Number(priorityDistance || 0) + 0.5; // small GPS tolerance
+    let deliveryPartnersWithDistance = deliveryPartners.map(partner => {
       const location = partner.availability?.currentLocation;
       if (!location || !location.coordinates || location.coordinates.length < 2) {
         return null;
@@ -167,7 +263,56 @@ export async function findNearestDeliveryBoys(restaurantLat, restaurantLng, rest
         longitude: lng,
         zoneId: partner.zoneId || null
       };
-    }).filter(partner => partner !== null && partner.distance <= priorityDistance).sort((a, b) => a.distance - b.distance);
+    }).filter(partner => partner !== null && Number.isFinite(partner.distance) && partner.distance <= effectivePriorityDistance).sort((a, b) => a.distance - b.distance);
+
+    if (deliveryPartners.length > 0 && deliveryPartnersWithDistance.length === 0) {
+      try {
+        const sample = deliveryPartners.slice(0, 5).map(p => {
+          const coords = p?.availability?.currentLocation?.coordinates || [];
+          const [lng, lat] = coords;
+          const dist = Number.isFinite(lat) && Number.isFinite(lng)
+            ? calculateDistance(restaurantLat, restaurantLng, lat, lng)
+            : null;
+          return {
+            id: p?._idStr || (p?._id?.toString ? p._id.toString() : String(p?._id || '')),
+            lat,
+            lng,
+            dist
+          };
+        });
+        console.warn('⚠️ [DeliveryAssign] All candidates filtered out. Debug:', {
+          restaurantLat,
+          restaurantLng,
+          priorityDistance,
+          sample
+        });
+      } catch {}
+    }
+    // Fallback to MongoDB location data if Firebase-based list is empty
+    if (deliveryPartnersWithDistance.length === 0) {
+      const fallbackPartners = await Delivery.find({
+        isActive: true,
+        status: { $in: ['approved', 'active'] },
+        'availability.isOnline': true,
+        'availability.currentLocation.coordinates': { $exists: true, $ne: [0, 0] }
+      }).select('_id name phone availability.currentLocation').lean();
+
+      deliveryPartnersWithDistance = (fallbackPartners || []).map(partner => {
+        const coords = partner?.availability?.currentLocation?.coordinates || [];
+        const [lng, lat] = coords;
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+        const distance = calculateDistance(restaurantLat, restaurantLng, lat, lng);
+        return {
+          ...partner,
+          distance,
+          latitude: lat,
+          longitude: lng,
+          zoneId: partner.zoneId || null
+        };
+      }).filter(p => p && Number.isFinite(p.distance) && p.distance <= effectivePriorityDistance)
+        .sort((a, b) => a.distance - b.distance);
+    }
+
     return deliveryPartnersWithDistance.map(partner => ({
       deliveryPartnerId: partner._id.toString(),
       name: partner.name,
@@ -246,24 +391,42 @@ export async function findNearestDeliveryBoy(restaurantLat, restaurantLng, resta
     const boysSnapshot = await db.ref('delivery_boys').once('value');
     const boysData = boysSnapshot.val() || {};
 
-    // Convert to array and filter online
-    let deliveryPartners = Object.entries(boysData).filter(([id, data]) => data.status === 'online' && data.lat && data.lng).map(([id, data]) => ({
-      _id: new mongoose.Types.ObjectId(id),
-      availability: {
-        currentLocation: {
-          coordinates: [data.lng, data.lat]
-        }
-      }
-    }));
+    // Convert to array and filter online (be resilient to string coords)
+    let deliveryPartners = Object.entries(boysData)
+      .filter(([id, data]) => {
+        const statusRaw = data?.status ?? data?.isOnline ?? '';
+        const status = String(statusRaw).toLowerCase();
+        const isOnline = status === 'online' || status === 'true' || status === '1' || data?.isOnline === true;
+        return isOnline;
+      })
+      .map(([id, data]) => {
+        const idStr = String(id);
+        const lat = Number(data?.lat);
+        const lng = Number(data?.lng);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+        const objectId = mongoose.Types.ObjectId.isValid(idStr) ? new mongoose.Types.ObjectId(idStr) : null;
+        return {
+          _id: objectId || idStr,
+          _idStr: idStr,
+          availability: {
+            currentLocation: {
+              coordinates: [lng, lat]
+            }
+          }
+        };
+      })
+      .filter(Boolean);
 
     // Fetch names and zones from MongoDB to augment Firebase data
     if (deliveryPartners.length > 0) {
-      const ids = deliveryPartners.map(p => p._id);
+      const ids = deliveryPartners
+        .map(p => (p?._idStr && mongoose.Types.ObjectId.isValid(p._idStr) ? new mongoose.Types.ObjectId(p._idStr) : null))
+        .filter(Boolean);
       // Construct the MongoDB query combining Firebase online drivers with standard DB filtering
       const finalDbQuery = {
-        _id: {
-          $in: ids
-        },
+        ...(ids.length > 0
+          ? { _id: { $in: ids } }
+          : { _id: { $in: [] } }),
         isActive: true,
         status: {
           $in: ['approved', 'active']
@@ -280,17 +443,31 @@ export async function findNearestDeliveryBoy(restaurantLat, restaurantLng, resta
         acc[p._id.toString()] = p;
         return acc;
       }, {});
-      deliveryPartners = deliveryPartners.filter(p => dbPartnerMap[p._id.toString()]).map(p => ({
-        ...p,
-        ...dbPartnerMap[p._id.toString()]
-      }));
+      deliveryPartners = deliveryPartners.map(p => {
+        const key = p?._idStr || (p?._id?.toString ? p._id.toString() : String(p?._id || ''));
+        const dbInfo = dbPartnerMap[key];
+        if (!dbInfo) {
+          console.warn(`⚠️ [DeliveryAssign] No DB match for delivery boy ${key}. Using Firebase-only data.`);
+        }
+        return {
+          ...p,
+          ...(dbInfo || {})
+        };
+      });
     }
+    const preIdleFilterPartners = deliveryPartners;
     deliveryPartners = await filterIdleDeliveryPartners(deliveryPartners);
     if (!deliveryPartners || deliveryPartners.length === 0) {
-      return null;
+      if (Array.isArray(preIdleFilterPartners) && preIdleFilterPartners.length > 0) {
+        console.warn('⚠️ [DeliveryAssign] All partners filtered as busy. Proceeding without idle filter for this assignment.');
+        deliveryPartners = preIdleFilterPartners;
+      } else {
+        return null;
+      }
     }
 
     // Calculate distance for each delivery partner and filter by zone if applicable
+    const effectiveMaxDistance = Math.min(Number(maxDistance) || 0, 5) + 0.5; // small GPS tolerance
     const deliveryPartnersWithDistance = deliveryPartners.map(partner => {
       const location = partner.availability?.currentLocation;
       if (!location || !location.coordinates || location.coordinates.length < 2) {
@@ -319,7 +496,7 @@ export async function findNearestDeliveryBoy(restaurantLat, restaurantLng, resta
         longitude: lng,
         zoneId: partner.zoneId || null
       };
-    }).filter(partner => partner !== null && partner.distance <= maxDistance).sort((a, b) => a.distance - b.distance); // Sort by distance (nearest first)
+    }).filter(partner => partner !== null && partner.distance <= effectiveMaxDistance).sort((a, b) => a.distance - b.distance); // Sort by distance (nearest first)
 
     if (deliveryPartnersWithDistance.length === 0) {
       return null;
@@ -341,6 +518,112 @@ export async function findNearestDeliveryBoy(restaurantLat, restaurantLng, resta
     console.error('❌ Error finding nearest delivery boy:', error);
     throw error;
   }
+}
+
+/**
+ * Sequentially notify the next delivery partner (one at a time)
+ * @param {Object} orderDoc - Order document (mongoose doc)
+ * @param {number} restaurantLat
+ * @param {number} restaurantLng
+ * @returns {Promise<{notified: boolean, deliveryPartnerId?: string}>}
+ */
+export async function notifyNextDeliveryPartner(orderDoc, restaurantLat, restaurantLng) {
+  if (!orderDoc || orderDoc.deliveryPartnerId) {
+    return { notified: false };
+  }
+  const orderId = orderDoc._id;
+
+  // Ensure assignmentInfo exists
+  if (!orderDoc.assignmentInfo) orderDoc.assignmentInfo = {};
+
+  // If a candidate is already active (and not rejected), don't advance the queue
+  if (orderDoc.assignmentInfo.currentCandidateId) {
+    const currentId = orderDoc.assignmentInfo.currentCandidateId?.toString?.() || String(orderDoc.assignmentInfo.currentCandidateId);
+    const rejectedSet = new Set((orderDoc.assignmentInfo.rejectedDeliveryPartnerIds || []).map(id => id?.toString?.() || String(id)));
+    if (currentId && !rejectedSet.has(currentId)) {
+      return { notified: false, deliveryPartnerId: currentId };
+    }
+  }
+
+  // Build candidate list if not present
+  if (!Array.isArray(orderDoc.assignmentInfo.candidateDeliveryPartnerIds) || orderDoc.assignmentInfo.candidateDeliveryPartnerIds.length === 0) {
+    const nearest = await findNearestDeliveryBoys(restaurantLat, restaurantLng, orderDoc.restaurantId, 5);
+    const populatedOrder = await Order.findById(orderId).populate('userId', 'name phone').populate('restaurantId', 'name address location phone ownerPhone').lean();
+    const candidateIdsRaw = nearest.map(db => db.deliveryPartnerId);
+    const filteredIds = populatedOrder
+      ? await filterByCodCashLimit(candidateIdsRaw, populatedOrder)
+      : candidateIdsRaw;
+
+    console.log('🧭 [DeliveryAssign] Candidates (within 5km):', nearest.map(n => ({
+      id: n.deliveryPartnerId,
+      distanceKm: Number(n.distance?.toFixed?.(2)) || n.distance
+    })));
+    console.log('🧭 [DeliveryAssign] Candidates after COD filter:', filteredIds);
+
+    orderDoc.assignmentInfo.candidateDeliveryPartnerIds = filteredIds;
+    orderDoc.assignmentInfo.currentCandidateIndex = -1;
+    orderDoc.assignmentInfo.rejectedDeliveryPartnerIds = [];
+    orderDoc.assignmentInfo.notificationPhase = 'sequential';
+  }
+
+  const candidates = orderDoc.assignmentInfo.candidateDeliveryPartnerIds || [];
+  const rejected = new Set(orderDoc.assignmentInfo.rejectedDeliveryPartnerIds || []);
+  let idx = Number(orderDoc.assignmentInfo.currentCandidateIndex) || -1;
+
+  // Move to next connected candidate not rejected
+  let nextId = null;
+  while (true) {
+    for (let i = idx + 1; i < candidates.length; i += 1) {
+      const candidateId = candidates[i];
+      if (!candidateId || rejected.has(candidateId)) continue;
+      nextId = candidateId;
+      idx = i;
+      break;
+    }
+
+    // If no candidate left, schedule auto-cancel and exit
+    if (!nextId) {
+      console.warn('⚠️ [DeliveryAssign] No candidates left, scheduling auto-cancel for order', orderDoc.orderId || orderId);
+      orderDoc.assignmentInfo.currentCandidateId = null;
+      orderDoc.assignmentInfo.lastNotifiedAt = new Date();
+      await orderDoc.save();
+      scheduleAssignmentTimeout(orderId);
+      return { notified: false };
+    }
+
+    // Skip if delivery partner is not connected to socket
+    const connection = await checkDeliveryPartnerConnection(nextId);
+    if (!connection?.connected) {
+      console.warn(`⚠️ [DeliveryAssign] Candidate ${nextId} not connected. Skipping.`);
+      if (!orderDoc.assignmentInfo.rejectedDeliveryPartnerIds) {
+        orderDoc.assignmentInfo.rejectedDeliveryPartnerIds = [];
+      }
+      orderDoc.assignmentInfo.rejectedDeliveryPartnerIds.push(nextId);
+      nextId = null;
+      continue;
+    }
+    break;
+  }
+
+  // Persist current candidate
+  orderDoc.assignmentInfo.currentCandidateIndex = idx;
+  orderDoc.assignmentInfo.currentCandidateId = nextId;
+  orderDoc.assignmentInfo.lastNotifiedAt = new Date();
+  await orderDoc.save();
+
+  // Notify only the current candidate
+  const populated = await Order.findById(orderId).populate('userId', 'name phone').populate('restaurantId', 'name address location phone ownerPhone').lean();
+  if (populated) {
+    await notifyDeliveryBoyNewOrder(populated, nextId);
+  }
+  console.log('✅ [DeliveryAssign] Notified delivery partner:', nextId, 'for order', orderDoc.orderId || orderId);
+
+  scheduleAssignmentTimeout(orderId);
+  return { notified: true, deliveryPartnerId: nextId };
+}
+
+export function clearAssignmentTimer(orderId) {
+  clearAssignmentTimeout(orderId);
 }
 
 /**

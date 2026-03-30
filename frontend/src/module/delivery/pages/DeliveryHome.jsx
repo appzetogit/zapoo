@@ -207,6 +207,24 @@ function smoothLocation(locationHistory) {
   return [avgLat, avgLng];
 }
 
+// Dev-only override for location (desktop testing)
+// Set in console: localStorage.setItem('deliveryDevLocation', JSON.stringify({ enabled:true, lat:22.7196, lng:75.8577 }))
+function getDevLocationOverride() {
+  try {
+    const raw = localStorage.getItem('deliveryDevLocation');
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    if (!data || data.enabled === false) return null;
+    const lat = Number(data.lat ?? data.latitude);
+    const lng = Number(data.lng ?? data.longitude);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+    return { lat, lng };
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Animate marker smoothly from current position to new position
  * @param {Object} marker - Google Maps Marker instance
@@ -1321,13 +1339,49 @@ export default function DeliveryHome() {
   const handleRejectClick = () => {
     setShowRejectPopup(true);
   };
-  const handleRejectConfirm = () => {
+  const handleRejectConfirm = async () => {
     if (alertAudioRef.current) {
       alertAudioRef.current.pause();
       alertAudioRef.current.currentTime = 0;
     }
+    const orderId = newOrder?.orderMongoId
+      || newOrder?.orderId
+      || selectedRestaurant?.orderId
+      || selectedRestaurant?.orderMongoId
+      || selectedRestaurant?.id;
+    if (orderId) {
+      try {
+        await deliveryAPI.rejectOrder(orderId);
+      } catch (error) {
+        const status = error?.response?.status;
+        const message = error?.response?.data?.message || '';
+        // If order was already assigned or no longer available, just dismiss locally.
+        if (status === 400 || status === 403) {
+          if (message) {
+            toast.info(message);
+          } else {
+            toast.info('Order is no longer available.');
+          }
+        } else {
+          console.error('❌ Error rejecting order:', error);
+          toast.error(message || 'Failed to reject order. Please try again.');
+          return;
+        }
+      }
+    }
+    // Clear UI state so the rejected order is removed from screen
     setShowRejectPopup(false);
     setShowNewOrderPopup(false);
+    setShowreachedPickupPopup(false);
+    setShowOrderIdConfirmationPopup(false);
+    setShowReachedDropPopup(false);
+    setShowPaymentPage(false);
+    setShowOrderDeliveredAnimation(false);
+    setShowCustomerReviewPopup(false);
+    setSelectedRestaurant(null);
+    if (typeof clearNewOrder === 'function') {
+      clearNewOrder();
+    }
     setIsNewOrderPopupMinimized(false); // Reset minimized state
     setNewOrderDragY(0); // Reset drag position
     setRejectReason("");
@@ -1640,6 +1694,36 @@ export default function DeliveryHome() {
     }
   }, []); // Run only on mount - get initial location
 
+  // Dev override: push mocked location every 5s if enabled (desktop testing)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const override = getDevLocationOverride();
+      if (!override) return;
+      const newLocation = [override.lat, override.lng];
+      setRiderLocation(newLocation);
+      lastLocationRef.current = newLocation;
+      localStorage.setItem('deliveryBoyLastLocation', JSON.stringify(newLocation));
+      if (window.deliveryMapInstance) {
+        createOrUpdateBikeMarker(override.lat, override.lng, null, true);
+      }
+      if (isOnlineRef.current) {
+        const now = Date.now();
+        const lastSentTime = window.lastLocationSentTime || 0;
+        if (now - lastSentTime >= 5000) {
+          deliveryAPI.updateLocation(override.lat, override.lng, true).then(() => {
+            window.lastLocationSentTime = now;
+            window.lastSentLocation = newLocation;
+          }).catch(error => {
+            if (error.code !== 'ERR_NETWORK' && error.message !== 'Network Error') {
+              console.error('❌ Error sending dev override location:', error);
+            }
+          });
+        }
+      }
+    }, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
   // Watch position updates - ONLY when online (Production Level Implementation)
   useEffect(() => {
     if (!navigator.geolocation) {
@@ -1657,10 +1741,11 @@ export default function DeliveryHome() {
 
     // Watch position updates for live tracking with STABLE TRACKING SYSTEM
     const watchId = navigator.geolocation.watchPosition(position => {
+      const devOverride = getDevLocationOverride();
       // Validate coordinates first
-      const latitude = position.coords.latitude;
-      const longitude = position.coords.longitude;
-      const accuracy = position.coords.accuracy || 0;
+      const latitude = devOverride ? devOverride.lat : position.coords.latitude;
+      const longitude = devOverride ? devOverride.lng : position.coords.longitude;
+      const accuracy = devOverride ? 0 : (position.coords.accuracy || 0);
 
       // Basic validation
       if (typeof latitude !== 'number' || typeof longitude !== 'number' || isNaN(latitude) || isNaN(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
@@ -1676,7 +1761,9 @@ export default function DeliveryHome() {
       // ============================================
 
       // Apply filtering: accuracy, distance jump, speed checks
-      const shouldAccept = shouldAcceptLocation(position, lastValidLocationRef.current, lastLocationTimeRef.current);
+      const shouldAccept = devOverride
+        ? true
+        : shouldAcceptLocation(position, lastValidLocationRef.current, lastLocationTimeRef.current);
       if (!shouldAccept) {
         // Location rejected by filter - but send to backend if it's been > 30 seconds since last update
         // This ensures admin map always shows delivery boy even with poor GPS
@@ -2225,8 +2312,37 @@ export default function DeliveryHome() {
     newOrderSwipeStartY.current = 0;
   };
 
+  const getPickupBlockInfo = () => {
+    const orderStatus = selectedRestaurant?.orderStatus || selectedRestaurant?.status || '';
+    const deliveryPhase = selectedRestaurant?.deliveryPhase || selectedRestaurant?.deliveryState?.currentPhase || '';
+    const deliveryStateStatus = selectedRestaurant?.deliveryState?.status || '';
+    const isCancelled = orderStatus === 'cancelled' || deliveryPhase === 'cancelled' || deliveryStateStatus === 'cancelled';
+    if (isCancelled) {
+      return {
+        blocked: true,
+        reason: 'Order is cancelled. Pickup not allowed.'
+      };
+    }
+    const isPending = orderStatus === 'pending' || deliveryPhase === 'assigned' || deliveryStateStatus === 'assigned' || deliveryStateStatus === 'pending';
+    if (isPending) {
+      return {
+        blocked: true,
+        reason: 'Order is not ready for pickup yet.'
+      };
+    }
+    return {
+      blocked: false,
+      reason: ''
+    };
+  };
+
   // Handle Reached Pickup button swipe
   const handlereachedPickupTouchStart = e => {
+    const pickupBlock = getPickupBlockInfo();
+    if (pickupBlock.blocked) {
+      toast.error(pickupBlock.reason);
+      return;
+    }
     reachedPickupSwipeStartX.current = e.touches[0].clientX;
     reachedPickupSwipeStartY.current = e.touches[0].clientY;
     reachedPickupIsSwiping.current = false;
@@ -2253,6 +2369,12 @@ export default function DeliveryHome() {
     }
   };
   const handlereachedPickupTouchEnd = e => {
+    const pickupBlock = getPickupBlockInfo();
+    if (pickupBlock.blocked) {
+      toast.error(pickupBlock.reason);
+      setreachedPickupButtonProgress(0);
+      return;
+    }
     if (!reachedPickupIsSwiping.current) {
       setreachedPickupButtonProgress(0);
       return;
@@ -2272,6 +2394,14 @@ export default function DeliveryHome() {
       // Close popup after animation, confirm reached pickup, then show order ID confirmation popup
       setTimeout(async () => {
         setShowreachedPickupPopup(false);
+
+        // Block if order is cancelled/pending
+        const pickupBlockAtConfirm = getPickupBlockInfo();
+        if (pickupBlockAtConfirm.blocked) {
+          toast.error(pickupBlockAtConfirm.reason);
+          setShowreachedPickupPopup(false);
+          return;
+        }
 
         // Get order ID - prioritize orderId (string) over id (MongoDB _id) for better compatibility
         // Backend accepts both _id and orderId, but orderId is more reliable
@@ -2701,6 +2831,12 @@ export default function DeliveryHome() {
     // Disable swipe if bill image is not uploaded
     if (!billImageUploaded) {
       toast.error('Please upload bill image first');
+      setOrderIdConfirmButtonProgress(0);
+      return;
+    }
+    const pickupBlock = getPickupBlockInfo();
+    if (pickupBlock.blocked) {
+      toast.error(pickupBlock.reason);
       setOrderIdConfirmButtonProgress(0);
       return;
     }
@@ -7600,12 +7736,19 @@ export default function DeliveryHome() {
 
     {/* Reached Pickup Button with Swipe */}
     <div className="relative w-full">
-      <motion.div ref={reachedPickupButtonRef} className="relative w-full bg-green-600 rounded-full overflow-hidden shadow-xl" style={{
-        touchAction: 'pan-x'
-      }} // Prevent vertical scrolling, allow horizontal pan
-        onTouchStart={handlereachedPickupTouchStart} onTouchMove={handlereachedPickupTouchMove} onTouchEnd={handlereachedPickupTouchEnd} whileTap={{
+      <motion.div
+        ref={reachedPickupButtonRef}
+        className={`relative w-full rounded-full overflow-hidden shadow-xl ${getPickupBlockInfo().blocked ? 'bg-gray-400 opacity-60 cursor-not-allowed' : 'bg-green-600'}`}
+        style={{
+          touchAction: getPickupBlockInfo().blocked ? 'none' : 'pan-x'
+        }} // Prevent vertical scrolling, allow horizontal pan
+        onTouchStart={!getPickupBlockInfo().blocked ? handlereachedPickupTouchStart : undefined}
+        onTouchMove={!getPickupBlockInfo().blocked ? handlereachedPickupTouchMove : undefined}
+        onTouchEnd={!getPickupBlockInfo().blocked ? handlereachedPickupTouchEnd : undefined}
+        whileTap={!getPickupBlockInfo().blocked ? {
           scale: 0.98
-        }}>
+        } : {}}
+      >
         {/* Swipe progress background */}
         <motion.div className="absolute inset-0 bg-green-500 rounded-full" animate={{
           width: `${reachedPickupButtonProgress * 100}%`

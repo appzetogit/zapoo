@@ -1096,11 +1096,9 @@ export default function Home() {
       setHeroSearch(transcript);
       if (transcript.trim()) {
         toast.success(`Searching for "${transcript}"`);
-        // Small delay to let user see transcript before auto-searching
-        setTimeout(() => {
-          navigate(`/user/search?q=${encodeURIComponent(transcript.trim())}`);
-          closeSearch();
-        }, 1500);
+        // Open same search overlay as the search bar
+        setSearchValue(transcript);
+        openSearch();
       }
     };
     recognition.onerror = event => {
@@ -1112,7 +1110,7 @@ export default function Home() {
       }
     };
     recognition.start();
-  }, [handleSearchFocus]);
+  }, [openSearch, setSearchValue]);
   const handleSearchClose = useCallback(() => {
     closeSearch();
     setHeroSearch("");

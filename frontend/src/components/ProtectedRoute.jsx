@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
+import { Loader2 } from "lucide-react";
 import { isModuleAuthenticated } from "@/lib/utils/auth";
 import { restaurantAPI } from "@/lib/api";
 import FeatureLockedScreen from "@/module/restaurant/components/FeatureLockedScreen";
@@ -146,7 +147,7 @@ export default function ProtectedRoute({ children, requiredRole, loginPath }) {
   if (requiredRole === "restaurant" && subscriptionLoading) {
     return (
       <div className="theme-blue h-full w-full min-h-screen flex items-center justify-center">
-        <div className="text-sm text-gray-600">Checking subscription...</div>
+        <Loader2 className="h-6 w-6 animate-spin text-gray-500" />
       </div>
     );
   }

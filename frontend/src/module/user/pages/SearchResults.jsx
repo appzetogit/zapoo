@@ -722,7 +722,17 @@ export default function SearchResults() {
             {matchingDishes.map(item => {
               const targetUrl = `/user/restaurants/${item.restaurantSlug}?dish=${encodeURIComponent(item.name)}`;
               return (
-                <Link key={item.id} to={targetUrl} className="block">
+                <Link
+                  key={item.id}
+                  to={targetUrl}
+                  state={{ prefillDish: item.name }}
+                  onClick={() => {
+                    try {
+                      sessionStorage.setItem("prefillDish", item.name);
+                    } catch {}
+                  }}
+                  className="block"
+                >
                   <div className="flex items-center gap-3 p-3 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#1a1a1a] shadow-sm hover:shadow-md transition-shadow">
                     <div className="w-11 h-11 rounded-full overflow-hidden bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
                       {item.image ? (

@@ -11,6 +11,7 @@ export const useDeliveryNotifications = () => {
   // Step 1: All refs first (unconditional)
   const socketRef = useRef(null);
   const audioRef = useRef(null);
+  const deliveryPartnerIdRef = useRef(null);
 
   // Step 2: All state hooks (unconditional)
   const [newOrder, setNewOrder] = useState(null);
@@ -67,6 +68,10 @@ export const useDeliveryNotifications = () => {
   // Step 4: All effects (unconditional hook calls, conditional logic inside)
   // Track user interaction for autoplay policy
   useEffect(() => {
+    deliveryPartnerIdRef.current = deliveryPartnerId;
+  }, [deliveryPartnerId]);
+
+  useEffect(() => {
     const handleUserInteraction = () => {
       userInteractedRef.current = true;
       // Remove listeners after first interaction
@@ -120,26 +125,41 @@ export const useDeliveryNotifications = () => {
 
   // Fetch delivery partner ID
   useEffect(() => {
+    const extractId = (obj) => {
+      if (!obj) return null;
+      return obj.id?.toString() || obj._id?.toString() || obj.deliveryId || null;
+    };
+
     const fetchDeliveryPartnerId = async () => {
       try {
         const response = await deliveryAPI.getCurrentDelivery();
         if (response.data?.success && response.data.data) {
           const deliveryPartner = response.data.data.user || response.data.data.deliveryPartner;
-          if (deliveryPartner) {
-            const id = deliveryPartner.id?.toString() || deliveryPartner._id?.toString() || deliveryPartner.deliveryId;
-            if (id) {
-              setDeliveryPartnerId(id);
-            } else {
-              console.warn('⚠️ Could not extract delivery partner ID from response');
-            }
-          } else {
-            console.warn('⚠️ No delivery partner data in API response');
+          const id = extractId(deliveryPartner);
+          if (id) {
+            setDeliveryPartnerId(id);
+            return;
           }
+          console.warn('⚠️ Could not extract delivery partner ID from API response');
         } else {
           console.warn('⚠️ Could not fetch delivery partner ID from API');
         }
       } catch (error) {
         console.error('Error fetching delivery partner:', error);
+      }
+      // Fallback to localStorage if API didn't return an ID
+      try {
+        const stored = localStorage.getItem('delivery_user');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          const fallbackId = extractId(parsed);
+          if (fallbackId) {
+            console.warn('⚠️ Using delivery ID from localStorage fallback');
+            setDeliveryPartnerId(fallbackId);
+          }
+        }
+      } catch (e) {
+        console.warn('⚠️ Failed to read delivery_user from localStorage');
       }
     };
     fetchDeliveryPartnerId();
@@ -147,10 +167,6 @@ export const useDeliveryNotifications = () => {
 
   // Socket connection effect
   useEffect(() => {
-    if (!deliveryPartnerId) {
-      return;
-    }
-
     // Normalize backend URL - use simpler, more robust approach
     let backendUrl = API_BASE_URL;
 
@@ -160,7 +176,8 @@ export const useDeliveryNotifications = () => {
       // Remove /api from pathname
       let pathname = urlObj.pathname.replace(/^\/api\/?$/, '');
       // Reconstruct clean URL
-      backendUrl = `${urlObj.protocol}//${urlObj.hostname}${urlObj.port ? `:${urlObj.port}` : ''}${pathname}`;
+      const hostname = urlObj.hostname === 'localhost' ? '127.0.0.1' : urlObj.hostname;
+      backendUrl = `${urlObj.protocol}//${hostname}${urlObj.port ? `:${urlObj.port}` : ''}${pathname}`;
     } catch (e) {
       // If URL parsing fails, use regex-based normalization
       // Remove /api suffix first
@@ -188,7 +205,11 @@ export const useDeliveryNotifications = () => {
     backendUrl = backendUrl.replace(/^(https?):\/+/gi, '$1://');
     backendUrl = backendUrl.replace(/\/+$/, ''); // Remove trailing slashes
 
+    // Avoid IPv6 localhost resolution issues in some browsers
+    backendUrl = backendUrl.replace('://localhost', '://127.0.0.1');
+
     const socketUrl = `${backendUrl}/delivery`;
+    console.warn('[DeliverySocket] init', { socketUrl, deliveryPartnerId, API_BASE_URL });
     // Warn if trying to connect to localhost in production
     if (import.meta.env.MODE === 'production' && backendUrl.includes('localhost')) {
       console.error('❌ CRITICAL: Trying to connect Socket.IO to localhost in production!');
@@ -222,6 +243,17 @@ export const useDeliveryNotifications = () => {
       console.error('💡 API_BASE_URL:', API_BASE_URL);
       return; // Don't try to connect with invalid URL
     }
+    if (socketRef.current) {
+      if (deliveryPartnerId) {
+        if (socketRef.current.connected) {
+          socketRef.current.emit('join-delivery', deliveryPartnerId);
+        } else {
+          socketRef.current.connect();
+        }
+      }
+      return;
+    }
+
     socketRef.current = io(socketUrl, {
       path: '/socket.io/',
       transports: ['polling'],
@@ -241,8 +273,9 @@ export const useDeliveryNotifications = () => {
     });
     socketRef.current.on('connect', () => {
       setIsConnected(true);
-      if (deliveryPartnerId) {
-        socketRef.current.emit('join-delivery', deliveryPartnerId);
+      const latestId = deliveryPartnerIdRef.current;
+      if (latestId) {
+        socketRef.current.emit('join-delivery', latestId);
       }
     });
     socketRef.current.on('delivery-room-joined', data => {});
@@ -270,8 +303,9 @@ export const useDeliveryNotifications = () => {
     socketRef.current.on('reconnect_attempt', attemptNumber => {});
     socketRef.current.on('reconnect', attemptNumber => {
       setIsConnected(true);
-      if (deliveryPartnerId) {
-        socketRef.current.emit('join-delivery', deliveryPartnerId);
+      const latestId = deliveryPartnerIdRef.current;
+      if (latestId) {
+        socketRef.current.emit('join-delivery', latestId);
       }
     });
     socketRef.current.on('new_order', orderData => {

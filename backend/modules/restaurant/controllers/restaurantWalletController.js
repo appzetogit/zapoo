@@ -1,4 +1,6 @@
 import RestaurantWallet from '../models/RestaurantWallet.js';
+import Order from '../../order/models/Order.js';
+import OrderSettlement from '../../order/models/OrderSettlement.js';
 import { successResponse, errorResponse } from '../../../shared/utils/response.js';
 import asyncHandler from '../../../shared/middleware/asyncHandler.js';
 import winston from 'winston';
@@ -27,6 +29,106 @@ export const getWallet = asyncHandler(async (req, res) => {
 
     // Find or create wallet
     const wallet = await RestaurantWallet.findOrCreateByRestaurantId(restaurant._id);
+
+    // Recompute totals from transactions if totals look empty but transactions exist (legacy/backfill fix)
+    try {
+      const hasTransactions = Array.isArray(wallet.transactions) && wallet.transactions.length > 0;
+      const totalsEmpty = (Number(wallet.totalBalance) || 0) === 0 && (Number(wallet.totalEarned) || 0) === 0;
+      if (hasTransactions && totalsEmpty) {
+        let totalBalance = 0;
+        let totalEarned = 0;
+        let totalWithdrawn = 0;
+        for (const t of wallet.transactions) {
+          if (t.status !== 'Completed') continue;
+          const amount = Number(t.amount) || 0;
+          if (t.type === 'payment' || t.type === 'bonus' || t.type === 'refund') {
+            totalBalance += amount;
+            totalEarned += amount;
+          } else if (t.type === 'withdrawal') {
+            totalBalance -= amount;
+            totalWithdrawn += amount;
+          } else if (t.type === 'deduction') {
+            totalBalance -= amount;
+          }
+        }
+        wallet.totalBalance = Math.max(0, totalBalance);
+        wallet.totalEarned = Math.max(0, totalEarned);
+        wallet.totalWithdrawn = Math.max(0, totalWithdrawn);
+        wallet.markModified('totalBalance');
+        wallet.markModified('totalEarned');
+        wallet.markModified('totalWithdrawn');
+        await wallet.save();
+      }
+    } catch (recalcError) {
+      console.warn('⚠️ Restaurant wallet totals recompute failed:', recalcError?.message || recalcError);
+    }
+
+    // Backfill wallet transactions if totals are zero but delivered orders exist (legacy data fix)
+    try {
+      const hasTransactions = Array.isArray(wallet.transactions) && wallet.transactions.length > 0;
+      const totalsEmpty = (Number(wallet.totalBalance) || 0) === 0 && (Number(wallet.totalEarned) || 0) === 0;
+      if (!hasTransactions || totalsEmpty) {
+        const restaurantIdStr = restaurant._id?.toString?.() || String(restaurant._id);
+        const restaurantIdAlt = restaurant.restaurantId?.toString?.() || null;
+        const restaurantIdExpr = [
+          { $eq: [{ $toString: { $ifNull: ['$restaurantId', ''] } }, restaurantIdStr] }
+        ];
+        if (restaurantIdAlt) {
+          restaurantIdExpr.push({ $eq: [{ $toString: { $ifNull: ['$restaurantId', ''] } }, restaurantIdAlt] });
+        }
+        const deliveredOrders = await Order.find({
+          $expr: {
+            $and: [
+              { $or: restaurantIdExpr },
+              {
+                $or: [
+                  { $in: [{ $toLower: { $ifNull: ['$status', ''] } }, ['delivered', 'completed']] },
+                  { $eq: [{ $toLower: { $ifNull: ['$deliveryState.status', ''] } }, 'delivered'] },
+                  { $eq: [{ $toLower: { $ifNull: ['$deliveryState.currentPhase', ''] } }, 'completed'] }
+                ]
+              }
+            ]
+          }
+        }).select('_id orderId').lean();
+
+        if (deliveredOrders.length > 0) {
+          const orderIds = deliveredOrders.map(o => o._id);
+          const settlements = await OrderSettlement.find({ orderId: { $in: orderIds } })
+            .select('orderId orderNumber restaurantEarning.netEarning')
+            .lean();
+          const settlementMap = new Map(
+            settlements.map(s => [String(s.orderId), Number(s?.restaurantEarning?.netEarning) || 0])
+          );
+
+          let backfillCount = 0;
+          for (const order of deliveredOrders) {
+            const orderIdStr = String(order._id);
+            const existing = wallet.transactions?.find(
+              t => t?.type === 'payment' && t?.orderId && String(t.orderId) === orderIdStr
+            );
+            if (existing) continue;
+
+            const amount = settlementMap.get(orderIdStr) || 0;
+            if (!amount || amount <= 0) continue;
+
+            wallet.addTransaction({
+              amount,
+              type: 'payment',
+              status: 'Completed',
+              description: `Backfill credit for order ${order.orderId || orderIdStr}`,
+              orderId: order._id
+            });
+            backfillCount += 1;
+          }
+
+          if (backfillCount > 0) {
+            await wallet.save();
+          }
+        }
+      }
+    } catch (backfillError) {
+      console.warn('⚠️ Restaurant wallet backfill failed:', backfillError?.message || backfillError);
+    }
 
     // Get recent transactions (last 50)
     const recentTransactions = wallet.transactions
@@ -199,4 +301,3 @@ export const getWalletStats = asyncHandler(async (req, res) => {
     return errorResponse(res, 500, 'Failed to fetch wallet stats');
   }
 });
-
