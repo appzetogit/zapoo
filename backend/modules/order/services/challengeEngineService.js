@@ -7,7 +7,6 @@ import Zone from '../../admin/models/Zone.js';
 import Order from '../models/Order.js';
 import DeliveryWallet from '../../delivery/models/DeliveryWallet.js';
 import RestaurantWallet from '../../restaurant/models/RestaurantWallet.js';
-import Top10Restaurant from '../../heroBanner/models/Top10Restaurant.js';
 import { createFreeBannerCredit, countAvailableFreeBannerCredits } from '../../marketing/services/freeBannerCreditService.js';
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
@@ -239,7 +238,6 @@ const applyRewardIfNeeded = async ({ progress, challenge, userId }) => {
   const amount = Number(challenge.rewardValue || 0);
   const description = `Challenge reward ${locked._id.toString()}`;
   const now = new Date();
-  const oneDayLater = new Date(now.getTime() + ONE_DAY_MS);
 
   try {
     if ((normalizedRewardType === 'wallet_credit' || normalizedRewardType === 'bonus') && amount > 0) {
@@ -269,26 +267,6 @@ const applyRewardIfNeeded = async ({ progress, challenge, userId }) => {
           wallet.markModified('transactions');
           await wallet.save();
         }
-      }
-    }
-
-    if (normalizedRewardType === 'top_10' && challenge.applicableUserType === 'restaurant') {
-      const existing = await Top10Restaurant.findOne({
-        restaurant: userId,
-        source: 'challenge',
-        isActive: true,
-        $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }]
-      });
-      if (!existing) {
-        const maxOrder = await Top10Restaurant.findOne().sort({ order: -1 }).select('order').lean();
-        await Top10Restaurant.create({
-          restaurant: userId,
-          rank: 10,
-          order: (maxOrder?.order ?? 0) + 1,
-          source: 'challenge',
-          expiresAt: oneDayLater,
-          isActive: true
-        });
       }
     }
 
@@ -517,6 +495,7 @@ export const evaluateChallengesOnDeliveryRejected = async ({ orderId, deliveryPa
 export const getMyChallengeProgress = async ({ userId, userType, now = new Date() }) => {
   const query = {
     applicableUserType: userType,
+    rewardType: { $ne: 'top_10' },
     status: 'active',
     startDate: { $lte: now },
     endDate: { $gte: now }

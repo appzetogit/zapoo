@@ -33,7 +33,7 @@ const Offers = lazy(() => import("../pages/Offers"))
 // Gourmet
 const Gourmet = lazy(() => import("../pages/Gourmet"))
 
-// Top 10
+// Top Restaurants
 const Top10 = lazy(() => import("../pages/Top10"))
 
 // Collections
@@ -154,7 +154,7 @@ export default function UserRouter() {
           {/* Gourmet */}
           <Route path="/gourmet" element={<Gourmet />} />
 
-          {/* Top 10 */}
+          {/* Top Restaurants */}
           <Route path="/top-10" element={<Top10 />} />
 
           {/* Collections */}
@@ -368,4 +368,3 @@ export default function UserRouter() {
     </Suspense>
   )
 }
-

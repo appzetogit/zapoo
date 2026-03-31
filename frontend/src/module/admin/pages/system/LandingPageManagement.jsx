@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Checkbox } from "@/components/ui/checkbox";
 export default function LandingPageManagement() {
   const [activeTab, setActiveTab] = useState('banners');
-  const [exploreMoreSubTab, setExploreMoreSubTab] = useState('top-10');
+  const [exploreMoreSubTab, setExploreMoreSubTab] = useState('gourmet');
 
   // Hero Banners
   const [banners, setBanners] = useState([]);
@@ -138,14 +138,10 @@ export default function LandingPageManagement() {
     fetchAllRestaurants();
   }, []);
 
-  // Fetch Top 10 and Gourmet when Explore More tab is active
+  // Fetch Gourmet when Explore More tab is active
   useEffect(() => {
-    if (activeTab === 'explore-more') {
-      if (exploreMoreSubTab === 'top-10') {
-        fetchTop10Restaurants();
-      } else if (exploreMoreSubTab === 'gourmet') {
-        fetchGourmetRestaurants();
-      }
+    if (activeTab === 'explore-more' && exploreMoreSubTab === 'gourmet') {
+      fetchGourmetRestaurants();
     }
   }, [activeTab, exploreMoreSubTab]);
 
@@ -908,115 +904,6 @@ export default function LandingPageManagement() {
     }
   };
 
-  // ==================== TOP 10 RESTAURANTS ====================
-  const fetchTop10Restaurants = async () => {
-    try {
-      setTop10Loading(true);
-      setError(null);
-      const response = await api.get('/hero-banners/top-10', getAuthConfig());
-      if (response.data.success) {
-        setTop10Restaurants(response.data.data.restaurants || []);
-      }
-    } catch (err) {
-      if (err.response?.status === 401 || err.response?.status === 404) {
-        setTop10Restaurants([]);
-        setError(null);
-      } else {
-        const errorMessage = err.response?.data?.message || 'Failed to load Top 10 restaurants';
-        setErrorSafely(errorMessage);
-      }
-    } finally {
-      setTop10Loading(false);
-    }
-  };
-  const handleAddTop10Restaurant = async () => {
-    if (!selectedRestaurantTop10 || !selectedRank) {
-      setError('Please select a restaurant and rank');
-      return;
-    }
-    try {
-      setError(null);
-      setSuccess(null);
-      const response = await api.post('/hero-banners/top-10', {
-        restaurantId: selectedRestaurantTop10,
-        rank: parseInt(selectedRank)
-      }, getAuthConfig());
-      if (response.data.success) {
-        setSuccess('Restaurant added to Top 10 successfully!');
-        setSelectedRestaurantTop10("");
-        setSelectedRank(1);
-        await fetchTop10Restaurants();
-        setTimeout(() => setSuccess(null), 3000);
-      }
-    } catch (err) {
-      setErrorSafely(err.response?.data?.message || 'Failed to add restaurant to Top 10.');
-    }
-  };
-  const handleDeleteTop10Restaurant = async id => {
-    if (!window.confirm('Are you sure you want to remove this restaurant from Top 10?')) return;
-    try {
-      setTop10Deleting(id);
-      setError(null);
-      setSuccess(null);
-      const response = await api.delete(`/hero-banners/top-10/${id}`, getAuthConfig());
-      if (response.data.success) {
-        setSuccess('Restaurant removed from Top 10 successfully!');
-        await fetchTop10Restaurants();
-        setTimeout(() => setSuccess(null), 3000);
-      }
-    } catch (err) {
-      setErrorSafely(err.response?.data?.message || 'Failed to remove restaurant.');
-    } finally {
-      setTop10Deleting(null);
-    }
-  };
-  const handleTop10OrderChange = async (id, direction) => {
-    const restaurant = top10Restaurants.find(r => r._id === id);
-    if (!restaurant) return;
-    const newOrder = direction === 'up' ? restaurant.order - 1 : restaurant.order + 1;
-    const otherRestaurant = top10Restaurants.find(r => r.order === newOrder && r._id !== id);
-    if (!otherRestaurant && newOrder < 0) return;
-    try {
-      setError(null);
-      await api.patch(`/hero-banners/top-10/${id}/order`, {
-        order: newOrder
-      }, getAuthConfig());
-      if (otherRestaurant) {
-        await api.patch(`/hero-banners/top-10/${otherRestaurant._id}/order`, {
-          order: restaurant.order
-        }, getAuthConfig());
-      }
-      await fetchTop10Restaurants();
-    } catch (err) {
-      setErrorSafely('Failed to update Top 10 restaurant order.');
-    }
-  };
-  const handleTop10RankChange = async (id, newRank) => {
-    try {
-      setError(null);
-      await api.patch(`/hero-banners/top-10/${id}/rank`, {
-        rank: parseInt(newRank)
-      }, getAuthConfig());
-      await fetchTop10Restaurants();
-    } catch (err) {
-      setErrorSafely('Failed to update Top 10 restaurant rank.');
-    }
-  };
-  const handleToggleTop10Status = async (id, currentStatus) => {
-    try {
-      setError(null);
-      setSuccess(null);
-      const response = await api.patch(`/hero-banners/top-10/${id}/status`, {}, getAuthConfig());
-      if (response.data.success) {
-        setSuccess(`Restaurant ${currentStatus ? 'deactivated' : 'activated'} successfully!`);
-        await fetchTop10Restaurants();
-        setTimeout(() => setSuccess(null), 3000);
-      }
-    } catch (err) {
-      setErrorSafely(err.response?.data?.message || 'Failed to update restaurant status.');
-    }
-  };
-
   // ==================== GOURMET RESTAURANTS ====================
   const fetchGourmetRestaurants = async () => {
     try {
@@ -1128,10 +1015,6 @@ export default function LandingPageManagement() {
     icon: Layout
   }];
   const exploreMoreTabs = [{
-    id: 'top-10',
-    label: 'Top 10',
-    icon: Trophy
-  }, {
     id: 'gourmet',
     label: 'Gourmet',
     icon: ChefHat
@@ -1393,7 +1276,6 @@ export default function LandingPageManagement() {
               <div className="flex gap-2 overflow-x-auto">
                 {exploreMoreTabs.map(tab => {
               const Icon = tab.icon;
-              const isActive = activeTab === 'explore-more' && (tab.id === 'top-10' ? top10Restaurants.length > 0 : tab.id === 'gourmet' ? gourmetRestaurants.length > 0 : false);
               return <button key={tab.id} onClick={() => setExploreMoreSubTab(tab.id)} className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors whitespace-nowrap ${exploreMoreSubTab === tab.id ? 'bg-orange-500 text-white' : 'text-slate-600 hover:bg-slate-100'}`}>
                       <Icon className="w-4 h-4" />
                       {tab.label}
@@ -1403,7 +1285,7 @@ export default function LandingPageManagement() {
             </div>
 
             {/* Top 10 Tab Content */}
-            {exploreMoreSubTab === 'top-10' && <>
+            {false && <>
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
                   <h2 className="text-lg font-bold text-slate-900 mb-4">Add Restaurant to Top 10</h2>
                   <div className="space-y-4">

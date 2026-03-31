@@ -1,6 +1,7 @@
 import Restaurant from '../models/Restaurant.js';
 import Menu from '../models/Menu.js';
 import Zone from '../../admin/models/Zone.js';
+import Order from '../../order/models/Order.js';
 import Tier from '../../admin/models/Tier.js';
 import BusinessSettings from '../../admin/models/BusinessSettings.js';
 import { successResponse, errorResponse } from '../../../shared/utils/response.js';
@@ -9,6 +10,60 @@ import { initializeCloudinary } from '../../../config/cloudinary.js';
 import asyncHandler from '../../../shared/middleware/asyncHandler.js';
 import mongoose from 'mongoose';
 import { calculateDistance } from '../../order/services/orderCalculationService.js';
+
+const attachRealReviewStats = async (restaurants = []) => {
+  if (!Array.isArray(restaurants) || restaurants.length === 0) {
+    return restaurants;
+  }
+
+  const restaurantIds = restaurants
+    .map((restaurant) => String(restaurant?._id || ''))
+    .filter(Boolean);
+
+  if (restaurantIds.length === 0) {
+    return restaurants.map((restaurant) => ({
+      ...restaurant,
+      rating: 0,
+      totalRatings: 0
+    }));
+  }
+
+  const reviewStats = await Order.aggregate([
+    {
+      $match: {
+        status: 'delivered',
+        'review.rating': { $exists: true, $ne: null },
+        restaurantId: { $in: restaurantIds }
+      }
+    },
+    {
+      $group: {
+        _id: '$restaurantId',
+        averageRating: { $avg: '$review.rating' },
+        totalRatings: { $sum: 1 }
+      }
+    }
+  ]);
+
+  const reviewStatsByRestaurantId = new Map(
+    reviewStats.map((entry) => [
+      String(entry._id),
+      {
+        rating: Number(entry.averageRating || 0),
+        totalRatings: Number(entry.totalRatings || 0)
+      }
+    ])
+  );
+
+  return restaurants.map((restaurant) => {
+    const stats = reviewStatsByRestaurantId.get(String(restaurant._id));
+    return {
+      ...restaurant,
+      rating: stats ? Number(stats.rating.toFixed(1)) : 0,
+      totalRatings: stats?.totalRatings || 0
+    };
+  });
+};
 import {
   resolveZoneAndTierForLocation,
   applyZoneTierToRestaurantById,
@@ -419,8 +474,10 @@ export const getRestaurants = async (req, res) => {
       total = await Restaurant.countDocuments(query);
     }
 
+    const restaurantsWithRealRatings = await attachRealReviewStats(restaurants);
+
     return successResponse(res, 200, 'Restaurants retrieved successfully', {
-      restaurants,
+      restaurants: restaurantsWithRealRatings,
       total,
       filters: {
         sortBy,

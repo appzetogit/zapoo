@@ -8,8 +8,8 @@ import ChallengeProgress from '../models/ChallengeProgress.js';
 const VALID_FREQUENCIES = ['daily', 'weekly', 'monthly'];
 const VALID_OPERATORS = ['>=', '<=', '=='];
 const VALID_TARGET_TYPES = ['restaurant', 'delivery_partner'];
-const VALID_REWARD_TYPES = ['wallet_credit', 'bonus', 'featured_listing', 'ad_credits', 'wallet', 'badge', 'top_10', 'free_banner'];
-const RESTAURANT_REWARD_TYPES = ['wallet_credit', 'top_10', 'free_banner'];
+const VALID_REWARD_TYPES = ['wallet_credit', 'bonus', 'featured_listing', 'ad_credits', 'wallet', 'badge', 'free_banner'];
+const RESTAURANT_REWARD_TYPES = ['wallet_credit', 'free_banner'];
 const VALID_METRIC_KEYS = [
   'order_count',
   'order_revenue',
@@ -195,7 +195,7 @@ export const createChallenge = asyncHandler(async (req, res) => {
 
 export const getChallenges = asyncHandler(async (req, res) => {
   const { page = 1, limit = 50, status, target_type, frequency } = req.query;
-  const query = {};
+  const query = { rewardType: { $ne: 'top_10' } };
 
   if (status) query.status = status;
   if (target_type) query.applicableUserType = normalizeTargetType(target_type);
@@ -233,6 +233,7 @@ export const getChallengeById = asyncHandler(async (req, res) => {
     .populate('tierIds', 'name rank')
     .lean();
   if (!challenge) return errorResponse(res, 404, 'Challenge not found');
+  if (challenge.rewardType === 'top_10') return errorResponse(res, 404, 'Challenge not found');
 
   return successResponse(res, 200, 'Challenge fetched successfully', { challenge });
 });
@@ -355,6 +356,7 @@ export const getAllChallengeProgress = asyncHandler(async (req, res) => {
 
   const challenge = await Challenge.findById(id).lean();
   if (!challenge) return errorResponse(res, 404, 'Challenge not found');
+  if (challenge.rewardType === 'top_10') return errorResponse(res, 404, 'Challenge not found');
 
   const skip = (Number(page) - 1) * Number(limit);
   const [progress, total] = await Promise.all([

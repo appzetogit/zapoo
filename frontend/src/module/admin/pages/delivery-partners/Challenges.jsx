@@ -23,7 +23,6 @@ const OPERATOR_OPTIONS = [
 const REWARD_OPTIONS = [
   { value: "wallet_credit", label: "Wallet Credit" },
   { value: "bonus", label: "Bonus" },
-  { value: "top_10", label: "Top 10 (1 day)" },
   { value: "free_banner", label: "Free Banner (1 day)" },
   { value: "featured_listing", label: "Featured Listing" },
   { value: "ad_credits", label: "Ad Credits" },
@@ -32,7 +31,7 @@ const REWARD_OPTIONS = [
 
 const HIDDEN_REWARD_TYPES_BY_TARGET = {
   restaurant: ["bonus", "wallet", "featured_listing", "ad_credits"],
-  delivery_partner: ["top_10", "free_banner", "featured_listing", "ad_credits"],
+  delivery_partner: ["free_banner", "featured_listing", "ad_credits"],
 }
 
 const LEGACY_METRIC_TO_KEY = {
@@ -404,8 +403,8 @@ export default function Challenges() {
     e.preventDefault()
 
     if (!form.target_value || Number(form.target_value) < 0) return toast.error("Valid target value is required")
-    const rewardVal = ["top_10", "free_banner"].includes(form.reward_type) ? 0 : Number(form.reward_value)
-    if (!["top_10", "free_banner"].includes(form.reward_type) && (form.reward_value === "" || Number(form.reward_value) < 0)) {
+    const rewardVal = ["free_banner"].includes(form.reward_type) ? 0 : Number(form.reward_value)
+    if (!["free_banner"].includes(form.reward_type) && (form.reward_value === "" || Number(form.reward_value) < 0)) {
       return toast.error("Valid reward value is required")
     }
 
@@ -829,7 +828,7 @@ export default function Challenges() {
                       value={form.reward_value}
                       onChange={(e) => setForm((prev) => ({ ...prev, reward_value: e.target.value }))}
                       className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-                      placeholder={["top_10", "free_banner"].includes(form.reward_type) ? "0 (N/A)" : "e.g. 500"}
+                      placeholder={["free_banner"].includes(form.reward_type) ? "0 (N/A)" : "e.g. 500"}
                     />
                   </div>
                 </div>
@@ -890,4 +889,3 @@ export default function Challenges() {
     </div >
   )
 }
-

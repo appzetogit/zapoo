@@ -806,9 +806,11 @@ export default function Home() {
           const image = allImages[0];
           return {
             id: restaurant.restaurantId || restaurant._id,
+            _id: restaurant._id,
             name: restaurant.name,
             cuisine: cuisine,
             rating: restaurant.rating ?? 0,
+            totalRatings: Number(restaurant.totalRatings || 0),
             deliveryTime: deliveryTime,
             distance: distance,
             distanceInKm: distanceInKm,
@@ -1772,7 +1774,7 @@ export default function Home() {
             href: '/user/gourmet'
           }, {
             id: 'top10',
-            label: 'Top 10',
+            label: 'Top Restaurants',
             image: exploreTop10,
             href: '/user/top-10'
           }, {
@@ -1849,14 +1851,14 @@ export default function Home() {
         {/* Featured Foods - Horizontal Scroll */}
 
         {/* Restaurants - Enhanced with Animations */}
-        {/* Top 10 Horizontal Scroll Section */}
+        {/* Top Restaurants Horizontal Scroll Section */}
         {!loadingTop10 && top10Restaurants.length > 0 && <div className="mb-8 lg:mb-12">
             <div className="px-1 mb-4 flex items-center justify-between">
               <div className="flex flex-col gap-0.5">
                 <h2 className="text-xs sm:text-sm lg:text-base font-semibold text-gray-400 tracking-widest uppercase">
                   Handpicked for you
                 </h2>
-                <span className="text-base sm:text-lg lg:text-2xl text-gray-900 dark:text-white font-bold">Top 10</span>
+                <span className="text-base sm:text-lg lg:text-2xl text-gray-900 dark:text-white font-bold">Top Restaurants</span>
               </div>
               <Link to="/user/top-10" className="text-orange-600 font-semibold text-sm hover:underline">
                 See All
@@ -1900,12 +1902,12 @@ export default function Home() {
                       </button>
 
                       {/* Rating Badge - Bottom Left */}
-                      <div className="absolute bottom-2 left-2 sm:bottom-3 sm:left-3">
-                        <div className="flex items-center gap-1 bg-[#1A9F4F] text-white px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-bold shadow-lg">
-                          <span>{restaurant.rating || "4.1"}</span>
-                          <Star className="w-2.5 h-2.5 sm:w-3 sm:h-3 fill-current" />
-                        </div>
-                      </div>
+                      {Number.isFinite(restaurant.rating) && <div className="absolute bottom-2 left-2 sm:bottom-3 sm:left-3">
+                          <div className="flex items-center gap-1 bg-[#1A9F4F] text-white px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-bold shadow-lg">
+                            <span>{restaurant.rating.toFixed(1)}</span>
+                            <Star className="w-2.5 h-2.5 sm:w-3 sm:h-3 fill-current" />
+                          </div>
+                        </div>}
                     </div>
 
                     {/* Restaurant Info */}
@@ -1923,10 +1925,12 @@ export default function Home() {
                             />
                           </span>
                         </div>
-                        <span className="w-1 h-1 rounded-full bg-gray-300" />
-                        <span className="text-xs sm:text-sm font-medium truncate">
-                          {restaurant.cuisine?.join(', ') || 'Continental, Italian'}
-                        </span>
+                        {Array.isArray(restaurant.cuisines) && restaurant.cuisines.length > 0 && <>
+                            <span className="w-1 h-1 rounded-full bg-gray-300" />
+                            <span className="text-xs sm:text-sm font-medium truncate">
+                              {restaurant.cuisines.join(', ')}
+                            </span>
+                          </>}
                       </div>
                     </div>
                   </Link>;
@@ -2050,9 +2054,9 @@ export default function Home() {
                                     <Star className="h-4 w-4 fill-current" />
                                     <span className="text-sm font-bold">{restaurant.rating}</span>
                                   </div>
-                                  <span className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
-                                    {restaurant.totalRatings ? `By ${restaurant.totalRatings >= 1000 ? `${(restaurant.totalRatings / 1000).toFixed(0)}K+` : `${restaurant.totalRatings}+`}` : "By 0+"}
-                                  </span>
+                                  {restaurant.totalRatings > 0 && <span className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
+                                      {`By ${restaurant.totalRatings >= 1000 ? `${(restaurant.totalRatings / 1000).toFixed(0)}K+` : `${restaurant.totalRatings}+`}`}
+                                    </span>}
                                 </div>
                               </div>
 

@@ -9,6 +9,7 @@ import AdminCategoryManagement from '../../admin/models/AdminCategoryManagement.
 import Zone from '../../admin/models/Zone.js';
 import { successResponse, errorResponse } from '../../../shared/utils/response.js';
 import { calculateDistance } from '../../order/services/orderCalculationService.js';
+import { getTopRestaurantsForUser } from '../services/topRestaurantsService.js';
 
 /**
  * Get all active hero banners (public endpoint)
@@ -866,82 +867,19 @@ export const getAllTop10Restaurants = async (req, res) => {
 export const getTop10Restaurants = async (req, res) => {
   try {
     const { latitude, longitude, zoneId } = req.query;
-    const userLat = latitude ? parseFloat(latitude) : null;
-    const userLng = longitude ? parseFloat(longitude) : null;
-    const hasGeoFilter = userLat != null && userLng != null && Number.isFinite(userLat) && Number.isFinite(userLng);
+    const result = await getTopRestaurantsForUser({
+      latitude,
+      longitude,
+      zoneId
+    });
 
-    let userZone = null;
-    if (zoneId && mongoose.Types.ObjectId.isValid(zoneId)) {
-      userZone = await Zone.findById(zoneId).select('_id isActive').lean();
-      if (!userZone?.isActive) {
-        userZone = null;
-      }
-    }
-
-    if (hasGeoFilter && !userZone) {
-      return successResponse(res, 200, 'User is outside service zone', {
-        restaurants: [],
-        status: 'OUT_OF_SERVICE'
-      });
-    }
-
-    let activeZoneIds = null;
-    if (userZone || hasGeoFilter) {
-      const activeZones = await Zone.find({ isActive: true }).select('_id').lean();
-      activeZoneIds = activeZones.map(zone => zone._id.toString());
-      if (activeZoneIds.length === 0) {
-        return successResponse(res, 200, 'No active zones available', {
-          restaurants: [],
-          status: 'OUT_OF_SERVICE'
-        });
-      }
-    }
-
-    const now = new Date();
-    const restaurants = await Top10Restaurant.find({
-      isActive: true,
-      $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }]
-    })
-      .populate('restaurant', 'name restaurantId slug profileImage coverImages menuImages rating estimatedDeliveryTime distance offer featuredDish featuredPrice location deliveryRange zoneId')
-      .sort({ rank: 1, order: 1 })
-      .lean();
-
-    let filteredRestaurants = restaurants.map(r => ({
-      ...r.restaurant,
-      rank: r.rank,
-      _id: r._id
-    }));
-
-    if (activeZoneIds) {
-      const activeZoneSet = new Set(activeZoneIds);
-      filteredRestaurants = filteredRestaurants.filter(res => {
-        if (!res?.zoneId) return false;
-        return activeZoneSet.has(res.zoneId.toString());
-      });
-    }
-
-    // Range check if user location provided
-    if (userLat !== null && userLng !== null) {
-      filteredRestaurants = filteredRestaurants.filter(res => {
-        const resLocation = res.location;
-        const resLat = resLocation?.latitude || resLocation?.coordinates?.[1];
-        const resLng = resLocation?.longitude || resLocation?.coordinates?.[0];
-
-        if (resLat && resLng) {
-          const dist = calculateDistance([resLng, resLat], [userLng, userLat]);
-          const range = res.deliveryRange || 5;
-          return dist <= range;
-        }
-        return true;
-      });
-    }
-
-    return successResponse(res, 200, 'Top 10 restaurants retrieved successfully', {
-      restaurants: filteredRestaurants
+    return successResponse(res, 200, 'Top restaurants retrieved successfully', {
+      restaurants: result.restaurants,
+      ...(result.status ? { status: result.status } : {})
     });
   } catch (error) {
-    console.error('Error fetching Top 10 restaurants:', error);
-    return errorResponse(res, 500, 'Failed to fetch Top 10 restaurants');
+    console.error('Error fetching Top restaurants:', error);
+    return errorResponse(res, 500, 'Failed to fetch Top restaurants');
   }
 };
 

@@ -220,7 +220,7 @@ export default function RestaurantChallenges() {
                                                         </div>
                                                         <div className="flex items-center gap-1 text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
                                                             <Zap className="w-3 h-3 fill-blue-600" />
-                                                            {challenge.rewardType === 'top_10' ? 'Reward: Top 10 (1 day)' : challenge.rewardType === 'free_banner' ? 'Reward: Free Banner (1 day)' : `Reward: ₹${challenge.rewardValue}`}
+                                                            {challenge.rewardType === 'free_banner' ? 'Reward: Free Banner (1 day)' : `Reward: ₹${challenge.rewardValue}`}
                                                         </div>
                                                     </div>
                                                 </div>
@@ -317,11 +317,9 @@ export default function RestaurantChallenges() {
                             <div className="flex items-center justify-between">
                                 <span className="font-medium">Reward</span>
                                 <span>
-                                    {selectedChallenge.rewardType === 'top_10'
-                                        ? 'Top 10 listing (1 day)'
-                                        : selectedChallenge.rewardType === 'free_banner'
-                                            ? 'Free banner (1 day)'
-                                            : `₹${selectedChallenge.rewardValue}`}
+                                    {selectedChallenge.rewardType === 'free_banner'
+                                        ? 'Free banner (1 day)'
+                                        : `₹${selectedChallenge.rewardValue}`}
                                 </span>
                             </div>
                             <div className="flex items-center justify-between">
