@@ -2,7 +2,7 @@ import axios from "axios";
 
 const {
   EXOTEL_SID,
-  EXOTEL_TOKEN,
+  EXOTEL_AUTH_TOKEN,
   EXOTEL_SUBDOMAIN,
   EXOTEL_STATUS_CALLBACK_BASE_URL,
 } = process.env;
@@ -13,13 +13,13 @@ const getBaseUrl = () => {
 };
 
 const getAuthConfig = () => {
-  if (!EXOTEL_SID || !EXOTEL_TOKEN) {
+  if (!EXOTEL_SID || !EXOTEL_AUTH_TOKEN) {
     throw new Error("Exotel credentials are not configured");
   }
   return {
     auth: {
       username: EXOTEL_SID,
-      password: EXOTEL_TOKEN,
+      password: EXOTEL_AUTH_TOKEN,
     },
   };
 };

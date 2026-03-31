@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, ShoppingBag, Phone, Copy, Download, User, CreditCard, Calendar, MapPin, RotateCcw, FileText } from "lucide-react";
-import { orderAPI, restaurantAPI } from "@/lib/api";
+import { orderAPI, restaurantAPI, api } from "@/lib/api";
 import { toast } from "sonner";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -14,6 +14,8 @@ export default function UserOrderDetails() {
   const [order, setOrder] = useState(null);
   const [restaurant, setRestaurant] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [callingRestaurant, setCallingRestaurant] = useState(false);
+  const [callingDeliveryPartner, setCallingDeliveryPartner] = useState(false);
   useEffect(() => {
     const fetchOrderDetails = async () => {
       try {
@@ -135,14 +137,80 @@ export default function UserOrderDetails() {
   const addressText = order.address?.formattedAddress || [order.address?.street, order.address?.city, order.address?.state, order.address?.zipCode].filter(Boolean).join(", ");
   const savings = (pricing.discount || 0) + (pricing.originalItemTotal || 0) - (pricing.subtotal || 0);
 
-  // Restaurant phone (multiple fallbacks) - use fetched restaurant data first
+  const normalizeId = (value) => {
+    if (!value && value !== 0) return "";
+    if (typeof value === "object") return String(value._id || value.id || value);
+    return String(value);
+  };
+
+  const customerId = normalizeId(order.userId || order.user || order.customerId);
+  const restaurantIdForCall = normalizeId(order.restaurantId || restaurantObj._id || restaurantObj.id);
+  const deliveryPartnerId = normalizeId(order.deliveryPartnerId || order.deliveryPartner || order.assignmentInfo?.deliveryPartnerId);
+  const deliveryPartnerPhone = order.deliveryPartner?.phone || order.deliveryPartnerPhone || "";
   const restaurantPhone = restaurantObj.primaryContactNumber || restaurantObj.phone || restaurantObj.contactNumber || order.restaurantPhone || "";
-  const handleCallRestaurant = () => {
-    if (!restaurantPhone) {
-      toast.error("Restaurant phone number not available");
+
+  const handleCallRestaurant = async () => {
+    const businessOrderId = order.orderId || order._id || orderId;
+    if (!businessOrderId || !customerId || !restaurantIdForCall) {
+      if (!restaurantPhone) {
+        toast.error("Restaurant phone number not available");
+        return;
+      }
+      window.location.href = `tel:${restaurantPhone}`;
       return;
     }
-    window.location.href = `tel:${restaurantPhone}`;
+
+    setCallingRestaurant(true);
+    try {
+      await api.post("/telephony/call", {
+        order_id: String(businessOrderId),
+        caller_user_id: customerId,
+        receiver_user_id: restaurantIdForCall,
+      });
+      toast.success("Connecting via masked number...");
+    } catch (error) {
+      const errorMessage = error?.response?.data?.message || error?.message || "Unable to place masked call";
+      if (restaurantPhone) {
+        toast.error(`${errorMessage}. Falling back to direct call.`);
+        window.location.href = `tel:${restaurantPhone}`;
+      } else {
+        toast.error(errorMessage);
+      }
+    } finally {
+      setCallingRestaurant(false);
+    }
+  };
+
+  const handleCallDeliveryPartner = async () => {
+    const businessOrderId = order.orderId || order._id || orderId;
+    if (!businessOrderId || !customerId || !deliveryPartnerId) {
+      if (!deliveryPartnerPhone) {
+        toast.error("Delivery partner phone number not available");
+        return;
+      }
+      window.location.href = `tel:${deliveryPartnerPhone}`;
+      return;
+    }
+
+    setCallingDeliveryPartner(true);
+    try {
+      await api.post("/telephony/call", {
+        order_id: String(businessOrderId),
+        caller_user_id: customerId,
+        receiver_user_id: deliveryPartnerId,
+      });
+      toast.success("Connecting via masked number...");
+    } catch (error) {
+      const errorMessage = error?.response?.data?.message || error?.message || "Unable to place masked call";
+      if (deliveryPartnerPhone) {
+        toast.error(`${errorMessage}. Falling back to direct call.`);
+        window.location.href = `tel:${deliveryPartnerPhone}`;
+      } else {
+        toast.error(errorMessage);
+      }
+    } finally {
+      setCallingDeliveryPartner(false);
+    }
   };
   const handleDownloadSummary = async () => {
     try {
@@ -303,9 +371,28 @@ export default function UserOrderDetails() {
               </div>
             </div>
 
-            <button type="button" onClick={handleCallRestaurant} className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center text-[#E23744] hover:bg-red-50">
-              <Phone className="w-4 h-4" />
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleCallRestaurant}
+                disabled={callingRestaurant}
+                title="Call restaurant via masked number"
+                className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center text-[#E23744] hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Phone className="w-4 h-4" />
+              </button>
+              {deliveryPartnerId ? (
+                <button
+                  type="button"
+                  onClick={handleCallDeliveryPartner}
+                  disabled={callingDeliveryPartner}
+                  title="Call delivery partner via masked number"
+                  className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center text-green-600 hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Phone className="w-4 h-4" />
+                </button>
+              ) : null}
+            </div>
           </div>
 
           <div className="flex items-center gap-2 mb-4">

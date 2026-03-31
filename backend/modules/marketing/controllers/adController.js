@@ -8,6 +8,12 @@ import Tier from '../../admin/models/Tier.js';
 import Restaurant from '../../restaurant/models/Restaurant.js';
 import BusinessSettings from '../../admin/models/BusinessSettings.js';
 import { calculateDistance } from '../../order/services/orderCalculationService.js';
+import {
+  countAvailableFreeBannerCredits,
+  reserveOldestAvailableFreeBannerCredit,
+  markReservedCreditAsConsumed,
+  releaseReservedFreeBannerCredit
+} from '../services/freeBannerCreditService.js';
 
 // Pricing configuration based on Tier Rank
 const AD_PRICING = {
@@ -25,6 +31,46 @@ const DEFAULT_PRICING = 500;
 // Ads are no longer limited by per-day slot counts; only dates and status
 // determine eligibility.
 import { uploadToCloudinary } from '../../../shared/utils/cloudinaryService.js';
+
+const FREE_BANNER_MESSAGE = 'You have won a free day banner';
+
+const buildAdBillingSummary = (ad = {}) => ({
+  originalTotalCost: Number(ad.originalTotalCost ?? ad.totalCost ?? 0),
+  freeBannerDiscountAmount: Number(ad.freeBannerDiscountAmount || 0),
+  finalTotalCost: Number(ad.totalCost || 0),
+  hasFreeBannerCreditApplied: Boolean(ad.hasFreeBannerCreditApplied),
+  appliedFreeBannerCreditId: ad.appliedFreeBannerCreditId || null,
+  billingMessage: ad.billingMessage || null
+});
+
+const calculateCampaignPricing = async ({ targetZoneIds, days }) => {
+  let totalCost = 0;
+
+  for (const zoneId of targetZoneIds) {
+    if (!mongoose.Types.ObjectId.isValid(zoneId)) {
+      const invalidZone = new Error(`Invalid zone ID: ${zoneId}`);
+      invalidZone.statusCode = 400;
+      throw invalidZone;
+    }
+
+    const zone = await Zone.findById(zoneId).populate('tierId');
+    if (!zone) {
+      const notFound = new Error(`Zone not found: ${zoneId}`);
+      notFound.statusCode = 404;
+      throw notFound;
+    }
+
+    const tierRank = zone?.tierId?.rank || 2;
+    const pricePerDay = AD_PRICING[tierRank] || DEFAULT_PRICING;
+    totalCost += pricePerDay * days;
+  }
+
+  const normalizedDays = Math.max(1, Number(days) || 1);
+  return {
+    originalTotalCost: totalCost,
+    perDayTotal: totalCost / normalizedDays
+  };
+};
 
 /**
  * Restaurant submits an ad request
@@ -125,26 +171,11 @@ export const createAdRequest = async (req, res) => {
       });
     }
 
-    // 2. Calculate total cost based on Tier
-    let totalCost = 0;
-    for (const zoneId of targetZoneIds) {
-      if (!mongoose.Types.ObjectId.isValid(zoneId)) {
-        return res.status(400).json({
-          success: false,
-          message: `Invalid zone ID: ${zoneId}`
-        });
-      }
-      const zone = await Zone.findById(zoneId).populate('tierId');
-      if (!zone) {
-        return res.status(404).json({
-          success: false,
-          message: `Zone not found: ${zoneId}`
-        });
-      }
-      const tierRank = zone?.tierId?.rank || 2;
-      const pricePerDay = AD_PRICING[tierRank] || DEFAULT_PRICING;
-      totalCost += pricePerDay * days;
-    }
+    const { originalTotalCost, perDayTotal } = await calculateCampaignPricing({
+      targetZoneIds,
+      days
+    });
+
     const adRequest = await AdRequest.create({
       restaurant: restaurantId,
       targetZones: targetZoneIds,
@@ -153,17 +184,50 @@ export const createAdRequest = async (req, res) => {
       title,
       description,
       redirectTarget,
-      totalCost,
+      totalCost: originalTotalCost,
+      originalTotalCost,
       status: 'Pending'
     });
+
+    let reservedCredit = null;
+    try {
+      reservedCredit = await reserveOldestAvailableFreeBannerCredit({
+        restaurantId,
+        adRequestId: adRequest._id
+      });
+
+      if (reservedCredit) {
+        adRequest.appliedFreeBannerCreditId = reservedCredit._id;
+        adRequest.hasFreeBannerCreditApplied = true;
+        adRequest.freeBannerDiscountAmount = perDayTotal;
+        adRequest.billingMessage = FREE_BANNER_MESSAGE;
+        adRequest.totalCost = Math.max(0, originalTotalCost - perDayTotal);
+        await adRequest.save();
+      }
+    } catch (creditError) {
+      if (reservedCredit?._id) {
+        await releaseReservedFreeBannerCredit({
+          creditId: reservedCredit._id,
+          adRequestId: adRequest._id
+        });
+      }
+      await AdRequest.findByIdAndDelete(adRequest._id);
+      throw creditError;
+    }
+
+    const availableFreeBannerCredits = await countAvailableFreeBannerCredits(restaurantId);
     res.status(201).json({
       success: true,
-      data: adRequest,
+      data: {
+        ...adRequest.toObject(),
+        ...buildAdBillingSummary(adRequest),
+        availableFreeBannerCredits
+      },
       message: 'Advertisement request submitted for review'
     });
   } catch (error) {
     console.error('❌ [createAdRequest] CRITICAL ERROR:', error);
-    res.status(500).json({
+    res.status(error.statusCode || 500).json({
       success: false,
       message: error.message || 'Internal server error in createAdRequest',
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
@@ -202,6 +266,17 @@ export const updateAdStatus = async (req, res) => {
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       const adStartDate = new Date(ad.startDate);
       if (adStartDate <= today) {
+        if (ad.appliedFreeBannerCreditId && ad.paymentStatus !== 'Paid') {
+          await releaseReservedFreeBannerCredit({
+            creditId: ad.appliedFreeBannerCreditId,
+            adRequestId: ad._id
+          });
+          ad.appliedFreeBannerCreditId = null;
+          ad.hasFreeBannerCreditApplied = false;
+          ad.freeBannerDiscountAmount = 0;
+          ad.billingMessage = null;
+          ad.totalCost = ad.originalTotalCost || ad.totalCost;
+        }
         ad.status = 'Rejected';
         ad.rejectionReason = 'Approval window expired (Campaign start date reached or passed)';
         await ad.save();
@@ -217,6 +292,17 @@ export const updateAdStatus = async (req, res) => {
       ad.approvedBy = req.user?._id;
       ad.approvalDate = new Date();
     } else if (status === 'Rejected') {
+      if (ad.appliedFreeBannerCreditId && ad.paymentStatus !== 'Paid') {
+        await releaseReservedFreeBannerCredit({
+          creditId: ad.appliedFreeBannerCreditId,
+          adRequestId: ad._id
+        });
+        ad.appliedFreeBannerCreditId = null;
+        ad.hasFreeBannerCreditApplied = false;
+        ad.freeBannerDiscountAmount = 0;
+        ad.billingMessage = null;
+        ad.totalCost = ad.originalTotalCost || ad.totalCost;
+      }
       ad.status = 'Rejected';
       ad.rejectionReason = rejectionReason;
     } else {
@@ -225,7 +311,10 @@ export const updateAdStatus = async (req, res) => {
     await ad.save();
     res.status(200).json({
       success: true,
-      data: ad,
+      data: {
+        ...ad.toObject(),
+        ...buildAdBillingSummary(ad)
+      },
       message: `Ad status updated to ${status}`
     });
   } catch (error) {
@@ -502,6 +591,31 @@ export const createAdPaymentOrder = async (req, res) => {
       });
     }
 
+    if (Number(ad.totalCost || 0) <= 0) {
+      ad.paymentStatus = 'Paid';
+      ad.status = 'Banner Pending';
+      await ad.save();
+
+      if (ad.appliedFreeBannerCreditId) {
+        await markReservedCreditAsConsumed({
+          creditId: ad.appliedFreeBannerCreditId,
+          adRequestId: ad._id
+        });
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: 'Free banner reward applied successfully',
+        data: {
+          freeActivation: true,
+          ad: {
+            ...ad.toObject(),
+            ...buildAdBillingSummary(ad)
+          }
+        }
+      });
+    }
+
     // Amount in paise
     const amountInPaise = Math.round(ad.totalCost * 100);
     const order = await createOrder({
@@ -580,10 +694,21 @@ export const verifyAdPayment = async (req, res) => {
     ad.razorpaySignature = razorpaySignature;
     ad.status = 'Banner Pending';
     await ad.save();
+
+    if (ad.appliedFreeBannerCreditId) {
+      await markReservedCreditAsConsumed({
+        creditId: ad.appliedFreeBannerCreditId,
+        adRequestId: ad._id
+      });
+    }
+
     res.status(200).json({
       success: true,
       message: 'Payment verified and ad activated!',
-      data: ad
+      data: {
+        ...ad.toObject(),
+        ...buildAdBillingSummary(ad)
+      }
     });
   } catch (error) {
     console.error('Error verifying ad payment:', error);
@@ -630,6 +755,12 @@ export const trackAdMetric = async (req, res) => {
     }, {
       new: true
     });
+    if (!ad) {
+      return res.status(404).json({
+        success: false,
+        message: 'Ad request not found'
+      });
+    }
     res.status(200).json({
       success: true,
       data: ad.metrics
@@ -729,19 +860,37 @@ export const getAllAdRequests = async (req, res) => {
     // Auto-reject expired pending requests
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    await AdRequest.updateMany({
+    const expiredPendingAds = await AdRequest.find({
       status: 'Pending',
       startDate: {
         $lte: today
       }
-    }, {
-      status: 'Rejected',
-      rejectionReason: 'Approval window expired'
     });
+
+    for (const ad of expiredPendingAds) {
+      if (ad.appliedFreeBannerCreditId && ad.paymentStatus !== 'Paid') {
+        await releaseReservedFreeBannerCredit({
+          creditId: ad.appliedFreeBannerCreditId,
+          adRequestId: ad._id
+        });
+        ad.appliedFreeBannerCreditId = null;
+        ad.hasFreeBannerCreditApplied = false;
+        ad.freeBannerDiscountAmount = 0;
+        ad.billingMessage = null;
+        ad.totalCost = ad.originalTotalCost || ad.totalCost;
+      }
+
+      ad.status = 'Rejected';
+      ad.rejectionReason = 'Approval window expired';
+      await ad.save();
+    }
     const ads = await AdRequest.find().populate('restaurant', 'name').populate('targetZones', 'name').sort({ createdAt: -1 }).lean();
     res.status(200).json({
       success: true,
-      data: ads
+      data: ads.map((ad) => ({
+        ...ad,
+        ...buildAdBillingSummary(ad)
+      }))
     });
   } catch (error) {
     res.status(500).json({
@@ -763,10 +912,17 @@ export const getMyAdRequests = async (req, res) => {
         message: 'Restaurant authentication required'
       });
     }
-    const ads = await AdRequest.find({ restaurant: restaurantId }).populate('targetZones', 'name').sort({ createdAt: -1 }).lean();
+    const [ads, availableFreeBannerCredits] = await Promise.all([
+      AdRequest.find({ restaurant: restaurantId }).populate('targetZones', 'name').sort({ createdAt: -1 }).lean(),
+      countAvailableFreeBannerCredits(restaurantId)
+    ]);
     res.status(200).json({
       success: true,
-      data: ads
+      data: ads.map((ad) => ({
+        ...ad,
+        ...buildAdBillingSummary(ad)
+      })),
+      availableFreeBannerCredits
     });
   } catch (error) {
     res.status(500).json({
@@ -810,9 +966,14 @@ export const getAdRequestById = async (req, res) => {
         });
       }
     }
+    const availableFreeBannerCredits = isAdmin ? 0 : await countAvailableFreeBannerCredits(restaurantId);
     res.status(200).json({
       success: true,
-      data: ad
+      data: {
+        ...ad.toObject(),
+        ...buildAdBillingSummary(ad),
+        availableFreeBannerCredits
+      }
     });
   } catch (error) {
     res.status(500).json({
@@ -854,7 +1015,7 @@ export const updateAdRequest = async (req, res) => {
     }
 
     // Only allow editing pending ads
-    if (ad.status !== 'pending') {
+    if (ad.status !== 'Pending') {
       return res.status(400).json({
         success: false,
         message: `Cannot edit an ad with status "${ad.status}". Only pending ads can be edited.`
@@ -913,7 +1074,10 @@ export const updateAdRequest = async (req, res) => {
     res.status(200).json({
       success: true,
       message: 'Ad updated successfully',
-      data: ad
+      data: {
+        ...ad.toObject(),
+        ...buildAdBillingSummary(ad)
+      }
     });
   } catch (error) {
     res.status(500).json({
@@ -1002,13 +1166,22 @@ export const deleteAdRequest = async (req, res) => {
         message: 'Invalid advertisement ID format'
       });
     }
-    const ad = await AdRequest.findByIdAndDelete(adId);
+    const ad = await AdRequest.findById(adId);
     if (!ad) {
       return res.status(404).json({
         success: false,
         message: 'Ad request not found'
       });
     }
+
+    if (ad.appliedFreeBannerCreditId && ad.paymentStatus !== 'Paid') {
+      await releaseReservedFreeBannerCredit({
+        creditId: ad.appliedFreeBannerCreditId,
+        adRequestId: ad._id
+      });
+    }
+
+    await AdRequest.findByIdAndDelete(adId);
     res.status(200).json({
       success: true,
       message: 'Ad request deleted successfully'

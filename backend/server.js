@@ -57,6 +57,7 @@ import uploadModuleRoutes from './modules/upload/index.js';
 import locationRoutes from './modules/location/index.js';
 import heroBannerRoutes from './modules/heroBanner/index.js';
 import marketingRoutes from './modules/marketing/index.js';
+import telephonyRoutes from './modules/telephony/routes/telephonyRoutes.js';
 
 
 // Validate required environment variables
@@ -368,6 +369,7 @@ app.use('/api/campaign', campaignRoutes);
 app.use('/api/notification', notificationRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/', telephonyRoutes);
 app.use('/api', categoryPublicRoutes);
 app.use('/api', feeSettingsPublicRoutes);
 app.use('/api/env', envPublicRoutes);

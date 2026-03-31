@@ -8,7 +8,7 @@ import Order from '../models/Order.js';
 import DeliveryWallet from '../../delivery/models/DeliveryWallet.js';
 import RestaurantWallet from '../../restaurant/models/RestaurantWallet.js';
 import Top10Restaurant from '../../heroBanner/models/Top10Restaurant.js';
-import ChallengeBanner from '../../marketing/models/ChallengeBanner.js';
+import { createFreeBannerCredit, countAvailableFreeBannerCredits } from '../../marketing/services/freeBannerCreditService.js';
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -293,32 +293,12 @@ const applyRewardIfNeeded = async ({ progress, challenge, userId }) => {
     }
 
     if (normalizedRewardType === 'free_banner' && challenge.applicableUserType === 'restaurant') {
-      const restaurant = await Restaurant.findById(userId)
-        .select('zoneId profileImage name')
-        .lean();
-      if (restaurant?.zoneId) {
-        const existing = await ChallengeBanner.findOne({
-          restaurant: userId,
-          endDate: { $gt: now }
-        });
-        if (!existing) {
-          const bannerImage =
-            typeof restaurant.profileImage === 'string'
-              ? restaurant.profileImage
-              : restaurant.profileImage?.url ?? null;
-          await ChallengeBanner.create({
-            restaurant: userId,
-            zoneId: restaurant.zoneId,
-            startDate: now,
-            endDate: oneDayLater,
-            title: challenge.challengeName || 'Challenge Reward',
-            description: 'You earned this spotlight!',
-            bannerImage,
-            redirectTarget: 'menu',
-            challengeProgressId: locked._id
-          });
-        }
-      }
+      await createFreeBannerCredit({
+        restaurantId: userId,
+        challengeId: challenge._id,
+        challengeProgressId: locked._id
+      });
+      locked.rewardAmount = 1;
     }
 
     await ChallengeProgress.findByIdAndUpdate(locked._id, {
@@ -326,7 +306,7 @@ const applyRewardIfNeeded = async ({ progress, challenge, userId }) => {
         rewardGranted: true,
         rewardGrantedAt: now,
         rewardStatus: 'issued',
-        rewardAmount: amount,
+        rewardAmount: normalizedRewardType === 'free_banner' ? 1 : amount,
         lastUpdated: now
       }
     });
@@ -582,6 +562,11 @@ export const getMyChallengeProgress = async ({ userId, userType, now = new Date(
     progressMap.set(`${row.challengeId.toString()}__${row.cycleKey}`, row);
   }
 
+  const availableFreeBannerCredits =
+    userType === 'restaurant'
+      ? await countAvailableFreeBannerCredits(userId)
+      : 0;
+
   return challenges.map((challenge) => {
     const cycle = getCycleBounds(challenge.frequency, now);
     const key = `${challenge._id.toString()}__${cycle.cycleKey}`;
@@ -589,6 +574,7 @@ export const getMyChallengeProgress = async ({ userId, userType, now = new Date(
 
     return {
       ...challenge,
+      availableFreeBannerCredits,
       cycleKey: cycle.cycleKey,
       cycleStart: cycle.cycleStart,
       cycleEnd: cycle.cycleEnd,

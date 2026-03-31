@@ -33,6 +33,7 @@ export default function AcceptedOrderDetails() {
   const [realOrder, setRealOrder] = useState(null)
   const [deliveryProfile, setDeliveryProfile] = useState(null)
   const [callingRestaurant, setCallingRestaurant] = useState(false)
+  const [callingCustomer, setCallingCustomer] = useState(false)
 
   // Listen for order status updates
   useEffect(() => {

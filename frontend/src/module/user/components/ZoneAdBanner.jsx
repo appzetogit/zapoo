@@ -96,7 +96,8 @@ export default function ZoneAdBanner() {
     // Track Impression for current slide
     useEffect(() => {
         const currentAd = ads[currentSlide]
-        if (currentAd && !currentAd._id.startsWith('fallback-') && !impressionsLogged.current.has(currentAd._id)) {
+        const isTrackableAd = currentAd && !currentAd._id.startsWith('fallback-') && currentAd.source !== 'challenge'
+        if (isTrackableAd && !impressionsLogged.current.has(currentAd._id)) {
             const trackImpression = async () => {
                 try {
                     await api.post(`/marketing/ads/${currentAd._id}/track`, { type: 'impression' })
@@ -113,7 +114,7 @@ export default function ZoneAdBanner() {
         if (!ad) return
 
         // Track Click for paid ads
-        if (!ad._id.startsWith('fallback-')) {
+        if (!ad._id.startsWith('fallback-') && ad.source !== 'challenge') {
             try {
                 await api.post(`/marketing/ads/${ad._id}/track`, { type: 'click' })
             } catch (err) {

@@ -55,6 +55,27 @@ const adRequestSchema = new mongoose.Schema(
             type: Number,
             required: true
         },
+        originalTotalCost: {
+            type: Number,
+            default: null
+        },
+        freeBannerDiscountAmount: {
+            type: Number,
+            default: 0
+        },
+        hasFreeBannerCreditApplied: {
+            type: Boolean,
+            default: false
+        },
+        billingMessage: {
+            type: String,
+            default: null
+        },
+        appliedFreeBannerCreditId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'FreeBannerCredit',
+            default: null
+        },
         rejectionReason: {
             type: String
         },

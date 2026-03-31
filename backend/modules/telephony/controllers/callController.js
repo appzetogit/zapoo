@@ -1,6 +1,7 @@
 import Order from "../../order/models/Order.js";
 import Restaurant from "../../restaurant/models/Restaurant.js";
 import Delivery from "../../delivery/models/Delivery.js";
+import User from "../../auth/models/User.js";
 import CallSession from "../models/CallSession.js";
 import {
   selectVirtualNumberByCity,
@@ -40,45 +41,36 @@ const determineRolesAndPhones = ({
   receiverUserId,
   restaurant,
   deliveryPartner,
+  customer,
 }) => {
   const restaurantPhone =
-    restaurant?.primaryContactNumber || restaurant?.phone || restaurant?.ownerPhone;
-  const deliveryPhone = deliveryPartner?.phone;
+    restaurant?.primaryContactNumber?.trim() ||
+    restaurant?.phone?.trim() ||
+    restaurant?.ownerPhone?.trim() ||
+    "";
+  const deliveryPhone = deliveryPartner?.phone?.trim() || "";
+  const customerPhone =
+    customer?.phone?.trim() ||
+    customer?.primaryContactNumber?.trim() ||
+    customer?.phoneNumber?.trim() ||
+    customer?.mobile?.trim() ||
+    "";
 
-  if (!restaurantPhone || !deliveryPhone) {
-    throw new Error("Missing phone numbers for restaurant or delivery partner");
+  const restaurantId = restaurant ? String(restaurant._id) : null;
+  const customerId = customer ? String(customer._id) : null;
+  const deliveryId = deliveryPartner ? String(deliveryPartner._id) : null;
+
+  if (!restaurantPhone) {
+    throw new Error("Missing restaurant phone number");
   }
 
-  const restaurantId = String(restaurant._id);
-  const deliveryId = String(deliveryPartner._id);
-
-  let caller_role;
-  let receiver_role;
-  let direction;
-  let fromPhone;
-  let toPhone;
-
-  if (callerUserId === restaurantId && receiverUserId === deliveryId) {
-    caller_role = "restaurant";
-    receiver_role = "delivery_partner";
-    direction = "restaurant_to_dp";
-    fromPhone = restaurantPhone;
-    toPhone = deliveryPhone;
-  } else if (callerUserId === deliveryId && receiverUserId === restaurantId) {
-    caller_role = "delivery_partner";
-    receiver_role = "restaurant";
-    direction = "dp_to_restaurant";
-    fromPhone = deliveryPhone;
-    toPhone = restaurantPhone;
-  } else {
-    caller_role = "restaurant";
-    receiver_role = "delivery_partner";
-    direction = "other";
-    fromPhone = restaurantPhone;
-    toPhone = deliveryPhone;
-  }
-
-  return {
+  const buildResult = ({
+    caller_role,
+    receiver_role,
+    direction,
+    fromPhone,
+    toPhone,
+  }) => ({
     caller_role,
     receiver_role,
     direction,
@@ -86,7 +78,106 @@ const determineRolesAndPhones = ({
     toPhone,
     restaurantPhone,
     deliveryPhone,
-  };
+    customerPhone,
+  });
+
+  if (callerUserId === restaurantId && receiverUserId === deliveryId) {
+    if (!deliveryPartner) {
+      throw new Error("Order does not have an assigned delivery partner");
+    }
+    if (!deliveryPhone) {
+      throw new Error("Missing delivery partner phone number");
+    }
+    return buildResult({
+      caller_role: "restaurant",
+      receiver_role: "delivery_partner",
+      direction: "restaurant_to_dp",
+      fromPhone: restaurantPhone,
+      toPhone: deliveryPhone,
+    });
+  }
+
+  if (callerUserId === deliveryId && receiverUserId === restaurantId) {
+    if (!deliveryPartner) {
+      throw new Error("Order does not have an assigned delivery partner");
+    }
+    if (!deliveryPhone) {
+      throw new Error("Missing delivery partner phone number");
+    }
+    return buildResult({
+      caller_role: "delivery_partner",
+      receiver_role: "restaurant",
+      direction: "dp_to_restaurant",
+      fromPhone: deliveryPhone,
+      toPhone: restaurantPhone,
+    });
+  }
+
+  if (callerUserId === restaurantId && receiverUserId === customerId) {
+    if (!customerPhone) {
+      throw new Error("Missing customer phone number");
+    }
+    return buildResult({
+      caller_role: "restaurant",
+      receiver_role: "customer",
+      direction: "restaurant_to_customer",
+      fromPhone: restaurantPhone,
+      toPhone: customerPhone,
+    });
+  }
+
+  if (callerUserId === customerId && receiverUserId === restaurantId) {
+    if (!customerPhone) {
+      throw new Error("Missing customer phone number");
+    }
+    return buildResult({
+      caller_role: "customer",
+      receiver_role: "restaurant",
+      direction: "customer_to_restaurant",
+      fromPhone: customerPhone,
+      toPhone: restaurantPhone,
+    });
+  }
+
+  if (callerUserId === customerId && receiverUserId === deliveryId) {
+    if (!deliveryPartner) {
+      throw new Error("Order does not have an assigned delivery partner");
+    }
+    if (!customerPhone) {
+      throw new Error("Missing customer phone number");
+    }
+    if (!deliveryPhone) {
+      throw new Error("Missing delivery partner phone number");
+    }
+    return buildResult({
+      caller_role: "customer",
+      receiver_role: "delivery_partner",
+      direction: "customer_to_dp",
+      fromPhone: customerPhone,
+      toPhone: deliveryPhone,
+    });
+  }
+
+  if (callerUserId === deliveryId && receiverUserId === customerId) {
+    if (!deliveryPartner) {
+      throw new Error("Order does not have an assigned delivery partner");
+    }
+    if (!deliveryPhone) {
+      throw new Error("Missing delivery partner phone number");
+    }
+    if (!customerPhone) {
+      throw new Error("Missing customer phone number");
+    }
+    return buildResult({
+      caller_role: "delivery_partner",
+      receiver_role: "customer",
+      direction: "dp_to_customer",
+      fromPhone: deliveryPhone,
+      toPhone: customerPhone,
+    });
+  }
+
+  throw new Error("Unsupported caller/receiver combination for this order");
 };
 
 export const initiateCall = async (req, res) => {
@@ -119,19 +210,30 @@ export const initiateCall = async (req, res) => {
         .json({ success: false, message: "Restaurant not found" });
     }
 
-    if (!order.deliveryPartnerId) {
+    if (!order.userId) {
       return res.status(400).json({
         success: false,
-        message: "Order does not have an assigned delivery partner",
+        message: "Order does not have an assigned customer",
       });
     }
 
-    const deliveryPartner = await Delivery.findById(order.deliveryPartnerId);
-    if (!deliveryPartner) {
+    const customer = await User.findById(order.userId);
+    if (!customer) {
       return res.status(404).json({
         success: false,
-        message: "Delivery partner not found",
+        message: "Customer not found",
       });
+    }
+
+    let deliveryPartner = null;
+    if (order.deliveryPartnerId) {
+      deliveryPartner = await Delivery.findById(order.deliveryPartnerId);
+      if (!deliveryPartner) {
+        return res.status(404).json({
+          success: false,
+          message: "Delivery partner not found",
+        });
+      }
     }
 
     const city = resolveCityForOrder(order, restaurant);
@@ -150,11 +252,13 @@ export const initiateCall = async (req, res) => {
       toPhone,
       restaurantPhone,
       deliveryPhone,
+      customerPhone,
     } = determineRolesAndPhones({
       callerUserId: caller_user_id,
       receiverUserId: receiver_user_id,
       restaurant,
       deliveryPartner,
+      customer,
     });
 
     let virtualNumberDoc;
@@ -186,7 +290,10 @@ export const initiateCall = async (req, res) => {
         receiver_role,
         virtual_number: virtualNumberDoc.number,
         restaurant_phone: restaurantPhone,
-        delivery_partner_phone: deliveryPhone,
+        delivery_partner_phone: deliveryPhone || null,
+        customer_phone: customerPhone || null,
+        caller_phone: fromPhone,
+        receiver_phone: toPhone,
         call_sid: callSid,
         status: "initiated",
         direction,

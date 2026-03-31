@@ -35,10 +35,25 @@ const callSessionSchema = new mongoose.Schema(
     },
     restaurant_phone: {
       type: String,
+      trim: true,
+      default: null,
+    },
+    delivery_partner_phone: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    customer_phone: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    caller_phone: {
+      type: String,
       required: true,
       trim: true,
     },
-    delivery_partner_phone: {
+    receiver_phone: {
       type: String,
       required: true,
       trim: true,
@@ -66,7 +81,15 @@ const callSessionSchema = new mongoose.Schema(
     },
     direction: {
       type: String,
-      enum: ["restaurant_to_dp", "dp_to_restaurant", "other"],
+      enum: [
+        "restaurant_to_dp",
+        "dp_to_restaurant",
+        "restaurant_to_customer",
+        "customer_to_restaurant",
+        "customer_to_dp",
+        "dp_to_customer",
+        "other",
+      ],
       required: true,
     },
     duration: {

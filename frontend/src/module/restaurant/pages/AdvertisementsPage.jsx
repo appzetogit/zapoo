@@ -38,6 +38,14 @@ export default function AdvertisementsPage() {
 
       // 1. Create Order
       const orderRes = await marketingAPI.createAdPaymentOrder(ad._id);
+      if (orderRes.data?.data?.freeActivation) {
+        toast.dismiss();
+        toast.success("Free banner reward applied. Your ad is ready for admin banner upload.");
+        fetchAds();
+        setProcessingPayment(false);
+        return;
+      }
+
       const {
         orderId,
         amount,
