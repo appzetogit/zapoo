@@ -33,14 +33,6 @@ export const syncCommissionRulesForTier = async ({
 
   const basePay = Number(deliveryPricing.basePay || deliveryPricing.baseFee || 0);
 
-  // Fetch existing rules so that manual per‑km and base payout edits are preserved
-  const existingRules = await DeliveryBoyCommission.find({ tier: tierName });
-  const existingByRangeKey = new Map();
-  existingRules.forEach((rule) => {
-    const key = `${Number(rule.minDistance || 0)}-${rule.maxDistance === null || rule.maxDistance === undefined ? "null" : Number(rule.maxDistance)}`;
-    existingByRangeKey.set(key, rule);
-  });
-
   const docs = activeSlabs
     .sort((a, b) => Number(a.minKm || 0) - Number(b.minKm || 0))
     .map((slab) => {
@@ -51,23 +43,21 @@ export const syncCommissionRulesForTier = async ({
           ? null
           : Number(slab.maxKm);
 
-      const key = `${minDistance}-${maxDistance === null ? "null" : maxDistance}`;
-      const existing = existingByRangeKey.get(key);
-
       return {
         name: `${tierName.toUpperCase()} ${slab.minKm}-${slab.maxKm ?? "∞"}km`,
         minDistance,
         maxDistance,
-        // For existing ranges, keep whatever admin had set; for new ones, start from 0
-        commissionPerKm: existing ? Number(existing.commissionPerKm || 0) : 0,
-        // Same for base payout: keep manual value if present, otherwise derive from tier for base slab
-        basePayout: existing
-          ? Number(existing.basePayout || 0)
-          : isBase
-            ? basePay
-            : 0,
+        commissionPerKm: isBase ? 0 : Number(slab.adminPerKmRate || 0),
+        basePayout: isBase ? basePay : 0,
         status: true,
         tier: tierName,
+        metadata: {
+          syncedFromTier: true,
+          syncedAt: new Date(),
+          syncedBy: adminId || null,
+          isBaseSlab: isBase,
+          adminPerKmRate: Number(slab.adminPerKmRate || 0),
+        },
       };
     });
 
@@ -79,4 +69,3 @@ export const syncCommissionRulesForTier = async ({
   await DeliveryBoyCommission.deleteMany({ tier: tierName });
   await DeliveryBoyCommission.insertMany(docs);
 };
-

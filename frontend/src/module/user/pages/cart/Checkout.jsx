@@ -64,7 +64,7 @@ export default function Checkout() {
         const response = await orderAPI.calculateOrder({
           items,
           restaurantId: cart[0]?.restaurantId,
-          addressId: selectedAddress,
+          deliveryAddress: defaultAddress,
           deliveryFleet: "standard",
         })
 
@@ -88,7 +88,7 @@ export default function Checkout() {
     }
 
     calculatePricing()
-  }, [cart, selectedAddress])
+  }, [cart, selectedAddress, defaultAddress])
 
   const handlePlaceOrder = async () => {
     if (!selectedAddress || !selectedPayment) {

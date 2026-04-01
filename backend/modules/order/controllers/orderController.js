@@ -183,7 +183,6 @@ export const createOrder = async (req, res) => {
     const pricingData = await calculateOrderPricing({
       items,
       restaurantId: assignedRestaurantId,
-      passedRestaurant: restaurant, // Use pre-fetched object
       deliveryAddress: address,
       couponCode: pricing.couponCode,
       deliveryFleet: deliveryFleet || 'standard'

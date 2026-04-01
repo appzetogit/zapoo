@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import Tier from './Tier.js';
 
 const deliveryBoyCommissionSchema = new mongoose.Schema(
   {
@@ -95,6 +96,77 @@ const buildActiveRulesQuery = (tier) => {
   return query;
 };
 
+const buildShiftedEntries = (items, minKey, maxKey) =>
+  items.map((item, index) => {
+    const originalMin = Number(item[minKey] || 0);
+    const originalMax = item[maxKey] === null || item[maxKey] === undefined
+      ? null
+      : Number(item[maxKey]);
+
+    return {
+      rule: item,
+      index,
+      effectiveMin: index === 0 ? originalMin : roundKm(originalMin + DELIVERY_SLAB_MARGIN_KM),
+      effectiveMax: originalMax === null ? null : roundKm(originalMax + DELIVERY_SLAB_MARGIN_KM)
+    };
+  });
+
+const resolveCommissionFromShiftedEntries = (shiftedEntries, normalizedDistance) => {
+  const baseRuleEntry =
+    shiftedEntries.find((entry) => entry.rule.isBaseSlab === true) ||
+    shiftedEntries.find((entry) => Number(entry.rule.minDistance) === 0) ||
+    shiftedEntries[0];
+
+  let applicableRuleEntry = null;
+  for (const entry of shiftedEntries) {
+    const lowerBoundOk = entry.index === 0
+      ? normalizedDistance >= entry.effectiveMin
+      : normalizedDistance > entry.effectiveMin;
+    const upperBoundOk = entry.effectiveMax === null || normalizedDistance <= entry.effectiveMax;
+
+    if (lowerBoundOk && upperBoundOk) {
+      applicableRuleEntry = entry;
+      break;
+    }
+  }
+
+  if (!applicableRuleEntry) {
+    applicableRuleEntry = shiftedEntries[shiftedEntries.length - 1] || baseRuleEntry;
+  }
+
+  const inBaseSlab = normalizedDistance >= baseRuleEntry.effectiveMin &&
+    (baseRuleEntry.effectiveMax === null || normalizedDistance <= baseRuleEntry.effectiveMax);
+
+  const appliedEntry = inBaseSlab ? baseRuleEntry : applicableRuleEntry;
+  const appliedRule = appliedEntry.rule;
+
+  let basePayout = 0;
+  let distanceCommission = 0;
+
+  if (inBaseSlab) {
+    basePayout = Number(baseRuleEntry.rule.basePayout || 0);
+  } else {
+    distanceCommission = normalizedDistance * Number(appliedRule.commissionPerKm || 0);
+  }
+
+  const commission = basePayout + distanceCommission;
+
+  return {
+    rule: appliedRule,
+    commission: Math.round(commission * 100) / 100,
+    breakdown: {
+      basePayout,
+      distance: normalizedDistance,
+      minDistance: appliedEntry.effectiveMin,
+      maxDistance: appliedEntry.effectiveMax,
+      commissionPerKm: Number(appliedRule.commissionPerKm || 0),
+      distanceCommission,
+      perKmApplied: !inBaseSlab,
+      slabShiftKm: DELIVERY_SLAB_MARGIN_KM
+    }
+  };
+};
+
 // Static method to find applicable commission rule for a distance
 // Optionally filters by tier (string); if not provided, uses all active rules.
 deliveryBoyCommissionSchema.statics.findApplicableRule = async function(distance, tier = null) {
@@ -129,13 +201,6 @@ deliveryBoyCommissionSchema.statics.findApplicableRule = async function(distance
 // Static method to calculate commission for a given distance
 // Optionally filters by tier (string); if not provided, uses all active rules.
 deliveryBoyCommissionSchema.statics.calculateCommission = async function(distance, tier = null) {
-  // Get all active rules sorted by minDistance (ascending)
-  const rules = await this.find(buildActiveRulesQuery(tier)).sort({ minDistance: 1 });
-
-  if (!rules || rules.length === 0) {
-    throw new Error('No commission rules found');
-  }
-
   const normalizedDistance = Math.max(0, Number(distance) || 0);
 
   // Explicit rule: exact 0 km is excluded from payout range.
@@ -156,79 +221,54 @@ deliveryBoyCommissionSchema.statics.calculateCommission = async function(distanc
     };
   }
 
+  if (tier) {
+    const tierDoc = await Tier.findOne({ name: tier })
+      .select('name deliveryPricing.basePay deliveryPricing.baseFee deliveryPricing.distanceSlabs')
+      .lean();
+
+    const tierSlabs = Array.isArray(tierDoc?.deliveryPricing?.distanceSlabs)
+      ? tierDoc.deliveryPricing.distanceSlabs.filter((slab) => slab && slab.isActive !== false)
+      : [];
+
+    if (tierSlabs.length > 0) {
+      const basePay = Number(tierDoc?.deliveryPricing?.basePay || tierDoc?.deliveryPricing?.baseFee || 0);
+      const tierRules = tierSlabs
+        .sort((a, b) => Number(a.minKm || 0) - Number(b.minKm || 0))
+        .map((slab) => ({
+          name: `${tierDoc?.name || tier} ${slab.minKm}-${slab.maxKm ?? '∞'}km`,
+          minDistance: Number(slab.minKm || 0),
+          maxDistance: slab.maxKm === null || slab.maxKm === undefined ? null : Number(slab.maxKm),
+          commissionPerKm: slab.isBaseSlab === true ? 0 : Number(slab.adminPerKmRate || 0),
+          basePayout: slab.isBaseSlab === true ? basePay : 0,
+          tier: tierDoc?.name || tier,
+          isBaseSlab: slab.isBaseSlab === true,
+          metadata: {
+            source: 'tier_distance_slab',
+            slabId: slab._id?.toString?.() || null,
+            adminPerKmRate: Number(slab.adminPerKmRate || 0)
+          }
+        }));
+
+      const shiftedTierRules = buildShiftedEntries(tierRules, 'minDistance', 'maxDistance');
+      return resolveCommissionFromShiftedEntries(shiftedTierRules, normalizedDistance);
+    }
+  }
+
+  // Fallback to synced commission rows when tier slabs are unavailable
+  const rules = await this.find(buildActiveRulesQuery(tier)).sort({ minDistance: 1 });
+
+  if (!rules || rules.length === 0) {
+    throw new Error('No commission rules found');
+  }
+
   // Delivery partner slabs are shifted by +0.2 km (Option A)
   // Example: 0-4 -> 0-4.2, 4-6 -> 4.2-6.2
-  const shiftedRules = rules.map((rule, index) => {
-    const originalMin = Number(rule.minDistance || 0);
-    const originalMax = rule.maxDistance === null || rule.maxDistance === undefined
-      ? null
-      : Number(rule.maxDistance);
-
-    return {
-      rule,
-      index,
-      effectiveMin: index === 0 ? originalMin : roundKm(originalMin + DELIVERY_SLAB_MARGIN_KM),
-      effectiveMax: originalMax === null ? null : roundKm(originalMax + DELIVERY_SLAB_MARGIN_KM)
-    };
-  });
-
-  const baseRuleEntry = shiftedRules.find((entry) => Number(entry.rule.minDistance) === 0) || shiftedRules[0];
-
-  let applicableRuleEntry = null;
-  for (const entry of shiftedRules) {
-    const lowerBoundOk = entry.index === 0
-      ? normalizedDistance >= entry.effectiveMin
-      : normalizedDistance > entry.effectiveMin;
-    const upperBoundOk = entry.effectiveMax === null || normalizedDistance <= entry.effectiveMax;
-
-    if (lowerBoundOk && upperBoundOk) {
-      applicableRuleEntry = entry;
-      break;
-    }
-  }
-
-  if (!applicableRuleEntry) {
-    applicableRuleEntry = shiftedRules[shiftedRules.length - 1] || baseRuleEntry;
-  }
-
-  const inBaseSlab = normalizedDistance >= baseRuleEntry.effectiveMin &&
-    (baseRuleEntry.effectiveMax === null || normalizedDistance <= baseRuleEntry.effectiveMax);
-
-  const appliedEntry = inBaseSlab ? baseRuleEntry : applicableRuleEntry;
-  const appliedRule = appliedEntry.rule;
-
-  // Payout rule:
-  // - Base slab: fixed base payout
-  // - Non-base slabs: full distance * slab per-km
-  let basePayout = 0;
-  let distanceCommission = 0;
-
-  if (inBaseSlab) {
-    basePayout = Number(baseRuleEntry.rule.basePayout || 0);
-  } else {
-    distanceCommission = normalizedDistance * Number(appliedRule.commissionPerKm || 0);
-  }
-
-  const commission = basePayout + distanceCommission;
-  return {
-    rule: appliedRule,
-    commission: Math.round(commission * 100) / 100,
-    breakdown: {
-      basePayout,
-      distance: normalizedDistance,
-      minDistance: appliedEntry.effectiveMin,
-      maxDistance: appliedEntry.effectiveMax,
-      commissionPerKm: appliedRule.commissionPerKm,
-      distanceCommission,
-      perKmApplied: !inBaseSlab,
-      slabShiftKm: DELIVERY_SLAB_MARGIN_KM
-    }
-  };
+  const shiftedRules = buildShiftedEntries(rules, 'minDistance', 'maxDistance');
+  return resolveCommissionFromShiftedEntries(shiftedRules, normalizedDistance);
 };
 
 const DeliveryBoyCommission = mongoose.model('DeliveryBoyCommission', deliveryBoyCommissionSchema);
 
 export default DeliveryBoyCommission;
-
 
 

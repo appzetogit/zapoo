@@ -134,14 +134,17 @@ export const getWallet = asyncHandler(async (req, res) => {
             let amount = settlementMap.get(orderIdStr) || 0;
             if (!amount || amount <= 0) {
               let distance = 0;
-              if (order?.deliveryState?.routeToDelivery?.distance) {
+              if (order?.pricing?.distanceKm != null && Number(order.pricing.distanceKm) > 0) {
+                distance = Number(order.pricing.distanceKm) || 0;
+              } else if (order?.deliveryState?.routeToDelivery?.distance) {
                 distance = Number(order.deliveryState.routeToDelivery.distance) || 0;
               } else if (order?.assignmentInfo?.distance) {
                 distance = Number(order.assignmentInfo.distance) || 0;
               }
               if (distance > 0) {
                 try {
-                  const commissionResult = await DeliveryBoyCommission.calculateCommission(distance);
+                  const tierName = order?.pricing?.pricingMeta?.tierName || null;
+                  const commissionResult = await DeliveryBoyCommission.calculateCommission(distance, tierName);
                   amount = Number(commissionResult?.commission) || 0;
                 } catch {
                   amount = 0;
