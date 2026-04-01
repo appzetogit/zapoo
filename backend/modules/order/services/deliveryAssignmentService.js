@@ -225,8 +225,42 @@ export async function findNearestDeliveryBoys(restaurantLat, restaurantLng, rest
         };
       });
     }
+    const firebasePartnerIds = new Set(
+      deliveryPartners
+        .map(p => p?._idStr || (p?._id?.toString ? p._id.toString() : String(p?._id || '')))
+        .filter(Boolean)
+    );
+    const mongoOnlyPartners = await Delivery.find({
+      isActive: true,
+      status: { $in: ['approved', 'active'] },
+      'availability.isOnline': true,
+      'availability.currentLocation.coordinates': { $exists: true, $ne: [0, 0] }
+    }).select('_id name phone zoneId availability.currentLocation').lean();
+
+    for (const partner of mongoOnlyPartners) {
+      const key = partner?._id?.toString?.() || String(partner?._id || '');
+      if (!key || firebasePartnerIds.has(key)) continue;
+      deliveryPartners.push({
+        ...partner,
+        _idStr: key
+      });
+    }
     const preIdleFilterPartners = deliveryPartners;
-    deliveryPartners = await filterIdleDeliveryPartners(deliveryPartners);
+    const idlePartners = await filterIdleDeliveryPartners(deliveryPartners);
+    if (Array.isArray(idlePartners) && idlePartners.length > 0) {
+      const idleIds = new Set(
+        idlePartners
+          .map(p => p?._idStr || (p?._id?.toString ? p._id.toString() : String(p?._id || '')))
+          .filter(Boolean)
+      );
+      const deferredBusyPartners = preIdleFilterPartners.filter(p => {
+        const key = p?._idStr || (p?._id?.toString ? p._id.toString() : String(p?._id || ''));
+        return key && !idleIds.has(key);
+      });
+      deliveryPartners = [...idlePartners, ...deferredBusyPartners];
+    } else {
+      deliveryPartners = idlePartners;
+    }
     if (!deliveryPartners || deliveryPartners.length === 0) {
       if (Array.isArray(preIdleFilterPartners) && preIdleFilterPartners.length > 0) {
         console.warn('⚠️ [DeliveryAssign] All partners filtered as busy. Proceeding without idle filter for this assignment.');
@@ -455,6 +489,27 @@ export async function findNearestDeliveryBoy(restaurantLat, restaurantLng, resta
         };
       });
     }
+    const firebasePartnerIds = new Set(
+      deliveryPartners
+        .map(p => p?._idStr || (p?._id?.toString ? p._id.toString() : String(p?._id || '')))
+        .filter(Boolean)
+    );
+    const mongoOnlyPartners = await Delivery.find({
+      isActive: true,
+      status: { $in: ['approved', 'active'] },
+      'availability.isOnline': true,
+      'availability.currentLocation.coordinates': { $exists: true, $ne: [0, 0] }
+    }).select('_id name phone zoneId availability.currentLocation').lean();
+
+    for (const partner of mongoOnlyPartners) {
+      const key = partner?._id?.toString?.() || String(partner?._id || '');
+      if (!key || firebasePartnerIds.has(key)) continue;
+      if (excludeIds && excludeIds.includes(key)) continue;
+      deliveryPartners.push({
+        ...partner,
+        _idStr: key
+      });
+    }
     const preIdleFilterPartners = deliveryPartners;
     deliveryPartners = await filterIdleDeliveryPartners(deliveryPartners);
     if (!deliveryPartners || deliveryPartners.length === 0) {
@@ -548,27 +603,24 @@ export async function notifyNextDeliveryPartner(orderDoc, restaurantLat, restaur
   // Build candidate list if not present
   if (!Array.isArray(orderDoc.assignmentInfo.candidateDeliveryPartnerIds) || orderDoc.assignmentInfo.candidateDeliveryPartnerIds.length === 0) {
     const nearest = await findNearestDeliveryBoys(restaurantLat, restaurantLng, orderDoc.restaurantId, 5);
-    const populatedOrder = await Order.findById(orderId).populate('userId', 'name phone').populate('restaurantId', 'name address location phone ownerPhone').lean();
     const candidateIdsRaw = nearest.map(db => db.deliveryPartnerId);
-    const filteredIds = populatedOrder
-      ? await filterByCodCashLimit(candidateIdsRaw, populatedOrder)
-      : candidateIdsRaw;
 
     console.log('🧭 [DeliveryAssign] Candidates (within 5km):', nearest.map(n => ({
       id: n.deliveryPartnerId,
       distanceKm: Number(n.distance?.toFixed?.(2)) || n.distance
     })));
-    console.log('🧭 [DeliveryAssign] Candidates after COD filter:', filteredIds);
+    console.log('🧭 [DeliveryAssign] Candidate queue:', candidateIdsRaw);
 
-    orderDoc.assignmentInfo.candidateDeliveryPartnerIds = filteredIds;
+    orderDoc.assignmentInfo.candidateDeliveryPartnerIds = candidateIdsRaw;
     orderDoc.assignmentInfo.currentCandidateIndex = -1;
     orderDoc.assignmentInfo.rejectedDeliveryPartnerIds = [];
     orderDoc.assignmentInfo.notificationPhase = 'sequential';
   }
 
-  const candidates = orderDoc.assignmentInfo.candidateDeliveryPartnerIds || [];
+  let candidates = orderDoc.assignmentInfo.candidateDeliveryPartnerIds || [];
   const rejected = new Set(orderDoc.assignmentInfo.rejectedDeliveryPartnerIds || []);
   let idx = Number(orderDoc.assignmentInfo.currentCandidateIndex) || -1;
+  const populated = await Order.findById(orderId).populate('userId', 'name phone').populate('restaurantId', 'name address location phone ownerPhone').lean();
 
   // Move to next connected candidate not rejected
   let nextId = null;
@@ -581,6 +633,22 @@ export async function notifyNextDeliveryPartner(orderDoc, restaurantLat, restaur
       break;
     }
 
+    if (!nextId) {
+      const refreshedCandidateIds = await refreshSequentialCandidateQueue(orderDoc, restaurantLat, restaurantLng);
+      if (refreshedCandidateIds.length > candidates.length) {
+        candidates = refreshedCandidateIds;
+        continue;
+      }
+
+      const fallbackCandidateId = await findNextCandidateByFreshLookup(orderDoc, restaurantLat, restaurantLng, rejected);
+      if (fallbackCandidateId) {
+        candidates = [...candidates, fallbackCandidateId];
+        orderDoc.assignmentInfo.candidateDeliveryPartnerIds = candidates;
+        await orderDoc.save();
+        continue;
+      }
+    }
+
     // If no candidate left, schedule auto-cancel and exit
     if (!nextId) {
       console.warn('⚠️ [DeliveryAssign] No candidates left, scheduling auto-cancel for order', orderDoc.orderId || orderId);
@@ -589,6 +657,13 @@ export async function notifyNextDeliveryPartner(orderDoc, restaurantLat, restaur
       await orderDoc.save();
       scheduleAssignmentTimeout(orderId);
       return { notified: false };
+    }
+
+    const codEligible = await canTakeOrderUnderCashLimit(nextId, populated);
+    if (!codEligible) {
+      console.warn(`⚠️ [DeliveryAssign] Candidate ${nextId} skipped for COD cash-limit on order ${orderDoc.orderId || orderId}`);
+      nextId = null;
+      continue;
     }
 
     // Skip if delivery partner is not connected to socket
@@ -612,7 +687,6 @@ export async function notifyNextDeliveryPartner(orderDoc, restaurantLat, restaur
   await orderDoc.save();
 
   // Notify only the current candidate
-  const populated = await Order.findById(orderId).populate('userId', 'name phone').populate('restaurantId', 'name address location phone ownerPhone').lean();
   if (populated) {
     await notifyDeliveryBoyNewOrder(populated, nextId);
   }
@@ -624,6 +698,102 @@ export async function notifyNextDeliveryPartner(orderDoc, restaurantLat, restaur
 
 export function clearAssignmentTimer(orderId) {
   clearAssignmentTimeout(orderId);
+}
+
+async function refreshSequentialCandidateQueue(orderDoc, restaurantLat, restaurantLng) {
+  try {
+    const currentIds = Array.isArray(orderDoc.assignmentInfo?.candidateDeliveryPartnerIds)
+      ? orderDoc.assignmentInfo.candidateDeliveryPartnerIds.map(id => id?.toString()).filter(Boolean)
+      : [];
+    const latestNearest = await findNearestDeliveryBoys(restaurantLat, restaurantLng, orderDoc.restaurantId, 5);
+    const latestIds = latestNearest.map(db => db.deliveryPartnerId?.toString()).filter(Boolean);
+    const seen = new Set(currentIds);
+    const mergedIds = [...currentIds];
+
+    for (const id of latestIds) {
+      if (!seen.has(id)) {
+        mergedIds.push(id);
+        seen.add(id);
+      }
+    }
+
+    if (mergedIds.length > currentIds.length) {
+      orderDoc.assignmentInfo.candidateDeliveryPartnerIds = mergedIds;
+      await orderDoc.save();
+      console.log(`🧭 [DeliveryAssign] Refreshed candidate queue for order ${orderDoc.orderId || orderDoc._id}:`, mergedIds);
+    }
+
+    return mergedIds;
+  } catch (error) {
+    console.warn(`⚠️ [DeliveryAssign] Failed to refresh candidate queue for order ${orderDoc.orderId || orderDoc._id}:`, error.message);
+    return Array.isArray(orderDoc.assignmentInfo?.candidateDeliveryPartnerIds)
+      ? orderDoc.assignmentInfo.candidateDeliveryPartnerIds
+      : [];
+  }
+}
+
+async function findNextCandidateByFreshLookup(orderDoc, restaurantLat, restaurantLng, rejectedSet) {
+  try {
+    const excludeIds = Array.from(rejectedSet || []).map(id => id?.toString()).filter(Boolean);
+    const nextNearest = await findNearestDeliveryBoy(
+      restaurantLat,
+      restaurantLng,
+      orderDoc.restaurantId,
+      5,
+      excludeIds
+    );
+
+    const candidateId = nextNearest?.deliveryPartnerId?.toString();
+    if (!candidateId) {
+      return null;
+    }
+
+    const existing = Array.isArray(orderDoc.assignmentInfo?.candidateDeliveryPartnerIds)
+      ? new Set(orderDoc.assignmentInfo.candidateDeliveryPartnerIds.map(id => id?.toString()).filter(Boolean))
+      : new Set();
+
+    if (existing.has(candidateId)) {
+      return null;
+    }
+
+    console.log(`🧭 [DeliveryAssign] Fresh fallback candidate found for order ${orderDoc.orderId || orderDoc._id}: ${candidateId}`);
+    return candidateId;
+  } catch (error) {
+    console.warn(`⚠️ [DeliveryAssign] Fresh fallback lookup failed for order ${orderDoc.orderId || orderDoc._id}:`, error.message);
+    return null;
+  }
+}
+
+async function canTakeOrderUnderCashLimit(deliveryPartnerId, order) {
+  if (!deliveryPartnerId || !order) return true;
+
+  const payMethod = (order?.payment?.method || '').toLowerCase().trim();
+  if (payMethod !== 'cash' && payMethod !== 'cod') {
+    return true;
+  }
+
+  const orderTotal = Number(order?.pricing?.total) || 0;
+  if (orderTotal <= 0) {
+    return true;
+  }
+
+  try {
+    const [wallet, settings] = await Promise.all([
+      DeliveryWallet.findOne({ deliveryId: deliveryPartnerId }).select('cashInHand').lean(),
+      BusinessSettings.getSettings()
+    ]);
+
+    const cashInHand = Number(wallet?.cashInHand) || 0;
+    const cashLimit = Number(settings?.deliveryCashLimit) || 0;
+    if (cashLimit <= 0) {
+      return true;
+    }
+
+    return cashInHand + orderTotal <= cashLimit;
+  } catch (error) {
+    console.warn(`⚠️ [DeliveryAssign] Cash-limit check failed for delivery partner ${deliveryPartnerId}:`, error.message);
+    return true;
+  }
 }
 
 /**

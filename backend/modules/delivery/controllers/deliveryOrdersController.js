@@ -774,11 +774,32 @@ export const rejectOrder = asyncHandler(async (req, res) => {
 
     // Notify next candidate in sequence
     try {
-      const restaurantId = orderDoc.restaurantId?._id || orderDoc.restaurantId;
-      const restaurant = await Restaurant.findById(restaurantId).select('location').lean();
+      const freshOrderDoc = await Order.findById(orderDoc._id).select('orderId restaurantId assignmentInfo deliveryPartnerId');
+      if (!freshOrderDoc || freshOrderDoc.deliveryPartnerId) {
+        return successResponse(res, 200, 'Order rejected successfully', {
+          orderId: orderDoc.orderId || orderDoc._id
+        });
+      }
+
+      const restaurantId = freshOrderDoc.restaurantId?._id || freshOrderDoc.restaurantId;
+      let restaurant = null;
+      if (restaurantId) {
+        restaurant = await Restaurant.findById(restaurantId).select('location').lean();
+      }
+      if (!restaurant && restaurantId) {
+        restaurant = await Restaurant.findOne({
+          $or: [{ restaurantId }, { _id: restaurantId }]
+        }).select('location').lean();
+      }
+
       if (restaurant?.location?.coordinates?.length >= 2) {
         const [restaurantLng, restaurantLat] = restaurant.location.coordinates;
-        await notifyNextDeliveryPartner(orderDoc, restaurantLat, restaurantLng);
+        const result = await notifyNextDeliveryPartner(freshOrderDoc, restaurantLat, restaurantLng);
+        if (!result?.notified) {
+          console.warn(`⚠️ [DeliveryAssign] No next delivery partner notified after reject for order ${freshOrderDoc.orderId || freshOrderDoc._id}`);
+        }
+      } else {
+        console.warn(`⚠️ [DeliveryAssign] Restaurant location missing while advancing reject flow for order ${freshOrderDoc.orderId || freshOrderDoc._id}`);
       }
     } catch (notifyErr) {
       console.error('❌ Error notifying next delivery partner after reject:', notifyErr);
