@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { ChevronDown, ShoppingCart, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLocation } from "../hooks/useLocation";
@@ -15,8 +15,7 @@ export default function PageNavbar({
 }) {
   const {
     location,
-    loading,
-    requestLocation
+    loading
   } = useLocation();
   const {
     getCartCount
@@ -25,24 +24,6 @@ export default function PageNavbar({
     openLocationSelector
   } = useLocationSelector();
   const cartCount = getCartCount();
-
-  // Auto-trigger location fetch if we have placeholder values (only once on mount)
-  useEffect(() => {
-    if (location && !loading && requestLocation && (location.formattedAddress === "Select location" || location.city === "Current Location")) {
-      // Wait a bit to avoid multiple rapid calls, and only trigger once
-      const timeoutId = setTimeout(() => {
-        requestLocation().then(fetchedLocation => {
-          if (fetchedLocation && fetchedLocation.formattedAddress !== "Select location" && fetchedLocation.city !== "Current Location") {} else {
-            console.warn("⚠️ Location fetch returned placeholder, user may need to select manually");
-          }
-        }).catch(err => {
-          console.warn("Location fetch failed:", err);
-        });
-      }, 2000); // Wait 2 seconds before triggering
-
-      return () => clearTimeout(timeoutId);
-    }
-  }, []); // Only run once on mount
 
   // Function to extract location parts for display
   // Main location: First 2 parts only (e.g., "Mama Loca, G-2")

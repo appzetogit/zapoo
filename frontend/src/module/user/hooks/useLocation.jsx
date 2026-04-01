@@ -1377,7 +1377,6 @@ export function useLocation() {
   useEffect(() => {
     // Load stored location first for IMMEDIATE display (no loading state)
     const stored = localStorage.getItem("userLocation");
-    let shouldForceRefresh = false;
     let hasInitialLocation = false;
     if (stored) {
       try {
@@ -1391,17 +1390,9 @@ export function useLocation() {
           setPermissionGranted(true);
           setLoading(false); // Set loading to false immediately
           hasInitialLocation = true;
-          // Check if we should refresh in background for better address
-          const hasCompleteAddress = parsedLocation?.formattedAddress && parsedLocation.formattedAddress !== "Select location" && !parsedLocation.formattedAddress.match(/^-?\d+\.\d+,\s*-?\d+\.\d+$/) && parsedLocation.formattedAddress.split(',').length >= 4;
-          if (!hasCompleteAddress) {
-            shouldForceRefresh = true;
-          }
-        } else {
-          shouldForceRefresh = true;
         }
       } catch (err) {
         console.error("Failed to parse stored location:", err);
-        shouldForceRefresh = true;
       }
     }
 
@@ -1413,19 +1404,12 @@ export function useLocation() {
           setPermissionGranted(true);
           setLoading(false);
           hasInitialLocation = true;
-          // Check if we should refresh for better address
-          const hasCompleteAddress = dbLoc?.formattedAddress && dbLoc.formattedAddress !== "Select location" && !dbLoc.formattedAddress.match(/^-?\d+\.\d+,\s*-?\d+\.\d+$/) && dbLoc.formattedAddress.split(',').length >= 4;
-          if (!hasCompleteAddress) {
-            shouldForceRefresh = true;
-          }
         } else {
           // No location found - set loading to false and show fallback
           setLoading(false);
-          shouldForceRefresh = true;
         }
       }).catch(() => {
         setLoading(false);
-        shouldForceRefresh = true;
       });
     }
 
@@ -1451,92 +1435,9 @@ export function useLocation() {
       });
     }, 5000); // 5 second safety timeout (increased to allow background fetch to complete)
 
-    // Don't set fallback immediately - wait for background fetch to complete
-    // The background fetch will set the location, or we'll use the cached/DB location
-    // Only set fallback if we have no location after all attempts
-
-    // Request fresh location in BACKGROUND (non-blocking)
-    // CRITICAL FIX: Only auto-request if permission is ALREADY granted
-    // This prevents "Requests geolocation permission on page load" warning
-    const checkPermissionAndStart = async () => {
-      try {
-        let permissionGranted = false;
-        if (navigator.permissions && navigator.permissions.query) {
-          try {
-            const result = await navigator.permissions.query({
-              name: 'geolocation'
-            });
-            if (result.state === 'granted') {
-              permissionGranted = true;
-            } else {}
-          } catch (permErr) {
-            console.warn("⚠️ Permission query failed:", permErr);
-          }
-        } else {}
-
-        // If permission NOT granted, and we don't have a specific user request (this is page load),
-        // we should SKIP automatic fetching/watching to allow the user to choose when to enable it.
-        // UNLESS we already have a valid initial location from localStorage/DB, in which case we might want to refresh?
-        // Actually, even then, we shouldn't prompt.
-        if (!permissionGranted) {
-          // If we have an initial location, we are fine (it's displayed).
-          // If we don't, we show "Select Location".
-          // In either case, we avoid the PROMPT.
-          // Ensure loading is false so UI doesn't hang
-          setLoading(false);
-          return;
-        }
-        // Always fetch fresh location if we don't have a valid one
-        // Check current location state to see if it's a placeholder
-        const currentLocation = location;
-        const hasPlaceholder = currentLocation && (currentLocation.formattedAddress === "Select location" || currentLocation.city === "Current Location");
-        const shouldFetch = shouldForceRefresh || !hasInitialLocation || hasPlaceholder;
-        if (shouldFetch) {
-          getLocation(true, shouldForceRefresh) // forceFresh = true if cached location is incomplete
-          .then(location => {
-            if (location && location.formattedAddress !== "Select location" && location.city !== "Current Location") {
-              // CRITICAL: Update state with fresh location so PageNavbar displays it
-              setLocation(location);
-              setPermissionGranted(true);
-              // Start watching for live updates
-              startWatchingLocation();
-            } else {
-              console.warn("⚠️ Location fetch returned placeholder, retrying...");
-              // Retry after 2 seconds if we got placeholder
-              setTimeout(() => {
-                getLocation(true, true).then(retryLocation => {
-                  if (retryLocation && retryLocation.formattedAddress !== "Select location" && retryLocation.city !== "Current Location") {
-                    setLocation(retryLocation);
-                    setPermissionGranted(true);
-                    startWatchingLocation();
-                  }
-                }).catch(() => {
-                  startWatchingLocation();
-                });
-              }, 2000);
-            }
-          }).catch(err => {
-            console.warn("⚠️ Background location fetch failed (using cached):", err.message);
-            // Still start watching in case permission is granted later
-            startWatchingLocation();
-          });
-        } else {
-          // We have a valid location, just start watching
-          startWatchingLocation();
-        }
-      } catch (err) {
-        console.error("Error in checkPermissionAndStart:", err);
-        setLoading(false);
-      }
-    };
-
-    // Only check permissions/start watching if we already have a saved location
-    // This avoids "Requests geolocation permission on page load" warnings on fresh visits
-    // New users must explicitly click "Use Current Location" first
-    const hasStoredLocation = localStorage.getItem("userLocation");
-    if (hasStoredLocation) {
-      checkPermissionAndStart();
-    } else {
+    // Customer location should remain stable after the initial/manual selection.
+    // Do not auto-refresh or start live GPS watching on page load.
+    if (!stored && !hasInitialLocation) {
       setLoading(false);
     }
 
@@ -1553,8 +1454,6 @@ export function useLocation() {
     setLoading(true);
     setError(null);
     try {
-      // Clear cached location to force fresh fetch
-      localStorage.removeItem("userLocation");
       // Show loading, so pass showLoading = true
       // forceFresh = true, updateDB = true, showLoading = true
       // This ensures we get fresh GPS coordinates and reverse geocode with Google Maps
@@ -1568,15 +1467,10 @@ export function useLocation() {
         console.warn("   2. Location permission not granted");
         console.warn("   3. GPS accuracy too low (try on mobile device)");
       } else {}
-
-      // Restart watching for live updates
-      startWatchingLocation();
       return location;
     } catch (err) {
       console.error("❌ Failed to request location:", err);
       setError(err.message || "Failed to get location");
-      // Still try to start watching in case it works
-      startWatchingLocation();
       throw err;
     } finally {
       setLoading(false);
