@@ -662,6 +662,13 @@ export async function notifyNextDeliveryPartner(orderDoc, restaurantLat, restaur
     const codEligible = await canTakeOrderUnderCashLimit(nextId, populated);
     if (!codEligible) {
       console.warn(`⚠️ [DeliveryAssign] Candidate ${nextId} skipped for COD cash-limit on order ${orderDoc.orderId || orderId}`);
+      rejected.add(nextId);
+      if (!orderDoc.assignmentInfo.rejectedDeliveryPartnerIds) {
+        orderDoc.assignmentInfo.rejectedDeliveryPartnerIds = [];
+      }
+      if (!orderDoc.assignmentInfo.rejectedDeliveryPartnerIds.includes(nextId)) {
+        orderDoc.assignmentInfo.rejectedDeliveryPartnerIds.push(nextId);
+      }
       nextId = null;
       continue;
     }
@@ -779,11 +786,11 @@ async function canTakeOrderUnderCashLimit(deliveryPartnerId, order) {
 
   try {
     const [wallet, settings] = await Promise.all([
-      DeliveryWallet.findOne({ deliveryId: deliveryPartnerId }).select('cashInHand').lean(),
+      DeliveryWallet.findOne({ deliveryId: deliveryPartnerId }).select('cashInHand transactions').lean(),
       BusinessSettings.getSettings()
     ]);
 
-    const cashInHand = Number(wallet?.cashInHand) || 0;
+    const cashInHand = getEffectiveCashInHand(wallet);
     const cashLimit = Number(settings?.deliveryCashLimit) || 0;
     if (cashLimit <= 0) {
       return true;
@@ -794,6 +801,30 @@ async function canTakeOrderUnderCashLimit(deliveryPartnerId, order) {
     console.warn(`⚠️ [DeliveryAssign] Cash-limit check failed for delivery partner ${deliveryPartnerId}:`, error.message);
     return true;
   }
+}
+
+function getEffectiveCashInHand(wallet) {
+  if (!wallet) return 0;
+
+  const transactions = Array.isArray(wallet.transactions) ? wallet.transactions : [];
+  if (transactions.length === 0) {
+    return Math.max(0, Number(wallet.cashInHand) || 0);
+  }
+
+  let cashInHand = 0;
+  for (const t of transactions) {
+    if (t?.status !== 'Completed') continue;
+    const amount = Number(t.amount) || 0;
+    if (t.type === 'payment' || t.type === 'bonus' || t.type === 'refund') {
+      if (t.paymentCollected) cashInHand += amount;
+    } else if (t.type === 'withdrawal') {
+      if (t.paymentCollected) cashInHand -= amount;
+    } else if (t.type === 'deduction' || t.type === 'deposit') {
+      cashInHand -= amount;
+    }
+  }
+
+  return Math.max(0, Number.isFinite(cashInHand) ? cashInHand : 0);
 }
 
 /**
