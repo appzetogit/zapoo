@@ -185,7 +185,8 @@ export const createOrder = async (req, res) => {
       restaurantId: assignedRestaurantId,
       deliveryAddress: address,
       couponCode: pricing.couponCode,
-      deliveryFleet: deliveryFleet || 'standard'
+      deliveryFleet: deliveryFleet || 'standard',
+      userId,
     });
 
     // Create the order
@@ -1174,7 +1175,8 @@ export const calculateOrder = async (req, res) => {
       restaurantId,
       deliveryAddress: finalDeliveryAddress,
       couponCode,
-      deliveryFleet: deliveryFleet || 'standard'
+      deliveryFleet: deliveryFleet || 'standard',
+      userId: req.user?._id || req.user?.id || null,
     });
     res.json({
       success: true,

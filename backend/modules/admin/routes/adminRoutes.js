@@ -213,6 +213,12 @@ import {
   updateChallengeStatus,
   getAllChallengeProgress
 } from "../controllers/challengeController.js";
+import {
+  createCustomerCoupon,
+  getCustomerCoupons,
+  updateCustomerCoupon,
+  updateCustomerCouponStatus,
+} from "../controllers/customerCouponController.js";
 import zoneRoutes from "./zoneRoutes.js";
 import tierRoutes from "./tierRoutes.js";
 import { authenticateAdmin } from "../middleware/adminAuth.js";
@@ -374,6 +380,10 @@ router.post("/food-approvals/:id/reject-special", rejectSpecialRecommendation);
 
 // Offers Management
 router.get("/offers", getAllOffers);
+router.get("/customer-coupons", getCustomerCoupons);
+router.post("/customer-coupons", createCustomerCoupon);
+router.put("/customer-coupons/:id", updateCustomerCoupon);
+router.patch("/customer-coupons/:id/status", updateCustomerCouponStatus);
 
 // Zone Management
 router.use("/zones", zoneRoutes);

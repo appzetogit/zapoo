@@ -10,6 +10,7 @@ import SubscriptionPlan from "../models/SubscriptionPlan.js";
 import RestaurantSubscription from "../../restaurant/models/RestaurantSubscription.js";
 import User from "../../auth/models/User.js";
 import Menu from "../../restaurant/models/Menu.js";
+import Delivery from "../../delivery/models/Delivery.js";
 import { successResponse, errorResponse } from "../../../shared/utils/response.js";
 import { asyncHandler } from "../../../shared/middleware/asyncHandler.js";
 import { normalizePhoneNumber } from "../../../shared/utils/phoneUtils.js";
@@ -53,6 +54,7 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
     // Filter by Tier if specified
     let orderScopeFilter = {};
     let restaurantScopeFilter = {};
+    let deliveryScopeFilter = {};
     let scopedRestaurantObjectIds = [];
     if (tierId && tierId !== "all") {
       const zones = await Zone.find({
@@ -62,6 +64,11 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
       const zoneIdStrings = zoneIds.map((id) => String(id));
       restaurantScopeFilter = {
         zoneId: {
+          $in: zoneIds
+        }
+      };
+      deliveryScopeFilter = {
+        "availability.zones": {
           $in: zoneIds
         }
       };
@@ -348,34 +355,41 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
     // 2. Aggregated counters for orders, restaurants, and users
     const last24Hours = new Date(now.getTime() - 24 * 60 * 60 * 1000);
     const pendingRestaurantRequestsQuery = {
-      isActive: false,
       ...restaurantScopeFilter,
-      $and: [{
-        $or: [{
-          "onboarding.completedSteps": 4
-        }, {
-          $and: [{
-            name: { $exists: true, $ne: null, $ne: "" }
+      $and: [
+        {
+          isActive: false
+        },
+        {
+          $or: [{
+            rejectionReason: { $exists: false }
           }, {
-            cuisines: { $exists: true, $ne: null, $not: { $size: 0 } }
-          }, {
-            openDays: { $exists: true, $ne: null, $not: { $size: 0 } }
-          }, {
-            estimatedDeliveryTime: { $exists: true, $ne: null, $ne: "" }
-          }, {
-            featuredDish: { $exists: true, $ne: null, $ne: "" }
+            rejectionReason: null
           }]
-        }]
-      }, {
-        $or: [{
-          rejectionReason: { $exists: false }
-        }, {
-          rejectionReason: null
-        }]
-      }]
+        },
+        {
+          $or: [{
+            "onboarding.completedSteps": { $gte: 3 }
+          }, {
+            $and: [{
+              name: { $exists: true, $ne: null, $ne: "" }
+            }, {
+              cuisines: { $exists: true, $ne: null, $not: { $size: 0 } }
+            }, {
+              openDays: { $exists: true, $ne: null, $not: { $size: 0 } }
+            }, {
+              "onboarding.step2.profileImageUrl": {
+                $exists: true,
+                $ne: null,
+                $ne: {}
+              }
+            }]
+          }]
+        }
+      ]
     };
 
-    const [orderCounts, restaurantStatsAgg, userStatsAgg] = await Promise.all([
+    const [orderCounts, restaurantStatsAgg, customerStatsAgg, deliveryStatsAgg] = await Promise.all([
       Order.aggregate([
         { $match: { ...orderScopeFilter, ...(startDate ? { createdAt: { $gte: startDate } } : {}) } },
         { $group: { _id: "$status", count: { $sum: 1 } } }
@@ -409,20 +423,26 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
       User.aggregate([
         {
           $facet: {
-            activeDelivery: [
-              { $match: { role: "delivery", isActive: true } },
-              { $count: "total" }
-            ],
-            totalDelivery: [
-              { $match: { role: "delivery" } },
-              { $count: "total" }
-            ],
             customers: [
               { $match: { $or: [{ role: "user" }, { role: { $exists: false } }, { role: null }] } },
               { $count: "total" }
+            ]
+          }
+        }
+      ]),
+      Delivery.aggregate([
+        {
+          $facet: {
+            total: [
+              { $match: { ...deliveryScopeFilter, status: { $in: ["approved", "active"] } } },
+              { $count: "total" }
             ],
-            pendingDelivery: [
-              { $match: { role: "delivery", $or: [{ isActive: false }, { deliveryStatus: "pending" }] } },
+            active: [
+              { $match: { ...deliveryScopeFilter, status: { $in: ["approved", "active"] } } },
+              { $count: "total" }
+            ],
+            pending: [
+              { $match: { ...deliveryScopeFilter, status: "pending" } },
               { $count: "total" }
             ]
           }
@@ -432,22 +452,23 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
 
     const orderStatusMap = orderCounts.reduce((acc, curr) => ({ ...acc, [curr._id]: curr.count }), {});
     const restaurantStats = restaurantStatsAgg[0] || {};
-    const userStats = userStatsAgg[0] || {};
+    const customerStats = customerStatsAgg[0] || {};
+    const deliveryStats = deliveryStatsAgg[0] || {};
     const activeRestaurants = restaurantStats.active?.[0]?.total || 0;
     const totalRestaurants = restaurantStats.total?.[0]?.total || 0;
     const pendingRestaurantRequests = restaurantStats.pending?.[0]?.total || 0;
     const recentRestaurants = restaurantStats.recentActive?.[0]?.total || 0;
     const restaurantIds = (restaurantStats.activeRestaurantIds || []).map((restaurantEntry) => restaurantEntry._id);
-    const activeDeliveryPartners = userStats.activeDelivery?.[0]?.total || 0;
-    const totalDeliveryBoys = userStats.totalDelivery?.[0]?.total || 0;
-    const totalCustomers = userStats.customers?.[0]?.total || 0;
-    const pendingDeliveryBoyRequests = userStats.pendingDelivery?.[0]?.total || 0;
+    const activeDeliveryPartners = deliveryStats.active?.[0]?.total || 0;
+    const totalDeliveryBoys = deliveryStats.total?.[0]?.total || 0;
+    const totalCustomers = customerStats.customers?.[0]?.total || 0;
+    const pendingDeliveryBoyRequests = deliveryStats.pending?.[0]?.total || 0;
 
     // 3. Total Foods/Addons and subscription sales breakdown
     const [menuStats, allPlans, soldSubscriptionCounts, recentOrders] = await Promise.all([
       restaurantIds.length > 0
         ? Menu.aggregate([
-          { $match: { isActive: true, restaurantId: { $in: restaurantIds } } },
+          { $match: { isActive: true, restaurant: { $in: restaurantIds } } },
           {
             $facet: {
               foodCount: [

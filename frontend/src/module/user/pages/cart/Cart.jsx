@@ -170,6 +170,7 @@ export default function Cart() {
 
   // Coupons state - fetched from backend
   const [availableCoupons, setAvailableCoupons] = useState([]);
+  const [availableAdminCoupons, setAvailableAdminCoupons] = useState([]);
   const [loadingCoupons, setLoadingCoupons] = useState(false);
 
   // Fee settings from database (used as fallback if pricing not available)
@@ -497,6 +498,20 @@ export default function Cart() {
     fetchCouponsForCartItems();
   }, [cart, restaurantId]);
 
+  const combinedAvailableCoupons = useMemo(() => {
+    const merged = [];
+    const seen = new Set();
+
+    [...availableCoupons, ...availableAdminCoupons].forEach(coupon => {
+      const code = coupon?.code;
+      if (!code || seen.has(code)) return;
+      seen.add(code);
+      merged.push(coupon);
+    });
+
+    return merged;
+  }, [availableAdminCoupons, availableCoupons]);
+
   // Calculate pricing from backend whenever cart, address, or coupon changes
   useEffect(() => {
     const calculatePricing = async () => {
@@ -526,10 +541,23 @@ export default function Cart() {
         });
         if (response?.data?.success && response?.data?.data?.pricing) {
           setPricing(response.data.data.pricing);
+          const nextAdminCoupons = (response.data.data.pricing.availableAdminCoupons || []).map(coupon => ({
+            code: coupon.code,
+            discount: coupon.discountPreview || 0,
+            discountPercentage: coupon.discountType === "percentage" ? coupon.discountValue : 0,
+            minOrder: coupon.minOrderValue || 0,
+            description: coupon.description || `Save with '${coupon.code}'`,
+            title: coupon.title,
+            source: "admin"
+          }));
+          setAvailableAdminCoupons(nextAdminCoupons);
+          if (availableCoupons.length === 0 && nextAdminCoupons.length > 0) {
+            setAvailableCoupons(nextAdminCoupons);
+          }
 
           // Update applied coupon if backend returns one
           if (response.data.data.pricing.appliedCoupon && !appliedCoupon) {
-            const coupon = availableCoupons.find(c => c.code === response.data.data.pricing.appliedCoupon.code);
+            const coupon = [...availableCoupons, ...nextAdminCoupons].find(c => c.code === response.data.data.pricing.appliedCoupon.code);
             if (coupon) {
               setAppliedCoupon(coupon);
             }
@@ -542,12 +570,13 @@ export default function Cart() {
         }
         // Fallback to frontend calculation if backend fails
         setPricing(null);
+        setAvailableAdminCoupons([]);
       } finally {
         setLoadingPricing(false);
       }
     };
     calculatePricing();
-  }, [cart, defaultAddress, appliedCoupon, couponCode, deliveryFleet, restaurantId, restaurantData]);
+  }, [cart, defaultAddress, appliedCoupon, couponCode, deliveryFleet, restaurantId, restaurantData, availableCoupons]);
 
   // Fetch wallet balance
   useEffect(() => {
@@ -1313,7 +1342,7 @@ export default function Cart() {
                   </div> : loadingCoupons ? <div className="flex items-center gap-2 md:gap-3">
                     <Percent className="h-4 w-4 md:h-5 md:w-5 text-gray-600 dark:text-gray-400" />
                     <p className="text-sm md:text-base text-gray-500 dark:text-gray-400">Loading coupons...</p>
-                  </div> : availableCoupons.length > 0 ? <div>
+                  </div> : combinedAvailableCoupons.length > 0 ? <div>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2 md:gap-3">
                         <Percent className="h-4 w-4 md:h-5 md:w-5 text-gray-600 dark:text-gray-400" />
@@ -1321,12 +1350,12 @@ export default function Cart() {
                           <p className="text-sm md:text-base font-medium text-gray-800 dark:text-gray-200">
                             Save ₹{availableCoupons[0].discount} with '{availableCoupons[0].code}'
                           </p>
-                          {availableCoupons.length > 1 && <button onClick={() => setShowCoupons(!showCoupons)} className="text-xs md:text-sm text-blue-600 dark:text-blue-400 font-medium">
+                          {combinedAvailableCoupons.length > 1 && <button onClick={() => setShowCoupons(!showCoupons)} className="text-xs md:text-sm text-blue-600 dark:text-blue-400 font-medium">
                               View all coupons →
                             </button>}
                         </div>
                       </div>
-                      <Button size="sm" variant="outline" className="h-7 md:h-8 text-xs md:text-sm border-[#FF5200] dark:border-[#FF5200] text-[#FF5200] dark:text-[#FF5200] hover:bg-[#FF5200]/10 dark:hover:bg-[#FF5200]/20" onClick={() => handleApplyCoupon(availableCoupons[0])} disabled={subtotal < availableCoupons[0].minOrder}>
+                      <Button size="sm" variant="outline" className="h-7 md:h-8 text-xs md:text-sm border-[#FF5200] dark:border-[#FF5200] text-[#FF5200] dark:text-[#FF5200] hover:bg-[#FF5200]/10 dark:hover:bg-[#FF5200]/20" onClick={() => handleApplyCoupon(combinedAvailableCoupons[0])} disabled={subtotal < combinedAvailableCoupons[0].minOrder}>
                         {subtotal < availableCoupons[0].minOrder ? `Min ₹${availableCoupons[0].minOrder}` : 'APPLY'}
                       </Button>
                     </div>
@@ -1336,8 +1365,8 @@ export default function Cart() {
                   </div>}
 
                 {/* Coupons List */}
-                {showCoupons && !appliedCoupon && availableCoupons.length > 0 && <div className="mt-3 md:mt-4 space-y-2 md:space-y-3 border-t dark:border-gray-700 pt-3 md:pt-4">
-                    {availableCoupons.map(coupon => <div key={coupon.code} className="flex items-center justify-between py-2 md:py-3 border-b border-dashed dark:border-gray-700 last:border-0">
+                {showCoupons && !appliedCoupon && combinedAvailableCoupons.length > 0 && <div className="mt-3 md:mt-4 space-y-2 md:space-y-3 border-t dark:border-gray-700 pt-3 md:pt-4">
+                    {combinedAvailableCoupons.map(coupon => <div key={coupon.code} className="flex items-center justify-between py-2 md:py-3 border-b border-dashed dark:border-gray-700 last:border-0">
                         <div>
                           <p className="text-sm md:text-base font-medium text-gray-800 dark:text-gray-200">{coupon.code}</p>
                           <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400">{coupon.description}</p>

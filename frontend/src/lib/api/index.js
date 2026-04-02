@@ -1321,6 +1321,24 @@ export const adminAPI = {
   getAllOffers: (params = {}) => {
     return apiClient.get(API_ENDPOINTS.ADMIN.OFFERS, { params });
   },
+  getCustomerCoupons: (params = {}) => {
+    return apiClient.get(API_ENDPOINTS.ADMIN.CUSTOMER_COUPONS, { params });
+  },
+  createCustomerCoupon: (couponData) => {
+    return apiClient.post(API_ENDPOINTS.ADMIN.CUSTOMER_COUPONS, couponData);
+  },
+  updateCustomerCoupon: (id, couponData) => {
+    return apiClient.put(
+      API_ENDPOINTS.ADMIN.CUSTOMER_COUPON_BY_ID.replace(":id", id),
+      couponData,
+    );
+  },
+  updateCustomerCouponStatus: (id, status) => {
+    return apiClient.patch(
+      API_ENDPOINTS.ADMIN.CUSTOMER_COUPON_STATUS.replace(":id", id),
+      { status },
+    );
+  },
 
   // Restaurant Commission Management
   getRestaurantCommissions: (params = {}) => {

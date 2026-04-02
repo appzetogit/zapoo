@@ -1,12 +1,15 @@
 import Restaurant from '../../restaurant/models/Restaurant.js';
 import Offer from '../../restaurant/models/Offer.js';
+import AdminCoupon from '../../admin/models/AdminCoupon.js';
 import FeeSettings from '../../admin/models/FeeSettings.js';
 import Zone from '../../admin/models/Zone.js';
 import Tier from '../../admin/models/Tier.js';
+import Order from '../models/Order.js';
 import { resolveZoneAndTierForLocation } from '../../admin/services/restaurantZoneAssignmentService.js';
 import mongoose from 'mongoose';
 
 const roundCurrency = (value) => Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
+const normalizeCouponCode = (code = '') => String(code || '').trim().toUpperCase();
 
 /** Treat common truthy shapes from JSON / older clients */
 const isRestaurantCustomDeliveryEnabled = (restaurant) => {
@@ -108,6 +111,96 @@ const getFeeSettings = async () => {
     console.error('Error fetching fee settings:', error);
     return getFallbackFeeSettings();
   }
+};
+
+const calculateAdminCouponDiscount = (subtotal, coupon) => {
+  if (!coupon) return 0;
+
+  let discount = 0;
+  if (coupon.discountType === 'percentage') {
+    discount = Number(subtotal || 0) * (Number(coupon.discountValue || 0) / 100);
+  } else {
+    discount = Number(coupon.discountValue || 0);
+  }
+
+  if (coupon.maxDiscountAmount !== null && coupon.maxDiscountAmount !== undefined) {
+    discount = Math.min(discount, Number(coupon.maxDiscountAmount || 0));
+  }
+
+  return roundCurrency(Math.max(0, Math.min(discount, Number(subtotal || 0))));
+};
+
+const getDeliveredOrderCountForUser = async (userId) => {
+  if (!userId) return 0;
+  return Order.countDocuments({
+    userId,
+    status: 'delivered'
+  });
+};
+
+const isAdminCouponValidForUser = ({
+  coupon,
+  deliveredOrderCount,
+  subtotal,
+  enforceMinOrder = false,
+}) => {
+  if (!coupon || coupon.status !== 'active') return false;
+
+  const now = new Date();
+  const validFrom = coupon.validFrom ? new Date(coupon.validFrom) : null;
+  const validUntil = coupon.validUntil ? new Date(coupon.validUntil) : null;
+
+  if (validFrom && validFrom > now) return false;
+  if (validUntil && validUntil < now) return false;
+  if (coupon.eligibilityType === 'first_delivered_order' && deliveredOrderCount > 0) {
+    return false;
+  }
+  if (enforceMinOrder && Number(subtotal || 0) < Number(coupon.minOrderValue || 0)) {
+    return false;
+  }
+
+  return true;
+};
+
+const getAvailableAdminCoupons = async ({
+  userId,
+  subtotal,
+}) => {
+  if (!userId) return [];
+
+  const deliveredOrderCount = await getDeliveredOrderCountForUser(userId);
+  const now = new Date();
+
+  const coupons = await AdminCoupon.find({
+    status: 'active',
+    validFrom: { $lte: now },
+    $or: [
+      { validUntil: { $gte: now } },
+      { validUntil: null }
+    ]
+  })
+    .sort({ createdAt: -1 })
+    .lean();
+
+  return coupons
+    .filter((coupon) => isAdminCouponValidForUser({
+      coupon,
+      deliveredOrderCount,
+      subtotal,
+      enforceMinOrder: false,
+    }))
+    .map((coupon) => ({
+      code: coupon.code,
+      title: coupon.title,
+      description: coupon.description || '',
+      discountType: coupon.discountType,
+      discountValue: Number(coupon.discountValue || 0),
+      discountPreview: calculateAdminCouponDiscount(subtotal, coupon),
+      maxDiscountAmount: coupon.maxDiscountAmount ?? null,
+      minOrderValue: Number(coupon.minOrderValue || 0),
+      eligibilityType: coupon.eligibilityType,
+      validUntil: coupon.validUntil || null,
+    }));
 };
 
 const findOrderValueSlab = (orderValueSlabs, subtotal) => {
@@ -430,6 +523,7 @@ export const calculateOrderPricing = async ({
   passedRestaurant = null,
   deliveryAddress = null,
   couponCode = null,
+  userId = null,
 }) => {
   try {
     const subtotal = items.reduce((sum, item) => {
@@ -459,8 +553,10 @@ export const calculateOrderPricing = async ({
     let appliedCoupon = null;
     /** Full offer doc when a coupon applies (for waivesDeliveryFee, etc.) */
     let offerForCoupon = null;
+    let availableAdminCoupons = [];
+    const normalizedCouponCode = normalizeCouponCode(couponCode);
 
-    if (couponCode && restaurant) {
+    if (restaurant) {
       try {
         let restaurantObjectId = restaurant._id;
         if (!restaurantObjectId && mongoose.Types.ObjectId.isValid(restaurantId) && restaurantId.length === 24) {
@@ -470,49 +566,89 @@ export const calculateOrderPricing = async ({
         if (restaurantObjectId) {
           const now = new Date();
 
-          const offer = await Offer.findOne({
-            restaurant: restaurantObjectId,
-            status: 'active',
-            'items.couponCode': couponCode,
-            startDate: { $lte: now },
-            $or: [
-              { endDate: { $gte: now } },
-              { endDate: null }
-            ]
-          }).lean();
+          if (normalizedCouponCode) {
+            const offer = await Offer.findOne({
+              restaurant: restaurantObjectId,
+              status: 'active',
+              'items.couponCode': normalizedCouponCode,
+              startDate: { $lte: now },
+              $or: [
+                { endDate: { $gte: now } },
+                { endDate: null }
+              ]
+            }).lean();
 
-          if (offer) {
-            const couponItem = offer.items.find(item => item.couponCode === couponCode);
-            if (couponItem) {
-              const cartItemIds = items.map(item => item.itemId);
-              const isValidForCart = couponItem.itemId && cartItemIds.includes(couponItem.itemId);
-              const minOrderMet = !offer.minOrderValue || subtotal >= offer.minOrderValue;
+            if (offer) {
+              const couponItem = offer.items.find(item => item.couponCode === normalizedCouponCode);
+              if (couponItem) {
+                const cartItemIds = items.map(item => item.itemId);
+                const isValidForCart = couponItem.itemId && cartItemIds.includes(couponItem.itemId);
+                const minOrderMet = !offer.minOrderValue || subtotal >= offer.minOrderValue;
 
-              if (isValidForCart && minOrderMet) {
-                const itemInCart = items.find(item => item.itemId === couponItem.itemId);
-                if (itemInCart) {
-                  const itemQuantity = itemInCart.quantity || 1;
-                  const discountPerItem = couponItem.originalPrice - couponItem.discountedPrice;
-                  discount = Math.round(discountPerItem * itemQuantity);
-                  const itemSubtotal = (itemInCart.price || 0) * itemQuantity;
-                  discount = Math.min(discount, itemSubtotal);
+                if (isValidForCart && minOrderMet) {
+                  const itemInCart = items.find(item => item.itemId === couponItem.itemId);
+                  if (itemInCart) {
+                    const itemQuantity = itemInCart.quantity || 1;
+                    const discountPerItem = couponItem.originalPrice - couponItem.discountedPrice;
+                    discount = Math.round(discountPerItem * itemQuantity);
+                    const itemSubtotal = (itemInCart.price || 0) * itemQuantity;
+                    discount = Math.min(discount, itemSubtotal);
+                  }
+
+                  appliedCoupon = {
+                    code: normalizedCouponCode,
+                    discount: discount,
+                    discountPercentage: couponItem.discountPercentage,
+                    minOrder: offer.minOrderValue || 0,
+                    type: offer.discountType === 'percentage' ? 'percentage' : 'flat',
+                    itemId: couponItem.itemId,
+                    itemName: couponItem.itemName,
+                    originalPrice: couponItem.originalPrice,
+                    discountedPrice: couponItem.discountedPrice,
+                    source: 'restaurant',
+                  };
+                  offerForCoupon = offer;
                 }
+              }
+            }
 
+            if (!appliedCoupon) {
+              const [deliveredOrderCount, adminCoupon] = await Promise.all([
+                getDeliveredOrderCountForUser(userId),
+                AdminCoupon.findOne({
+                  code: normalizedCouponCode,
+                  status: 'active',
+                  validFrom: { $lte: now },
+                  $or: [
+                    { validUntil: { $gte: now } },
+                    { validUntil: null }
+                  ]
+                }).lean()
+              ]);
+
+              if (adminCoupon && isAdminCouponValidForUser({
+                coupon: adminCoupon,
+                deliveredOrderCount,
+                subtotal,
+                enforceMinOrder: true,
+              })) {
+                discount = calculateAdminCouponDiscount(subtotal, adminCoupon);
                 appliedCoupon = {
-                  code: couponCode,
-                  discount: discount,
-                  discountPercentage: couponItem.discountPercentage,
-                  minOrder: offer.minOrderValue || 0,
-                  type: offer.discountType === 'percentage' ? 'percentage' : 'flat',
-                  itemId: couponItem.itemId,
-                  itemName: couponItem.itemName,
-                  originalPrice: couponItem.originalPrice,
-                  discountedPrice: couponItem.discountedPrice,
+                  code: normalizedCouponCode,
+                  discount,
+                  minOrder: adminCoupon.minOrderValue || 0,
+                  type: adminCoupon.discountType,
+                  title: adminCoupon.title,
+                  source: 'admin',
                 };
-                offerForCoupon = offer;
               }
             }
           }
+
+          availableAdminCoupons = await getAvailableAdminCoupons({
+            userId,
+            subtotal,
+          });
         }
       } catch (error) {
         console.error(`Error fetching coupon from database: ${error.message}`);
@@ -656,7 +792,9 @@ export const calculateOrderPricing = async ({
         code: appliedCoupon.code,
         discount: discount,
         freeDelivery: freeDeliveryReason === 'coupon' || freeDeliveryReason === 'threshold',
+        source: appliedCoupon.source || 'restaurant',
       } : null,
+      availableAdminCoupons,
       pricingMeta: {
         tierId: tier?._id || null,
         tierName: tier?.name || null,
