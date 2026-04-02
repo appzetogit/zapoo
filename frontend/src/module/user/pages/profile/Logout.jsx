@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { useState } from "react"
 import { authAPI, notificationAPI } from "@/lib/api"
 import { firebaseAuth } from "@/lib/firebase"
+import { clearModuleAuth } from "@/lib/utils/auth"
 
 export default function Logout() {
   const navigate = useNavigate()
@@ -46,12 +47,10 @@ export default function Logout() {
       }
 
       // Clear all authentication data from localStorage
+      clearModuleAuth("user")
       localStorage.removeItem("accessToken")
       localStorage.removeItem("user_authenticated")
       localStorage.removeItem("user_user")
-
-      // Clear sessionStorage
-      sessionStorage.removeItem("userAuthData")
 
       // Dispatch auth change event to notify other components
       window.dispatchEvent(new Event("userAuthChanged"))
@@ -65,10 +64,10 @@ export default function Logout() {
       console.error("Error during logout:", err)
 
       // Clear local data anyway
+      clearModuleAuth("user")
       localStorage.removeItem("accessToken")
       localStorage.removeItem("user_authenticated")
       localStorage.removeItem("user_user")
-      sessionStorage.removeItem("userAuthData")
       window.dispatchEvent(new Event("userAuthChanged"))
 
       setError("An error occurred during logout, but you have been signed out locally.")
@@ -168,4 +167,3 @@ export default function Logout() {
     </AnimatedPage>
   )
 }
-

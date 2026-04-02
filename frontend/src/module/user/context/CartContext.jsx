@@ -1,5 +1,6 @@
 // src/context/cart-context.jsx
 import { createContext, useContext, useEffect, useMemo, useState } from "react"
+import { getUserIdFromToken } from "@/lib/utils/auth"
 
 // Default cart context value to prevent errors during initial render
 const defaultCartContext = {
@@ -32,31 +33,96 @@ const defaultCartContext = {
 
 const CartContext = createContext(defaultCartContext)
 
-export function CartProvider({ children }) {
-  // Safe init (works with SSR and bad JSON)
-  const [cart, setCart] = useState(() => {
-    if (typeof window === "undefined") return []
-    try {
-      const saved = localStorage.getItem("cart")
-      return saved ? JSON.parse(saved) : []
-    } catch {
-      return []
+const LEGACY_CART_STORAGE_KEY = "cart"
+const GUEST_CART_STORAGE_KEY = "cart_guest"
+
+const getStoredUserCartOwner = () => {
+  if (typeof window === "undefined") return null
+
+  try {
+    const rawUser = localStorage.getItem("user_user")
+    if (rawUser) {
+      const parsedUser = JSON.parse(rawUser)
+      return (
+        parsedUser?._id ||
+        parsedUser?.id ||
+        parsedUser?.userId ||
+        parsedUser?.phone ||
+        null
+      )
     }
-  })
+  } catch {
+    // ignore malformed user payload and fall back to token
+  }
+
+  const token =
+    localStorage.getItem("user_accessToken") ||
+    localStorage.getItem("accessToken")
+
+  return getUserIdFromToken(token) || null
+}
+
+const getCartStorageKey = () => {
+  const ownerId = getStoredUserCartOwner()
+  return ownerId ? `cart_${String(ownerId)}` : GUEST_CART_STORAGE_KEY
+}
+
+const loadCartFromStorage = (storageKey) => {
+  if (typeof window === "undefined") return []
+
+  try {
+    const saved = localStorage.getItem(storageKey)
+    return saved ? JSON.parse(saved) : []
+  } catch {
+    return []
+  }
+}
+
+export function CartProvider({ children }) {
+  const [cartStorageKey, setCartStorageKey] = useState(() => getCartStorageKey())
+  // Safe init (works with SSR and bad JSON)
+  const [cart, setCart] = useState(() => loadCartFromStorage(getCartStorageKey()))
 
   // Track last add event for animation
   const [lastAddEvent, setLastAddEvent] = useState(null)
   // Track last remove event for animation
   const [lastRemoveEvent, setLastRemoveEvent] = useState(null)
+  const [isCartHydrated, setIsCartHydrated] = useState(false)
+
+  useEffect(() => {
+    setCart(loadCartFromStorage(cartStorageKey))
+    setIsCartHydrated(true)
+  }, [cartStorageKey])
+
+  useEffect(() => {
+    const syncCartOwner = () => {
+      const nextStorageKey = getCartStorageKey()
+      setCartStorageKey((prev) => {
+        if (prev === nextStorageKey) return prev
+        setIsCartHydrated(false)
+        return nextStorageKey
+      })
+    }
+
+    syncCartOwner()
+    window.addEventListener("userAuthChanged", syncCartOwner)
+
+    return () => {
+      window.removeEventListener("userAuthChanged", syncCartOwner)
+    }
+  }, [])
 
   // Persist to localStorage whenever cart changes
   useEffect(() => {
+    if (!isCartHydrated) return
+
     try {
-      localStorage.setItem("cart", JSON.stringify(cart))
+      localStorage.setItem(cartStorageKey, JSON.stringify(cart))
+      localStorage.removeItem(LEGACY_CART_STORAGE_KEY)
     } catch {
       // ignore storage errors (private mode, quota, etc.)
     }
-  }, [cart])
+  }, [cart, cartStorageKey, isCartHydrated])
 
   const addToCart = (item, sourcePosition = null) => {
     // 1. Validate item has required info

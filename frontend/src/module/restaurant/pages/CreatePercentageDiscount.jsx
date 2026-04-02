@@ -46,6 +46,7 @@ export default function CreatePercentageDiscount() {
     item: null,
     editingOffer: null
   });
+  const [discountTypeDropdownOpen, setDiscountTypeDropdownOpen] = useState(false);
   const [offerFormData, setOfferFormData] = useState({
     discountType: "percentage",
     // "percentage" or "flat"
@@ -902,14 +903,50 @@ export default function CreatePercentageDiscount() {
           {/* Form Content */}
           <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
             {/* Discount Type Dropdown */}
-            <div>
+            <div className="relative">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Discount Type
               </label>
-              <select value={offerFormData.discountType} onChange={e => handleOfferFormChange("discountType", e.target.value)} className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
-                <option value="percentage">Percentage Discount</option>
-                <option value="flat">Flat Discount</option>
-              </select>
+              <button
+                type="button"
+                onClick={() => setDiscountTypeDropdownOpen(prev => !prev)}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm bg-white flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <span>{offerFormData.discountType === "percentage" ? "Percentage Discount" : "Flat Discount"}</span>
+                <ChevronDown className="w-4 h-4 text-gray-500" />
+              </button>
+
+              <AnimatePresence>
+                {discountTypeDropdownOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -4 }}
+                    className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleOfferFormChange("discountType", "percentage");
+                        setDiscountTypeDropdownOpen(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    >
+                      Percentage Discount
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleOfferFormChange("discountType", "flat");
+                        setDiscountTypeDropdownOpen(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    >
+                      Flat Discount
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
 
             {/* Percentage Discount */}
