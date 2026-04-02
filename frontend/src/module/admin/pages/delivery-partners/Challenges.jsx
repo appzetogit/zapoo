@@ -169,6 +169,9 @@ const getRewardLabel = (rewardType) => {
 }
 
 const getRewardOptionsByTarget = (targetType) => {
+  if (targetType === "delivery_partner") {
+    return REWARD_OPTIONS.filter((opt) => opt.value === "wallet_credit")
+  }
   const hidden = HIDDEN_REWARD_TYPES_BY_TARGET[targetType] || []
   return REWARD_OPTIONS.filter((opt) => !hidden.includes(opt.value))
 }
