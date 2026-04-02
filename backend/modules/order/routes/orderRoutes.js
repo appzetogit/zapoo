@@ -8,13 +8,13 @@ import {
   cancelOrder,
   updateDeliveryInstructions
 } from '../controllers/orderController.js';
-import { authenticate } from '../../auth/middleware/auth.js';
+import { authenticate, optionalAuthenticate } from '../../auth/middleware/auth.js';
 
 const router = express.Router();
 
 // Calculate order pricing (public endpoint - no auth required for cart preview)
 // This must be before the authenticate middleware
-router.post('/calculate', calculateOrder);
+router.post('/calculate', optionalAuthenticate, calculateOrder);
 
 // All other routes require authentication
 router.use(authenticate);

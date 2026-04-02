@@ -123,8 +123,9 @@ const calculateAdminCouponDiscount = (subtotal, coupon) => {
     discount = Number(coupon.discountValue || 0);
   }
 
-  if (coupon.maxDiscountAmount !== null && coupon.maxDiscountAmount !== undefined) {
-    discount = Math.min(discount, Number(coupon.maxDiscountAmount || 0));
+  const maxDiscountAmount = Number(coupon.maxDiscountAmount);
+  if (Number.isFinite(maxDiscountAmount) && maxDiscountAmount > 0) {
+    discount = Math.min(discount, maxDiscountAmount);
   }
 
   return roundCurrency(Math.max(0, Math.min(discount, Number(subtotal || 0))));

@@ -11,6 +11,11 @@ const toNumberOrNull = (value) => {
   return Number.isFinite(numberValue) ? numberValue : null;
 };
 
+const normalizeMaxDiscountAmount = (value) => {
+  const parsed = toNumberOrNull(value);
+  return parsed !== null && parsed > 0 ? parsed : null;
+};
+
 const getDerivedStatus = (coupon) => {
   const now = new Date();
   if (coupon.status === "cancelled") return "cancelled";
@@ -54,8 +59,8 @@ export const createCustomerCoupon = asyncHandler(async (req, res) => {
     return errorResponse(res, 400, "Minimum order value must be 0 or more");
   }
 
-  const parsedMaxDiscount = toNumberOrNull(maxDiscountAmount);
-  if (parsedMaxDiscount !== null && parsedMaxDiscount < 0) {
+  const parsedMaxDiscount = normalizeMaxDiscountAmount(maxDiscountAmount);
+  if (maxDiscountAmount !== null && maxDiscountAmount !== undefined && maxDiscountAmount !== "" && Number(maxDiscountAmount) < 0) {
     return errorResponse(res, 400, "Maximum discount amount cannot be negative");
   }
 
@@ -175,6 +180,7 @@ export const updateCustomerCoupon = asyncHandler(async (req, res) => {
   }
 
   const {
+    code,
     title,
     description,
     discountType,
@@ -185,6 +191,20 @@ export const updateCustomerCoupon = asyncHandler(async (req, res) => {
     validFrom,
     validUntil,
   } = req.body;
+
+  if (code !== undefined) {
+    const normalizedCode = normalizeCouponCode(code);
+    if (!normalizedCode) {
+      return errorResponse(res, 400, "Coupon code is required");
+    }
+    if (normalizedCode !== coupon.code) {
+      const existingCoupon = await AdminCoupon.findOne({ code: normalizedCode, _id: { $ne: id } }).lean();
+      if (existingCoupon) {
+        return errorResponse(res, 400, "Coupon code already exists");
+      }
+      coupon.code = normalizedCode;
+    }
+  }
 
   if (title !== undefined) coupon.title = String(title).trim();
   if (description !== undefined) coupon.description = String(description || "").trim();
@@ -202,8 +222,8 @@ export const updateCustomerCoupon = asyncHandler(async (req, res) => {
   }
 
   if (maxDiscountAmount !== undefined) {
-    const parsedMaxDiscount = toNumberOrNull(maxDiscountAmount);
-    if (parsedMaxDiscount !== null && parsedMaxDiscount < 0) {
+    const parsedMaxDiscount = normalizeMaxDiscountAmount(maxDiscountAmount);
+    if (maxDiscountAmount !== null && maxDiscountAmount !== undefined && maxDiscountAmount !== "" && Number(maxDiscountAmount) < 0) {
       return errorResponse(res, 400, "Maximum discount amount cannot be negative");
     }
     coupon.maxDiscountAmount = parsedMaxDiscount;

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Search, Plus, TicketPercent } from "lucide-react";
+import { Search, Plus, TicketPercent, Pencil, X } from "lucide-react";
 import { adminAPI } from "@/lib/api";
 
 const INITIAL_FORM = {
@@ -25,6 +25,7 @@ export default function Coupons() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [form, setForm] = useState(INITIAL_FORM);
+  const [editingCouponId, setEditingCouponId] = useState(null);
 
   const fetchRestaurantOffers = async () => {
     const response = await adminAPI.getAllOffers({});
@@ -93,7 +94,7 @@ export default function Coupons() {
       setSubmitting(true);
       setError(null);
 
-      await adminAPI.createCustomerCoupon({
+      const payload = {
         ...form,
         code: form.code.trim().toUpperCase(),
         discountValue: Number(form.discountValue),
@@ -101,18 +102,48 @@ export default function Coupons() {
         minOrderValue: form.minOrderValue === "" ? 0 : Number(form.minOrderValue),
         validFrom: form.validFrom || undefined,
         validUntil: form.validUntil || null,
-      });
+      };
+
+      if (editingCouponId) {
+        await adminAPI.updateCustomerCoupon(editingCouponId, payload);
+      } else {
+        await adminAPI.createCustomerCoupon(payload);
+      }
 
       setForm(INITIAL_FORM);
+      setEditingCouponId(null);
       const coupons = await fetchCustomerCoupons();
       setCustomerCoupons(coupons);
       setActiveTab("admin");
     } catch (err) {
-      console.error("Error creating customer coupon:", err);
-      setError(err?.response?.data?.message || "Failed to create customer coupon");
+      console.error("Error saving customer coupon:", err);
+      setError(err?.response?.data?.message || "Failed to save customer coupon");
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleEditCoupon = (coupon) => {
+    setEditingCouponId(coupon._id);
+    setForm({
+      code: coupon.code || "",
+      title: coupon.title || "",
+      description: coupon.description || "",
+      discountType: coupon.discountType || "percentage",
+      discountValue: coupon.discountValue ?? "",
+      maxDiscountAmount: coupon.maxDiscountAmount ?? "",
+      minOrderValue: coupon.minOrderValue ?? "",
+      eligibilityType: coupon.eligibilityType || "first_delivered_order",
+      validFrom: coupon.validFrom ? new Date(coupon.validFrom).toISOString().slice(0, 16) : "",
+      validUntil: coupon.validUntil ? new Date(coupon.validUntil).toISOString().slice(0, 16) : "",
+      status: coupon.status || "active",
+    });
+    setActiveTab("admin");
+  };
+
+  const handleCancelEdit = () => {
+    setEditingCouponId(null);
+    setForm(INITIAL_FORM);
   };
 
   const handleStatusChange = async (couponId, nextStatus) => {
@@ -179,7 +210,7 @@ export default function Coupons() {
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
               <div className="flex items-center gap-2 mb-4">
                 <Plus className="h-5 w-5 text-[#FF5200]" />
-                <h2 className="text-lg font-bold text-slate-900">Create Customer Coupon</h2>
+                <h2 className="text-lg font-bold text-slate-900">{editingCouponId ? "Edit Customer Coupon" : "Create Customer Coupon"}</h2>
               </div>
 
               <form onSubmit={handleCreateCoupon} className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -222,10 +253,22 @@ export default function Coupons() {
                   </Field>
                 </div>
                 <div className="md:col-span-2 xl:col-span-3 flex justify-end">
-                  <button type="submit" disabled={submitting} className="inline-flex items-center gap-2 rounded-lg bg-[#FF5200] px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60">
+                  <div className="flex items-center gap-3">
+                    {editingCouponId && (
+                      <button
+                        type="button"
+                        onClick={handleCancelEdit}
+                        className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                      >
+                        <X className="h-4 w-4" />
+                        Cancel Edit
+                      </button>
+                    )}
+                    <button type="submit" disabled={submitting} className="inline-flex items-center gap-2 rounded-lg bg-[#FF5200] px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60">
                     <TicketPercent className="h-4 w-4" />
-                    {submitting ? "Creating..." : "Create Coupon"}
+                    {submitting ? "Saving..." : editingCouponId ? "Save Changes" : "Create Coupon"}
                   </button>
+                  </div>
                 </div>
               </form>
             </div>
@@ -247,7 +290,7 @@ export default function Coupons() {
                   <table className="w-full">
                     <thead className="bg-slate-50 border-b border-slate-200">
                       <tr>
-                        {["Code", "Title", "Eligibility", "Discount", "Min Order", "Delivered Uses", "Status", "Valid Until"].map((label) => (
+                        {["Code", "Title", "Eligibility", "Discount", "Min Order", "Delivered Uses", "Status", "Valid Until", "Actions"].map((label) => (
                           <th key={label} className="px-4 py-3 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">{label}</th>
                         ))}
                       </tr>
@@ -285,6 +328,16 @@ export default function Coupons() {
                           </td>
                           <td className="px-4 py-4 text-sm text-slate-700">
                             {coupon.validUntil ? new Date(coupon.validUntil).toLocaleString() : "No expiry"}
+                          </td>
+                          <td className="px-4 py-4">
+                            <button
+                              type="button"
+                              onClick={() => handleEditCoupon(coupon)}
+                              className="inline-flex items-center gap-2 rounded-lg border border-[#FF5200] px-3 py-1.5 text-sm font-semibold text-[#FF5200] hover:bg-[#FF5200]/5"
+                            >
+                              <Pencil className="h-4 w-4" />
+                              Edit
+                            </button>
                           </td>
                         </tr>
                       ))}

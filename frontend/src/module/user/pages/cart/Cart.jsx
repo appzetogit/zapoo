@@ -1348,7 +1348,7 @@ export default function Cart() {
                         <Percent className="h-4 w-4 md:h-5 md:w-5 text-gray-600 dark:text-gray-400" />
                         <div>
                           <p className="text-sm md:text-base font-medium text-gray-800 dark:text-gray-200">
-                            Save ₹{availableCoupons[0].discount} with '{availableCoupons[0].code}'
+                            Save ₹{combinedAvailableCoupons[0].discount} with '{combinedAvailableCoupons[0].code}'
                           </p>
                           {combinedAvailableCoupons.length > 1 && <button onClick={() => setShowCoupons(!showCoupons)} className="text-xs md:text-sm text-blue-600 dark:text-blue-400 font-medium">
                               View all coupons →
@@ -1356,7 +1356,7 @@ export default function Cart() {
                         </div>
                       </div>
                       <Button size="sm" variant="outline" className="h-7 md:h-8 text-xs md:text-sm border-[#FF5200] dark:border-[#FF5200] text-[#FF5200] dark:text-[#FF5200] hover:bg-[#FF5200]/10 dark:hover:bg-[#FF5200]/20" onClick={() => handleApplyCoupon(combinedAvailableCoupons[0])} disabled={subtotal < combinedAvailableCoupons[0].minOrder}>
-                        {subtotal < availableCoupons[0].minOrder ? `Min ₹${availableCoupons[0].minOrder}` : 'APPLY'}
+                        {subtotal < combinedAvailableCoupons[0].minOrder ? `Min ₹${combinedAvailableCoupons[0].minOrder}` : 'APPLY'}
                       </Button>
                     </div>
                   </div> : <div className="flex items-center gap-2 md:gap-3">
@@ -2101,4 +2101,5 @@ export default function Cart() {
       `}</style>
     </div>;
 }
+
 
