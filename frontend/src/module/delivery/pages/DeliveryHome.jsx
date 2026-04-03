@@ -374,7 +374,8 @@ export default function DeliveryHome() {
     clearOrderReady,
     orderTaken,
     clearOrderTaken,
-    isConnected
+    isConnected,
+    stopNotificationSound
   } = useDeliveryNotifications();
 
   // Default location - will be set from saved location or GPS, not hardcoded
@@ -574,6 +575,7 @@ export default function DeliveryHome() {
   const [showRejectPopup, setShowRejectPopup] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const alertAudioRef = useRef(null);
+  const shouldPlayPopupSoundRef = useRef(false);
   const userInteractedRef = useRef(false); // Track user interaction for autoplay policy
   const newOrderAcceptButtonRef = useRef(null);
   const newOrderAcceptButtonSwipeStartX = useRef(0);
@@ -679,6 +681,18 @@ export default function DeliveryHome() {
   useEffect(() => {
     isOnlineRef.current = isOnline;
   }, [isOnline]);
+
+  const stopAlertSound = useCallback(() => {
+    shouldPlayPopupSoundRef.current = false;
+    if (alertAudioRef.current) {
+      alertAudioRef.current.pause();
+      alertAudioRef.current.currentTime = 0;
+      alertAudioRef.current = null;
+    }
+    if (typeof stopNotificationSound === 'function') {
+      stopNotificationSound();
+    }
+  }, [stopNotificationSound]);
 
   // Sync online status with localStorage changes (from FeedNavbar or other tabs)
   useEffect(() => {
@@ -1171,11 +1185,7 @@ export default function DeliveryHome() {
         setCountdownSeconds(prev => {
           if (prev <= 1) {
             // Stop audio when countdown reaches 0
-            if (alertAudioRef.current) {
-              alertAudioRef.current.pause();
-              alertAudioRef.current.currentTime = 0;
-              alertAudioRef.current = null;
-            }
+            stopAlertSound();
             // Auto-close when countdown reaches 0
             setShowNewOrderPopup(false);
             return 0;
@@ -1197,24 +1207,29 @@ export default function DeliveryHome() {
         countdownTimerRef.current = null;
       }
     };
-  }, [showNewOrderPopup, countdownSeconds]);
+  }, [showNewOrderPopup, countdownSeconds, stopAlertSound]);
 
   // Play audio when New Order popup appears (only for real orders from Socket.IO)
   useEffect(() => {
-    if (showNewOrderPopup && (newOrder || selectedRestaurant)) {
+    const shouldPlayPopupSound = showNewOrderPopup && isOnline && (newOrder || selectedRestaurant);
+    shouldPlayPopupSoundRef.current = shouldPlayPopupSound;
+
+    if (shouldPlayPopupSound) {
       // Stop any existing audio first
-      if (alertAudioRef.current) {
-        alertAudioRef.current.pause();
-        alertAudioRef.current.currentTime = 0;
-        alertAudioRef.current = null;
-      }
+      stopAlertSound();
+      shouldPlayPopupSoundRef.current = true;
 
       // Play alert sound when popup appears
       const playAudio = async () => {
         try {
-          // Check localStorage preference
-          const currentPreference = localStorage.getItem('delivery_alert_sound') || 'zomato_tone';
           const audio = await playAlertSound();
+          if (!shouldPlayPopupSoundRef.current) {
+            if (audio) {
+              audio.pause();
+              audio.currentTime = 0;
+            }
+            return;
+          }
           if (audio) {
             alertAudioRef.current = audio;
             // Verify audio is actually playing and ensure it loops
@@ -1222,7 +1237,7 @@ export default function DeliveryHome() {
 
             // Manually restart if loop doesn't work
             audio.addEventListener('ended', () => {
-              if (showNewOrderPopup && alertAudioRef.current === audio) {
+              if (shouldPlayPopupSoundRef.current && alertAudioRef.current === audio) {
                 audio.currentTime = 0;
                 audio.play().catch(err => {
                   console.error('[NewOrder] ❌ Failed to restart audio:', err);
@@ -1252,13 +1267,9 @@ export default function DeliveryHome() {
       };
     } else {
       // Stop audio when popup closes
-      if (alertAudioRef.current) {
-        alertAudioRef.current.pause();
-        alertAudioRef.current.currentTime = 0;
-        alertAudioRef.current = null;
-      }
+      stopAlertSound();
     }
-  }, [showNewOrderPopup, selectedRestaurant]);
+  }, [showNewOrderPopup, isOnline, newOrder, selectedRestaurant, stopAlertSound]);
 
   // Reset countdown when popup closes
   useEffect(() => {
@@ -1324,13 +1335,14 @@ export default function DeliveryHome() {
     const currentId = newOrder?.orderMongoId || newOrder?.orderId || selectedRestaurant?.id;
     if (takenId && currentId && takenId === currentId) {
       acceptedOrderIdsRef.current.add(takenId);
+      stopAlertSound();
       setShowNewOrderPopup(false);
       clearNewOrder();
       localStorage.removeItem('deliveryPendingOrder');
       toast.info('This order was accepted by another delivery partner.');
     }
     clearOrderTaken();
-  }, [orderTaken]);
+  }, [orderTaken, clearNewOrder, clearOrderTaken, newOrder?.orderId, newOrder?.orderMongoId, selectedRestaurant?.id, stopAlertSound]);
 
   // Reject reasons for order cancellation
   const rejectReasons = ["Too far from current location", "Vehicle issue", "Personal emergency", "Weather conditions", "Already have too many orders", "Other reason"];
@@ -1340,10 +1352,7 @@ export default function DeliveryHome() {
     setShowRejectPopup(true);
   };
   const handleRejectConfirm = async () => {
-    if (alertAudioRef.current) {
-      alertAudioRef.current.pause();
-      alertAudioRef.current.currentTime = 0;
-    }
+    stopAlertSound();
     const orderId = newOrder?.orderMongoId
       || newOrder?.orderId
       || selectedRestaurant?.orderId
@@ -2039,11 +2048,7 @@ export default function DeliveryHome() {
   // Extract the order acceptance logic to a standalone function so it can be called from different UI components
   const processOrderAcceptance = async () => {
     // Stop audio immediately when user accepts
-    if (alertAudioRef.current) {
-      alertAudioRef.current.pause();
-      alertAudioRef.current.currentTime = 0;
-      alertAudioRef.current = null;
-    }
+    stopAlertSound();
 
     // Get order ID from selectedRestaurant or newOrder
     const orderId = selectedRestaurant?.id || newOrder?.orderMongoId || newOrder?.orderId;
@@ -3726,6 +3731,19 @@ export default function DeliveryHome() {
   // Handle online toggle - check for booked gigs
   const handleToggleOnline = () => {
     if (isOnline) {
+      stopAlertSound();
+      if (showNewOrderPopup) {
+        setShowRejectPopup(false);
+        setRejectReason("");
+        setShowNewOrderPopup(false);
+        setIsNewOrderPopupMinimized(false);
+        setNewOrderDragY(0);
+        setCountdownSeconds(300);
+        localStorage.removeItem('deliveryPendingOrder');
+        if (typeof clearNewOrder === 'function') {
+          clearNewOrder();
+        }
+      }
       goOffline();
     } else {
       // Check if there are any booked gigs
@@ -5877,6 +5895,7 @@ export default function DeliveryHome() {
 
   // Utility function to clear order data when order is deleted or cancelled
   const clearOrderData = useCallback(() => {
+    stopAlertSound();
     localStorage.removeItem('deliveryActiveOrder');
     localStorage.removeItem('deliveryPendingOrder');
     localStorage.removeItem('deliveryAtDropOrderId');
@@ -5903,7 +5922,7 @@ export default function DeliveryHome() {
     directionsResponseRef.current = null;
     setRoutePolyline([]);
     setShowRoutePath(false);
-  }, [clearNewOrder, clearOrderReady]);
+  }, [clearNewOrder, clearOrderReady, stopAlertSound]);
 
   // Periodically verify order still exists (every 30 seconds) to catch deletions
   useEffect(() => {

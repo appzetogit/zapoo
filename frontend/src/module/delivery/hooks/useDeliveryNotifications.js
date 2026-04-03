@@ -23,8 +23,32 @@ export const useDeliveryNotifications = () => {
   // Step 3: All callbacks before effects (unconditional)
   // Track user interaction for autoplay policy
   const userInteractedRef = useRef(false);
+  const stopNotificationSound = useCallback(() => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+  }, []);
+
+  const isDeliveryPartnerOnline = useCallback(() => {
+    try {
+      const appOnlineStatusRaw = localStorage.getItem('app:isOnline');
+      if (appOnlineStatusRaw != null) {
+        return JSON.parse(appOnlineStatusRaw) === true;
+      }
+      return localStorage.getItem('delivery_online_status') === 'true';
+    } catch {
+      return false;
+    }
+  }, []);
+
   const playNotificationSound = useCallback(() => {
     try {
+      if (!isDeliveryPartnerOnline()) {
+        stopNotificationSound();
+        return;
+      }
+
       // Get current selected sound preference from localStorage
       const selectedSound = localStorage.getItem('delivery_alert_sound') || 'zomato_tone';
       const soundFile = selectedSound === 'original' ? originalSound : alertSound;
@@ -63,7 +87,7 @@ export const useDeliveryNotifications = () => {
         console.warn('Error playing sound:', error);
       }
     }
-  }, []);
+  }, [isDeliveryPartnerOnline, stopNotificationSound]);
 
   // Step 4: All effects (unconditional hook calls, conditional logic inside)
   // Track user interaction for autoplay policy
@@ -309,39 +333,59 @@ export const useDeliveryNotifications = () => {
       }
     });
     socketRef.current.on('new_order', orderData => {
+      if (!isDeliveryPartnerOnline()) {
+        stopNotificationSound();
+        return;
+      }
       setNewOrder(orderData);
       playNotificationSound();
     });
 
     // Listen for priority-based order notifications (new_order_available)
     socketRef.current.on('new_order_available', orderData => {
+      if (!isDeliveryPartnerOnline()) {
+        stopNotificationSound();
+        return;
+      }
       // Treat it the same as new_order for now - delivery boy can accept it
       setNewOrder(orderData);
       playNotificationSound();
     });
     socketRef.current.on('order_taken', data => {
+      stopNotificationSound();
       setOrderTaken(data);
     });
     socketRef.current.on('play_notification_sound', data => {
+      if (!isDeliveryPartnerOnline()) {
+        stopNotificationSound();
+        return;
+      }
       playNotificationSound();
     });
     socketRef.current.on('order_ready', orderData => {
+      if (!isDeliveryPartnerOnline()) {
+        stopNotificationSound();
+        return;
+      }
       setOrderReady(orderData);
       playNotificationSound();
     });
     return () => {
+      stopNotificationSound();
       if (socketRef.current) {
         socketRef.current.disconnect();
         socketRef.current = null;
       }
     };
-  }, [deliveryPartnerId, playNotificationSound]);
+  }, [deliveryPartnerId, isDeliveryPartnerOnline, playNotificationSound, stopNotificationSound]);
 
   // Helper functions
   const clearNewOrder = () => {
+    stopNotificationSound();
     setNewOrder(null);
   };
   const clearOrderReady = () => {
+    stopNotificationSound();
     setOrderReady(null);
   };
   const clearOrderTaken = () => {
@@ -355,6 +399,7 @@ export const useDeliveryNotifications = () => {
     orderTaken,
     clearOrderTaken,
     isConnected,
-    playNotificationSound
+    playNotificationSound,
+    stopNotificationSound
   };
 };

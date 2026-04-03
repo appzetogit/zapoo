@@ -6,6 +6,15 @@ import { useProgressStore } from "../store/progressStore"
 import FeedNavbar from "../components/FeedNavbar"
 import { deliveryAPI } from "@/lib/api"
 import { fetchWalletTransactions } from "../utils/deliveryWalletState"
+import { toast } from "sonner"
+
+const DELIVERY_UI_STEP = {
+  EN_ROUTE_TO_PICKUP: 'en_route_to_pickup',
+  REACHED_PICKUP: 'reached_pickup',
+  ORDER_ID_CONFIRMATION: 'order_id_confirmation',
+  EN_ROUTE_TO_DELIVERY: 'en_route_to_delivery',
+  REACHED_DROP: 'reached_drop',
+}
 
 export default function TripHistory() {
   const navigate = useNavigate()
@@ -21,6 +30,7 @@ export default function TripHistory() {
   const [bonusTransactions, setBonusTransactions] = useState([])
   const [bonusLoading, setBonusLoading] = useState(false)
   const [hasViewedBonus, setHasViewedBonus] = useState(false)
+  const [openingTripId, setOpeningTripId] = useState(null)
 
   const tripTypes = ["ALL TRIPS", "Completed", "Cancelled", "Pending"]
 
@@ -152,6 +162,146 @@ export default function TripHistory() {
 
     return () => clearInterval(interval)
   }, [])
+
+  const getDeliveryUiStepFromOrder = (order) => {
+    const orderStatus = order?.status || ''
+    const deliveryPhase = order?.deliveryState?.currentPhase || ''
+    const deliveryStateStatus = order?.deliveryState?.status || ''
+
+    if (deliveryPhase === 'at_delivery') {
+      return DELIVERY_UI_STEP.REACHED_DROP
+    }
+
+    if (
+      orderStatus === 'out_for_delivery' ||
+      deliveryPhase === 'en_route_to_delivery' ||
+      deliveryPhase === 'picked_up' ||
+      deliveryStateStatus === 'order_confirmed'
+    ) {
+      return DELIVERY_UI_STEP.EN_ROUTE_TO_DELIVERY
+    }
+
+    if (deliveryPhase === 'at_pickup' || deliveryStateStatus === 'reached_pickup') {
+      return DELIVERY_UI_STEP.ORDER_ID_CONFIRMATION
+    }
+
+    if (orderStatus === 'ready' || deliveryPhase === 'ready') {
+      return DELIVERY_UI_STEP.REACHED_PICKUP
+    }
+
+    return DELIVERY_UI_STEP.EN_ROUTE_TO_PICKUP
+  }
+
+  const buildRestaurantInfoFromOrder = (order) => {
+    const restaurantCoords = order?.restaurantId?.location?.coordinates || []
+    const customerCoords = order?.address?.location?.coordinates || []
+
+    return {
+      id: order?._id || order?.orderId,
+      orderId: order?.orderId,
+      name: order?.restaurantName || order?.restaurantId?.name || 'Restaurant',
+      address:
+        order?.restaurantId?.address ||
+        order?.restaurantId?.location?.formattedAddress ||
+        'Restaurant address',
+      lat: restaurantCoords[1],
+      lng: restaurantCoords[0],
+      customerName: order?.userId?.name || 'Customer',
+      customerAddress: order?.address?.formattedAddress || 'Customer address',
+      deliveryInstructions: order?.address?.deliveryInstructions || '',
+      customerLat: customerCoords[1],
+      customerLng: customerCoords[0],
+      items: order?.items || [],
+      total: order?.pricing?.total || 0,
+      estimatedEarnings: order?.pricing?.deliveryFee || 0,
+      amount: order?.pricing?.deliveryFee || order?.pricing?.total || 0,
+      paymentMethod: order?.paymentMethod || order?.payment?.method || 'razorpay',
+      orderStatus: order?.status || 'pending',
+      status: order?.status || 'pending',
+      deliveryPhase: order?.deliveryState?.currentPhase || '',
+      deliveryState: order?.deliveryState || null,
+    }
+  }
+
+  const handleTripClick = async (trip) => {
+    if (trip?.status !== 'Pending') {
+      return
+    }
+
+    const tripId = trip?.id || trip?.orderId
+    if (!tripId || openingTripId) {
+      return
+    }
+
+    setOpeningTripId(tripId)
+
+    try {
+      const response = await deliveryAPI.getOrderDetails(tripId)
+      const order = response?.data?.data?.order || response?.data?.data || null
+      const orderStatus = order?.status || ''
+      const deliveryPhase = order?.deliveryState?.currentPhase || ''
+      const deliveryStateStatus = order?.deliveryState?.status || ''
+      const isCancelled = orderStatus === 'cancelled' || deliveryPhase === 'cancelled' || deliveryStateStatus === 'cancelled'
+      const isCompleted =
+        orderStatus === 'delivered' ||
+        orderStatus === 'completed' ||
+        deliveryPhase === 'completed' ||
+        deliveryPhase === 'delivered' ||
+        deliveryStateStatus === 'delivered'
+
+      if (!order || isCancelled || isCompleted) {
+        toast.info(isCancelled ? 'This order has been cancelled.' : 'This order is already completed.')
+        setTrips((prevTrips) =>
+          prevTrips.map((item) => {
+            if ((item.id || item.orderId) !== tripId) return item
+            return {
+              ...item,
+              status: isCancelled ? 'Cancelled' : 'Completed',
+            }
+          })
+        )
+        return
+      }
+
+      const restaurantInfo = buildRestaurantInfoFromOrder(order)
+      const uiStep = getDeliveryUiStepFromOrder(order)
+
+      localStorage.removeItem('deliveryPendingOrder')
+      localStorage.setItem(
+        'deliveryActiveOrder',
+        JSON.stringify({
+          orderId: order?.orderId || order?._id || tripId,
+          restaurantInfo,
+          uiStep,
+          routeCoordinates: [],
+          hasDirectionsAPI: false,
+          acceptedAt: order?.deliveryState?.acceptedAt || order?.updatedAt || order?.createdAt || new Date().toISOString(),
+          updatedAt: Date.now(),
+        })
+      )
+
+      navigate('/delivery')
+    } catch (error) {
+      const status = error?.response?.status
+      if (status === 404 || status === 403) {
+        toast.info('This order is no longer available.')
+        setTrips((prevTrips) =>
+          prevTrips.map((item) => {
+            if ((item.id || item.orderId) !== tripId) return item
+            return {
+              ...item,
+              status: 'Cancelled',
+            }
+          })
+        )
+      } else {
+        console.error('Error opening pending trip:', error)
+        toast.error('Unable to open this trip. Please try again.')
+      }
+    } finally {
+      setOpeningTripId(null)
+    }
+  }
 
   return (
     <div className="h-screen bg-white flex flex-col overflow-hidden">
@@ -325,10 +475,30 @@ export default function TripHistory() {
           </div>
         ) : (
           <div className="space-y-3">
-            {trips.map((trip) => (
+            {trips.map((trip) => {
+              const tripId = trip.id || trip.orderId
+              const isPendingTrip = trip.status === 'Pending'
+              const isOpeningThisTrip = openingTripId === tripId
+
+              return (
               <div
-                key={trip.id || trip.orderId}
-                className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+                key={tripId}
+                onClick={() => handleTripClick(trip)}
+                role={isPendingTrip ? 'button' : undefined}
+                tabIndex={isPendingTrip ? 0 : -1}
+                aria-disabled={!isPendingTrip || isOpeningThisTrip}
+                onKeyDown={(event) => {
+                  if (!isPendingTrip || isOpeningThisTrip) return
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault()
+                    handleTripClick(trip)
+                  }
+                }}
+                className={`bg-white border border-gray-200 rounded-lg p-4 transition-shadow ${
+                  isPendingTrip
+                    ? 'cursor-pointer hover:shadow-md active:scale-[0.99]'
+                    : 'cursor-default opacity-80'
+                } ${isOpeningThisTrip ? 'pointer-events-none opacity-70' : ''}`}
               >
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex-1">
@@ -350,7 +520,7 @@ export default function TripHistory() {
                     trip.status === 'Cancelled' ? 'text-red-600' :
                       'text-yellow-600'
                     }`}>
-                    {trip.status}
+                    {isOpeningThisTrip ? 'Opening...' : trip.status}
                   </span>
                 </div>
                 <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
@@ -364,7 +534,7 @@ export default function TripHistory() {
                   </div>
                 </div>
               </div>
-            ))}
+            )})}
           </div>
         )}
       </div>
@@ -478,4 +648,3 @@ export default function TripHistory() {
     </div>
   )
 }
-
