@@ -558,8 +558,10 @@ export const getRestaurantById = async (req, res) => {
       }
     }
 
+    const [restaurantWithStats] = await attachRealReviewStats([restaurant]);
+
     return successResponse(res, 200, 'Restaurant retrieved successfully', {
-      restaurant,
+      restaurant: restaurantWithStats || restaurant,
       outOfRange
     });
   } catch (error) {

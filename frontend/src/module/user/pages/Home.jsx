@@ -1500,13 +1500,6 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Zone Ad Banner - same width container as hero banner */}
-      <div className="relative w-full bg-white dark:bg-[#0a0a0a] pt-4 sm:pt-4 pb-1 sm:pb-2">
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
-          <ZoneAdBanner />
-        </div>
-      </div>
-
       {/* Rest of Content - Container Width with Unified Background */}
       <motion.div className="relative max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 xl:px-12 space-y-0 pt-2 sm:pt-3 lg:pt-6" initial={{
       opacity: 0
@@ -1728,8 +1721,95 @@ export default function Home() {
           </div>
         </motion.section>
 
+        {/* Top Restaurants Horizontal Scroll Section */}
+        {!loadingTop10 && top10Restaurants.length > 0 && <div className="mb-6 sm:mb-7 lg:mb-8">
+            <div className="px-1 mb-4 flex items-center justify-between">
+              <div className="flex flex-col gap-0.5">
+                <h2 className="text-xs sm:text-sm lg:text-base font-semibold text-gray-400 tracking-widest uppercase">
+                  Handpicked for you
+                </h2>
+                <span className="text-base sm:text-lg lg:text-2xl text-gray-900 dark:text-white font-bold">Top Restaurants</span>
+              </div>
+              <Link to="/user/top-10" className="text-orange-600 font-semibold text-sm hover:underline">
+                See All
+              </Link>
+            </div>
+
+            <div className="flex gap-4 sm:gap-6 overflow-x-auto pb-6 scrollbar-hide px-1" style={{
+          scrollbarWidth: "none",
+          msOverflowStyle: "none"
+        }}>
+              {top10Restaurants.map((item, index) => {
+            const restaurant = item.restaurant || item;
+            const restaurantSlug = restaurant.slug || restaurant.name?.toLowerCase().replace(/\s+/g, "-");
+            return <Link key={restaurant._id || index} to={`/user/restaurants/${restaurantSlug}`} className="flex-shrink-0 w-[240px] sm:w-[280px] group">
+                    <div className="relative aspect-[4/3] rounded-2xl overflow-hidden mb-3 shadow-sm group-hover:shadow-md transition-shadow">
+                      {/* Restaurant Image */}
+                      <OptimizedImage src={restaurant.profileImage?.url || "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&h=600&fit=crop"} alt={restaurant.name} className="w-full h-full transform transition-transform duration-500 group-hover:scale-110" objectFit="cover" />
+
+                      {/* Gradient Overlay */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-60" />
+
+                      {/* Offer Badge - Top Left */}
+                      {restaurant.offer && <div className="absolute top-2 left-2 sm:top-3 sm:left-3">
+                          <div className="bg-white/95 backdrop-blur-sm px-2 py-1 sm:px-3 sm:py-1.5 rounded-xl shadow-lg border border-orange-100 flex flex-col items-center">
+                            <span className="text-[10px] sm:text-xs font-black text-orange-600 uppercase tracking-tighter leading-none">
+                              {restaurant.offer.split(' ')[0]} {restaurant.offer.split(' ')[1]}
+                            </span>
+                            <span className="text-[8px] sm:text-[10px] font-bold text-gray-500 uppercase tracking-tighter leading-none mt-0.5">
+                              {restaurant.offer.split(' ').slice(2).join(' ')}
+                            </span>
+                          </div>
+                        </div>}
+
+                      {/* Favorite Button - Top Right */}
+                      <button onClick={e => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleToggleFavorite(e);
+                }} className="absolute top-2 right-2 sm:top-3 sm:right-3 p-2 rounded-full bg-white/20 backdrop-blur-md text-white hover:bg-white hover:text-red-500 transition-all shadow-sm">
+                        <Heart className={`w-4 h-4 sm:w-5 sm:h-5 ${isFavorite(restaurantSlug) ? 'fill-current text-red-500' : ''}`} />
+                      </button>
+
+                      {/* Rating Badge - Bottom Left */}
+                      {Number.isFinite(restaurant.rating) && <div className="absolute bottom-2 left-2 sm:bottom-3 sm:left-3">
+                          <div className="flex items-center gap-1 bg-[#1A9F4F] text-white px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-bold shadow-lg">
+                            <span>{restaurant.rating.toFixed(1)}</span>
+                            <Star className="w-2.5 h-2.5 sm:w-3 sm:h-3 fill-current" />
+                          </div>
+                        </div>}
+                    </div>
+
+                    {/* Restaurant Info */}
+                    <div className="px-1">
+                      <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white truncate mb-0.5">
+                        {restaurant.name}
+                      </h3>
+                      <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+                        <div className="flex items-center gap-1">
+                          <Zap className="w-3.5 h-3.5 text-[#1A9F4F] fill-current" />
+                          <span className="text-xs sm:text-sm font-semibold text-[#1A9F4F]">
+                            <DynamicEtaText
+                              restaurantId={restaurant._id || restaurant.restaurantId}
+                              fallback={restaurant.estimatedDeliveryTime || '20-25 mins'}
+                            />
+                          </span>
+                        </div>
+                        {Array.isArray(restaurant.cuisines) && restaurant.cuisines.length > 0 && <>
+                            <span className="w-1 h-1 rounded-full bg-gray-300" />
+                            <span className="text-xs sm:text-sm font-medium truncate">
+                              {restaurant.cuisines.join(', ')}
+                            </span>
+                          </>}
+                      </div>
+                    </div>
+                  </Link>;
+              })}
+            </div>
+          </div>}
+
         {/* Explore More Section */}
-        <motion.section className="pt-2 sm:pt-3 lg:pt-4" initial={{
+        <motion.section className="pt-1.5 sm:pt-2 lg:pt-3" initial={{
         opacity: 0,
         y: 20
       }} whileInView={{
@@ -1848,95 +1928,38 @@ export default function Home() {
           </div>
         </motion.section>
 
-        {/* Featured Foods - Horizontal Scroll */}
-
-        {/* Restaurants - Enhanced with Animations */}
-        {/* Top Restaurants Horizontal Scroll Section */}
-        {!loadingTop10 && top10Restaurants.length > 0 && <div className="mb-8 lg:mb-12">
-            <div className="px-1 mb-4 flex items-center justify-between">
-              <div className="flex flex-col gap-0.5">
-                <h2 className="text-xs sm:text-sm lg:text-base font-semibold text-gray-400 tracking-widest uppercase">
-                  Handpicked for you
-                </h2>
-                <span className="text-base sm:text-lg lg:text-2xl text-gray-900 dark:text-white font-bold">Top Restaurants</span>
-              </div>
-              <Link to="/user/top-10" className="text-orange-600 font-semibold text-sm hover:underline">
-                See All
-              </Link>
-            </div>
-
-            <div className="flex gap-4 sm:gap-6 overflow-x-auto pb-6 scrollbar-hide px-1" style={{
-          scrollbarWidth: "none",
-          msOverflowStyle: "none"
+        {/* In the Spotlight */}
+        <motion.section className="pt-1.5 sm:pt-2 lg:pt-3 pb-0.5 sm:pb-1" initial={{
+        opacity: 0,
+        y: 20
+      }} whileInView={{
+        opacity: 1,
+        y: 0
+      }} viewport={{
+        once: true,
+        margin: "-50px"
+      }} transition={{
+        duration: 0.5
+      }}>
+          <motion.h2 className="text-xs sm:text-sm lg:text-base font-semibold text-gray-400 dark:text-gray-500 tracking-widest uppercase mb-2 sm:mb-3 lg:mb-4 px-1" initial={{
+          opacity: 0,
+          x: -20
+        }} whileInView={{
+          opacity: 1,
+          x: 0
+        }} viewport={{
+          once: true
+        }} transition={{
+          duration: 0.5
         }}>
-              {top10Restaurants.map((item, index) => {
-            const restaurant = item.restaurant || item;
-            const restaurantSlug = restaurant.slug || restaurant.name?.toLowerCase().replace(/\s+/g, "-");
-            return <Link key={restaurant._id || index} to={`/user/restaurants/${restaurantSlug}`} className="flex-shrink-0 w-[240px] sm:w-[280px] group">
-                    <div className="relative aspect-[4/3] rounded-2xl overflow-hidden mb-3 shadow-sm group-hover:shadow-md transition-shadow">
-                      {/* Restaurant Image */}
-                      <OptimizedImage src={restaurant.profileImage?.url || "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&h=600&fit=crop"} alt={restaurant.name} className="w-full h-full transform transition-transform duration-500 group-hover:scale-110" objectFit="cover" />
-
-                      {/* Gradient Overlay */}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-60" />
-
-                      {/* Offer Badge - Top Left */}
-                      {restaurant.offer && <div className="absolute top-2 left-2 sm:top-3 sm:left-3">
-                          <div className="bg-white/95 backdrop-blur-sm px-2 py-1 sm:px-3 sm:py-1.5 rounded-xl shadow-lg border border-orange-100 flex flex-col items-center">
-                            <span className="text-[10px] sm:text-xs font-black text-orange-600 uppercase tracking-tighter leading-none">
-                              {restaurant.offer.split(' ')[0]} {restaurant.offer.split(' ')[1]}
-                            </span>
-                            <span className="text-[8px] sm:text-[10px] font-bold text-gray-500 uppercase tracking-tighter leading-none mt-0.5">
-                              {restaurant.offer.split(' ').slice(2).join(' ')}
-                            </span>
-                          </div>
-                        </div>}
-
-                      {/* Favorite Button - Top Right */}
-                      <button onClick={e => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  handleToggleFavorite(e);
-                }} className="absolute top-2 right-2 sm:top-3 sm:right-3 p-2 rounded-full bg-white/20 backdrop-blur-md text-white hover:bg-white hover:text-red-500 transition-all shadow-sm">
-                        <Heart className={`w-4 h-4 sm:w-5 sm:h-5 ${isFavorite(restaurantSlug) ? 'fill-current text-red-500' : ''}`} />
-                      </button>
-
-                      {/* Rating Badge - Bottom Left */}
-                      {Number.isFinite(restaurant.rating) && <div className="absolute bottom-2 left-2 sm:bottom-3 sm:left-3">
-                          <div className="flex items-center gap-1 bg-[#1A9F4F] text-white px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-bold shadow-lg">
-                            <span>{restaurant.rating.toFixed(1)}</span>
-                            <Star className="w-2.5 h-2.5 sm:w-3 sm:h-3 fill-current" />
-                          </div>
-                        </div>}
-                    </div>
-
-                    {/* Restaurant Info */}
-                    <div className="px-1">
-                      <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white truncate mb-0.5">
-                        {restaurant.name}
-                      </h3>
-                      <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
-                        <div className="flex items-center gap-1">
-                          <Zap className="w-3.5 h-3.5 text-[#1A9F4F] fill-current" />
-                          <span className="text-xs sm:text-sm font-semibold text-[#1A9F4F]">
-                            <DynamicEtaText
-                              restaurantId={restaurant._id || restaurant.restaurantId}
-                              fallback={restaurant.estimatedDeliveryTime || '20-25 mins'}
-                            />
-                          </span>
-                        </div>
-                        {Array.isArray(restaurant.cuisines) && restaurant.cuisines.length > 0 && <>
-                            <span className="w-1 h-1 rounded-full bg-gray-300" />
-                            <span className="text-xs sm:text-sm font-medium truncate">
-                              {restaurant.cuisines.join(', ')}
-                            </span>
-                          </>}
-                      </div>
-                    </div>
-                  </Link>;
-          })}
+            IN THE SPOTLIGHT
+          </motion.h2>
+          <div className="relative w-full bg-white dark:bg-[#0a0a0a] pt-4 sm:pt-4 pb-1 sm:pb-2">
+            <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+              <ZoneAdBanner />
             </div>
-          </div>}
+          </div>
+        </motion.section>
 
         <motion.section className="space-y-0 pt-3 sm:pt-4 lg:pt-6 pb-20 md:pb-24" initial={{
         opacity: 0
@@ -2064,7 +2087,10 @@ export default function Home() {
                               <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 mb-1.5">
                                 <Zap className="w-4 h-4 text-emerald-600 fill-current" />
                                 <span className="font-semibold text-emerald-700 dark:text-emerald-400">
-                                  {restaurant.deliveryTime}
+                                  <DynamicEtaText
+                                    restaurantId={restaurant._id || restaurant.id || restaurant.restaurantId}
+                                    fallback={restaurant.deliveryTime || restaurant.estimatedDeliveryTime || '25-30 mins'}
+                                  />
                                 </span>
                                 <span className="text-gray-400">|</span>
                                 <span className="font-semibold">{restaurant.distance}</span>

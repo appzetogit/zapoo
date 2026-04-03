@@ -2149,8 +2149,8 @@ export const heroBannerAPI = {
   },
 
   // Get Gourmet restaurants (public)
-  getGourmetRestaurants: () => {
-    return apiClient.get(API_ENDPOINTS.HERO_BANNER.GOURMET_PUBLIC);
+  getGourmetRestaurants: (params = {}) => {
+    return apiClient.get(API_ENDPOINTS.HERO_BANNER.GOURMET_PUBLIC, { params });
   },
 };
 

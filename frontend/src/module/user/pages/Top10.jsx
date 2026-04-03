@@ -25,6 +25,13 @@ export default function Top10() {
   useEffect(() => {
     const fetchTop10Restaurants = async () => {
       try {
+        const hasCoords = location?.latitude != null && location?.longitude != null
+        if (!hasCoords) {
+          setLoading(true)
+          setError(null)
+          setTop10Restaurants([])
+          return
+        }
         if (isOutOfService) {
           setTop10Restaurants([])
           setError(null)
@@ -35,7 +42,7 @@ export default function Top10() {
         setError(null)
         const params = {}
         if (zoneId) params.zoneId = zoneId
-        if (location?.latitude != null && location?.longitude != null) {
+        if (hasCoords) {
           params.latitude = location.latitude
           params.longitude = location.longitude
         }

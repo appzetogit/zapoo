@@ -24,6 +24,13 @@ export default function Gourmet() {
   useEffect(() => {
     const fetchGourmetRestaurants = async () => {
       try {
+        const hasCoords = location?.latitude != null && location?.longitude != null
+        if (!hasCoords) {
+          setLoading(true)
+          setError(null)
+          setGourmetRestaurants([])
+          return
+        }
         if (isOutOfService) {
           setGourmetRestaurants([])
           setError(null)
@@ -34,7 +41,7 @@ export default function Gourmet() {
         setError(null)
         const params = {}
         if (zoneId) params.zoneId = zoneId
-        if (location?.latitude != null && location?.longitude != null) {
+        if (hasCoords) {
           params.latitude = location.latitude
           params.longitude = location.longitude
         }

@@ -1497,7 +1497,7 @@ export default function RestaurantDetails() {
                             </div>
 
                             {/* Right Side - Image and Add Button */}
-                            <div className="relative w-32 h-32 flex-shrink-0">
+                            <div className="relative w-32 h-32 flex-shrink-0 overflow-visible">
                               {item.image || item.images && item.images.length > 0 ? <img src={item.image || item.images[0]} alt={item.name} className="w-full h-full object-cover rounded-2xl shadow-sm" /> : <div className="w-full h-full bg-gray-200 dark:bg-gray-700 rounded-2xl flex items-center justify-center">
                                   <span className="text-xs text-gray-400">No image</span>
                                 </div>}
@@ -1531,7 +1531,7 @@ export default function RestaurantDetails() {
                     }} animate={{
                       opacity: 1,
                       scale: 1
-                    }} transition={{
+                                }} transition={{
                       duration: 0.3,
                       type: "spring",
                       damping: 20,
@@ -1541,7 +1541,7 @@ export default function RestaurantDetails() {
                       if (!shouldShowGrayscale) {
                         updateItemQuantity(item, 1, e);
                       }
-                    }} disabled={shouldShowGrayscale} className={`absolute -bottom-2 left-1/2 -translate-x-1/2 bg-white border font-bold px-6 py-1.5 rounded-lg shadow-md flex items-center gap-1 transition-colors ${shouldShowGrayscale ? 'border-gray-300 text-gray-400 cursor-not-allowed opacity-50' : 'border-green-600 text-green-600 hover:bg-green-50'}`}>
+                    }} disabled={shouldShowGrayscale} className={`absolute bottom-2 left-1/2 -translate-x-1/2 z-20 bg-white border font-bold px-6 py-1.5 rounded-lg shadow-md flex items-center gap-1 transition-colors ${shouldShowGrayscale ? 'border-gray-300 text-gray-400 cursor-not-allowed opacity-50' : 'border-green-600 text-green-600 hover:bg-green-50'}`}>
                                   ADD <Plus size={14} className="stroke-[3px]" />
                                 </motion.button>}
                             </div>
@@ -1653,7 +1653,7 @@ export default function RestaurantDetails() {
                                       </div>
 
                                       {/* Right Side - Image and Add Button */}
-                                      <div className="relative w-32 h-32 flex-shrink-0">
+                                      <div className="relative w-32 h-32 flex-shrink-0 overflow-visible">
                                         {item.image || item.images && item.images.length > 0 ? <img src={item.image || item.images[0]} alt={item.name} className="w-full h-full object-cover rounded-2xl shadow-sm" /> : <div className="w-full h-full bg-gray-200 dark:bg-gray-700 rounded-2xl flex items-center justify-center">
                                             <span className="text-xs text-gray-400">No image</span>
                                           </div>}
@@ -1692,15 +1692,15 @@ export default function RestaurantDetails() {
                             type: "spring",
                             damping: 20,
                             stiffness: 300
-                          }} onClick={e => {
-                            e.stopPropagation();
-                            if (!shouldShowGrayscale) {
-                              updateItemQuantity(item, 1, e);
-                            }
-                          }} disabled={shouldShowGrayscale} className={`absolute -bottom-2 left-1/2 -translate-x-1/2 bg-white border font-bold px-6 py-1.5 rounded-lg shadow-md flex items-center gap-1 transition-colors ${shouldShowGrayscale ? 'border-gray-300 text-gray-400 cursor-not-allowed opacity-50' : 'border-green-600 text-green-600 hover:bg-green-50'}`}>
-                                            ADD <Plus size={14} className="stroke-[3px]" />
-                                          </motion.button>}
-                                      </div>
+                                        }} onClick={e => {
+                      e.stopPropagation();
+                      if (!shouldShowGrayscale) {
+                        updateItemQuantity(item, 1, e);
+                      }
+                    }} disabled={shouldShowGrayscale} className={`absolute bottom-2 left-1/2 -translate-x-1/2 z-20 bg-white border font-bold px-6 py-1.5 rounded-lg shadow-md flex items-center gap-1 transition-colors ${shouldShowGrayscale ? 'border-gray-300 text-gray-400 cursor-not-allowed opacity-50' : 'border-green-600 text-green-600 hover:bg-green-50'}`}>
+                                  ADD <Plus size={14} className="stroke-[3px]" />
+                                </motion.button>}
+                            </div>
                                     </div>;
                     })}
                               </div>}
