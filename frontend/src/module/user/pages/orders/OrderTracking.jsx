@@ -12,7 +12,7 @@ import { useOrders } from "../../context/OrdersContext";
 import { useProfile } from "../../context/ProfileContext";
 import { useLocation as useUserLocation } from "../../hooks/useLocation";
 import DeliveryTrackingMap from "../../components/DeliveryTrackingMap";
-import { orderAPI, restaurantAPI, userAPI } from "@/lib/api";
+import { orderAPI, restaurantAPI, telephonyAPI, userAPI } from "@/lib/api";
 import circleIcon from "@/assets/circleicon.png";
 
 const hasOrderBeenPickedUp = apiOrder => {
@@ -40,6 +40,16 @@ const deriveTrackingUiStatus = apiOrder => {
   if (apiOrder.status === 'preparing') return 'preparing';
   return 'placed';
 };
+
+const normalizeEntityId = (value) => {
+  if (!value && value !== 0) return "";
+  if (typeof value === "object") {
+    return String(value._id || value.id || "");
+  }
+  return String(value);
+};
+
+const normalizePhoneNumber = (value) => (value ? String(value).replace(/[^\d+]/g, "") : "");
 
 // Animated checkmark component
 const AnimatedCheckmark = ({
@@ -218,10 +228,17 @@ export default function OrderTracking() {
   const [showInstructionsDialog, setShowInstructionsDialog] = useState(false);
   const [deliveryInstructions, setDeliveryInstructions] = useState("");
   const [isSavingInstructions, setIsSavingInstructions] = useState(false);
+  const [isCallingRestaurant, setIsCallingRestaurant] = useState(false);
   const defaultAddress = getDefaultAddress();
   const customerName = order?.userName || order?.userId?.fullName || order?.userId?.name || userProfile?.fullName || userProfile?.name || 'Customer';
   const customerPhone = order?.userPhone || order?.userId?.phone || userProfile?.phone || defaultAddress?.phone || "";
   const currentDeliveryInstructions = order?.address?.deliveryInstructions || "";
+  const restaurantPhone =
+    order?.restaurantId?.primaryContactNumber ||
+    order?.restaurantId?.phone ||
+    order?.restaurantId?.ownerPhone ||
+    order?.restaurantPhone ||
+    "";
 
   useEffect(() => {
     if (!showPhoneDialog) return;
@@ -486,6 +503,56 @@ export default function OrderTracking() {
     // Only restrict if order is already cancelled or delivered (checked above)
 
     setShowCancelDialog(true);
+  };
+
+  const handleCallRestaurantMasked = async () => {
+    if (!order) return;
+
+    if (order.status === "cancelled" || order.status === "delivered") {
+      toast.error("Calls are not allowed for cancelled or delivered orders");
+      return;
+    }
+
+    const callerUserId =
+      normalizeEntityId(order.userId) ||
+      normalizeEntityId(userProfile);
+    const receiverUserId = normalizeEntityId(order.restaurantId);
+    const businessOrderId = order.id || order.orderId || orderId;
+    const fallbackPhone = normalizePhoneNumber(restaurantPhone);
+
+    if (!businessOrderId || !callerUserId || !receiverUserId) {
+      if (fallbackPhone) {
+        toast.error("Masked call unavailable right now. Falling back to direct call.");
+        window.location.href = `tel:${fallbackPhone}`;
+      } else {
+        toast.error("Restaurant phone number not available");
+      }
+      return;
+    }
+
+    setIsCallingRestaurant(true);
+    try {
+      await telephonyAPI.initiateMaskedCall({
+        orderId: businessOrderId,
+        callerUserId,
+        receiverUserId,
+      });
+      toast.success("Connecting via masked number...");
+    } catch (error) {
+      const errorMessage =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Unable to place masked call";
+
+      if (fallbackPhone) {
+        toast.error(`${errorMessage}. Falling back to direct call.`);
+        window.location.href = `tel:${fallbackPhone}`;
+      } else {
+        toast.error(errorMessage);
+      }
+    } finally {
+      setIsCallingRestaurant(false);
+    }
   };
   const handleSavePhone = async () => {
     const trimmedPhone = editablePhone.trim();
@@ -978,10 +1045,20 @@ export default function OrderTracking() {
               <p className="font-semibold text-gray-900">{order.restaurant}</p>
               <p className="text-sm text-gray-500">{order.address?.city || 'Local Area'}</p>
             </div>
-            <motion.button className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center" whileTap={{
-            scale: 0.9
-          }}>
-              <Phone className="w-5 h-5 text-green-700" />
+            <motion.button
+              type="button"
+              onClick={handleCallRestaurantMasked}
+              disabled={isCallingRestaurant || order.status === "cancelled" || order.status === "delivered"}
+              className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+              whileTap={{
+                scale: 0.9
+              }}
+            >
+              {isCallingRestaurant ? (
+                <Loader2 className="w-5 h-5 text-green-700 animate-spin" />
+              ) : (
+                <Phone className="w-5 h-5 text-green-700" />
+              )}
             </motion.button>
           </div>
 

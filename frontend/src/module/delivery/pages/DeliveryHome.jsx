@@ -15,7 +15,7 @@ import { fetchDeliveryWallet, calculatePeriodEarnings } from "../utils/deliveryW
 import { formatCurrency } from "../../restaurant/utils/currency";
 import { getAllDeliveryOrders } from "../utils/deliveryOrderStatus";
 import { getUnreadDeliveryNotificationCount } from "../utils/deliveryNotifications";
-import { deliveryAPI, restaurantAPI, uploadAPI } from "@/lib/api";
+import { deliveryAPI, restaurantAPI, telephonyAPI, uploadAPI } from "@/lib/api";
 import { useDeliveryNotifications } from "../hooks/useDeliveryNotifications";
 import { getGoogleMapsApiKey } from "@/lib/utils/googleMapsApiKey";
 import { useCompanyName } from "@/lib/hooks/useCompanyName";
@@ -115,6 +115,16 @@ const DELIVERY_UI_STEP = {
   CUSTOMER_REVIEW: 'customer_review',
   PAYMENT: 'payment'
 };
+
+const normalizeEntityId = (value) => {
+  if (!value && value !== 0) return "";
+  if (typeof value === "object") {
+    return String(value._id || value.id || "");
+  }
+  return String(value);
+};
+
+const normalizePhoneNumber = (value) => (value ? String(value).replace(/[^\d+]/g, "") : "");
 
 // ============================================
 // STABLE TRACKING SYSTEM - RAPIDO/UBER STYLE
@@ -563,6 +573,9 @@ export default function DeliveryHome() {
     return hotspots;
   });
   const [selectedRestaurant, setSelectedRestaurant] = useState(null);
+  const [deliveryPartnerUserId, setDeliveryPartnerUserId] = useState("");
+  const [isCallingRestaurant, setIsCallingRestaurant] = useState(false);
+  const [isCallingCustomer, setIsCallingCustomer] = useState(false);
   const [bottomSheetExpanded, setBottomSheetExpanded] = useState(false);
   const [acceptButtonProgress, setAcceptButtonProgress] = useState(0);
   const [isAnimatingToComplete, setIsAnimatingToComplete] = useState(false);
@@ -2121,6 +2134,8 @@ export default function DeliveryHome() {
           restaurantInfo = {
             id: order._id || order.orderId,
             orderId: order.orderId,
+            restaurantMongoId: normalizeEntityId(order.restaurantId),
+            customerUserId: normalizeEntityId(order.userId),
             name: restaurantName,
             address: restaurantAddress,
             lat: restaurantLat || selectedRestaurant?.lat,
@@ -2128,6 +2143,7 @@ export default function DeliveryHome() {
             estimatedEarnings: backendEarnings || selectedRestaurant?.estimatedEarnings || 0,
             amount: earningsValue,
             customerName: order.userId?.name,
+            customerPhone: order.userId?.phone || null,
             customerAddress: order.address?.formattedAddress || '',
             deliveryInstructions: order.address?.deliveryInstructions || '',
             customerLat: order.address?.location?.coordinates?.[1],
@@ -2959,9 +2975,13 @@ export default function DeliveryHome() {
               if (customerLat && customerLng) {
                 const updatedRestaurant = {
                   ...selectedRestaurant,
+                  restaurantMongoId: normalizeEntityId(order.restaurantId) || selectedRestaurant.restaurantMongoId || "",
+                  customerUserId: normalizeEntityId(order.userId) || selectedRestaurant.customerUserId || "",
                   customerName: order.userId?.name || selectedRestaurant.customerName,
+                  customerPhone: order.userId?.phone || selectedRestaurant.customerPhone || null,
                   customerAddress: order.address?.formattedAddress || (order.address?.street ? `${order.address.street}, ${order.address.city || ''}, ${order.address.state || ''}`.trim() : '') || selectedRestaurant.customerAddress,
                   deliveryInstructions: order.address?.deliveryInstructions || selectedRestaurant.deliveryInstructions || '',
+                  phone: order.restaurantId?.phone || selectedRestaurant.phone || null,
                   customerLat,
                   customerLng
                 };
@@ -3633,6 +3653,8 @@ export default function DeliveryHome() {
       const restaurantData = {
         id: newOrder.orderMongoId || newOrder.orderId,
         orderId: newOrder.orderId,
+        restaurantMongoId: normalizeEntityId(newOrder.restaurantId || newOrder.restaurantMongoId),
+        customerUserId: normalizeEntityId(newOrder.userId || newOrder.customerId),
         name: newOrder.restaurantName,
         address: restaurantAddress,
         lat: newOrder.restaurantLocation?.latitude,
@@ -3645,6 +3667,7 @@ export default function DeliveryHome() {
         deliveryFee,
         amount: earnedValue > 0 ? earnedValue : deliveryFee > 0 ? deliveryFee : 0,
         customerName: newOrder.customerName,
+        customerPhone: newOrder.customerPhone || null,
         customerAddress: newOrder.customerLocation?.address || 'Customer address',
         deliveryInstructions: newOrder.customerLocation?.deliveryInstructions || newOrder.address?.deliveryInstructions || '',
         customerLat: newOrder.customerLocation?.latitude,
@@ -3997,6 +4020,8 @@ export default function DeliveryHome() {
           const restaurantData = {
             id: firstOrder._id?.toString() || firstOrder.orderId,
             orderId: firstOrder.orderId,
+            restaurantMongoId: normalizeEntityId(firstOrder.restaurantId),
+            customerUserId: normalizeEntityId(firstOrder.userId),
             name: firstOrder.restaurantId?.name || 'Restaurant',
             address: restaurantAddress,
             lat: firstOrder.restaurantId?.location?.coordinates?.[1],
@@ -4007,6 +4032,7 @@ export default function DeliveryHome() {
             pickupDistance: pickupDistance,
             estimatedEarnings: firstOrder.pricing?.deliveryFee || 0,
             customerName: firstOrder.userId?.name || 'Customer',
+            customerPhone: firstOrder.userId?.phone || null,
             customerAddress: firstOrder.address?.formattedAddress || (firstOrder.address?.street ? `${firstOrder.address.street}, ${firstOrder.address.city || ''}, ${firstOrder.address.state || ''}`.trim() : 'Customer address'),
             deliveryInstructions: firstOrder.address?.deliveryInstructions || '',
             customerLat: firstOrder.address?.location?.coordinates?.[1],
@@ -4071,6 +4097,7 @@ export default function DeliveryHome() {
         if (response?.data?.success && response?.data?.data?.profile) {
           const profile = response.data.data.profile;
           const bankDetails = profile?.documents?.bankDetails;
+          setDeliveryPartnerUserId(normalizeEntityId(profile));
 
           // Store delivery partner status first
           if (profile?.status) {
@@ -4133,6 +4160,7 @@ export default function DeliveryHome() {
       const response = await deliveryAPI.getProfile();
       if (response?.data?.success && response?.data?.data?.profile) {
         const profile = response.data.data.profile;
+        setDeliveryPartnerUserId(normalizeEntityId(profile));
         setDeliveryStatus(profile.status);
         setRejectionReason(null);
       }
@@ -4144,6 +4172,130 @@ export default function DeliveryHome() {
       setIsReverifying(false);
     }
   };
+
+  const resolveDeliveryPartnerCallerId = useCallback(async () => {
+    if (deliveryPartnerUserId) {
+      return deliveryPartnerUserId;
+    }
+
+    try {
+      const response = await deliveryAPI.getProfile();
+      const profile = response?.data?.data?.profile;
+      const profileId = normalizeEntityId(profile);
+      if (profileId) {
+        setDeliveryPartnerUserId(profileId);
+      }
+      return profileId;
+    } catch (error) {
+      console.error("Error fetching delivery profile for masked call:", error);
+      return "";
+    }
+  }, [deliveryPartnerUserId]);
+
+  const refreshSelectedRestaurantCallContext = useCallback(async () => {
+    const orderLookupId =
+      selectedRestaurant?.orderId ||
+      selectedRestaurant?.id ||
+      newOrder?.orderId ||
+      newOrder?.orderMongoId;
+
+    if (!orderLookupId) {
+      return selectedRestaurant;
+    }
+
+    try {
+      const response = await deliveryAPI.getOrderDetails(orderLookupId);
+      const order = response?.data?.data?.order || response?.data?.data || response?.data?.order;
+      if (!order) {
+        return selectedRestaurant;
+      }
+
+      const nextRestaurantInfo = {
+        ...(selectedRestaurant || {}),
+        id: order._id || selectedRestaurant?.id || orderLookupId,
+        orderId: order.orderId || selectedRestaurant?.orderId || orderLookupId,
+        restaurantMongoId: normalizeEntityId(order.restaurantId) || selectedRestaurant?.restaurantMongoId || "",
+        customerUserId: normalizeEntityId(order.userId) || selectedRestaurant?.customerUserId || "",
+        phone: order.restaurantId?.phone || selectedRestaurant?.phone || null,
+        ownerPhone: order.restaurantId?.ownerPhone || selectedRestaurant?.ownerPhone || null,
+        customerPhone: order.userId?.phone || selectedRestaurant?.customerPhone || null,
+        customerName: order.userId?.name || order.userId?.fullName || selectedRestaurant?.customerName,
+        customerAddress: order.address?.formattedAddress || selectedRestaurant?.customerAddress,
+        deliveryInstructions: order.address?.deliveryInstructions || selectedRestaurant?.deliveryInstructions || "",
+        customerLat: order.address?.location?.coordinates?.[1] ?? selectedRestaurant?.customerLat,
+        customerLng: order.address?.location?.coordinates?.[0] ?? selectedRestaurant?.customerLng,
+      };
+
+      setSelectedRestaurant(nextRestaurantInfo);
+      return nextRestaurantInfo;
+    } catch (error) {
+      console.error("Error refreshing order details for masked call:", error);
+      return selectedRestaurant;
+    }
+  }, [newOrder?.orderId, newOrder?.orderMongoId, selectedRestaurant]);
+
+  const placeDeliveryMaskedCall = useCallback(async ({ targetRole }) => {
+    const isRestaurantCall = targetRole === "restaurant";
+    const setCallingState = isRestaurantCall ? setIsCallingRestaurant : setIsCallingCustomer;
+    const latestRestaurantInfo = await refreshSelectedRestaurantCallContext();
+    const orderIdForCall = latestRestaurantInfo?.orderId;
+    const callerUserId = await resolveDeliveryPartnerCallerId();
+    const receiverUserId = isRestaurantCall
+      ? latestRestaurantInfo?.restaurantMongoId
+      : latestRestaurantInfo?.customerUserId;
+    const fallbackPhone = normalizePhoneNumber(
+      isRestaurantCall
+        ? latestRestaurantInfo?.phone || latestRestaurantInfo?.ownerPhone
+        : latestRestaurantInfo?.customerPhone,
+    );
+
+    if (latestRestaurantInfo?.orderStatus === "cancelled" || latestRestaurantInfo?.orderStatus === "delivered") {
+      toast.error("Calls are not allowed for cancelled or delivered orders");
+      return;
+    }
+
+    if (!orderIdForCall || !callerUserId || !receiverUserId) {
+      if (fallbackPhone) {
+        toast.error("Masked call unavailable right now. Falling back to direct call.");
+        window.location.href = `tel:${fallbackPhone}`;
+      } else {
+        toast.error(`${isRestaurantCall ? "Restaurant" : "Customer"} phone number not available`);
+      }
+      return;
+    }
+
+    setCallingState(true);
+    try {
+      await telephonyAPI.initiateMaskedCall({
+        orderId: orderIdForCall,
+        callerUserId,
+        receiverUserId,
+      });
+      toast.success("Connecting via masked number...");
+    } catch (error) {
+      const errorMessage =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Unable to place masked call";
+
+      if (fallbackPhone) {
+        toast.error(`${errorMessage}. Falling back to direct call.`);
+        window.location.href = `tel:${fallbackPhone}`;
+      } else {
+        toast.error(errorMessage);
+      }
+    } finally {
+      setCallingState(false);
+    }
+  }, [refreshSelectedRestaurantCallContext, resolveDeliveryPartnerCallerId]);
+
+  const handleCallRestaurantMasked = useCallback(() => {
+    placeDeliveryMaskedCall({ targetRole: "restaurant" });
+  }, [placeDeliveryMaskedCall]);
+
+  const handleCallCustomerMasked = useCallback(() => {
+    placeDeliveryMaskedCall({ targetRole: "customer" });
+  }, [placeDeliveryMaskedCall]);
 
   // Ola Maps SDK check removed
 
@@ -5658,15 +5810,19 @@ export default function DeliveryHome() {
             ...savedRestaurantInfo,
             id: order?._id || savedRestaurantInfo.id,
             orderId: order?.orderId || savedRestaurantInfo.orderId,
+            restaurantMongoId: normalizeEntityId(order?.restaurantId) || savedRestaurantInfo.restaurantMongoId || "",
+            customerUserId: normalizeEntityId(order?.userId) || savedRestaurantInfo.customerUserId || "",
             name: order?.restaurantName || order?.restaurantId?.name || savedRestaurantInfo.name,
             address: order?.restaurantId?.address || order?.restaurantId?.location?.formattedAddress || savedRestaurantInfo.address,
             lat: restaurantCoords[1] ?? savedRestaurantInfo.lat,
             lng: restaurantCoords[0] ?? savedRestaurantInfo.lng,
             customerName: order?.userId?.name || savedRestaurantInfo.customerName,
+            customerPhone: order?.userId?.phone || savedRestaurantInfo.customerPhone || null,
             customerAddress: order?.address?.formattedAddress || savedRestaurantInfo.customerAddress,
             deliveryInstructions: order?.address?.deliveryInstructions || savedRestaurantInfo.deliveryInstructions || '',
             customerLat: customerCoords[1] ?? savedRestaurantInfo.customerLat,
             customerLng: customerCoords[0] ?? savedRestaurantInfo.customerLng,
+            phone: order?.restaurantId?.phone || savedRestaurantInfo.phone || null,
             total: order?.pricing?.total ?? savedRestaurantInfo.total,
             paymentMethod: order?.paymentMethod || savedRestaurantInfo.paymentMethod,
             orderStatus: order?.status || savedRestaurantInfo.orderStatus,
@@ -7614,86 +7770,20 @@ export default function DeliveryHome() {
 
     {/* Action Buttons */}
     <div className="flex gap-3 mb-6">
-      <button onClick={async () => {
-        // Try multiple paths to find restaurant phone number
-        let restaurantPhone = selectedRestaurant?.phone || selectedRestaurant?.restaurantId?.phone || selectedRestaurant?.ownerPhone || selectedRestaurant?.restaurant?.phone || null;
-        // If phone not found in selectedRestaurant, try to fetch order details from backend
-        if (!restaurantPhone && selectedRestaurant?.orderId) {
-          try {
-            const orderId = selectedRestaurant.orderId || selectedRestaurant.id;
-            const response = await deliveryAPI.getOrderDetails(orderId);
-            // Check multiple response formats
-            const order = response.data?.data?.order || response.data?.order || null;
-            if (order) {
-              // Try all possible paths in the API response
-              // Restaurant model has both 'phone' and 'ownerPhone' fields
-              restaurantPhone = order.restaurantId?.phone || order.restaurantId?.ownerPhone || order.restaurant?.phone || order.restaurant?.ownerPhone || order.restaurantId?.contact?.phone || order.restaurantId?.owner?.phone || null;
-              // If phone found, update selectedRestaurant for future use
-              if (restaurantPhone && selectedRestaurant) {
-                setSelectedRestaurant({
-                  ...selectedRestaurant,
-                  phone: restaurantPhone,
-                  ownerPhone: order.restaurantId?.ownerPhone || order.restaurant?.ownerPhone || restaurantPhone
-                });
-              }
-
-              // If still not found, try restaurant API directly
-              if (!restaurantPhone && order.restaurantId) {
-                const restaurantId = typeof order.restaurantId === 'string' ? order.restaurantId : order.restaurantId._id || order.restaurantId.id || order.restaurantId.toString();
-                if (restaurantId) {
-                  try {
-                    const restaurantResponse = await restaurantAPI.getRestaurantById(restaurantId);
-                    if (restaurantResponse.data?.success && restaurantResponse.data.data) {
-                      const restaurant = restaurantResponse.data.data.restaurant || restaurantResponse.data.data;
-                      restaurantPhone = restaurant.phone || restaurant.ownerPhone || restaurant.primaryContactNumber;
-                      if (restaurantPhone) {
-                        setSelectedRestaurant({
-                          ...selectedRestaurant,
-                          phone: restaurantPhone,
-                          ownerPhone: restaurant.ownerPhone || restaurantPhone
-                        });
-                      }
-                    }
-                  } catch (restaurantError) {
-                    console.error('❌ [CALL] Error fetching restaurant by ID:', restaurantError);
-                  }
-                }
-              }
-              if (!restaurantPhone) {
-                console.warn('⚠️ [CALL] Phone not found in order.restaurantId object:', order.restaurantId);
-              }
-            } else {
-              console.warn('⚠️ [CALL] Order details API response format unexpected - order not found in response:', {
-                responseKeys: Object.keys(response.data || {}),
-                responseData: response.data
-              });
-            }
-          } catch (error) {
-            console.error('❌ [CALL] Error fetching order details for phone:', error);
-            console.error('❌ [CALL] Error message:', error.message);
-            console.error('❌ [CALL] Error response:', error.response?.data);
-            console.error('❌ [CALL] Error status:', error.response?.status);
-          }
-        } else if (!selectedRestaurant?.orderId) {
-          console.warn('⚠️ [CALL] Cannot fetch phone - orderId not found in selectedRestaurant:', selectedRestaurant);
-        }
-        if (restaurantPhone) {
-          // Remove any spaces, dashes, or special characters except + and digits
-          const cleanPhone = restaurantPhone.replace(/[^\d+]/g, '');
-          window.location.href = `tel:${cleanPhone}`;
-        } else {
-          toast.error('Restaurant phone number not available. Please contact support.');
-          console.error('❌ Restaurant phone not found in any path:', {
-            selectedRestaurant,
-            hasPhone: !!selectedRestaurant?.phone,
-            hasRestaurantIdPhone: !!selectedRestaurant?.restaurantId?.phone,
-            hasOwnerPhone: !!selectedRestaurant?.ownerPhone,
-            orderId: selectedRestaurant?.orderId
-          });
-        }
-      }} className="flex-1 flex items-center justify-center gap-2 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-        <Phone className="w-5 h-5 text-gray-700" />
-        <span className="text-gray-700 font-medium">Call</span>
+      <button
+        type="button"
+        onClick={handleCallRestaurantMasked}
+        disabled={isCallingRestaurant}
+        className="flex-1 flex items-center justify-center gap-2 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+      >
+        {isCallingRestaurant ? (
+          <Loader2 className="w-5 h-5 text-gray-700 animate-spin" />
+        ) : (
+          <Phone className="w-5 h-5 text-gray-700" />
+        )}
+        <span className="text-gray-700 font-medium">
+          {isCallingRestaurant ? 'Calling...' : 'Call'}
+        </span>
       </button>
       <button onClick={() => {
         // Get restaurant location coordinates
@@ -8011,15 +8101,34 @@ export default function DeliveryHome() {
 
     {/* Action Buttons */}
     <div className="flex gap-3 mb-6">
-      <button className="flex-1 flex items-center justify-center gap-2 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-        <Phone className="w-5 h-5 text-gray-700" />
-        <span className="text-gray-700 font-medium">Call</span>
+      <button
+        type="button"
+        onClick={handleCallCustomerMasked}
+        disabled={isCallingCustomer}
+        className="flex-1 flex items-center justify-center gap-2 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+      >
+        {isCallingCustomer ? (
+          <Loader2 className="w-5 h-5 text-gray-700 animate-spin" />
+        ) : (
+          <Phone className="w-5 h-5 text-gray-700" />
+        )}
+        <span className="text-gray-700 font-medium">
+          {isCallingCustomer ? 'Calling...' : 'Call'}
+        </span>
       </button>
-      <button className="flex-1 flex items-center justify-center gap-2 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+      <button
+        type="button"
+        onClick={() => navigate("/delivery/profile/conversation")}
+        className="flex-1 flex items-center justify-center gap-2 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+      >
         <MapPin className="w-5 h-5 text-gray-700" />
         <span className="text-gray-700 font-medium">Chat</span>
       </button>
-      <button className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors">
+      <button
+        type="button"
+        onClick={handleStartNavigation}
+        className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors"
+      >
         <MapPin className="w-5 h-5 text-white" />
         <span className="text-white font-medium">Map</span>
       </button>
