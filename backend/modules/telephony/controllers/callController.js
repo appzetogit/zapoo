@@ -419,15 +419,22 @@ export const handleExotelCallback = async (req, res) => {
  */
 export const handleIncomingCallPassthru = async (req, res) => {
   try {
-    const { From, CustomField, CallSid, CallType, To, Called } = req.body || {};
-    const calledNumberRaw = To || Called || req.body.to || req.body.called || "";
+    const params = req.method === "GET" ? req.query : req.body || {};
+    const { From, CustomField, CallSid, CallType, To, Called } = params;
+    const calledNumberRaw = To || Called || params.to || params.called || "";
     const incomingVirtualNumber = String(calledNumberRaw || process.env.EXOTEL_VIRTUAL_NUMBER || "").trim();
 
+    // Log incoming CallSid and From number
+    console.log("Exotel Passthru - Incoming CallSid:", CallSid, "From:", From);
+
     console.log("Passthru incoming call:", {
-      from: From,
-      customField: CustomField,
-      callSid: CallSid,
-      to: incomingVirtualNumber,
+      method: req.method,
+      params: {
+        From,
+        CustomField,
+        CallSid,
+        To: incomingVirtualNumber,
+      },
     });
 
     // Edge case: Missing required fields
@@ -438,7 +445,7 @@ export const handleIncomingCallPassthru = async (req, res) => {
         CallSid,
       });
       return res
-        .type("application/xml")
+        .set("Content-Type", "text/xml; charset=utf-8")
         .send(
           `<?xml version="1.0" encoding="UTF-8"?><Response><Hangup reason="missing_parameters"/></Response>`
         );
@@ -474,7 +481,7 @@ export const handleIncomingCallPassthru = async (req, res) => {
         CallSid,
       });
       return res
-        .type("application/xml")
+        .set("Content-Type", "text/xml; charset=utf-8")
         .send(
           `<?xml version="1.0" encoding="UTF-8"?><Response><Hangup reason="order_not_found"/></Response>`
         );
@@ -512,7 +519,7 @@ export const handleIncomingCallPassthru = async (req, res) => {
       }
 
       return res
-        .type("application/xml")
+        .set("Content-Type", "text/xml; charset=utf-8")
         .send(
           `<?xml version="1.0" encoding="UTF-8"?><Response><Hangup reason="unauthorized"/></Response>`
         );
@@ -561,7 +568,7 @@ export const handleIncomingCallPassthru = async (req, res) => {
       }
 
       return res
-        .type("application/xml")
+        .set("Content-Type", "text/xml; charset=utf-8")
         .send(
           `<?xml version="1.0" encoding="UTF-8"?><Response><Hangup reason="routing_failed"/></Response>`
         );
@@ -598,17 +605,15 @@ export const handleIncomingCallPassthru = async (req, res) => {
       const dialCallerId = String(incomingVirtualNumber || process.env.EXOTEL_VIRTUAL_NUMBER || "").replace(/[\s\-+]/g, "").slice(-10);
 
       return res
-        .type("application/xml")
+        .set("Content-Type", "text/xml; charset=utf-8")
         .send(`<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Dial timeLimit="600" timeout="30" callerId="${dialCallerId}">
-    <Number>${normalizedRecipientPhone}</Number>
-  </Dial>
+  <Dial>+91${normalizedRecipientPhone}</Dial>
 </Response>`);
     } catch (sessionErr) {
       console.error("Passthru: Failed to create call session:", sessionErr);
       return res
-        .type("application/xml")
+        .set("Content-Type", "text/xml; charset=utf-8")
         .send(
           `<?xml version="1.0" encoding="UTF-8"?><Response><Hangup reason="system_error"/></Response>`
         );
@@ -616,7 +621,7 @@ export const handleIncomingCallPassthru = async (req, res) => {
   } catch (error) {
     console.error("Passthru handler error:", error);
     return res
-      .type("application/xml")
+      .set("Content-Type", "text/xml; charset=utf-8")
       .send(
         `<?xml version="1.0" encoding="UTF-8"?><Response><Hangup reason="handler_error"/></Response>`
       );
