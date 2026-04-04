@@ -308,9 +308,11 @@ export const initiateCall = async (req, res) => {
         },
       });
     } catch (err) {
+      console.error("Telephony call initiation failed:", err);
       return res.status(500).json({
         success: false,
         message: "Failed to initiate call",
+        error: process.env.NODE_ENV !== "production" ? err.message : undefined,
       });
     }
   } catch (error) {
@@ -401,6 +403,220 @@ export const handleExotelCallback = async (req, res) => {
 
     return res.status(200).json({ success: true });
   } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+};
+
+/**
+ * Passthru handler for incoming calls via Exotel
+ * Receives incoming call, routes to appropriate recipient
+ * Responds with XML dial instructions
+ * 
+ * Exotel sends: From, CallType, CallSid, CustomField (orderId), etc.
+ */
+export const handleIncomingCallPassthru = async (req, res) => {
+  try {
+    const { From, CustomField, CallSid, CallType } = req.body || {};
+
+    console.log("Passthru incoming call:", {
+      from: From,
+      customField: CustomField,
+      callSid: CallSid,
+    });
+
+    // Edge case: Missing required fields
+    if (!From || !CustomField || !CallSid) {
+      console.warn("Passthru: Missing required Exotel parameters", {
+        From,
+        CustomField,
+        CallSid,
+      });
+      return res
+        .type("application/xml")
+        .send(
+          `<?xml version="1.0" encoding="UTF-8"?><Response><Hangup reason="missing_parameters"/></Response>`
+        );
+    }
+
+    const orderId = String(CustomField).trim();
+    const incomingFromPhone = String(From).trim();
+
+    // Import routing service dynamically
+    const { routeIncomingCall, validateCallSafety } = await import(
+      "../services/callRoutingService.js"
+    );
+
+    // Validate call safety first
+    const safetyCheck = await validateCallSafety({
+      orderId,
+      incomingFromPhone,
+    });
+
+    if (!safetyCheck.safe) {
+      console.warn(`Passthru: Call safety check failed: ${safetyCheck.reason}`, {
+        orderId,
+        incomingFromPhone,
+      });
+
+      // Log the failed attempt
+      try {
+        await CallSession.create({
+          order_id: orderId,
+          call_sid: CallSid,
+          caller_phone: incomingFromPhone,
+          receiver_phone: "unknown",
+          caller_role: "unknown",
+          receiver_role: "unknown",
+          virtual_number: "passthru_incoming",
+          direction: "other",
+          status: "failed",
+          call_type: "inbound_passthru",
+          incoming_from: incomingFromPhone,
+          routing_lookup_status: "failed_access_denied",
+          routing_error: safetyCheck.reason,
+        });
+      } catch (logErr) {
+        console.error("Failed to log rejected call:", logErr);
+      }
+
+      return res
+        .type("application/xml")
+        .send(
+          `<?xml version="1.0" encoding="UTF-8"?><Response><Hangup reason="unauthorized"/></Response>`
+        );
+    }
+
+    // Route the call
+    const routingResult = await routeIncomingCall({
+      incomingFromPhone,
+      incomingVirtualNumber: "passthru_virtual",
+      orderId,
+    });
+
+    if (!routingResult.success) {
+      console.warn("Passthru: Routing failed", {
+        orderId,
+        incomingFromPhone,
+        error: routingResult.errorCode,
+      });
+
+      // Log the routing failure
+      try {
+        const mappedStatus = {
+          order_not_found: "failed_order_not_active",
+          order_not_active: "failed_order_not_active",
+          unauthorized_caller: "failed_access_denied",
+          no_recipient_found: "failed_recipient_not_found",
+        }[routingResult.errorCode] || "failed_unknown";
+
+        await CallSession.create({
+          order_id: orderId,
+          call_sid: CallSid,
+          caller_phone: incomingFromPhone,
+          receiver_phone: "unknown",
+          caller_role: "unknown",
+          receiver_role: "unknown",
+          virtual_number: "passthru_incoming",
+          direction: "other",
+          status: "failed",
+          call_type: "inbound_passthru",
+          incoming_from: incomingFromPhone,
+          routing_lookup_status: mappedStatus,
+          routing_error: routingResult.error,
+        });
+      } catch (logErr) {
+        console.error("Failed to log routing failure:", logErr);
+      }
+
+      return res
+        .type("application/xml")
+        .send(
+          `<?xml version="1.0" encoding="UTF-8"?><Response><Hangup reason="routing_failed"/></Response>`
+        );
+    }
+
+    // Recipient found - create call session
+    try {
+      const callSession = await CallSession.create({
+        order_id: orderId,
+        call_sid: CallSid,
+        caller_phone: incomingFromPhone,
+        receiver_phone: routingResult.recipientPhone,
+        caller_role: routingResult.callerRole,
+        receiver_role: routingResult.recipientRole,
+        virtual_number: "passthru_incoming",
+        direction: routingResult.callType,
+        status: "ringing",
+        call_type: "inbound_passthru",
+        incoming_from: incomingFromPhone,
+        routing_lookup_status: "resolved",
+        started_at: new Date(),
+      });
+
+      console.log("Passthru: Call routed successfully", {
+        callSessionId: callSession._id,
+        callType: routingResult.callType,
+        to: routingResult.recipientPhone,
+      });
+
+      // Response with dial XML to Exotel
+      const normalizedPhone = String(routingResult.recipientPhone)
+        .replace(/[\s\-+]/g, "")
+        .slice(-10);
+
+      return res
+        .type("application/xml")
+        .send(`<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Dial timeLimit="600" timeout="30" callerId="${normalizedPhone}">
+    <Number>${normalizedPhone}</Number>
+  </Dial>
+</Response>`);
+    } catch (sessionErr) {
+      console.error("Passthru: Failed to create call session:", sessionErr);
+      return res
+        .type("application/xml")
+        .send(
+          `<?xml version="1.0" encoding="UTF-8"?><Response><Hangup reason="system_error"/></Response>`
+        );
+    }
+  } catch (error) {
+    console.error("Passthru handler error:", error);
+    return res
+      .type("application/xml")
+      .send(
+        `<?xml version="1.0" encoding="UTF-8"?><Response><Hangup reason="handler_error"/></Response>`
+      );
+  }
+};
+
+/**
+ * Get virtual numbers for frontend
+ * Returns the configured virtual numbers for different call types
+ */
+export const getVirtualNumbers = async (req, res) => {
+  try {
+    // For now, return the same virtual number for all types
+    // Later you can have different numbers for different call types
+    // or fetch from database based on city/order type
+    const virtualNumbers = {
+      restaurant_call: "03348052382",  // For delivery partner to restaurant
+      customer_call: "03348052382",    // For delivery partner to customer
+      // Add more as needed:
+      // restaurant_to_delivery: "03348052382",
+      // delivery_to_customer: "03348052382",
+      // restaurant_to_customer: "03348052382"
+    };
+
+    return res.status(200).json({
+      success: true,
+      data: virtualNumbers,
+    });
+  } catch (error) {
+    console.error("Error getting virtual numbers:", error);
     return res.status(500).json({
       success: false,
       message: "Internal server error",

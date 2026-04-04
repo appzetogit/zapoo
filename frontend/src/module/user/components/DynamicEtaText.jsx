@@ -74,7 +74,7 @@ export default function DynamicEtaText({
           payload.items = JSON.parse(itemsSig);
         }
 
-        const res = await api.post("/order/orders/quote-eta", payload);
+        const res = await api.post("/orders/quote-eta", payload);
         const data = res?.data?.data;
         const minETA = Number(data?.minETA);
         const maxETA = Number(data?.maxETA);
@@ -97,4 +97,3 @@ export default function DynamicEtaText({
 
   return <span className={className}>{text}</span>;
 }
-

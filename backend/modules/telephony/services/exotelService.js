@@ -4,7 +4,6 @@ const {
   EXOTEL_SID,
   EXOTEL_AUTH_TOKEN,
   EXOTEL_SUBDOMAIN,
-  EXOTEL_STATUS_CALLBACK_BASE_URL,
 } = process.env;
 
 const getBaseUrl = () => {
@@ -24,6 +23,40 @@ const getAuthConfig = () => {
   };
 };
 
+// Normalize phone number: remove +, spaces, dashes
+const normalizePhone = (phone) => {
+  if (!phone) return null;
+  return String(phone).replace(/[\s\-+]/g, "").slice(-10);
+};
+
+// Generate Exotel XML response for passthru call
+export const generatePassthruXML = (toPhone) => {
+  if (!toPhone) {
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Hangup reason="invalid_recipient"/>
+</Response>`;
+  }
+
+  const normalizedPhone = normalizePhone(toPhone);
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Dial timeLimit="600" timeout="30" callerId="${normalizedPhone}">
+    <Number>${normalizedPhone}</Number>
+  </Dial>
+</Response>`;
+};
+
+// Generate XML for unavailable status
+export const generateUnavailableXML = (reason = "routing_failed") => {
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Play>https://zapoo.co.in/audio/unavailable.mp3</Play>
+  <Hangup reason="${reason}"/>
+</Response>`;
+};
+
+// Legacy method - kept for backward compatibility if needed
 export const initiateMaskedCall = async ({
   fromPhone,
   toPhone,
@@ -36,9 +69,6 @@ export const initiateMaskedCall = async ({
 
   const url = `${getBaseUrl()}/Calls/connect`;
 
-  const statusCallbackBase =
-    EXOTEL_STATUS_CALLBACK_BASE_URL || "https://example.com";
-
   const payload = new URLSearchParams({
     From: fromPhone,
     To: toPhone,
@@ -47,7 +77,7 @@ export const initiateMaskedCall = async ({
     TimeOut: "30",
     TimeLimit: "600",
     CustomField: String(orderId),
-    StatusCallback: `${statusCallbackBase}/api/telephony/exotel-callback`,
+    StatusCallback: `${process.env.EXOTEL_STATUS_CALLBACK_BASE_URL || "https://example.com"}/api/telephony/status-callback`,
     StatusCallbackEvents: "answered,terminal",
   }).toString();
 
@@ -74,10 +104,20 @@ export const initiateMaskedCall = async ({
       raw: data,
     };
   } catch (error) {
-    const err = error.response?.data || error.message || "Exotel error";
-    const wrappedError = new Error(
-      typeof err === "string" ? err : JSON.stringify(err)
-    );
+    const responseData = error.response?.data;
+    const statusCode = error.response?.status;
+    const message = responseData
+      ? `Exotel HTTP ${statusCode}: ${JSON.stringify(responseData)}`
+      : error.message || "Exotel error";
+
+    console.error("Exotel call failure:", {
+      url,
+      statusCode,
+      responseData,
+      message,
+    });
+
+    const wrappedError = new Error(message);
     wrappedError.name = "ExotelCallError";
     throw wrappedError;
   }

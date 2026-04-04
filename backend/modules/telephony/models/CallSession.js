@@ -112,6 +112,41 @@ const callSessionSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.Mixed,
       default: null,
     },
+    call_type: {
+      type: String,
+      enum: [
+        "outbound_api",
+        "inbound_passthru",
+      ],
+      default: "outbound_api",
+    },
+    incoming_from: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    incoming_caller_id_displayed: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    routing_lookup_status: {
+      type: String,
+      enum: [
+        "pending",
+        "resolved",
+        "failed_caller_not_found",
+        "failed_recipient_not_found",
+        "failed_order_not_active",
+        "failed_access_denied",
+        "failed_unknown",
+      ],
+      default: "pending",
+    },
+    routing_error: {
+      type: String,
+      default: null,
+    },
   },
   {
     timestamps: true,
@@ -119,6 +154,8 @@ const callSessionSchema = new mongoose.Schema(
 );
 
 callSessionSchema.index({ order_id: 1, virtual_number: 1 });
+callSessionSchema.index({ incoming_from: 1 });
+callSessionSchema.index({ call_sid: 1, created_at: -1 });
 
 export default mongoose.model("CallSession", callSessionSchema);
 
