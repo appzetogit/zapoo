@@ -12,7 +12,8 @@ import { useOrders } from "../../context/OrdersContext";
 import { useProfile } from "../../context/ProfileContext";
 import { useLocation as useUserLocation } from "../../hooks/useLocation";
 import DeliveryTrackingMap from "../../components/DeliveryTrackingMap";
-import { orderAPI, restaurantAPI, telephonyAPI, userAPI } from "@/lib/api";
+import { orderAPI, restaurantAPI, userAPI } from "@/lib/api";
+import { getExotelTelLink } from "@/lib/telephony";
 import circleIcon from "@/assets/circleicon.png";
 
 const hasOrderBeenPickedUp = apiOrder => {
@@ -530,28 +531,18 @@ export default function OrderTracking() {
       return;
     }
 
-    setIsCallingRestaurant(true);
-    try {
-      await telephonyAPI.initiateMaskedCall({
-        orderId: businessOrderId,
-        callerUserId,
-        receiverUserId,
-      });
-      toast.success("Connecting via masked number...");
-    } catch (error) {
-      const errorMessage =
-        error?.response?.data?.message ||
-        error?.message ||
-        "Unable to place masked call";
+    const telLink = getExotelTelLink();
+    if (telLink) {
+      toast.success("Opening masked call dialer...");
+      window.location.href = telLink;
+      return;
+    }
 
-      if (fallbackPhone) {
-        toast.error(`${errorMessage}. Falling back to direct call.`);
-        window.location.href = `tel:${fallbackPhone}`;
-      } else {
-        toast.error(errorMessage);
-      }
-    } finally {
-      setIsCallingRestaurant(false);
+    if (fallbackPhone) {
+      toast.error("Masked call unavailable. Falling back to direct call.");
+      window.location.href = `tel:${fallbackPhone}`;
+    } else {
+      toast.error("Masked call unavailable and no direct number found.");
     }
   };
   const handleSavePhone = async () => {

@@ -12,6 +12,83 @@ const phonesMatch = (phone1, phone2) => {
   return normalizePhone(phone1) === normalizePhone(phone2);
 };
 
+const buildPhoneRegex = (phone) => {
+  const normalized = normalizePhone(phone);
+  if (!normalized) return null;
+  return new RegExp(`${normalized}$`);
+};
+
+const findRestaurantByPhone = async (phone) => {
+  const regex = buildPhoneRegex(phone);
+  if (!regex) return null;
+  return Restaurant.findOne({
+    $or: [
+      { primaryContactNumber: regex },
+      { phone: regex },
+      { ownerPhone: regex },
+    ],
+  });
+};
+
+const findDeliveryPartnerByPhone = async (phone) => {
+  const regex = buildPhoneRegex(phone);
+  if (!regex) return null;
+  return Delivery.findOne({ phone: regex });
+};
+
+const findCustomerByPhone = async (phone) => {
+  const regex = buildPhoneRegex(phone);
+  if (!regex) return null;
+  return User.findOne({
+    $or: [
+      { phone: regex },
+      { primaryContactNumber: regex },
+      { phoneNumber: regex },
+      { mobile: regex },
+    ],
+  });
+};
+
+const findOrderByCallerPhone = async (incomingFromPhone) => {
+  const normalizedPhone = normalizePhone(incomingFromPhone);
+  if (!normalizedPhone) {
+    return null;
+  }
+
+  const activeStatusFilter = {
+    status: { $nin: ["delivered", "cancelled", "expired"] },
+  };
+
+  const restaurant = await findRestaurantByPhone(normalizedPhone);
+  if (restaurant) {
+    const order = await Order.findOne({
+      restaurantId: String(restaurant._id),
+      ...activeStatusFilter,
+    }).sort({ createdAt: -1 });
+    if (order) return { order, callerRole: "restaurant" };
+  }
+
+  const deliveryPartner = await findDeliveryPartnerByPhone(normalizedPhone);
+  if (deliveryPartner) {
+    const order = await Order.findOne({
+      deliveryPartnerId: deliveryPartner._id,
+      ...activeStatusFilter,
+    }).sort({ createdAt: -1 });
+    if (order) return { order, callerRole: "delivery_partner" };
+  }
+
+  const customer = await findCustomerByPhone(normalizedPhone);
+  if (customer) {
+    const order = await Order.findOne({
+      userId: customer._id,
+      ...activeStatusFilter,
+    }).sort({ createdAt: -1 });
+    if (order) return { order, callerRole: "customer" };
+  }
+
+  return null;
+};
+
 /**
  * Route incoming call based on caller and virtual number
  * Edge cases handled:
@@ -25,6 +102,7 @@ export const routeIncomingCall = async ({
   incomingFromPhone,
   incomingVirtualNumber,
   orderId,
+  order,
 }) => {
   const result = {
     success: false,
@@ -39,7 +117,7 @@ export const routeIncomingCall = async ({
 
   try {
     // Validation
-    if (!incomingFromPhone || !incomingVirtualNumber || !orderId) {
+    if (!incomingFromPhone || !incomingVirtualNumber || (!orderId && !order)) {
       result.error = "Missing required parameters";
       result.errorCode = "invalid_params";
       return result;
@@ -52,30 +130,34 @@ export const routeIncomingCall = async ({
       return result;
     }
 
-    // Find order
-    const order = await Order.findOne({ orderId });
-    if (!order) {
+    // Resolve order if not already provided
+    let resolvedOrder = order;
+    if (!resolvedOrder) {
+      resolvedOrder = await Order.findOne({ orderId });
+    }
+
+    if (!resolvedOrder) {
       result.error = "Order not found";
       result.errorCode = "order_not_found";
       return result;
     }
 
     // Check order status
-    if (["completed", "cancelled", "expired"].includes(order.status)) {
-      result.error = `Cannot route call for ${order.status} order`;
+    if (["completed", "cancelled", "expired"].includes(resolvedOrder.status)) {
+      result.error = `Cannot route call for ${resolvedOrder.status} order`;
       result.errorCode = "order_not_active";
       return result;
     }
 
     // Fetch related entities
-    const restaurant = await Restaurant.findById(order.restaurantId);
+    const restaurant = await Restaurant.findById(resolvedOrder.restaurantId);
     if (!restaurant) {
       result.error = "Restaurant not found";
       result.errorCode = "restaurant_not_found";
       return result;
     }
 
-    const customer = await User.findById(order.userId);
+    const customer = await User.findById(resolvedOrder.userId);
     if (!customer) {
       result.error = "Customer not found";
       result.errorCode = "customer_not_found";
@@ -83,8 +165,8 @@ export const routeIncomingCall = async ({
     }
 
     let deliveryPartner = null;
-    if (order.deliveryPartnerId) {
-      deliveryPartner = await Delivery.findById(order.deliveryPartnerId);
+    if (resolvedOrder.deliveryPartnerId) {
+      deliveryPartner = await Delivery.findById(resolvedOrder.deliveryPartnerId);
       if (!deliveryPartner) {
         result.error = "Delivery partner not found";
         result.errorCode = "delivery_partner_not_found";
@@ -171,7 +253,7 @@ export const routeIncomingCall = async ({
       // Customer is calling
 
       // Prefer delivery partner if available and order not completed
-      if (deliveryPartner && deliveryPhone && order.status !== "ready_for_pickup") {
+      if (deliveryPartner && deliveryPhone && resolvedOrder.status !== "ready_for_pickup") {
         result.recipientPhone = deliveryPhone;
         result.callType = "customer_to_delivery_partner";
         result.callerRole = "customer";
@@ -227,22 +309,25 @@ export const findActiveCallSession = async (orderId) => {
 /**
  * Validate if call parameters are safe to proceed
  */
-export const validateCallSafety = async ({ orderId, incomingFromPhone }) => {
-  const order = await Order.findOne({ orderId });
+export const validateCallSafety = async ({ orderId, incomingFromPhone, order }) => {
+  let resolvedOrder = order;
+  if (!resolvedOrder) {
+    resolvedOrder = await Order.findOne({ orderId });
+  }
 
-  if (!order) {
+  if (!resolvedOrder) {
     return { safe: false, reason: "order_not_found" };
   }
 
-  if (["completed", "cancelled", "expired"].includes(order.status)) {
+  if (["completed", "cancelled", "expired"].includes(resolvedOrder.status)) {
     return { safe: false, reason: "order_terminal_state" };
   }
 
   // Check if incoming phone is associated with order
-  const restaurant = await Restaurant.findById(order.restaurantId);
-  const customer = await User.findById(order.userId);
-  const deliveryPartner = order.deliveryPartnerId
-    ? await Delivery.findById(order.deliveryPartnerId)
+  const restaurant = await Restaurant.findById(resolvedOrder.restaurantId);
+  const customer = await User.findById(resolvedOrder.userId);
+  const deliveryPartner = resolvedOrder.deliveryPartnerId
+    ? await Delivery.findById(resolvedOrder.deliveryPartnerId)
     : null;
 
   const validPhones = [

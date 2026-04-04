@@ -15,7 +15,8 @@ import { fetchDeliveryWallet, calculatePeriodEarnings } from "../utils/deliveryW
 import { formatCurrency } from "../../restaurant/utils/currency";
 import { getAllDeliveryOrders } from "../utils/deliveryOrderStatus";
 import { getUnreadDeliveryNotificationCount } from "../utils/deliveryNotifications";
-import { deliveryAPI, restaurantAPI, telephonyAPI, uploadAPI } from "@/lib/api";
+import { deliveryAPI, restaurantAPI, uploadAPI } from "@/lib/api";
+import { getExotelTelLink } from "@/lib/telephony";
 import { useDeliveryNotifications } from "../hooks/useDeliveryNotifications";
 import { getGoogleMapsApiKey } from "@/lib/utils/googleMapsApiKey";
 import { useCompanyName } from "@/lib/hooks/useCompanyName";
@@ -4264,28 +4265,18 @@ export default function DeliveryHome() {
       return;
     }
 
-    setCallingState(true);
-    try {
-      await telephonyAPI.initiateMaskedCall({
-        orderId: orderIdForCall,
-        callerUserId,
-        receiverUserId,
-      });
-      toast.success("Connecting via masked number...");
-    } catch (error) {
-      const errorMessage =
-        error?.response?.data?.message ||
-        error?.message ||
-        "Unable to place masked call";
+    const telLink = getExotelTelLink();
+    if (telLink) {
+      toast.success("Opening masked call dialer...");
+      window.location.href = telLink;
+      return;
+    }
 
-      if (fallbackPhone) {
-        toast.error(`${errorMessage}. Falling back to direct call.`);
-        window.location.href = `tel:${fallbackPhone}`;
-      } else {
-        toast.error(errorMessage);
-      }
-    } finally {
-      setCallingState(false);
+    if (fallbackPhone) {
+      toast.error("Masked call unavailable. Falling back to direct call.");
+      window.location.href = `tel:${fallbackPhone}`;
+    } else {
+      toast.error("Masked call unavailable and no direct number found.");
     }
   }, [refreshSelectedRestaurantCallContext, resolveDeliveryPartnerCallerId]);
 

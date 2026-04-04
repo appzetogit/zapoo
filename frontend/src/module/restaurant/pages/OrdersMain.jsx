@@ -9,6 +9,7 @@ import BottomNavOrders from "../components/BottomNavOrders";
 import RestaurantNavbar from "../components/RestaurantNavbar";
 import notificationSound from "@/assets/audio/alert.mp3";
 import { restaurantAPI, api } from "@/lib/api";
+import { getExotelTelLink } from "@/lib/telephony";
 import { useRestaurantNotifications } from "../hooks/useRestaurantNotifications";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -1727,15 +1728,13 @@ function OrderCard({
       return;
     }
 
-    try {
-      await api.post("/telephony/call", {
-        order_id: orderId,
-        caller_user_id: String(restaurantMongoId),
-        receiver_user_id: String(deliveryPartnerId),
-      });
-    } catch (error) {
-      // Optional: surface a toast here if needed
+    const telLink = getExotelTelLink();
+    if (telLink) {
+      window.location.href = telLink;
+      return;
     }
+
+    // If Exotel number is not configured, fallback is not available here.
   };
   return <div className="w-full bg-white rounded-2xl p-4 mb-3 border border-gray-200 hover:border-gray-400 transition-colors relative">
     {/* Cancel button - only show for preparing orders */}

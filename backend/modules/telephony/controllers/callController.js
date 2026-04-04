@@ -419,16 +419,19 @@ export const handleExotelCallback = async (req, res) => {
  */
 export const handleIncomingCallPassthru = async (req, res) => {
   try {
-    const { From, CustomField, CallSid, CallType } = req.body || {};
+    const { From, CustomField, CallSid, CallType, To, Called } = req.body || {};
+    const calledNumberRaw = To || Called || req.body.to || req.body.called || "";
+    const incomingVirtualNumber = String(calledNumberRaw || process.env.EXOTEL_VIRTUAL_NUMBER || "").trim();
 
     console.log("Passthru incoming call:", {
       from: From,
       customField: CustomField,
       callSid: CallSid,
+      to: incomingVirtualNumber,
     });
 
     // Edge case: Missing required fields
-    if (!From || !CustomField || !CallSid) {
+    if (!From || !CallSid) {
       console.warn("Passthru: Missing required Exotel parameters", {
         From,
         CustomField,
@@ -441,30 +444,56 @@ export const handleIncomingCallPassthru = async (req, res) => {
         );
     }
 
-    const orderId = String(CustomField).trim();
+    const orderId = CustomField ? String(CustomField).trim() : "";
     const incomingFromPhone = String(From).trim();
 
     // Import routing service dynamically
-    const { routeIncomingCall, validateCallSafety } = await import(
-      "../services/callRoutingService.js"
-    );
+    const {
+      routeIncomingCall,
+      validateCallSafety,
+      findOrderByCallerPhone,
+    } = await import("../services/callRoutingService.js");
 
-    // Validate call safety first
+    // Resolve order by custom field or caller phone
+    let order = null;
+    if (orderId) {
+      order = await Order.findOne({ orderId });
+    }
+
+    if (!order) {
+      const phoneLookup = await findOrderByCallerPhone(incomingFromPhone);
+      if (phoneLookup?.order) {
+        order = phoneLookup.order;
+      }
+    }
+
+    if (!order) {
+      console.warn("Passthru: No order found for incoming call", {
+        incomingFromPhone,
+        orderId,
+        CallSid,
+      });
+      return res
+        .type("application/xml")
+        .send(
+          `<?xml version="1.0" encoding="UTF-8"?><Response><Hangup reason="order_not_found"/></Response>`
+        );
+    }
+
     const safetyCheck = await validateCallSafety({
-      orderId,
+      order,
       incomingFromPhone,
     });
 
     if (!safetyCheck.safe) {
       console.warn(`Passthru: Call safety check failed: ${safetyCheck.reason}`, {
-        orderId,
+        orderId: order.orderId,
         incomingFromPhone,
       });
 
-      // Log the failed attempt
       try {
         await CallSession.create({
-          order_id: orderId,
+          order_id: order.orderId,
           call_sid: CallSid,
           caller_phone: incomingFromPhone,
           receiver_phone: "unknown",
@@ -492,8 +521,8 @@ export const handleIncomingCallPassthru = async (req, res) => {
     // Route the call
     const routingResult = await routeIncomingCall({
       incomingFromPhone,
-      incomingVirtualNumber: "passthru_virtual",
-      orderId,
+      incomingVirtualNumber,
+      order,
     });
 
     if (!routingResult.success) {
@@ -541,13 +570,13 @@ export const handleIncomingCallPassthru = async (req, res) => {
     // Recipient found - create call session
     try {
       const callSession = await CallSession.create({
-        order_id: orderId,
+        order_id: order.orderId || order?.orderId || (order ? String(order.orderId || order._id) : null),
         call_sid: CallSid,
         caller_phone: incomingFromPhone,
         receiver_phone: routingResult.recipientPhone,
         caller_role: routingResult.callerRole,
         receiver_role: routingResult.recipientRole,
-        virtual_number: "passthru_incoming",
+        virtual_number: incomingVirtualNumber || process.env.EXOTEL_VIRTUAL_NUMBER || "passthru_incoming",
         direction: routingResult.callType,
         status: "ringing",
         call_type: "inbound_passthru",
@@ -563,16 +592,17 @@ export const handleIncomingCallPassthru = async (req, res) => {
       });
 
       // Response with dial XML to Exotel
-      const normalizedPhone = String(routingResult.recipientPhone)
+      const normalizedRecipientPhone = String(routingResult.recipientPhone)
         .replace(/[\s\-+]/g, "")
         .slice(-10);
+      const dialCallerId = String(incomingVirtualNumber || process.env.EXOTEL_VIRTUAL_NUMBER || "").replace(/[\s\-+]/g, "").slice(-10);
 
       return res
         .type("application/xml")
         .send(`<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Dial timeLimit="600" timeout="30" callerId="${normalizedPhone}">
-    <Number>${normalizedPhone}</Number>
+  <Dial timeLimit="600" timeout="30" callerId="${dialCallerId}">
+    <Number>${normalizedRecipientPhone}</Number>
   </Dial>
 </Response>`);
     } catch (sessionErr) {

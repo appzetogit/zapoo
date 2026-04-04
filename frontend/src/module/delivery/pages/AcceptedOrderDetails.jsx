@@ -24,6 +24,7 @@ import {
   getDeliveryOrderPaymentStatus
 } from "../utils/deliveryWalletState"
 import { deliveryAPI, api } from "@/lib/api"
+import { getExotelTelLink } from "@/lib/telephony"
 
 export default function AcceptedOrderDetails() {
   const navigate = useNavigate()
@@ -98,13 +99,21 @@ export default function AcceptedOrderDetails() {
   }, [orderId])
 
   const handleCallRestaurantMasked = () => {
-    if (!restaurantVirtualNumber) return
-    window.location.href = `tel:${restaurantVirtualNumber}`
+    const telLink = getExotelTelLink()
+    if (!telLink) {
+      alert("Virtual number is not available. Please try again later.")
+      return
+    }
+    window.location.href = telLink
   }
 
   const handleCallCustomer = () => {
-    if (!customerVirtualNumber) return
-    window.location.href = `tel:${customerVirtualNumber}`
+    const telLink = getExotelTelLink()
+    if (!telLink) {
+      alert("Virtual number is not available. Please try again later.")
+      return
+    }
+    window.location.href = telLink
   }
 
   // Order data matching the image exactly

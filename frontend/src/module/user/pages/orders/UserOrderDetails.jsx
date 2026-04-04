@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, ShoppingBag, Phone, Copy, Download, User, CreditCard, Calendar, MapPin, RotateCcw, FileText } from "lucide-react";
 import { orderAPI, restaurantAPI, api } from "@/lib/api";
+import { getExotelTelLink } from "@/lib/telephony";
 import { toast } from "sonner";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -160,25 +161,20 @@ export default function UserOrderDetails() {
       return;
     }
 
-    setCallingRestaurant(true);
-    try {
-      await api.post("/telephony/call", {
-        order_id: String(businessOrderId),
-        caller_user_id: customerId,
-        receiver_user_id: restaurantIdForCall,
-      });
-      toast.success("Connecting via masked number...");
-    } catch (error) {
-      const errorMessage = error?.response?.data?.message || error?.message || "Unable to place masked call";
-      if (restaurantPhone) {
-        toast.error(`${errorMessage}. Falling back to direct call.`);
-        window.location.href = `tel:${restaurantPhone}`;
-      } else {
-        toast.error(errorMessage);
-      }
-    } finally {
-      setCallingRestaurant(false);
+    const telLink = getExotelTelLink();
+    if (telLink) {
+      toast.success("Opening masked call dialer...");
+      window.location.href = telLink;
+      return;
     }
+
+    if (!restaurantPhone) {
+      toast.error("Restaurant phone number not available");
+      return;
+    }
+
+    toast.success("Opening direct restaurant call...");
+    window.location.href = `tel:${restaurantPhone}`;
   };
 
   const handleCallDeliveryPartner = async () => {
@@ -192,25 +188,20 @@ export default function UserOrderDetails() {
       return;
     }
 
-    setCallingDeliveryPartner(true);
-    try {
-      await api.post("/telephony/call", {
-        order_id: String(businessOrderId),
-        caller_user_id: customerId,
-        receiver_user_id: deliveryPartnerId,
-      });
-      toast.success("Connecting via masked number...");
-    } catch (error) {
-      const errorMessage = error?.response?.data?.message || error?.message || "Unable to place masked call";
-      if (deliveryPartnerPhone) {
-        toast.error(`${errorMessage}. Falling back to direct call.`);
-        window.location.href = `tel:${deliveryPartnerPhone}`;
-      } else {
-        toast.error(errorMessage);
-      }
-    } finally {
-      setCallingDeliveryPartner(false);
+    const telLink = getExotelTelLink();
+    if (telLink) {
+      toast.success("Opening masked call dialer...");
+      window.location.href = telLink;
+      return;
     }
+
+    if (!deliveryPartnerPhone) {
+      toast.error("Delivery partner phone number not available");
+      return;
+    }
+
+    toast.success("Opening direct delivery partner call...");
+    window.location.href = `tel:${deliveryPartnerPhone}`;
   };
   const handleDownloadSummary = async () => {
     try {
