@@ -17,17 +17,15 @@
 // The script:
 // - fetches the real order details
 // - resolves restaurant/customer/delivery participants
-// - verifies all 6 call pairings via /api/telephony/call
-// - verifies inbound passthru XML via /api/telephony/passthru
+// - verifies all 6 call pairings via /api/telephony/passthru
+// - checks that Exotel receives valid Dial XML for each pairing
 
 import axios from "axios";
 
 const [, , orderId, authToken] = process.argv;
 
 if (!orderId) {
-  console.error(
-    "Usage: node verifyTelephonyFlow.js <ORDER_ID> [AUTH_TOKEN]"
-  );
+  console.error("Usage: node verifyTelephonyFlow.js <ORDER_ID> [AUTH_TOKEN]");
   process.exit(1);
 }
 
@@ -46,7 +44,12 @@ const client = axios.create({
 
 const normalizePhone = (phone) => {
   if (!phone) return "";
-  return String(phone).replace(/[\s\-+]/g, "").slice(-10);
+  return String(phone).replace(/\D/g, "").slice(-10);
+};
+
+const e164 = (phone) => {
+  const normalized = normalizePhone(phone);
+  return normalized ? `+91${normalized}` : "";
 };
 
 const getResponsePayload = (data) => {
@@ -73,25 +76,17 @@ const extractPhone = (entity, fallbacks = []) => {
 
 const parseXml = (xml) => {
   const text = String(xml || "");
-  const hangupReason = text.match(/<Hangup[^>]*reason="([^"]+)"/i)?.[1] || null;
   const dialNumber = text.match(/<Number>([^<]+)<\/Number>/i)?.[1] || null;
   const callerId = text.match(/callerId="([^"]+)"/i)?.[1] || null;
-
-  return {
-    text,
-    hangupReason,
-    dialNumber,
-    callerId,
-  };
+  return { text, dialNumber, callerId };
 };
 
 async function fetchOrderContext() {
-  const [orderRes, deliveryMeRes, virtualRes] = await Promise.all([
+  const [orderRes, deliveryMeRes] = await Promise.all([
     client.get(`/api/delivery/orders/${encodeURIComponent(orderId)}`),
     process.env.DELIVERY_USER_ID && process.env.DELIVERY_PHONE
       ? Promise.resolve(null)
       : client.get("/api/delivery/me").catch(() => null),
-    client.get("/api/telephony/virtual-numbers").catch(() => null),
   ]);
 
   const order = getResponsePayload(orderRes.data)?.order;
@@ -99,18 +94,17 @@ async function fetchOrderContext() {
     throw new Error("Unable to resolve order details from /api/delivery/orders/:orderId");
   }
 
-  const deliveryProfile = process.env.DELIVERY_USER_ID && process.env.DELIVERY_PHONE
-    ? {
-        _id: process.env.DELIVERY_USER_ID,
-        phone: process.env.DELIVERY_PHONE,
-      }
-    : getResponsePayload(deliveryMeRes?.data)?.profile ||
-      getResponsePayload(deliveryMeRes?.data)?.delivery ||
-      getResponsePayload(deliveryMeRes?.data);
+  const deliveryProfile =
+    process.env.DELIVERY_USER_ID && process.env.DELIVERY_PHONE
+      ? {
+          _id: process.env.DELIVERY_USER_ID,
+          phone: process.env.DELIVERY_PHONE,
+        }
+      : getResponsePayload(deliveryMeRes?.data)?.profile ||
+        getResponsePayload(deliveryMeRes?.data)?.delivery ||
+        getResponsePayload(deliveryMeRes?.data);
 
-  const virtualNumbers = getResponsePayload(virtualRes?.data) || {};
-
-  return { order, deliveryProfile, virtualNumbers };
+  return { order, deliveryProfile };
 }
 
 function buildParticipants({ order, deliveryProfile }) {
@@ -149,37 +143,31 @@ function buildPairings(participants) {
       label: "restaurant_to_delivery_partner",
       callerRole: "restaurant",
       receiverRole: "delivery_partner",
-      expectedDialRole: "delivery_partner",
     },
     {
       label: "delivery_partner_to_restaurant",
       callerRole: "delivery_partner",
       receiverRole: "restaurant",
-      expectedDialRole: "restaurant",
     },
     {
       label: "restaurant_to_customer",
       callerRole: "restaurant",
       receiverRole: "customer",
-      expectedDialRole: "customer",
     },
     {
       label: "customer_to_restaurant",
       callerRole: "customer",
       receiverRole: "restaurant",
-      expectedDialRole: "restaurant",
     },
     {
       label: "customer_to_delivery_partner",
       callerRole: "customer",
       receiverRole: "delivery_partner",
-      expectedDialRole: "delivery_partner",
     },
     {
       label: "delivery_partner_to_customer",
       callerRole: "delivery_partner",
       receiverRole: "customer",
-      expectedDialRole: "customer",
     },
   ].map((pairing) => ({
     ...pairing,
@@ -188,31 +176,6 @@ function buildPairings(participants) {
     callerPhone: participants[pairing.callerRole].phone,
     receiverPhone: participants[pairing.receiverRole].phone,
   }));
-}
-
-async function verifyOutboundCall(pairing) {
-  const res = await client.post("/api/telephony/call", {
-    order_id: orderId,
-    caller_user_id: pairing.callerId,
-    receiver_user_id: pairing.receiverId,
-  });
-
-  if (!res.data?.success) {
-    throw new Error(
-      `Outbound call failed for ${pairing.label}: ${JSON.stringify(res.data, null, 2)}`
-    );
-  }
-
-  const data = res.data.data || {};
-  if (!data.call_sid || !data.virtual_number || !data.direction) {
-    throw new Error(`Outbound call response incomplete for ${pairing.label}`);
-  }
-
-  return {
-    callSid: data.call_sid,
-    virtualNumber: data.virtual_number,
-    direction: data.direction,
-  };
 }
 
 async function verifyPassthru(pairing, configuredMaskingNumber) {
@@ -230,17 +193,17 @@ async function verifyPassthru(pairing, configuredMaskingNumber) {
   });
 
   const parsed = parseXml(res.data);
-  const expectedDial = `+91${normalizePhone(pairing.receiverPhone)}`;
+  const expectedDial = e164(pairing.receiverPhone);
 
-  if (parsed.hangupReason) {
+  if (!parsed.dialNumber) {
     throw new Error(
-      `Passthru returned hangup for ${pairing.label}: ${parsed.hangupReason} ${parsed.text}`
+      `Passthru did not return a <Number> for ${pairing.label}: ${parsed.text}`
     );
   }
 
-  if (!parsed.dialNumber || parsed.dialNumber !== expectedDial) {
+  if (parsed.dialNumber !== expectedDial) {
     throw new Error(
-      `Passthru dial mismatch for ${pairing.label}: expected ${expectedDial}, got ${parsed.dialNumber || "null"}`
+      `Passthru dial mismatch for ${pairing.label}: expected ${expectedDial}, got ${parsed.dialNumber}`
     );
   }
 
@@ -252,13 +215,10 @@ async function main() {
     console.log("Base URL:", BASE_URL);
     console.log("Order ID:", orderId);
 
-    const { order, deliveryProfile, virtualNumbers } = await fetchOrderContext();
+    const { order, deliveryProfile } = await fetchOrderContext();
     const participants = buildParticipants({ order, deliveryProfile });
     const pairings = buildPairings(participants);
     const configuredMaskingNumber =
-      virtualNumbers.restaurant_call ||
-      virtualNumbers.customer_call ||
-      virtualNumbers.delivery_partner_call ||
       process.env.EXOTEL_VIRTUAL_NUMBER ||
       process.env.EXOTEL_VIRTUAL_NUMBERS ||
       "";
@@ -276,33 +236,14 @@ async function main() {
 
     for (const pairing of pairings) {
       console.log(`\n=== Verifying ${pairing.label} ===`);
-      const outbound = await verifyOutboundCall(pairing);
-      console.log("Outbound:", outbound);
-
       const passthru = await verifyPassthru(pairing, configuredMaskingNumber);
       console.log("Passthru XML:", passthru.text.replace(/\s+/g, " ").trim());
-
-      results.push({
-        label: pairing.label,
-        outbound,
-        passthru,
-      });
+      results.push({ label: pairing.label, passthru });
     }
 
     console.log("\n=== Verification summary ===");
     for (const result of results) {
-      console.log(
-        `${result.label}: direction=${result.outbound.direction}, virtual=${result.outbound.virtualNumber}, dial=${result.passthru.dialNumber}`
-      );
-    }
-
-    const outboundVirtualNumbers = [
-      ...new Set(results.map((r) => r.outbound.virtualNumber).filter(Boolean)),
-    ];
-    if (outboundVirtualNumbers.length === 1) {
-      console.log("✅ All pairings used the same configured Exotel masking number.");
-    } else {
-      console.warn("⚠ Pairings used different configured numbers:", outboundVirtualNumbers);
+      console.log(`${result.label}: dial=${result.passthru.dialNumber}`);
     }
 
     console.log("\nDone.");

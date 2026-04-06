@@ -163,7 +163,6 @@ Masked numbers are now sourced from Exotel/env config only. No DB seeding is req
 
 Main endpoints:
 
-- `POST /api/telephony/call`
 - `GET|POST /api/telephony/passthru`
 - `GET /api/telephony/virtual-numbers`
 - `POST /api/telephony/exotel-callback`
@@ -178,6 +177,7 @@ Optional environment overrides for the verifier:
 
 - `ZAPOO_BASE_URL`
 - `EXOTEL_VIRTUAL_NUMBER` or `EXOTEL_VIRTUAL_NUMBERS`
+- `EXOTEL_SAFE_NUMBER` or `EXOTEL_SUPPORT_NUMBER` for passthru fallback dialing
 - `DELIVERY_PHONE`
 - `DELIVERY_USER_ID`
 - `RESTAURANT_PHONE`
@@ -188,7 +188,6 @@ Optional environment overrides for the verifier:
 What the verifier checks:
 
 - all 6 role pairings end to end
-- outbound masked call creation
 - passthru XML dial response
 - fixed Exotel masking-number behavior from env
 - basic failure handling for missing/invalid data

@@ -3,16 +3,8 @@ import Restaurant from "../../restaurant/models/Restaurant.js";
 import Delivery from "../../delivery/models/Delivery.js";
 import User from "../../auth/models/User.js";
 import CallSession from "../models/CallSession.js";
-import {
-  getConfiguredVirtualNumbers,
-  selectVirtualNumberByCity,
-  NoVirtualNumberFoundError,
-} from "../services/numberPoolService.js";
-import {
-  generateHangupXML,
-  generatePassthruXML,
-  initiateMaskedCall,
-} from "../services/exotelService.js";
+import { getConfiguredVirtualNumbers } from "../services/numberPoolService.js";
+import { generatePassthruXML } from "../services/exotelService.js";
 
 const TERMINAL_ORDER_STATUSES = new Set([
   "delivered",
@@ -21,351 +13,144 @@ const TERMINAL_ORDER_STATUSES = new Set([
   "completed",
 ]);
 
-const validateCallRequest = (body) => {
-  const errors = [];
-  if (!body.order_id || typeof body.order_id !== "string") {
-    errors.push("order_id is required and must be a string");
-  }
-  if (!body.caller_user_id || typeof body.caller_user_id !== "string") {
-    errors.push("caller_user_id is required and must be a string");
-  }
-  if (!body.receiver_user_id || typeof body.receiver_user_id !== "string") {
-    errors.push("receiver_user_id is required and must be a string");
-  }
-  return errors;
+const ACTIVE_ORDER_STATUSES = new Set([
+  "pending",
+  "confirmed",
+  "preparing",
+  "ready",
+  "out_for_delivery",
+]);
+
+const normalizePhone = (phone) => {
+  if (!phone) return null;
+  const digits = String(phone).replace(/\D/g, "");
+  return digits ? digits.slice(-10) : null;
 };
 
-const resolveCityForOrder = (order, restaurant) => {
-  if (order?.address?.city) {
-    return order.address.city;
-  }
-  if (restaurant?.location?.city) {
-    return restaurant.location.city;
-  }
-  if (restaurant?.onboarding?.step1?.location?.city) {
-    return restaurant.onboarding.step1.location.city;
-  }
-  return null;
+const formatToE164 = (phone) => {
+  const normalized = normalizePhone(phone);
+  if (!normalized) return null;
+  return `+91${normalized}`;
 };
 
-const determineRolesAndPhones = ({
-  callerUserId,
-  receiverUserId,
-  restaurant,
-  deliveryPartner,
-  customer,
-}) => {
-  const restaurantPhone =
-    restaurant?.primaryContactNumber?.trim() ||
-    restaurant?.phone?.trim() ||
-    restaurant?.ownerPhone?.trim() ||
-    "";
-  const deliveryPhone = deliveryPartner?.phone?.trim() || "";
-  const customerPhone =
-    customer?.phone?.trim() ||
-    customer?.primaryContactNumber?.trim() ||
-    customer?.phoneNumber?.trim() ||
-    customer?.mobile?.trim() ||
-    "";
-
-  const restaurantId = restaurant ? String(restaurant._id) : null;
-  const customerId = customer ? String(customer._id) : null;
-  const deliveryId = deliveryPartner ? String(deliveryPartner._id) : null;
-
-  if (!restaurantPhone) {
-    throw new Error("Missing restaurant phone number");
-  }
-
-  const buildResult = ({
-    caller_role,
-    receiver_role,
-    direction,
-    fromPhone,
-    toPhone,
-    callerUserId: selectedCallerUserId,
-    receiverUserId: selectedReceiverUserId,
-  }) => ({
-    caller_role,
-    receiver_role,
-    direction,
-    fromPhone,
-    toPhone,
-    callerUserId: selectedCallerUserId,
-    receiverUserId: selectedReceiverUserId,
-    restaurantPhone,
-    deliveryPhone,
-    customerPhone,
-  });
-
-  if (callerUserId === restaurantId && receiverUserId === deliveryId) {
-    if (!deliveryPartner) {
-      throw new Error("Order does not have an assigned delivery partner");
-    }
-    if (!deliveryPhone) {
-      throw new Error("Missing delivery partner phone number");
-    }
-    return buildResult({
-      caller_role: "restaurant",
-      receiver_role: "delivery_partner",
-      direction: "restaurant_to_delivery_partner",
-      fromPhone: restaurantPhone,
-      toPhone: deliveryPhone,
-      callerUserId: restaurantId,
-      receiverUserId: deliveryId,
-    });
-  }
-
-  if (callerUserId === deliveryId && receiverUserId === restaurantId) {
-    if (!deliveryPartner) {
-      throw new Error("Order does not have an assigned delivery partner");
-    }
-    if (!deliveryPhone) {
-      throw new Error("Missing delivery partner phone number");
-    }
-    return buildResult({
-      caller_role: "delivery_partner",
-      receiver_role: "restaurant",
-      direction: "delivery_partner_to_restaurant",
-      fromPhone: deliveryPhone,
-      toPhone: restaurantPhone,
-      callerUserId: deliveryId,
-      receiverUserId: restaurantId,
-    });
-  }
-
-  if (callerUserId === restaurantId && receiverUserId === customerId) {
-    if (!customerPhone) {
-      throw new Error("Missing customer phone number");
-    }
-    return buildResult({
-      caller_role: "restaurant",
-      receiver_role: "customer",
-      direction: "restaurant_to_customer",
-      fromPhone: restaurantPhone,
-      toPhone: customerPhone,
-      callerUserId: restaurantId,
-      receiverUserId: customerId,
-    });
-  }
-
-  if (callerUserId === customerId && receiverUserId === restaurantId) {
-    if (!customerPhone) {
-      throw new Error("Missing customer phone number");
-    }
-    return buildResult({
-      caller_role: "customer",
-      receiver_role: "restaurant",
-      direction: "customer_to_restaurant",
-      fromPhone: customerPhone,
-      toPhone: restaurantPhone,
-      callerUserId: customerId,
-      receiverUserId: restaurantId,
-    });
-  }
-
-  if (callerUserId === customerId && receiverUserId === deliveryId) {
-    if (!deliveryPartner) {
-      throw new Error("Order does not have an assigned delivery partner");
-    }
-    if (!customerPhone) {
-      throw new Error("Missing customer phone number");
-    }
-    if (!deliveryPhone) {
-      throw new Error("Missing delivery partner phone number");
-    }
-    return buildResult({
-      caller_role: "customer",
-      receiver_role: "delivery_partner",
-      direction: "customer_to_delivery_partner",
-      fromPhone: customerPhone,
-      toPhone: deliveryPhone,
-      callerUserId: customerId,
-      receiverUserId: deliveryId,
-    });
-  }
-
-  if (callerUserId === deliveryId && receiverUserId === customerId) {
-    if (!deliveryPartner) {
-      throw new Error("Order does not have an assigned delivery partner");
-    }
-    if (!deliveryPhone) {
-      throw new Error("Missing delivery partner phone number");
-    }
-    if (!customerPhone) {
-      throw new Error("Missing customer phone number");
-    }
-    return buildResult({
-      caller_role: "delivery_partner",
-      receiver_role: "customer",
-      direction: "delivery_partner_to_customer",
-      fromPhone: deliveryPhone,
-      toPhone: customerPhone,
-      callerUserId: deliveryId,
-      receiverUserId: customerId,
-    });
-  }
-
-  throw new Error("Unsupported caller/receiver combination for this order");
+const buildPhoneRegex = (phone) => {
+  const normalized = normalizePhone(phone);
+  if (!normalized) return null;
+  return new RegExp(`${normalized}$`);
 };
 
-export const initiateCall = async (req, res) => {
-  try {
-    const errors = validateCallRequest(req.body);
-    if (errors.length) {
-      return res.status(400).json({ success: false, errors });
-    }
+const getSupportDialNumber = () => {
+  return (
+    formatToE164(process.env.EXOTEL_SAFE_NUMBER) ||
+    formatToE164(process.env.EXOTEL_SUPPORT_NUMBER) ||
+    "+911111111111"
+  );
+};
 
-    const { order_id, caller_user_id, receiver_user_id } = req.body;
+const getOrderParticipantPhones = async (order) => {
+  const [restaurant, customer, deliveryPartner] = await Promise.all([
+    order?.restaurantId
+      ? Restaurant.findById(order.restaurantId).select(
+        "phone primaryContactNumber ownerPhone location onboarding step1"
+      )
+      : null,
+    order?.userId
+      ? User.findById(order.userId).select(
+        "phone primaryContactNumber phoneNumber mobile"
+      )
+      : null,
+    order?.deliveryPartnerId
+      ? Delivery.findById(order.deliveryPartnerId).select("phone")
+      : null,
+  ]);
 
-    const order = await Order.findOne({ orderId: order_id });
-    if (!order) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Order not found" });
-    }
+  return {
+    restaurant,
+    customer,
+    deliveryPartner,
+    restaurantPhone:
+      restaurant?.primaryContactNumber?.trim() ||
+      restaurant?.phone?.trim() ||
+      restaurant?.ownerPhone?.trim() ||
+      "",
+    customerPhone:
+      customer?.phone?.trim() ||
+      customer?.primaryContactNumber?.trim() ||
+      customer?.phoneNumber?.trim() ||
+      customer?.mobile?.trim() ||
+      "",
+    deliveryPhone: deliveryPartner?.phone?.trim() || "",
+  };
+};
 
-    if (TERMINAL_ORDER_STATUSES.has(order.status)) {
-      return res.status(400).json({
-        success: false,
-        message: "Calls are not allowed for terminal orders",
-      });
-    }
+const identifyCallerRole = ({ normalizedFrom, restaurantPhone, customerPhone, deliveryPhone }) => {
+  if (normalizedFrom && customerPhone && normalizePhone(customerPhone) === normalizedFrom) {
+    return "customer";
+  }
+  if (normalizedFrom && restaurantPhone && normalizePhone(restaurantPhone) === normalizedFrom) {
+    return "restaurant";
+  }
+  if (normalizedFrom && deliveryPhone && normalizePhone(deliveryPhone) === normalizedFrom) {
+    return "delivery";
+  }
+  return "unknown";
+};
 
-    const restaurant = await Restaurant.findById(order.restaurantId);
-    if (!restaurant) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Restaurant not found" });
-    }
+const findLatestActiveOrderByCallerPhone = async (incomingFromPhone) => {
+  const normalizedFrom = normalizePhone(incomingFromPhone);
+  if (!normalizedFrom) {
+    return null;
+  }
 
-    if (!order.userId) {
-      return res.status(400).json({
-        success: false,
-        message: "Order does not have an assigned customer",
-      });
-    }
+  const phoneRegex = buildPhoneRegex(normalizedFrom);
+  if (!phoneRegex) {
+    return null;
+  }
 
-    const customer = await User.findById(order.userId);
-    if (!customer) {
-      return res.status(404).json({
-        success: false,
-        message: "Customer not found",
-      });
-    }
+  const [restaurantMatches, customerMatches, deliveryMatches] = await Promise.all([
+    Restaurant.find({
+      $or: [
+        { primaryContactNumber: phoneRegex },
+        { phone: phoneRegex },
+        { ownerPhone: phoneRegex },
+      ],
+    }).select("_id"),
+    User.find({
+      $or: [
+        { phone: phoneRegex },
+        { primaryContactNumber: phoneRegex },
+        { phoneNumber: phoneRegex },
+        { mobile: phoneRegex },
+      ],
+    }).select("_id"),
+    Delivery.find({ phone: phoneRegex }).select("_id"),
+  ]);
 
-    let deliveryPartner = null;
-    if (order.deliveryPartnerId) {
-      deliveryPartner = await Delivery.findById(order.deliveryPartnerId);
-      if (!deliveryPartner) {
-        return res.status(404).json({
-          success: false,
-          message: "Delivery partner not found",
-        });
-      }
-    }
-
-    const city = resolveCityForOrder(order, restaurant);
-    if (!city) {
-      return res.status(400).json({
-        success: false,
-        message: "City information is missing for this order",
-      });
-    }
-
-    let rolePlan;
-    try {
-      rolePlan = determineRolesAndPhones({
-        callerUserId: caller_user_id,
-        receiverUserId: receiver_user_id,
-        restaurant,
-        deliveryPartner,
-        customer,
-      });
-    } catch (err) {
-      return res.status(400).json({
-        success: false,
-        message: err.message,
-      });
-    }
-
-    const {
-      caller_role,
-      receiver_role,
-      direction,
-      fromPhone,
-      toPhone,
-      callerUserId,
-      receiverUserId,
-      restaurantPhone,
-      deliveryPhone,
-      customerPhone,
-    } = rolePlan;
-
-    let virtualNumberDoc;
-    try {
-      virtualNumberDoc = await selectVirtualNumberByCity({
-        city,
-        stableKey: order.orderId,
-      });
-    } catch (err) {
-      if (err instanceof NoVirtualNumberFoundError) {
-        return res.status(503).json({
-          success: false,
-          message: "No virtual numbers configured",
-        });
-      }
-      throw err;
-    }
-
-    try {
-      const { callSid } = await initiateMaskedCall({
-        fromPhone,
-        toPhone,
-        virtualNumber: virtualNumberDoc.number,
-        orderId: order.orderId,
-      });
-
-      const session = await CallSession.create({
-        order_id: order.orderId,
-        caller_user_id: callerUserId,
-        receiver_user_id: receiverUserId,
-        caller_role,
-        receiver_role,
-        virtual_number: virtualNumberDoc.number,
-        restaurant_phone: restaurantPhone,
-        delivery_partner_phone: deliveryPhone || null,
-        customer_phone: customerPhone || null,
-        caller_phone: fromPhone,
-        receiver_phone: toPhone,
-        call_sid: callSid,
-        status: "initiated",
-        direction,
-        call_type: "outbound_api",
-        incoming_caller_id_displayed: virtualNumberDoc.number,
-      });
-
-      return res.status(201).json({
-        success: true,
-        data: {
-          call_sid: session.call_sid,
-          virtual_number: session.virtual_number,
-          direction: session.direction,
-        },
-      });
-    } catch (err) {
-      console.error("Telephony call initiation failed:", err);
-      return res.status(500).json({
-        success: false,
-        message: "Failed to initiate call",
-        error: process.env.NODE_ENV !== "production" ? err.message : undefined,
-      });
-    }
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Internal server error",
+  const orClauses = [];
+  if (restaurantMatches.length) {
+    orClauses.push({
+      restaurantId: { $in: restaurantMatches.map((doc) => String(doc._id)) },
     });
   }
+  if (customerMatches.length) {
+    orClauses.push({
+      userId: { $in: customerMatches.map((doc) => doc._id) },
+    });
+  }
+  if (deliveryMatches.length) {
+    orClauses.push({
+      deliveryPartnerId: { $in: deliveryMatches.map((doc) => doc._id) },
+    });
+  }
+
+  if (!orClauses.length) {
+    return null;
+  }
+
+  return Order.findOne({
+    status: { $in: Array.from(ACTIVE_ORDER_STATUSES) },
+    $or: orClauses,
+  }).sort({ createdAt: -1 });
 };
 
 export const handleExotelCallback = async (req, res) => {
@@ -471,205 +256,197 @@ export const handleExotelCallback = async (req, res) => {
 export const handleIncomingCallPassthru = async (req, res) => {
   try {
     const params = req.method === "GET" ? req.query : req.body || {};
-    const { From, CustomField, CallSid, CallType, To, Called } = params;
-    const calledNumberRaw = To || Called || params.to || params.called || "";
-    const incomingVirtualNumber = String(calledNumberRaw || process.env.EXOTEL_VIRTUAL_NUMBER || "").trim();
-
-    // Log incoming CallSid and From number
-    console.log("Exotel Passthru - Incoming CallSid:", CallSid, "From:", From);
+    const { From, To, CallSid, CustomField } = params;
+    const normalizedFrom = normalizePhone(From);
+    const incomingVirtualNumber =
+      formatToE164(To) ||
+      formatToE164(process.env.EXOTEL_VIRTUAL_NUMBER) ||
+      getSupportDialNumber();
+    const fallbackPhone = getSupportDialNumber();
+    const timestamp = new Date();
 
     console.log("Passthru incoming call:", {
-      method: req.method,
-      params: {
-        From,
-        CustomField,
-        CallSid,
-        To: incomingVirtualNumber,
-      },
+      CallSid,
+      From,
+      normalizedFrom,
+      To,
+      CustomField,
+      timestamp,
     });
 
-    // Edge case: Missing required fields
-    if (!From || !CallSid) {
-      console.warn("Passthru: Missing required Exotel parameters", {
-        From,
-        CustomField,
-        CallSid,
-      });
+    const sendDialResponse = (receiverPhone, callerId = incomingVirtualNumber) => {
       return res
         .set("Content-Type", "text/xml; charset=utf-8")
-        .send(generateHangupXML("missing_parameters"));
+        .send(
+          generatePassthruXML({
+            toPhone: receiverPhone,
+            callerId,
+            fallbackPhone,
+          })
+        );
+    };
+
+    if (!From || !CallSid) {
+      console.warn("Passthru: missing required params", {
+        From,
+        CallSid,
+        CustomField,
+      });
+      return sendDialResponse(fallbackPhone);
     }
 
     const orderId = CustomField ? String(CustomField).trim() : "";
-    const incomingFromPhone = String(From).trim();
-
-    // Import routing service dynamically
-    const {
-      routeIncomingCall,
-      validateCallSafety,
-      findOrderByCallerPhone,
-    } = await import("../services/callRoutingService.js");
-
-    // Resolve order by custom field or caller phone
     let order = null;
+
     if (orderId) {
       order = await Order.findOne({ orderId });
     }
 
     if (!order) {
-      const phoneLookup = await findOrderByCallerPhone(incomingFromPhone);
-      if (phoneLookup?.order) {
-        order = phoneLookup.order;
-      }
+      order = await findLatestActiveOrderByCallerPhone(From);
     }
 
     if (!order) {
-      console.warn("Passthru: No order found for incoming call", {
-        incomingFromPhone,
-        orderId,
+      console.warn("Passthru: no active order matched caller", {
         CallSid,
-      });
-      return res
-        .set("Content-Type", "text/xml; charset=utf-8")
-        .send(generateHangupXML("order_not_found"));
-    }
-
-    const safetyCheck = await validateCallSafety({
-      order,
-      incomingFromPhone,
-    });
-
-    if (!safetyCheck.safe) {
-      console.warn(`Passthru: Call safety check failed: ${safetyCheck.reason}`, {
-        orderId: order.orderId,
-        incomingFromPhone,
-      });
-
-      try {
-        await CallSession.create({
-          order_id: order.orderId,
-          call_sid: CallSid,
-          caller_phone: incomingFromPhone,
-          receiver_phone: "unknown",
-          caller_role: "unknown",
-          receiver_role: "unknown",
-          virtual_number: "passthru_incoming",
-          direction: "other",
-          status: "failed",
-          call_type: "inbound_passthru",
-          incoming_from: incomingFromPhone,
-          routing_lookup_status: "failed_access_denied",
-          routing_error: safetyCheck.reason,
-        });
-      } catch (logErr) {
-        console.error("Failed to log rejected call:", logErr);
-      }
-
-      return res
-        .set("Content-Type", "text/xml; charset=utf-8")
-        .send(generateHangupXML("unauthorized"));
-    }
-
-    // Route the call
-    const routingResult = await routeIncomingCall({
-      incomingFromPhone,
-      incomingVirtualNumber,
-      order,
-    });
-
-    if (!routingResult.success) {
-      console.warn("Passthru: Routing failed", {
+        From,
+        normalizedFrom,
         orderId,
-        incomingFromPhone,
-        error: routingResult.errorCode,
       });
+      return sendDialResponse(fallbackPhone);
+    }
 
-      // Log the routing failure
-      try {
-        const mappedStatus = {
-          invalid_params: "failed_unknown",
-          invalid_phone_format: "failed_unknown",
-          order_not_found: "failed_order_not_active",
-          order_not_active: "failed_order_not_active",
-          unauthorized_caller: "failed_access_denied",
-          no_recipient_found: "failed_recipient_not_found",
-          restaurant_not_found: "failed_unknown",
-          customer_not_found: "failed_unknown",
-          delivery_partner_not_found: "failed_unknown",
-          internal_error: "failed_unknown",
-        }[routingResult.errorCode] || "failed_unknown";
+    if (!ACTIVE_ORDER_STATUSES.has(order.status)) {
+      console.warn("Passthru: order is not active", {
+        orderId: order.orderId,
+        status: order.status,
+        CallSid,
+        From,
+      });
+      return sendDialResponse(fallbackPhone);
+    }
 
-        await CallSession.create({
-          order_id: order.orderId || String(order._id),
-          call_sid: CallSid,
-          caller_phone: incomingFromPhone,
-          receiver_phone: "unknown",
-          caller_role: "unknown",
-          receiver_role: "unknown",
-          virtual_number: "passthru_incoming",
-          direction: "other",
-          status: "failed",
-          call_type: "inbound_passthru",
-          incoming_from: incomingFromPhone,
-          routing_lookup_status: mappedStatus,
-          routing_error: routingResult.error,
-        });
-      } catch (logErr) {
-        console.error("Failed to log routing failure:", logErr);
+    const {
+      restaurant,
+      customer,
+      deliveryPartner,
+      restaurantPhone,
+      customerPhone,
+      deliveryPhone,
+    } = await getOrderParticipantPhones(order);
+
+    const role = identifyCallerRole({
+      normalizedFrom,
+      restaurantPhone,
+      customerPhone,
+      deliveryPhone,
+    });
+
+    let receiverPhone = fallbackPhone;
+    let receiverRole = "unknown";
+    let callType = "other";
+
+    if (role === "customer") {
+      if (deliveryPhone) {
+        receiverPhone = formatToE164(deliveryPhone) || fallbackPhone;
+        receiverRole = "delivery_partner";
+        callType = "customer_to_delivery_partner";
+      } else if (restaurantPhone) {
+        receiverPhone = formatToE164(restaurantPhone) || fallbackPhone;
+        receiverRole = "restaurant";
+        callType = "customer_to_restaurant";
       }
-
-      return res
-        .set("Content-Type", "text/xml; charset=utf-8")
-        .send(generateHangupXML("routing_failed"));
+    } else if (role === "restaurant") {
+      if (deliveryPhone) {
+        receiverPhone = formatToE164(deliveryPhone) || fallbackPhone;
+        receiverRole = "delivery_partner";
+        callType = "restaurant_to_delivery_partner";
+      } else if (customerPhone) {
+        receiverPhone = formatToE164(customerPhone) || fallbackPhone;
+        receiverRole = "customer";
+        callType = "restaurant_to_customer";
+      }
+    } else if (role === "delivery") {
+      if (customerPhone) {
+        receiverPhone = formatToE164(customerPhone) || fallbackPhone;
+        receiverRole = "customer";
+        callType = "delivery_partner_to_customer";
+      } else if (restaurantPhone) {
+        receiverPhone = formatToE164(restaurantPhone) || fallbackPhone;
+        receiverRole = "restaurant";
+        callType = "delivery_partner_to_restaurant";
+      }
+    } else {
+      receiverPhone = fallbackPhone;
+      receiverRole = "unknown";
+      callType = "other";
     }
 
-    // Recipient found - create call session
-    try {
-      const callSession = await CallSession.create({
-        order_id: order.orderId || String(order._id),
-        caller_user_id: routingResult.callerUserId || null,
-        receiver_user_id: routingResult.receiverUserId || null,
-        call_sid: CallSid,
-        caller_phone: incomingFromPhone,
-        receiver_phone: routingResult.receiverPhone || routingResult.recipientPhone,
-        caller_role: routingResult.callerRole,
-        receiver_role: routingResult.recipientRole,
-        virtual_number: incomingVirtualNumber || process.env.EXOTEL_VIRTUAL_NUMBER || "passthru_incoming",
-        direction: routingResult.callType,
-        status: "ringing",
-        call_type: "inbound_passthru",
-        incoming_from: incomingFromPhone,
-        incoming_caller_id_displayed: incomingVirtualNumber || process.env.EXOTEL_VIRTUAL_NUMBER || null,
-        routing_lookup_status: "resolved",
-        started_at: new Date(),
-      });
-
-      console.log("Passthru: Call routed successfully", {
-        callSessionId: callSession._id,
-        callType: routingResult.callType,
-        to: routingResult.recipientPhone,
-      });
-
-      // Response with dial XML to Exotel
-      return res
-        .set("Content-Type", "text/xml; charset=utf-8")
-        .send(
-          generatePassthruXML({
-            toPhone: routingResult.receiverPhone || routingResult.recipientPhone,
-            callerId: incomingVirtualNumber || process.env.EXOTEL_VIRTUAL_NUMBER,
-          })
-        );
-    } catch (sessionErr) {
-      console.error("Passthru: Failed to create call session:", sessionErr);
-      return res
-        .set("Content-Type", "text/xml; charset=utf-8")
-        .send(generateHangupXML("system_error"));
+    if (!receiverPhone) {
+      receiverPhone = fallbackPhone;
     }
+
+    const callerPhone = formatToE164(From) || From;
+    const callerUserId =
+      role === "restaurant"
+        ? restaurant?._id ? String(restaurant._id) : null
+        : role === "customer"
+          ? customer?._id ? String(customer._id) : null
+          : role === "delivery"
+            ? deliveryPartner?._id ? String(deliveryPartner._id) : null
+            : null;
+    const receiverUserId =
+      receiverRole === "restaurant"
+        ? restaurant?._id ? String(restaurant._id) : null
+        : receiverRole === "customer"
+          ? customer?._id ? String(customer._id) : null
+          : receiverRole === "delivery_partner"
+            ? deliveryPartner?._id ? String(deliveryPartner._id) : null
+            : null;
+
+    console.log({
+      CallSid,
+      From,
+      normalizedFrom,
+      role,
+      orderId: order.orderId,
+      receiverPhone,
+      timestamp: new Date(),
+    });
+
+    void CallSession.create({
+      order_id: order.orderId || String(order._id),
+      caller_user_id: callerUserId,
+      receiver_user_id: receiverUserId,
+      call_sid: CallSid,
+      caller_phone: callerPhone,
+      receiver_phone: receiverPhone,
+      caller_role: role,
+      receiver_role: receiverRole,
+      virtual_number: incomingVirtualNumber,
+      direction: callType,
+      status: "ringing",
+      call_type: "inbound_passthru",
+      incoming_from: From,
+      incoming_caller_id_displayed: incomingVirtualNumber,
+      routing_lookup_status: role === "unknown" ? "failed_access_denied" : "resolved",
+      started_at: new Date(),
+    }).catch((err) => {
+      console.error("Passthru: background call session logging failed:", err);
+    });
+
+    return sendDialResponse(receiverPhone);
   } catch (error) {
     console.error("Passthru handler error:", error);
     return res
       .set("Content-Type", "text/xml; charset=utf-8")
-      .send(generateHangupXML("handler_error"));
+      .send(
+        generatePassthruXML({
+          toPhone: getSupportDialNumber(),
+          callerId: formatToE164(process.env.EXOTEL_VIRTUAL_NUMBER) || getSupportDialNumber(),
+          fallbackPhone: getSupportDialNumber(),
+        })
+      );
   }
 };
 

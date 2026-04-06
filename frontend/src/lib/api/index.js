@@ -56,20 +56,6 @@ export const api = {
   },
 };
 
-export const telephonyAPI = {
-  initiateMaskedCall: ({ orderId, callerUserId, receiverUserId }) => {
-    if (!orderId || !callerUserId || !receiverUserId) {
-      return Promise.reject(new Error("orderId, callerUserId and receiverUserId are required"));
-    }
-
-    return apiClient.post("/telephony/call", {
-      order_id: String(orderId),
-      caller_user_id: String(callerUserId),
-      receiver_user_id: String(receiverUserId),
-    });
-  },
-};
-
 // Export auth helper functions
 export const authAPI = {
   // Send OTP (supports both phone and email)

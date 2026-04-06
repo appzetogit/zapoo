@@ -23,7 +23,7 @@ import {
 import {
   getDeliveryOrderPaymentStatus
 } from "../utils/deliveryWalletState"
-import { deliveryAPI, api } from "@/lib/api"
+import { deliveryAPI } from "@/lib/api"
 import { getExotelTelLink } from "@/lib/telephony"
 
 export default function AcceptedOrderDetails() {
@@ -35,8 +35,6 @@ export default function AcceptedOrderDetails() {
   const [deliveryProfile, setDeliveryProfile] = useState(null)
   const [callingRestaurant, setCallingRestaurant] = useState(false)
   const [callingCustomer, setCallingCustomer] = useState(false)
-  const [restaurantVirtualNumber, setRestaurantVirtualNumber] = useState(null)
-  const [customerVirtualNumber, setCustomerVirtualNumber] = useState(null)
 
   // Listen for order status updates
   useEffect(() => {
@@ -65,33 +63,18 @@ export default function AcceptedOrderDetails() {
       try {
         if (!orderId) return
 
-        const [orderRes, meRes, virtualRes] = await Promise.all([
+        const [orderRes, meRes] = await Promise.all([
           deliveryAPI.getOrderDetails(orderId),
           deliveryAPI.getCurrentDelivery(),
-          api.get("/telephony/virtual-numbers"), // Get virtual numbers from backend
         ])
 
         const orderData = orderRes.data?.data?.order || orderRes.data?.order || null
         const deliveryData = meRes.data?.data?.delivery || meRes.data?.delivery || null
-        const virtualData = virtualRes.data?.data || null
 
         setRealOrder(orderData)
         setDeliveryProfile(deliveryData)
-
-        // Set virtual numbers from backend API
-        if (virtualData) {
-          setRestaurantVirtualNumber(virtualData.restaurant_call)
-          setCustomerVirtualNumber(virtualData.customer_call)
-        } else {
-          // Fallback to hardcoded if API fails
-          setRestaurantVirtualNumber("03348052382")
-          setCustomerVirtualNumber("03348052382")
-        }
       } catch (err) {
         console.error("Failed to fetch order details:", err)
-        // Set fallback virtual numbers
-        setRestaurantVirtualNumber("03348052382")
-        setCustomerVirtualNumber("03348052382")
       }
     }
 
@@ -230,7 +213,6 @@ export default function AcceptedOrderDetails() {
                 <button
                   type="button"
                   onClick={handleCallCustomer}
-                  disabled={!customerVirtualNumber}
                   className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-green-500 flex items-center justify-center hover:bg-green-600 transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Phone className="w-4 h-4 md:w-5 md:h-5 text-white" />

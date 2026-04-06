@@ -1,6 +1,5 @@
 import express from "express";
 import {
-  initiateCall,
   handleExotelCallback,
   handleIncomingCallPassthru,
   getVirtualNumbers,
@@ -8,7 +7,6 @@ import {
 
 const router = express.Router();
 
-router.post("/api/telephony/call", initiateCall);
 router.post("/api/telephony/exotel-callback", handleExotelCallback);
 router.post("/api/telephony/passthru", handleIncomingCallPassthru);
 router.get("/api/telephony/passthru", handleIncomingCallPassthru);
