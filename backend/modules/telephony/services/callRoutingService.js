@@ -12,6 +12,13 @@ const phonesMatch = (phone1, phone2) => {
   return normalizePhone(phone1) === normalizePhone(phone2);
 };
 
+const TERMINAL_ORDER_STATUSES = new Set([
+  "delivered",
+  "cancelled",
+  "expired",
+  "completed",
+]);
+
 const buildPhoneRegex = (phone) => {
   const normalized = normalizePhone(phone);
   if (!normalized) return null;
@@ -56,7 +63,7 @@ const findOrderByCallerPhone = async (incomingFromPhone) => {
   }
 
   const activeStatusFilter = {
-    status: { $nin: ["delivered", "cancelled", "expired"] },
+    status: { $nin: Array.from(TERMINAL_ORDER_STATUSES) },
   };
 
   const restaurant = await findRestaurantByPhone(normalizedPhone);
@@ -89,6 +96,40 @@ const findOrderByCallerPhone = async (incomingFromPhone) => {
   return null;
 };
 
+const getParticipantDetails = ({ role, restaurant, deliveryPartner, customer }) => {
+  if (role === "restaurant") {
+    return {
+      userId: restaurant ? String(restaurant._id) : null,
+      phone:
+        restaurant?.primaryContactNumber ||
+        restaurant?.phone ||
+        restaurant?.ownerPhone ||
+        "",
+    };
+  }
+
+  if (role === "delivery_partner") {
+    return {
+      userId: deliveryPartner ? String(deliveryPartner._id) : null,
+      phone: deliveryPartner?.phone || "",
+    };
+  }
+
+  if (role === "customer") {
+    return {
+      userId: customer ? String(customer._id) : null,
+      phone:
+        customer?.phone ||
+        customer?.primaryContactNumber ||
+        customer?.phoneNumber ||
+        customer?.mobile ||
+        "",
+    };
+  }
+
+  return { userId: null, phone: "" };
+};
+
 /**
  * Route incoming call based on caller and virtual number
  * Edge cases handled:
@@ -110,6 +151,10 @@ export const routeIncomingCall = async ({
     callType: null,
     callerRole: null,
     recipientRole: null,
+    callerUserId: null,
+    receiverUserId: null,
+    callerPhone: null,
+    receiverPhone: null,
     error: null,
     errorCode: null,
     metadata: {},
@@ -143,7 +188,7 @@ export const routeIncomingCall = async ({
     }
 
     // Check order status
-    if (["completed", "cancelled", "expired"].includes(resolvedOrder.status)) {
+    if (TERMINAL_ORDER_STATUSES.has(resolvedOrder.status)) {
       result.error = `Cannot route call for ${resolvedOrder.status} order`;
       result.errorCode = "order_not_active";
       return result;
@@ -192,6 +237,9 @@ export const routeIncomingCall = async ({
       ""
     ).trim();
 
+    const callerDetails = (role) =>
+      getParticipantDetails({ role, restaurant, deliveryPartner, customer });
+
     // Route logic: Determine who is calling and who to route to
     if (phonesMatch(normalizedFromPhone, restaurantPhone)) {
       // Restaurant is calling - route to recipient based on context
@@ -202,6 +250,10 @@ export const routeIncomingCall = async ({
         result.callType = "restaurant_to_delivery_partner";
         result.callerRole = "restaurant";
         result.recipientRole = "delivery_partner";
+        result.callerUserId = callerDetails("restaurant").userId;
+        result.receiverUserId = callerDetails("delivery_partner").userId;
+        result.callerPhone = restaurantPhone;
+        result.receiverPhone = deliveryPhone;
         result.success = true;
         return result;
       }
@@ -212,6 +264,10 @@ export const routeIncomingCall = async ({
         result.callType = "restaurant_to_customer";
         result.callerRole = "restaurant";
         result.recipientRole = "customer";
+        result.callerUserId = callerDetails("restaurant").userId;
+        result.receiverUserId = callerDetails("customer").userId;
+        result.callerPhone = restaurantPhone;
+        result.receiverPhone = customerPhone;
         result.success = true;
         return result;
       }
@@ -230,6 +286,10 @@ export const routeIncomingCall = async ({
         result.callType = "delivery_partner_to_customer";
         result.callerRole = "delivery_partner";
         result.recipientRole = "customer";
+        result.callerUserId = callerDetails("delivery_partner").userId;
+        result.receiverUserId = callerDetails("customer").userId;
+        result.callerPhone = deliveryPhone;
+        result.receiverPhone = customerPhone;
         result.success = true;
         return result;
       }
@@ -240,6 +300,10 @@ export const routeIncomingCall = async ({
         result.callType = "delivery_partner_to_restaurant";
         result.callerRole = "delivery_partner";
         result.recipientRole = "restaurant";
+        result.callerUserId = callerDetails("delivery_partner").userId;
+        result.receiverUserId = callerDetails("restaurant").userId;
+        result.callerPhone = deliveryPhone;
+        result.receiverPhone = restaurantPhone;
         result.success = true;
         return result;
       }
@@ -253,11 +317,15 @@ export const routeIncomingCall = async ({
       // Customer is calling
 
       // Prefer delivery partner if available and order not completed
-      if (deliveryPartner && deliveryPhone && resolvedOrder.status !== "ready_for_pickup") {
+      if (deliveryPartner && deliveryPhone) {
         result.recipientPhone = deliveryPhone;
         result.callType = "customer_to_delivery_partner";
         result.callerRole = "customer";
         result.recipientRole = "delivery_partner";
+        result.callerUserId = callerDetails("customer").userId;
+        result.receiverUserId = callerDetails("delivery_partner").userId;
+        result.callerPhone = customerPhone;
+        result.receiverPhone = deliveryPhone;
         result.success = true;
         return result;
       }
@@ -268,6 +336,10 @@ export const routeIncomingCall = async ({
         result.callType = "customer_to_restaurant";
         result.callerRole = "customer";
         result.recipientRole = "restaurant";
+        result.callerUserId = callerDetails("customer").userId;
+        result.receiverUserId = callerDetails("restaurant").userId;
+        result.callerPhone = customerPhone;
+        result.receiverPhone = restaurantPhone;
         result.success = true;
         return result;
       }
@@ -296,7 +368,7 @@ export const routeIncomingCall = async ({
 export const findActiveCallSession = async (orderId) => {
   try {
     const order = await Order.findOne({ orderId });
-    if (!order || ["completed", "cancelled"].includes(order.status)) {
+    if (!order || TERMINAL_ORDER_STATUSES.has(order.status)) {
       return null;
     }
     return order;
@@ -319,7 +391,7 @@ export const validateCallSafety = async ({ orderId, incomingFromPhone, order }) 
     return { safe: false, reason: "order_not_found" };
   }
 
-  if (["completed", "cancelled", "expired"].includes(resolvedOrder.status)) {
+  if (TERMINAL_ORDER_STATUSES.has(resolvedOrder.status)) {
     return { safe: false, reason: "order_terminal_state" };
   }
 

@@ -10,23 +10,27 @@ const callSessionSchema = new mongoose.Schema(
     },
     caller_user_id: {
       type: String,
-      required: true,
+      required: false,
       trim: true,
+      default: null,
     },
     receiver_user_id: {
       type: String,
-      required: true,
+      required: false,
       trim: true,
+      default: null,
     },
     caller_role: {
       type: String,
-      enum: ["restaurant", "delivery_partner", "customer", "admin"],
-      required: true,
+      enum: ["restaurant", "delivery_partner", "customer", "admin", "unknown"],
+      required: false,
+      default: "unknown",
     },
     receiver_role: {
       type: String,
-      enum: ["restaurant", "delivery_partner", "customer", "admin"],
-      required: true,
+      enum: ["restaurant", "delivery_partner", "customer", "admin", "unknown"],
+      required: false,
+      default: "unknown",
     },
     virtual_number: {
       type: String,
@@ -82,12 +86,12 @@ const callSessionSchema = new mongoose.Schema(
     direction: {
       type: String,
       enum: [
-        "restaurant_to_dp",
-        "dp_to_restaurant",
+        "restaurant_to_delivery_partner",
+        "delivery_partner_to_restaurant",
         "restaurant_to_customer",
         "customer_to_restaurant",
-        "customer_to_dp",
-        "dp_to_customer",
+        "customer_to_delivery_partner",
+        "delivery_partner_to_customer",
         "other",
       ],
       required: true,
@@ -155,7 +159,7 @@ const callSessionSchema = new mongoose.Schema(
 
 callSessionSchema.index({ order_id: 1, virtual_number: 1 });
 callSessionSchema.index({ incoming_from: 1 });
-callSessionSchema.index({ call_sid: 1, created_at: -1 });
+callSessionSchema.index({ call_sid: 1, createdAt: -1 });
 
 export default mongoose.model("CallSession", callSessionSchema);
 

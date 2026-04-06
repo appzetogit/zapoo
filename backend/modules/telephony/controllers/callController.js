@@ -4,10 +4,22 @@ import Delivery from "../../delivery/models/Delivery.js";
 import User from "../../auth/models/User.js";
 import CallSession from "../models/CallSession.js";
 import {
+  getConfiguredVirtualNumbers,
   selectVirtualNumberByCity,
   NoVirtualNumberFoundError,
 } from "../services/numberPoolService.js";
-import { initiateMaskedCall } from "../services/exotelService.js";
+import {
+  generateHangupXML,
+  generatePassthruXML,
+  initiateMaskedCall,
+} from "../services/exotelService.js";
+
+const TERMINAL_ORDER_STATUSES = new Set([
+  "delivered",
+  "cancelled",
+  "expired",
+  "completed",
+]);
 
 const validateCallRequest = (body) => {
   const errors = [];
@@ -70,12 +82,16 @@ const determineRolesAndPhones = ({
     direction,
     fromPhone,
     toPhone,
+    callerUserId: selectedCallerUserId,
+    receiverUserId: selectedReceiverUserId,
   }) => ({
     caller_role,
     receiver_role,
     direction,
     fromPhone,
     toPhone,
+    callerUserId: selectedCallerUserId,
+    receiverUserId: selectedReceiverUserId,
     restaurantPhone,
     deliveryPhone,
     customerPhone,
@@ -91,9 +107,11 @@ const determineRolesAndPhones = ({
     return buildResult({
       caller_role: "restaurant",
       receiver_role: "delivery_partner",
-      direction: "restaurant_to_dp",
+      direction: "restaurant_to_delivery_partner",
       fromPhone: restaurantPhone,
       toPhone: deliveryPhone,
+      callerUserId: restaurantId,
+      receiverUserId: deliveryId,
     });
   }
 
@@ -107,9 +125,11 @@ const determineRolesAndPhones = ({
     return buildResult({
       caller_role: "delivery_partner",
       receiver_role: "restaurant",
-      direction: "dp_to_restaurant",
+      direction: "delivery_partner_to_restaurant",
       fromPhone: deliveryPhone,
       toPhone: restaurantPhone,
+      callerUserId: deliveryId,
+      receiverUserId: restaurantId,
     });
   }
 
@@ -123,6 +143,8 @@ const determineRolesAndPhones = ({
       direction: "restaurant_to_customer",
       fromPhone: restaurantPhone,
       toPhone: customerPhone,
+      callerUserId: restaurantId,
+      receiverUserId: customerId,
     });
   }
 
@@ -136,6 +158,8 @@ const determineRolesAndPhones = ({
       direction: "customer_to_restaurant",
       fromPhone: customerPhone,
       toPhone: restaurantPhone,
+      callerUserId: customerId,
+      receiverUserId: restaurantId,
     });
   }
 
@@ -152,9 +176,11 @@ const determineRolesAndPhones = ({
     return buildResult({
       caller_role: "customer",
       receiver_role: "delivery_partner",
-      direction: "customer_to_dp",
+      direction: "customer_to_delivery_partner",
       fromPhone: customerPhone,
       toPhone: deliveryPhone,
+      callerUserId: customerId,
+      receiverUserId: deliveryId,
     });
   }
 
@@ -171,9 +197,11 @@ const determineRolesAndPhones = ({
     return buildResult({
       caller_role: "delivery_partner",
       receiver_role: "customer",
-      direction: "dp_to_customer",
+      direction: "delivery_partner_to_customer",
       fromPhone: deliveryPhone,
       toPhone: customerPhone,
+      callerUserId: deliveryId,
+      receiverUserId: customerId,
     });
   }
 
@@ -196,10 +224,10 @@ export const initiateCall = async (req, res) => {
         .json({ success: false, message: "Order not found" });
     }
 
-    if (order.status === "delivered" || order.status === "cancelled") {
+    if (TERMINAL_ORDER_STATUSES.has(order.status)) {
       return res.status(400).json({
         success: false,
-        message: "Calls are not allowed for delivered or cancelled orders",
+        message: "Calls are not allowed for terminal orders",
       });
     }
 
@@ -244,31 +272,46 @@ export const initiateCall = async (req, res) => {
       });
     }
 
+    let rolePlan;
+    try {
+      rolePlan = determineRolesAndPhones({
+        callerUserId: caller_user_id,
+        receiverUserId: receiver_user_id,
+        restaurant,
+        deliveryPartner,
+        customer,
+      });
+    } catch (err) {
+      return res.status(400).json({
+        success: false,
+        message: err.message,
+      });
+    }
+
     const {
       caller_role,
       receiver_role,
       direction,
       fromPhone,
       toPhone,
+      callerUserId,
+      receiverUserId,
       restaurantPhone,
       deliveryPhone,
       customerPhone,
-    } = determineRolesAndPhones({
-      callerUserId: caller_user_id,
-      receiverUserId: receiver_user_id,
-      restaurant,
-      deliveryPartner,
-      customer,
-    });
+    } = rolePlan;
 
     let virtualNumberDoc;
     try {
-      virtualNumberDoc = await selectVirtualNumberByCity({ city });
+      virtualNumberDoc = await selectVirtualNumberByCity({
+        city,
+        stableKey: order.orderId,
+      });
     } catch (err) {
       if (err instanceof NoVirtualNumberFoundError) {
         return res.status(503).json({
           success: false,
-          message: "No virtual numbers available in this city",
+          message: "No virtual numbers configured",
         });
       }
       throw err;
@@ -284,8 +327,8 @@ export const initiateCall = async (req, res) => {
 
       const session = await CallSession.create({
         order_id: order.orderId,
-        caller_user_id,
-        receiver_user_id,
+        caller_user_id: callerUserId,
+        receiver_user_id: receiverUserId,
         caller_role,
         receiver_role,
         virtual_number: virtualNumberDoc.number,
@@ -297,6 +340,8 @@ export const initiateCall = async (req, res) => {
         call_sid: callSid,
         status: "initiated",
         direction,
+        call_type: "outbound_api",
+        incoming_caller_id_displayed: virtualNumberDoc.number,
       });
 
       return res.status(201).json({
@@ -327,7 +372,7 @@ export const handleExotelCallback = async (req, res) => {
   try {
     const payload = req.body || {};
     const callSid =
-      payload.CallSid || payload.CallSid || payload.callSid || payload.call_sid;
+      payload.CallSid || payload.callSid || payload.call_sid;
 
     if (!callSid) {
       return res.status(400).json({
@@ -348,6 +393,10 @@ export const handleExotelCallback = async (req, res) => {
     let status = session.status;
 
     switch (exotelStatus.toLowerCase()) {
+      case "initiated":
+      case "queued":
+        status = "initiated";
+        break;
       case "in-progress":
       case "ringing":
         status = "ringing";
@@ -357,6 +406,7 @@ export const handleExotelCallback = async (req, res) => {
         break;
       case "completed":
       case "success":
+      case "terminal":
         status = "completed";
         break;
       case "busy":
@@ -371,6 +421,7 @@ export const handleExotelCallback = async (req, res) => {
         status = "failed";
         break;
       case "cancelled":
+      case "canceled":
         status = "cancelled";
         break;
       default:
@@ -446,9 +497,7 @@ export const handleIncomingCallPassthru = async (req, res) => {
       });
       return res
         .set("Content-Type", "text/xml; charset=utf-8")
-        .send(
-          `<?xml version="1.0" encoding="UTF-8"?><Response><Hangup reason="missing_parameters"/></Response>`
-        );
+        .send(generateHangupXML("missing_parameters"));
     }
 
     const orderId = CustomField ? String(CustomField).trim() : "";
@@ -482,9 +531,7 @@ export const handleIncomingCallPassthru = async (req, res) => {
       });
       return res
         .set("Content-Type", "text/xml; charset=utf-8")
-        .send(
-          `<?xml version="1.0" encoding="UTF-8"?><Response><Hangup reason="order_not_found"/></Response>`
-        );
+        .send(generateHangupXML("order_not_found"));
     }
 
     const safetyCheck = await validateCallSafety({
@@ -520,9 +567,7 @@ export const handleIncomingCallPassthru = async (req, res) => {
 
       return res
         .set("Content-Type", "text/xml; charset=utf-8")
-        .send(
-          `<?xml version="1.0" encoding="UTF-8"?><Response><Hangup reason="unauthorized"/></Response>`
-        );
+        .send(generateHangupXML("unauthorized"));
     }
 
     // Route the call
@@ -542,14 +587,20 @@ export const handleIncomingCallPassthru = async (req, res) => {
       // Log the routing failure
       try {
         const mappedStatus = {
+          invalid_params: "failed_unknown",
+          invalid_phone_format: "failed_unknown",
           order_not_found: "failed_order_not_active",
           order_not_active: "failed_order_not_active",
           unauthorized_caller: "failed_access_denied",
           no_recipient_found: "failed_recipient_not_found",
+          restaurant_not_found: "failed_unknown",
+          customer_not_found: "failed_unknown",
+          delivery_partner_not_found: "failed_unknown",
+          internal_error: "failed_unknown",
         }[routingResult.errorCode] || "failed_unknown";
 
         await CallSession.create({
-          order_id: orderId,
+          order_id: order.orderId || String(order._id),
           call_sid: CallSid,
           caller_phone: incomingFromPhone,
           receiver_phone: "unknown",
@@ -569,18 +620,18 @@ export const handleIncomingCallPassthru = async (req, res) => {
 
       return res
         .set("Content-Type", "text/xml; charset=utf-8")
-        .send(
-          `<?xml version="1.0" encoding="UTF-8"?><Response><Hangup reason="routing_failed"/></Response>`
-        );
+        .send(generateHangupXML("routing_failed"));
     }
 
     // Recipient found - create call session
     try {
       const callSession = await CallSession.create({
-        order_id: order.orderId || order?.orderId || (order ? String(order.orderId || order._id) : null),
+        order_id: order.orderId || String(order._id),
+        caller_user_id: routingResult.callerUserId || null,
+        receiver_user_id: routingResult.receiverUserId || null,
         call_sid: CallSid,
         caller_phone: incomingFromPhone,
-        receiver_phone: routingResult.recipientPhone,
+        receiver_phone: routingResult.receiverPhone || routingResult.recipientPhone,
         caller_role: routingResult.callerRole,
         receiver_role: routingResult.recipientRole,
         virtual_number: incomingVirtualNumber || process.env.EXOTEL_VIRTUAL_NUMBER || "passthru_incoming",
@@ -588,6 +639,7 @@ export const handleIncomingCallPassthru = async (req, res) => {
         status: "ringing",
         call_type: "inbound_passthru",
         incoming_from: incomingFromPhone,
+        incoming_caller_id_displayed: incomingVirtualNumber || process.env.EXOTEL_VIRTUAL_NUMBER || null,
         routing_lookup_status: "resolved",
         started_at: new Date(),
       });
@@ -599,32 +651,25 @@ export const handleIncomingCallPassthru = async (req, res) => {
       });
 
       // Response with dial XML to Exotel
-      const normalizedRecipientPhone = String(routingResult.recipientPhone)
-        .replace(/[\s\-+]/g, "")
-        .slice(-10);
-      const dialCallerId = String(incomingVirtualNumber || process.env.EXOTEL_VIRTUAL_NUMBER || "").replace(/[\s\-+]/g, "").slice(-10);
-
       return res
         .set("Content-Type", "text/xml; charset=utf-8")
-        .send(`<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-  <Dial>+91${normalizedRecipientPhone}</Dial>
-</Response>`);
+        .send(
+          generatePassthruXML({
+            toPhone: routingResult.receiverPhone || routingResult.recipientPhone,
+            callerId: incomingVirtualNumber || process.env.EXOTEL_VIRTUAL_NUMBER,
+          })
+        );
     } catch (sessionErr) {
       console.error("Passthru: Failed to create call session:", sessionErr);
       return res
         .set("Content-Type", "text/xml; charset=utf-8")
-        .send(
-          `<?xml version="1.0" encoding="UTF-8"?><Response><Hangup reason="system_error"/></Response>`
-        );
+        .send(generateHangupXML("system_error"));
     }
   } catch (error) {
     console.error("Passthru handler error:", error);
     return res
       .set("Content-Type", "text/xml; charset=utf-8")
-      .send(
-        `<?xml version="1.0" encoding="UTF-8"?><Response><Hangup reason="handler_error"/></Response>`
-      );
+      .send(generateHangupXML("handler_error"));
   }
 };
 
@@ -634,16 +679,16 @@ export const handleIncomingCallPassthru = async (req, res) => {
  */
 export const getVirtualNumbers = async (req, res) => {
   try {
-    // For now, return the same virtual number for all types
-    // Later you can have different numbers for different call types
-    // or fetch from database based on city/order type
+    const configuredNumbers = getConfiguredVirtualNumbers();
+    const sharedNumber = configuredNumbers[0] || null;
+
     const virtualNumbers = {
-      restaurant_call: "03348052382",  // For delivery partner to restaurant
-      customer_call: "03348052382",    // For delivery partner to customer
-      // Add more as needed:
-      // restaurant_to_delivery: "03348052382",
-      // delivery_to_customer: "03348052382",
-      // restaurant_to_customer: "03348052382"
+      restaurant_call: sharedNumber,
+      customer_call: sharedNumber,
+      delivery_partner_call: sharedNumber,
+      customer_delivery_call: sharedNumber,
+      city: process.env.EXOTEL_VIRTUAL_CITY || null,
+      all: configuredNumbers,
     };
 
     return res.status(200).json({

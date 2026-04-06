@@ -29,20 +29,34 @@ const normalizePhone = (phone) => {
   return String(phone).replace(/[\s\-+]/g, "").slice(-10);
 };
 
-// Generate Exotel XML response for passthru call
-export const generatePassthruXML = (toPhone) => {
-  if (!toPhone) {
-    return `<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-  <Hangup reason="invalid_recipient"/>
-</Response>`;
+const formatIndianNumber = (phone) => {
+  const normalized = normalizePhone(phone);
+  if (!normalized || normalized.length !== 10) {
+    return null;
   }
 
-  const normalizedPhone = normalizePhone(toPhone);
+  return `+91${normalized}`;
+};
+
+export const generateHangupXML = (reason = "routing_failed") => {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Dial timeLimit="600" timeout="30" callerId="${normalizedPhone}">
-    <Number>${normalizedPhone}</Number>
+  <Hangup reason="${reason}"/>
+</Response>`;
+};
+
+// Generate Exotel XML response for passthru call
+export const generatePassthruXML = ({ toPhone, callerId } = {}) => {
+  const formattedToPhone = formatIndianNumber(toPhone);
+  if (!formattedToPhone) {
+    return generateHangupXML("invalid_recipient");
+  }
+
+  const formattedCallerId = formatIndianNumber(callerId) || formattedToPhone;
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Dial timeLimit="600" timeout="30" callerId="${formattedCallerId}">
+    <Number>${formattedToPhone}</Number>
   </Dial>
 </Response>`;
 };

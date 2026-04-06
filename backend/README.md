@@ -151,6 +151,48 @@ curl -X GET http://localhost:5000/api/auth/me \
   -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
 ```
 
+### Telephony Masking
+
+The telephony module supports masked calls for these pairings:
+
+- restaurant ↔ delivery partner
+- restaurant ↔ customer
+- customer ↔ delivery partner
+
+Masked numbers are now sourced from Exotel/env config only. No DB seeding is required.
+
+Main endpoints:
+
+- `POST /api/telephony/call`
+- `GET|POST /api/telephony/passthru`
+- `GET /api/telephony/virtual-numbers`
+- `POST /api/telephony/exotel-callback`
+
+Verification script:
+
+```bash
+npm run verify:telephony -- <ORDER_ID> [AUTH_TOKEN]
+```
+
+Optional environment overrides for the verifier:
+
+- `ZAPOO_BASE_URL`
+- `EXOTEL_VIRTUAL_NUMBER` or `EXOTEL_VIRTUAL_NUMBERS`
+- `DELIVERY_PHONE`
+- `DELIVERY_USER_ID`
+- `RESTAURANT_PHONE`
+- `RESTAURANT_USER_ID`
+- `CUSTOMER_PHONE`
+- `CUSTOMER_USER_ID`
+
+What the verifier checks:
+
+- all 6 role pairings end to end
+- outbound masked call creation
+- passthru XML dial response
+- fixed Exotel masking-number behavior from env
+- basic failure handling for missing/invalid data
+
 ## Authentication Flow
 
 1. **Send OTP:**
@@ -192,4 +234,3 @@ Health check endpoint: `GET /health`
 ## License
 
 ISC
-
