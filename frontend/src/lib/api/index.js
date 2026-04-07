@@ -1175,6 +1175,78 @@ export const deliveryAPI = {
   },
 };
 
+// Export telephony API helper functions
+export const telephonyAPI = {
+  initiateMaskedCall: ({ orderId, targetRole }) => {
+    // DEBUG: trace masked-call request payload from the frontend into the backend bridge API
+    console.log("[MASKING][FRONTEND][REQUEST] initiateMaskedCall", {
+      orderId,
+      targetRole,
+      endpoint: API_ENDPOINTS.TELEPHONY.CALL,
+      timestamp: new Date(),
+    });
+
+    return apiClient
+      .post(API_ENDPOINTS.TELEPHONY.CALL, {
+        orderId,
+        targetRole,
+      })
+      .then((response) => {
+        // DEBUG: trace the backend bridge response returned to the frontend caller
+        console.log("[MASKING][FRONTEND][RESPONSE] initiateMaskedCall", {
+          orderId,
+          targetRole,
+          status: response?.status,
+          data: response?.data,
+          timestamp: new Date(),
+        });
+        return response;
+      })
+      .catch((error) => {
+        // DEBUG: capture frontend-visible masking failures with backend error details
+        console.error("[MASKING][FRONTEND][ERROR] initiateMaskedCall", {
+          orderId,
+          targetRole,
+          status: error?.response?.status,
+          data: error?.response?.data,
+          message: error?.message,
+          timestamp: new Date(),
+        });
+        throw error;
+      });
+  },
+
+  getVirtualNumbers: () => {
+    // DEBUG: trace virtual-number lookup requests from the frontend
+    console.log("[MASKING][FRONTEND][REQUEST] getVirtualNumbers", {
+      endpoint: API_ENDPOINTS.TELEPHONY.VIRTUAL_NUMBERS,
+      timestamp: new Date(),
+    });
+
+    return apiClient
+      .get(API_ENDPOINTS.TELEPHONY.VIRTUAL_NUMBERS)
+      .then((response) => {
+        // DEBUG: trace the configured masking-number response returned to the frontend
+        console.log("[MASKING][FRONTEND][RESPONSE] getVirtualNumbers", {
+          status: response?.status,
+          data: response?.data,
+          timestamp: new Date(),
+        });
+        return response;
+      })
+      .catch((error) => {
+        // DEBUG: capture virtual-number lookup failures for masking configuration debugging
+        console.error("[MASKING][FRONTEND][ERROR] getVirtualNumbers", {
+          status: error?.response?.status,
+          data: error?.response?.data,
+          message: error?.message,
+          timestamp: new Date(),
+        });
+        throw error;
+      });
+  },
+};
+
 // Export admin API helper functions
 export const adminAPI = {
   // Admin Auth

@@ -118,8 +118,8 @@ const callSessionSchema = new mongoose.Schema(
     },
     call_type: {
       type: String,
-      enum: ["inbound_passthru"],
-      default: "inbound_passthru",
+      enum: ["inbound_passthru", "outbound_bridge"],
+      default: "outbound_bridge",
     },
     incoming_from: {
       type: String,

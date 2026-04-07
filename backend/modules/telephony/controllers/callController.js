@@ -3,8 +3,9 @@ import Restaurant from "../../restaurant/models/Restaurant.js";
 import Delivery from "../../delivery/models/Delivery.js";
 import User from "../../auth/models/User.js";
 import CallSession from "../models/CallSession.js";
-import { getConfiguredVirtualNumbers } from "../services/numberPoolService.js";
-import { generatePassthruXML } from "../services/exotelService.js";
+import { findOrderByIdentifier } from "../../order/utils/findOrderByIdentifier.js";
+import { selectVirtualNumberForOrder, getConfiguredVirtualNumbers } from "../services/numberPoolService.js";
+import { generatePassthruXML, initiateBridgeCall as initiateExotelBridgeCall } from "../services/exotelService.js";
 
 const TERMINAL_ORDER_STATUSES = new Set([
   "delivered",
@@ -50,17 +51,17 @@ const getSupportDialNumber = () => {
 const getOrderParticipantPhones = async (order) => {
   const [restaurant, customer, deliveryPartner] = await Promise.all([
     order?.restaurantId
-      ? Restaurant.findById(order.restaurantId).select(
-        "phone primaryContactNumber ownerPhone location onboarding step1"
-      )
+      ? Restaurant.findById(order.restaurantId)
+        .select("phone primaryContactNumber ownerPhone location onboarding step1")
+        .lean()
       : null,
     order?.userId
-      ? User.findById(order.userId).select(
-        "phone primaryContactNumber phoneNumber mobile"
-      )
+      ? User.findById(order.userId)
+        .select("phone primaryContactNumber phoneNumber mobile")
+        .lean()
       : null,
     order?.deliveryPartnerId
-      ? Delivery.findById(order.deliveryPartnerId).select("phone")
+      ? Delivery.findById(order.deliveryPartnerId).select("phone").lean()
       : null,
   ]);
 
@@ -114,7 +115,7 @@ const findLatestActiveOrderByCallerPhone = async (incomingFromPhone) => {
         { phone: phoneRegex },
         { ownerPhone: phoneRegex },
       ],
-    }).select("_id"),
+    }).select("_id").lean(),
     User.find({
       $or: [
         { phone: phoneRegex },
@@ -122,8 +123,8 @@ const findLatestActiveOrderByCallerPhone = async (incomingFromPhone) => {
         { phoneNumber: phoneRegex },
         { mobile: phoneRegex },
       ],
-    }).select("_id"),
-    Delivery.find({ phone: phoneRegex }).select("_id"),
+    }).select("_id").lean(),
+    Delivery.find({ phone: phoneRegex }).select("_id").lean(),
   ]);
 
   const orClauses = [];
@@ -151,6 +152,393 @@ const findLatestActiveOrderByCallerPhone = async (incomingFromPhone) => {
     status: { $in: Array.from(ACTIVE_ORDER_STATUSES) },
     $or: orClauses,
   }).sort({ createdAt: -1 });
+};
+
+const normalizeCallerRole = (role) => {
+  if (!role) return "unknown";
+  const normalized = String(role).toLowerCase().trim();
+  if (normalized === "user" || normalized === "customer") return "customer";
+  if (normalized === "restaurant") return "restaurant";
+  if (normalized === "delivery") return "delivery_partner";
+  if (normalized === "delivery_partner") return "delivery_partner";
+  return "unknown";
+};
+
+const normalizeTargetRole = (role) => {
+  if (!role) return "unknown";
+  const normalized = String(role).toLowerCase().trim();
+  if (normalized === "user" || normalized === "customer") return "customer";
+  if (normalized === "restaurant") return "restaurant";
+  if (normalized === "delivery" || normalized === "delivery_partner") return "delivery_partner";
+  return "unknown";
+};
+
+const buildBridgeDirection = (callerRole, receiverRole) => {
+  return `${callerRole}_to_${receiverRole}`;
+};
+
+const debugMaskingFlow = (stage, payload) => {
+  console.log(`[MASKING][${stage}]`, payload);
+};
+
+const getOrderTelephonyNumber = async (orderDoc) => {
+  const existing = orderDoc?.telephony?.virtualNumber;
+  if (existing) {
+    return formatToE164(existing);
+  }
+
+  const selected = selectVirtualNumberForOrder(orderDoc.orderId || orderDoc._id);
+  if (!selected) {
+    throw new Error("No configured Exotel virtual number available");
+  }
+
+  await Order.updateOne(
+    { _id: orderDoc._id },
+    {
+      $set: {
+        "telephony.virtualNumber": selected,
+        "telephony.virtualNumberAssignedAt": new Date(),
+        "telephony.virtualNumberSource": "deterministic_env",
+      },
+    }
+  );
+
+  return selected;
+};
+
+const resolveBridgeRecipient = ({
+  targetRole,
+  restaurant,
+  customer,
+  deliveryPartner,
+  restaurantPhone,
+  customerPhone,
+  deliveryPhone,
+}) => {
+  if (targetRole === "restaurant") {
+    if (!restaurantPhone) {
+      throw new Error("Restaurant phone number not available");
+    }
+    return {
+      receiverRole: "restaurant",
+      receiverPhone: formatToE164(restaurantPhone),
+      receiverUserId: restaurant?._id ? String(restaurant._id) : null,
+    };
+  }
+
+  if (targetRole === "customer") {
+    if (!customerPhone) {
+      throw new Error("Customer phone number not available");
+    }
+    return {
+      receiverRole: "customer",
+      receiverPhone: formatToE164(customerPhone),
+      receiverUserId: customer?._id ? String(customer._id) : null,
+    };
+  }
+
+  if (targetRole === "delivery_partner") {
+    if (!deliveryPartner) {
+      throw new Error("Order does not have an assigned delivery partner");
+    }
+    if (!deliveryPhone) {
+      throw new Error("Delivery partner phone number not available");
+    }
+    return {
+      receiverRole: "delivery_partner",
+      receiverPhone: formatToE164(deliveryPhone),
+      receiverUserId: deliveryPartner?._id ? String(deliveryPartner._id) : null,
+    };
+  }
+
+  throw new Error("Invalid target role");
+};
+
+const resolveBridgeCaller = ({ reqUser, order, callerRole }) => {
+  const callerUserId = reqUser?._id ? String(reqUser._id) : null;
+  const orderRestaurantId = order?.restaurantId ? String(order.restaurantId) : null;
+  const orderCustomerId = order?.userId ? String(order.userId) : null;
+  const orderDeliveryId = order?.deliveryPartnerId
+    ? String(order.deliveryPartnerId)
+    : order?.assignmentInfo?.deliveryPartnerId
+      ? String(order.assignmentInfo.deliveryPartnerId)
+      : null;
+
+  if (callerRole === "restaurant") {
+    if (!callerUserId || callerUserId !== orderRestaurantId) {
+      throw new Error("Caller is not the restaurant for this order");
+    }
+    return {
+      callerRole: "restaurant",
+      callerPhone:
+        reqUser?.primaryContactNumber ||
+        reqUser?.phone ||
+        reqUser?.ownerPhone ||
+        null,
+      callerUserId,
+    };
+  }
+
+  if (callerRole === "customer") {
+    if (!callerUserId || callerUserId !== orderCustomerId) {
+      throw new Error("Caller is not the customer for this order");
+    }
+    return {
+      callerRole: "customer",
+      callerPhone:
+        reqUser?.phone ||
+        reqUser?.primaryContactNumber ||
+        reqUser?.phoneNumber ||
+        reqUser?.mobile ||
+        null,
+      callerUserId,
+    };
+  }
+
+  if (callerRole === "delivery_partner") {
+    if (!orderDeliveryId) {
+      throw new Error("Order does not have an assigned delivery partner");
+    }
+    if (!callerUserId || callerUserId !== orderDeliveryId) {
+      throw new Error("Caller is not the assigned delivery partner for this order");
+    }
+    return {
+      callerRole: "delivery_partner",
+      callerPhone: reqUser?.phone || null,
+      callerUserId,
+    };
+  }
+
+  throw new Error("Unsupported caller role");
+};
+
+export const initiateBridgeCall = async (req, res) => {
+  try {
+    const body = req.body || {};
+    const orderId = String(body.orderId || body.order_id || "").trim();
+    const targetRole = normalizeTargetRole(body.targetRole || body.target_role || body.intent);
+    const callerRole = normalizeCallerRole(req.user?.role);
+
+    // Debugging the masked-call entry request from frontend to backend.
+    debugMaskingFlow("BRIDGE_REQUEST", {
+      orderId,
+      targetRole,
+      callerRole,
+      authRole: req.user?.role || null,
+      timestamp: new Date(),
+    });
+
+    if (!orderId) {
+      return res.status(400).json({
+        success: false,
+        message: "orderId is required",
+      });
+    }
+
+    if (targetRole === "unknown") {
+      return res.status(400).json({
+        success: false,
+        message: "targetRole is required",
+      });
+    }
+
+    const order = await findOrderByIdentifier(orderId);
+
+    // Debugging order lookup and the resolved order context for bridge initiation.
+    debugMaskingFlow("ORDER_LOOKUP", {
+      orderId,
+      found: Boolean(order),
+      matchedOrderId: order?.orderId || order?._id || null,
+      status: order?.status || null,
+      restaurantId: order?.restaurantId || null,
+      userId: order?.userId || null,
+      deliveryPartnerId: order?.deliveryPartnerId || order?.assignmentInfo?.deliveryPartnerId || null,
+    });
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Order not found",
+      });
+    }
+
+    if (TERMINAL_ORDER_STATUSES.has(order.status)) {
+      return res.status(400).json({
+        success: false,
+        message: "Calls are not allowed for terminal orders",
+      });
+    }
+
+    const reqUser = req.restaurant || req.delivery || req.user;
+    const caller = resolveBridgeCaller({ reqUser, order, callerRole });
+    const participants = await getOrderParticipantPhones(order);
+    const recipient = resolveBridgeRecipient({
+      targetRole,
+      ...participants,
+    });
+
+    if (caller.callerRole === recipient.receiverRole) {
+      return res.status(400).json({
+        success: false,
+        message: "Caller and receiver roles cannot be the same",
+      });
+    }
+
+    // Debugging final caller/receiver resolution before Exotel bridge request.
+    debugMaskingFlow("ROUTE_RESOLUTION", {
+      orderId,
+      callerRole: caller.callerRole,
+      callerUserId: caller.callerUserId,
+      callerPhone: caller.callerPhone,
+      receiverRole: recipient.receiverRole,
+      receiverUserId: recipient.receiverUserId,
+      receiverPhone: recipient.receiverPhone,
+      direction: buildBridgeDirection(caller.callerRole, recipient.receiverRole),
+    });
+
+    const bridgeNumber = await getOrderTelephonyNumber(order);
+    const bridgeNumberE164 = formatToE164(bridgeNumber);
+    const callerPhone = formatToE164(caller.callerPhone);
+
+    if (!bridgeNumberE164) {
+      return res.status(500).json({
+        success: false,
+        message: "No configured Exotel virtual number available",
+      });
+    }
+
+    if (!callerPhone || !recipient.receiverPhone) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid caller and receiver phone numbers are required",
+      });
+    }
+
+    const direction = buildBridgeDirection(caller.callerRole, recipient.receiverRole);
+
+    // Debugging the exact Exotel bridge request payload before it is sent.
+    debugMaskingFlow("EXOTEL_BRIDGE_REQUEST", {
+      orderId,
+      fromPhone: callerPhone,
+      toPhone: recipient.receiverPhone,
+      virtualNumber: bridgeNumberE164,
+      direction,
+      exotelBaseUrl: process.env.EXOTEL_SUBDOMAIN || "api",
+    });
+
+    const exotelResponse = await initiateExotelBridgeCall({
+      fromPhone: callerPhone,
+      toPhone: recipient.receiverPhone,
+      virtualNumber: bridgeNumberE164,
+      orderId,
+    });
+
+    // Debugging Exotel response to confirm call SID creation and API success.
+    debugMaskingFlow("EXOTEL_BRIDGE_RESPONSE", {
+      orderId,
+      callSid: exotelResponse.callSid,
+      raw: exotelResponse.raw,
+    });
+
+    let session = null;
+    try {
+      session = await CallSession.create({
+        order_id: orderId,
+        caller_user_id: caller.callerUserId,
+        receiver_user_id: recipient.receiverUserId,
+        caller_role: caller.callerRole,
+        receiver_role: recipient.receiverRole,
+        virtual_number: bridgeNumberE164,
+        restaurant_phone: participants.restaurantPhone || null,
+        delivery_partner_phone: participants.deliveryPhone || null,
+        customer_phone: participants.customerPhone || null,
+        caller_phone: callerPhone,
+        receiver_phone: recipient.receiverPhone,
+        call_sid: exotelResponse.callSid,
+        status: "initiated",
+        direction,
+        call_type: "outbound_bridge",
+        incoming_caller_id_displayed: bridgeNumberE164,
+      });
+    } catch (sessionError) {
+      console.error("Bridge session logging failed:", sessionError);
+    }
+
+    // Debugging the call-session record written after Exotel accepts the bridge request.
+    debugMaskingFlow("SESSION_CREATED", {
+      orderId,
+      callSid: exotelResponse.callSid,
+      sessionId: session?._id ? String(session._id) : null,
+      status: session?.status || "initiated",
+      direction,
+      virtualNumber: bridgeNumberE164,
+    });
+
+    try {
+      await Order.updateOne(
+        { _id: order._id },
+        {
+          $set: {
+            "telephony.lastBridgeCallAt": new Date(),
+            "telephony.lastBridgeCallSid": exotelResponse.callSid,
+          },
+        }
+      );
+    } catch (orderUpdateError) {
+      console.error("Bridge order metadata update failed:", orderUpdateError);
+    }
+
+    // Debugging the order metadata update that stores bridge tracking fields.
+    debugMaskingFlow("ORDER_UPDATED", {
+      orderId,
+      callSid: exotelResponse.callSid,
+      lastBridgeCallAt: new Date(),
+      virtualNumber: bridgeNumberE164,
+    });
+
+    // Debugging the final bridge session summary after persistence.
+    console.log("[BRIDGE]", {
+      orderId,
+      targetRole,
+      callerRole: caller.callerRole,
+      receiverRole: recipient.receiverRole,
+      callSid: exotelResponse.callSid,
+      virtualNumber: bridgeNumberE164,
+      timestamp: new Date(),
+    });
+
+    // Debugging the exact JSON response returned to the frontend after bridge initiation.
+    debugMaskingFlow("BRIDGE_RESPONSE", {
+      success: true,
+      data: {
+        callSid: session?.call_sid || exotelResponse.callSid,
+        orderId,
+        direction,
+      },
+      timestamp: new Date(),
+    });
+
+    return res.status(201).json({
+      success: true,
+      data: {
+        callSid: session?.call_sid || exotelResponse.callSid,
+        orderId,
+        direction,
+      },
+    });
+  } catch (error) {
+    // Debugging any bridge-initiation failure before the API responds to the frontend.
+    debugMaskingFlow("BRIDGE_ERROR", {
+      message: error?.message || "Failed to initiate bridge call",
+      name: error?.name || null,
+      timestamp: new Date(),
+    });
+    console.error("Bridge call initiation failed:", error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Failed to initiate bridge call",
+    });
+  }
 };
 
 export const handleExotelCallback = async (req, res) => {
@@ -224,6 +612,19 @@ export const handleExotelCallback = async (req, res) => {
       (payload.StatusType && payload.StatusType.toLowerCase() === "terminal") ||
       (payload.Event && payload.Event.toLowerCase() === "terminal");
 
+    // Debugging Exotel callback status updates and terminal event handling.
+    debugMaskingFlow("EXOTEL_CALLBACK", {
+      callSid,
+      orderId: session.order_id,
+      previousStatus: session.status,
+      incomingStatus: exotelStatus,
+      mappedStatus: status,
+      duration,
+      cost,
+      isTerminalEvent,
+      rawPayload: payload,
+    });
+
     const update = {
       status,
       duration,
@@ -265,7 +666,7 @@ export const handleIncomingCallPassthru = async (req, res) => {
     const fallbackPhone = getSupportDialNumber();
     const timestamp = new Date();
 
-    console.log("Passthru incoming call:", {
+    console.log("[PASSTHRU]", {
       CallSid,
       From,
       normalizedFrom,
@@ -275,6 +676,14 @@ export const handleIncomingCallPassthru = async (req, res) => {
     });
 
     const sendDialResponse = (receiverPhone, callerId = incomingVirtualNumber) => {
+      // Debugging the final XML response sent back to Exotel for passthru routing.
+      debugMaskingFlow("PASSTHRU_XML_RESPONSE", {
+        CallSid,
+        receiverPhone,
+        callerId,
+        fallbackPhone,
+        timestamp: new Date(),
+      });
       return res
         .set("Content-Type", "text/xml; charset=utf-8")
         .send(
@@ -307,6 +716,14 @@ export const handleIncomingCallPassthru = async (req, res) => {
     }
 
     if (!order) {
+      // Debugging passthru fallback when no order is matched from orderId or caller phone.
+      debugMaskingFlow("PASSTHRU_NO_ORDER", {
+        CallSid,
+        From,
+        normalizedFrom,
+        orderId,
+        fallbackPhone,
+      });
       console.warn("Passthru: no active order matched caller", {
         CallSid,
         From,
@@ -317,6 +734,14 @@ export const handleIncomingCallPassthru = async (req, res) => {
     }
 
     if (!ACTIVE_ORDER_STATUSES.has(order.status)) {
+      // Debugging passthru rejection when the order is in a terminal or inactive state.
+      debugMaskingFlow("PASSTHRU_INACTIVE_ORDER", {
+        CallSid,
+        orderId: order.orderId,
+        status: order.status,
+        From,
+        fallbackPhone,
+      });
       console.warn("Passthru: order is not active", {
         orderId: order.orderId,
         status: order.status,
@@ -335,8 +760,21 @@ export const handleIncomingCallPassthru = async (req, res) => {
       deliveryPhone,
     } = await getOrderParticipantPhones(order);
 
+
     const role = identifyCallerRole({
       normalizedFrom,
+      restaurantPhone,
+      customerPhone,
+      deliveryPhone,
+    });
+
+    // Debugging passthru caller-role detection from the incoming Exotel number.
+    debugMaskingFlow("PASSTHRU_ROLE_DETECTION", {
+      CallSid,
+      From,
+      normalizedFrom,
+      orderId: order.orderId,
+      detectedRole: role,
       restaurantPhone,
       customerPhone,
       deliveryPhone,
@@ -385,6 +823,17 @@ export const handleIncomingCallPassthru = async (req, res) => {
     if (!receiverPhone) {
       receiverPhone = fallbackPhone;
     }
+
+    // Debugging passthru routing decision before the XML is generated.
+    debugMaskingFlow("PASSTHRU_ROUTE", {
+      CallSid,
+      orderId: order.orderId,
+      callerRole: role,
+      receiverRole,
+      receiverPhone,
+      callType,
+      fallbackPhone,
+    });
 
     const callerPhone = formatToE164(From) || From;
     const callerUserId =
@@ -468,6 +917,14 @@ export const getVirtualNumbers = async (req, res) => {
       all: configuredNumbers,
     };
 
+    // Debugging the virtual-number response sent to the frontend for masking configuration.
+    debugMaskingFlow("VIRTUAL_NUMBERS", {
+      sharedNumber,
+      city: process.env.EXOTEL_VIRTUAL_CITY || null,
+      totalConfiguredNumbers: configuredNumbers.length,
+      timestamp: new Date(),
+    });
+
     return res.status(200).json({
       success: true,
       data: virtualNumbers,
@@ -480,4 +937,3 @@ export const getVirtualNumbers = async (req, res) => {
     });
   }
 };
-

@@ -1,3 +1,28 @@
+import axios from "axios";
+
+const {
+  EXOTEL_SID,
+  EXOTEL_AUTH_TOKEN,
+  EXOTEL_SUBDOMAIN,
+} = process.env;
+
+const getBaseUrl = () => {
+  const subdomain = EXOTEL_SUBDOMAIN || "api";
+  return `https://${subdomain}.exotel.com/v1/Accounts/${EXOTEL_SID}`;
+};
+
+const getAuthConfig = () => {
+  if (!EXOTEL_SID || !EXOTEL_AUTH_TOKEN) {
+    throw new Error("Exotel credentials are not configured");
+  }
+  return {
+    auth: {
+      username: EXOTEL_SID,
+      password: EXOTEL_AUTH_TOKEN,
+    },
+  };
+};
+
 // Normalize phone number: remove +, spaces, dashes
 const normalizePhone = (phone) => {
   if (!phone) return null;
@@ -50,5 +75,100 @@ export const generateUnavailableXML = (reason = "routing_failed") => {
   <Play>https://zapoo.co.in/audio/unavailable.mp3</Play>
   <Hangup reason="${reason}"/>
 </Response>`;
+};
+
+export const initiateBridgeCall = async ({
+  fromPhone,
+  toPhone,
+  virtualNumber,
+  orderId,
+}) => {
+  if (!fromPhone || !toPhone || !virtualNumber || !orderId) {
+    throw new Error("Missing required parameters for Exotel bridge call");
+  }
+
+  const url = `${getBaseUrl()}/Calls/connect`;
+  const payload = new URLSearchParams({
+    From: fromPhone,
+    To: toPhone,
+    CallerId: virtualNumber,
+    CallType: "trans",
+    TimeOut: "30",
+    TimeLimit: "600",
+    CustomField: String(orderId),
+    StatusCallback:
+      `${process.env.EXOTEL_STATUS_CALLBACK_BASE_URL || "https://example.com"}/api/telephony/exotel-callback`,
+    StatusCallbackEvents: "answered,terminal",
+  }).toString();
+
+  try {
+    // DEBUG: trace the outbound Exotel bridge request without exposing credentials
+    console.log("[MASKING][EXOTEL][REQUEST]", {
+      url,
+      fromPhone,
+      toPhone,
+      virtualNumber,
+      orderId,
+      statusCallback:
+        `${process.env.EXOTEL_STATUS_CALLBACK_BASE_URL || "https://example.com"}/api/telephony/exotel-callback`,
+      timestamp: new Date(),
+    });
+
+    const response = await axios.post(url, payload, {
+      ...getAuthConfig(),
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+    });
+
+    const data = response.data || {};
+    const callSid =
+      data.Call && (data.Call.Sid || data.Call.sid)
+        ? data.Call.Sid || data.Call.sid
+        : undefined;
+
+    if (!callSid) {
+      throw new Error("Exotel response missing Call SID");
+    }
+
+    // DEBUG: trace the Exotel bridge response returned for the outbound call request
+    console.log("[MASKING][EXOTEL][RESPONSE]", {
+      url,
+      callSid,
+      raw: data,
+      timestamp: new Date(),
+    });
+
+    return {
+      callSid,
+      raw: data,
+    };
+  } catch (error) {
+    const responseData = error.response?.data;
+    const statusCode = error.response?.status;
+    const message = responseData
+      ? `Exotel HTTP ${statusCode}: ${JSON.stringify(responseData)}`
+      : error.message || "Exotel error";
+
+    console.error("Exotel bridge call failure:", {
+      url,
+      statusCode,
+      responseData,
+      message,
+    });
+
+    // DEBUG: trace the exact Exotel bridge failure payload before bubbling the error upward
+    console.error("[MASKING][EXOTEL][ERROR]", {
+      url,
+      statusCode,
+      responseData,
+      message,
+      timestamp: new Date(),
+    });
+
+    const wrappedError = new Error(message);
+    wrappedError.name = "ExotelBridgeCallError";
+    throw wrappedError;
+  }
 };
 

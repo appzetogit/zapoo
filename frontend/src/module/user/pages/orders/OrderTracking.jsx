@@ -12,8 +12,7 @@ import { useOrders } from "../../context/OrdersContext";
 import { useProfile } from "../../context/ProfileContext";
 import { useLocation as useUserLocation } from "../../hooks/useLocation";
 import DeliveryTrackingMap from "../../components/DeliveryTrackingMap";
-import { orderAPI, restaurantAPI, userAPI } from "@/lib/api";
-import { getExotelTelLink } from "@/lib/telephony";
+import { orderAPI, restaurantAPI, userAPI, telephonyAPI } from "@/lib/api";
 import circleIcon from "@/assets/circleicon.png";
 
 const hasOrderBeenPickedUp = apiOrder => {
@@ -234,13 +233,6 @@ export default function OrderTracking() {
   const customerName = order?.userName || order?.userId?.fullName || order?.userId?.name || userProfile?.fullName || userProfile?.name || 'Customer';
   const customerPhone = order?.userPhone || order?.userId?.phone || userProfile?.phone || defaultAddress?.phone || "";
   const currentDeliveryInstructions = order?.address?.deliveryInstructions || "";
-  const restaurantPhone =
-    order?.restaurantId?.primaryContactNumber ||
-    order?.restaurantId?.phone ||
-    order?.restaurantId?.ownerPhone ||
-    order?.restaurantPhone ||
-    "";
-
   useEffect(() => {
     if (!showPhoneDialog) return;
     setEditablePhone(customerPhone || "");
@@ -514,35 +506,31 @@ export default function OrderTracking() {
       return;
     }
 
-    const callerUserId =
-      normalizeEntityId(order.userId) ||
-      normalizeEntityId(userProfile);
-    const receiverUserId = normalizeEntityId(order.restaurantId);
     const businessOrderId = order.id || order.orderId || orderId;
-    const fallbackPhone = normalizePhoneNumber(restaurantPhone);
 
-    if (!businessOrderId || !callerUserId || !receiverUserId) {
-      if (fallbackPhone) {
-        toast.error("Masked call unavailable right now. Falling back to direct call.");
-        window.location.href = `tel:${fallbackPhone}`;
-      } else {
-        toast.error("Restaurant phone number not available");
-      }
+    if (!businessOrderId) {
+      toast.error("Order ID not available");
       return;
     }
 
-    const telLink = getExotelTelLink();
-    if (telLink) {
-      toast.success("Opening masked call dialer...");
-      window.location.href = telLink;
-      return;
-    }
-
-    if (fallbackPhone) {
-      toast.error("Masked call unavailable. Falling back to direct call.");
-      window.location.href = `tel:${fallbackPhone}`;
-    } else {
-      toast.error("Masked call unavailable and no direct number found.");
+    try {
+      // DEBUG: trace the masked-call button click for restaurant calls from the tracking screen
+      console.log("[MASKING][FRONTEND][CLICK]", {
+        screen: "OrderTracking",
+        targetRole: "restaurant",
+        orderId: businessOrderId,
+        timestamp: new Date(),
+      });
+      setIsCallingRestaurant(true);
+      await telephonyAPI.initiateMaskedCall({
+        orderId: businessOrderId,
+        targetRole: "restaurant",
+      });
+      toast.success("Call connecting to restaurant");
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Failed to initiate masked call");
+    } finally {
+      setIsCallingRestaurant(false);
     }
   };
   const handleSavePhone = async () => {

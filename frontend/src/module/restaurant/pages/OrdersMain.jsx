@@ -8,8 +8,7 @@ import { toast } from "sonner";
 import BottomNavOrders from "../components/BottomNavOrders";
 import RestaurantNavbar from "../components/RestaurantNavbar";
 import notificationSound from "@/assets/audio/alert.mp3";
-import { restaurantAPI, api } from "@/lib/api";
-import { getExotelTelLink } from "@/lib/telephony";
+import { restaurantAPI, api, telephonyAPI } from "@/lib/api";
 import { useRestaurantNotifications } from "../hooks/useRestaurantNotifications";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -1720,21 +1719,35 @@ function OrderCard({
 }) {
   const displayStatus = status === "confirmed" ? "preparing" : status;
   const isReady = displayStatus === "ready" || displayStatus === "Ready";
+  const [isCallingDeliveryPartner, setIsCallingDeliveryPartner] = useState(false);
 
   const handleCallDeliveryPartner = async (e) => {
     e.stopPropagation();
 
-    if (!deliveryPartnerId || !restaurantMongoId || !orderId) {
+    if (!deliveryPartnerId || !orderId) {
+      toast.error("Unable to resolve delivery partner call");
       return;
     }
 
-    const telLink = getExotelTelLink();
-    if (telLink) {
-      window.location.href = telLink;
-      return;
+    try {
+      // DEBUG: trace the masked-call button click for delivery-partner calls from the restaurant orders screen
+      console.log("[MASKING][FRONTEND][CLICK]", {
+        screen: "OrdersMain",
+        targetRole: "delivery_partner",
+        orderId,
+        timestamp: new Date(),
+      });
+      setIsCallingDeliveryPartner(true);
+      await telephonyAPI.initiateMaskedCall({
+        orderId,
+        targetRole: "delivery_partner",
+      });
+      toast.success("Call connecting to delivery partner");
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Failed to initiate masked call");
+    } finally {
+      setIsCallingDeliveryPartner(false);
     }
-
-    // If Exotel number is not configured, fallback is not available here.
   };
   return <div className="w-full bg-white rounded-2xl p-4 mb-3 border border-gray-200 hover:border-gray-400 transition-colors relative">
     {/* Cancel button - only show for preparing orders */}
@@ -1836,10 +1849,11 @@ function OrderCard({
               <button
                 type="button"
                 onClick={handleCallDeliveryPartner}
+                disabled={isCallingDeliveryPartner}
                 className="mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-green-600 text-white hover:bg-green-700"
               >
-                <Phone className="w-3 h-3" />
-                Call delivery partner
+                {isCallingDeliveryPartner ? <Loader2 className="w-3 h-3 animate-spin" /> : <Phone className="w-3 h-3" />}
+                {isCallingDeliveryPartner ? "Calling..." : "Call delivery partner"}
               </button>
             )}
           </div>

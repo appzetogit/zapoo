@@ -15,8 +15,7 @@ import { fetchDeliveryWallet, calculatePeriodEarnings } from "../utils/deliveryW
 import { formatCurrency } from "../../restaurant/utils/currency";
 import { getAllDeliveryOrders } from "../utils/deliveryOrderStatus";
 import { getUnreadDeliveryNotificationCount } from "../utils/deliveryNotifications";
-import { deliveryAPI, restaurantAPI, uploadAPI } from "@/lib/api";
-import { getExotelTelLink } from "@/lib/telephony";
+import { deliveryAPI, restaurantAPI, telephonyAPI, uploadAPI } from "@/lib/api";
 import { useDeliveryNotifications } from "../hooks/useDeliveryNotifications";
 import { getGoogleMapsApiKey } from "@/lib/utils/googleMapsApiKey";
 import { useCompanyName } from "@/lib/hooks/useCompanyName";
@@ -4174,25 +4173,6 @@ export default function DeliveryHome() {
     }
   };
 
-  const resolveDeliveryPartnerCallerId = useCallback(async () => {
-    if (deliveryPartnerUserId) {
-      return deliveryPartnerUserId;
-    }
-
-    try {
-      const response = await deliveryAPI.getProfile();
-      const profile = response?.data?.data?.profile;
-      const profileId = normalizeEntityId(profile);
-      if (profileId) {
-        setDeliveryPartnerUserId(profileId);
-      }
-      return profileId;
-    } catch (error) {
-      console.error("Error fetching delivery profile for masked call:", error);
-      return "";
-    }
-  }, [deliveryPartnerUserId]);
-
   const refreshSelectedRestaurantCallContext = useCallback(async () => {
     const orderLookupId =
       selectedRestaurant?.orderId ||
@@ -4240,45 +4220,37 @@ export default function DeliveryHome() {
     const setCallingState = isRestaurantCall ? setIsCallingRestaurant : setIsCallingCustomer;
     const latestRestaurantInfo = await refreshSelectedRestaurantCallContext();
     const orderIdForCall = latestRestaurantInfo?.orderId;
-    const callerUserId = await resolveDeliveryPartnerCallerId();
-    const receiverUserId = isRestaurantCall
-      ? latestRestaurantInfo?.restaurantMongoId
-      : latestRestaurantInfo?.customerUserId;
-    const fallbackPhone = normalizePhoneNumber(
-      isRestaurantCall
-        ? latestRestaurantInfo?.phone || latestRestaurantInfo?.ownerPhone
-        : latestRestaurantInfo?.customerPhone,
-    );
 
     if (latestRestaurantInfo?.orderStatus === "cancelled" || latestRestaurantInfo?.orderStatus === "delivered") {
       toast.error("Calls are not allowed for cancelled or delivered orders");
       return;
     }
 
-    if (!orderIdForCall || !callerUserId || !receiverUserId) {
-      if (fallbackPhone) {
-        toast.error("Masked call unavailable right now. Falling back to direct call.");
-        window.location.href = `tel:${fallbackPhone}`;
-      } else {
-        toast.error(`${isRestaurantCall ? "Restaurant" : "Customer"} phone number not available`);
-      }
+    if (!orderIdForCall) {
+      toast.error("Order ID not available");
       return;
     }
 
-    const telLink = getExotelTelLink();
-    if (telLink) {
-      toast.success("Opening masked call dialer...");
-      window.location.href = telLink;
-      return;
+    try {
+      // DEBUG: trace the masked-call button click for delivery home restaurant/customer actions
+      console.log("[MASKING][FRONTEND][CLICK]", {
+        screen: "DeliveryHome",
+        targetRole: isRestaurantCall ? "restaurant" : "customer",
+        orderId: orderIdForCall,
+        timestamp: new Date(),
+      });
+      setCallingState(true);
+      await telephonyAPI.initiateMaskedCall({
+        orderId: orderIdForCall,
+        targetRole: isRestaurantCall ? "restaurant" : "customer",
+      });
+      toast.success(`Call connecting to ${isRestaurantCall ? "restaurant" : "customer"}`);
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Failed to initiate masked call");
+    } finally {
+      setCallingState(false);
     }
-
-    if (fallbackPhone) {
-      toast.error("Masked call unavailable. Falling back to direct call.");
-      window.location.href = `tel:${fallbackPhone}`;
-    } else {
-      toast.error("Masked call unavailable and no direct number found.");
-    }
-  }, [refreshSelectedRestaurantCallContext, resolveDeliveryPartnerCallerId]);
+  }, [refreshSelectedRestaurantCallContext]);
 
   const handleCallRestaurantMasked = useCallback(() => {
     placeDeliveryMaskedCall({ targetRole: "restaurant" });

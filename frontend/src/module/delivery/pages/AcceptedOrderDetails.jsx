@@ -23,8 +23,8 @@ import {
 import {
   getDeliveryOrderPaymentStatus
 } from "../utils/deliveryWalletState"
-import { deliveryAPI } from "@/lib/api"
-import { getExotelTelLink } from "@/lib/telephony"
+import { toast } from "sonner"
+import { deliveryAPI, telephonyAPI } from "@/lib/api"
 
 export default function AcceptedOrderDetails() {
   const navigate = useNavigate()
@@ -82,21 +82,59 @@ export default function AcceptedOrderDetails() {
   }, [orderId])
 
   const handleCallRestaurantMasked = () => {
-    const telLink = getExotelTelLink()
-    if (!telLink) {
-      alert("Virtual number is not available. Please try again later.")
+    if (orderStatus === "cancelled" || orderStatus === "delivered") {
+      toast.error("Calls are not allowed for cancelled or delivered orders")
       return
     }
-    window.location.href = telLink
+
+    // DEBUG: trace the masked-call button click for restaurant calls from the delivery order-details screen
+    console.log("[MASKING][FRONTEND][CLICK]", {
+      screen: "AcceptedOrderDetails",
+      targetRole: "restaurant",
+      orderId,
+      timestamp: new Date(),
+    });
+
+    setCallingRestaurant(true)
+    telephonyAPI.initiateMaskedCall({
+      orderId,
+      targetRole: "restaurant",
+    })
+      .then(() => {
+        toast.success("Call connecting to restaurant")
+      })
+      .catch((error) => {
+        toast.error(error?.response?.data?.message || "Failed to initiate masked call")
+      })
+      .finally(() => setCallingRestaurant(false))
   }
 
   const handleCallCustomer = () => {
-    const telLink = getExotelTelLink()
-    if (!telLink) {
-      alert("Virtual number is not available. Please try again later.")
+    if (orderStatus === "cancelled" || orderStatus === "delivered") {
+      toast.error("Calls are not allowed for cancelled or delivered orders")
       return
     }
-    window.location.href = telLink
+
+    // DEBUG: trace the masked-call button click for customer calls from the delivery order-details screen
+    console.log("[MASKING][FRONTEND][CLICK]", {
+      screen: "AcceptedOrderDetails",
+      targetRole: "customer",
+      orderId,
+      timestamp: new Date(),
+    });
+
+    setCallingCustomer(true)
+    telephonyAPI.initiateMaskedCall({
+      orderId,
+      targetRole: "customer",
+    })
+      .then(() => {
+        toast.success("Call connecting to customer")
+      })
+      .catch((error) => {
+        toast.error(error?.response?.data?.message || "Failed to initiate masked call")
+      })
+      .finally(() => setCallingCustomer(false))
   }
 
   // Order data matching the image exactly

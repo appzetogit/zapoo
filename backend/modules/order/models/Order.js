@@ -225,6 +225,31 @@ const orderSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Delivery'
   },
+  telephony: {
+    virtualNumber: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    virtualNumberAssignedAt: {
+      type: Date,
+      default: null,
+    },
+    virtualNumberSource: {
+      type: String,
+      enum: ['deterministic_env', 'manual'],
+      default: 'deterministic_env',
+    },
+    lastBridgeCallAt: {
+      type: Date,
+      default: null,
+    },
+    lastBridgeCallSid: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+  },
   estimatedDeliveryTime: {
     type: Number, // in minutes
     default: 30
@@ -364,6 +389,8 @@ orderSchema.index({ restaurantId: 1, status: 1 });
 orderSchema.index({ deliveryPartnerId: 1, createdAt: -1 });
 // Active order lookup by delivery partner
 orderSchema.index({ deliveryPartnerId: 1, status: 1 });
+// Telephony virtual-number lookup
+orderSchema.index({ 'telephony.virtualNumber': 1 });
 // Admin lists by status + recency
 orderSchema.index({ status: 1, createdAt: -1 });
 // Payment gateway lookups

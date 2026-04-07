@@ -153,17 +153,21 @@ curl -X GET http://localhost:5000/api/auth/me \
 
 ### Telephony Masking
 
-The telephony module supports masked calls for these pairings:
+The telephony module supports masked bridge calls for these pairings:
 
 - restaurant ↔ delivery partner
 - restaurant ↔ customer
 - customer ↔ delivery partner
+- delivery partner ↔ restaurant
+- customer ↔ restaurant
+- delivery partner ↔ customer
 
-Masked numbers are now sourced from Exotel/env config only. No DB seeding is required.
+Each order gets one deterministic virtual number from the configured Exotel/env list, and the same number can be reused concurrently across different orders.
 
 Main endpoints:
 
-- `GET|POST /api/telephony/passthru`
+- `POST /api/telephony/call` (Exotel Voice API bridge initiation)
+- `GET|POST /api/telephony/passthru` (legacy compatibility path)
 - `GET /api/telephony/virtual-numbers`
 - `POST /api/telephony/exotel-callback`
 
@@ -176,20 +180,16 @@ npm run verify:telephony -- <ORDER_ID> [AUTH_TOKEN]
 Optional environment overrides for the verifier:
 
 - `ZAPOO_BASE_URL`
-- `EXOTEL_VIRTUAL_NUMBER` or `EXOTEL_VIRTUAL_NUMBERS`
-- `EXOTEL_SAFE_NUMBER` or `EXOTEL_SUPPORT_NUMBER` for passthru fallback dialing
-- `DELIVERY_PHONE`
-- `DELIVERY_USER_ID`
-- `RESTAURANT_PHONE`
-- `RESTAURANT_USER_ID`
-- `CUSTOMER_PHONE`
-- `CUSTOMER_USER_ID`
+- `RESTAURANT_AUTH_TOKEN`
+- `CUSTOMER_AUTH_TOKEN`
+- `DELIVERY_AUTH_TOKEN`
+- `AUTH_TOKEN` or `TEST_TOKEN` as a shared fallback
 
 What the verifier checks:
 
-- all 6 role pairings end to end
-- passthru XML dial response
-- fixed Exotel masking-number behavior from env
+- bridge call initiation for all 6 role pairings
+- deterministic Exotel masking-number selection from env
+- callback/session tracking for outbound bridge calls
 - basic failure handling for missing/invalid data
 
 ## Authentication Flow

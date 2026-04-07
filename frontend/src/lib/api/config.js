@@ -248,6 +248,12 @@ export const API_ENDPOINTS = {
     SUPPORT_TICKETS_STATS: "/delivery/support-tickets/stats",
     CHALLENGES: "/delivery/challenges",
   },
+  // Telephony endpoints
+  TELEPHONY: {
+    CALL: "/telephony/call",
+    PASSTHRU: "/telephony/passthru",
+    VIRTUAL_NUMBERS: "/telephony/virtual-numbers",
+  },
   // Admin endpoints
   ADMIN: {
     AUTH: {

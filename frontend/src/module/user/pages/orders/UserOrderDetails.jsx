@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, ShoppingBag, Phone, Copy, Download, User, CreditCard, Calendar, MapPin, RotateCcw, FileText } from "lucide-react";
-import { orderAPI, restaurantAPI, api } from "@/lib/api";
-import { getExotelTelLink } from "@/lib/telephony";
+import { orderAPI, restaurantAPI, api, telephonyAPI } from "@/lib/api";
 import { toast } from "sonner";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -144,64 +143,72 @@ export default function UserOrderDetails() {
     return String(value);
   };
 
-  const customerId = normalizeId(order.userId || order.user || order.customerId);
-  const restaurantIdForCall = normalizeId(order.restaurantId || restaurantObj._id || restaurantObj.id);
   const deliveryPartnerId = normalizeId(order.deliveryPartnerId || order.deliveryPartner || order.assignmentInfo?.deliveryPartnerId);
-  const deliveryPartnerPhone = order.deliveryPartner?.phone || order.deliveryPartnerPhone || "";
-  const restaurantPhone = restaurantObj.primaryContactNumber || restaurantObj.phone || restaurantObj.contactNumber || order.restaurantPhone || "";
 
   const handleCallRestaurant = async () => {
     const businessOrderId = order.orderId || order._id || orderId;
-    if (!businessOrderId || !customerId || !restaurantIdForCall) {
-      if (!restaurantPhone) {
-        toast.error("Restaurant phone number not available");
-        return;
-      }
-      window.location.href = `tel:${restaurantPhone}`;
+    if (!businessOrderId) {
+      toast.error("Order ID not available");
       return;
     }
 
-    const telLink = getExotelTelLink();
-    if (telLink) {
-      toast.success("Opening masked call dialer...");
-      window.location.href = telLink;
+    if (order.status === "cancelled" || order.status === "delivered") {
+      toast.error("Calls are not allowed for cancelled or delivered orders");
       return;
     }
 
-    if (!restaurantPhone) {
-      toast.error("Restaurant phone number not available");
-      return;
+    try {
+      // DEBUG: trace the masked-call button click for restaurant calls from the order details screen
+      console.log("[MASKING][FRONTEND][CLICK]", {
+        screen: "UserOrderDetails",
+        targetRole: "restaurant",
+        orderId: businessOrderId,
+        timestamp: new Date(),
+      });
+      setCallingRestaurant(true);
+      await telephonyAPI.initiateMaskedCall({
+        orderId: businessOrderId,
+        targetRole: "restaurant",
+      });
+      toast.success("Call connecting to restaurant");
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Failed to initiate masked call");
+    } finally {
+      setCallingRestaurant(false);
     }
-
-    toast.success("Opening direct restaurant call...");
-    window.location.href = `tel:${restaurantPhone}`;
   };
 
   const handleCallDeliveryPartner = async () => {
     const businessOrderId = order.orderId || order._id || orderId;
-    if (!businessOrderId || !customerId || !deliveryPartnerId) {
-      if (!deliveryPartnerPhone) {
-        toast.error("Delivery partner phone number not available");
-        return;
-      }
-      window.location.href = `tel:${deliveryPartnerPhone}`;
+    if (!businessOrderId) {
+      toast.error("Order ID not available");
       return;
     }
 
-    const telLink = getExotelTelLink();
-    if (telLink) {
-      toast.success("Opening masked call dialer...");
-      window.location.href = telLink;
+    if (order.status === "cancelled" || order.status === "delivered") {
+      toast.error("Calls are not allowed for cancelled or delivered orders");
       return;
     }
 
-    if (!deliveryPartnerPhone) {
-      toast.error("Delivery partner phone number not available");
-      return;
+    try {
+      // DEBUG: trace the masked-call button click for delivery-partner calls from the order details screen
+      console.log("[MASKING][FRONTEND][CLICK]", {
+        screen: "UserOrderDetails",
+        targetRole: "delivery_partner",
+        orderId: businessOrderId,
+        timestamp: new Date(),
+      });
+      setCallingDeliveryPartner(true);
+      await telephonyAPI.initiateMaskedCall({
+        orderId: businessOrderId,
+        targetRole: "delivery_partner",
+      });
+      toast.success("Call connecting to delivery partner");
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Failed to initiate masked call");
+    } finally {
+      setCallingDeliveryPartner(false);
     }
-
-    toast.success("Opening direct delivery partner call...");
-    window.location.href = `tel:${deliveryPartnerPhone}`;
   };
   const handleDownloadSummary = async () => {
     try {
