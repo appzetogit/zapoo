@@ -105,7 +105,9 @@ export const initiateBridgeCall = async ({
     CustomField: String(orderId),
     StatusCallback:
       `${process.env.EXOTEL_STATUS_CALLBACK_BASE_URL || "https://example.com"}/api/telephony/exotel-callback`,
-    StatusCallbackEvents: "answered,terminal",
+    StatusCallbackContentType: "application/json",
+    "StatusCallbackEvents[0]": "terminal",
+    "StatusCallbackEvents[1]": "answered",
   }).toString();
 
   try {
