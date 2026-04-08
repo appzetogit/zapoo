@@ -11,6 +11,8 @@ const normalizePhone = (phone) => {
   return String(phone).replace(/[\s\-+]/g, "").trim();
 };
 
+console.log("EXOTEL_VIRTUAL_NUMBERS:", process.env.EXOTEL_VIRTUAL_NUMBERS);
+
 const normalizeConfiguredNumbers = () => {
   const rawNumbers = process.env.EXOTEL_VIRTUAL_NUMBERS || process.env.EXOTEL_VIRTUAL_NUMBER || "";
   return String(rawNumbers)
