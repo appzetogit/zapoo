@@ -7,18 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import BottomNavOrders from "../components/BottomNavOrders";
 
-// Load Razorpay SDK dynamically
-function loadRazorpayScript() {
-    return new Promise((resolve) => {
-        if (window.Razorpay) return resolve(true);
-        const script = document.createElement("script");
-        script.src = "https://checkout.razorpay.com/v1/checkout.js";
-        script.onload = () => resolve(true);
-        script.onerror = () => resolve(false);
-        document.body.appendChild(script);
-    });
-}
-
 export default function SubscriptionPlans() {
     const navigate = useNavigate();
     const [plans, setPlans] = useState([]);
@@ -62,86 +50,12 @@ export default function SubscriptionPlans() {
 
     const startSubscriptionFlow = async (plan) => {
         if (!plan?._id) return;
-        try {
-            setPendingPlanConfirm(null);
-            setProcessingId(plan._id);
 
-            // Step 1: Create the Razorpay order (or activate free plan)
-            const res = await subscriptionAPI.subscribe({ planId: plan._id });
-
-            if (!res.data.success) {
-                throw new Error(res.data.message || "Failed to initiate subscription");
-            }
-
-            if (res?.data?.message && res?.data?.data?.deferredActivation) {
-                toast.info(res.data.message);
-            }
-
-            // If no razorpay data, it was a free plan — already activated
-            if (!res.data.data?.razorpay) {
-                toast.success(`Successfully subscribed to ${plan.name}!`);
-                await fetchData();
-                return;
-            }
-
-            // Step 2: Load Razorpay SDK
-            const sdkLoaded = await loadRazorpayScript();
-            if (!sdkLoaded) {
-                throw new Error("Razorpay SDK failed to load. Please check your internet connection.");
-            }
-
-            const { orderId, amount, currency, key } = res.data.data.razorpay;
-
-            // Step 3: Open Razorpay Checkout
-            await new Promise((resolve, reject) => {
-                const rzp = new window.Razorpay({
-                    key,
-                    amount,
-                    currency,
-                    order_id: orderId,
-                    name: "Zapoo Restaurant",
-                    description: `Subscribe to ${plan.name}`,
-                    theme: { color: "#DC2626" },
-                    handler: async (paymentResponse) => {
-                        try {
-                            // Step 4: Verify payment and activate subscription
-                            const verifyRes = await subscriptionAPI.verifyPayment({
-                                razorpay_payment_id: paymentResponse.razorpay_payment_id,
-                                razorpay_order_id: paymentResponse.razorpay_order_id,
-                                razorpay_signature: paymentResponse.razorpay_signature,
-                                planId: plan._id,
-                            });
-
-                            if (verifyRes.data.success) {
-                                toast.success(
-                                    verifyRes?.data?.message ||
-                                    `🎉 Successfully subscribed to ${plan.name}!`
-                                );
-                                await fetchData();
-                                resolve();
-                            } else {
-                                throw new Error(verifyRes.data.message || "Payment verification failed");
-                            }
-                        } catch (err) {
-                            reject(err);
-                        }
-                    },
-                    modal: {
-                        ondismiss: () => {
-                            toast.info("Payment cancelled");
-                            resolve(); // don't reject — user just closed
-                        }
-                    }
-                });
-                rzp.open();
-            });
-
-        } catch (error) {
-            console.error("Subscription error:", error);
-            toast.error(error.response?.data?.message || error.message || "Failed to subscribe");
-        } finally {
-            setProcessingId(null);
-        }
+        setProcessingId(plan._id);
+        setPendingPlanConfirm(null);
+        navigate(`/restaurant/subscription/checkout?planId=${plan._id}`, {
+            state: { plan }
+        });
     };
 
     const handleSubscribe = async (plan) => {
@@ -201,11 +115,10 @@ export default function SubscriptionPlans() {
     }
 
     const activePlanId = currentSubscription?.planId?._id || currentSubscription?.planId;
-    const isSubscribed = !!activePlanId && currentSubscription?.status === 'active';
+    const isSubscribed = !!activePlanId && currentSubscription?.status === "active";
 
     return (
         <div className="min-h-screen bg-gray-50/50 flex flex-col">
-            {/* Sticky Header */}
             <div className="sticky top-0 z-40 bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3">
                 <button
                     onClick={() => navigate(-1)}
@@ -222,10 +135,7 @@ export default function SubscriptionPlans() {
                 )}
             </div>
 
-            {/* Content */}
             <div className="flex-1 px-4 py-6 pb-24 max-w-7xl mx-auto w-full space-y-8">
-
-                {/* Header Section */}
                 <div className="text-center space-y-3 max-w-2xl mx-auto pt-2">
                     <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-gray-900">
                         Supercharge Your <span className="text-orange-500">Restaurant</span>
@@ -234,6 +144,7 @@ export default function SubscriptionPlans() {
                         Choose a plan that fits your growth. Zero commission, enhanced visibility, and powerful analytics to scale your business.
                     </p>
                 </div>
+
                 {!isSubscribed && !trialUsed && (
                     <div className="max-w-md mx-auto">
                         <Button
@@ -246,7 +157,6 @@ export default function SubscriptionPlans() {
                     </div>
                 )}
 
-                {/* Current Subscription Status */}
                 {isSubscribed && (
                     <Card className="border-orange-200 bg-orange-50/50 overflow-hidden relative">
                         <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
@@ -281,7 +191,6 @@ export default function SubscriptionPlans() {
                     </Card>
                 )}
 
-                {/* Plans Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 items-start">
                     {plans.map((plan) => {
                         const isCurrent = activePlanId?.toString() === plan._id?.toString();
@@ -289,11 +198,10 @@ export default function SubscriptionPlans() {
                             <Card
                                 key={plan._id}
                                 className={`relative overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 ${isCurrent
-                                    ? 'border-2 border-orange-500 shadow-lg shadow-orange-100 ring-4 ring-orange-50'
-                                    : 'border-gray-200 hover:border-orange-200'
+                                    ? "border-2 border-orange-500 shadow-lg shadow-orange-100 ring-4 ring-orange-50"
+                                    : "border-gray-200 hover:border-orange-200"
                                     }`}
                             >
-                                {/* Popular Tag */}
                                 {plan.price > 1000 && plan.price < 5000 && !isCurrent && (
                                     <div className="absolute top-4 right-4">
                                         <span className="bg-gradient-to-r from-orange-500 to-amber-500 text-white text-xs font-bold px-2.5 py-1 rounded-full shadow-sm">
@@ -310,7 +218,7 @@ export default function SubscriptionPlans() {
                                     </div>
                                 )}
 
-                                <CardHeader className={`pb-4 px-6 ${isCurrent ? 'pt-12' : 'pt-8'}`}>
+                                <CardHeader className={`pb-4 px-6 ${isCurrent ? "pt-12" : "pt-8"}`}>
                                     <div className="w-11 h-11 rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center mb-4">
                                         <CreditCard className="w-5 h-5" />
                                     </div>
@@ -322,7 +230,7 @@ export default function SubscriptionPlans() {
 
                                 <CardContent className="px-6 pb-6">
                                     <div className="flex items-baseline mb-6">
-                                        <span className="text-4xl font-extrabold text-gray-900 tracking-tight">₹{plan.price?.toLocaleString() || '0'}</span>
+                                        <span className="text-4xl font-extrabold text-gray-900 tracking-tight">₹{plan.price?.toLocaleString() || "0"}</span>
                                         <span className="text-gray-400 font-medium ml-1.5 text-sm">/total</span>
                                     </div>
 
@@ -342,10 +250,10 @@ export default function SubscriptionPlans() {
                                 <CardFooter className="px-6 pb-6 pt-0">
                                     <Button
                                         className={`w-full h-11 text-sm font-semibold rounded-xl transition-all duration-200 flex items-center justify-center gap-2 ${isCurrent
-                                            ? 'bg-green-100 text-green-700 border border-green-200 hover:bg-green-200 cursor-default'
-                                            : plan.needsRMCall 
-                                                ? 'bg-orange-600 text-white hover:bg-orange-700 hover:shadow-orange-200 hover:shadow-lg'
-                                                : 'bg-gray-900 text-white hover:bg-orange-500 hover:shadow-orange-200 hover:shadow-lg'
+                                            ? "bg-green-100 text-green-700 border border-green-200 hover:bg-green-200 cursor-default"
+                                            : plan.needsRMCall
+                                                ? "bg-orange-600 text-white hover:bg-orange-700 hover:shadow-orange-200 hover:shadow-lg"
+                                                : "bg-gray-900 text-white hover:bg-orange-500 hover:shadow-orange-200 hover:shadow-lg"
                                             }`}
                                         onClick={() => !isCurrent && handleSubscribe(plan)}
                                         disabled={isCurrent || (processingId === plan._id)}
@@ -366,7 +274,6 @@ export default function SubscriptionPlans() {
                     })}
                 </div>
 
-                {/* Footer */}
                 <div className="text-center pt-4 pb-2 border-t border-gray-200">
                     <p className="text-gray-400 text-sm">
                         Need help choosing? <a href="#" className="text-orange-500 font-medium underline-offset-4 hover:underline">Contact our sales team</a> for a custom quote.
@@ -379,8 +286,7 @@ export default function SubscriptionPlans() {
                     <div className="w-full max-w-md rounded-2xl bg-white border border-gray-200 shadow-2xl p-4 sm:p-5">
                         <h3 className="text-base sm:text-lg font-bold text-gray-900">Current plan is still active</h3>
                         <p className="text-sm text-gray-600 mt-2 leading-relaxed">
-                            If you continue, <span className="font-semibold">{pendingPlanConfirm.name}</span> will be
-                            purchased now and activated automatically after your current plan expires.
+                            If you continue, <span className="font-semibold">{pendingPlanConfirm.name}</span> will be purchased now and activated automatically after your current plan expires.
                         </p>
                         <div className="mt-4 flex items-center justify-end gap-2">
                             <Button

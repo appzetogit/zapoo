@@ -21,6 +21,21 @@ const getPlanAmountForRestaurant = (plan, restaurant) => {
   return plan?.pricing?.tier1 || 0;
 };
 
+const roundToTwo = (value) => Math.round((Number(value) || 0) * 100) / 100;
+
+const getSubscriptionBillingForRestaurant = (plan, restaurant) => {
+  const baseAmount = roundToTwo(getPlanAmountForRestaurant(plan, restaurant));
+  const gstAmount = roundToTwo(baseAmount * 0.18);
+  const totalAmount = roundToTwo(baseAmount + gstAmount);
+
+  return {
+    baseAmount,
+    gstRate: 18,
+    gstAmount,
+    totalAmount
+  };
+};
+
 const hasActiveSubscription = (restaurant) => {
   if (!restaurant?.subscription) return false;
   const now = new Date();
@@ -267,7 +282,8 @@ export const subscribe = async (req, res) => {
     const isCurrentPlan =
       restaurant.subscription?.planId?.toString() === plan._id.toString();
 
-    const amount = getPlanAmountForRestaurant(plan, restaurant);
+    const billing = getSubscriptionBillingForRestaurant(plan, restaurant);
+    const amount = billing.totalAmount;
 
     if (amount === 0) {
       if (alreadyActive && !isCurrentPlan) {
@@ -335,6 +351,7 @@ export const subscribe = async (req, res) => {
         data: {
           subscription: restaurant.subscription,
           plan,
+          billing
         },
       });
     }
@@ -366,6 +383,7 @@ export const subscribe = async (req, res) => {
           key: credentials.keyId,
         },
         plan,
+        billing
       },
     });
   } catch (error) {
@@ -937,7 +955,8 @@ export const verifySubscriptionPayment = async (req, res) => {
       });
     }
 
-    const amount = getPlanAmountForRestaurant(plan, restaurant);
+    const billing = getSubscriptionBillingForRestaurant(plan, restaurant);
+    const amount = billing.totalAmount;
     const alreadyActive = hasActiveSubscription(restaurant);
     const isCurrentPlan =
       restaurant.subscription?.planId?.toString() === plan._id.toString();
@@ -964,13 +983,14 @@ export const verifySubscriptionPayment = async (req, res) => {
         success: true,
         message:
           "This is not your current active plan. It has been purchased and will activate automatically after your current plan expires.",
-        data: {
-          deferredActivation: true,
-          currentPlan: restaurant.subscription,
-          queuedSubscription: restaurant.queuedSubscription,
-        },
-      });
-    }
+      data: {
+        deferredActivation: true,
+        currentPlan: restaurant.subscription,
+        queuedSubscription: restaurant.queuedSubscription,
+        billing
+      },
+    });
+  }
 
     const startDate = new Date();
     const endDate = new Date();
@@ -1014,6 +1034,7 @@ export const verifySubscriptionPayment = async (req, res) => {
       message: "Subscription payment verified and activated successfully",
       data: {
         subscription: restaurant.subscription,
+        billing
       },
     });
   } catch (error) {

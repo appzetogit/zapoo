@@ -1,5 +1,6 @@
 import jwtService from "../services/jwtService.js";
 import User from "../models/User.js";
+import Restaurant from "../../restaurant/models/Restaurant.js";
 import { errorResponse } from "../../../shared/utils/response.js";
 import { getRedisClient } from "../../../config/redis.js";
 
@@ -104,6 +105,26 @@ export const optionalAuthenticate = async (req, res, next) => {
 
     const token = authHeader.substring(7);
     const decoded = jwtService.verifyAccessToken(token);
+
+    // Restaurant tokens need to resolve against the Restaurant collection,
+    // otherwise optional auth endpoints like subscription plans lose tier context.
+    if (decoded.role === "restaurant") {
+      const restaurant = await Restaurant.findById(decoded.userId)
+        .select("name email phone isActive zoneId tierId subscription queuedSubscription trialUsed businessModel")
+        .populate({
+          path: "zoneId",
+          populate: { path: "tierId" },
+        })
+        .lean();
+
+      if (restaurant) {
+        req.user = { ...restaurant, role: "restaurant" };
+        req.restaurant = restaurant;
+        req.token = decoded;
+      }
+
+      return next();
+    }
 
     // Try finding in User first (most common)
     let user = await User.findById(decoded.userId).select("name email phone role profileImage isActive preferences").lean();
