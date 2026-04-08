@@ -11,28 +11,51 @@ import {
 const languageTabs = [
   { key: "default", label: "Default" },
   { key: "en", label: "English(EN)" },
-  { key: "bn", label: "Bengali - বাংলা(BN)" },
-  { key: "ar", label: "Arabic - العربية (AR)" },
-  { key: "es", label: "Spanish - español(ES)" }
+  { key: "hi", label: "Hindi - हिंदी(HI)" },
+  { key: "bn", label: "Bengali - বাংলা(BN)" }
 ]
 
 export default function EditZoneDialog({ isOpen, onOpenChange, zone, onSave }) {
   const [activeLanguage, setActiveLanguage] = useState("default")
-  const [zoneName, setZoneName] = useState("")
-  const [zoneDisplayName, setZoneDisplayName] = useState("")
+  const [localizedZoneName, setLocalizedZoneName] = useState({ en: "", hi: "", bn: "" })
+  const [localizedDisplayName, setLocalizedDisplayName] = useState({ en: "", hi: "", bn: "" })
 
   useEffect(() => {
     if (zone) {
-      setZoneName(zone.name || "")
-      setZoneDisplayName(zone.displayName || "")
+      const zoneNameFallback = zone.name || ""
+      const displayNameFallback = zone.displayName || zone.zoneName || zone.name || ""
+      setLocalizedZoneName({
+        en: zone.localizedName?.en || zoneNameFallback,
+        hi: zone.localizedName?.hi || "",
+        bn: zone.localizedName?.bn || ""
+      })
+      setLocalizedDisplayName({
+        en: zone.localizedZoneName?.en || zone.zoneName || displayNameFallback,
+        hi: zone.localizedZoneName?.hi || "",
+        bn: zone.localizedZoneName?.bn || ""
+      })
       setActiveLanguage("default")
     }
   }, [zone])
 
+  const currentLocaleKey = activeLanguage === "default" ? "en" : activeLanguage
+  const zoneName = localizedZoneName[currentLocaleKey] || ""
+  const zoneDisplayName = localizedDisplayName[currentLocaleKey] || ""
+
   const handleReset = () => {
     if (zone) {
-      setZoneName(zone.name || "")
-      setZoneDisplayName(zone.displayName || "")
+      const zoneNameFallback = zone.name || ""
+      const displayNameFallback = zone.displayName || zone.zoneName || zone.name || ""
+      setLocalizedZoneName({
+        en: zone.localizedName?.en || zoneNameFallback,
+        hi: zone.localizedName?.hi || "",
+        bn: zone.localizedName?.bn || ""
+      })
+      setLocalizedDisplayName({
+        en: zone.localizedZoneName?.en || zone.zoneName || displayNameFallback,
+        hi: zone.localizedZoneName?.hi || "",
+        bn: zone.localizedZoneName?.bn || ""
+      })
     }
   }
 
@@ -41,8 +64,13 @@ export default function EditZoneDialog({ isOpen, onOpenChange, zone, onSave }) {
     if (onSave && zone) {
       onSave({
         ...zone,
-        name: zoneName,
-        displayName: zoneDisplayName,
+        name: localizedZoneName.en || zone.name,
+        zoneName: localizedDisplayName.en || zone.zoneName || zone.displayName,
+        displayName: localizedDisplayName.en || zone.displayName || zone.zoneName,
+        localizedName: localizedZoneName,
+        localizedZoneName: localizedDisplayName,
+        locale: currentLocaleKey,
+        autoTranslate: currentLocaleKey === "en",
       })
       onOpenChange(false)
     }
@@ -90,7 +118,12 @@ export default function EditZoneDialog({ isOpen, onOpenChange, zone, onSave }) {
                   <input
                     type="text"
                     value={zoneName}
-                    onChange={(e) => setZoneName(e.target.value)}
+                    onChange={(e) =>
+                      setLocalizedZoneName((prev) => ({
+                        ...prev,
+                        [currentLocaleKey]: e.target.value,
+                      }))
+                    }
                     placeholder="Type zone name here"
                     className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     required
@@ -104,7 +137,12 @@ export default function EditZoneDialog({ isOpen, onOpenChange, zone, onSave }) {
                   <input
                     type="text"
                     value={zoneDisplayName}
-                    onChange={(e) => setZoneDisplayName(e.target.value)}
+                    onChange={(e) =>
+                      setLocalizedDisplayName((prev) => ({
+                        ...prev,
+                        [currentLocaleKey]: e.target.value,
+                      }))
+                    }
                     placeholder="Write display zone name"
                     className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     required
@@ -158,4 +196,3 @@ export default function EditZoneDialog({ isOpen, onOpenChange, zone, onSave }) {
     </Dialog>
   )
 }
-

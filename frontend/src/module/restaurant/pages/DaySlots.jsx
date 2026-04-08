@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import { motion, AnimatePresence } from "framer-motion"
 import Lenis from "lenis"
+import { useTranslation } from "react-i18next"
 import { ArrowLeft, Clock, Edit2, Trash2, ChevronDown, AlertTriangle, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -41,7 +42,8 @@ function TimePickerWheel({
   initialHour, 
   initialMinute, 
   initialPeriod,
-  onConfirm 
+  onConfirm,
+  t
 }) {
   const parsedHour = Math.max(1, Math.min(12, parseInt(initialHour) || 1))
   // Ensure minute is a valid number between 0-59
@@ -368,7 +370,7 @@ function TimePickerWheel({
               onClick={handleConfirm}
               className="text-blue-600 hover:text-blue-700 font-medium text-base transition-colors"
             >
-              Okay
+              {t("restaurant.daySlots.actions.okay")}
             </button>
           </div>
         </motion.div>
@@ -378,10 +380,21 @@ function TimePickerWheel({
 }
 
 export default function DaySlots() {
+  const { t } = useTranslation()
   const companyName = useCompanyName()
   const navigate = useNavigate()
   const { day } = useParams()
   const dayName = day ? day.charAt(0).toUpperCase() + day.slice(1) : "Monday"
+  const dayKeyMap = {
+    Monday: "monday",
+    Tuesday: "tuesday",
+    Wednesday: "wednesday",
+    Thursday: "thursday",
+    Friday: "friday",
+    Saturday: "saturday",
+    Sunday: "sunday",
+  }
+  const dayDisplayName = t(`restaurant.daySlots.days.${dayKeyMap[dayName] || "monday"}`)
   
   const [dayData, setDayData] = useState(() => {
     try {
@@ -534,7 +547,7 @@ export default function DaySlots() {
 
   const addSlot = () => {
     if (dayData.slots.length >= 3) {
-      alert("Maximum 3 slots allowed per day")
+      alert(t("restaurant.daySlots.alerts.maxSlots"))
       return
     }
     setDayData(prev => ({
@@ -554,7 +567,7 @@ export default function DaySlots() {
 
   const deleteSlot = (slotId) => {
     if (dayData.slots.length === 1) {
-      alert("At least one slot is required")
+      alert(t("restaurant.daySlots.alerts.minOneSlot"))
       return
     }
     
@@ -595,7 +608,7 @@ export default function DaySlots() {
       navigate("/restaurant/outlet-timings")
     } catch (error) {
       console.error("Error saving day slots:", error)
-      alert("Error saving slots. Please try again.")
+      alert(t("restaurant.daySlots.alerts.saveError"))
     }
   }
 
@@ -607,12 +620,12 @@ export default function DaySlots() {
           <button
             onClick={() => navigate("/restaurant/outlet-timings")}
             className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
-            aria-label="Go back"
+            aria-label={t("restaurant.daySlots.aria.goBack")}
           >
             <ArrowLeft className="w-6 h-6 text-gray-900" />
           </button>
           <div className="flex-1">
-            <h1 className="text-xl font-bold text-gray-900">{dayName}</h1>
+            <h1 className="text-xl font-bold text-gray-900">{dayDisplayName}</h1>
             <p className="text-sm text-gray-500">{companyName} delivery</p>
           </div>
         </div>
@@ -620,7 +633,7 @@ export default function DaySlots() {
         
         <div className="bg-gray-50 p-2">
           <p className="text-sm text-gray-700">
-            Add or modify your restaurant timings here. You can create maximum up to 3 time slots in a day.
+            {t("restaurant.daySlots.description")}
           </p>
         </div>
 
@@ -643,13 +656,13 @@ export default function DaySlots() {
                 {/* Slot Header */}
                 <div className="flex items-center justify-between">
                   <div>
-                    <span className="text-base font-bold text-gray-900">Slot-{index + 1}</span>
+                    <span className="text-base font-bold text-gray-900">{t("restaurant.daySlots.labels.slot", { number: index + 1 })}</span>
                     <span className="text-sm text-gray-600 ml-2">({duration})</span>
                   </div>
                   <button
                     onClick={() => deleteSlot(slot.id)}
                     className="w-8 h-8 bg-pink-100 hover:bg-red-600 rounded-full flex items-center justify-center transition-colors"
-                    aria-label="Delete slot"
+                    aria-label={t("restaurant.daySlots.aria.deleteSlot")}
                   >
                     <Trash2 className="w-4 h-4 text-red-400" />
                   </button>
@@ -659,7 +672,7 @@ export default function DaySlots() {
                 <div className="flex w-full justify-between items-center gap-3">
                   <div className="flex  items-center gap-2 shrink-0">
                     <Clock className="w-4 h-4 text-gray-600" />
-                    <span className="text-sm font-medium text-gray-700 whitespace-nowrap">Start Time</span>
+                    <span className="text-sm font-medium text-gray-700 whitespace-nowrap">{t("restaurant.daySlots.fields.startTime")}</span>
                   </div>
                   <div 
                     className="relative flex items-center border border-gray-300 rounded-sm bg-gray-50 cursor-pointer"
@@ -669,14 +682,14 @@ export default function DaySlots() {
                       type="text"
                       value={slot.start}
                       readOnly
-                      placeholder="03:45"
+                      placeholder={t("restaurant.daySlots.placeholders.startTime")}
                       className="w-20 px-2 py-2 bg-transparent text-gray-900 font-bold focus:outline-none cursor-pointer"
                       style={{ fontSize: '15px' }}
                     />
                     <button
                       type="button"
                       className="mr-2 p-1 hover:bg-gray-200 rounded transition-colors z-10 relative"
-                      aria-label="Open time picker"
+                      aria-label={t("restaurant.daySlots.aria.openTimePicker")}
                     >
                       <Edit2 className="w-4 h-4 text-gray-500 shrink-0" />
                     </button>
@@ -696,7 +709,7 @@ export default function DaySlots() {
                 <div className="flex w-full justify-between items-center gap-3">
                   <div className="flex items-center gap-2 shrink-0">
                     <Clock className="w-4 h-4 text-gray-600" />
-                    <span className="text-sm font-medium mr-1 text-gray-700 whitespace-nowrap">End Time</span>
+                    <span className="text-sm font-medium mr-1 text-gray-700 whitespace-nowrap">{t("restaurant.daySlots.fields.endTime")}</span>
                   </div>
                   <div 
                     className="relative flex items-center border border-gray-300 rounded-sm bg-gray-50 cursor-pointer"
@@ -706,14 +719,14 @@ export default function DaySlots() {
                       type="text"
                       value={slot.end}
                       readOnly
-                      placeholder="02:15"
+                      placeholder={t("restaurant.daySlots.placeholders.endTime")}
                       className="w-20 px-2 py-2 bg-transparent text-gray-900 font-bold focus:outline-none cursor-pointer"
                       style={{ fontSize: '15px' }}
                     />
                     <button
                       type="button"
                       className="mr-2 p-1 hover:bg-gray-200 rounded transition-colors z-10 relative"
-                      aria-label="Open time picker"
+                      aria-label={t("restaurant.daySlots.aria.openTimePicker")}
                     >
                       <Edit2 className="w-4 h-4 text-gray-500 shrink-0" />
                     </button>
@@ -739,7 +752,7 @@ export default function DaySlots() {
             onClick={addSlot}
             className="w-full text-blue-600 hover:text-blue-700 text-sm font-medium py-3 transition-colors"
           >
-            + Add time slot
+            {t("restaurant.daySlots.actions.addTimeSlot")}
           </button>
         )}
       </div>
@@ -759,13 +772,13 @@ export default function DaySlots() {
               htmlFor="copy-to-all"
               className="text-sm text-gray-700 cursor-pointer"
             >
-              Copy above timings to all days
+              {t("restaurant.daySlots.labels.copyToAllDays")}
             </label>
           </div>
 
           {/* Total Duration */}
           <div className="text-sm text-gray-700">
-            Total: {calculateTotalDuration()}
+            {t("restaurant.daySlots.labels.total")}: {calculateTotalDuration()}
           </div>
 
           {/* Save Button */}
@@ -773,7 +786,7 @@ export default function DaySlots() {
             onClick={handleSave}
             className="w-full bg-gray-800 hover:bg-gray-900 text-white font-medium py-3 rounded-lg"
           >
-            Save
+            {t("restaurant.daySlots.actions.save")}
           </Button>
         </div>
       </div>
@@ -792,6 +805,7 @@ export default function DaySlots() {
             initialHour={timeParts.hour}
             initialMinute={timeParts.minute}
             initialPeriod={currentPeriod}
+            t={t}
             onConfirm={(hour, minute, period) => {
               handleCustomTimeChange(timePickerOpen.slotId, timePickerOpen.field, hour, minute, period)
               setTimePickerOpen({ slotId: null, field: null, type: null })
@@ -814,6 +828,7 @@ export default function DaySlots() {
             initialHour={timeParts.hour}
             initialMinute={timeParts.minute}
             initialPeriod={currentPeriod}
+            t={t}
             onConfirm={(hour, minute, period) => {
               handleCustomTimeChange(timePickerOpen.slotId, timePickerOpen.field, hour, minute, period)
               setTimePickerOpen({ slotId: null, field: null, type: null })
@@ -830,10 +845,10 @@ export default function DaySlots() {
               <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center shrink-0">
                 <AlertTriangle className="w-6 h-6 text-red-600" />
               </div>
-              <DialogTitle className="text-left">Delete Time Slot</DialogTitle>
+              <DialogTitle className="text-left">{t("restaurant.daySlots.dialog.deleteTitle")}</DialogTitle>
             </div>
             <DialogDescription className="text-left text-gray-600 pt-2">
-              Are you sure you want to delete this time slot? This action cannot be undone.
+              {t("restaurant.daySlots.dialog.deleteDescription")}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:gap-0">
@@ -845,13 +860,13 @@ export default function DaySlots() {
               }}
               className="w-full sm:w-auto"
             >
-              Cancel
+              {t("restaurant.daySlots.actions.cancel")}
             </Button>
             <Button
               onClick={confirmDelete}
               className="w-full sm:w-auto bg-red-600 hover:bg-red-700 text-white"
             >
-              Delete
+              {t("restaurant.daySlots.actions.delete")}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -14,6 +14,7 @@ import { orderAPI } from "@/lib/api"
 import { initRazorpayPayment } from "@/lib/utils/razorpay"
 import { getCompanyNameAsync } from "@/lib/utils/businessSettings"
 import { toast } from "sonner"
+import { useTranslation } from "react-i18next"
 
 function normalizeCheckoutPaymentMethod(pm) {
   if (!pm) return "razorpay"
@@ -24,6 +25,7 @@ function normalizeCheckoutPaymentMethod(pm) {
 }
 
 export default function Checkout() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const { cart, clearCart } = useCart()
   const { getDefaultAddress, getDefaultPaymentMethod, addresses, paymentMethods, userProfile } = useProfile()
@@ -92,23 +94,23 @@ export default function Checkout() {
 
   const handlePlaceOrder = async () => {
     if (!selectedAddress || !selectedPayment) {
-      toast.error("Please select a delivery address and payment method")
+      toast.error(t("user.checkout.toast.selectAddressAndPayment"))
       return
     }
 
     if (cart.length === 0) {
-      toast.error("Your cart is empty")
+      toast.error(t("user.checkout.toast.cartEmpty"))
       return
     }
 
     if (!defaultAddress) {
-      toast.error("Invalid delivery address")
+      toast.error(t("user.checkout.toast.invalidDeliveryAddress"))
       return
     }
 
     const restaurantId = cart[0]?.restaurantId
     if (!restaurantId) {
-      toast.error("Missing restaurant — open checkout from the restaurant cart.")
+      toast.error(t("user.checkout.toast.missingRestaurant"))
       return
     }
 
@@ -151,7 +153,7 @@ export default function Checkout() {
       const { order, razorpay } = orderResponse.data.data
 
       if (paymentMethod === "cash") {
-        toast.success("Order placed with Cash on Delivery")
+        toast.success(t("user.checkout.toast.orderPlacedCod"))
         clearCart()
         navigate(`/user/orders/${order?.orderId || order?.id}?confirmed=true`)
         setIsPlacingOrder(false)
@@ -159,7 +161,7 @@ export default function Checkout() {
       }
 
       if (paymentMethod === "wallet") {
-        toast.success("Order placed with Wallet")
+        toast.success(t("user.checkout.toast.orderPlacedWallet"))
         clearCart()
         navigate(`/user/orders/${order?.orderId || order?.id}?confirmed=true`)
         setIsPlacingOrder(false)
@@ -167,7 +169,7 @@ export default function Checkout() {
       }
 
       if (!razorpay?.orderId || !razorpay?.key) {
-        throw new Error(razorpay ? "Razorpay is not configured." : "Failed to start payment")
+        throw new Error(razorpay ? t("user.checkout.toast.razorpayNotConfigured") : t("user.checkout.toast.failedToStartPayment"))
       }
 
       const userPhone = userProfile?.phone || defaultAddress?.phone || ""
@@ -200,22 +202,22 @@ export default function Checkout() {
               razorpaySignature: response.razorpay_signature,
             })
             if (verifyResponse.data.success) {
-              toast.success("Payment successful")
+              toast.success(t("user.checkout.toast.paymentSuccessful"))
               clearCart()
               navigate(`/user/orders/${order.orderId}?confirmed=true`)
             } else {
-              throw new Error(verifyResponse.data.message || "Verification failed")
+              throw new Error(verifyResponse.data.message || t("user.checkout.toast.verificationFailed"))
             }
           } catch (err) {
             console.error(err)
-            toast.error(err?.response?.data?.message || err.message || "Payment verification failed")
+            toast.error(err?.response?.data?.message || err.message || t("user.checkout.toast.paymentVerificationFailed"))
           } finally {
             setIsPlacingOrder(false)
           }
         },
         onError: (error) => {
           if (error?.code !== "PAYMENT_CANCELLED" && error?.message !== "PAYMENT_CANCELLED") {
-            toast.error(error?.description || error?.message || "Payment failed")
+            toast.error(error?.description || error?.message || t("user.checkout.toast.paymentFailed"))
           }
           setIsPlacingOrder(false)
         },
@@ -223,7 +225,7 @@ export default function Checkout() {
       })
     } catch (err) {
       console.error("Order creation failed", err)
-      toast.error(err?.response?.data?.message || err.message || "Failed to place order")
+      toast.error(err?.response?.data?.message || err.message || t("user.checkout.toast.failedToPlaceOrder"))
       setIsPlacingOrder(false)
     }
   }
@@ -234,13 +236,13 @@ export default function Checkout() {
         <div className="max-w-4xl mx-auto space-y-6">
           <Card className="bg-white dark:bg-[#1a1a1a] border-0 dark:border-gray-800">
             <CardHeader>
-              <CardTitle className="text-base sm:text-lg md:text-xl dark:text-white">Checkout</CardTitle>
+              <CardTitle className="text-base sm:text-lg md:text-xl dark:text-white">{t("user.checkout.title")}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-center py-12">
-                <p className="text-muted-foreground text-lg mb-4 dark:text-gray-400">Your cart is empty</p>
+                <p className="text-muted-foreground text-lg mb-4 dark:text-gray-400">{t("user.checkout.yourCartIsEmpty")}</p>
                 <Link to="/user/cart">
-                  <Button>Go to Cart</Button>
+                  <Button>{t("user.checkout.goToCart")}</Button>
                 </Link>
               </div>
             </CardContent>
@@ -260,7 +262,7 @@ export default function Checkout() {
                 <ArrowLeft className="h-5 w-5 md:h-6 md:w-6" />
               </Button>
             </Link>
-            <h1 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold dark:text-white">Checkout</h1>
+            <h1 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold dark:text-white">{t("user.checkout.title")}</h1>
           </div>
         </ScrollReveal>
 
@@ -273,7 +275,7 @@ export default function Checkout() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <MapPin className="h-5 w-5 text-yellow-600" />
-                    <span className="dark:text-white">Delivery Address</span>
+                    <span className="dark:text-white">{t("user.checkout.deliveryAddress")}</span>
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -299,7 +301,7 @@ export default function Checkout() {
                             <div className="flex items-start justify-between">
                               <div className="flex-1">
                                 {address.isDefault && (
-                                  <Badge className="mb-2 bg-yellow-500 text-white">Default</Badge>
+                                  <Badge className="mb-2 bg-yellow-500 text-white">{t("user.checkout.default")}</Badge>
                                 )}
                                 <p className="text-sm font-medium">{addressString}</p>
                               </div>
@@ -313,9 +315,9 @@ export default function Checkout() {
                     </div>
                   ) : (
                     <div className="text-center py-8">
-                      <p className="text-muted-foreground mb-4">No addresses saved</p>
+                      <p className="text-muted-foreground mb-4">{t("user.checkout.noAddressesSaved")}</p>
                       <Link to="/user/profile/addresses/new">
-                        <Button>Add Address</Button>
+                        <Button>{t("user.checkout.addAddress")}</Button>
                       </Link>
                     </div>
                   )}
@@ -329,7 +331,7 @@ export default function Checkout() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <CreditCard className="h-5 w-5 text-yellow-600" />
-                    <span className="dark:text-white">Payment Method</span>
+                    <span className="dark:text-white">{t("user.checkout.paymentMethod")}</span>
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -352,7 +354,7 @@ export default function Checkout() {
                               <div className="flex-1">
                                 <div className="flex items-center gap-2 mb-2">
                                   {payment.isDefault && (
-                                    <Badge className="bg-yellow-500 text-white">Default</Badge>
+                                    <Badge className="bg-yellow-500 text-white">{t("user.checkout.default")}</Badge>
                                   )}
                                   <Badge variant="outline" className="capitalize">
                                     {payment.type}
@@ -360,7 +362,7 @@ export default function Checkout() {
                                 </div>
                                 <p className="font-semibold">{cardNumber}</p>
                                 <p className="text-sm text-muted-foreground">
-                                  {payment.cardHolder} • Expires {payment.expiryMonth}/{payment.expiryYear.slice(-2)}
+                                  {payment.cardHolder} • {t("user.checkout.expires")} {payment.expiryMonth}/{payment.expiryYear.slice(-2)}
                                 </p>
                               </div>
                               {isSelected && (
@@ -372,15 +374,15 @@ export default function Checkout() {
                       })}
                       <Link to="/user/profile/payments">
                         <Button variant="outline" className="w-full">
-                          Manage Payment Methods
+                          {t("user.checkout.managePaymentMethods")}
                         </Button>
                       </Link>
                     </div>
                   ) : (
                     <div className="text-center py-8">
-                      <p className="text-muted-foreground mb-4">No payment methods saved</p>
+                      <p className="text-muted-foreground mb-4">{t("user.checkout.noPaymentMethodsSaved")}</p>
                       <Link to="/user/profile/payments/new">
-                        <Button>Add Payment Method</Button>
+                        <Button>{t("user.checkout.addPaymentMethod")}</Button>
                       </Link>
                     </div>
                   )}
@@ -394,7 +396,7 @@ export default function Checkout() {
             <ScrollReveal delay={0.3}>
               <Card className="sticky top-4 md:top-6 dark:bg-[#1a1a1a] dark:border-gray-800">
                 <CardHeader>
-                  <CardTitle className="text-base md:text-lg lg:text-xl dark:text-white">Order Summary</CardTitle>
+                  <CardTitle className="text-base md:text-lg lg:text-xl dark:text-white">{t("user.checkout.orderSummary")}</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4 md:space-y-6">
                   <div className="space-y-3 md:space-y-4 max-h-64 md:max-h-80 overflow-y-auto">
@@ -420,25 +422,25 @@ export default function Checkout() {
 
                   <div className="space-y-2 md:space-y-3 pt-4 md:pt-6 border-t dark:border-gray-700">
                     <div className="flex justify-between text-sm md:text-base">
-                      <span className="text-muted-foreground">Subtotal</span>
+                      <span className="text-muted-foreground">{t("user.checkout.subtotal")}</span>
                       <span className="dark:text-gray-200">₹{pricing.subtotal.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between text-sm md:text-base">
-                      <span className="text-muted-foreground">Delivery Fee</span>
+                      <span className="text-muted-foreground">{t("user.checkout.deliveryFee")}</span>
                       <span className="dark:text-gray-200">
-                        {isCalculating ? "Calculating..." : `₹${pricing.deliveryFee.toFixed(2)}`}
+                        {isCalculating ? t("user.checkout.calculating") : `₹${pricing.deliveryFee.toFixed(2)}`}
                       </span>
                     </div>
                     <div className="flex justify-between text-sm md:text-base">
-                      <span className="text-muted-foreground">Platform Fee</span>
+                      <span className="text-muted-foreground">{t("user.checkout.platformFee")}</span>
                       <span className="dark:text-gray-200">₹{pricing.platformFee.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between text-sm md:text-base">
-                      <span className="text-muted-foreground">GST</span>
+                      <span className="text-muted-foreground">{t("user.checkout.gst")}</span>
                       <span className="dark:text-gray-200">₹{pricing.gst.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between font-bold text-lg md:text-xl lg:text-2xl pt-2 md:pt-3 border-t dark:border-gray-700">
-                      <span className="dark:text-white">Total</span>
+                      <span className="dark:text-white">{t("user.checkout.total")}</span>
                       <span className="text-yellow-600 dark:text-yellow-400">
                         {isCalculating ? "..." : `₹${pricing.total.toFixed(2)}`}
                       </span>
@@ -450,7 +452,7 @@ export default function Checkout() {
                     onClick={handlePlaceOrder}
                     disabled={isPlacingOrder || !selectedAddress || !selectedPayment}
                   >
-                    {isPlacingOrder ? "Placing Order..." : "Place Order"}
+                    {isPlacingOrder ? t("user.checkout.placingOrder") : t("user.checkout.placeOrder")}
                   </Button>
                 </CardContent>
               </Card>

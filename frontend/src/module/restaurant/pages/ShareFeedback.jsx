@@ -7,8 +7,10 @@ import { API_ENDPOINTS } from "@/lib/api/config"
 import api from "@/lib/api"
 import { toast } from "sonner"
 import { useCompanyName } from "@/lib/hooks/useCompanyName"
+import { useTranslation } from "react-i18next"
 
 export default function ShareFeedback() {
+  const { t } = useTranslation()
   const companyName = useCompanyName()
   const navigate = useNavigate()
   const [rating, setRating] = useState(null)
@@ -36,7 +38,7 @@ export default function ShareFeedback() {
       console.error('Error submitting feedback:', error)
       // Still show thanks popup even if backend save fails (graceful degradation)
       if (error.response?.status !== 401) {
-        toast.error('Failed to save feedback, but thank you for your input!')
+        toast.error(t("restaurant.shareFeedback.toast.saveFailed"))
       }
       setShowThanks(true)
     } finally {
@@ -49,12 +51,12 @@ export default function ShareFeedback() {
       {/* Header */}
       <div className="flex items-center justify-between px-4 pt-4 pb-3">
         <h1 className="text-xl font-semibold text-gray-900">
-          Share your feedback
+          {t("restaurant.shareFeedback.title")}
         </h1>
         <button
           onClick={handleClose}
           className="p-2 rounded-full hover:bg-gray-100"
-          aria-label="Close"
+          aria-label={t("restaurant.shareFeedback.aria.close")}
         >
           <X className="w-5 h-5 text-gray-900" />
         </button>
@@ -63,9 +65,9 @@ export default function ShareFeedback() {
       <div className="flex-1 px-4">
         {/* Question */}
         <div className="mt-6 mb-6">
-          <p className="text-sm text-gray-700 mb-1">Tell us about your</p>
+          <p className="text-sm text-gray-700 mb-1">{t("restaurant.shareFeedback.subtitlePrefix")}</p>
           <p className="text-lg font-semibold text-gray-900">
-            Overall experience with {companyName.toLowerCase()}
+            {t("restaurant.shareFeedback.subtitleMain", { companyName: companyName.toLowerCase() })}
           </p>
         </div>
 
@@ -98,8 +100,8 @@ export default function ShareFeedback() {
             })}
           </div>
           <div className="flex items-center justify-between mt-1">
-            <span className="text-xs text-red-500">Very Bad</span>
-            <span className="text-xs text-green-600">Very Good</span>
+            <span className="text-xs text-red-500">{t("restaurant.shareFeedback.scale.veryBad")}</span>
+            <span className="text-xs text-green-600">{t("restaurant.shareFeedback.scale.veryGood")}</span>
           </div>
           {rating !== null && (
             <motion.p
@@ -108,11 +110,11 @@ export default function ShareFeedback() {
               animate={{ opacity: 1, y: 0 }}
               key={rating}
             >
-              You rated your experience{" "}
+              {t("restaurant.shareFeedback.scale.ratedPrefix")}{" "}
               <span className="font-semibold text-gray-900">
                 {rating}/10
               </span>
-              .
+              {t("restaurant.shareFeedback.scale.ratedSuffix")}
             </motion.p>
           )}
         </div>
@@ -144,7 +146,7 @@ export default function ShareFeedback() {
           }`}
           whileTap={rating !== null ? { scale: 0.98 } : undefined}
         >
-          Continue
+          {t("restaurant.shareFeedback.actions.continue")}
         </motion.button>
       </div>
 
@@ -174,10 +176,10 @@ export default function ShareFeedback() {
                   <span className="text-2xl">✓</span>
                 </div>
                 <h2 className="text-base font-semibold text-gray-900 mb-1">
-                  Thanks for your feedback
+                  {t("restaurant.shareFeedback.thanks.title")}
                 </h2>
                 <p className="text-xs text-gray-600 mb-4">
-                  It helps us improve your experience with {companyName.toLowerCase()}.
+                  {t("restaurant.shareFeedback.thanks.subtitle", { companyName: companyName.toLowerCase() })}
                 </p>
                 <button
                   type="button"
@@ -187,7 +189,7 @@ export default function ShareFeedback() {
                     navigate(-1)
                   }}
                 >
-                  Done
+                  {t("restaurant.shareFeedback.actions.done")}
                 </button>
               </div>
             </motion.div>

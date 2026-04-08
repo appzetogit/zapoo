@@ -3,6 +3,47 @@ import Restaurant from '../../restaurant/models/Restaurant.js';
 import { successResponse, errorResponse } from '../../../shared/utils/response.js';
 import asyncHandler from '../../../shared/middleware/asyncHandler.js';
 import mongoose from 'mongoose';
+import { resolveLocaleFromRequest } from '../../../shared/i18n/localeResolver.js';
+import { resolveLocalizedText, toLocalizedText } from '../../../shared/i18n/localizedText.js';
+import { buildLocalizedText } from '../../../shared/i18n/translationService.js';
+import { normalizeLocale } from '../../../shared/i18n/localeConstants.js';
+
+function mergeLocalizedValue(existingValue, localizedOverride, fallback = '') {
+  const merged = toLocalizedText(existingValue, fallback);
+  if (localizedOverride && typeof localizedOverride === 'object') {
+    for (const locale of ['en', 'hi', 'bn']) {
+      if (typeof localizedOverride[locale] === 'string') {
+        merged[locale] = localizedOverride[locale];
+      }
+    }
+  }
+  return merged;
+}
+
+async function enrichLocalizedValue(localizedValue, sourceLocale, autoTranslate, overrides = null) {
+  if (sourceLocale === 'en' && autoTranslate && localizedValue.en) {
+    try {
+      const translated = await buildLocalizedText(localizedValue.en);
+      if (!overrides?.hi) localizedValue.hi = translated.hi || localizedValue.hi;
+      if (!overrides?.bn) localizedValue.bn = translated.bn || localizedValue.bn;
+    } catch (error) {
+      console.warn(`[i18n] Zone translation failed: ${error.message}`);
+    }
+  }
+  return localizedValue;
+}
+
+function resolveZoneForLocale(zone, locale) {
+  const resolvedName = resolveLocalizedText(zone.localizedName, locale, zone.name || zone.zoneName || '');
+  const resolvedZoneName = resolveLocalizedText(zone.localizedZoneName, locale, zone.zoneName || zone.name || '');
+
+  return {
+    ...zone,
+    name: resolvedName,
+    zoneName: resolvedZoneName,
+    displayName: resolvedZoneName
+  };
+}
 
 /**
  * Get all zones
@@ -10,6 +51,7 @@ import mongoose from 'mongoose';
  */
 export const getZones = asyncHandler(async (req, res) => {
   try {
+    const locale = resolveLocaleFromRequest(req);
     const {
       page = 1,
       limit = 50,
@@ -25,6 +67,12 @@ export const getZones = asyncHandler(async (req, res) => {
       query.$or = [
         { name: { $regex: search, $options: 'i' } },
         { zoneName: { $regex: search, $options: 'i' } },
+        { 'localizedName.en': { $regex: search, $options: 'i' } },
+        { 'localizedName.hi': { $regex: search, $options: 'i' } },
+        { 'localizedName.bn': { $regex: search, $options: 'i' } },
+        { 'localizedZoneName.en': { $regex: search, $options: 'i' } },
+        { 'localizedZoneName.hi': { $regex: search, $options: 'i' } },
+        { 'localizedZoneName.bn': { $regex: search, $options: 'i' } },
         { serviceLocation: { $regex: search, $options: 'i' } },
         { country: { $regex: search, $options: 'i' } }
       ];
@@ -59,7 +107,7 @@ export const getZones = asyncHandler(async (req, res) => {
     const total = await Zone.countDocuments(query);
 
     return successResponse(res, 200, 'Zones retrieved successfully', {
-      zones,
+      zones: zones.map((zone) => resolveZoneForLocale(zone, locale)),
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
@@ -79,6 +127,7 @@ export const getZones = asyncHandler(async (req, res) => {
  */
 export const getZoneById = asyncHandler(async (req, res) => {
   try {
+    const locale = resolveLocaleFromRequest(req);
     const { id } = req.params;
 
     const zone = await Zone.findById(id)
@@ -95,7 +144,7 @@ export const getZoneById = asyncHandler(async (req, res) => {
     }
 
     return successResponse(res, 200, 'Zone retrieved successfully', {
-      zone
+      zone: resolveZoneForLocale(zone, locale)
     });
   } catch (error) {
     console.error('Error fetching zone:', error);
@@ -109,9 +158,15 @@ export const getZoneById = asyncHandler(async (req, res) => {
  */
 export const createZone = asyncHandler(async (req, res) => {
   try {
+    const locale = resolveLocaleFromRequest(req);
     const {
       name,
       zoneName,
+      displayName,
+      localizedName,
+      localizedZoneName,
+      locale: sourceLocaleInput,
+      autoTranslate = true,
       country,
       serviceLocation,
       restaurantId,
@@ -159,9 +214,24 @@ export const createZone = asyncHandler(async (req, res) => {
     }
 
     // Create zone
+    const sourceLocale = normalizeLocale(sourceLocaleInput || 'en');
+    const canonicalName = name || zoneName || displayName || '';
+    const canonicalZoneName = zoneName || displayName || name || '';
+
+    let nextLocalizedName = mergeLocalizedValue(localizedName, localizedName, canonicalName);
+    let nextLocalizedZoneName = mergeLocalizedValue(localizedZoneName, localizedZoneName, canonicalZoneName);
+    nextLocalizedName[sourceLocale] = canonicalName || nextLocalizedName[sourceLocale];
+    nextLocalizedZoneName[sourceLocale] = canonicalZoneName || nextLocalizedZoneName[sourceLocale];
+    if (!nextLocalizedName.en) nextLocalizedName.en = canonicalName;
+    if (!nextLocalizedZoneName.en) nextLocalizedZoneName.en = canonicalZoneName;
+    nextLocalizedName = await enrichLocalizedValue(nextLocalizedName, sourceLocale, autoTranslate, localizedName);
+    nextLocalizedZoneName = await enrichLocalizedValue(nextLocalizedZoneName, sourceLocale, autoTranslate, localizedZoneName);
+
     const zoneData = {
-      name: name || zoneName,
-      zoneName: zoneName || name,
+      name: nextLocalizedName.en || canonicalName,
+      localizedName: nextLocalizedName,
+      zoneName: nextLocalizedZoneName.en || canonicalZoneName,
+      localizedZoneName: nextLocalizedZoneName,
       country: country || 'India',
       serviceLocation: serviceLocation || country,
       restaurantId: restaurantId ? new mongoose.Types.ObjectId(restaurantId) : null,
@@ -185,7 +255,7 @@ export const createZone = asyncHandler(async (req, res) => {
     await zone.populate('tierId', 'name rank minArea maxArea');
 
     return successResponse(res, 201, 'Zone created successfully', {
-      zone
+      zone: resolveZoneForLocale(zone.toObject(), locale)
     });
   } catch (error) {
     console.error('Error creating zone:', error);
@@ -202,8 +272,11 @@ export const createZone = asyncHandler(async (req, res) => {
  */
 export const updateZone = asyncHandler(async (req, res) => {
   try {
+    const locale = resolveLocaleFromRequest(req);
     const { id } = req.params;
-    const updateData = req.body;
+    const updateData = { ...req.body };
+    const sourceLocale = normalizeLocale(updateData.locale || 'en');
+    const autoTranslate = updateData.autoTranslate !== undefined ? Boolean(updateData.autoTranslate) : true;
 
     const zone = await Zone.findById(id);
     if (!zone) {
@@ -225,6 +298,57 @@ export const updateZone = asyncHandler(async (req, res) => {
     }
 
     const coordinatesChanged = !!updateData.coordinates;
+
+    if (typeof updateData.displayName === 'string' && updateData.displayName.trim()) {
+      updateData.zoneName = updateData.displayName.trim();
+    }
+
+    const hasNameInput = typeof updateData.name === 'string';
+    const hasZoneNameInput = typeof updateData.zoneName === 'string';
+    const incomingLocalizedName = updateData.localizedName;
+    const incomingLocalizedZoneName = updateData.localizedZoneName;
+
+    if (hasNameInput || incomingLocalizedName) {
+      let nextLocalizedName = mergeLocalizedValue(
+        zone.localizedName,
+        incomingLocalizedName,
+        zone.name || zone.zoneName || ''
+      );
+      if (hasNameInput) nextLocalizedName[sourceLocale] = updateData.name;
+      if (!nextLocalizedName.en) nextLocalizedName.en = zone.name || zone.zoneName || updateData.name || '';
+      nextLocalizedName = await enrichLocalizedValue(
+        nextLocalizedName,
+        sourceLocale,
+        autoTranslate,
+        incomingLocalizedName
+      );
+      updateData.localizedName = nextLocalizedName;
+      updateData.name = nextLocalizedName.en;
+    }
+
+    if (hasZoneNameInput || incomingLocalizedZoneName) {
+      let nextLocalizedZoneName = mergeLocalizedValue(
+        zone.localizedZoneName,
+        incomingLocalizedZoneName,
+        zone.zoneName || zone.name || ''
+      );
+      if (hasZoneNameInput) nextLocalizedZoneName[sourceLocale] = updateData.zoneName;
+      if (!nextLocalizedZoneName.en) {
+        nextLocalizedZoneName.en = zone.zoneName || zone.name || updateData.zoneName || '';
+      }
+      nextLocalizedZoneName = await enrichLocalizedValue(
+        nextLocalizedZoneName,
+        sourceLocale,
+        autoTranslate,
+        incomingLocalizedZoneName
+      );
+      updateData.localizedZoneName = nextLocalizedZoneName;
+      updateData.zoneName = nextLocalizedZoneName.en;
+    }
+
+    delete updateData.displayName;
+    delete updateData.locale;
+    delete updateData.autoTranslate;
 
     // Update zone
     Object.assign(zone, updateData);
@@ -286,7 +410,7 @@ export const updateZone = asyncHandler(async (req, res) => {
     await zone.populate('tierId', 'name rank minArea maxArea');
 
     return successResponse(res, 200, 'Zone updated successfully', {
-      zone
+      zone: resolveZoneForLocale(zone.toObject(), locale)
     });
   } catch (error) {
     console.error('Error updating zone:', error);
@@ -348,6 +472,7 @@ export const toggleZoneStatus = asyncHandler(async (req, res) => {
  */
 export const getZonesByRestaurant = asyncHandler(async (req, res) => {
   try {
+    const locale = resolveLocaleFromRequest(req);
     const { restaurantId } = req.params;
 
     const zones = await Zone.find({
@@ -363,7 +488,7 @@ export const getZonesByRestaurant = asyncHandler(async (req, res) => {
       .lean();
 
     return successResponse(res, 200, 'Zones retrieved successfully', {
-      zones
+      zones: zones.map((zone) => resolveZoneForLocale(zone, locale))
     });
   } catch (error) {
     console.error('Error fetching zones by restaurant:', error);
@@ -377,6 +502,7 @@ export const getZonesByRestaurant = asyncHandler(async (req, res) => {
  */
 export const detectUserZone = asyncHandler(async (req, res) => {
   try {
+    const locale = resolveLocaleFromRequest(req);
     const { lat, lng, latitude, longitude } = req.query;
 
     // Support both lat/lng and latitude/longitude
@@ -477,8 +603,8 @@ export const detectUserZone = asyncHandler(async (req, res) => {
       zoneId: userZone._id.toString(),
       zone: {
         _id: userZone._id.toString(),
-        name: userZone.name || userZone.zoneName,
-        zoneName: userZone.zoneName || userZone.name,
+        name: resolveLocalizedText(userZone.localizedName, locale, userZone.name || userZone.zoneName),
+        zoneName: resolveLocalizedText(userZone.localizedZoneName, locale, userZone.zoneName || userZone.name),
         country: userZone.country,
         unit: userZone.unit
       },
@@ -496,12 +622,17 @@ export const detectUserZone = asyncHandler(async (req, res) => {
  */
 export const getActiveZonesPublic = asyncHandler(async (req, res) => {
   try {
+    const locale = resolveLocaleFromRequest(req);
     const zones = await Zone.find({ isActive: true })
-      .select('name zoneName country coordinates isActive')
+      .select('name zoneName localizedName localizedZoneName country coordinates isActive')
       .lean();
 
     return successResponse(res, 200, 'Active zones retrieved successfully', {
-      zones
+      zones: zones.map((zone) => ({
+        ...zone,
+        name: resolveLocalizedText(zone.localizedName, locale, zone.name || zone.zoneName),
+        zoneName: resolveLocalizedText(zone.localizedZoneName, locale, zone.zoneName || zone.name)
+      }))
     });
   } catch (error) {
     console.error('Error fetching active zones (public):', error);
@@ -554,6 +685,7 @@ function calculateDistance(lat1, lng1, lat2, lng2) {
  */
 export const checkLocationInZone = asyncHandler(async (req, res) => {
   try {
+    const locale = resolveLocaleFromRequest(req);
     const { latitude, longitude, restaurantId } = req.body;
 
     if (!latitude || !longitude || !restaurantId) {
@@ -585,8 +717,8 @@ export const checkLocationInZone = asyncHandler(async (req, res) => {
       isInZone: matchingZones.length > 0,
       zones: matchingZones.map(zone => ({
         _id: zone._id,
-        name: zone.name || zone.zoneName,
-        zoneName: zone.zoneName || zone.name,
+        name: resolveLocalizedText(zone.localizedName, locale, zone.name || zone.zoneName),
+        zoneName: resolveLocalizedText(zone.localizedZoneName, locale, zone.zoneName || zone.name),
         country: zone.country,
         serviceLocation: zone.serviceLocation
       }))

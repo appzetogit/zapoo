@@ -1,5 +1,6 @@
 import axios from 'axios';
 import winston from 'winston';
+import { resolveLocaleFromRequest } from '../../../shared/i18n/localeResolver.js';
 const logger = winston.createLogger({
   level: 'info',
   format: winston.format.json(),
@@ -13,6 +14,7 @@ const logger = winston.createLogger({
  */
 export const reverseGeocode = async (req, res) => {
   try {
+    const locale = resolveLocaleFromRequest(req);
     const {
       lat,
       lng
@@ -160,7 +162,7 @@ export const reverseGeocode = async (req, res) => {
                   params: {
                     latlng: `${latNum},${lngNum}`,
                     key: googleApiKey,
-                    language: 'en'
+                    language: locale
                   },
                   timeout: 5000
                 });

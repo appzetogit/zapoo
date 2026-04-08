@@ -1,6 +1,7 @@
 import { motion } from "framer-motion"
 import { Lock, Crown } from "lucide-react"
 import { useNavigate } from "react-router-dom"
+import { useTranslation } from "react-i18next"
 
 /**
  * A wrapper component that blurs its children and shows an "Upgrade" overlay
@@ -9,12 +10,15 @@ import { useNavigate } from "react-router-dom"
 export default function SubscriptionFeatureOverlay({ 
     children, 
     isLocked, 
-    title = "Premium Feature",
-    message = "Upgrade your plan to unlock this growth tool.",
+    title,
+    message,
     fullscreen = false,
     onGoBack
 }) {
+    const { t } = useTranslation()
     const navigate = useNavigate()
+    const resolvedTitle = title || t("restaurant.subscriptionFeatureOverlay.title")
+    const resolvedMessage = message || t("restaurant.subscriptionFeatureOverlay.message")
 
     if (!isLocked) return <div className="h-full w-full">{children}</div>
 
@@ -50,9 +54,9 @@ export default function SubscriptionFeatureOverlay({
                         <Lock className="w-8 h-8 text-white" />
                     </div>
                     
-                    <h3 className="text-xl font-extrabold text-gray-900 mb-2">{title}</h3>
+                    <h3 className="text-xl font-extrabold text-gray-900 mb-2">{resolvedTitle}</h3>
                     <p className="text-sm text-gray-500 font-medium max-w-[240px] mb-6 leading-relaxed">
-                        {message}
+                        {resolvedMessage}
                     </p>
                     
                     <motion.button
@@ -66,7 +70,7 @@ export default function SubscriptionFeatureOverlay({
                     >
                         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full hover:translate-x-full transition-transform duration-1000" />
                         <Crown className="w-4 h-4 text-amber-400 fill-amber-400" />
-                        View subscription plans
+                        {t("restaurant.subscriptionFeatureOverlay.actions.viewPlans")}
                     </motion.button>
 
                     <motion.button
@@ -75,7 +79,7 @@ export default function SubscriptionFeatureOverlay({
                         onClick={handleGoBack}
                         className="mt-3 px-6 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all"
                     >
-                        Go back
+                        {t("restaurant.subscriptionFeatureOverlay.actions.goBack")}
                     </motion.button>
                 </motion.div>
             </div>

@@ -327,11 +327,16 @@ export async function notifyDeliveryBoyNewOrder(order, deliveryPartnerId) {
 
     // Send FCM push to delivery partner (always send)
     try {
-      await sendNotificationToUser(normalizedDeliveryPartnerId, 'delivery', '🆕 New Order Assigned', `Order #${order.orderId} from ${order.restaurantName || 'restaurant'}`, {
+      await sendNotificationToUser(normalizedDeliveryPartnerId, 'delivery', 'New Order Assigned', `Order #${order.orderId} from ${order.restaurantName || 'restaurant'}`, {
         orderId: order.orderId,
         orderMongoId: order._id?.toString(),
         status: order.status,
-        type: 'new_order'
+        type: 'new_order',
+        templateKey: 'delivery_new_order',
+        templateVars: {
+          orderId: order.orderId,
+          restaurantName: order.restaurantName || 'restaurant'
+        }
       });
     } catch (pushError) {
       console.error('❌ [FCM] Error sending delivery new order notification:', pushError);
@@ -602,11 +607,15 @@ export async function notifyDeliveryBoyOrderReady(order, deliveryPartnerId) {
 
     // Send FCM push to delivery partner (always send)
     try {
-      await sendNotificationToUser(normalizedDeliveryPartnerId, 'delivery', '🥡 Order Ready for Pickup', `Order #${order.orderId} is ready for pickup`, {
+      await sendNotificationToUser(normalizedDeliveryPartnerId, 'delivery', 'Order Ready for Pickup', `Order #${order.orderId} is ready for pickup`, {
         orderId: order.orderId,
         orderMongoId: order._id?.toString(),
         status: 'ready',
-        type: 'order_ready'
+        type: 'order_ready',
+        templateKey: 'delivery_order_ready_for_pickup',
+        templateVars: {
+          orderId: order.orderId
+        }
       });
     } catch (pushError) {
       console.error('❌ [FCM] Error sending delivery order ready notification:', pushError);

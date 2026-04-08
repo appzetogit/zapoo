@@ -110,6 +110,14 @@ const metricsSchema = new mongoose.Schema({
   }
 }, { _id: false });
 
+const preferencesSchema = new mongoose.Schema({
+  language: {
+    type: String,
+    enum: ['en', 'hi', 'bn'],
+    default: 'en'
+  }
+}, { _id: false });
+
 const deliverySchema = new mongoose.Schema(
   {
     deliveryId: { type: String, trim: true },
@@ -133,6 +141,10 @@ const deliverySchema = new mongoose.Schema(
     // --- Availability & metrics ---
     availability: availabilitySchema,
     metrics: metricsSchema,
+    preferences: {
+      type: preferencesSchema,
+      default: () => ({ language: 'en' })
+    },
     // --- Workflow ---
     status: {
       type: String,
@@ -242,4 +254,3 @@ deliverySchema.methods.comparePassword = async function (candidatePassword) {
 };
 
 export default mongoose.model('Delivery', deliverySchema);
-

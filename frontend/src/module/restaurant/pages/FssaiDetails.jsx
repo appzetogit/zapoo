@@ -1,8 +1,10 @@
 import { useNavigate } from "react-router-dom"
 import { ArrowLeft, ChevronDown, Download } from "lucide-react"
+import { useTranslation } from "react-i18next"
 
 export default function FssaiDetails() {
   const navigate = useNavigate()
+  const { t } = useTranslation()
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
@@ -11,18 +13,18 @@ export default function FssaiDetails() {
         <button
           onClick={() => navigate(-1)}
           className="p-2 rounded-full hover:bg-gray-100"
-          aria-label="Back"
+          aria-label={t("restaurant.fssaiDetails.aria.back")}
         >
           <ArrowLeft className="w-5 h-5 text-gray-900" />
         </button>
         <div className="flex-1">
           <div className="flex items-center gap-1">
             <h1 className="text-base font-semibold text-gray-900">
-              Kadhai Chammach Restaurant
+              {t("restaurant.fssaiDetails.restaurantName")}
             </h1>
             <ChevronDown className="w-4 h-4 text-gray-500" />
           </div>
-          <p className="text-xs text-gray-500">By Pass Road (South), Indore</p>
+          <p className="text-xs text-gray-500">{t("restaurant.fssaiDetails.location")}</p>
         </div>
       </div>
 
@@ -34,10 +36,10 @@ export default function FssaiDetails() {
           </div>
           <div className="flex-1">
             <p className="text-sm font-semibold text-gray-900">
-              FSSAI is expiring in 14 days
+              {t("restaurant.fssaiDetails.warning.title")}
             </p>
             <p className="text-xs text-gray-700 mt-1">
-              Update before expiry to keep getting orders
+              {t("restaurant.fssaiDetails.warning.subtitle")}
             </p>
           </div>
         </div>
@@ -45,7 +47,7 @@ export default function FssaiDetails() {
         {/* Details card */}
         <div className="rounded-2xl bg-white shadow-sm border border-gray-100 p-4 space-y-3">
           <div>
-            <p className="text-xs text-gray-500 mb-1">FSSAI registration number</p>
+            <p className="text-xs text-gray-500 mb-1">{t("restaurant.fssaiDetails.fields.registrationNumber")}</p>
             <p className="text-sm font-semibold text-gray-900">
               21424850010602
             </p>
@@ -55,7 +57,7 @@ export default function FssaiDetails() {
 
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs text-gray-500 mb-1">Document</p>
+              <p className="text-xs text-gray-500 mb-1">{t("restaurant.fssaiDetails.fields.document")}</p>
               <p className="text-sm font-semibold text-gray-900">
                 20959122.pdf
               </p>
@@ -71,7 +73,7 @@ export default function FssaiDetails() {
           <div className="border-t border-dashed border-gray-200" />
 
           <div>
-            <p className="text-xs text-gray-500 mb-1">Valid up to</p>
+            <p className="text-xs text-gray-500 mb-1">{t("restaurant.fssaiDetails.fields.validUpto")}</p>
             <p className="text-sm font-semibold text-gray-900">29-12-2025</p>
           </div>
         </div>
@@ -84,16 +86,16 @@ export default function FssaiDetails() {
           className="w-full py-3 rounded-full bg-black text-white text-sm font-medium mb-2"
           onClick={() => navigate("/restaurant/fssai/update")}
         >
-          Update FSSAI license
+          {t("restaurant.fssaiDetails.actions.updateLicense")}
         </button>
         <p className="text-xs text-center text-gray-600">
-          Havent renewed your FSSAI?{" "}
+          {t("restaurant.fssaiDetails.actions.notRenewed")}{" "}
           <button
             type="button"
             className="text-blue-600 underline underline-offset-2"
             onClick={() => navigate("/restaurant/fssai/update")}
           >
-            Apply Now
+            {t("restaurant.fssaiDetails.actions.applyNow")}
           </button>
         </p>
       </div>

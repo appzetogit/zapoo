@@ -1,12 +1,14 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Trophy, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { heroBannerAPI } from "@/lib/api";
-import api from "@/lib/api";
-import { useLocation } from "../hooks/useLocation";
-import { useZone } from "../hooks/useZone";
-import { toast } from "sonner";
+import { useState, useEffect } from "react"
+import { Link, useNavigate } from "react-router-dom"
+import { ArrowLeft, Star, Clock, Bookmark, BadgePercent, Trophy, Loader2 } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+import { heroBannerAPI } from "@/lib/api"
+import { useLocation } from "../hooks/useLocation"
+import { useZone } from "../hooks/useZone"
+import { toast } from "sonner"
+import DynamicEtaText from "../components/DynamicEtaText"
+import { useTranslation } from "react-i18next"
 import FeaturedStyleRestaurantCard from "../components/FeaturedStyleRestaurantCard";
 
 import top10Banner from "@/assets/top10pagebanner.png";

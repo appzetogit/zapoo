@@ -6,7 +6,7 @@ import restaurantAuthRoutes from './routes/restaurantAuthRoutes.js';
 import { validate } from '../../shared/middleware/validate.js';
 import Joi from 'joi';
 import { getOnboarding, upsertOnboarding, createRestaurantFromOnboardingManual } from './controllers/restaurantOnboardingController.js';
-import { getRestaurants, getRestaurantById, getRestaurantByOwner, updateRestaurantProfile, uploadProfileImage, uploadMenuImage, deleteRestaurantAccount, updateDeliveryStatus, getRestaurantsWithDishesUnder250, getDeliveryPricingConfig, updateDeliveryPricingConfig } from './controllers/restaurantController.js';
+import { getRestaurants, getRestaurantById, getRestaurantByOwner, updateRestaurantProfile, uploadProfileImage, uploadMenuImage, deleteRestaurantAccount, updateDeliveryStatus, getRestaurantsWithDishesUnder250, getDeliveryPricingConfig, updateDeliveryPricingConfig, getRestaurantPreferences, updateRestaurantPreferences } from './controllers/restaurantController.js';
 import { getRestaurantFinance } from './controllers/restaurantFinanceController.js';
 import { getWallet, getWalletTransactions, getWalletStats } from './controllers/restaurantWalletController.js';
 import { createWithdrawalRequest, getRestaurantWithdrawalRequests } from './controllers/withdrawalController.js';
@@ -167,6 +167,10 @@ router.get('/owner/me', authenticate, getRestaurantByOwner);
 
 // Profile routes (authenticated - for restaurant module)
 router.put('/profile', authenticate, updateRestaurantProfile);
+router.get('/preferences', authenticate, getRestaurantPreferences);
+router.put('/preferences', authenticate, validate(Joi.object({
+    language: Joi.string().valid('en', 'hi', 'bn').required()
+})), updateRestaurantPreferences);
 router.delete('/profile', authenticate, deleteRestaurantAccount);
 router.post('/profile/image', authenticate, uploadMiddleware.single('file'), uploadProfileImage);
 router.post('/profile/menu-image', authenticate, uploadMiddleware.single('file'), uploadMenuImage);

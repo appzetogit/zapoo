@@ -9,8 +9,13 @@ const {
 } = process.env;
 
 const getBaseUrl = () => {
-  const subdomain = EXOTEL_SUBDOMAIN || "api";
-  return `https://${subdomain}.exotel.com/v1/Accounts/${EXOTEL_SID}`;
+  const { sid, subdomain } = getExotelConfig();
+  const normalizedSubdomain = subdomain
+    .replace(/^https?:\/\//i, "")
+    .replace(/\.exotel\.com$/i, "")
+    .replace(/\/+$/g, "");
+
+  return `https://${normalizedSubdomain}.exotel.com/v1/Accounts/${sid}`;
 };
 
 const getAuthConfig = () => {
@@ -224,4 +229,3 @@ export const initiateBridgeCall = async ({
     throw wrappedError;
   }
 };
-

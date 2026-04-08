@@ -1,32 +1,30 @@
 import { motion } from "framer-motion"
 import { useNavigate, useParams } from "react-router-dom"
 import { ArrowLeft, ChevronRight } from "lucide-react"
+import { useTranslation } from "react-i18next"
 import BottomNavOrders from "../components/BottomNavOrders"
 
-const offerGoalTitles = {
-  "grow-customers": "Grow your customer base",
-  "increase-value": "Increase your order value",
-  "mealtime-orders": "Get more mealtime orders",
-}
-
-const discountTypes = [
-  {
-    id: "percentage",
-    title: "Percentage discount",
-    description: "Create promo discounts like '30% OFF up to ₹75'",
-    indicator: (
-      <div className="flex flex-col items-center justify-center">
-        <span className="text-lg font-bold text-purple-600 leading-none">30%</span>
-        <span className="text-xs font-semibold text-purple-600 leading-tight">OFF</span>
-      </div>
-    ),
-  },
-]
-
 export default function ChooseDiscountType() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const { goalId } = useParams()
-  const pageTitle = offerGoalTitles[goalId] || "Choose discount type"
+  const pageTitle = t(`restaurant.chooseDiscountType.goals.${goalId}`, {
+    defaultValue: t("restaurant.chooseDiscountType.title")
+  })
+
+  const discountTypes = [
+    {
+      id: "percentage",
+      title: t("restaurant.chooseDiscountType.types.percentage.title"),
+      description: t("restaurant.chooseDiscountType.types.percentage.description"),
+      indicator: (
+        <div className="flex flex-col items-center justify-center">
+          <span className="text-lg font-bold text-purple-600 leading-none">30%</span>
+          <span className="text-xs font-semibold text-purple-600 leading-tight">{t("restaurant.chooseDiscountType.types.percentage.offLabel")}</span>
+        </div>
+      ),
+    },
+  ]
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
@@ -36,6 +34,7 @@ export default function ChooseDiscountType() {
           <button
             onClick={() => navigate("/restaurant/hub-growth/create-offers")}
             className="p-1 rounded-full hover:bg-gray-100"
+            aria-label={t("restaurant.chooseDiscountType.aria.goBack")}
           >
             <ArrowLeft className="w-5 h-5 text-gray-700" />
           </button>
@@ -77,7 +76,7 @@ export default function ChooseDiscountType() {
           
           <div className="relative z-10 pr-16">
             <h2 className="text-xl font-bold text-white leading-tight">
-              Choose your promo discount type
+              {t("restaurant.chooseDiscountType.choosePromo")}
             </h2>
           </div>
         </div>

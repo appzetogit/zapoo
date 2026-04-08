@@ -1,8 +1,11 @@
 import { motion } from "framer-motion"
 import { Leaf } from "lucide-react"
+import { useTranslation } from "react-i18next"
 import BottomNavOrders from "../components/BottomNavOrders"
 
 export default function Hyperpure() {
+  const { t } = useTranslation()
+
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col pb-24">
       <motion.div
@@ -13,8 +16,8 @@ export default function Hyperpure() {
       >
         <div className="text-center">
           <Leaf className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-gray-900 mb-2">Hyperpure</h2>
-          <p className="text-gray-600">This page is under development</p>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">{t("restaurant.hyperpure.title")}</h2>
+          <p className="text-gray-600">{t("restaurant.hyperpure.underDevelopment")}</p>
         </div>
       </motion.div>
       <BottomNavOrders />

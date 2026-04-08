@@ -1,8 +1,10 @@
 import { useNavigate } from "react-router-dom"
 import { ArrowLeft } from "lucide-react"
+import { useTranslation } from "react-i18next"
 
 export default function FssaiUpdate() {
   const navigate = useNavigate()
+  const { t } = useTranslation()
 
   const handleSubmit = (e) => {
     e.preventDefault()
@@ -17,54 +19,54 @@ export default function FssaiUpdate() {
         <button
           onClick={() => navigate(-1)}
           className="p-2 rounded-full hover:bg-gray-100"
-          aria-label="Back"
+          aria-label={t("restaurant.fssaiUpdate.aria.back")}
         >
           <ArrowLeft className="w-5 h-5 text-gray-900" />
         </button>
-        <h1 className="text-base font-semibold text-gray-900">Update FSSAI</h1>
+        <h1 className="text-base font-semibold text-gray-900">{t("restaurant.fssaiUpdate.title")}</h1>
       </div>
 
       <form onSubmit={handleSubmit} className="flex-1 px-4 pt-4 pb-28 space-y-4">
         <div>
           <label className="block text-xs font-medium text-gray-700 mb-1">
-            FSSAI registration number
+            {t("restaurant.fssaiUpdate.fields.registrationNumber")}
           </label>
           <input
             type="text"
-            placeholder="eg. 19138110019201"
+            placeholder={t("restaurant.fssaiUpdate.placeholders.registrationNumber")}
             className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-black focus:border-black"
           />
         </div>
 
         <div>
           <label className="block text-xs font-medium text-gray-700 mb-1">
-            Valid up to
+            {t("restaurant.fssaiUpdate.fields.validUpto")}
           </label>
           <input
             type="text"
-            placeholder="DD-MM-YYYY"
+            placeholder={t("restaurant.fssaiUpdate.placeholders.validUpto")}
             className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-black focus:border-black"
           />
         </div>
 
         <div>
           <label className="block text-xs font-medium text-gray-700 mb-2">
-            Upload your FSSAI license
+            {t("restaurant.fssaiUpdate.fields.uploadLicense")}
           </label>
           <div className="w-full rounded-xl border border-dashed border-gray-300 bg-gray-50 px-4 py-8 flex flex-col items-center justify-center text-center">
             <div className="mb-2 text-2xl">⬆️</div>
             <p className="text-sm font-medium text-gray-900 mb-1">
-              Upload your FSSAI license
+              {t("restaurant.fssaiUpdate.fields.uploadLicense")}
             </p>
             <p className="text-xs text-gray-500">
-              jpeg, png, or pdf (up to 5MB)
+              {t("restaurant.fssaiUpdate.hints.fileTypes")}
             </p>
           </div>
           <button
             type="button"
             className="mt-2 text-xs text-gray-700 underline underline-offset-2"
           >
-            View upload guidelines
+            {t("restaurant.fssaiUpdate.actions.viewGuidelines")}
           </button>
         </div>
       </form>
@@ -77,7 +79,7 @@ export default function FssaiUpdate() {
           className="w-full py-3 rounded-full bg-gray-200 text-gray-500 text-sm font-medium"
           disabled
         >
-          Confirm
+          {t("restaurant.fssaiUpdate.actions.confirm")}
         </button>
       </div>
     </div>

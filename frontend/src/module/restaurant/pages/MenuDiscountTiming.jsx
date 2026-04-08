@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
+import { useTranslation } from "react-i18next";
 import { ArrowLeft, Info, Calendar as CalendarIcon, ChevronDown, X } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import BottomNavOrders from "../components/BottomNavOrders";
 export default function MenuDiscountTiming() {
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const {
@@ -17,26 +19,47 @@ export default function MenuDiscountTiming() {
   } = location.state || {};
   const [customerGroup, setCustomerGroup] = useState("all");
   const [offerDays, setOfferDays] = useState("all");
-  const [startDate, setStartDate] = useState("18 Dec 2025");
-  const [targetMealtime, setTargetMealtime] = useState("All mealtimes");
+  const [targetMealtime, setTargetMealtime] = useState("all");
   const [startDateDate, setStartDateDate] = useState(new Date());
   const [isMealtimeOpen, setIsMealtimeOpen] = useState(false);
   const [tempMealtime, setTempMealtime] = useState(targetMealtime);
-  const mealtimeOptions = ["All mealtimes", "Breakfast (8 AM - 11 AM)", "Lunch (11 AM - 3 PM)", "Snacks (3 PM - 7 PM)", "Dinner (7 PM - 11 PM)", "Late night (11 PM - 6 AM)"];
+  const mealtimeOptions = [{
+    id: "all",
+    labelKey: "restaurant.menuDiscountTiming.mealtimes.all"
+  }, {
+    id: "breakfast",
+    labelKey: "restaurant.menuDiscountTiming.mealtimes.breakfast"
+  }, {
+    id: "lunch",
+    labelKey: "restaurant.menuDiscountTiming.mealtimes.lunch"
+  }, {
+    id: "snacks",
+    labelKey: "restaurant.menuDiscountTiming.mealtimes.snacks"
+  }, {
+    id: "dinner",
+    labelKey: "restaurant.menuDiscountTiming.mealtimes.dinner"
+  }, {
+    id: "lateNight",
+    labelKey: "restaurant.menuDiscountTiming.mealtimes.lateNight"
+  }];
+  const localeCode = i18n.language === "bn" ? "bn-IN" : i18n.language === "hi" ? "hi-IN" : "en-IN";
   const formatDateLabel = date => {
-    if (!date) return startDate;
+    if (!date) return "";
     const day = date.getDate().toString().padStart(2, "0");
-    const month = date.toLocaleString("en-US", {
+    const month = date.toLocaleString(localeCode, {
       month: "short"
     });
     const year = date.getFullYear();
     return `${day} ${month} ${year}`;
   };
+  const startDate = formatDateLabel(startDateDate);
+  const targetMealtimeLabel = t(mealtimeOptions.find(option => option.id === targetMealtime)?.labelKey || "restaurant.menuDiscountTiming.mealtimes.all");
+  const tempMealtimeLabel = optionId => t(mealtimeOptions.find(option => option.id === optionId)?.labelKey || "restaurant.menuDiscountTiming.mealtimes.all");
   const getPageTitle = () => {
-    if (discountType === "percentage-menu") return "Percentage discount";
-    if (discountType === "flat-price-menu") return "Flat price";
+    if (discountType === "percentage-menu") return t("restaurant.menuDiscountTiming.pageTitles.percentage");
+    if (discountType === "flat-price-menu") return t("restaurant.menuDiscountTiming.pageTitles.flatPrice");
     if (discountType === "bogo-menu") return "BOGO";
-    return "Menu discount";
+    return t("restaurant.menuDiscountTiming.pageTitles.default");
   };
   const getBackPath = () => {
     if (discountType === "percentage-menu") return "/restaurant/hub-growth/create-offers/delight-customers/percentage";
@@ -51,7 +74,7 @@ export default function MenuDiscountTiming() {
     // TODO: Save offer to backend here
 
     // Navigate back to create offers page
-    alert("Offer created successfully!");
+    alert(t("restaurant.menuDiscountTiming.toast.created"));
     navigate("/restaurant/hub-growth/create-offers");
   };
   return <div className="min-h-screen bg-gray-100 flex flex-col">
@@ -69,11 +92,11 @@ export default function MenuDiscountTiming() {
       <div className="flex-1 px-4 py-6 space-y-6">
         {/* Customer target */}
         <div>
-          <h2 className="text-lg font-bold text-gray-900 tracking-wider mb-3">Customer target</h2>
+          <h2 className="text-lg font-bold text-gray-900 tracking-wider mb-3">{t("restaurant.menuDiscountTiming.customerTarget.title")}</h2>
           <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
             <label className="flex items-start justify-between gap-3 cursor-pointer">
               <div className="flex-1">
-                <p className="text-sm font-semibold text-gray-900">All customers</p>
+                <p className="text-sm font-semibold text-gray-900">{t("restaurant.menuDiscountTiming.customerTarget.allCustomers")}</p>
               </div>
               <input type="radio" name="customerGroupMenu" value="all" checked={customerGroup === "all"} onChange={e => setCustomerGroup(e.target.value)} className="mt-1 w-5 h-5 text-black border-gray-400 focus:ring-black" style={{
               accentColor: "#000000"
@@ -81,8 +104,8 @@ export default function MenuDiscountTiming() {
             </label>
             <label className="flex items-start justify-between gap-3 cursor-pointer">
               <div className="flex-1">
-                <p className="text-sm font-semibold text-gray-900">New customers</p>
-                <p className="text-xs text-gray-500 mt-1">Customers who haven&apos;t ordered in the last 90 days</p>
+                <p className="text-sm font-semibold text-gray-900">{t("restaurant.menuDiscountTiming.customerTarget.newCustomers")}</p>
+                <p className="text-xs text-gray-500 mt-1">{t("restaurant.menuDiscountTiming.customerTarget.newCustomersHint")}</p>
               </div>
               <input type="radio" name="customerGroupMenu" value="new" checked={customerGroup === "new"} onChange={e => setCustomerGroup(e.target.value)} className="mt-1 w-5 h-5 text-black border-gray-400 focus:ring-black" style={{
               accentColor: "#000000"
@@ -93,21 +116,21 @@ export default function MenuDiscountTiming() {
 
         {/* Offer timings */}
         <div>
-          <h2 className="text-lg font-bold text-gray-900 tracking-wider mb-3">Offer timings</h2>
+          <h2 className="text-lg font-bold text-gray-900 tracking-wider mb-3">{t("restaurant.menuDiscountTiming.offerTimings.title")}</h2>
           <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-4">
             {/* Day chips */}
             <div className="flex gap-2">
               {[{
               id: "all",
-              label: "All days"
+              labelKey: "restaurant.menuDiscountTiming.days.all"
             }, {
               id: "mon-thu",
-              label: "Mon - Thu"
+              labelKey: "restaurant.menuDiscountTiming.days.monThu"
             }, {
               id: "fri-sun",
-              label: "Fri - Sun"
+              labelKey: "restaurant.menuDiscountTiming.days.friSun"
             }].map(option => <button key={option.id} onClick={() => setOfferDays(option.id)} className={`flex-1 py-2.5 px-4 rounded-full text-sm font-medium border transition-colors ${offerDays === option.id ? "bg-black text-white border-black" : "bg-white text-gray-900 border-gray-300"}`}>
-                  {option.label}
+                  {t(option.labelKey)}
                 </button>)}
             </div>
 
@@ -117,7 +140,7 @@ export default function MenuDiscountTiming() {
             <Popover>
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-gray-900">Start date</span>
+                  <span className="text-sm font-medium text-gray-900">{t("restaurant.menuDiscountTiming.fields.startDate")}</span>
                   <PopoverTrigger asChild>
                     <button type="button" className="p-1 rounded-full hover:bg-gray-100">
                       <Info className="w-4 h-4 text-gray-500" />
@@ -143,13 +166,13 @@ export default function MenuDiscountTiming() {
             {/* Target mealtime */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-gray-900">Target mealtime</span>
+                <span className="text-sm font-medium text-gray-900">{t("restaurant.menuDiscountTiming.fields.targetMealtime")}</span>
                 <button onClick={() => setIsMealtimeOpen(true)} className="p-1 rounded-full hover:bg-gray-100">
                   <Info className="w-4 h-4 text-gray-500" />
                 </button>
               </div>
               <button onClick={() => setIsMealtimeOpen(true)} className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white flex items-center justify-between text-sm font-medium text-gray-900">
-                <span>{targetMealtime}</span>
+                <span>{targetMealtimeLabel}</span>
                 <ChevronDown className="w-4 h-4 text-gray-500" />
               </button>
             </div>
@@ -160,7 +183,7 @@ export default function MenuDiscountTiming() {
       {/* Bottom button */}
       <div className="sticky bottom-0 bg-white border-t border-gray-200 px-4 py-4">
         <button onClick={handlePreview} disabled={!isFormValid} className={`w-full py-3 rounded-lg font-semibold text-sm transition-colors ${isFormValid ? "bg-black text-white hover:bg-gray-900" : "bg-gray-300 text-gray-500 cursor-not-allowed"}`}>
-          Preview offer
+          {t("restaurant.menuDiscountTiming.actions.previewOffer")}
         </button>
       </div>
 
@@ -186,27 +209,27 @@ export default function MenuDiscountTiming() {
           stiffness: 300
         }} className="fixed bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-2xl z-[9999] max-h-[70vh] flex flex-col" onClick={e => e.stopPropagation()}>
               <div className="flex items-center justify-between px-4 py-4 border-b border-gray-200 rounded-t-2xl">
-                <h2 className="text-lg font-bold text-gray-900 tracking-wide">Select target mealtime</h2>
+                <h2 className="text-lg font-bold text-gray-900 tracking-wide">{t("restaurant.menuDiscountTiming.popup.title")}</h2>
                 <button onClick={() => setIsMealtimeOpen(false)} className="p-1 rounded-full hover:bg-gray-100">
                   <X className="w-5 h-5 text-gray-600" />
                 </button>
               </div>
               <div className="flex-1 px-4 py-4 overflow-y-auto">
                 <div className="space-y-2">
-                  {mealtimeOptions.map(option => <label key={option} className="flex items-center gap-3 py-2 cursor-pointer">
-                      <input type="radio" name="targetMealtime" value={option} checked={tempMealtime === option} onChange={e => setTempMealtime(e.target.value)} className="w-5 h-5 text-black border-gray-400 focus:ring-black" style={{
+                  {mealtimeOptions.map(option => <label key={option.id} className="flex items-center gap-3 py-2 cursor-pointer">
+                      <input type="radio" name="targetMealtime" value={option.id} checked={tempMealtime === option.id} onChange={e => setTempMealtime(e.target.value)} className="w-5 h-5 text-black border-gray-400 focus:ring-black" style={{
                   accentColor: "#000000"
                 }} />
-                      <span className="text-sm font-medium text-gray-900">{option}</span>
+                      <span className="text-sm font-medium text-gray-900">{tempMealtimeLabel(option.id)}</span>
                     </label>)}
                 </div>
               </div>
               <div className="px-4 py-4 border-t border-gray-200">
-                <button onClick={() => {
+            <button onClick={() => {
               setTargetMealtime(tempMealtime);
               setIsMealtimeOpen(false);
             }} className={`w-full py-3 rounded-lg font-semibold text-sm transition-colors ${tempMealtime ? "bg-black text-white hover:bg-gray-900" : "bg-gray-300 text-gray-500 cursor-not-allowed"}`} disabled={!tempMealtime}>
-                  Confirm
+                  {t("restaurant.menuDiscountTiming.actions.confirm")}
                 </button>
               </div>
             </motion.div>

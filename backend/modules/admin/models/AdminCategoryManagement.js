@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { localizedTextSchema } from '../../../shared/i18n/localizedText.js';
 
 const adminCategoryManagementSchema = new mongoose.Schema(
   {
@@ -6,6 +7,10 @@ const adminCategoryManagementSchema = new mongoose.Schema(
       type: String,
       required: [true, 'Category name is required'],
       trim: true
+    },
+    localizedName: {
+      type: localizedTextSchema,
+      default: () => ({ en: '', hi: '', bn: '' })
     },
     image: {
       type: String,
@@ -28,6 +33,10 @@ const adminCategoryManagementSchema = new mongoose.Schema(
     description: {
       type: String,
       trim: true
+    },
+    localizedDescription: {
+      type: localizedTextSchema,
+      default: () => ({ en: '', hi: '', bn: '' })
     },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
@@ -68,4 +77,3 @@ adminCategoryManagementSchema.virtual('sl').get(function() {
 const AdminCategoryManagement = mongoose.model('AdminCategoryManagement', adminCategoryManagementSchema);
 
 export default AdminCategoryManagement;
-

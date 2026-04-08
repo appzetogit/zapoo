@@ -1,8 +1,10 @@
 import { useRef } from "react"
 import { ChevronLeft, ChevronRight } from "lucide-react"
+import { useTranslation } from "react-i18next"
 import { Button } from "@/components/ui/button"
 
 export default function Carousel({ children, className = "" }) {
+  const { t } = useTranslation()
   const scrollRef = useRef(null)
 
   const scroll = (direction) => {
@@ -22,6 +24,7 @@ export default function Carousel({ children, className = "" }) {
         size="icon"
         className="absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-white/90 backdrop-blur-sm shadow-lg hover:bg-white rounded-full h-10 w-10"
         onClick={() => scroll("left")}
+        aria-label={t("user.carousel.previous")}
       >
         <ChevronLeft className="h-5 w-5" />
       </Button>
@@ -37,12 +40,12 @@ export default function Carousel({ children, className = "" }) {
         size="icon"
         className="absolute right-0 top-1/2 -translate-y-1/2 z-10 bg-white/90 backdrop-blur-sm shadow-lg hover:bg-white rounded-full h-10 w-10"
         onClick={() => scroll("right")}
+        aria-label={t("user.carousel.next")}
       >
         <ChevronRight className="h-5 w-5" />
       </Button>
     </div>
   )
 }
-
 
 

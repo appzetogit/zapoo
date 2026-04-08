@@ -8,8 +8,10 @@ import { useLocation as useLocationHook } from "../hooks/useLocation"
 import { useCart } from "../context/CartContext"
 import { useLocationSelector } from "./UserLayout"
 import { FaLocationDot } from "react-icons/fa6"
+import { useTranslation } from "react-i18next"
 
 export default function DesktopNavbar() {
+  const { t } = useTranslation()
   const location = useLocation()
   const { location: userLocation, loading: locationLoading } = useLocationHook()
   const { getCartCount } = useCart()
@@ -25,7 +27,7 @@ export default function DesktopNavbar() {
   const cityName = userLocation?.city || null
   const stateName = userLocation?.state || null
   // Main location name: Show area if available, otherwise show city, otherwise "Select"
-  const mainLocationName = areaName || cityName || "Select"
+  const mainLocationName = areaName || cityName || t("user.navbar.select")
   // Secondary location: Show only city when area is available (as per design image)
   const secondaryLocation = areaName
     ? (cityName || "")  // Show only city when area is available
@@ -102,7 +104,7 @@ export default function DesktopNavbar() {
               >
                 {locationLoading ? (
                   <span className="text-sm font-bold text-black">
-                    Loading...
+                    {t("user.navbar.loading")}
                   </span>
                 ) : (
                   <div className="flex flex-col items-start min-w-0">
@@ -137,7 +139,7 @@ export default function DesktopNavbar() {
                   : "text-gray-600 dark:text-gray-400 hover:text-[#FD7675]"
                   }`}
               >
-                <span className="relative z-10">Delivery</span>
+                <span className="relative z-10">{t("user.bottomNavigation.delivery")}</span>
                 {isDelivery && (
                   <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#FD7675] rounded-t-full" />
                 )}
@@ -154,7 +156,7 @@ export default function DesktopNavbar() {
                   : "text-gray-600 dark:text-gray-400 hover:text-[#FD7675]"
                   }`}
               >
-                <span className="relative z-10">Under 250</span>
+                <span className="relative z-10">{t("user.bottomNavigation.under250")}</span>
                 {isUnder250 && (
                   <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#FD7675] rounded-t-full" />
                 )}
@@ -171,7 +173,7 @@ export default function DesktopNavbar() {
                   : "text-gray-600 dark:text-gray-400 hover:text-[#FD7675]"
                   }`}
               >
-                <span className="relative z-10">Profile</span>
+                <span className="relative z-10">{t("user.bottomNavigation.profile")}</span>
                 {isProfile && (
                   <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#FD7675] rounded-t-full" />
                 )}
@@ -186,7 +188,7 @@ export default function DesktopNavbar() {
                   variant="ghost"
                   size="icon"
                   className="h-9 w-9 lg:h-10 lg:w-10 rounded-full p-0 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                  title="Wallet"
+                  title={t("user.navbar.wallet")}
                 >
                   <Wallet className="h-5 w-5 lg:h-6 lg:w-6 text-gray-700 dark:text-gray-300" strokeWidth={2} />
                 </Button>
@@ -198,7 +200,7 @@ export default function DesktopNavbar() {
                   variant="ghost"
                   size="icon"
                   className="relative h-9 w-9 lg:h-10 lg:w-10 rounded-full p-0 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                  title="Cart"
+                  title={t("user.navbar.cart")}
                 >
                   <ShoppingCart className="h-5 w-5 lg:h-6 lg:w-6 text-gray-700 dark:text-gray-300" strokeWidth={2} />
                   {cartCount > 0 && (
@@ -218,4 +220,3 @@ export default function DesktopNavbar() {
     </nav>
   )
 }
-

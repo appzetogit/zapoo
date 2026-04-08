@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { localizedTextSchema } from '../../../shared/i18n/localizedText.js';
 
 const featureSchema = new mongoose.Schema({
   icon: {
@@ -10,10 +11,18 @@ const featureSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
+  localizedTitle: {
+    type: localizedTextSchema,
+    default: () => ({ en: '', hi: '', bn: '' })
+  },
   description: {
     type: String,
     required: true,
     trim: true
+  },
+  localizedDescription: {
+    type: localizedTextSchema,
+    default: () => ({ en: '', hi: '', bn: '' })
   },
   color: {
     type: String,
@@ -34,6 +43,10 @@ const statSchema = new mongoose.Schema({
     type: String,
     required: true,
     trim: true
+  },
+  localizedLabel: {
+    type: localizedTextSchema,
+    default: () => ({ en: '', hi: '', bn: '' })
   },
   value: {
     type: String,
@@ -70,6 +83,14 @@ const aboutSchema = new mongoose.Schema(
       default: 'Your trusted food delivery partner, bringing delicious meals right to your doorstep. Experience the convenience of ordering from your favorite restaurants with fast, reliable delivery.',
       trim: true
     },
+    localizedDescription: {
+      type: localizedTextSchema,
+      default: () => ({
+        en: 'Your trusted food delivery partner, bringing delicious meals right to your doorstep. Experience the convenience of ordering from your favorite restaurants with fast, reliable delivery.',
+        hi: '',
+        bn: ''
+      })
+    },
     logo: {
       type: String,
       default: ''
@@ -101,4 +122,3 @@ const aboutSchema = new mongoose.Schema(
 aboutSchema.index({ isActive: 1 });
 
 export default mongoose.model('About', aboutSchema);
-

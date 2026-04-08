@@ -1,15 +1,17 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from "react-i18next";
 import { Bell, Send, Clock, CheckCircle2, XCircle, AlertCircle, ImagePlus, X, Trash2, ArrowLeft } from 'lucide-react';
 import apiClient from '@/lib/api';
 
 const STATUS_CONFIG = {
-    pending: { label: 'Pending Review', color: 'bg-yellow-100 text-yellow-800 border-yellow-200', icon: Clock },
-    approved: { label: 'Approved & Sent', color: 'bg-green-100 text-green-800 border-green-200', icon: CheckCircle2 },
-    rejected: { label: 'Rejected', color: 'bg-red-100 text-red-800 border-red-200', icon: XCircle },
+    pending: { labelKey: 'restaurant.notificationRequest.status.pending', color: 'bg-yellow-100 text-yellow-800 border-yellow-200', icon: Clock },
+    approved: { labelKey: 'restaurant.notificationRequest.status.approved', color: 'bg-green-100 text-green-800 border-green-200', icon: CheckCircle2 },
+    rejected: { labelKey: 'restaurant.notificationRequest.status.rejected', color: 'bg-red-100 text-red-800 border-red-200', icon: XCircle },
 };
 
 export default function RestaurantNotificationRequest() {
+    const { t, i18n } = useTranslation();
     const navigate = useNavigate();
     const [form, setForm] = useState({ title: '', description: '' });
     const [quota, setQuota] = useState({ used: 0, limit: 2, remaining: 2 });
@@ -70,11 +72,11 @@ export default function RestaurantNotificationRequest() {
         // Client-side validation
         const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
         if (!validTypes.includes(file.type)) {
-            setImageError('Only JPG, PNG, or WEBP images are allowed.');
+            setImageError(t("restaurant.notificationRequest.validation.imageType"));
             return;
         }
         if (file.size > 5 * 1024 * 1024) {
-            setImageError('Image must be under 5 MB.');
+            setImageError(t("restaurant.notificationRequest.validation.imageSize"));
             return;
         }
 
@@ -96,10 +98,10 @@ export default function RestaurantNotificationRequest() {
                 headers: { 'Content-Type': 'multipart/form-data' },
             });
             const url = res.data?.data?.url || res.data?.url;
-            if (!url) throw new Error('No URL returned');
+            if (!url) throw new Error(t("restaurant.notificationRequest.validation.noUploadUrl"));
             setImageUrl(url);
         } catch {
-            setImageError('Image upload failed. You can still submit without an image.');
+            setImageError(t("restaurant.notificationRequest.validation.imageUploadFailed"));
             setImageFile(null);
             setImagePreview(null);
         } finally {
@@ -121,11 +123,11 @@ export default function RestaurantNotificationRequest() {
         setError('');
         setSuccess('');
         if (!form.title.trim() || !form.description.trim()) {
-            setError('Title and description are required.');
+            setError(t("restaurant.notificationRequest.validation.titleDescriptionRequired"));
             return;
         }
         if (uploadingImage) {
-            setError('Image is still uploading, please wait.');
+            setError(t("restaurant.notificationRequest.validation.imageUploading"));
             return;
         }
         setSubmitting(true);
@@ -134,12 +136,12 @@ export default function RestaurantNotificationRequest() {
                 ...form,
                 imageUrl: imageUrl || null,
             });
-            setSuccess('Request submitted successfully! Admin will review it shortly.');
+            setSuccess(t("restaurant.notificationRequest.feedback.submitSuccess"));
             setForm({ title: '', description: '' });
             clearImage();
             fetchRequests();
         } catch (err) {
-            const msg = err.response?.data?.message || 'Failed to submit request. Please try again.';
+            const msg = err.response?.data?.message || t("restaurant.notificationRequest.feedback.submitFailed");
             setError(msg);
         } finally {
             setSubmitting(false);
@@ -160,19 +162,19 @@ export default function RestaurantNotificationRequest() {
                         type="button"
                         onClick={() => navigate(-1)}
                         className="p-1.5 -ml-1 rounded-lg hover:bg-slate-200/80 transition-colors shrink-0"
-                        aria-label="Go back"
+                        aria-label={t("restaurant.notificationRequest.aria.goBack")}
                     >
                         <ArrowLeft className="w-5 h-5 text-slate-700" />
                     </button>
                     <Bell className="w-6 h-6 text-[#FF5200]" />
-                    <h1 className="text-2xl font-bold text-slate-900">Notify Customers</h1>
+                    <h1 className="text-2xl font-bold text-slate-900">{t("restaurant.notificationRequest.title")}</h1>
                 </div>
 
                 {/* Quota Bar */}
                 <div className="bg-white rounded-xl border border-slate-200 p-4 flex items-center justify-between">
                     <div>
-                        <p className="text-sm font-medium text-slate-700">Today's Request Quota</p>
-                        <p className="text-xs text-slate-500 mt-0.5">Resets at midnight</p>
+                        <p className="text-sm font-medium text-slate-700">{t("restaurant.notificationRequest.quota.title")}</p>
+                        <p className="text-xs text-slate-500 mt-0.5">{t("restaurant.notificationRequest.quota.subtitle")}</p>
                     </div>
                     <div className="flex items-center gap-2">
                         {[...Array(quota.limit)].map((_, i) => (
@@ -187,22 +189,22 @@ export default function RestaurantNotificationRequest() {
                             </div>
                         ))}
                         <span className="ml-2 text-sm text-slate-600 font-medium">
-                            {quota.used}/{quota.limit} used
+                            {t("restaurant.notificationRequest.quota.used", { used: quota.used, limit: quota.limit })}
                         </span>
                     </div>
                 </div>
 
                 {/* Submit Form */}
                 <div className="bg-white rounded-xl border border-slate-200 p-6">
-                    <h2 className="text-lg font-semibold text-slate-900 mb-4">Submit a Notification Request</h2>
+                    <h2 className="text-lg font-semibold text-slate-900 mb-4">{t("restaurant.notificationRequest.submit.title")}</h2>
 
                     {(isLimitReached || hasPending) && (
                         <div className="mb-4 p-3 rounded-lg bg-amber-50 border border-amber-200 flex items-start gap-2">
                             <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
                             <p className="text-sm text-amber-700">
                                 {isLimitReached
-                                    ? 'Daily request limit reached. You can submit again tomorrow.'
-                                    : 'You already have a pending request. Wait for admin review.'}
+                                    ? t("restaurant.notificationRequest.submit.limitReached")
+                                    : t("restaurant.notificationRequest.submit.pendingExists")}
                             </p>
                         </div>
                     )}
@@ -211,13 +213,13 @@ export default function RestaurantNotificationRequest() {
                         {/* Title */}
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1">
-                                Notification Title <span className="text-red-500">*</span>
+                                {t("restaurant.notificationRequest.fields.notificationTitle")} <span className="text-red-500">*</span>
                             </label>
                             <input
                                 type="text"
                                 value={form.title}
                                 onChange={e => setForm(p => ({ ...p, title: e.target.value }))}
-                                placeholder="e.g. 30% off all items today!"
+                                placeholder={t("restaurant.notificationRequest.placeholders.title")}
                                 maxLength={60}
                                 disabled={formDisabled}
                                 className="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#FF5200] focus:border-[#FF5200] disabled:opacity-50 disabled:bg-slate-50"
@@ -228,12 +230,12 @@ export default function RestaurantNotificationRequest() {
                         {/* Description */}
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1">
-                                Description <span className="text-red-500">*</span>
+                                {t("restaurant.notificationRequest.fields.description")} <span className="text-red-500">*</span>
                             </label>
                             <textarea
                                 value={form.description}
                                 onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
-                                placeholder="Write a clear, attractive message for customers..."
+                                placeholder={t("restaurant.notificationRequest.placeholders.description")}
                                 rows={4}
                                 maxLength={200}
                                 disabled={formDisabled}
@@ -245,7 +247,7 @@ export default function RestaurantNotificationRequest() {
                         {/* Image Upload */}
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1">
-                                Image <span className="text-slate-400 font-normal">(optional)</span>
+                                {t("restaurant.notificationRequest.fields.image")} <span className="text-slate-400 font-normal">({t("restaurant.notificationRequest.common.optional")})</span>
                             </label>
 
                             {!imagePreview ? (
@@ -265,25 +267,25 @@ export default function RestaurantNotificationRequest() {
                                         className="hidden"
                                     />
                                     <ImagePlus className="w-7 h-7 text-slate-400 mb-1" />
-                                    <p className="text-xs text-slate-500">Click to upload — JPG, PNG or WEBP, max 5 MB</p>
+                                    <p className="text-xs text-slate-500">{t("restaurant.notificationRequest.upload.helpText")}</p>
                                 </label>
                             ) : (
                                 /* Preview */
                                 <div className="relative w-full h-40 rounded-lg overflow-hidden border border-slate-200">
-                                    <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                                    <img src={imagePreview} alt={t("restaurant.notificationRequest.aria.imagePreview")} className="w-full h-full object-cover" />
                                     {/* Uploading overlay */}
                                     {uploadingImage && (
                                         <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
                                             <div className="flex flex-col items-center text-white text-xs gap-1">
                                                 <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                                Uploading…
+                                                {t("restaurant.notificationRequest.upload.uploading")}
                                             </div>
                                         </div>
                                     )}
                                     {/* Uploaded badge */}
                                     {!uploadingImage && imageUrl && (
                                         <div className="absolute top-2 left-2 bg-green-600 text-white text-xs px-2 py-0.5 rounded-full">
-                                            ✓ Uploaded
+                                            {t("restaurant.notificationRequest.upload.uploaded")}
                                         </div>
                                     )}
                                     {/* Remove button */}
@@ -292,6 +294,7 @@ export default function RestaurantNotificationRequest() {
                                             type="button"
                                             onClick={clearImage}
                                             className="absolute top-2 right-2 bg-black/60 text-white rounded-full p-1 hover:bg-black/80 transition-colors"
+                                            aria-label={t("restaurant.notificationRequest.aria.removeImage")}
                                         >
                                             <X className="w-3 h-3" />
                                         </button>
@@ -317,21 +320,25 @@ export default function RestaurantNotificationRequest() {
                             className="flex items-center gap-2 px-6 py-2.5 bg-[#FF5200] text-white text-sm font-medium rounded-lg hover:bg-[#E64A00] transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             <Send className="w-4 h-4" />
-                            {submitting ? 'Submitting...' : uploadingImage ? 'Image uploading...' : 'Submit Request'}
+                            {submitting
+                                ? t("restaurant.notificationRequest.actions.submitting")
+                                : uploadingImage
+                                    ? t("restaurant.notificationRequest.actions.imageUploading")
+                                    : t("restaurant.notificationRequest.actions.submitRequest")}
                         </button>
                     </form>
                 </div>
 
                 {/* My Requests */}
                 <div className="bg-white rounded-xl border border-slate-200 p-6">
-                    <h2 className="text-lg font-semibold text-slate-900 mb-4">My Requests</h2>
+                    <h2 className="text-lg font-semibold text-slate-900 mb-4">{t("restaurant.notificationRequest.requests.title")}</h2>
 
                     {loading ? (
-                        <div className="text-center py-8 text-slate-400 text-sm">Loading...</div>
+                        <div className="text-center py-8 text-slate-400 text-sm">{t("restaurant.notificationRequest.common.loading")}</div>
                     ) : requests.length === 0 ? (
                         <div className="text-center py-8 text-slate-400">
                             <Bell className="w-10 h-10 mx-auto mb-2 opacity-30" />
-                            <p className="text-sm">No requests submitted yet.</p>
+                            <p className="text-sm">{t("restaurant.notificationRequest.requests.empty")}</p>
                         </div>
                     ) : (
                         <div className="space-y-3">
@@ -352,19 +359,19 @@ export default function RestaurantNotificationRequest() {
                                             <p className="text-sm font-semibold text-slate-900 truncate">{req.title}</p>
                                             <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{req.description}</p>
                                             <p className="text-xs text-slate-400 mt-1">
-                                                {new Date(req.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                                {new Date(req.createdAt).toLocaleDateString(i18n.language === "bn" ? "bn-IN" : i18n.language === "hi" ? "hi-IN" : "en-IN", { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                                             </p>
                                         </div>
                                         <div className="flex flex-col items-end gap-2">
                                             <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border whitespace-nowrap ${cfg.color}`}>
                                                 <Icon className="w-3 h-3" />
-                                                {cfg.label}
+                                                {t(cfg.labelKey)}
                                             </span>
                                             <button
                                                 type="button"
                                                 onClick={() => handleDelete(req._id)}
                                                 className="p-1.5 rounded-full hover:bg-red-50 text-red-500 hover:text-red-600"
-                                                aria-label="Delete request"
+                                                aria-label={t("restaurant.notificationRequest.aria.deleteRequest")}
                                             >
                                                 <Trash2 className="w-4 h-4" />
                                             </button>
@@ -375,7 +382,10 @@ export default function RestaurantNotificationRequest() {
                             {requests.length > PAGE_SIZE && (
                                 <div className="flex items-center justify-between pt-3 border-t border-slate-200 text-xs text-slate-500">
                                     <span>
-                                        Page {page} of {Math.max(1, Math.ceil(requests.length / PAGE_SIZE))}
+                                        {t("restaurant.notificationRequest.pagination.pageOf", {
+                                            page,
+                                            total: Math.max(1, Math.ceil(requests.length / PAGE_SIZE)),
+                                        })}
                                     </span>
                                     <div className="flex items-center gap-2">
                                         <button
@@ -384,7 +394,7 @@ export default function RestaurantNotificationRequest() {
                                             onClick={() => setPage((p) => Math.max(1, p - 1))}
                                             className="px-2 py-1 rounded-lg border border-slate-200 disabled:opacity-40"
                                         >
-                                            Prev
+                                            {t("restaurant.notificationRequest.pagination.prev")}
                                         </button>
                                         <button
                                             type="button"
@@ -392,7 +402,7 @@ export default function RestaurantNotificationRequest() {
                                             onClick={() => setPage((p) => Math.min(Math.ceil(requests.length / PAGE_SIZE), p + 1))}
                                             className="px-2 py-1 rounded-lg border border-slate-200 disabled:opacity-40"
                                         >
-                                            Next
+                                            {t("restaurant.notificationRequest.pagination.next")}
                                         </button>
                                     </div>
                                 </div>

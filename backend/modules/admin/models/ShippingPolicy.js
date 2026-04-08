@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { localizedTextSchema } from '../../../shared/i18n/localizedText.js';
 
 const shippingPolicySchema = new mongoose.Schema(
   {
@@ -7,10 +8,18 @@ const shippingPolicySchema = new mongoose.Schema(
       default: 'Shipping Policy',
       trim: true
     },
+    localizedTitle: {
+      type: localizedTextSchema,
+      default: () => ({ en: 'Shipping Policy', hi: '', bn: '' })
+    },
     content: {
       type: String,
       required: true,
       default: ''
+    },
+    localizedContent: {
+      type: localizedTextSchema,
+      default: () => ({ en: '', hi: '', bn: '' })
     },
     isActive: {
       type: Boolean,
@@ -31,4 +40,3 @@ const shippingPolicySchema = new mongoose.Schema(
 shippingPolicySchema.index({ isActive: 1 });
 
 export default mongoose.model('ShippingPolicy', shippingPolicySchema);
-

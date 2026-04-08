@@ -11,9 +11,22 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Lock, Eye, EyeOff, Save, Loader2, Shield } from "lucide-react";
+import { Lock, Eye, EyeOff, Save, Loader2, Shield, Check } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import {
+  getCurrentLanguage,
+  persistLanguage,
+  setAppLanguage,
+} from "@/lib/i18n/language.js";
+
+const LANGUAGES = [
+  { code: "en", name: "English", nativeName: "English" },
+  { code: "hi", name: "Hindi", nativeName: "हिंदी" },
+  { code: "bn", name: "Bengali", nativeName: "বাংলা" },
+];
 
 export default function AdminSettings() {
+  const { t } = useTranslation();
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: "",
     newPassword: "",
@@ -23,6 +36,8 @@ export default function AdminSettings() {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [savingLanguage, setSavingLanguage] = useState(false);
+  const [selectedLanguage, setSelectedLanguage] = useState(getCurrentLanguage());
   const [errors, setErrors] = useState({});
 
   const handlePasswordChange = (field, value) => {
@@ -44,23 +59,23 @@ export default function AdminSettings() {
     const newErrors = {};
 
     if (!passwordForm.currentPassword) {
-      newErrors.currentPassword = "Current password is required";
+      newErrors.currentPassword = t("admin.settings.validation.currentRequired");
     }
 
     if (!passwordForm.newPassword) {
-      newErrors.newPassword = "New password is required";
+      newErrors.newPassword = t("admin.settings.validation.newRequired");
     } else if (passwordForm.newPassword.length < 6) {
-      newErrors.newPassword = "Password must be at least 6 characters long";
+      newErrors.newPassword = t("admin.settings.validation.minLength");
     }
 
     if (!passwordForm.confirmPassword) {
-      newErrors.confirmPassword = "Please confirm your new password";
+      newErrors.confirmPassword = t("admin.settings.validation.confirmRequired");
     } else if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      newErrors.confirmPassword = "Passwords do not match";
+      newErrors.confirmPassword = t("admin.settings.validation.mismatch");
     }
 
     if (passwordForm.currentPassword === passwordForm.newPassword) {
-      newErrors.newPassword = "New password must be different from current password";
+      newErrors.newPassword = t("admin.settings.validation.mustDiffer");
     }
 
     setErrors(newErrors);
@@ -88,11 +103,11 @@ export default function AdminSettings() {
         confirmPassword: "",
       });
 
-      toast.success("Password changed successfully");
+      toast.success(t("admin.settings.toast.passwordUpdated"));
     } catch (error) {
       console.error("Error changing password:", error);
       const errorMessage =
-        error?.response?.data?.message || "Failed to change password";
+        error?.response?.data?.message || t("admin.settings.toast.passwordUpdateFailed");
       
       // Set specific error for current password
       if (errorMessage.includes("current password") || errorMessage.includes("incorrect")) {
@@ -105,12 +120,34 @@ export default function AdminSettings() {
     }
   };
 
+  const handleLanguageChange = async (code) => {
+    if (savingLanguage || code === selectedLanguage) return;
+
+    try {
+      setSavingLanguage(true);
+      const languageName =
+        LANGUAGES.find((item) => item.code === code)?.name || t("common.language");
+      await adminAPI.updatePreferences({ language: code });
+      await setAppLanguage(code);
+      persistLanguage(code);
+      setSelectedLanguage(code);
+      toast.success(t("common.languageUpdated", { language: languageName }));
+      window.location.reload();
+    } catch (error) {
+      toast.error(
+        error?.response?.data?.message || t("common.languageUpdateFailed")
+      );
+    } finally {
+      setSavingLanguage(false);
+    }
+  };
+
   return (
     <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-neutral-900">Settings</h1>
+        <h1 className="text-3xl font-bold text-neutral-900">{t("admin.settings.title")}</h1>
         <p className="text-neutral-600 mt-1">
-          Manage your account settings and preferences
+          {t("admin.settings.subtitle")}
         </p>
       </div>
 
@@ -119,10 +156,10 @@ export default function AdminSettings() {
         <CardHeader>
           <div className="flex items-center gap-2">
             <Shield className="w-5 h-5 text-neutral-700" />
-            <CardTitle>Change Password</CardTitle>
+            <CardTitle>{t("admin.settings.changePassword")}</CardTitle>
           </div>
           <CardDescription>
-            Update your password to keep your account secure
+            {t("admin.settings.changePasswordDescription")}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -130,7 +167,7 @@ export default function AdminSettings() {
             <div className="space-y-2">
               <Label htmlFor="currentPassword" className="flex items-center gap-2">
                 <Lock className="w-4 h-4" />
-                Current Password
+                {t("admin.settings.currentPassword")}
               </Label>
               <div className="relative">
                 <Input
@@ -140,7 +177,7 @@ export default function AdminSettings() {
                   onChange={(e) =>
                     handlePasswordChange("currentPassword", e.target.value)
                   }
-                  placeholder="Enter your current password"
+                  placeholder={t("admin.settings.currentPasswordPlaceholder")}
                   className={`h-11 pr-12 ${
                     errors.currentPassword ? "border-red-500" : ""
                   }`}
@@ -168,7 +205,7 @@ export default function AdminSettings() {
             <div className="space-y-2">
               <Label htmlFor="newPassword" className="flex items-center gap-2">
                 <Lock className="w-4 h-4" />
-                New Password
+                {t("admin.settings.newPassword")}
               </Label>
               <div className="relative">
                 <Input
@@ -178,7 +215,7 @@ export default function AdminSettings() {
                   onChange={(e) =>
                     handlePasswordChange("newPassword", e.target.value)
                   }
-                  placeholder="Enter your new password"
+                  placeholder={t("admin.settings.newPasswordPlaceholder")}
                   className={`h-11 pr-12 ${
                     errors.newPassword ? "border-red-500" : ""
                   }`}
@@ -202,14 +239,14 @@ export default function AdminSettings() {
                 <p className="text-sm text-red-600">{errors.newPassword}</p>
               )}
               <p className="text-xs text-neutral-500">
-                Password must be at least 6 characters long
+                {t("admin.settings.passwordHint")}
               </p>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="confirmPassword" className="flex items-center gap-2">
                 <Lock className="w-4 h-4" />
-                Confirm New Password
+                {t("admin.settings.confirmPassword")}
               </Label>
               <div className="relative">
                 <Input
@@ -219,7 +256,7 @@ export default function AdminSettings() {
                   onChange={(e) =>
                     handlePasswordChange("confirmPassword", e.target.value)
                   }
-                  placeholder="Confirm your new password"
+                  placeholder={t("admin.settings.confirmPasswordPlaceholder")}
                   className={`h-11 pr-12 ${
                     errors.confirmPassword ? "border-red-500" : ""
                   }`}
@@ -253,12 +290,12 @@ export default function AdminSettings() {
                 {saving ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Changing Password...
+                    {t("admin.settings.changingPassword")}
                   </>
                 ) : (
                   <>
                     <Save className="w-4 h-4 mr-2" />
-                    Change Password
+                    {t("admin.settings.changePasswordAction")}
                   </>
                 )}
               </Button>
@@ -267,21 +304,51 @@ export default function AdminSettings() {
         </CardContent>
       </Card>
 
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("common.language")}</CardTitle>
+          <CardDescription>
+            {t("common.languageSettingsDescription")}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {LANGUAGES.map((language) => (
+            <button
+              key={language.code}
+              type="button"
+              onClick={() => handleLanguageChange(language.code)}
+              disabled={savingLanguage}
+              className="w-full rounded-md border border-neutral-200 px-4 py-3 flex items-center justify-between hover:bg-neutral-50 transition-colors disabled:opacity-60"
+            >
+              <div className="text-left">
+                <p className="font-medium text-neutral-900">{language.name}</p>
+                <p className="text-sm text-neutral-500">{language.nativeName}</p>
+              </div>
+              {selectedLanguage === language.code && (
+                <Check className="w-5 h-5 text-blue-600" />
+              )}
+            </button>
+          ))}
+          <p className="text-xs text-neutral-500 pt-1">
+            {savingLanguage ? t("common.savingLanguage") : t("common.languageRefreshNotice")}
+          </p>
+        </CardContent>
+      </Card>
+
       {/* Additional Settings can be added here */}
       <Card>
         <CardHeader>
-          <CardTitle>Account Settings</CardTitle>
+          <CardTitle>{t("admin.settings.accountSettings")}</CardTitle>
           <CardDescription>
-            Additional account settings and preferences
+            {t("admin.settings.accountSettingsDescription")}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <p className="text-sm text-neutral-600">
-            More settings options will be available here soon.
+            {t("admin.settings.moreSettingsSoon")}
           </p>
         </CardContent>
       </Card>
     </div>
   );
 }
-

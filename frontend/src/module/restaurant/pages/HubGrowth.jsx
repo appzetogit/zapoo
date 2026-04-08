@@ -1,11 +1,12 @@
-import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import { useNavigate } from "react-router-dom"
+import { useTranslation } from "react-i18next"
 import { ChevronRight, Menu, Megaphone, Bell, Trophy } from "lucide-react"
 import BottomNavOrders from "../components/BottomNavOrders"
 import offersAndDiscountsIcon from "@/assets/hub/icons/offersanddiscounts.png"
 
 export default function HubGrowth() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
 
   return (
@@ -13,10 +14,11 @@ export default function HubGrowth() {
       {/* Header */}
       <div className="sticky top-0 z-40 bg-white border-b border-gray-200 px-4 py-3">
         <div className="flex items-center justify-between">
-          <h1 className="text-xl font-bold text-gray-900">Grow your business</h1>
+          <h1 className="text-xl font-bold text-gray-900">{t("restaurant.hubGrowth.title")}</h1>
           <button
             onClick={() => navigate("/restaurant/explore")}
             className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+            aria-label={t("restaurant.hubGrowth.aria.openMenu")}
           >
             <Menu className="w-5 h-5 text-gray-700" />
           </button>
@@ -27,7 +29,7 @@ export default function HubGrowth() {
       <div className="flex-1 px-4 py-6">
         {/* Build your own section */}
         <div className="mb-6">
-          <h2 className="text-base font-bold text-gray-900 mb-4">Build your own</h2>
+          <h2 className="text-base font-bold text-gray-900 mb-4">{t("restaurant.hubGrowth.buildYourOwn")}</h2>
 
           <div className="space-y-3">
             {/* Offers and discounts card */}
@@ -38,12 +40,12 @@ export default function HubGrowth() {
             >
               <div className="shrink-0">
                 <div className="w-12 h-12 rounded-lg flex items-center justify-center relative overflow-hidden">
-                  <img src={offersAndDiscountsIcon} alt="Offers and discounts" className="w-full h-full object-contain" />
+                  <img src={offersAndDiscountsIcon} alt={t("restaurant.hubGrowth.cards.offers.title")} className="w-full h-full object-contain" />
                 </div>
               </div>
               <div className="flex-1">
-                <h3 className="text-base font-bold text-gray-900 mb-1">Offers and discounts</h3>
-                <p className="text-sm text-gray-600">Start your own offers and grow your business</p>
+                <h3 className="text-base font-bold text-gray-900 mb-1">{t("restaurant.hubGrowth.cards.offers.title")}</h3>
+                <p className="text-sm text-gray-600">{t("restaurant.hubGrowth.cards.offers.subtitle")}</p>
               </div>
               <ChevronRight className="w-5 h-5 text-blue-600 shrink-0" />
             </motion.div>
@@ -60,8 +62,8 @@ export default function HubGrowth() {
                 </div>
               </div>
               <div className="flex-1">
-                <h3 className="text-base font-bold text-gray-900 mb-1">Promoted Banners</h3>
-                <p className="text-sm text-gray-600">Get better visibility on homepage & search</p>
+                <h3 className="text-base font-bold text-gray-900 mb-1">{t("restaurant.hubGrowth.cards.promotedBanners.title")}</h3>
+                <p className="text-sm text-gray-600">{t("restaurant.hubGrowth.cards.promotedBanners.subtitle")}</p>
               </div>
               <ChevronRight className="w-5 h-5 text-blue-600 shrink-0" />
             </motion.div>
@@ -78,8 +80,8 @@ export default function HubGrowth() {
                 </div>
               </div>
               <div className="flex-1">
-                <h3 className="text-base font-bold text-gray-900 mb-1">Notify Customers</h3>
-                <p className="text-sm text-gray-600">Request admin to send a push notification to all users</p>
+                <h3 className="text-base font-bold text-gray-900 mb-1">{t("restaurant.hubGrowth.cards.notifyCustomers.title")}</h3>
+                <p className="text-sm text-gray-600">{t("restaurant.hubGrowth.cards.notifyCustomers.subtitle")}</p>
               </div>
               <ChevronRight className="w-5 h-5 text-blue-600 shrink-0" />
             </motion.div>
@@ -126,8 +128,8 @@ export default function HubGrowth() {
                 </div>
               </div>
               <div className="flex-1">
-                <h3 className="text-base font-bold text-gray-900 mb-1">Business Challenges</h3>
-                <p className="text-sm text-gray-600">Complete milestones to earn rewards and grow faster</p>
+                <h3 className="text-base font-bold text-gray-900 mb-1">{t("restaurant.hubGrowth.cards.businessChallenges.title")}</h3>
+                <p className="text-sm text-gray-600">{t("restaurant.hubGrowth.cards.businessChallenges.subtitle")}</p>
               </div>
               <ChevronRight className="w-5 h-5 text-blue-600 shrink-0" />
             </motion.div>

@@ -8,6 +8,9 @@ import Zone from '../../admin/models/Zone.js';
 import User from '../../auth/models/User.js';
 import Restaurant from '../../restaurant/models/Restaurant.js';
 import Delivery from '../../delivery/models/Delivery.js';
+import { buildLocalizedText } from '../../../shared/i18n/translationService.js';
+import { resolveLocaleFromRequest } from '../../../shared/i18n/localeResolver.js';
+import { resolveLocalizedText } from '../../../shared/i18n/localizedText.js';
 
 /**
  * Broadcast notification to specific roles or all users.
@@ -50,6 +53,9 @@ export const broadcastNotification = asyncHandler(async (req, res) => {
     return errorResponse(res, 400, 'Title and Body are required');
   }
 
+  const localizedTitle = await buildLocalizedText(title);
+  const localizedDescription = await buildLocalizedText(body);
+
   // Map targetRole → Notification.target + DeviceToken.role filter
   let notificationTarget = 'all_users';
   let deviceRoleFilter = undefined;
@@ -79,6 +85,8 @@ export const broadcastNotification = asyncHandler(async (req, res) => {
   const notification = await Notification.create({
     title,
     description: body,
+    localizedTitle,
+    localizedDescription,
     imageUrl,
     target: notificationTarget,
     sourceType: 'admin_direct',
@@ -156,7 +164,7 @@ export const broadcastNotification = asyncHandler(async (req, res) => {
 
   console.log(`[Broadcast] targetRole=${targetRole}, targetZone=${targetZone}, deviceRoleFilter=${deviceRoleFilter}, query=${JSON.stringify(query)}`);
   console.log(`[AdminBroadcast] Query: ${JSON.stringify(query)}`);
-  const tokensRaw = await DeviceToken.find(query).select('deviceToken role').lean();
+  const tokensRaw = await DeviceToken.find(query).select('deviceToken role userId').lean();
   const tokens = tokensRaw.map(t => t.deviceToken).filter(Boolean);
   console.log(`[AdminBroadcast] Found ${tokens.length} tokens for role filter`);
   if (tokens.length > 0) {
@@ -174,16 +182,22 @@ export const broadcastNotification = asyncHandler(async (req, res) => {
     console.log(`[Broadcast] Breakdown by Role: ${JSON.stringify(roleCounts)}`);
 
     // Background/foreground logic is handled inside pushNotificationHelper
-    await sendPushNotification(uniqueTokens, {
-      title,
-      body,
-      imageUrl,
-      data: {
-        ...data,
-        notificationId: notification._id.toString(),
-        target: deviceRoleFilter || 'all'
-      }
-    });
+    const localeGroups = await buildLocaleTokenGroups(tokensRaw);
+
+    for (const [locale, groupedTokens] of localeGroups.entries()) {
+      const deduped = Array.from(new Set(groupedTokens));
+      await sendPushNotification(deduped, {
+        title: resolveLocalizedText(notification.localizedTitle, locale, title),
+        body: resolveLocalizedText(notification.localizedDescription, locale, body),
+        imageUrl,
+        data: {
+          ...data,
+          notificationId: notification._id.toString(),
+          target: deviceRoleFilter || 'all',
+          locale
+        }
+      });
+    }
   }
 
   return successResponse(res, 200, 'Broadcast initiated', {
@@ -197,6 +211,7 @@ export const broadcastNotification = asyncHandler(async (req, res) => {
  * Fetch all broadcast history for admin.
  */
 export const getBroadcastHistory = asyncHandler(async (req, res) => {
+  const locale = resolveLocaleFromRequest(req);
   const { page = 1, limit = 50 } = req.query;
   const skip = (parseInt(page) - 1) * parseInt(limit);
 
@@ -211,7 +226,11 @@ export const getBroadcastHistory = asyncHandler(async (req, res) => {
   ]);
 
   return successResponse(res, 200, 'Notification history fetched', {
-    notifications,
+    notifications: notifications.map((notification) => ({
+      ...notification,
+      title: resolveLocalizedText(notification.localizedTitle, locale, notification.title),
+      description: resolveLocalizedText(notification.localizedDescription, locale, notification.description)
+    })),
     pagination: {
       total,
       page: parseInt(page),
@@ -235,3 +254,44 @@ export const deleteNotification = asyncHandler(async (req, res) => {
 
   return successResponse(res, 200, 'Notification deleted successfully');
 });
+
+async function buildLocaleTokenGroups(tokensRaw) {
+  const idsByRole = {
+    user: [],
+    restaurant: [],
+    delivery: []
+  };
+
+  tokensRaw.forEach((row) => {
+    if (idsByRole[row.role]) {
+      idsByRole[row.role].push(String(row.userId));
+    }
+  });
+
+  const [users, restaurants, deliveries] = await Promise.all([
+    idsByRole.user.length
+      ? User.find({ _id: { $in: idsByRole.user } }).select('_id preferences.language').lean()
+      : [],
+    idsByRole.restaurant.length
+      ? Restaurant.find({ _id: { $in: idsByRole.restaurant } }).select('_id preferences.language').lean()
+      : [],
+    idsByRole.delivery.length
+      ? Delivery.find({ _id: { $in: idsByRole.delivery } }).select('_id preferences.language').lean()
+      : []
+  ]);
+
+  const localeById = new Map();
+  [...users, ...restaurants, ...deliveries].forEach((row) => {
+    localeById.set(String(row._id), row.preferences?.language || 'en');
+  });
+
+  const groups = new Map();
+  tokensRaw.forEach((row) => {
+    const locale = localeById.get(String(row.userId)) || 'en';
+    const list = groups.get(locale) || [];
+    list.push(row.deviceToken);
+    groups.set(locale, list);
+  });
+
+  return groups;
+}

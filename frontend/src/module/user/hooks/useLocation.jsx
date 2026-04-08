@@ -4,6 +4,7 @@ import { USER_LOCATION_UPDATED_EVENT } from "../constants/locationEvents.js";
 import { ref, set, get } from 'firebase/database';
 import { getAuth } from 'firebase/auth';
 import { realtimeDb } from '@/lib/firebaseConfig';
+import { getCurrentLanguage } from '@/lib/i18n/language.js';
 
 // Module-level geocode cache — shared across hook instances, survives re-renders
 const _geocodeCache = new Map();
@@ -128,7 +129,7 @@ export function useLocation() {
       const controller = new AbortController();
       setTimeout(() => controller.abort(), 3000); // Faster timeout
 
-      const res = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`, {
+      const res = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=${getCurrentLanguage()}`, {
         signal: controller.signal
       });
       const data = await res.json();
@@ -239,7 +240,7 @@ export function useLocation() {
         // ZOMATO-STYLE: Use Geocoding API with proper parameters for EXACT location
         // language=en for English, region=in for India (helps with better results)
         // result_type: prioritize premise > street_address > establishment > point_of_interest for exact location
-        const response = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${GOOGLE_MAPS_API_KEY}&language=en&region=in&result_type=premise|street_address|establishment|point_of_interest|route|sublocality`, {
+        const response = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${GOOGLE_MAPS_API_KEY}&language=${getCurrentLanguage()}&region=in&result_type=premise|street_address|establishment|point_of_interest|route|sublocality`, {
           signal: controller.signal
         });
         clearTimeout(timeoutId); // Clear timeout if request completes

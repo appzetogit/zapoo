@@ -617,7 +617,10 @@ export const firebaseGoogleLogin = asyncHandler(async (req, res) => {
     return errorResponse(res, 400, `Invalid role. Allowed roles: ${allowedRoles.join(", ")}`);
   }
 
-  // Ensure Firebase Admin is configured
+  // Ensure Firebase Admin is configured (initialize lazily on first request)
+  if (!firebaseAuthService.isEnabled()) {
+    await firebaseAuthService.init();
+  }
   if (!firebaseAuthService.isEnabled()) {
     return errorResponse(res, 500, "Firebase Auth is not configured. Please set FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL and FIREBASE_PRIVATE_KEY in backend .env");
   }
@@ -647,13 +650,14 @@ export const firebaseGoogleLogin = asyncHandler(async (req, res) => {
       return errorResponse(res, 400, "Invalid email format received from Google.");
     }
 
-    // Find existing user by firebase UID (stored in googleId) or email with same role
+    // Find existing user only within requested role.
+    // This prevents cross-role collisions (same Google account used in another role).
     let user = await User.findOne({
+      role: userRole,
       $or: [{
         googleId: firebaseUid
       }, {
-        email,
-        role: userRole
+        email
       }]
     });
     if (user) {
@@ -668,17 +672,18 @@ export const firebaseGoogleLogin = asyncHandler(async (req, res) => {
         if (!user.signupMethod) {
           user.signupMethod = "google";
         }
-        await user.save();
-      }
-
-      // If this is a restaurant login, make sure role matches
-      if (userRole === "restaurant" && user.role !== "restaurant") {
-        return errorResponse(res, 403, "This account is not registered as a restaurant partner");
-      }
-
-      // If user role doesn't match requested role, return error
-      if (user.role !== userRole) {
-        return errorResponse(res, 403, `This account is registered as ${user.role}, not ${userRole}`);
+        try {
+          await user.save();
+        } catch (linkError) {
+          // If googleId is already linked in another role, continue with email+role based auth.
+          if (linkError?.code !== 11000) {
+            throw linkError;
+          }
+          logger.warn("Google ID already linked to another role; proceeding with role-scoped account", {
+            email,
+            role: userRole
+          });
+        }
       }
     } else {
       // Auto-register new user based on Firebase data
@@ -697,7 +702,7 @@ export const firebaseGoogleLogin = asyncHandler(async (req, res) => {
       } catch (createError) {
         // Handle duplicate key error - user might have been created between findOne and create
         if (createError.code === 11000) {
-          logger.warn("Duplicate key error during user creation, retrying find", {
+          logger.warn("Duplicate key error during user creation, retrying role-scoped find", {
             email,
             role: userRole
           });
@@ -705,24 +710,42 @@ export const firebaseGoogleLogin = asyncHandler(async (req, res) => {
             email,
             role: userRole
           });
-          if (!user) {
-            logger.error("User not found after duplicate key error", {
+          if (user) {
+            // Link Google ID if not already linked
+            if (!user.googleId) {
+              user.googleId = firebaseUid;
+              user.googleEmail = email;
+              if (!user.profileImage && picture) {
+                user.profileImage = picture;
+              }
+              if (!user.signupMethod) {
+                user.signupMethod = "google";
+              }
+              try {
+                await user.save();
+              } catch (linkError) {
+                if (linkError?.code !== 11000) {
+                  throw linkError;
+                }
+                logger.warn("Google ID already linked to another role while linking existing account", {
+                  email,
+                  role: userRole
+                });
+              }
+            }
+          } else {
+            // Most likely duplicate googleId from another role.
+            // Create role-scoped account without googleId and rely on verified Google email.
+            logger.warn("googleId already exists in another role; creating email-scoped role account", {
               email,
               role: userRole
             });
-            throw createError;
-          }
-          // Link Google ID if not already linked
-          if (!user.googleId) {
-            user.googleId = firebaseUid;
-            user.googleEmail = email;
-            if (!user.profileImage && picture) {
-              user.profileImage = picture;
-            }
-            if (!user.signupMethod) {
-              user.signupMethod = "google";
-            }
-            await user.save();
+            const fallbackUserData = {
+              ...userData,
+              googleId: undefined,
+              googleEmail: undefined
+            };
+            user = await User.create(fallbackUserData);
           }
         } else {
           logger.error("Error creating user via Firebase Google login", {

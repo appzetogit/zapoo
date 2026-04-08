@@ -4,6 +4,7 @@ import Delivery from '../models/Delivery.js';
 import { validate } from '../../../shared/middleware/validate.js';
 import Joi from 'joi';
 import winston from 'winston';
+import { normalizeLocale } from '../../../shared/i18n/localeConstants.js';
 const logger = winston.createLogger({
   level: 'info',
   format: winston.format.json(),
@@ -119,6 +120,36 @@ export const updateProfile = asyncHandler(async (req, res) => {
     }
     return errorResponse(res, 500, 'Failed to update profile');
   }
+});
+
+export const getPreferences = asyncHandler(async (req, res) => {
+  const delivery = await Delivery.findById(req.delivery._id).select('preferences').lean();
+  if (!delivery) {
+    return errorResponse(res, 404, 'Delivery partner not found');
+  }
+
+  return successResponse(res, 200, 'Preferences retrieved successfully', {
+    preferences: {
+      language: delivery.preferences?.language || 'en'
+    }
+  });
+});
+
+export const updatePreferences = asyncHandler(async (req, res) => {
+  const delivery = await Delivery.findById(req.delivery._id);
+  if (!delivery) {
+    return errorResponse(res, 404, 'Delivery partner not found');
+  }
+
+  delivery.preferences = delivery.preferences || {};
+  delivery.preferences.language = normalizeLocale(req.body?.language);
+  await delivery.save();
+
+  return successResponse(res, 200, 'Preferences updated successfully', {
+    preferences: {
+      language: delivery.preferences.language
+    }
+  });
 });
 
 /**

@@ -1,9 +1,12 @@
 import { Link } from "react-router-dom"
 import { ArrowLeft, MapPin } from "lucide-react"
+import { useTranslation } from "react-i18next"
 import AnimatedPage from "../../components/AnimatedPage"
 import { Button } from "@/components/ui/button"
 
 export default function Coupons() {
+  const { t } = useTranslation()
+
   return (
     <AnimatedPage className="min-h-screen bg-[#f5f5f5] dark:bg-[#0a0a0a]">
       <div className="max-w-md mx-auto px-4 py-4">
@@ -14,7 +17,7 @@ export default function Coupons() {
               <ArrowLeft className="h-5 w-5 text-black dark:text-white" />
             </Button>
           </Link>
-          <h1 className="text-xl font-bold text-black dark:text-white">Your coupons</h1>
+          <h1 className="text-xl font-bold text-black dark:text-white">{t("user.coupons.title")}</h1>
         </div>
 
         {/* Empty State */}
@@ -147,9 +150,9 @@ export default function Coupons() {
 
           {/* Text Content */}
           <div className="text-center space-y-3 max-w-sm">
-            <h2 className="text-xl font-bold text-black">No coupons found</h2>
+            <h2 className="text-xl font-bold text-black">{t("user.coupons.empty.title")}</h2>
             <p className="text-sm text-gray-600 leading-relaxed">
-              Discover hidden coupons on your map screen after placing an order
+              {t("user.coupons.empty.description")}
             </p>
           </div>
         </div>
@@ -157,4 +160,3 @@ export default function Coupons() {
     </AnimatedPage>
   )
 }
-

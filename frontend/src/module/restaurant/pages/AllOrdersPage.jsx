@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useNavigate } from "react-router-dom"
+import { useTranslation } from "react-i18next"
 import {
   ArrowLeft,
   Search,
@@ -229,6 +230,7 @@ const filterOptions = {
 }
 
 export default function AllOrdersPage() {
+  const { t, i18n } = useTranslation()
   const navigate = useNavigate()
   const [searchQuery, setSearchQuery] = useState("")
   const [showCalendar, setShowCalendar] = useState(false)
@@ -281,25 +283,26 @@ export default function AllOrdersPage() {
 
   // Transform API order to component format
   const transformOrder = useCallback((order) => {
+    const localeCode = i18n.language === "bn" ? "bn-IN" : i18n.language === "hi" ? "hi-IN" : "en-IN"
     const createdAt = new Date(order.createdAt)
-    const date = createdAt.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
-    const time = createdAt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
+    const date = createdAt.toLocaleDateString(localeCode, { day: 'numeric', month: 'short' })
+    const time = createdAt.toLocaleTimeString(localeCode, { hour: '2-digit', minute: '2-digit', hour12: true })
 
     // Format address
     const address = order.address?.formattedAddress ||
       order.address?.address ||
       (order.address?.street ? `${order.address.street}, ${order.address.city || ''}`.trim() : '') ||
-      'Address not available'
+      t("restaurant.allOrders.common.addressNotAvailable")
 
     // Get restaurant name
-    const restaurantName = restaurantData?.name || order.restaurantId?.name || 'Restaurant'
+    const restaurantName = restaurantData?.name || order.restaurantId?.name || t("restaurant.allOrders.common.restaurant")
 
     // Get customer name
-    const customerName = order.userId?.name || order.customerName || 'Customer'
+    const customerName = order.userId?.name || order.customerName || t("restaurant.allOrders.common.customer")
 
     // Format items
     const items = (order.items || []).map(item => ({
-      name: item.name || 'Item',
+      name: item.name || t("restaurant.allOrders.common.item"),
       quantity: item.quantity || 1,
       price: item.price || 0
     }))
@@ -316,13 +319,18 @@ export default function AllOrdersPage() {
     // Get rejection/cancellation reason
     let reason = null
     if (status === 'REJECTED' && order.rejectionReason) {
-      reason = `Rejected by Restaurant: ${order.rejectionReason}`
+      reason = t("restaurant.allOrders.reasons.rejectedByRestaurantWithReason", { reason: order.rejectionReason })
     } else if (status === 'CANCELLED' && order.cancellationReason) {
-      reason = `Cancelled by ${order.cancelledBy === 'customer' ? 'customer' : 'restaurant'}: ${order.cancellationReason}`
+      reason = t("restaurant.allOrders.reasons.cancelledByWithReason", {
+        actor: order.cancelledBy === "customer"
+          ? t("restaurant.allOrders.common.customer")
+          : t("restaurant.allOrders.common.restaurant"),
+        reason: order.cancellationReason
+      })
     } else if (status === 'REJECTED') {
-      reason = 'Rejected by Restaurant'
+      reason = t("restaurant.allOrders.reasons.rejectedByRestaurant")
     } else if (status === 'CANCELLED') {
-      reason = 'Cancelled by customer'
+      reason = t("restaurant.allOrders.reasons.cancelledByCustomer")
     }
 
     // Determine tags based on order properties
@@ -349,7 +357,7 @@ export default function AllOrdersPage() {
       createdAt: order.createdAt,
       mongoId: order._id?.toString()
     }
-  }, [restaurantData])
+  }, [restaurantData, i18n.language, t])
 
   // Fetch orders from backend
   useEffect(() => {
@@ -390,7 +398,7 @@ export default function AllOrdersPage() {
         // Suppress 401 errors as they're handled by axios interceptor
         if (err.response?.status !== 401) {
           console.error('Error fetching orders:', err)
-          setError(err.message || 'Failed to fetch orders')
+          setError(err.message || t("restaurant.allOrders.errors.fetchOrdersFailed"))
         }
         setOrders([])
       } finally {
@@ -450,12 +458,100 @@ export default function AllOrdersPage() {
   }
 
   const formatDateRange = () => {
-    if (!startDate || !endDate) return "Select date range"
+    if (!startDate || !endDate) return t("restaurant.allOrders.dateRange.select")
     const startDay = startDate.getDate()
     const endDay = endDate.getDate()
-    const month = startDate.toLocaleString('en-US', { month: 'short' })
+    const month = startDate.toLocaleString(i18n.language === "bn" ? "bn-IN" : i18n.language === "hi" ? "hi-IN" : "en-US", { month: 'short' })
     const year = startDate.getFullYear().toString().slice(-2)
     return `${startDay} - ${endDay} ${month}'${year}`
+  }
+
+  const getDateRangeLabel = (label) => {
+    const map = {
+      "last 2 days": "last2Days",
+      "this week": "thisWeek",
+      "last week": "lastWeek",
+      "last 30 days": "last30Days",
+      "custom date range": "customDateRange",
+    }
+    return t(`restaurant.allOrders.dateRange.options.${map[label] || "customDateRange"}`)
+  }
+
+  const getFilterCategoryLabel = (id) => {
+    const map = {
+      "Order status": "orderStatus",
+      "Ratings": "ratings",
+      "KPT delay": "kptDelay",
+      "Complaints": "complaints",
+      "Order type": "orderType",
+    }
+    return t(`restaurant.allOrders.filter.categories.${map[id] || "orderStatus"}`)
+  }
+
+  const getFilterOptionLabel = (option) => {
+    const map = {
+      preparing: "preparing",
+      ready: "ready",
+      "out-for-delivery": "outForDelivery",
+      delivered: "delivered",
+      rejected: "rejected",
+      cancelled: "cancelled",
+      "5-star": "fiveOrLess",
+      "4-star": "fourOrLess",
+      "3-star": "threeOrLess",
+      "2-star": "twoOrLess",
+      "1-star": "oneStar",
+      "0-10": "zeroToTen",
+      "10-20": "tenToTwenty",
+      "20-30": "twentyToThirty",
+      "30-plus": "thirtyPlus",
+      "order-delayed": "orderDelayed",
+      "wrong-items": "wrongItems",
+      "missing-items": "missingItems",
+      "poor-taste": "poorTaste",
+      "poor-packaging": "poorPackaging",
+      "out-of-stock": "outOfStock",
+      "not-delivered": "notDelivered",
+      "self-delivery": "selfDelivery",
+      "food-rescue": "foodRescue",
+      "large-order": "largeOrder",
+      "veg-only": "vegOnly",
+      irctc: "irctc",
+      replacement: "replacement",
+      hospital: "hospital",
+    }
+    const key = map[option.id]
+    return key ? t(`restaurant.allOrders.filter.options.${key}`) : option.label
+  }
+
+  const getStatusLabel = (status) => {
+    const map = {
+      REJECTED: "rejected",
+      CANCELLED: "cancelled",
+      DELIVERED: "delivered",
+      PREPARING: "preparing",
+      READY: "ready",
+      "OUT FOR DELIVERY": "outForDelivery",
+      PENDING: "pending"
+    }
+    const key = map[status]
+    return key ? t(`restaurant.allOrders.status.${key}`) : status
+  }
+
+  const getTagLabel = (tag) => {
+    const map = {
+      CUTLERY: "cutlery",
+      "EXPRESS DELIVERY": "expressDelivery",
+      "SELF DELIVERY": "selfDelivery",
+      "VEG ONLY": "vegOnly",
+      "FOOD RESCUE": "foodRescue",
+      IRCTC: "irctc",
+      REPLACEMENT: "replacement",
+      HOSPITAL: "hospital",
+      "LARGE ORDER": "largeOrder"
+    }
+    const key = map[tag]
+    return key ? t(`restaurant.allOrders.tags.${key}`) : tag
   }
 
   const handleCopyOrderId = (orderId, e) => {
@@ -579,22 +675,22 @@ export default function AllOrdersPage() {
           <button
             onClick={() => navigate(-1)}
             className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
-            aria-label="Go back"
+            aria-label={t("restaurant.allOrders.aria.goBack")}
           >
             <ArrowLeft className="w-6 h-6 text-gray-900" />
           </button>
           <div className="flex-1">
-            <p className="text-sm text-gray-600">Showing order history for</p>
+            <p className="text-sm text-gray-600">{t("restaurant.allOrders.labels.showingOrderHistoryFor")}</p>
             <div className="flex items-center gap-2">
               <h1 className="text-base font-bold text-gray-900">
-                {restaurantData?.name || 'Restaurant'}
+                {restaurantData?.name || t("restaurant.allOrders.common.restaurant")}
               </h1>
               <ChevronDown className="w-4 h-4 text-gray-600" />
             </div>
           </div>
           <button
             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-            aria-label="Help"
+            aria-label={t("restaurant.allOrders.aria.help")}
           >
             <HelpCircle className="w-5 h-5 text-gray-900" />
           </button>
@@ -609,7 +705,7 @@ export default function AllOrdersPage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input
               type="text"
-              placeholder="Search by order ID"
+              placeholder={t("restaurant.allOrders.search.placeholder")}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -621,7 +717,7 @@ export default function AllOrdersPage() {
                 ? 'bg-blue-50 border-blue-500 hover:bg-blue-100'
                 : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
               }`}
-            aria-label="Filter"
+            aria-label={t("restaurant.allOrders.aria.filter")}
           >
             <Filter className={`w-5 h-5 ${hasActiveFilters() ? 'text-blue-600' : 'text-gray-900'}`} />
             {hasActiveFilters() && (
@@ -638,7 +734,7 @@ export default function AllOrdersPage() {
           className="w-full flex items-center justify-between px-4 py-3 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
         >
           <div className="text-left">
-            <p className="text-sm font-medium text-gray-900 capitalize">{selectedDateRange.label}</p>
+            <p className="text-sm font-medium text-gray-900 capitalize">{getDateRangeLabel(selectedDateRange.label)}</p>
             <p className="text-xs text-gray-500 mt-0.5">{formatDateRange()}</p>
           </div>
           <div className="flex items-center gap-2">
@@ -659,14 +755,15 @@ export default function AllOrdersPage() {
             <div className="flex items-center gap-2">
               <Filter className="w-4 h-4 text-blue-600" />
               <span className="text-sm text-blue-900">
-                <span className="font-semibold">{Object.values(filters).flat().length}</span> filter{Object.values(filters).flat().length !== 1 ? 's' : ''} applied
+                <span className="font-semibold">{Object.values(filters).flat().length}</span>{" "}
+                {t("restaurant.allOrders.filter.applied", { count: Object.values(filters).flat().length })}
               </span>
             </div>
             <button
               onClick={handleClearFilters}
               className="text-xs text-blue-600 hover:text-blue-800 font-medium hover:underline"
             >
-              Clear all
+              {t("restaurant.allOrders.actions.clearAll")}
             </button>
           </motion.div>
         </div>
@@ -678,7 +775,7 @@ export default function AllOrdersPage() {
           <div className="text-center py-12 bg-white rounded-lg border border-gray-200">
             <div className="flex flex-col items-center gap-3">
               <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-              <p className="text-gray-600 text-sm">Loading orders...</p>
+              <p className="text-gray-600 text-sm">{t("restaurant.allOrders.loading.orders")}</p>
             </div>
           </div>
         )}
@@ -686,7 +783,7 @@ export default function AllOrdersPage() {
         {!loading && error && (
           <div className="text-center py-12 bg-white rounded-lg border border-gray-200">
             <div className="flex flex-col items-center gap-3">
-              <p className="text-red-600 font-medium text-sm">Error loading orders</p>
+              <p className="text-red-600 font-medium text-sm">{t("restaurant.allOrders.errors.loadingOrders")}</p>
               <p className="text-gray-500 text-xs">{error}</p>
             </div>
           </div>
@@ -713,11 +810,11 @@ export default function AllOrdersPage() {
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className={`px-2.5 py-1 rounded text-xs font-bold ${getStatusColor(order.status)}`}>
-                      {order.status}
+                      {getStatusLabel(order.status)}
                     </span>
                     {order.tags && order.tags.map((tag, idx) => (
                       <span key={idx} className="px-2.5 py-1 rounded text-xs font-bold bg-green-600 text-white">
-                        {tag}
+                        {getTagLabel(tag)}
                       </span>
                     ))}
                   </div>
@@ -729,11 +826,11 @@ export default function AllOrdersPage() {
 
                 {/* Order ID */}
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="text-base font-bold text-gray-900">ID: {order.id}</span>
+                  <span className="text-base font-bold text-gray-900">{t("restaurant.allOrders.labels.id")}: {order.id}</span>
                   <button
                     onClick={(e) => handleCopyOrderId(order.id, e)}
                     className="p-1 hover:bg-gray-100 rounded transition-colors"
-                    aria-label="Copy order ID"
+                    aria-label={t("restaurant.allOrders.aria.copyOrderId")}
                   >
                     <Copy className="w-4 h-4 text-gray-500" />
                   </button>
@@ -746,7 +843,7 @@ export default function AllOrdersPage() {
 
                 {/* Customer Info */}
                 <p className="text-sm text-gray-600 mb-3">
-                  Ordered by {order.customer}
+                  {t("restaurant.allOrders.labels.orderedBy")} {order.customer}
                 </p>
 
                 {/* Divider */}
@@ -763,7 +860,7 @@ export default function AllOrdersPage() {
                     </div>
                   ))}
                   {order.items.length > 1 && (
-                    <p className="text-sm text-gray-500">+{order.items.length - 1} more items</p>
+                    <p className="text-sm text-gray-500">+{order.items.length - 1} {t("restaurant.allOrders.labels.moreItems")}</p>
                   )}
                 </div>
 
@@ -787,15 +884,15 @@ export default function AllOrdersPage() {
             <div className="flex flex-col items-center gap-3">
               <Filter className="w-12 h-12 text-gray-300" />
               <div>
-                <p className="text-gray-900 font-medium text-sm mb-1">No orders found</p>
-                <p className="text-gray-500 text-xs">Try adjusting your filters</p>
+                <p className="text-gray-900 font-medium text-sm mb-1">{t("restaurant.allOrders.empty.title")}</p>
+                <p className="text-gray-500 text-xs">{t("restaurant.allOrders.empty.subtitle")}</p>
               </div>
               {hasActiveFilters() && (
                 <button
                   onClick={handleClearFilters}
                   className="mt-2 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
                 >
-                  Clear filters
+                  {t("restaurant.allOrders.actions.clearFilters")}
                 </button>
               )}
             </div>
@@ -832,11 +929,11 @@ export default function AllOrdersPage() {
             >
               {/* Header */}
               <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 sticky top-0 bg-white z-10">
-                <h2 className="text-lg font-bold text-gray-900">Select date range</h2>
+                <h2 className="text-lg font-bold text-gray-900">{t("restaurant.allOrders.dateRange.select")}</h2>
                 <button
                   onClick={() => setShowDateRangePopup(false)}
                   className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
-                  aria-label="Close"
+                  aria-label={t("restaurant.allOrders.aria.close")}
                 >
                   <X className="w-5 h-5 text-gray-900" />
                 </button>
@@ -850,7 +947,7 @@ export default function AllOrdersPage() {
                     onClick={() => handleDateRangeSelect(option)}
                     className="w-full text-left py-4 px-4 rounded-lg hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0"
                   >
-                    <span className="text-base text-gray-900 capitalize">{option.label}</span>
+                    <span className="text-base text-gray-900 capitalize">{getDateRangeLabel(option.label)}</span>
                   </button>
                 ))}
               </div>
@@ -908,11 +1005,11 @@ export default function AllOrdersPage() {
 
               {/* Header */}
               <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
-                <h2 className="text-lg font-bold text-gray-900">Filters</h2>
+                <h2 className="text-lg font-bold text-gray-900">{t("restaurant.allOrders.filter.title")}</h2>
                 <button
                   onClick={() => setShowFilterPopup(false)}
                   className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
-                  aria-label="Close"
+                  aria-label={t("restaurant.allOrders.aria.close")}
                 >
                   <X className="w-5 h-5 text-gray-900" />
                 </button>
@@ -934,7 +1031,7 @@ export default function AllOrdersPage() {
                           : 'text-gray-600 hover:bg-gray-100'
                         }`}
                     >
-                      {category.label}
+                      {getFilterCategoryLabel(category.id)}
                     </button>
                   ))}
                 </div>
@@ -947,7 +1044,7 @@ export default function AllOrdersPage() {
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                       <input
                         type="text"
-                        placeholder="Search"
+                        placeholder={t("restaurant.allOrders.search.filterPlaceholder")}
                         value={filterSearch}
                         onChange={(e) => setFilterSearch(e.target.value)}
                         className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -959,7 +1056,7 @@ export default function AllOrdersPage() {
                   <div className="flex-1 overflow-y-auto px-3 py-2">
                     {filterOptions[activeFilterCategory]
                       ?.filter(option =>
-                        option.label.toLowerCase().includes(filterSearch.toLowerCase())
+                        getFilterOptionLabel(option).toLowerCase().includes(filterSearch.toLowerCase())
                       )
                       .map((option) => {
                         const isChecked = isFilterChecked(option)
@@ -1000,7 +1097,7 @@ export default function AllOrdersPage() {
                                 />
                               )}
                             </div>
-                            <span className="ml-3 text-sm text-gray-900">{option.label}</span>
+                            <span className="ml-3 text-sm text-gray-900">{getFilterOptionLabel(option)}</span>
                           </label>
                         )
                       })}
@@ -1014,7 +1111,7 @@ export default function AllOrdersPage() {
                   onClick={handleClearFilters}
                   className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-900 hover:bg-gray-50 transition-colors"
                 >
-                  Clear all
+                  {t("restaurant.allOrders.actions.clearAll")}
                 </button>
                 <button
                   onClick={handleApplyFilters}
@@ -1027,10 +1124,10 @@ export default function AllOrdersPage() {
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
-                      Applying...
+                      {t("restaurant.allOrders.actions.applying")}
                     </>
                   ) : (
-                    'Apply'
+                    t("restaurant.allOrders.actions.apply")
                   )}
                 </button>
               </div>
@@ -1053,7 +1150,7 @@ export default function AllOrdersPage() {
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
-              <p className="text-sm font-medium text-gray-900">Applying filters...</p>
+              <p className="text-sm font-medium text-gray-900">{t("restaurant.allOrders.actions.applyingFilters")}</p>
             </div>
           </motion.div>
         )}
@@ -1072,7 +1169,7 @@ export default function AllOrdersPage() {
             <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
-            <span className="text-sm font-medium">Order ID copied to clipboard</span>
+            <span className="text-sm font-medium">{t("restaurant.allOrders.toast.orderIdCopied")}</span>
           </motion.div>
         )}
       </AnimatePresence>

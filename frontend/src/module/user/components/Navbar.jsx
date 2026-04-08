@@ -14,8 +14,10 @@ import { useCart } from "../context/CartContext"
 import { useLocationSelector } from "./UserLayout"
 import ThemeToggle from "@/components/ThemeToggle"
 import { getCachedSettings, loadBusinessSettings } from "@/lib/utils/businessSettings"
+import { useTranslation } from "react-i18next"
 
 export default function Navbar() {
+  const { t } = useTranslation()
   const { location, loading } = useLocation()
   const { getCartCount } = useCart()
   const { openLocationSelector } = useLocationSelector()
@@ -73,8 +75,8 @@ export default function Navbar() {
 
   // Show area if available, otherwise show city
   const areaName = location?.area && location?.area !== location?.city ? location.area : null
-  const cityName = areaName || location?.city || "Select"
-  const stateName = location?.state || "Location"
+  const cityName = areaName || location?.city || t("user.navbar.select")
+  const stateName = location?.state || t("user.navbar.location")
 
   const handleLocationClick = () => {
     // Open location selector overlay
@@ -98,7 +100,7 @@ export default function Navbar() {
             >
               {loading ? (
                 <span className="text-xs sm:text-sm font-semibold text-left text-black">
-                  Loading...
+                  {t("user.navbar.loading")}
                 </span>
               ) : (
                 <div className="flex flex-col items-start w-full min-w-0">
@@ -125,7 +127,7 @@ export default function Navbar() {
 
               size="icon"
               className="relative h-10 w-10 sm:h-11 sm:w-11 md:h-12 md:w-12 hover:bg-gray-100"
-              title={`${userPoints} Points`}
+              title={t("user.navbar.pointsTitle", { points: userPoints })}
             >
               <Trophy className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 text-primary-orange" />
               <span className="absolute -top-0.5 -right-0.5 sm:-top-1 sm:-right-1 h-4 w-4 sm:h-5 sm:w-5 rounded-full bg-primary-orange text-white text-[10px] sm:text-xs flex items-center justify-center font-semibold">
@@ -161,22 +163,22 @@ export default function Navbar() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
                 <Link to="/user/cart">
-                  <DropdownMenuItem>YOUR CART</DropdownMenuItem>
+                  <DropdownMenuItem>{t("user.navbar.menu.cart")}</DropdownMenuItem>
                 </Link>
                 <Link to="/user/profile">
-                  <DropdownMenuItem>Profile</DropdownMenuItem>
+                  <DropdownMenuItem>{t("user.navbar.menu.profile")}</DropdownMenuItem>
                 </Link>
                 <Link to="/user/orders">
-                  <DropdownMenuItem>My Orders</DropdownMenuItem>
+                  <DropdownMenuItem>{t("user.navbar.menu.myOrders")}</DropdownMenuItem>
                 </Link>
                 <Link to="/user/offers">
-                  <DropdownMenuItem>Offers</DropdownMenuItem>
+                  <DropdownMenuItem>{t("user.navbar.menu.offers")}</DropdownMenuItem>
                 </Link>
                 <Link to="/user/help">
-                  <DropdownMenuItem>Help</DropdownMenuItem>
+                  <DropdownMenuItem>{t("user.navbar.menu.help")}</DropdownMenuItem>
                 </Link>
                 <Link to="/user/auth/sign-in">
-                  <DropdownMenuItem>Sign Out</DropdownMenuItem>
+                  <DropdownMenuItem>{t("user.navbar.menu.signOut")}</DropdownMenuItem>
                 </Link>
               </DropdownMenuContent>
             </DropdownMenu>

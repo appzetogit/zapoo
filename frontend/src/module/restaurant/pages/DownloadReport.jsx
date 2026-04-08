@@ -1,40 +1,38 @@
 import { useState, useMemo, useEffect } from "react"
 import { ArrowLeft, CheckCircle, Mail } from "lucide-react"
 import { useNavigate } from "react-router-dom"
+import { useTranslation } from "react-i18next"
 
-const REPORT_VIEWS = [
-  { id: "detailed", label: "Detailed report" },
-  { id: "item", label: "Item sales report" },
-]
-
-const VIEW_TYPES = ["DAILY", "WEEKLY", "MONTHLY"]
+const REPORT_VIEWS = ["detailed", "item"]
+const VIEW_TYPES = ["daily", "weekly", "monthly"]
 
 export default function DownloadReport() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [reportView, setReportView] = useState("detailed")
-  const [viewType, setViewType] = useState("DAILY")
+  const [viewType, setViewType] = useState("daily")
   const durations = useMemo(() => {
-    if (viewType === "WEEKLY") {
+    if (viewType === "weekly") {
       return [
-        { id: "4w", label: "Last 4 weeks" },
-        { id: "8w", label: "Last 8 weeks" },
-        { id: "12w", label: "Last 12 weeks" },
-        { id: "custom", label: "Custom" },
+        { id: "4w", labelKey: "restaurant.downloadReport.durations.weekly.last4w" },
+        { id: "8w", labelKey: "restaurant.downloadReport.durations.weekly.last8w" },
+        { id: "12w", labelKey: "restaurant.downloadReport.durations.weekly.last12w" },
+        { id: "custom", labelKey: "restaurant.downloadReport.durations.common.custom" },
       ]
     }
-    if (viewType === "MONTHLY") {
+    if (viewType === "monthly") {
       return [
-        { id: "3m", label: "Last 3 months" },
-        { id: "6m", label: "Last 6 months" },
-        { id: "12m", label: "Last 12 months" },
-        { id: "custom", label: "Custom" },
+        { id: "3m", labelKey: "restaurant.downloadReport.durations.monthly.last3m" },
+        { id: "6m", labelKey: "restaurant.downloadReport.durations.monthly.last6m" },
+        { id: "12m", labelKey: "restaurant.downloadReport.durations.monthly.last12m" },
+        { id: "custom", labelKey: "restaurant.downloadReport.durations.common.custom" },
       ]
     }
     return [
-      { id: "7", label: "Last 7 days" },
-      { id: "14", label: "Last 14 days" },
-      { id: "30", label: "Last 30 days" },
-      { id: "custom", label: "Custom" },
+      { id: "7", labelKey: "restaurant.downloadReport.durations.daily.last7" },
+      { id: "14", labelKey: "restaurant.downloadReport.durations.daily.last14" },
+      { id: "30", labelKey: "restaurant.downloadReport.durations.daily.last30" },
+      { id: "custom", labelKey: "restaurant.downloadReport.durations.common.custom" },
     ]
   }, [viewType])
 
@@ -58,39 +56,40 @@ export default function DownloadReport() {
         <button
           className="p-2 -ml-2 rounded-full hover:bg-gray-100"
           onClick={() => navigate(-1)}
-          aria-label="Back"
+          aria-label={t("restaurant.downloadReport.aria.back")}
         >
           <ArrowLeft className="w-5 h-5 text-gray-900" />
         </button>
-        <h1 className="text-lg font-bold text-gray-900">Download report</h1>
+        <h1 className="text-lg font-bold text-gray-900">{t("restaurant.downloadReport.title")}</h1>
       </div>
 
       <div className="bg-[#f8e7a0] text-gray-900 text-sm px-4 py-2">
-        You are generating a report for <span className="font-semibold">All Outlets</span>
+        {t("restaurant.downloadReport.banner.generatingFor")}{" "}
+        <span className="font-semibold">{t("restaurant.downloadReport.banner.allOutlets")}</span>
       </div>
 
       <div className="flex-1 px-4 py-5 space-y-6">
         <div className="space-y-3">
-          <p className="text-sm font-semibold text-gray-900">Select the report view:</p>
+          <p className="text-sm font-semibold text-gray-900">{t("restaurant.downloadReport.labels.selectReportView")}</p>
           <div className="space-y-3">
-            {REPORT_VIEWS.map((opt) => (
-              <label key={opt.id} className="flex items-center gap-3 text-sm text-gray-900">
+            {REPORT_VIEWS.map((id) => (
+              <label key={id} className="flex items-center gap-3 text-sm text-gray-900">
                 <input
                   type="radio"
                   name="reportView"
-                  value={opt.id}
-                  checked={reportView === opt.id}
-                  onChange={() => setReportView(opt.id)}
+                  value={id}
+                  checked={reportView === id}
+                  onChange={() => setReportView(id)}
                   className="w-5 h-5 accent-black"
                 />
-                {opt.label}
+                {t(`restaurant.downloadReport.reportViews.${id}`)}
               </label>
             ))}
           </div>
         </div>
 
         <div className="space-y-3">
-          <p className="text-sm font-semibold text-gray-900">Select view for data:</p>
+          <p className="text-sm font-semibold text-gray-900">{t("restaurant.downloadReport.labels.selectDataView")}</p>
           <div className="grid grid-cols-3 border border-gray-300 rounded-xl overflow-hidden text-center text-sm font-semibold">
             {VIEW_TYPES.map((type) => (
               <button
@@ -98,14 +97,14 @@ export default function DownloadReport() {
                 onClick={() => setViewType(type)}
                 className={`py-2 ${viewType === type ? "bg-black text-white" : "bg-white text-gray-800"}`}
               >
-                {type}
+                {t(`restaurant.downloadReport.viewTypes.${type}`)}
               </button>
             ))}
           </div>
         </div>
 
         <div className="space-y-3">
-          <p className="text-sm font-semibold text-gray-900">Select duration for report:</p>
+          <p className="text-sm font-semibold text-gray-900">{t("restaurant.downloadReport.labels.selectDuration")}</p>
           <div className="space-y-3">
             {durations.map((opt) => (
               <label key={opt.id} className="flex items-center gap-3 text-sm text-gray-900">
@@ -117,7 +116,7 @@ export default function DownloadReport() {
                   onChange={() => setDuration(opt.id)}
                   className="w-5 h-5 accent-black"
                 />
-                {opt.label}
+                {t(opt.labelKey)}
               </label>
             ))}
           </div>
@@ -130,7 +129,7 @@ export default function DownloadReport() {
           className="w-full bg-black text-white py-4 rounded-xl text-sm font-semibold flex items-center justify-center gap-2"
         >
           <Mail className="w-5 h-5" />
-          Send an email
+          {t("restaurant.downloadReport.actions.sendEmail")}
         </button>
       </div>
 
@@ -140,8 +139,8 @@ export default function DownloadReport() {
             <div className="flex items-center gap-3">
               <CheckCircle className="w-6 h-6 text-green-600" />
               <div>
-                <p className="text-sm font-semibold text-gray-900">Report queued</p>
-                <p className="text-xs text-gray-600">We’ll email it to you shortly.</p>
+                <p className="text-sm font-semibold text-gray-900">{t("restaurant.downloadReport.success.title")}</p>
+                <p className="text-xs text-gray-600">{t("restaurant.downloadReport.success.subtitle")}</p>
               </div>
             </div>
           </div>
@@ -150,7 +149,6 @@ export default function DownloadReport() {
     </div>
   )
 }
-
 
 
 

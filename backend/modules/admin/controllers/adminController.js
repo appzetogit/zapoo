@@ -19,6 +19,7 @@ import mongoose from "mongoose";
 import { uploadToCloudinary } from "../../../shared/utils/cloudinaryService.js";
 import { initializeCloudinary } from "../../../config/cloudinary.js";
 import { applyZoneTierToRestaurantById } from "../services/restaurantZoneAssignmentService.js";
+import { normalizeLocale } from "../../../shared/i18n/localeConstants.js";
 const logger = winston.createLogger({
   level: "info",
   format: winston.format.json(),
@@ -993,6 +994,36 @@ export const updateAdminProfile = asyncHandler(async (req, res) => {
     });
     return errorResponse(res, 500, "Failed to update profile");
   }
+});
+
+export const getAdminPreferences = asyncHandler(async (req, res) => {
+  const admin = await Admin.findById(req.user._id).select("preferences").lean();
+  if (!admin) {
+    return errorResponse(res, 404, "Admin profile not found");
+  }
+
+  return successResponse(res, 200, "Preferences retrieved successfully", {
+    preferences: {
+      language: admin.preferences?.language || "en"
+    }
+  });
+});
+
+export const updateAdminPreferences = asyncHandler(async (req, res) => {
+  const admin = await Admin.findById(req.user._id);
+  if (!admin) {
+    return errorResponse(res, 404, "Admin profile not found");
+  }
+
+  admin.preferences = admin.preferences || {};
+  admin.preferences.language = normalizeLocale(req.body?.language);
+  await admin.save();
+
+  return successResponse(res, 200, "Preferences updated successfully", {
+    preferences: {
+      language: admin.preferences.language
+    }
+  });
 });
 
 /**

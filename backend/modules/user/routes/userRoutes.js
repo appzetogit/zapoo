@@ -5,6 +5,8 @@ import {
   uploadProfileImage,
   updateUserLocation,
   getUserLocation,
+  getUserPreferences,
+  updateUserPreferences,
   getUserAddresses,
   addUserAddress,
   updateUserAddress,
@@ -35,6 +37,8 @@ router.post(
 // Location routes
 router.get('/location', getUserLocation);
 router.put('/location', updateUserLocation);
+router.get('/preferences', getUserPreferences);
+router.put('/preferences', updateUserPreferences);
 
 // Address routes
 router.get('/addresses', getUserAddresses);

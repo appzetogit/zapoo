@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Lenis from "lenis";
+import { useTranslation } from "react-i18next";
 import { ArrowLeft, Settings, ChevronRight } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent } from "@/components/ui/card";
@@ -8,6 +9,7 @@ import { restaurantAPI } from "@/lib/api";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 export default function RestaurantStatus() {
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const [deliveryStatus, setDeliveryStatus] = useState(false);
   const [restaurantData, setRestaurantData] = useState(null);
@@ -387,11 +389,12 @@ export default function RestaurantStatus() {
   // Format current date and time
   const formatCurrentDateTime = () => {
     const now = currentDateTime;
-    const dateStr = now.toLocaleDateString('en-US', {
+    const localeCode = i18n.language === "bn" ? "bn-IN" : i18n.language === "hi" ? "hi-IN" : "en-US";
+    const dateStr = now.toLocaleDateString(localeCode, {
       day: 'numeric',
       month: 'short'
     });
-    const timeStr = now.toLocaleTimeString('en-US', {
+    const timeStr = now.toLocaleTimeString(localeCode, {
       hour: 'numeric',
       minute: '2-digit',
       hour12: true
@@ -458,12 +461,12 @@ export default function RestaurantStatus() {
       {/* Header */}
       <div className="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-50">
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate(-1)} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors" aria-label="Go back">
+          <button onClick={() => navigate(-1)} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors" aria-label={t("restaurant.status.aria.goBack")}>
             <ArrowLeft className="w-6 h-6 text-gray-900" />
           </button>
           <div className="flex-1">
-            <h1 className="text-lg font-bold text-gray-900">Restaurant status</h1>
-            <p className="text-sm text-gray-500 mt-0.5">You are mapped to 1 restaurant</p>
+            <h1 className="text-lg font-bold text-gray-900">{t("restaurant.status.title")}</h1>
+            <p className="text-sm text-gray-500 mt-0.5">{t("restaurant.status.mappedRestaurants", { count: 1 })}</p>
           </div>
         </div>
       </div>
@@ -476,11 +479,11 @@ export default function RestaurantStatus() {
             <div className="flex items-start justify-between">
               <div className="flex-1 min-w-0">
                 <h2 className="text-base font-bold text-gray-900 mb-1">
-                  {loading ? "Loading..." : restaurantData?.name || "Restaurant"}
+                  {loading ? t("restaurant.status.common.loading") : restaurantData?.name || t("restaurant.status.common.restaurant")}
                 </h2>
                 <p className="text-sm text-gray-500">
-                  {loading ? "Loading..." : <>
-                      {restaurantData?.id ? `ID: ${String(restaurantData.id).slice(-5)}` : ""}
+                  {loading ? t("restaurant.status.common.loading") : <>
+                      {restaurantData?.id ? `${t("restaurant.status.labels.id")}: ${String(restaurantData.id).slice(-5)}` : ""}
                       {restaurantData?.location && formatAddress(restaurantData.location) ? <> | {formatAddress(restaurantData.location)}</> : ""}
                     </>}
                 </p>
@@ -488,45 +491,47 @@ export default function RestaurantStatus() {
               <button onClick={() => {
               // Navigate to restaurant settings
               navigate("/restaurant/explore");
-            }} className="ml-3 p-2 bg-gray-200 hover:bg-gray-300 rounded-full transition-colors shrink-0" aria-label="Explore more">
+            }} className="ml-3 p-2 bg-gray-200 hover:bg-gray-300 rounded-full transition-colors shrink-0" aria-label={t("restaurant.status.aria.exploreMore")}>
                 <Settings className="w-5 h-5 text-gray-600" />
               </button>
             </div>
 
             <div className="flex items-center justify-between">
             <div className="flex-1">
-              <p className="text-base font-bold text-gray-900 mb-1.5">Delivery status</p>
+              <p className="text-base font-bold text-gray-900 mb-1.5">{t("restaurant.status.labels.deliveryStatus")}</p>
               <div className="flex items-center gap-2">
                 <div className={`w-2 h-2 rounded-full ${deliveryStatus ? 'bg-green-500' : 'bg-gray-600'}`}></div>
                 <p className="text-sm text-gray-500">
-                  {deliveryStatus ? 'Receiving orders' : 'Not receiving orders'}
+                  {deliveryStatus
+                    ? t("restaurant.status.statusText.receiving")
+                    : t("restaurant.status.statusText.notReceiving")}
                 </p>
               </div>
             </div>
             <Switch checked={deliveryStatus} onCheckedChange={handleDeliveryStatusChange} className="ml-4 data-[state=unchecked]:bg-gray-300 data-[state=checked]:bg-green-600" />
           </div>
 
-          <p className="text-sm text-gray-700 mb-2">Current delivery slot</p>
+          <p className="text-sm text-gray-700 mb-2">{t("restaurant.status.labels.currentDeliverySlot")}</p>
           <div className="flex items-center justify-between">
             <p className="text-base font-bold text-gray-900">
-              {loading ? "Loading..." : (() => {
+              {loading ? t("restaurant.status.common.loading") : (() => {
                 // If current day is closed, show "Today is Off"
                 if (isDayClosed) {
-                  return "Today is Off";
+                  return t("restaurant.status.labels.todayOff");
                 }
                 const timings = getCurrentDayTimings();
                 if (timings) {
-                  const dateStr = currentDateTime.toLocaleDateString('en-US', {
+                  const dateStr = currentDateTime.toLocaleDateString(i18n.language === "bn" ? "bn-IN" : i18n.language === "hi" ? "hi-IN" : "en-US", {
                     day: 'numeric',
                     month: 'short'
                   });
                   return `${dateStr}, ${timings.openingTime} - ${timings.closingTime}`;
                 }
-                return "Not configured";
+                return t("restaurant.status.labels.notConfigured");
               })()}
             </p>
             {!isDayClosed && <button onClick={() => navigate("/restaurant/outlet-timings")} className="flex items-center gap-1 text-blue-600 hover:text-blue-700 text-sm font-medium">
-                Details
+                {t("restaurant.status.actions.details")}
                 <ChevronRight className="w-4 h-4" />
               </button>}
           </div>
@@ -542,7 +547,7 @@ export default function RestaurantStatus() {
             <span className="text-white text-xs font-bold">!</span>
           </div>
           <p className="text-sm text-gray-700 flex-1">
-            You are currently outside your scheduled delivery timings.
+            {t("restaurant.status.warnings.outsideTimings")}
           </p>
         </div>}
 
@@ -554,15 +559,15 @@ export default function RestaurantStatus() {
               <span className="text-3xl">⚠️</span>
             </div>
             <DialogTitle className="text-lg font-semibold text-gray-900 text-center">
-              Outlet Timings Closed
+              {t("restaurant.status.dialogs.outletClosed.title")}
             </DialogTitle>
           </DialogHeader>
           <DialogFooter className="flex-col gap-2 sm:flex-row">
             <Button onClick={() => setShowOutletClosedDialog(false)} variant="outline" className="w-full sm:w-auto">
-              Cancel
+              {t("restaurant.status.actions.cancel")}
             </Button>
             <Button onClick={handleGoToOutletTimings} className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white">
-              Go to Outlet Timings
+              {t("restaurant.status.actions.goToOutletTimings")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -576,21 +581,21 @@ export default function RestaurantStatus() {
               <span className="text-3xl">⚠️</span>
             </div>
             <DialogTitle className="text-lg font-semibold text-gray-900 text-center">
-              Outside Delivery Timings
+              {t("restaurant.status.dialogs.outsideTimings.title")}
             </DialogTitle>
             <DialogDescription className="mt-2 text-sm text-gray-600">
-              You are currently outside your scheduled delivery timings. Please change outlet timings to enable delivery status.
+              {t("restaurant.status.dialogs.outsideTimings.description")}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="flex-col gap-2 sm:flex-row">
             <Button onClick={() => setShowOutsideTimingsDialog(false)} variant="outline" className="w-full sm:w-auto">
-              Cancel
+              {t("restaurant.status.actions.cancel")}
             </Button>
             <Button onClick={() => {
               setShowOutsideTimingsDialog(false);
               navigate("/restaurant/outlet-timings");
             }} className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white">
-              Change Outlet Timings
+              {t("restaurant.status.actions.changeOutletTimings")}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -1,12 +1,14 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { Bell, X, ShoppingBag, MapPin, Clock, IndianRupee, Truck, CreditCard } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 /**
  * New Order Notification Component
  * Displays a notification popup when a new order is received
  */
 export default function NewOrderNotification({ order, onClose, onViewOrder }) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
 
   if (!order) return null;
@@ -37,13 +39,14 @@ export default function NewOrderNotification({ order, onClose, onViewOrder }) {
                 <Bell className="w-6 h-6 text-white animate-pulse" />
               </div>
               <div>
-                <h3 className="text-white font-bold text-lg">New Order!</h3>
-                <p className="text-white/90 text-sm">Order #{order.orderId}</p>
+                <h3 className="text-white font-bold text-lg">{t("restaurant.newOrderNotification.title")}</h3>
+                <p className="text-white/90 text-sm">{t("restaurant.newOrderNotification.orderNumber", { id: order.orderId })}</p>
               </div>
             </div>
             <button
               onClick={onClose}
               className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors"
+              aria-label={t("restaurant.newOrderNotification.aria.close")}
             >
               <X className="w-5 h-5 text-white" />
             </button>
@@ -56,7 +59,7 @@ export default function NewOrderNotification({ order, onClose, onViewOrder }) {
               <div className="flex items-center justify-between p-4 bg-green-50 rounded-xl">
                 <div className="flex items-center gap-2">
                   <IndianRupee className="w-5 h-5 text-green-600" />
-                  <span className="text-gray-600 font-medium">Total Amount</span>
+                  <span className="text-gray-600 font-medium">{t("restaurant.newOrderNotification.totalAmount")}</span>
                 </div>
                 <span className="text-2xl font-bold text-green-600">
                   ₹{order.total?.toFixed(2) || '0.00'}
@@ -72,7 +75,9 @@ export default function NewOrderNotification({ order, onClose, onViewOrder }) {
                   <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${isCod ? 'bg-amber-50 border border-amber-200' : 'bg-emerald-50 border border-emerald-200'}`}>
                     <CreditCard className={`w-4 h-4 ${isCod ? 'text-amber-600' : 'text-emerald-600'}`} />
                     <span className={`text-sm font-semibold ${isCod ? 'text-amber-700' : 'text-emerald-700'}`}>
-                      {isCod ? 'Cash on Delivery' : 'Online Payment'}
+                      {isCod
+                        ? t("restaurant.newOrderNotification.payment.cashOnDelivery")
+                        : t("restaurant.newOrderNotification.payment.onlinePayment")}
                     </span>
                   </div>
                 );
@@ -80,7 +85,7 @@ export default function NewOrderNotification({ order, onClose, onViewOrder }) {
 
               {/* Items */}
               <div>
-                <h4 className="text-sm font-semibold text-gray-700 mb-2">Items:</h4>
+                <h4 className="text-sm font-semibold text-gray-700 mb-2">{t("restaurant.newOrderNotification.items")}</h4>
                 <div className="space-y-2">
                   {order.items?.slice(0, 3).map((item, index) => (
                     <div key={index} className="flex items-center justify-between text-sm">
@@ -94,7 +99,7 @@ export default function NewOrderNotification({ order, onClose, onViewOrder }) {
                   ))}
                   {order.items?.length > 3 && (
                     <p className="text-xs text-gray-500 mt-2">
-                      +{order.items.length - 3} more items
+                      +{order.items.length - 3} {t("restaurant.newOrderNotification.moreItems")}
                     </p>
                   )}
                 </div>
@@ -110,20 +115,20 @@ export default function NewOrderNotification({ order, onClose, onViewOrder }) {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <Truck className="w-4 h-4 text-blue-600" />
-                        <span className="text-gray-600 font-medium text-sm">Delivery Charge</span>
+                        <span className="text-gray-600 font-medium text-sm">{t("restaurant.newOrderNotification.deliveryCharge")}</span>
                       </div>
                       <div className="text-right">
                         <span className="text-lg font-bold text-blue-600">
                           ₹{adminCost.toFixed(2)}
                         </span>
                         {order.distanceKm > 0 && (
-                          <p className="text-[11px] text-gray-500">{order.distanceKm.toFixed(1)} km</p>
+                          <p className="text-[11px] text-gray-500">{t("restaurant.newOrderNotification.distanceKm", { km: order.distanceKm.toFixed(1) })}</p>
                         )}
                       </div>
                     </div>
                     {restaurantEarning > 0 && (
                       <div className="flex items-center justify-between pt-1.5 border-t border-blue-100">
-                        <span className="text-xs text-gray-500">Your earnings from delivery</span>
+                        <span className="text-xs text-gray-500">{t("restaurant.newOrderNotification.yourDeliveryEarnings")}</span>
                         <span className="text-sm font-semibold text-green-600">+₹{restaurantEarning.toFixed(2)}</span>
                       </div>
                     )}
@@ -136,9 +141,9 @@ export default function NewOrderNotification({ order, onClose, onViewOrder }) {
                 <div className="flex items-start gap-2 p-3 bg-gray-50 rounded-lg">
                   <MapPin className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" />
                   <div className="flex-1">
-                    <p className="text-xs text-gray-500 mb-1">Delivery Address</p>
+                    <p className="text-xs text-gray-500 mb-1">{t("restaurant.newOrderNotification.deliveryAddress")}</p>
                     <p className="text-sm text-gray-800">
-                      {order.customerAddress.street || order.customerAddress.label || 'Address'}
+                      {order.customerAddress.street || order.customerAddress.label || t("restaurant.newOrderNotification.address")}
                       {order.customerAddress.city && `, ${order.customerAddress.city}`}
                     </p>
                   </div>
@@ -149,14 +154,14 @@ export default function NewOrderNotification({ order, onClose, onViewOrder }) {
               {order.estimatedDeliveryTime && (
                 <div className="flex items-center gap-2 text-sm text-gray-600">
                   <Clock className="w-4 h-4" />
-                  <span>Est. delivery: {order.estimatedDeliveryTime} mins</span>
+                  <span>{t("restaurant.newOrderNotification.estimatedDelivery", { mins: order.estimatedDeliveryTime })}</span>
                 </div>
               )}
 
               {/* Note */}
               {order.note && (
                 <div className="p-3 bg-yellow-50 rounded-lg border border-yellow-200">
-                  <p className="text-xs text-yellow-800 font-medium mb-1">Note:</p>
+                  <p className="text-xs text-yellow-800 font-medium mb-1">{t("restaurant.newOrderNotification.note")}</p>
                   <p className="text-sm text-yellow-900">{order.note}</p>
                 </div>
               )}
@@ -168,14 +173,14 @@ export default function NewOrderNotification({ order, onClose, onViewOrder }) {
                 onClick={onClose}
                 className="flex-1 px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl transition-colors"
               >
-                Dismiss
+                {t("restaurant.newOrderNotification.actions.dismiss")}
               </button>
               <button
                 onClick={handleViewOrder}
                 className="flex-1 px-4 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl transition-colors flex items-center justify-center gap-2"
               >
                 <ShoppingBag className="w-5 h-5" />
-                View Order
+                {t("restaurant.newOrderNotification.actions.viewOrder")}
               </button>
             </div>
           </div>
@@ -184,4 +189,3 @@ export default function NewOrderNotification({ order, onClose, onViewOrder }) {
     </AnimatePresence>
   );
 }
-

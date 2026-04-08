@@ -5,6 +5,7 @@ import { ArrowLeft, ChevronDown } from "lucide-react"
 import { restaurantAPI } from "@/lib/api"
 import { toast } from "sonner"
 import { Loader2 } from "lucide-react"
+import { useTranslation } from "react-i18next"
 
 const ADDRESS_STORAGE_KEY = "restaurant_address"
 
@@ -14,6 +15,7 @@ const DEFAULT_LNG = 75.8577
 
 export default function EditRestaurantAddress() {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const [address, setAddress] = useState("")
   const [restaurantName, setRestaurantName] = useState("")
   const [location, setLocation] = useState(null)
@@ -182,14 +184,14 @@ export default function EditRestaurantAddress() {
         setLocation(updatedLocation)
         setAddress(finalFormattedAddress)
         window.dispatchEvent(new Event("addressUpdated"))
-        toast.success("Address updated successfully!")
+        toast.success(t("restaurant.editAddress.toast.updated"))
         navigate(-1)
       } else {
-        throw new Error("Failed to update profile")
+        throw new Error(t("restaurant.editAddress.toast.updateProfileFailed"))
       }
     } catch (error) {
       console.error("Error updating address:", error)
-      toast.error(error.response?.data?.message || error.message || "Failed to update address")
+      toast.error(error.response?.data?.message || error.message || t("restaurant.editAddress.toast.updateFailed"))
     } finally {
       setLoading(false)
     }
@@ -214,7 +216,7 @@ export default function EditRestaurantAddress() {
         <button
           onClick={() => navigate(-1)}
           className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors shrink-0"
-          aria-label="Go back"
+          aria-label={t("restaurant.editAddress.aria.goBack")}
         >
           <ArrowLeft className="w-6 h-6 text-gray-900" />
         </button>
@@ -247,8 +249,8 @@ export default function EditRestaurantAddress() {
           <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 pointer-events-none z-10">
             {/* Tooltip */}
             <div className="bg-black text-white px-3 py-2 rounded-lg mb-2 whitespace-nowrap shadow-lg">
-              <p className="text-xs font-semibold">Your outlet location</p>
-              <p className="text-[10px] text-gray-300">Orders will be picked up from here</p>
+              <p className="text-xs font-semibold">{t("restaurant.editAddress.map.title")}</p>
+              <p className="text-[10px] text-gray-300">{t("restaurant.editAddress.map.subtitle")}</p>
             </div>
             {/* Marker Pin */}
             <div className="w-6 h-6 bg-black rounded-full border-2 border-white shadow-lg mx-auto"></div>
@@ -257,7 +259,7 @@ export default function EditRestaurantAddress() {
 
         {/* Address Details Section - Stays below map in flex flow but can scroll */}
         <div className="bg-white rounded-t-3xl shadow-[0_-4px_20px_rgba(0,0,0,0.05)] px-4 pt-6 pb-2 z-20 shrink-0 border-t border-gray-100 mobile-address-container">
-          <h2 className="text-xl font-bold text-gray-900 text-center mb-4">Outlet address</h2>
+          <h2 className="text-xl font-bold text-gray-900 text-center mb-4">{t("restaurant.editAddress.title")}</h2>
 
           {/* Manual Address Entry - Integrated and scrollable if height is tight */}
           <div
@@ -266,62 +268,62 @@ export default function EditRestaurantAddress() {
             data-lenis-prevent
           >
             <div className="relative z-50">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 block">Building / Street</label>
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 block">{t("restaurant.editAddress.fields.buildingStreet")}</label>
               <input
                 type="text"
                 name="addressLine1"
                 value={addressFields.addressLine1}
                 onChange={handleInputChange}
-                placeholder="Building name, street etc."
+                placeholder={t("restaurant.editAddress.placeholders.addressLine1")}
                 className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black transition-all"
               />
             </div>
 
             <div className="relative z-50">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 block">Floor / Suite (Optional)</label>
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 block">{t("restaurant.editAddress.fields.floorSuite")}</label>
               <input
                 type="text"
                 name="addressLine2"
                 value={addressFields.addressLine2}
                 onChange={handleInputChange}
-                placeholder="Floor, suite, subunit etc."
+                placeholder={t("restaurant.editAddress.placeholders.addressLine2")}
                 className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black transition-all"
               />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="relative z-50">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 block">Area</label>
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 block">{t("restaurant.editAddress.fields.area")}</label>
                 <input
                   type="text"
                   name="area"
                   value={addressFields.area}
                   onChange={handleInputChange}
-                  placeholder="Area / Locality"
+                  placeholder={t("restaurant.editAddress.placeholders.area")}
                   className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black transition-all"
                 />
               </div>
               <div className="relative z-50">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 block">City</label>
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 block">{t("restaurant.editAddress.fields.city")}</label>
                 <input
                   type="text"
                   name="city"
                   value={addressFields.city}
                   onChange={handleInputChange}
-                  placeholder="City"
+                  placeholder={t("restaurant.editAddress.placeholders.city")}
                   className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black transition-all"
                 />
               </div>
             </div>
 
             <div className="relative z-50">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 block">Landmark</label>
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 block">{t("restaurant.editAddress.fields.landmark")}</label>
               <input
                 type="text"
                 name="landmark"
                 value={addressFields.landmark}
                 onChange={handleInputChange}
-                placeholder="Famous nearby place"
+                placeholder={t("restaurant.editAddress.placeholders.landmark")}
                 className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black transition-all"
               />
             </div>
@@ -335,7 +337,7 @@ export default function EditRestaurantAddress() {
               className="w-full bg-black text-white font-semibold py-4 text-base rounded-xl flex items-center justify-center gap-2 hover:bg-gray-900 active:scale-[0.98] transition-all disabled:bg-gray-400 disabled:cursor-not-allowed shadow-lg shadow-black/10"
             >
               {loading && <Loader2 className="w-5 h-5 animate-spin" />}
-              {loading ? "Updating Details..." : "Save Address"}
+              {loading ? t("restaurant.editAddress.actions.updating") : t("restaurant.editAddress.actions.save")}
             </button>
           </div>
         </div>

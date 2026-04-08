@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react"
 import { toast } from "sonner"
-import api, { adminAPI } from "@/lib/api"
+import api from "@/lib/api"
 import { API_ENDPOINTS } from "@/lib/api/config"
-import { Heart, Users, Shield, Clock, Star, Award, Plus, X, GripVertical } from "lucide-react"
+import { Heart, Users, Shield, Clock, Star, Award, Plus, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -39,14 +39,22 @@ const colorOptions = [
   { value: 'text-red-600 dark:text-red-400', label: 'Red', bg: 'bg-red-100 dark:bg-red-900/30' }
 ]
 
+const languageTabs = [
+  { key: 'en', label: 'English' },
+  { key: 'hi', label: 'Hindi' },
+  { key: 'bn', label: 'Bengali' }
+]
+
 export default function AboutUs() {
   const { companyName } = useCompanyName()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [activeLanguage, setActiveLanguage] = useState('en')
   const [aboutData, setAboutData] = useState({
     appName: 'Appzeto Food',
     version: '1.0.0',
     description: '',
+    localizedDescription: { en: '', hi: '', bn: '' },
     logo: '',
     features: []
   })
@@ -60,7 +68,29 @@ export default function AboutUs() {
       setLoading(true)
       const response = await api.get(API_ENDPOINTS.ADMIN.ABOUT)
       if (response.data.success) {
-        setAboutData(response.data.data)
+        const payload = response.data.data || {}
+        setAboutData({
+          ...payload,
+          localizedDescription: {
+            en: payload.localizedDescription?.en || payload.description || '',
+            hi: payload.localizedDescription?.hi || '',
+            bn: payload.localizedDescription?.bn || ''
+          },
+          features: (payload.features || []).map((feature, index) => ({
+            ...feature,
+            order: typeof feature.order === 'number' ? feature.order : index,
+            localizedTitle: {
+              en: feature.localizedTitle?.en || feature.title || '',
+              hi: feature.localizedTitle?.hi || '',
+              bn: feature.localizedTitle?.bn || ''
+            },
+            localizedDescription: {
+              en: feature.localizedDescription?.en || feature.description || '',
+              hi: feature.localizedDescription?.hi || '',
+              bn: feature.localizedDescription?.bn || ''
+            }
+          }))
+        })
       }
     } catch (error) {
       console.error('Error fetching about data:', error)
@@ -73,7 +103,12 @@ export default function AboutUs() {
   const handleSave = async () => {
     try {
       setSaving(true)
-      const response = await api.put(API_ENDPOINTS.ADMIN.ABOUT, aboutData)
+      const response = await api.put(API_ENDPOINTS.ADMIN.ABOUT, {
+        ...aboutData,
+        description: aboutData.localizedDescription?.en || aboutData.description || '',
+        locale: activeLanguage,
+        autoTranslate: activeLanguage === 'en'
+      })
       if (response.data.success) {
         toast.success('About page updated successfully')
         setAboutData(response.data.data)
@@ -94,7 +129,9 @@ export default function AboutUs() {
         {
           icon: 'Heart',
           title: '',
+          localizedTitle: { en: '', hi: '', bn: '' },
           description: '',
+          localizedDescription: { en: '', hi: '', bn: '' },
           color: 'text-pink-600 dark:text-pink-400',
           bgColor: 'bg-pink-100 dark:bg-pink-900/30',
           order: prev.features.length
@@ -115,7 +152,12 @@ export default function AboutUs() {
 
       // Save to backend immediately
       setSaving(true)
-      const response = await api.put(API_ENDPOINTS.ADMIN.ABOUT, updatedData)
+      const response = await api.put(API_ENDPOINTS.ADMIN.ABOUT, {
+        ...updatedData,
+        description: updatedData.localizedDescription?.en || updatedData.description || '',
+        locale: activeLanguage,
+        autoTranslate: activeLanguage === 'en'
+      })
       if (response.data.success) {
         toast.success('Feature deleted successfully')
         setAboutData(response.data.data)
@@ -147,6 +189,27 @@ export default function AboutUs() {
     })
   }
 
+  const updateFeatureTextByLocale = (index, field, value) => {
+    setAboutData(prev => {
+      const newFeatures = [...prev.features]
+      const current = newFeatures[index]
+      const localizedKey = field === 'title' ? 'localizedTitle' : 'localizedDescription'
+      const nextLocalized = {
+        en: current?.[localizedKey]?.en || current?.[field] || '',
+        hi: current?.[localizedKey]?.hi || '',
+        bn: current?.[localizedKey]?.bn || '',
+        [activeLanguage]: value
+      }
+
+      newFeatures[index] = {
+        ...current,
+        [localizedKey]: nextLocalized,
+        [field]: nextLocalized.en
+      }
+      return { ...prev, features: newFeatures }
+    })
+  }
+
   if (loading) {
     return (
       <div className="p-4 lg:p-6 bg-slate-50 min-h-screen flex items-center justify-center">
@@ -164,6 +227,23 @@ export default function AboutUs() {
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-slate-900">About Us</h1>
           <p className="text-sm text-slate-600 mt-1">Manage your About page content</p>
+        </div>
+
+        <div className="mb-6 flex items-center gap-2 flex-wrap">
+          {languageTabs.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setActiveLanguage(tab.key)}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                activeLanguage === tab.key
+                  ? "bg-blue-600 text-white"
+                  : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
 
         {/* Basic Information */}
@@ -196,8 +276,20 @@ export default function AboutUs() {
               <Label htmlFor="description">Description</Label>
               <Textarea
                 id="description"
-                value={aboutData.description}
-                onChange={(e) => setAboutData(prev => ({ ...prev, description: e.target.value }))}
+                value={aboutData.localizedDescription?.[activeLanguage] || ''}
+                onChange={(e) => setAboutData(prev => {
+                  const nextLocalized = {
+                    en: prev.localizedDescription?.en || prev.description || '',
+                    hi: prev.localizedDescription?.hi || '',
+                    bn: prev.localizedDescription?.bn || '',
+                    [activeLanguage]: e.target.value
+                  }
+                  return {
+                    ...prev,
+                    localizedDescription: nextLocalized,
+                    description: nextLocalized.en
+                  }
+                })}
                 placeholder="Your trusted food delivery partner..."
                 rows={4}
                 className="mt-1"
@@ -277,16 +369,16 @@ export default function AboutUs() {
                         <div>
                           <Label>Title</Label>
                           <Input
-                            value={feature.title}
-                            onChange={(e) => updateFeature(index, 'title', e.target.value)}
+                            value={feature.localizedTitle?.[activeLanguage] || ''}
+                            onChange={(e) => updateFeatureTextByLocale(index, 'title', e.target.value)}
                             placeholder="Feature title"
                           />
                         </div>
                         <div>
                           <Label>Description</Label>
                           <Textarea
-                            value={feature.description}
-                            onChange={(e) => updateFeature(index, 'description', e.target.value)}
+                            value={feature.localizedDescription?.[activeLanguage] || ''}
+                            onChange={(e) => updateFeatureTextByLocale(index, 'description', e.target.value)}
                             placeholder="Feature description"
                             rows={2}
                           />

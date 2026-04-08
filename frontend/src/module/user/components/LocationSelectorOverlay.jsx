@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { locationAPI, userAPI } from "@/lib/api";
 import { ensureGoogleMapsLoaded } from "@/lib/utils/googleMapsLoader.js";
 import { USER_LOCATION_UPDATED_EVENT } from "../constants/locationEvents.js";
+import { getCurrentLanguage } from "@/lib/i18n/language.js";
 
 async function persistGlobalUserLocationFromOverlay(payload) {
   try {
@@ -1521,7 +1522,7 @@ export default function LocationSelectorOverlay({
               getGoogleMapsApiKey
             } = await import('@/lib/utils/googleMapsApiKey.js');
             const apiKey = (await getGoogleMapsApiKey()) || GOOGLE_MAPS_API_KEY;
-            const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${roundedLat},${roundedLng}&key=${apiKey}&language=en&region=in&result_type=street_address|premise|point_of_interest|establishment`;
+            const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${roundedLat},${roundedLng}&key=${apiKey}&language=${getCurrentLanguage()}&region=in&result_type=street_address|premise|point_of_interest|establishment`;
             const geocodeResponse = await fetch(geocodeUrl).then(res => res.json());
             if (geocodeResponse.status === "OK" && geocodeResponse.results && geocodeResponse.results.length > 0) {
               // Find result with POI/premise for most accurate address

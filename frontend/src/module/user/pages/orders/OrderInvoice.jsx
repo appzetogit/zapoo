@@ -9,8 +9,10 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { useOrders } from "../../context/OrdersContext"
 import { useCompanyName } from "@/lib/hooks/useCompanyName"
+import { useTranslation } from "react-i18next"
 
 export default function OrderInvoice() {
+  const { t } = useTranslation()
   const companyName = useCompanyName()
   const { orderId } = useParams()
   const { getOrderById } = useOrders()
@@ -21,9 +23,9 @@ export default function OrderInvoice() {
     return (
       <AnimatedPage className="min-h-screen bg-[#f5f5f5] dark:bg-[#0a0a0a] p-4">
         <div className="max-w-4xl mx-auto text-center py-20">
-          <h1 className="text-lg sm:text-xl md:text-2xl font-bold mb-4">Order Not Found</h1>
+          <h1 className="text-lg sm:text-xl md:text-2xl font-bold mb-4">{t("user.invoice.orderNotFound")}</h1>
           <Link to="/user/orders">
-            <Button>Back to Orders</Button>
+            <Button>{t("user.invoice.backToOrders")}</Button>
           </Link>
         </div>
       </AnimatedPage>
@@ -32,7 +34,7 @@ export default function OrderInvoice() {
 
   const formatDate = (dateString) => {
     const date = new Date(dateString)
-    return date.toLocaleDateString('en-US', { 
+    return date.toLocaleDateString(undefined, {
       year: 'numeric', 
       month: 'long', 
       day: 'numeric',
@@ -49,7 +51,7 @@ export default function OrderInvoice() {
       <!DOCTYPE html>
       <html>
         <head>
-          <title>Invoice - ${order.id}</title>
+          <title>${t("user.invoice.invoice")} - ${order.id}</title>
           <style>
             body {
               font-family: Arial, sans-serif;
@@ -139,8 +141,8 @@ export default function OrderInvoice() {
                 </Button>
               </Link>
               <div>
-                <h1 className="text-lg sm:text-xl md:text-2xl font-bold">Invoice</h1>
-                <p className="text-muted-foreground text-sm sm:text-base">Order {order.id}</p>
+                <h1 className="text-lg sm:text-xl md:text-2xl font-bold">{t("user.invoice.invoice")}</h1>
+                <p className="text-muted-foreground text-sm sm:text-base">{t("user.invoice.orderWithId", { id: order.id })}</p>
               </div>
             </div>
             <div className="flex gap-2 no-print">
@@ -150,14 +152,14 @@ export default function OrderInvoice() {
                 className="flex items-center gap-2 text-xs sm:text-sm h-9 sm:h-10"
               >
                 <Printer className="h-3 w-3 sm:h-4 sm:w-4" />
-                <span className="hidden sm:inline">Print</span>
+                <span className="hidden sm:inline">{t("user.invoice.print")}</span>
               </Button>
               <Button
                 onClick={handleDownloadPDF}
                 className="bg-green-600 hover:bg-green-700 flex items-center gap-2 text-xs sm:text-sm h-9 sm:h-10"
               >
                 <Download className="h-3 w-3 sm:h-4 sm:w-4 text-white" />
-                <span className="hidden sm:inline text-white">Download PDF</span>
+                <span className="hidden sm:inline text-white">{t("user.invoice.downloadPdf")}</span>
                 <span className="sm:hidden text-white">PDF</span>
               </Button>
             </div>
@@ -171,12 +173,12 @@ export default function OrderInvoice() {
               <div className="invoice-header">
                 <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
                   <FileText className="h-6 w-6 sm:h-8 sm:w-8 text-green-600" />
-                  <h2 className="invoice-title text-xl sm:text-2xl md:text-3xl text-green-600 font-bold">INVOICE</h2>
+                  <h2 className="invoice-title text-xl sm:text-2xl md:text-3xl text-green-600 font-bold">{t("user.invoice.invoiceUpper")}</h2>
                 </div>
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0">
                   <div>
                     <p className="text-xs sm:text-sm text-muted-foreground">{companyName}</p>
-                    <p className="text-xs sm:text-sm text-muted-foreground">Food Delivery Platform</p>
+                    <p className="text-xs sm:text-sm text-muted-foreground">{t("user.invoice.foodDeliveryPlatform")}</p>
                   </div>
                   <Badge className="bg-green-600 text-white text-sm sm:text-base md:text-lg px-3 sm:px-4 py-1.5 sm:py-2 w-fit">
                     {order.status.toUpperCase()}
@@ -187,7 +189,7 @@ export default function OrderInvoice() {
               {/* Invoice Details */}
               <div className="invoice-details grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 md:gap-8 mt-4 sm:mt-6">
                 <div>
-                  <h3 className="font-bold mb-2 text-sm sm:text-base">Bill To:</h3>
+                  <h3 className="font-bold mb-2 text-sm sm:text-base">{t("user.invoice.billTo")}</h3>
                   <p className="text-xs sm:text-sm">{order.address?.street}</p>
                   {order.address?.additionalDetails && (
                     <p className="text-xs sm:text-sm">{order.address.additionalDetails}</p>
@@ -197,29 +199,29 @@ export default function OrderInvoice() {
                   </p>
                 </div>
                 <div className="text-left sm:text-right">
-                  <h3 className="font-bold mb-2 text-sm sm:text-base">Invoice Details:</h3>
-                  <p className="text-xs sm:text-sm"><strong>Invoice #:</strong> {order.id}</p>
-                  <p className="text-xs sm:text-sm"><strong>Date:</strong> {formatDate(order.createdAt)}</p>
-                  <p className="text-xs sm:text-sm"><strong>Payment:</strong> {(() => {
+                  <h3 className="font-bold mb-2 text-sm sm:text-base">{t("user.invoice.invoiceDetails")}</h3>
+                  <p className="text-xs sm:text-sm"><strong>{t("user.invoice.invoiceNumber")}:</strong> {order.id}</p>
+                  <p className="text-xs sm:text-sm"><strong>{t("user.invoice.date")}:</strong> {formatDate(order.createdAt)}</p>
+                  <p className="text-xs sm:text-sm"><strong>{t("user.invoice.payment")}:</strong> {(() => {
                     const m = (order.payment?.method || order.paymentMethod || '').toString().toLowerCase();
-                    if (m === 'cash' || m === 'cod') return 'Cash on Delivery';
-                    if (m === 'wallet') return 'Wallet';
-                    return 'Online';
+                    if (m === 'cash' || m === 'cod') return t("user.invoice.paymentMethod.cashOnDelivery");
+                    if (m === 'wallet') return t("user.invoice.paymentMethod.wallet");
+                    return t("user.invoice.paymentMethod.online");
                   })()}</p>
                 </div>
               </div>
 
               {/* Items Table */}
               <div className="invoice-items mt-4 sm:mt-6">
-                <h3 className="font-bold mb-3 sm:mb-4 text-sm sm:text-base">Order Items:</h3>
+                <h3 className="font-bold mb-3 sm:mb-4 text-sm sm:text-base">{t("user.invoice.orderItems")}</h3>
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs sm:text-sm">
                     <thead>
                       <tr>
-                        <th className="px-2 sm:px-3 py-2 text-left">Item</th>
-                        <th className="px-2 sm:px-3 py-2 text-center hidden sm:table-cell">Quantity</th>
-                        <th className="px-2 sm:px-3 py-2 text-right hidden md:table-cell">Unit Price</th>
-                        <th className="px-2 sm:px-3 py-2 text-right">Total</th>
+                        <th className="px-2 sm:px-3 py-2 text-left">{t("user.invoice.item")}</th>
+                        <th className="px-2 sm:px-3 py-2 text-center hidden sm:table-cell">{t("user.invoice.quantity")}</th>
+                        <th className="px-2 sm:px-3 py-2 text-right hidden md:table-cell">{t("user.invoice.unitPrice")}</th>
+                        <th className="px-2 sm:px-3 py-2 text-right">{t("user.invoice.total")}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -235,7 +237,7 @@ export default function OrderInvoice() {
                               <div className="min-w-0 flex-1">
                                 <span className="font-medium block">{item.name}</span>
                                 <span className="text-muted-foreground sm:hidden text-xs">
-                                  Qty: {item.quantity} × ${item.price.toFixed(2)}
+                                  {t("user.invoice.qty")}: {item.quantity} × ${item.price.toFixed(2)}
                                 </span>
                               </div>
                             </div>
@@ -253,27 +255,27 @@ export default function OrderInvoice() {
               {/* Total Section */}
               <div className="total-section mt-4 sm:mt-6">
                 <div className="total-row flex justify-between text-xs sm:text-sm sm:text-base py-1 sm:py-2">
-                  <span>Subtotal:</span>
+                  <span>{t("user.invoice.subtotal")}:</span>
                   <span>${order.subtotal.toFixed(2)}</span>
                 </div>
                 <div className="total-row flex justify-between text-xs sm:text-sm sm:text-base py-1 sm:py-2">
-                  <span>Delivery Fee:</span>
+                  <span>{t("user.invoice.deliveryFee")}:</span>
                   <span>${order.deliveryFee.toFixed(2)}</span>
                 </div>
                 <div className="total-row flex justify-between text-xs sm:text-sm sm:text-base py-1 sm:py-2">
-                  <span>Tax:</span>
+                  <span>{t("user.invoice.tax")}:</span>
                   <span>${order.tax.toFixed(2)}</span>
                 </div>
                 <div className="grand-total flex justify-between text-base sm:text-lg md:text-xl md:text-2xl pt-2 sm:pt-3 mt-2 sm:mt-3 border-t-2 border-green-600">
-                  <span>Total:</span>
+                  <span>{t("user.invoice.total")}:</span>
                   <span>${order.total.toFixed(2)}</span>
                 </div>
               </div>
 
               {/* Footer */}
               <div className="mt-6 sm:mt-8 pt-4 sm:pt-6 border-t text-center text-xs sm:text-sm text-muted-foreground">
-                <p>Thank you for your order!</p>
-                <p className="mt-1 sm:mt-2">For any queries, please contact our support team.</p>
+                <p>{t("user.invoice.thankYou")}</p>
+                <p className="mt-1 sm:mt-2">{t("user.invoice.supportLine")}</p>
               </div>
             </CardContent>
           </Card>
@@ -283,12 +285,12 @@ export default function OrderInvoice() {
           <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 no-print">
             <Link to={`/user/orders/${orderId}`} className="flex-1">
               <Button variant="outline" className="w-full text-sm sm:text-base h-10 sm:h-11">
-                Track Order
+                {t("user.invoice.trackOrder")}
               </Button>
             </Link>
             <Link to="/user/orders" className="flex-1">
               <Button variant="outline" className="w-full text-sm sm:text-base h-10 sm:h-11">
-                Back to Orders
+                {t("user.invoice.backToOrders")}
               </Button>
             </Link>
           </div>

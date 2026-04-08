@@ -2,6 +2,10 @@ import AdminCoupon from "../models/AdminCoupon.js";
 import Order from "../../order/models/Order.js";
 import { successResponse, errorResponse } from "../../../shared/utils/response.js";
 import { asyncHandler } from "../../../shared/middleware/asyncHandler.js";
+import { resolveLocaleFromRequest } from "../../../shared/i18n/localeResolver.js";
+import { normalizeLocale } from "../../../shared/i18n/localeConstants.js";
+import { resolveLocalizedText, toLocalizedText } from "../../../shared/i18n/localizedText.js";
+import { buildLocalizedText } from "../../../shared/i18n/translationService.js";
 
 const normalizeCouponCode = (code = "") => String(code || "").trim().toUpperCase();
 
@@ -25,6 +29,37 @@ const getDerivedStatus = (coupon) => {
   return coupon.status;
 };
 
+const mergeLocalizedValue = (existingValue, localizedOverride, fallback = "") => {
+  const merged = toLocalizedText(existingValue, fallback);
+  if (localizedOverride && typeof localizedOverride === "object") {
+    for (const locale of ["en", "hi", "bn"]) {
+      if (typeof localizedOverride[locale] === "string") {
+        merged[locale] = localizedOverride[locale];
+      }
+    }
+  }
+  return merged;
+};
+
+const maybeTranslate = async (localizedValue, sourceLocale, autoTranslate, explicitOverrides = null) => {
+  if (sourceLocale === "en" && autoTranslate && localizedValue.en) {
+    try {
+      const translated = await buildLocalizedText(localizedValue.en);
+      if (!explicitOverrides?.hi) localizedValue.hi = translated.hi || localizedValue.hi;
+      if (!explicitOverrides?.bn) localizedValue.bn = translated.bn || localizedValue.bn;
+    } catch (error) {
+      console.warn(`[i18n] Coupon translation failed: ${error.message}`);
+    }
+  }
+  return localizedValue;
+};
+
+const resolveCouponForLocale = (coupon, locale) => ({
+  ...coupon,
+  title: resolveLocalizedText(coupon.localizedTitle, locale, coupon.title || ""),
+  description: resolveLocalizedText(coupon.localizedDescription, locale, coupon.description || ""),
+});
+
 export const createCustomerCoupon = asyncHandler(async (req, res) => {
   const {
     code,
@@ -38,6 +73,10 @@ export const createCustomerCoupon = asyncHandler(async (req, res) => {
     validFrom,
     validUntil = null,
     status = "active",
+    localizedTitle,
+    localizedDescription,
+    locale,
+    autoTranslate = true,
   } = req.body;
 
   const normalizedCode = normalizeCouponCode(code);
@@ -84,10 +123,31 @@ export const createCustomerCoupon = asyncHandler(async (req, res) => {
     return errorResponse(res, 400, "Coupon code already exists");
   }
 
+  const sourceLocale = normalizeLocale(locale || "en");
+  let nextLocalizedTitle = mergeLocalizedValue(localizedTitle, localizedTitle, String(title).trim());
+  let nextLocalizedDescription = mergeLocalizedValue(
+    localizedDescription,
+    localizedDescription,
+    String(description || "").trim()
+  );
+  nextLocalizedTitle[sourceLocale] = String(title).trim();
+  nextLocalizedDescription[sourceLocale] = String(description || "").trim();
+  if (!nextLocalizedTitle.en) nextLocalizedTitle.en = String(title).trim();
+  if (!nextLocalizedDescription.en) nextLocalizedDescription.en = String(description || "").trim();
+  nextLocalizedTitle = await maybeTranslate(nextLocalizedTitle, sourceLocale, autoTranslate, localizedTitle);
+  nextLocalizedDescription = await maybeTranslate(
+    nextLocalizedDescription,
+    sourceLocale,
+    autoTranslate,
+    localizedDescription
+  );
+
   const coupon = await AdminCoupon.create({
     code: normalizedCode,
-    title: String(title).trim(),
-    description: String(description || "").trim(),
+    title: nextLocalizedTitle.en,
+    localizedTitle: nextLocalizedTitle,
+    description: nextLocalizedDescription.en,
+    localizedDescription: nextLocalizedDescription,
     discountType,
     discountValue: parsedDiscountValue,
     maxDiscountAmount: parsedMaxDiscount,
@@ -100,12 +160,14 @@ export const createCustomerCoupon = asyncHandler(async (req, res) => {
     updatedBy: req.user?._id || null,
   });
 
+  const requestLocale = resolveLocaleFromRequest(req);
   return successResponse(res, 201, "Customer coupon created successfully", {
-    coupon,
+    coupon: resolveCouponForLocale(coupon.toObject(), requestLocale),
   });
 });
 
 export const getCustomerCoupons = asyncHandler(async (req, res) => {
+  const locale = resolveLocaleFromRequest(req);
   const {
     page = 1,
     limit = 50,
@@ -122,6 +184,12 @@ export const getCustomerCoupons = asyncHandler(async (req, res) => {
       { code: { $regex: search.trim(), $options: "i" } },
       { title: { $regex: search.trim(), $options: "i" } },
       { description: { $regex: search.trim(), $options: "i" } },
+      { "localizedTitle.en": { $regex: search.trim(), $options: "i" } },
+      { "localizedTitle.hi": { $regex: search.trim(), $options: "i" } },
+      { "localizedTitle.bn": { $regex: search.trim(), $options: "i" } },
+      { "localizedDescription.en": { $regex: search.trim(), $options: "i" } },
+      { "localizedDescription.hi": { $regex: search.trim(), $options: "i" } },
+      { "localizedDescription.bn": { $regex: search.trim(), $options: "i" } },
     ];
   }
 
@@ -156,7 +224,7 @@ export const getCustomerCoupons = asyncHandler(async (req, res) => {
   const usageMap = new Map(usageAgg.map((entry) => [String(entry._id), entry.deliveredUses || 0]));
 
   const formattedCoupons = coupons.map((coupon) => ({
-    ...coupon,
+    ...resolveCouponForLocale(coupon, locale),
     effectiveStatus: getDerivedStatus(coupon),
     deliveredUses: usageMap.get(coupon.code) || 0,
   }));
@@ -173,6 +241,7 @@ export const getCustomerCoupons = asyncHandler(async (req, res) => {
 });
 
 export const updateCustomerCoupon = asyncHandler(async (req, res) => {
+  const requestLocale = resolveLocaleFromRequest(req);
   const { id } = req.params;
   const coupon = await AdminCoupon.findById(id);
   if (!coupon) {
@@ -190,7 +259,12 @@ export const updateCustomerCoupon = asyncHandler(async (req, res) => {
     eligibilityType,
     validFrom,
     validUntil,
+    localizedTitle,
+    localizedDescription,
+    locale,
+    autoTranslate = true,
   } = req.body;
+  const sourceLocale = normalizeLocale(locale || "en");
 
   if (code !== undefined) {
     const normalizedCode = normalizeCouponCode(code);
@@ -206,8 +280,37 @@ export const updateCustomerCoupon = asyncHandler(async (req, res) => {
     }
   }
 
-  if (title !== undefined) coupon.title = String(title).trim();
-  if (description !== undefined) coupon.description = String(description || "").trim();
+  if (title !== undefined || localizedTitle !== undefined) {
+    let nextLocalizedTitle = mergeLocalizedValue(
+      coupon.localizedTitle,
+      localizedTitle,
+      coupon.title || ""
+    );
+    if (title !== undefined) nextLocalizedTitle[sourceLocale] = String(title).trim();
+    if (!nextLocalizedTitle.en) nextLocalizedTitle.en = coupon.title || String(title || "").trim();
+    nextLocalizedTitle = await maybeTranslate(nextLocalizedTitle, sourceLocale, autoTranslate, localizedTitle);
+    coupon.localizedTitle = nextLocalizedTitle;
+    coupon.title = nextLocalizedTitle.en;
+  }
+  if (description !== undefined || localizedDescription !== undefined) {
+    let nextLocalizedDescription = mergeLocalizedValue(
+      coupon.localizedDescription,
+      localizedDescription,
+      coupon.description || ""
+    );
+    if (description !== undefined) nextLocalizedDescription[sourceLocale] = String(description || "").trim();
+    if (!nextLocalizedDescription.en) {
+      nextLocalizedDescription.en = coupon.description || String(description || "").trim();
+    }
+    nextLocalizedDescription = await maybeTranslate(
+      nextLocalizedDescription,
+      sourceLocale,
+      autoTranslate,
+      localizedDescription
+    );
+    coupon.localizedDescription = nextLocalizedDescription;
+    coupon.description = nextLocalizedDescription.en;
+  }
   if (discountType !== undefined) coupon.discountType = discountType;
 
   if (discountValue !== undefined) {
@@ -263,11 +366,12 @@ export const updateCustomerCoupon = asyncHandler(async (req, res) => {
   await coupon.save();
 
   return successResponse(res, 200, "Customer coupon updated successfully", {
-    coupon,
+    coupon: resolveCouponForLocale(coupon.toObject(), requestLocale),
   });
 });
 
 export const updateCustomerCouponStatus = asyncHandler(async (req, res) => {
+  const requestLocale = resolveLocaleFromRequest(req);
   const { id } = req.params;
   const { status } = req.body;
 
@@ -289,6 +393,6 @@ export const updateCustomerCouponStatus = asyncHandler(async (req, res) => {
   }
 
   return successResponse(res, 200, "Customer coupon status updated successfully", {
-    coupon,
+    coupon: resolveCouponForLocale(coupon.toObject(), requestLocale),
   });
 });

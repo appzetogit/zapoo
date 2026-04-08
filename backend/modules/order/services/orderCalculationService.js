@@ -7,6 +7,8 @@ import Tier from '../../admin/models/Tier.js';
 import Order from '../models/Order.js';
 import { resolveZoneAndTierForLocation } from '../../admin/services/restaurantZoneAssignmentService.js';
 import mongoose from 'mongoose';
+import { resolveLocalizedText } from '../../../shared/i18n/localizedText.js';
+import { DEFAULT_LOCALE, normalizeLocale } from '../../../shared/i18n/localeConstants.js';
 
 const roundCurrency = (value) => Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
 const normalizeCouponCode = (code = '') => String(code || '').trim().toUpperCase();
@@ -166,11 +168,13 @@ const isAdminCouponValidForUser = ({
 const getAvailableAdminCoupons = async ({
   userId,
   subtotal,
+  locale = DEFAULT_LOCALE,
 }) => {
   if (!userId) return [];
 
   const deliveredOrderCount = await getDeliveredOrderCountForUser(userId);
   const now = new Date();
+  const normalizedLocale = normalizeLocale(locale);
 
   const coupons = await AdminCoupon.find({
     status: 'active',
@@ -192,8 +196,8 @@ const getAvailableAdminCoupons = async ({
     }))
     .map((coupon) => ({
       code: coupon.code,
-      title: coupon.title,
-      description: coupon.description || '',
+      title: resolveLocalizedText(coupon.localizedTitle, normalizedLocale, coupon.title || ''),
+      description: resolveLocalizedText(coupon.localizedDescription, normalizedLocale, coupon.description || ''),
       discountType: coupon.discountType,
       discountValue: Number(coupon.discountValue || 0),
       discountPreview: calculateAdminCouponDiscount(subtotal, coupon),
@@ -525,6 +529,7 @@ export const calculateOrderPricing = async ({
   deliveryAddress = null,
   couponCode = null,
   userId = null,
+  locale = DEFAULT_LOCALE,
 }) => {
   try {
     const subtotal = items.reduce((sum, item) => {
@@ -556,6 +561,7 @@ export const calculateOrderPricing = async ({
     let offerForCoupon = null;
     let availableAdminCoupons = [];
     const normalizedCouponCode = normalizeCouponCode(couponCode);
+    const normalizedLocale = normalizeLocale(locale);
 
     if (restaurant) {
       try {
@@ -639,7 +645,11 @@ export const calculateOrderPricing = async ({
                   discount,
                   minOrder: adminCoupon.minOrderValue || 0,
                   type: adminCoupon.discountType,
-                  title: adminCoupon.title,
+                  title: resolveLocalizedText(
+                    adminCoupon.localizedTitle,
+                    normalizedLocale,
+                    adminCoupon.title || ''
+                  ),
                   source: 'admin',
                 };
               }
@@ -649,6 +659,7 @@ export const calculateOrderPricing = async ({
           availableAdminCoupons = await getAvailableAdminCoupons({
             userId,
             subtotal,
+            locale: normalizedLocale,
           });
         }
       } catch (error) {

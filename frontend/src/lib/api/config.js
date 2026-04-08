@@ -140,6 +140,7 @@ export const API_ENDPOINTS = {
       RESET_PASSWORD: "/restaurant/auth/reset-password"
     },
     PROFILE: "/restaurant/profile",
+    PREFERENCES: "/restaurant/preferences",
     DELIVERY_STATUS: "/restaurant/delivery-status",
     STAFF: "/restaurant/staff",
     MENU: "/restaurant/menu",
@@ -229,6 +230,7 @@ export const API_ENDPOINTS = {
     WALLET_DEPOSIT_VERIFY: "/delivery/wallet/deposit/verify",
     ORDER_STATS: "/delivery/orders/stats",
     PROFILE: "/delivery/profile",
+    PREFERENCES: "/delivery/preferences",
     ORDERS: "/delivery/orders",
     ORDER_BY_ID: "/delivery/orders/:orderId",
     ORDER_ACCEPT: "/delivery/orders/:orderId/accept",
@@ -264,6 +266,7 @@ export const API_ENDPOINTS = {
       ME: "/admin/auth/me"
     },
     PROFILE: "/admin/profile",
+    PREFERENCES: "/admin/preferences",
     CHANGE_PASSWORD: "/admin/settings/change-password",
     TIERS: "/admin/tiers",
     TIER_BY_ID: "/admin/tiers/:id",

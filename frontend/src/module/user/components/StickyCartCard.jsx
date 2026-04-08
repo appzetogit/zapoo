@@ -3,8 +3,10 @@ import { X, ChevronRight } from "lucide-react"
 import { useCart } from "../context/CartContext"
 import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
+import { useTranslation } from "react-i18next"
 
 export default function StickyCartCard() {
+  const { t } = useTranslation()
   const { cart, getCartCount } = useCart()
   const [isVisible, setIsVisible] = useState(true)
   const [bottomPosition, setBottomPosition] = useState("bottom-[70px]") // Fixed above bottom navigation
@@ -39,7 +41,7 @@ export default function StickyCartCard() {
   }, [])
 
   // Get restaurant info from first cart item or use default
-  const restaurantName = cart[0]?.restaurant || "Restaurant"
+  const restaurantName = cart[0]?.restaurant || t("user.stickyCart.restaurant")
   const restaurantImage = cart[0]?.image || "https://images.unsplash.com/photo-1512058564366-18510be2db19?w=200&h=200&fit=crop"
   
   // Create restaurant slug from restaurant name
@@ -111,7 +113,7 @@ export default function StickyCartCard() {
                     {restaurantName}
                   </h3>
                   <div className="flex items-center gap-1 text-gray-600 dark:text-gray-400 text-sm md:text-base">
-                    <span>View Menu</span>
+                    <span>{t("user.stickyCart.viewMenu")}</span>
                     <ChevronRight className="h-3 w-3 md:h-4 md:w-4" />
                   </div>
                 </Link>
@@ -122,8 +124,10 @@ export default function StickyCartCard() {
                   className="flex-shrink-0 bg-green-600 dark:bg-green-700 hover:bg-green-700 text-white px-4 py-2.5 md:px-5 md:py-3 rounded-lg font-semibold transition-colors"
                 >
                   <div className="text-center">
-                    <div className="text-xs md:text-sm opacity-90">View Cart</div>
-                    <div className="text-xs md:text-sm font-bold">{cartCount} {cartCount === 1 ? 'item' : 'items'}</div>
+                    <div className="text-xs md:text-sm opacity-90">{t("user.stickyCart.viewCart")}</div>
+                    <div className="text-xs md:text-sm font-bold">
+                      {t("user.stickyCart.itemsCount", { count: cartCount })}
+                    </div>
                   </div>
                 </Link>
 
@@ -145,4 +149,3 @@ export default function StickyCartCard() {
     </AnimatePresence>
   )
 }
-

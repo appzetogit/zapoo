@@ -30,6 +30,13 @@ const adminSchema = new mongoose.Schema({
   profileImage: {
     type: String
   },
+  preferences: {
+    language: {
+      type: String,
+      enum: ['en', 'hi', 'bn'],
+      default: 'en'
+    }
+  },
   permissions: {
     type: [String],
     enum: [
@@ -111,4 +118,3 @@ adminSchema.methods.updateLastLogin = async function() {
 const Admin = mongoose.model('Admin', adminSchema);
 
 export default Admin;
-

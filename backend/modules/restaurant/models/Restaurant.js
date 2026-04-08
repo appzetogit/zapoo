@@ -67,6 +67,14 @@ const customerDeliveryRateSchema = new mongoose.Schema({
   }
 }, { _id: true });
 
+const preferencesSchema = new mongoose.Schema({
+  language: {
+    type: String,
+    enum: ['en', 'hi', 'bn'],
+    default: 'en'
+  }
+}, { _id: false });
+
 const restaurantSchema = new mongoose.Schema(
   {
     restaurantId: {
@@ -143,6 +151,10 @@ const restaurantSchema = new mongoose.Schema(
     profileImage: {
       url: String,
       publicId: String,
+    },
+    preferences: {
+      type: preferencesSchema,
+      default: () => ({ language: 'en' }),
     },
     menuImages: [
       {

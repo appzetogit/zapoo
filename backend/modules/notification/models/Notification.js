@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { localizedTextSchema } from '../../../shared/i18n/localizedText.js';
 
 /**
  * Notification — a sent notification visible to users.
@@ -17,6 +18,14 @@ const notificationSchema = new mongoose.Schema(
             required: true,
             trim: true,
             maxlength: 500,
+        },
+        localizedTitle: {
+            type: localizedTextSchema,
+            default: () => ({ en: '', hi: '', bn: '' })
+        },
+        localizedDescription: {
+            type: localizedTextSchema,
+            default: () => ({ en: '', hi: '', bn: '' })
         },
         imageUrl: {
             type: String,

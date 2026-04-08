@@ -247,7 +247,10 @@ export const getCurrentAdmin = asyncHandler(async (req, res) => {
       return errorResponse(res, 404, 'Admin not found');
     }
     return successResponse(res, 200, 'Admin retrieved successfully', {
-      admin
+      admin: {
+        ...admin,
+        preferences: admin.preferences || { language: 'en' }
+      }
     });
   } catch (error) {
     logger.error(`Error fetching current admin: ${error.message}`);

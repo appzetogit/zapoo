@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { localizedTextSchema } from "../../../shared/i18n/localizedText.js";
 
 const adminCouponSchema = new mongoose.Schema(
   {
@@ -15,10 +16,18 @@ const adminCouponSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    localizedTitle: {
+      type: localizedTextSchema,
+      default: () => ({ en: "", hi: "", bn: "" }),
+    },
     description: {
       type: String,
       default: "",
       trim: true,
+    },
+    localizedDescription: {
+      type: localizedTextSchema,
+      default: () => ({ en: "", hi: "", bn: "" }),
     },
     discountType: {
       type: String,

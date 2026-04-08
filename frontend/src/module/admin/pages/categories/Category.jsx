@@ -8,7 +8,10 @@ import { API_BASE_URL } from "@/lib/api/config";
 import { toast } from "sonner";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { useTranslation } from "react-i18next";
 export default function Category() {
+  const { t } = useTranslation();
+  const [activeLanguage, setActiveLanguage] = useState("en");
   const [searchQuery, setSearchQuery] = useState("");
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -22,6 +25,9 @@ export default function Category() {
   const [editingCategory, setEditingCategory] = useState(null);
   const [formData, setFormData] = useState({
     name: "",
+    description: "",
+    localizedName: { en: "", hi: "", bn: "" },
+    localizedDescription: { en: "", hi: "", bn: "" },
     image: "https://via.placeholder.com/40",
     status: true,
     type: ""
@@ -52,7 +58,7 @@ export default function Category() {
     const adminToken = localStorage.getItem('admin_accessToken');
     if (!adminToken) {
       console.warn('No admin token found. User may need to login.');
-      toast.error('Please login to access categories');
+      toast.error(t("admin.category.errors.loginRequired"));
       setLoading(false);
       return;
     }
@@ -105,7 +111,7 @@ export default function Category() {
       if (response.data.success) {
         setCategories(response.data.data.categories || []);
       } else {
-        toast.error(response.data.message || 'Failed to load categories');
+        toast.error(response.data.message || t("admin.category.errors.loadFailed"));
         setCategories([]);
       }
     } catch (error) {
@@ -130,25 +136,25 @@ export default function Category() {
         const status = error.response.status;
         const errorData = error.response.data;
         if (status === 401) {
-          toast.error('Authentication required. Please login again.');
+          toast.error(t("admin.category.errors.authRequired"));
         } else if (status === 403) {
-          toast.error('Access denied. You do not have permission.');
+          toast.error(t("admin.category.errors.accessDenied"));
         } else if (status === 404) {
-          toast.error('Categories endpoint not found. Please check backend server.');
+          toast.error(t("admin.category.errors.endpointNotFound"));
         } else if (status >= 500) {
-          toast.error('Server error. Please try again later.');
+          toast.error(t("admin.category.errors.serverError"));
         } else {
-          toast.error(errorData?.message || `Error ${status}: Failed to load categories`);
+          toast.error(errorData?.message || t("admin.category.errors.loadWithStatus", { status }));
         }
       } else if (error.request) {
         // Request was made but no response received
         console.error('Network error - No response from server');
         console.error('Request URL:', error.config?.baseURL + error.config?.url);
-        toast.error('Cannot connect to server. Please check if backend is running on ' + API_BASE_URL.replace('/api', ''));
+        toast.error(t("admin.category.errors.network", { host: API_BASE_URL.replace('/api', '') }));
       } else {
         // Something else happened
         console.error('Request setup error:', error.message);
-        toast.error(error.message || 'Failed to load categories');
+        toast.error(error.message || t("admin.category.errors.loadFailed"));
       }
       setCategories([]);
     } finally {
@@ -167,7 +173,7 @@ export default function Category() {
     try {
       const response = await adminAPI.toggleCategoryStatus(id);
       if (response.data.success) {
-        toast.success('Category status updated successfully');
+        toast.success(t("admin.category.success.statusUpdated"));
         // Update local state immediately for better UX
         setCategories(prevCategories => prevCategories.map(cat => cat.id === id ? {
           ...cat,
@@ -178,17 +184,17 @@ export default function Category() {
       }
     } catch (error) {
       console.error('Error toggling status:', error);
-      const errorMessage = error.response?.data?.message || 'Failed to update category status';
+      const errorMessage = error.response?.data?.message || t("admin.category.errors.updateStatusFailed");
       toast.error(errorMessage);
     }
   };
   const handleDelete = async id => {
-    const categoryName = categories.find(cat => cat.id === id)?.name || 'this category';
-    if (window.confirm(`Are you sure you want to delete "${categoryName}"? This action cannot be undone.`)) {
+    const categoryName = categories.find(cat => cat.id === id)?.name || t("admin.category.common.thisCategory");
+    if (window.confirm(t("admin.category.confirm.delete", { categoryName }))) {
       try {
         const response = await adminAPI.deleteCategory(id);
         if (response.data.success) {
-          toast.success('Category deleted successfully');
+          toast.success(t("admin.category.success.deleted"));
           // Remove from local state immediately for better UX
           setCategories(prevCategories => prevCategories.filter(cat => cat.id !== id));
           // Refresh from server to ensure consistency
@@ -196,15 +202,27 @@ export default function Category() {
         }
       } catch (error) {
         console.error('Error deleting category:', error);
-        const errorMessage = error.response?.data?.message || 'Failed to delete category';
+        const errorMessage = error.response?.data?.message || t("admin.category.errors.deleteFailed");
         toast.error(errorMessage);
       }
     }
   };
   const handleEdit = category => {
+    setActiveLanguage("en");
     setEditingCategory(category);
     setFormData({
       name: category.name || "",
+      description: category.description || "",
+      localizedName: {
+        en: category.localizedName?.en || category.name || "",
+        hi: category.localizedName?.hi || "",
+        bn: category.localizedName?.bn || "",
+      },
+      localizedDescription: {
+        en: category.localizedDescription?.en || category.description || "",
+        hi: category.localizedDescription?.hi || "",
+        bn: category.localizedDescription?.bn || "",
+      },
       image: category.image || "https://via.placeholder.com/40",
       status: category.status !== undefined ? category.status : true,
       type: category.type || ""
@@ -214,9 +232,13 @@ export default function Category() {
     setIsModalOpen(true);
   };
   const handleAddNew = () => {
+    setActiveLanguage("en");
     setEditingCategory(null);
     setFormData({
       name: "",
+      description: "",
+      localizedName: { en: "", hi: "", bn: "" },
+      localizedDescription: { en: "", hi: "", bn: "" },
       image: "https://via.placeholder.com/40",
       status: true,
       type: ""
@@ -235,25 +257,25 @@ export default function Category() {
       // Add title
       doc.setFontSize(18);
       doc.setTextColor(30, 30, 30);
-      doc.text('Category List', 14, 20);
+      doc.text(t("admin.category.title.list"), 14, 20);
 
       // Add date
       doc.setFontSize(10);
       doc.setTextColor(100, 100, 100);
-      const date = new Date().toLocaleDateString('en-US', {
+      const date = new Date().toLocaleDateString(undefined, {
         year: 'numeric',
         month: 'long',
         day: 'numeric'
       });
-      doc.text(`Generated on: ${date}`, 14, 28);
+      doc.text(t("admin.category.export.generatedOn", { date }), 14, 28);
 
       // Prepare table data
-      const tableData = filteredCategories.map((category, index) => [category.sl || index + 1, category.name || 'N/A', category.type || 'N/A', category.status ? 'Active' : 'Inactive', category.id || 'N/A']);
+      const tableData = filteredCategories.map((category, index) => [category.sl || index + 1, category.name || t("admin.category.common.na"), category.type || t("admin.category.common.na"), category.status ? t("admin.category.status.active") : t("admin.category.status.inactive"), category.id || t("admin.category.common.na")]);
 
       // Add table
       autoTable(doc, {
         startY: 35,
-        head: [['SL', 'Category Name', 'Type', 'Status', 'ID']],
+        head: [[t("admin.category.table.sl"), t("admin.category.table.name"), t("admin.category.table.type"), t("admin.category.table.status"), t("admin.category.table.id")]],
         body: tableData,
         theme: 'striped',
         headStyles: {
@@ -312,10 +334,10 @@ export default function Category() {
       // Save PDF
       const fileName = `Categories_${new Date().toISOString().split('T')[0]}.pdf`;
       doc.save(fileName);
-      toast.success('PDF exported successfully!');
+      toast.success(t("admin.category.success.exported"));
     } catch (error) {
       console.error('Error exporting PDF:', error);
-      toast.error('Failed to export PDF');
+      toast.error(t("admin.category.errors.exportFailed"));
     }
   };
   const handleImageSelect = e => {
@@ -325,14 +347,14 @@ export default function Category() {
     // Validate file type
     const allowedTypes = ["image/png", "image/jpeg", "image/jpg", "image/webp"];
     if (!allowedTypes.includes(file.type)) {
-      toast.error("Invalid file type. Please upload PNG, JPG, JPEG, or WEBP.");
+      toast.error(t("admin.category.errors.invalidFileType"));
       return;
     }
 
     // Validate file size (max 5MB)
     const maxSize = 5 * 1024 * 1024; // 5MB
     if (file.size > maxSize) {
-      toast.error("File size exceeds 5MB limit.");
+      toast.error(t("admin.category.errors.fileTooLarge"));
       return;
     }
 
@@ -353,11 +375,15 @@ export default function Category() {
   };
   const handleCloseModal = () => {
     setIsModalOpen(false);
+    setActiveLanguage("en");
     setEditingCategory(null);
     setSelectedImageFile(null);
     setImagePreview(null);
     setFormData({
       name: "",
+      description: "",
+      localizedName: { en: "", hi: "", bn: "" },
+      localizedDescription: { en: "", hi: "", bn: "" },
       image: "https://via.placeholder.com/40",
       status: true,
       type: ""
@@ -374,6 +400,11 @@ export default function Category() {
       // Prepare FormData for file upload
       const formDataToSend = new FormData();
       formDataToSend.append('name', formData.name);
+      formDataToSend.append('description', formData.description || "");
+      formDataToSend.append('localizedName', JSON.stringify(formData.localizedName || {}));
+      formDataToSend.append('localizedDescription', JSON.stringify(formData.localizedDescription || {}));
+      formDataToSend.append('locale', activeLanguage);
+      formDataToSend.append('autoTranslate', String(activeLanguage === 'en'));
       formDataToSend.append('type', formData.type);
       formDataToSend.append('status', formData.status.toString());
 
@@ -387,7 +418,7 @@ export default function Category() {
       if (editingCategory) {
         const response = await adminAPI.updateCategory(editingCategory.id, formDataToSend);
         if (response.data.success) {
-          toast.success('Category updated successfully');
+          toast.success(t("admin.category.success.updated"));
           // Update local state immediately for better UX
           const updatedCategory = response.data.data.category;
           setCategories(prevCategories => prevCategories.map(cat => cat.id === editingCategory.id ? {
@@ -399,7 +430,7 @@ export default function Category() {
       } else {
         const response = await adminAPI.createCategory(formDataToSend);
         if (response.data.success) {
-          toast.success('Category created successfully');
+          toast.success(t("admin.category.success.created"));
         }
       }
 
@@ -425,11 +456,11 @@ export default function Category() {
         } : null
       });
       if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
-        toast.error('Cannot connect to server. Please check if backend is running on ' + API_BASE_URL.replace('/api', ''));
+        toast.error(t("admin.category.errors.network", { host: API_BASE_URL.replace('/api', '') }));
       } else if (error.response) {
-        toast.error(error.response.data?.message || `Error ${error.response.status}: Failed to save category`);
+        toast.error(error.response.data?.message || t("admin.category.errors.saveWithStatus", { status: error.response.status }));
       } else {
-        toast.error(error.message || 'Failed to save category');
+        toast.error(error.message || t("admin.category.errors.saveFailed"));
       }
     } finally {
       setUploadingImage(false);
@@ -447,12 +478,12 @@ export default function Category() {
               <div className="w-2 h-2 bg-white rounded-sm"></div>
             </div>
           </div>
-          <h1 className="text-2xl font-bold text-slate-900">Category</h1>
+          <h1 className="text-2xl font-bold text-slate-900">{t("admin.category.title.page")}</h1>
         </div>
 
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-2">
-            <h2 className="text-lg font-semibold text-slate-900">Category List</h2>
+            <h2 className="text-lg font-semibold text-slate-900">{t("admin.category.title.list")}</h2>
             <span className="px-3 py-1 rounded-full text-sm font-semibold bg-slate-100 text-slate-700">
               {filteredCategories.length}
             </span>
@@ -460,19 +491,19 @@ export default function Category() {
 
           <div className="flex items-center gap-3 flex-wrap">
             <div className="relative flex-1 sm:flex-initial min-w-[200px]">
-              <input type="text" placeholder="Ex : Categories" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-10 pr-4 py-2.5 w-full text-sm rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-slate-400" />
+              <input type="text" placeholder={t("admin.category.search.placeholder")} value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-10 pr-4 py-2.5 w-full text-sm rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-slate-400" />
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             </div>
 
             <button onClick={handleExportPDF} disabled={filteredCategories.length === 0} className="px-4 py-2.5 text-sm font-medium rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 flex items-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
               <Download className="w-4 h-4" />
-              <span>Export</span>
+              <span>{t("admin.category.actions.export")}</span>
               <ChevronDown className="w-3 h-3" />
             </button>
 
             <button onClick={handleAddNew} className="px-4 py-2.5 text-sm font-medium rounded-lg bg-orange-600 text-white hover:bg-orange-700 flex items-center gap-2 transition-all shadow-sm">
               <Plus className="w-4 h-4" />
-              <span>Add New Category</span>
+              <span>{t("admin.category.actions.addNew")}</span>
             </button>
           </div>
         </div>
@@ -485,14 +516,14 @@ export default function Category() {
           <div className="flex items-center gap-1.5 flex-wrap">
             <Button variant="outline" onClick={() => setIsFilterOpen(true)} className="h-5 px-1.5 rounded-md flex items-center gap-1 whitespace-nowrap shrink-0 transition-all bg-white border border-gray-200 hover:bg-gray-50">
               <SlidersHorizontal className="h-2.5 w-2.5" />
-              <span className="text-[10px] font-bold text-black">Filters</span>
+              <span className="text-[10px] font-bold text-black">{t("admin.category.filters.title")}</span>
             </Button>
             {[{
             id: 'delivery-under-30',
-            label: 'Under 30 mins'
+            label: t("admin.category.filters.options.under30")
           }, {
             id: 'delivery-under-45',
-            label: 'Under 45 mins'
+            label: t("admin.category.filters.options.under45")
           }].map(filter => {
             const isActive = activeFilters.has(filter.id);
             return <Button key={filter.id} variant="outline" onClick={() => toggleFilter(filter.id)} className={`h-5 px-1.5 rounded-md flex items-center gap-1 whitespace-nowrap shrink-0 transition-all ${isActive ? 'bg-orange-600 text-white border border-orange-600 hover:bg-orange-600/90' : 'bg-white border border-gray-200 hover:bg-gray-50'}`}>
@@ -505,11 +536,11 @@ export default function Category() {
           <div className="flex items-center gap-1.5 flex-wrap">
             {[{
             id: 'distance-under-1km',
-            label: 'Under 1km',
+            label: t("admin.category.filters.options.under1kmShort"),
             icon: MapPin
           }, {
             id: 'distance-under-2km',
-            label: 'Under 2km',
+            label: t("admin.category.filters.options.under2kmShort"),
             icon: MapPin
           }].map(filter => {
             const Icon = filter.icon;
@@ -530,22 +561,22 @@ export default function Category() {
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
                 <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
-                  SL
+                  {t("admin.category.table.sl")}
                 </th>
                 <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
-                  Image
+                  {t("admin.category.table.image")}
                 </th>
                 <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
-                  Title
+                  {t("admin.category.table.name")}
                 </th>
                 <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
-                  Type
+                  {t("admin.category.table.type")}
                 </th>
                 <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
-                  Status
+                  {t("admin.category.table.status")}
                 </th>
                 <th className="px-6 py-4 text-center text-[10px] font-bold text-slate-700 uppercase tracking-wider">
-                  Action
+                  {t("admin.category.table.action")}
                 </th>
               </tr>
             </thead>
@@ -554,14 +585,14 @@ export default function Category() {
                   <td colSpan={6} className="px-6 py-20 text-center">
                     <div className="flex flex-col items-center justify-center">
                       <Loader2 className="w-8 h-8 animate-spin text-orange-600 mb-2" />
-                      <p className="text-sm text-slate-500">Loading categories...</p>
+                      <p className="text-sm text-slate-500">{t("admin.category.loading.categories")}</p>
                     </div>
                   </td>
                 </tr> : filteredCategories.length === 0 ? <tr>
                   <td colSpan={6} className="px-6 py-20 text-center">
                     <div className="flex flex-col items-center justify-center">
-                      <p className="text-lg font-semibold text-slate-700 mb-1">No Data Found</p>
-                      <p className="text-sm text-slate-500">No categories match your search</p>
+                      <p className="text-lg font-semibold text-slate-700 mb-1">{t("admin.category.empty.noData")}</p>
+                      <p className="text-sm text-slate-500">{t("admin.category.empty.noMatch")}</p>
                     </div>
                   </td>
                 </tr> : filteredCategories.map((category, index) => <tr key={category.id} className="hover:bg-slate-50 transition-colors">
@@ -579,19 +610,19 @@ export default function Category() {
                       <span className="text-sm font-medium text-slate-900">{category.name}</span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm font-medium text-slate-700">{category.type || 'N/A'}</span>
+                      <span className="text-sm font-medium text-slate-700">{category.type || t("admin.category.common.na")}</span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <button onClick={() => handleToggleStatus(category.id)} disabled={loading} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${category.status ? "bg-orange-600" : "bg-slate-300"}`} title={category.status ? "Click to deactivate" : "Click to activate"}>
+                      <button onClick={() => handleToggleStatus(category.id)} disabled={loading} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${category.status ? "bg-orange-600" : "bg-slate-300"}`} title={category.status ? t("admin.category.actions.clickToDeactivate") : t("admin.category.actions.clickToActivate")}>
                         <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${category.status ? "translate-x-6" : "translate-x-1"}`} />
                       </button>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-center">
                       <div className="flex items-center justify-center gap-2">
-                        <button onClick={() => handleEdit(category)} className="p-1.5 rounded text-orange-600 hover:bg-orange-50 transition-colors" title="Edit">
+                        <button onClick={() => handleEdit(category)} className="p-1.5 rounded text-orange-600 hover:bg-orange-50 transition-colors" title={t("admin.category.actions.edit")}>
                           <Edit className="w-4 h-4" />
                         </button>
-                        <button onClick={() => handleDelete(category.id)} className="p-1.5 rounded text-red-600 hover:bg-red-50 transition-colors" title="Delete">
+                        <button onClick={() => handleDelete(category.id)} className="p-1.5 rounded text-red-600 hover:bg-red-50 transition-colors" title={t("admin.category.actions.delete")}>
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
@@ -612,13 +643,13 @@ export default function Category() {
                 <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl max-h-[85vh] flex flex-col animate-[slideUp_0.3s_ease-out]">
                   {/* Header */}
                   <div className="flex items-center justify-between px-4 py-4 border-b">
-                    <h2 className="text-lg font-bold text-gray-900">Filters and sorting</h2>
+                    <h2 className="text-lg font-bold text-gray-900">{t("admin.category.filters.modalTitle")}</h2>
                     <button onClick={() => {
               setActiveFilters(new Set());
               setSortBy(null);
               setSelectedCuisine(null);
             }} className="text-orange-600 font-medium text-sm">
-                      Clear all
+                      {t("admin.category.filters.clearAll")}
                     </button>
                   </div>
 
@@ -628,35 +659,35 @@ export default function Category() {
                     <div className="w-24 sm:w-28 bg-gray-50 border-r flex flex-col">
                       {[{
                 id: 'sort',
-                label: 'Sort By',
+                label: t("admin.category.filters.tabs.sortBy"),
                 icon: ArrowDownUp
               }, {
                 id: 'time',
-                label: 'Time',
+                label: t("admin.category.filters.tabs.time"),
                 icon: Timer
               }, {
                 id: 'rating',
-                label: 'Rating',
+                label: t("admin.category.filters.tabs.rating"),
                 icon: Star
               }, {
                 id: 'distance',
-                label: 'Distance',
+                label: t("admin.category.filters.tabs.distance"),
                 icon: MapPin
               }, {
                 id: 'price',
-                label: 'Dish Price',
+                label: t("admin.category.filters.tabs.dishPrice"),
                 icon: IndianRupee
               }, {
                 id: 'cuisine',
-                label: 'Cuisine',
+                label: t("admin.category.filters.tabs.cuisine"),
                 icon: UtensilsCrossed
               }, {
                 id: 'offers',
-                label: 'Offers',
+                label: t("admin.category.filters.tabs.offers"),
                 icon: BadgePercent
               }, {
                 id: 'trust',
-                label: 'Trust',
+                label: t("admin.category.filters.tabs.trust"),
                 icon: ShieldCheck
               }].map(tab => {
                 const Icon = tab.icon;
@@ -682,23 +713,23 @@ export default function Category() {
                     <div ref={rightContentRef} className="flex-1 overflow-y-auto p-4">
                       {/* Sort By Tab */}
                       <div ref={el => filterSectionRefs.current['sort'] = el} data-section-id="sort" className="space-y-4 mb-8">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Sort by</h3>
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4">{t("admin.category.filters.sortBy")}</h3>
                         <div className="flex flex-col gap-3">
                           {[{
                     id: null,
-                    label: 'Relevance'
+                    label: t("admin.category.filters.options.relevance")
                   }, {
                     id: 'price-low',
-                    label: 'Price: Low to High'
+                    label: t("admin.category.filters.options.priceLowToHigh")
                   }, {
                     id: 'price-high',
-                    label: 'Price: High to Low'
+                    label: t("admin.category.filters.options.priceHighToLow")
                   }, {
                     id: 'rating-high',
-                    label: 'Rating: High to Low'
+                    label: t("admin.category.filters.options.ratingHighToLow")
                   }, {
                     id: 'rating-low',
-                    label: 'Rating: Low to High'
+                    label: t("admin.category.filters.options.ratingLowToHigh")
                   }].map(option => <button key={option.id || 'relevance'} onClick={() => setSortBy(option.id)} className={`px-4 py-3 rounded-xl border text-left transition-colors ${sortBy === option.id ? 'border-orange-600 bg-orange-50' : 'border-gray-200 hover:border-orange-600'}`}>
                               <span className={`text-sm font-medium ${sortBy === option.id ? 'text-orange-600' : 'text-gray-700'}`}>
                                 {option.label}
@@ -709,69 +740,69 @@ export default function Category() {
 
                       {/* Time Tab */}
                       <div ref={el => filterSectionRefs.current['time'] = el} data-section-id="time" className="space-y-4 mb-8">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Delivery Time</h3>
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4">{t("admin.category.filters.deliveryTime")}</h3>
                         <div className="grid grid-cols-2 gap-3">
                           <button onClick={() => toggleFilter('delivery-under-30')} className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition-colors ${activeFilters.has('delivery-under-30') ? 'border-orange-600 bg-orange-50' : 'border-gray-200 hover:border-orange-600'}`}>
                             <Timer className={`h-6 w-6 ${activeFilters.has('delivery-under-30') ? 'text-orange-600' : 'text-gray-600'}`} strokeWidth={1.5} />
-                            <span className={`text-sm font-medium ${activeFilters.has('delivery-under-30') ? 'text-orange-600' : 'text-gray-700'}`}>Under 30 mins</span>
+                            <span className={`text-sm font-medium ${activeFilters.has('delivery-under-30') ? 'text-orange-600' : 'text-gray-700'}`}>{t("admin.category.filters.options.under30")}</span>
                           </button>
                           <button onClick={() => toggleFilter('delivery-under-45')} className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition-colors ${activeFilters.has('delivery-under-45') ? 'border-orange-600 bg-orange-50' : 'border-gray-200 hover:border-orange-600'}`}>
                             <Timer className={`h-6 w-6 ${activeFilters.has('delivery-under-45') ? 'text-orange-600' : 'text-gray-600'}`} strokeWidth={1.5} />
-                            <span className={`text-sm font-medium ${activeFilters.has('delivery-under-45') ? 'text-orange-600' : 'text-gray-700'}`}>Under 45 mins</span>
+                            <span className={`text-sm font-medium ${activeFilters.has('delivery-under-45') ? 'text-orange-600' : 'text-gray-700'}`}>{t("admin.category.filters.options.under45")}</span>
                           </button>
                         </div>
                       </div>
 
                       {/* Rating Tab */}
                       <div ref={el => filterSectionRefs.current['rating'] = el} data-section-id="rating" className="space-y-4 mb-8">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Restaurant Rating</h3>
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4">{t("admin.category.filters.restaurantRating")}</h3>
                         <div className="grid grid-cols-2 gap-3">
                           <button onClick={() => toggleFilter('rating-35-plus')} className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition-colors ${activeFilters.has('rating-35-plus') ? 'border-orange-600 bg-orange-50' : 'border-gray-200 hover:border-orange-600'}`}>
                             <Star className={`h-6 w-6 ${activeFilters.has('rating-35-plus') ? 'text-orange-600 fill-orange-600' : 'text-gray-400'}`} />
-                            <span className={`text-sm font-medium ${activeFilters.has('rating-35-plus') ? 'text-orange-600' : 'text-gray-700'}`}>Rated 3.5+</span>
+                            <span className={`text-sm font-medium ${activeFilters.has('rating-35-plus') ? 'text-orange-600' : 'text-gray-700'}`}>{t("admin.category.filters.options.rated35")}</span>
                           </button>
                           <button onClick={() => toggleFilter('rating-4-plus')} className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition-colors ${activeFilters.has('rating-4-plus') ? 'border-orange-600 bg-orange-50' : 'border-gray-200 hover:border-orange-600'}`}>
                             <Star className={`h-6 w-6 ${activeFilters.has('rating-4-plus') ? 'text-orange-600 fill-orange-600' : 'text-gray-400'}`} />
-                            <span className={`text-sm font-medium ${activeFilters.has('rating-4-plus') ? 'text-orange-600' : 'text-gray-700'}`}>Rated 4.0+</span>
+                            <span className={`text-sm font-medium ${activeFilters.has('rating-4-plus') ? 'text-orange-600' : 'text-gray-700'}`}>{t("admin.category.filters.options.rated40")}</span>
                           </button>
                           <button onClick={() => toggleFilter('rating-45-plus')} className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition-colors ${activeFilters.has('rating-45-plus') ? 'border-orange-600 bg-orange-50' : 'border-gray-200 hover:border-orange-600'}`}>
                             <Star className={`h-6 w-6 ${activeFilters.has('rating-45-plus') ? 'text-orange-600 fill-orange-600' : 'text-gray-400'}`} />
-                            <span className={`text-sm font-medium ${activeFilters.has('rating-45-plus') ? 'text-orange-600' : 'text-gray-700'}`}>Rated 4.5+</span>
+                            <span className={`text-sm font-medium ${activeFilters.has('rating-45-plus') ? 'text-orange-600' : 'text-gray-700'}`}>{t("admin.category.filters.options.rated45")}</span>
                           </button>
                         </div>
                       </div>
 
                       {/* Distance Tab */}
                       <div ref={el => filterSectionRefs.current['distance'] = el} data-section-id="distance" className="space-y-4 mb-8">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Distance</h3>
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4">{t("admin.category.filters.distance")}</h3>
                         <div className="grid grid-cols-2 gap-3">
                           <button onClick={() => toggleFilter('distance-under-1km')} className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition-colors ${activeFilters.has('distance-under-1km') ? 'border-orange-600 bg-orange-50' : 'border-gray-200 hover:border-orange-600'}`}>
                             <MapPin className={`h-6 w-6 ${activeFilters.has('distance-under-1km') ? 'text-orange-600' : 'text-gray-600'}`} strokeWidth={1.5} />
-                            <span className={`text-sm font-medium ${activeFilters.has('distance-under-1km') ? 'text-orange-600' : 'text-gray-700'}`}>Under 1 km</span>
+                            <span className={`text-sm font-medium ${activeFilters.has('distance-under-1km') ? 'text-orange-600' : 'text-gray-700'}`}>{t("admin.category.filters.options.under1km")}</span>
                           </button>
                           <button onClick={() => toggleFilter('distance-under-2km')} className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition-colors ${activeFilters.has('distance-under-2km') ? 'border-orange-600 bg-orange-50' : 'border-gray-200 hover:border-orange-600'}`}>
                             <MapPin className={`h-6 w-6 ${activeFilters.has('distance-under-2km') ? 'text-orange-600' : 'text-gray-600'}`} strokeWidth={1.5} />
-                            <span className={`text-sm font-medium ${activeFilters.has('distance-under-2km') ? 'text-orange-600' : 'text-gray-700'}`}>Under 2 km</span>
+                            <span className={`text-sm font-medium ${activeFilters.has('distance-under-2km') ? 'text-orange-600' : 'text-gray-700'}`}>{t("admin.category.filters.options.under2km")}</span>
                           </button>
                         </div>
                       </div>
 
                       {/* Price Tab */}
                       <div ref={el => filterSectionRefs.current['price'] = el} data-section-id="price" className="space-y-4 mb-8">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Dish Price</h3>
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4">{t("admin.category.filters.dishPrice")}</h3>
                         <div className="flex flex-col gap-3">
                           <button onClick={() => toggleFilter('price-under-200')} className={`px-4 py-3 rounded-xl border text-left transition-colors ${activeFilters.has('price-under-200') ? 'border-orange-600 bg-orange-50' : 'border-gray-200 hover:border-orange-600'}`}>
-                            <span className={`text-sm font-medium ${activeFilters.has('price-under-200') ? 'text-orange-600' : 'text-gray-700'}`}>Under ₹200</span>
+                            <span className={`text-sm font-medium ${activeFilters.has('price-under-200') ? 'text-orange-600' : 'text-gray-700'}`}>{t("admin.category.filters.options.under200")}</span>
                           </button>
                           <button onClick={() => toggleFilter('price-under-500')} className={`px-4 py-3 rounded-xl border text-left transition-colors ${activeFilters.has('price-under-500') ? 'border-orange-600 bg-orange-50' : 'border-gray-200 hover:border-orange-600'}`}>
-                            <span className={`text-sm font-medium ${activeFilters.has('price-under-500') ? 'text-orange-600' : 'text-gray-700'}`}>Under ₹500</span>
+                            <span className={`text-sm font-medium ${activeFilters.has('price-under-500') ? 'text-orange-600' : 'text-gray-700'}`}>{t("admin.category.filters.options.under500")}</span>
                           </button>
                         </div>
                       </div>
 
                       {/* Cuisine Tab */}
                       <div ref={el => filterSectionRefs.current['cuisine'] = el} data-section-id="cuisine" className="space-y-4 mb-8">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Cuisine</h3>
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4">{t("admin.category.filters.cuisine")}</h3>
                         <div className="grid grid-cols-2 gap-3">
                           {['Chinese', 'American', 'Japanese', 'Italian', 'Mexican', 'Indian', 'Asian', 'Seafood', 'Desserts', 'Cafe', 'Healthy'].map(cuisine => <button key={cuisine} onClick={() => setSelectedCuisine(selectedCuisine === cuisine ? null : cuisine)} className={`px-4 py-3 rounded-xl border text-center transition-colors ${selectedCuisine === cuisine ? 'border-orange-600 bg-orange-50' : 'border-gray-200 hover:border-orange-600'}`}>
                               <span className={`text-sm font-medium ${selectedCuisine === cuisine ? 'text-orange-600' : 'text-gray-700'}`}>
@@ -783,13 +814,13 @@ export default function Category() {
 
                       {/* Trust Markers Tab */}
                       {activeFilterTab === 'trust' && <div className="space-y-4">
-                          <h3 className="text-lg font-semibold text-gray-900">Trust Markers</h3>
+                          <h3 className="text-lg font-semibold text-gray-900">{t("admin.category.filters.trustMarkers")}</h3>
                           <div className="flex flex-col gap-3">
                             <button className="px-4 py-3 rounded-xl border border-gray-200 hover:border-orange-600 text-left transition-colors">
-                              <span className="text-sm font-medium text-gray-700">Top Rated</span>
+                              <span className="text-sm font-medium text-gray-700">{t("admin.category.filters.options.topRated")}</span>
                             </button>
                             <button className="px-4 py-3 rounded-xl border border-gray-200 hover:border-orange-600 text-left transition-colors">
-                              <span className="text-sm font-medium text-gray-700">Trusted by 1000+ users</span>
+                              <span className="text-sm font-medium text-gray-700">{t("admin.category.filters.options.trustedByUsers")}</span>
                             </button>
                           </div>
                         </div>}
@@ -799,10 +830,10 @@ export default function Category() {
                   {/* Footer */}
                   <div className="flex items-center gap-4 px-4 py-4 border-t bg-white">
                     <button onClick={() => setIsFilterOpen(false)} className="flex-1 py-3 text-center font-semibold text-gray-700">
-                      Close
+                      {t("admin.category.actions.close")}
                     </button>
                     <button onClick={() => setIsFilterOpen(false)} className={`flex-1 py-3 font-semibold rounded-xl transition-colors ${activeFilters.size > 0 || sortBy || selectedCuisine ? 'bg-orange-600 text-white hover:bg-orange-700' : 'bg-gray-200 text-gray-500'}`}>
-                      {activeFilters.size > 0 || sortBy || selectedCuisine ? 'Show results' : 'Show results'}
+                      {t("admin.category.actions.showResults")}
                     </button>
                   </div>
                 </div>
@@ -829,7 +860,7 @@ export default function Category() {
                   {/* Header */}
                   <div className="flex items-center justify-between px-6 py-4 border-b">
                     <h2 className="text-xl font-bold text-slate-900">
-                      {editingCategory ? 'Edit Category' : 'Add New Category'}
+                      {editingCategory ? t("admin.category.modal.editTitle") : t("admin.category.modal.createTitle")}
                     </h2>
                     <button onClick={handleCloseModal} className="p-1 rounded hover:bg-slate-100 transition-colors">
                       <X className="w-5 h-5 text-slate-500" />
@@ -838,41 +869,87 @@ export default function Category() {
 
                   {/* Form */}
                   <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {[{ code: "en", label: t("common.languageNames.en") }, { code: "hi", label: t("common.languageNames.hi") }, { code: "bn", label: t("common.languageNames.bn") }].map((lang) => (
+                        <button
+                          key={lang.code}
+                          type="button"
+                          onClick={() => setActiveLanguage(lang.code)}
+                          className={`px-3 py-1.5 rounded-md text-xs font-semibold ${activeLanguage === lang.code ? "bg-orange-600 text-white" : "bg-slate-100 text-slate-700"}`}
+                        >
+                          {lang.label}
+                        </button>
+                      ))}
+                    </div>
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-2">
-                        Category Type *
+                        {t("admin.category.modal.fields.categoryType")}
                       </label>
                       <select required value={formData.type} onChange={e => setFormData({
                 ...formData,
                 type: e.target.value
               })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white">
-                        <option value="">Select category type</option>
-                        <option value="Starters">Starters</option>
-                        <option value="Main course">Main course</option>
-                        <option value="Desserts">Desserts</option>
-                        <option value="Beverages">Beverages</option>
-                        <option value="Varieties">Varieties</option>
+                        <option value="">{t("admin.category.modal.fields.selectCategoryType")}</option>
+                        <option value="Starters">{t("admin.category.modal.types.starters")}</option>
+                        <option value="Main course">{t("admin.category.modal.types.mainCourse")}</option>
+                        <option value="Desserts">{t("admin.category.modal.types.desserts")}</option>
+                        <option value="Beverages">{t("admin.category.modal.types.beverages")}</option>
+                        <option value="Varieties">{t("admin.category.modal.types.varieties")}</option>
                       </select>
                     </div>
 
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-2">
-                        Category Name *
+                        {t("admin.category.modal.fields.categoryName")}
                       </label>
-                      <input type="text" required value={formData.name} onChange={e => setFormData({
-                ...formData,
-                name: e.target.value
-              })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500" placeholder="Enter category name" />
+                      <input type="text" required={activeLanguage === 'en'} value={formData.localizedName?.[activeLanguage] || ""} onChange={e => {
+                const value = e.target.value;
+                setFormData(prev => {
+                  const localizedName = {
+                    en: prev.localizedName?.en || prev.name || "",
+                    hi: prev.localizedName?.hi || "",
+                    bn: prev.localizedName?.bn || "",
+                    [activeLanguage]: value
+                  };
+                  return {
+                    ...prev,
+                    localizedName,
+                    name: localizedName.en
+                  };
+                });
+              }} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500" placeholder={t("admin.category.modal.fields.categoryNamePlaceholder")} />
                     </div>
 
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-2">
-                        Category Image
+                        {t("admin.category.modal.fields.description")}
+                      </label>
+                      <textarea value={formData.localizedDescription?.[activeLanguage] || ""} onChange={e => {
+                const value = e.target.value;
+                setFormData(prev => {
+                  const localizedDescription = {
+                    en: prev.localizedDescription?.en || prev.description || "",
+                    hi: prev.localizedDescription?.hi || "",
+                    bn: prev.localizedDescription?.bn || "",
+                    [activeLanguage]: value
+                  };
+                  return {
+                    ...prev,
+                    localizedDescription,
+                    description: localizedDescription.en
+                  };
+                });
+              }} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500" placeholder={t("admin.category.modal.fields.descriptionPlaceholder")} rows={3} />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">
+                        {t("admin.category.modal.fields.categoryImage")}
                       </label>
                       <div className="space-y-3">
                         {/* Image Preview */}
                         {(imagePreview || formData.image) && <div className="relative w-32 h-32 rounded-lg overflow-hidden border border-slate-300">
-                            <img src={imagePreview || formData.image} alt="Category preview" className="w-full h-full object-cover" onError={e => {
+                            <img src={imagePreview || formData.image} alt={t("admin.category.modal.fields.categoryPreviewAlt")} className="w-full h-full object-cover" onError={e => {
                     e.target.src = "https://via.placeholder.com/128";
                   }} />
                             {imagePreview && <button type="button" onClick={handleRemoveImage} className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors">
@@ -886,13 +963,13 @@ export default function Category() {
                           <label htmlFor="category-image-upload" className="flex items-center gap-2 px-4 py-2 border border-slate-300 rounded-lg cursor-pointer hover:bg-slate-50 transition-colors">
                             <Upload className="w-4 h-4 text-slate-600" />
                             <span className="text-sm text-slate-700">
-                              {imagePreview ? 'Change Image' : 'Upload Image'}
+                              {imagePreview ? t("admin.category.modal.fields.changeImage") : t("admin.category.modal.fields.uploadImage")}
                             </span>
                           </label>
                           {uploadingImage && <Loader2 className="w-5 h-5 animate-spin text-orange-600" />}
                         </div>
                         <p className="text-xs text-slate-500">
-                          Supported formats: PNG, JPG, JPEG, WEBP (Max 5MB)
+                          {t("admin.category.modal.fields.supportedFormats")}
                         </p>
                       </div>
                     </div>
@@ -903,17 +980,17 @@ export default function Category() {
                 status: e.target.checked
               })} className="w-4 h-4 text-orange-600 border-slate-300 rounded focus:ring-orange-500" />
                       <label htmlFor="status" className="text-sm font-medium text-slate-700">
-                        Active Status
+                        {t("admin.category.modal.fields.activeStatus")}
                       </label>
                     </div>
 
                     {/* Footer */}
                     <div className="flex items-center gap-3 pt-4">
                       <button type="button" onClick={handleCloseModal} className="flex-1 px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 transition-colors">
-                        Cancel
+                        {t("admin.category.actions.cancel")}
                       </button>
                       <button type="submit" className="flex-1 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors">
-                        {editingCategory ? 'Update' : 'Create'}
+                        {editingCategory ? t("admin.category.actions.update") : t("admin.category.actions.create")}
                       </button>
                     </div>
                   </form>

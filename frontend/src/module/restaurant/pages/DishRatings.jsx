@@ -1,13 +1,15 @@
 import { useNavigate } from "react-router-dom"
 import { ArrowLeft } from "lucide-react"
+import { useTranslation } from "react-i18next"
 
 export default function DishRatings() {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   
   // Restaurant information - in a real app, this would come from state/context/API
-  const restaurantName = "Kadhai Chammach Restaurant"
+  const restaurantName = t("restaurant.dishRatings.restaurantName")
   const restaurantId = "20959122"
-  const restaurantLocation = "Musakhedi, Idrish Nagar, By Pass Road (South), Indore"
+  const restaurantLocation = t("restaurant.dishRatings.restaurantLocation")
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col">
@@ -17,7 +19,7 @@ export default function DishRatings() {
           <button
             onClick={() => navigate(-1)}
             className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
-            aria-label="Go back"
+            aria-label={t("restaurant.dishRatings.aria.goBack")}
           >
             <ArrowLeft className="w-6 h-6 text-gray-900" />
           </button>
@@ -36,11 +38,10 @@ export default function DishRatings() {
       <div className="flex-1 flex items-center justify-center px-4">
         <div className="text-center">
           <p className="text-sm text-gray-600">
-            You haven't received any dish rating yet
+            {t("restaurant.dishRatings.empty")}
           </p>
         </div>
       </div>
     </div>
   )
 }
-

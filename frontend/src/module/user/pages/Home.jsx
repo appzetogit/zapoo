@@ -42,11 +42,9 @@ import ZoneAdBanner from "../components/ZoneAdBanner";
 import DynamicEtaText from "../components/DynamicEtaText";
 import RecommendedItemsBadge, { ActiveRecommendedItemBadge } from "../components/RecommendedItemsBadge";
 import { isRestaurantDeliverableNow } from "../utils/restaurantAvailability";
+import { useTranslation } from "react-i18next";
 
 // Banner images for hero carousel - will be fetched from API
-
-// Animated placeholder for search - moved outside component to prevent recreation
-const placeholders = ["Search \"burger\"", "Search \"biryani\"", "Search \"pizza\"", "Search \"desserts\"", "Search \"chinese\"", "Search \"thali\"", "Search \"momos\"", "Search \"dosa\""];
 
 // Restaurant Image Carousel Component
 const RestaurantImageCarousel = React.memo(({
@@ -189,6 +187,7 @@ const RestaurantImageCarousel = React.memo(({
     </div>;
 });
 export default function Home() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const query = searchParams.get("q") || "";
@@ -223,7 +222,8 @@ export default function Home() {
   const [loadingBanners, setLoadingBanners] = useState(true);
   const [landingCategories, setLandingCategories] = useState([]);
   const [landingExploreMore, setLandingExploreMore] = useState([]);
-  const [exploreMoreHeading, setExploreMoreHeading] = useState("Explore More");
+  const defaultExploreMoreHeading = t("user.home.exploreMoreHeading");
+  const [exploreMoreHeading, setExploreMoreHeading] = useState(defaultExploreMoreHeading);
   const [loadingLandingConfig, setLoadingLandingConfig] = useState(true);
   const [restaurantsData, setRestaurantsData] = useState([]);
   const [loadingRestaurants, setLoadingRestaurants] = useState(true);
@@ -234,6 +234,16 @@ export default function Home() {
   const [loadingTop10, setLoadingTop10] = useState(true);
   const isHandlingSwitchOff = useRef(false);
   const [recommendedPreviewByRestaurantId, setRecommendedPreviewByRestaurantId] = useState({});
+  const placeholders = useMemo(() => ([
+    t("user.home.searchPlaceholderBurger"),
+    t("user.home.searchPlaceholderBiryani"),
+    t("user.home.searchPlaceholderPizza"),
+    t("user.home.searchPlaceholderDesserts"),
+    t("user.home.searchPlaceholderChinese"),
+    t("user.home.searchPlaceholderThali"),
+    t("user.home.searchPlaceholderMomos"),
+    t("user.home.searchPlaceholderDosa"),
+  ]), [t]);
 
   // Swipe functionality for hero banner carousel
   const touchStartX = useRef(0);
@@ -350,20 +360,20 @@ export default function Home() {
           // Extra safety: only keep active items and ensure order ascending
           setLandingCategories(apiCategories.filter(c => c.isActive !== false).sort((a, b) => (a.order ?? 0) - (b.order ?? 0)));
           setLandingExploreMore(apiExploreMore.filter(e => e.isActive !== false).sort((a, b) => (a.order ?? 0) - (b.order ?? 0)));
-          setExploreMoreHeading(response.data.data.settings?.exploreMoreHeading || "Explore More");
+          setExploreMoreHeading(response.data.data.settings?.exploreMoreHeading || defaultExploreMoreHeading);
         }
       } catch (error) {
         console.error('Error fetching landing config:', error);
         // Fallback to empty arrays and default heading
         setLandingCategories([]);
         setLandingExploreMore([]);
-        setExploreMoreHeading("Explore More");
+        setExploreMoreHeading(defaultExploreMoreHeading);
       } finally {
         setLoadingLandingConfig(false);
       }
     };
     fetchLandingConfig();
-  }, []);
+  }, [defaultExploreMoreHeading]);
 
   // Auto-cycle hero banner images
   useEffect(() => {
@@ -1081,7 +1091,7 @@ export default function Home() {
   const handleVoiceSearch = useCallback(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
-      toast.error("Speech Recognition is not supported in this browser.");
+      toast.error(t("user.home.voiceNotSupported"));
       return;
     }
     const recognition = new SpeechRecognition();
@@ -1089,7 +1099,7 @@ export default function Home() {
     recognition.interimResults = false;
     recognition.maxAlternatives = 1;
     recognition.onstart = () => {
-      toast("Listening...", {
+      toast(t("user.home.listening"), {
         icon: <Mic className="w-4 h-4 text-orange-500 animate-pulse" />
       });
     };
@@ -1097,7 +1107,7 @@ export default function Home() {
       const transcript = event.results[0][0].transcript;
       setHeroSearch(transcript);
       if (transcript.trim()) {
-        toast.success(`Searching for "${transcript}"`);
+        toast.success(t("user.home.searchingFor", { text: transcript }));
         // Open same search overlay as the search bar
         setSearchValue(transcript);
         openSearch();
@@ -1106,13 +1116,13 @@ export default function Home() {
     recognition.onerror = event => {
       console.error("Speech recognition error", event.error);
       if (event.error === 'not-allowed') {
-        toast.error("Microphone access denied. Please enable it in browser settings.");
+        toast.error(t("user.home.microphoneDenied"));
       } else {
-        toast.error("Could not hear you. Please try again.");
+        toast.error(t("user.home.couldNotHear"));
       }
     };
     recognition.start();
-  }, [openSearch, setSearchValue]);
+  }, [openSearch, setSearchValue, t]);
   const handleSearchClose = useCallback(() => {
     closeSearch();
     setHeroSearch("");
@@ -1128,7 +1138,7 @@ export default function Home() {
     }, 2000); // Change placeholder every 2 seconds (same as RestaurantDetails)
 
     return () => clearInterval(interval);
-  }, []); // placeholders is a constant, no need for dependency
+  }, [placeholders.length]);
 
   // Lightweight ScrollReveal replacement - CSS only, no IntersectionObserver
   const ScrollRevealSimple = ({
@@ -1327,7 +1337,7 @@ export default function Home() {
           <div ref={vegModeToggleRef} className="flex items-center gap-2 lg:gap-3 flex-shrink-0">
             <div className="flex flex-col items-end leading-none">
               <span className="text-emerald-600 text-[10px] lg:text-xs font-black">VEG</span>
-              <span className="text-emerald-600 text-[8px] lg:text-[10px] font-bold">MODE</span>
+              <span className="text-emerald-600 text-[8px] lg:text-[10px] font-bold">{t("user.home.vegMode")}</span>
             </div>
             <Switch checked={vegMode} onCheckedChange={handleVegModeChange} className="data-[state=checked]:bg-emerald-500 data-[state=unchecked]:bg-gray-200 w-8 h-4 lg:w-10 lg:h-5" />
           </div>
@@ -1464,7 +1474,7 @@ export default function Home() {
                               {currentBanner.title}
                             </h2>}
                           <button className="inline-flex items-center gap-2 bg-orange-500 text-white text-sm font-semibold px-5 py-2 rounded-full w-fit shadow pointer-events-none">
-                            {currentBanner?.ctaText || 'Order Now'}
+                            {currentBanner?.ctaText || t("user.home.orderNow")}
                           </button>
                         </motion.div>
                       </AnimatePresence>
@@ -1588,7 +1598,7 @@ export default function Home() {
                           <UtensilsCrossed className="w-5 h-5 sm:w-6 sm:h-6 text-pink-600 dark:text-pink-400" />
                         </div>
                         <span className="text-sm sm:text-base font-bold text-gray-900 dark:text-white">
-                          See all
+                          {t("user.home.seeAll")}
                         </span>
                       </div>
                     </div>
@@ -1628,7 +1638,7 @@ export default function Home() {
                           <UtensilsCrossed className="w-5 h-5 sm:w-6 sm:h-6 text-pink-600 dark:text-pink-400" />
                         </div>
                         <span className="text-sm sm:text-base font-bold text-gray-900 dark:text-white">
-                          See all
+                          {t("user.home.seeAll")}
                         </span>
                       </div>
                     </div>
@@ -1636,7 +1646,7 @@ export default function Home() {
               </> :
           // No categories available from API
           <div className="flex items-center justify-center py-4 text-gray-500 text-sm">
-                No categories available
+                {t("user.home.noCategories")}
               </div>}
           </div>
         </motion.section>
@@ -1667,7 +1677,7 @@ export default function Home() {
           }}>
               <Button variant="outline" onClick={() => setIsFilterOpen(true)} className="h-7 sm:h-8 px-2 sm:px-3 rounded-md flex items-center gap-1.5 whitespace-nowrap flex-shrink-0 font-medium transition-all bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-white">
                 <SlidersHorizontal className="h-3 w-3 sm:h-4 sm:w-4" />
-                <span className="text-xs sm:text-sm font-bold text-gray-900 dark:text-white">Filters</span>
+                <span className="text-xs sm:text-sm font-bold text-gray-900 dark:text-white">{t("user.home.filters")}</span>
               </Button>
             </motion.div>
 
@@ -1726,12 +1736,12 @@ export default function Home() {
             <div className="px-1 mb-4 flex items-center justify-between">
               <div className="flex flex-col gap-0.5">
                 <h2 className="text-xs sm:text-sm lg:text-base font-semibold text-gray-400 tracking-widest uppercase">
-                  Handpicked for you
+                  {t("user.home.handpickedForYou")}
                 </h2>
-                <span className="text-base sm:text-lg lg:text-2xl text-gray-900 dark:text-white font-bold">Top Restaurants</span>
+                <span className="text-base sm:text-lg lg:text-2xl text-gray-900 dark:text-white font-bold">{t("user.home.topRestaurants")}</span>
               </div>
               <Link to="/user/top-10" className="text-orange-600 font-semibold text-sm hover:underline">
-                See All
+                {t("user.home.seeAll")}
               </Link>
             </div>
 
@@ -2003,7 +2013,7 @@ export default function Home() {
             }}>
                   <div className="flex flex-col items-center gap-3">
                     <Loader2 className="h-8 w-8 text-orange-600 animate-spin" strokeWidth={2.5} />
-                    <span className="text-sm font-medium text-gray-700 dark:text-white">Loading restaurants...</span>
+                    <span className="text-sm font-medium text-gray-700 dark:text-white">{t("user.home.loadingRestaurants")}</span>
                   </div>
                 </motion.div>}
             </AnimatePresence>
@@ -2378,7 +2388,7 @@ export default function Home() {
                 setIsLoadingFilterResults(false);
               }
             }} className={`flex-1 py-3 font-semibold rounded-xl transition-colors ${activeFilters.size > 0 || sortBy || selectedCuisine ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-gray-200 text-gray-500'}`} disabled={isLoadingFilterResults}>
-                  {isLoadingFilterResults ? 'Loading...' : activeFilters.size > 0 || sortBy || selectedCuisine ? `Show results` : 'Show results'}
+                  {isLoadingFilterResults ? t("user.home.loading") : t("user.home.showResults")}
                 </button>
               </div>
             </motion.div>

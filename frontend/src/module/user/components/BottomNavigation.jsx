@@ -1,7 +1,9 @@
 import { Link, useLocation } from "react-router-dom"
-import { UtensilsCrossed, Tag, User, Truck } from "lucide-react"
+import { Tag, User, Truck } from "lucide-react"
+import { useTranslation } from "react-i18next"
 
 export default function BottomNavigation() {
+  const { t } = useTranslation()
   const location = useLocation()
 
   // Check active routes - support both /user/* and /* paths
@@ -31,7 +33,7 @@ export default function BottomNavigation() {
         >
           <Truck className={`h-5 w-5 ${isDelivery ? "text-orange-600 dark:text-orange-500 fill-orange-600 dark:fill-orange-500" : "text-gray-600 dark:text-gray-400"}`} strokeWidth={2} />
           <span className={`text-xs sm:text-sm font-medium ${isDelivery ? "text-orange-600 dark:text-orange-500 font-semibold" : "text-gray-600 dark:text-gray-400"}`}>
-            Delivery
+            {t("user.bottomNavigation.delivery")}
           </span>
           {isDelivery && (
             <div className="absolute top-0 left-0 right-0 h-0.5 bg-orange-600 dark:bg-orange-500 rounded-b-full" />
@@ -51,7 +53,7 @@ export default function BottomNavigation() {
         >
           <Tag className={`h-5 w-5 ${isUnder250 ? "text-orange-600 dark:text-orange-500 fill-orange-600 dark:fill-orange-500" : "text-gray-600 dark:text-gray-400"}`} strokeWidth={2} />
           <span className={`text-xs sm:text-sm font-medium ${isUnder250 ? "text-orange-600 dark:text-orange-500 font-semibold" : "text-gray-600 dark:text-gray-400"}`}>
-            Under 250
+            {t("user.bottomNavigation.under250")}
           </span>
           {isUnder250 && (
             <div className="absolute top-0 left-0 right-0 h-0.5 bg-orange-600 dark:bg-orange-500 rounded-b-full" />
@@ -68,7 +70,7 @@ export default function BottomNavigation() {
         >
           <User className={`h-5 w-5 ${isProfile ? "text-orange-600 dark:text-orange-500 fill-orange-600 dark:fill-orange-500" : "text-gray-600 dark:text-gray-400"}`} />
           <span className={`text-xs sm:text-sm font-medium ${isProfile ? "text-orange-600 dark:text-orange-500 font-semibold" : "text-gray-600 dark:text-gray-400"}`}>
-            Profile
+            {t("user.bottomNavigation.profile")}
           </span>
           {isProfile && (
             <div className="absolute top-0 left-0 right-0 h-0.5 bg-orange-600 dark:bg-orange-500 rounded-b-full" />

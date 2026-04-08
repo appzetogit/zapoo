@@ -373,6 +373,12 @@ export const restaurantAPI = {
   updateProfile: (data) => {
     return apiClient.put(API_ENDPOINTS.RESTAURANT.PROFILE, data);
   },
+  getPreferences: () => {
+    return apiClient.get(API_ENDPOINTS.RESTAURANT.PREFERENCES);
+  },
+  updatePreferences: (preferences) => {
+    return apiClient.put(API_ENDPOINTS.RESTAURANT.PREFERENCES, preferences);
+  },
 
   // Delete restaurant account
   deleteAccount: () => {
@@ -1058,6 +1064,12 @@ export const deliveryAPI = {
   updateProfile: (data) => {
     return apiClient.put(API_ENDPOINTS.DELIVERY.PROFILE, data);
   },
+  getPreferences: () => {
+    return apiClient.get(API_ENDPOINTS.DELIVERY.PREFERENCES);
+  },
+  updatePreferences: (preferences) => {
+    return apiClient.put(API_ENDPOINTS.DELIVERY.PREFERENCES, preferences);
+  },
 
   // Get orders
   getOrders: (params = {}) => {
@@ -1282,6 +1294,12 @@ export const adminAPI = {
   // Update admin profile
   updateAdminProfile: (profileData) => {
     return apiClient.put(API_ENDPOINTS.ADMIN.PROFILE, profileData);
+  },
+  getPreferences: () => {
+    return apiClient.get(API_ENDPOINTS.ADMIN.PREFERENCES);
+  },
+  updatePreferences: (preferences) => {
+    return apiClient.put(API_ENDPOINTS.ADMIN.PREFERENCES, preferences);
   },
 
   // Change admin password

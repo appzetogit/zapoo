@@ -1,28 +1,31 @@
 import { AlertTriangle, Clock3, Crown } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 export default function SubscriptionExpiryBanner({
   daysLeft,
   isExpired,
   onBuyNow,
   type = "subscription",
-  planName = "current plan",
+  planName,
 }) {
+  const { t } = useTranslation();
+  const effectivePlanName = planName || t("restaurant.subscriptionExpiryBanner.currentPlan");
   const isTrial = type === "trial";
   const title = isTrial
     ? isExpired
-      ? "Your trial has expired"
-      : "Your free trial is ending soon"
+      ? t("restaurant.subscriptionExpiryBanner.titles.trialExpired")
+      : t("restaurant.subscriptionExpiryBanner.titles.trialEndingSoon")
     : isExpired
-      ? "Your plan has expired"
-      : "Your plan is ending soon";
+      ? t("restaurant.subscriptionExpiryBanner.titles.planExpired")
+      : t("restaurant.subscriptionExpiryBanner.titles.planEndingSoon");
 
   const subtitle = isExpired
-    ? "Buy a subscription plan to continue uninterrupted access."
+    ? t("restaurant.subscriptionExpiryBanner.subtitles.expired")
     : daysLeft === 0
-      ? `Expires today (${planName}). Buy a plan to continue.`
+      ? t("restaurant.subscriptionExpiryBanner.subtitles.expiresToday", { planName: effectivePlanName })
       : daysLeft === 1
-        ? `Expires tomorrow (${planName}). Buy a plan to continue.`
-        : `Expires in ${daysLeft} days (${planName}). Buy a plan to continue.`;
+        ? t("restaurant.subscriptionExpiryBanner.subtitles.expiresTomorrow", { planName: effectivePlanName })
+        : t("restaurant.subscriptionExpiryBanner.subtitles.expiresInDays", { daysLeft, planName: effectivePlanName });
 
   return (
     <div
@@ -58,7 +61,7 @@ export default function SubscriptionExpiryBanner({
           }`}
         >
           <Crown className="w-3.5 h-3.5" />
-          Buy Plan
+          {t("restaurant.subscriptionExpiryBanner.actions.buyPlan")}
         </button>
       </div>
     </div>

@@ -4,7 +4,9 @@ import { ArrowLeft, Search, MoreVertical, ChevronRight, Star, RotateCcw, AlertCi
 import { orderAPI, api, API_ENDPOINTS } from "@/lib/api";
 import { toast } from "sonner";
 import { getCompanyNameAsync } from "@/lib/utils/businessSettings";
+import { useTranslation } from "react-i18next";
 export default function Orders() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -224,9 +226,9 @@ export default function Orders() {
         }
       } catch (error) {
         console.error('Error fetching user orders:', error);
-        let errorMessage = 'Failed to load orders';
+        let errorMessage = t("user.orders.error.failedToLoad");
         if (error?.response?.status === 401) {
-          errorMessage = 'Please login to view your orders';
+          errorMessage = t("user.orders.error.loginRequired");
         } else if (error?.response?.data?.message) {
           errorMessage = error.response.data.message;
         }
@@ -251,7 +253,7 @@ export default function Orders() {
   const formatDate = dateString => {
     const date = new Date(dateString);
     const day = date.getDate().toString().padStart(2, '0');
-    const month = date.toLocaleDateString('en-US', {
+    const month = date.toLocaleDateString(undefined, {
       month: 'short'
     });
     const hours = date.getHours();
@@ -276,7 +278,7 @@ export default function Orders() {
     if (order.restaurantId) {
       navigate(`/user/restaurants/${order.restaurantId}`);
     } else {
-      toast.info('Restaurant information not available');
+      toast.info(t("user.orders.toast.restaurantInfoMissing"));
     }
   };
 
@@ -287,9 +289,11 @@ export default function Orders() {
   const handleShareRestaurant = async order => {
     const companyName = await getCompanyNameAsync();
     const location = order.restaurantLocation || `${order.address?.city || ""}, ${order.address?.state || ""}`.trim();
-    const shareText = `Check out ${order.restaurant} on ${companyName}.
-Location: ${location || "Location not available"}
-Order again from this restaurant in the ${companyName} app.`;
+    const shareText = t("user.orders.share.text", {
+      restaurant: order.restaurant,
+      companyName,
+      location: location || t("user.orders.locationNotAvailable")
+    });
     try {
       if (navigator.share) {
         await navigator.share({
@@ -298,14 +302,14 @@ Order again from this restaurant in the ${companyName} app.`;
         });
       } else if (navigator.clipboard && navigator.clipboard.writeText) {
         await navigator.clipboard.writeText(shareText);
-        toast.success("Restaurant details copied to clipboard");
+        toast.success(t("user.orders.toast.restaurantCopied"));
       } else {
-        toast.info("Sharing is not supported on this device");
+        toast.info(t("user.orders.toast.sharingNotSupported"));
       }
     } catch (error) {
       if (error?.name !== "AbortError") {
         console.error("Error sharing restaurant:", error);
-        toast.error("Failed to share restaurant");
+        toast.error(t("user.orders.toast.shareFailed"));
       }
     } finally {
       setActiveMenuOrderId(null);
@@ -337,7 +341,7 @@ Order again from this restaurant in the ${companyName} app.`;
   // Submit rating & feedback to backend
   const handleSubmitRating = async () => {
     if (!ratingModal.order || selectedRating === null) {
-      toast.error("Please select a rating first");
+      toast.error(t("user.orders.rating.selectFirst"));
       return;
     }
     try {
@@ -365,7 +369,7 @@ Order again from this restaurant in the ${companyName} app.`;
           comment: feedbackText || undefined
         }
       } : o));
-      toast.success("Thanks for rating your order! 🎉");
+      toast.success(t("user.orders.rating.thanks"));
 
       // Mark this order as rated so popup doesn't show again (before closing modal)
       const orderId = order.id || order._id || order.mongoId;
@@ -373,7 +377,7 @@ Order again from this restaurant in the ${companyName} app.`;
       handleCloseRating();
     } catch (error) {
       console.error("Error submitting order rating:", error);
-      toast.error(error?.response?.data?.message || "Failed to submit rating. Please try again.");
+      toast.error(error?.response?.data?.message || t("user.orders.rating.submitFailed"));
     } finally {
       setSubmittingRating(false);
     }
@@ -384,7 +388,7 @@ Order again from this restaurant in the ${companyName} app.`;
           <Link to="/user">
             <ArrowLeft className="w-6 h-6 text-gray-700 cursor-pointer" />
           </Link>
-          <h1 className="ml-4 text-xl font-semibold text-gray-800">Your Orders</h1>
+          <h1 className="ml-4 text-xl font-semibold text-gray-800">{t("user.orders.title")}</h1>
         </div>
         <div className="flex items-center justify-center py-20">
           <Loader2 className="w-8 h-8 text-red-500 animate-spin" />
@@ -397,12 +401,12 @@ Order again from this restaurant in the ${companyName} app.`;
           <Link to="/user">
             <ArrowLeft className="w-6 h-6 text-gray-700 cursor-pointer" />
           </Link>
-          <h1 className="ml-4 text-xl font-semibold text-gray-800">Your Orders</h1>
+          <h1 className="ml-4 text-xl font-semibold text-gray-800">{t("user.orders.title")}</h1>
         </div>
         <div className="px-4 py-8 text-center">
-          <p className="text-gray-600">You haven't placed any orders yet</p>
+          <p className="text-gray-600">{t("user.orders.empty.noOrders")}</p>
           <Link to="/user">
-            <button className="mt-4 text-red-500 font-medium">Start Ordering</button>
+            <button className="mt-4 text-red-500 font-medium">{t("user.orders.empty.startOrdering")}</button>
           </Link>
         </div>
       </div>;
@@ -413,21 +417,21 @@ Order again from this restaurant in the ${companyName} app.`;
         <Link to="/user">
           <ArrowLeft className="w-6 h-6 text-gray-700 cursor-pointer" />
         </Link>
-        <h1 className="ml-4 text-xl font-semibold text-gray-800">Your Orders</h1>
+        <h1 className="ml-4 text-xl font-semibold text-gray-800">{t("user.orders.title")}</h1>
       </div>
 
       {/* Search Bar */}
       <div className="p-4 bg-white mt-1">
         <div className="flex items-center bg-white border border-gray-200 rounded-lg px-3 py-2 shadow-sm">
           <Search className="w-5 h-5 text-red-500" />
-          <input type="text" placeholder="Search by restaurant or dish" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="flex-1 ml-3 outline-none text-gray-600 placeholder-gray-400" />
+          <input type="text" placeholder={t("user.orders.searchPlaceholder")} value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="flex-1 ml-3 outline-none text-gray-600 placeholder-gray-400" />
         </div>
       </div>
 
       {/* Orders List */}
       <div className="px-4 py-2 space-y-4">
         {filteredOrders.length === 0 ? <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center">
-            <p className="text-gray-600">No orders found matching your search</p>
+            <p className="text-gray-600">{t("user.orders.empty.noSearchResults")}</p>
           </div> : filteredOrders.map(order => {
         // Check payment method - COD/wallet orders have 'pending' status which is normal
         const isCodOrWallet = order.payment?.method === 'cash' || order.payment?.method === 'cod' || order.payment?.method === 'wallet' || order.paymentMethod === 'cash' || order.paymentMethod === 'cod' || order.paymentMethod === 'wallet';
@@ -442,7 +446,7 @@ Order again from this restaurant in the ${companyName} app.`;
         // Prefer food image from first item; fallback to restaurant image, then generic food photo
         const firstItemImage = order.items?.[0]?.image;
         const restaurantImage = firstItemImage || order.restaurantImage || "https://images.unsplash.com/photo-1604908176997-125188eb3c52?auto=format&fit=crop&w=200&q=80";
-        const location = order.restaurantLocation || `${order.address?.city || ''}, ${order.address?.state || ''}`.trim() || 'Location not available';
+        const location = order.restaurantLocation || `${order.address?.city || ''}, ${order.address?.state || ''}`.trim() || t("user.orders.locationNotAvailable");
         return <div key={order.id} className="relative bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                 {/* Card Header: Restaurant Info */}
                 <div className="flex items-start justify-between p-4 pb-2">
@@ -459,12 +463,12 @@ Order again from this restaurant in the ${companyName} app.`;
                       <p className="text-xs text-gray-500 mt-0.5">{location}</p>
                       {order.orderId && <p className="text-xs text-gray-400 mt-0.5 font-mono">#{order.orderId}</p>}
                       {order.deliveryPartnerName && <p className="text-xs text-gray-600 mt-1">
-                          <span className="font-medium">Delivery:</span> {order.deliveryPartnerName}
+                          <span className="font-medium">{t("user.orders.deliveryLabel")}:</span> {order.deliveryPartnerName}
                           {order.deliveryPartnerPhone && ` • ${order.deliveryPartnerPhone}`}
                         </p>}
                       {order.restaurantId && <Link to={`/user/restaurants/${order.restaurantId}`}>
                           <button className="text-xs text-red-500 font-medium flex items-center mt-1 hover:text-red-600">
-                            View menu <span className="ml-0.5">▸</span>
+                            {t("user.orders.viewMenu")} <span className="ml-0.5">▸</span>
                           </button>
                         </Link>}
                     </div>
@@ -478,10 +482,10 @@ Order again from this restaurant in the ${companyName} app.`;
                 {/* Three-dots dropdown menu */}
                 {activeMenuOrderId === order.id && <div className="absolute right-3 top-10 z-20 w-40 rounded-xl bg-white shadow-lg border border-gray-100 py-1 text-xs">
                     <button type="button" onClick={() => handleShareRestaurant(order)} className="w-full text-left px-3 py-2 hover:bg-gray-50 text-gray-800">
-                      Share restaurant
+                      {t("user.orders.menu.shareRestaurant")}
                     </button>
                     <button type="button" onClick={() => handleViewOrderDetails(order)} className="w-full text-left px-3 py-2 hover:bg-gray-50 text-gray-800">
-                      Order details
+                      {t("user.orders.menu.orderDetails")}
                     </button>
                   </div>}
 
@@ -492,7 +496,7 @@ Order again from this restaurant in the ${companyName} app.`;
                 <div className="px-4 py-2 space-y-2">
                   {order.items && order.items.length > 0 ? order.items.map((item, idx) => {
               const isVeg = item.isVeg !== undefined ? item.isVeg : item.category === 'veg' || item.type === 'veg';
-              const itemName = item.name || item.foodName || 'Item';
+              const itemName = item.name || item.foodName || t("user.orders.itemFallback");
               const itemQuantity = item.quantity || 1;
               const itemPrice = item.price || 0;
               const itemTotal = itemQuantity * itemPrice;
@@ -519,40 +523,40 @@ Order again from this restaurant in the ${companyName} app.`;
                               </div>
                               <div className="text-right flex-shrink-0">
                                 <span className="text-sm font-semibold text-gray-800">₹{itemTotal.toFixed(2)}</span>
-                                {itemQuantity > 1 && <p className="text-xs text-gray-500">₹{itemPrice.toFixed(2)} each</p>}
+                                {itemQuantity > 1 && <p className="text-xs text-gray-500">₹{itemPrice.toFixed(2)} {t("user.orders.each")}</p>}
                               </div>
                             </div>
                           </div>
                         </div>;
-            }) : <p className="text-sm text-gray-500">No items found</p>}
+            }) : <p className="text-sm text-gray-500">{t("user.orders.noItemsFound")}</p>}
                 </div>
 
                 {/* Order Summary */}
                 <div className="px-4 py-3 bg-gray-50 rounded-lg mx-4 mb-2">
                   <div className="space-y-1.5">
                     {order.subtotal > 0 && <div className="flex justify-between text-xs">
-                        <span className="text-gray-600">Subtotal</span>
+                        <span className="text-gray-600">{t("user.orders.summary.subtotal")}</span>
                         <span className="text-gray-800 font-medium">₹{order.subtotal.toFixed(2)}</span>
                       </div>}
                     {order.deliveryFee > 0 && <div className="flex justify-between text-xs">
-                        <span className="text-gray-600">Delivery Fee</span>
+                        <span className="text-gray-600">{t("user.orders.summary.deliveryFee")}</span>
                         <span className="text-gray-800 font-medium">₹{order.deliveryFee.toFixed(2)}</span>
                       </div>}
                     {order.tax > 0 && <div className="flex justify-between text-xs">
-                        <span className="text-gray-600">Tax</span>
+                        <span className="text-gray-600">{t("user.orders.summary.tax")}</span>
                         <span className="text-gray-800 font-medium">₹{order.tax.toFixed(2)}</span>
                       </div>}
                     {order.pricing?.discount > 0 && <div className="flex justify-between text-xs">
-                        <span className="text-green-600">Discount</span>
+                        <span className="text-green-600">{t("user.orders.summary.discount")}</span>
                         <span className="text-green-600 font-medium">-₹{order.pricing.discount.toFixed(2)}</span>
                       </div>}
                     {order.pricing?.couponCode && <div className="flex justify-between text-xs">
-                        <span className="text-gray-600">Coupon Applied</span>
+                        <span className="text-gray-600">{t("user.orders.summary.couponApplied")}</span>
                         <span className="text-gray-800 font-medium">{order.pricing.couponCode}</span>
                       </div>}
                     <div className="border-t border-gray-200 pt-1.5 mt-1.5">
                       <div className="flex justify-between">
-                        <span className="text-sm font-semibold text-gray-800">Total</span>
+                        <span className="text-sm font-semibold text-gray-800">{t("user.orders.summary.total")}</span>
                         <span className="text-base font-bold text-gray-900">₹{order.total.toFixed(2)}</span>
                       </div>
                     </div>
@@ -562,25 +566,25 @@ Order again from this restaurant in the ${companyName} app.`;
                 {/* Date and Payment Info */}
                 <div className="px-4 py-2 flex items-center justify-between">
                   <div className="flex-1">
-                    <p className="text-xs text-gray-400">Order placed on {formatDate(order.createdAt)}</p>
-                    {order.deliveredAt && <p className="text-xs text-gray-400 mt-0.5">Delivered on {formatDate(order.deliveredAt)}</p>}
+                    <p className="text-xs text-gray-400">{t("user.orders.orderPlacedOn")} {formatDate(order.createdAt)}</p>
+                    {order.deliveredAt && <p className="text-xs text-gray-400 mt-0.5">{t("user.orders.deliveredOn")} {formatDate(order.deliveredAt)}</p>}
                     {order.payment && <p className="text-xs text-gray-500 mt-1">
-                        Payment: <span className="font-medium capitalize">
-                          {order.payment.method === 'cash' || order.payment.method === 'cod' ? 'Cash on Delivery' : order.payment.method === 'wallet' ? 'Wallet' : order.payment.method === 'razorpay' ? 'Online' : order.payment.method || 'N/A'}
+                        {t("user.orders.payment")} <span className="font-medium capitalize">
+                          {order.payment.method === 'cash' || order.payment.method === 'cod' ? t("user.orders.paymentMethod.cashOnDelivery") : order.payment.method === 'wallet' ? t("user.orders.paymentMethod.wallet") : order.payment.method === 'razorpay' ? t("user.orders.paymentMethod.online") : order.payment.method || t("user.orders.paymentMethod.na")}
                         </span>
                         {order.payment.status && <span className={`ml-2 px-1.5 py-0.5 rounded text-[10px] font-medium ${order.payment.status === 'completed' ? 'bg-green-100 text-green-700' : order.payment.status === 'failed' ? 'bg-red-100 text-red-700' : order.payment.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-700'}`}>
                             {order.payment.status}
                           </span>}
                       </p>}
-                    {isDelivered && !paymentFailed && <p className="text-xs font-medium text-green-600 mt-1">✓ Delivered</p>}
-                    {isRestaurantCancelled && <p className="text-xs font-medium text-red-500 mt-1">✗ Restaurant Cancelled</p>}
-                    {isUserCancelled && <p className="text-xs font-medium text-gray-500 mt-1">✗ Cancelled by you</p>}
-                    {isCancelled && !isRestaurantCancelled && !isUserCancelled && <p className="text-xs font-medium text-gray-500 mt-1">✗ Cancelled</p>}
+                    {isDelivered && !paymentFailed && <p className="text-xs font-medium text-green-600 mt-1">{t("user.orders.status.deliveredWithIcon")}</p>}
+                    {isRestaurantCancelled && <p className="text-xs font-medium text-red-500 mt-1">{t("user.orders.status.restaurantCancelledWithIcon")}</p>}
+                    {isUserCancelled && <p className="text-xs font-medium text-gray-500 mt-1">{t("user.orders.status.cancelledByYouWithIcon")}</p>}
+                    {isCancelled && !isRestaurantCancelled && !isUserCancelled && <p className="text-xs font-medium text-gray-500 mt-1">{t("user.orders.status.cancelledWithIcon")}</p>}
                   </div>
                   <div className="flex items-center ml-4">
                     <Link to={`/user/orders/${order.id}`}>
                       <button className="text-xs text-red-500 font-medium hover:text-red-600 flex items-center gap-1">
-                        View Details
+                        {t("user.orders.viewDetails")}
                         <ChevronRight className="w-4 h-4" />
                       </button>
                     </Link>
@@ -598,39 +602,39 @@ Order again from this restaurant in the ${companyName} app.`;
                         <div className="bg-red-100 p-1 rounded-full">
                           <AlertCircle className="w-4 h-4 text-red-500" />
                         </div>
-                        <span className="text-xs font-semibold text-red-500">Restaurant Cancelled</span>
+                        <span className="text-xs font-semibold text-red-500">{t("user.orders.status.restaurantCancelled")}</span>
                       </div>
-                      <p className="text-xs text-gray-600 ml-7">Refund will be processed in 24-48 hours</p>
+                      <p className="text-xs text-gray-600 ml-7">{t("user.orders.refundInfo")}</p>
                     </div> : paymentFailed ? <div className="flex items-center gap-2">
                       <div className="bg-red-100 p-1 rounded-full">
                         <AlertCircle className="w-4 h-4 text-red-500" />
                       </div>
-                      <span className="text-xs font-semibold text-red-500">Payment failed</span>
+                      <span className="text-xs font-semibold text-red-500">{t("user.orders.status.paymentFailed")}</span>
                     </div> : isDelivered && order.rating ? <div>
                       <div className="flex items-center gap-1">
-                        <span className="text-sm text-gray-800">You rated</span>
+                        <span className="text-sm text-gray-800">{t("user.orders.youRated")}</span>
                         <div className="flex bg-yellow-400 text-white px-1 rounded text-[10px] items-center gap-0.5 h-4">
                           {order.rating}<Star className="w-2 h-2 fill-current" />
                         </div>
                       </div>
                     </div> : isDelivered ? <div>
-                      <p className="text-xs text-gray-500">Order delivered</p>
+                      <p className="text-xs text-gray-500">{t("user.orders.status.orderDelivered")}</p>
                       <button type="button" onClick={() => handleOpenRating(order)} className="text-xs text-red-500 font-medium mt-0.5 flex items-center">
-                        Rate order <span className="ml-0.5">▸</span>
+                        {t("user.orders.rateOrder")} <span className="ml-0.5">▸</span>
                       </button>
                     </div> : <div>
-                      <p className="text-xs text-gray-500">{order.status === 'preparing' ? 'Preparing' : order.status === 'outForDelivery' ? 'Out for delivery' : order.status === 'confirmed' ? 'Order confirmed' : ''}</p>
+                      <p className="text-xs text-gray-500">{order.status === 'preparing' ? t("user.orders.status.preparing") : order.status === 'outForDelivery' ? t("user.orders.status.outForDelivery") : order.status === 'confirmed' ? t("user.orders.status.orderConfirmed") : ''}</p>
                       {/* Countdown Timer */}
                       {countdowns[order.id] && countdowns[order.id] > 0 && <div className="flex items-center gap-1 mt-1 text-xs text-orange-600 font-medium">
                           <Clock size={12} />
-                          <span>{countdowns[order.id]} min{countdowns[order.id] !== 1 ? 's' : ''} remaining</span>
+                          <span>{t("user.orders.countdownRemaining", { count: countdowns[order.id] })}</span>
                         </div>}
                     </div>}
 
                   {/* Right Side: Reorder Button */}
                   {isDelivered && !paymentFailed && <button onClick={() => handleReorder(order)} className="bg-[#E23744] hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-1 shadow-sm transition-colors">
                       <RotateCcw className="w-3.5 h-3.5" />
-                      Reorder
+                      {t("user.orders.reorder")}
                     </button>}
                 </div>
               </div>;
@@ -650,14 +654,14 @@ Order again from this restaurant in the ${companyName} app.`;
               <div className="flex items-center justify-between mb-2">
                 <h2 className="text-xl font-bold text-white flex items-center gap-2">
                   <Star className="w-5 h-5 fill-white" />
-                  Rate Your Order
+                  {t("user.orders.rating.title")}
                 </h2>
                 <button type="button" onClick={handleCloseRating} className="text-white/80 hover:text-white transition-colors p-1 rounded-full hover:bg-white/20">
                   <span className="text-xl">✕</span>
                 </button>
               </div>
               <p className="text-sm text-white/90">
-                {ratingModal.order.restaurant} • Order #{ratingModal.order.id}
+                {ratingModal.order.restaurant} • {t("user.orders.rating.orderLabel")} #{ratingModal.order.id}
               </p>
             </div>
 
@@ -665,7 +669,7 @@ Order again from this restaurant in the ${companyName} app.`;
               {/* Star rating (1–5) */}
               <div className="mb-6">
                 <p className="text-sm font-semibold text-gray-900 mb-4 text-center">
-                  How was your overall experience?
+                  {t("user.orders.rating.experienceQuestion")}
                 </p>
                 <div className="flex items-center justify-center gap-2 mb-3">
                   {Array.from({
@@ -678,40 +682,40 @@ Order again from this restaurant in the ${companyName} app.`;
               })}
                 </div>
                 <div className="flex items-center justify-between mt-2 px-2">
-                  <span className="text-xs text-red-500 font-medium">Poor</span>
-                  <span className="text-xs text-gray-400">Average</span>
-                  <span className="text-xs text-green-600 font-medium">Excellent</span>
+                  <span className="text-xs text-red-500 font-medium">{t("user.orders.rating.poor")}</span>
+                  <span className="text-xs text-gray-400">{t("user.orders.rating.average")}</span>
+                  <span className="text-xs text-green-600 font-medium">{t("user.orders.rating.excellent")}</span>
                 </div>
                 {selectedRating && <p className="text-center mt-3 text-sm font-medium text-gray-700">
-                    {selectedRating === 5 && "⭐⭐⭐⭐⭐ Excellent!"}
-                    {selectedRating === 4 && "⭐⭐⭐⭐ Great!"}
-                    {selectedRating === 3 && "⭐⭐⭐ Good"}
-                    {selectedRating === 2 && "⭐⭐ Fair"}
-                    {selectedRating === 1 && "⭐ Poor"}
+                    {selectedRating === 5 && t("user.orders.rating.legend.five")}
+                    {selectedRating === 4 && t("user.orders.rating.legend.four")}
+                    {selectedRating === 3 && t("user.orders.rating.legend.three")}
+                    {selectedRating === 2 && t("user.orders.rating.legend.two")}
+                    {selectedRating === 1 && t("user.orders.rating.legend.one")}
                   </p>}
               </div>
 
               {/* Feedback textarea */}
               <div className="mb-6">
                 <label className="block text-sm font-semibold text-gray-900 mb-2">
-                  Share your feedback <span className="text-gray-400 font-normal">(Optional)</span>
+                  {t("user.orders.rating.shareFeedback")} <span className="text-gray-400 font-normal">({t("user.orders.optional")})</span>
                 </label>
-                <textarea rows={4} value={feedbackText} onChange={e => setFeedbackText(e.target.value)} className="w-full rounded-xl border-2 border-gray-200 px-4 py-3 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#E23744] focus:border-[#E23744] resize-none transition-all" placeholder="What did you like or dislike about this order? Share your experience..." />
-                <p className="text-xs text-gray-400 mt-1">Your feedback helps us improve our service</p>
+                <textarea rows={4} value={feedbackText} onChange={e => setFeedbackText(e.target.value)} className="w-full rounded-xl border-2 border-gray-200 px-4 py-3 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#E23744] focus:border-[#E23744] resize-none transition-all" placeholder={t("user.orders.rating.feedbackPlaceholder")} />
+                <p className="text-xs text-gray-400 mt-1">{t("user.orders.rating.feedbackHint")}</p>
               </div>
 
               {/* Submit Button */}
               <button type="button" disabled={submittingRating || selectedRating === null} onClick={handleSubmitRating} className="w-full rounded-xl bg-gradient-to-r from-[#E23744] to-red-600 text-white text-base font-bold py-3.5 hover:from-red-600 hover:to-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-red-500/30 flex items-center justify-center gap-2">
                 {submittingRating ? <>
                     <Loader2 className="w-5 h-5 animate-spin" />
-                    Submitting...
+                    {t("user.orders.rating.submitting")}
                   </> : <>
                     <Star className="w-5 h-5 fill-white" />
-                    Submit Rating
+                    {t("user.orders.rating.submit")}
                   </>}
               </button>
               
-              {selectedRating === null && <p className="text-xs text-center text-red-500 mt-2">Please select a rating to continue</p>}
+              {selectedRating === null && <p className="text-xs text-center text-red-500 mt-2">{t("user.orders.rating.selectToContinue")}</p>}
             </div>
           </div>
         </div>}

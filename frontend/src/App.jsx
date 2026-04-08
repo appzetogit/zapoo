@@ -35,6 +35,7 @@ const NewAdvertisementPage = lazy(() => import("@/module/restaurant/pages/NewAdv
 const EditAdvertisementPage = lazy(() => import("@/module/restaurant/pages/EditAdvertisementPage"))
 const MenuCategoriesPage = lazy(() => import("@/module/restaurant/pages/MenuCategoriesPage"))
 const RestaurantStatus = lazy(() => import("@/module/restaurant/pages/RestaurantStatus"))
+const RestaurantChangeLanguage = lazy(() => import("@/module/restaurant/pages/ChangeLanguage"))
 const DeliveryPricing = lazy(() => import("@/module/restaurant/pages/DeliveryPricing"))
 const ExploreMore = lazy(() => import("@/module/restaurant/pages/ExploreMore"))
 const RushHour = lazy(() => import("@/module/restaurant/pages/RushHour"))
@@ -272,6 +273,14 @@ export default function App() {
           element={
             <ProtectedRoute requiredRole="restaurant" loginPath="/restaurant/login">
               <RestaurantStatus />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/restaurant/change-language"
+          element={
+            <ProtectedRoute requiredRole="restaurant" loginPath="/restaurant/login">
+              <RestaurantChangeLanguage />
             </ProtectedRoute>
           }
         />

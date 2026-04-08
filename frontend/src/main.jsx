@@ -7,6 +7,9 @@ import App from './App.jsx';
 import { ThemeProvider } from './context/ThemeContext.jsx';
 import { getGoogleMapsApiKey } from './lib/utils/googleMapsApiKey.js';
 import { loadBusinessSettings } from './lib/utils/businessSettings.js';
+import './i18n';
+import LanguageBootstrap from './components/LanguageBootstrap.jsx';
+import { getStoredLanguage } from './lib/i18n/language.js';
 
 // Load business settings on app start (favicon, title)
 // Silently handle errors - this is not critical for app functionality
@@ -60,8 +63,9 @@ async function waitForGoogleMapsConstructors() {
   try {
     const googleMapsApiKey = await getGoogleMapsApiKey();
     if (googleMapsApiKey) {
+      const locale = getStoredLanguage();
       const script = document.createElement('script');
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${googleMapsApiKey}&libraries=places,geometry,drawing,geocoding&loading=async`;
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${googleMapsApiKey}&libraries=places,geometry,drawing,geocoding&loading=async&language=${locale}`;
       script.async = true;
       script.defer = true;
       script.onload = async () => {
@@ -181,6 +185,7 @@ if (!rootElement) {
 createRoot(rootElement).render(<StrictMode>
     <BrowserRouter>
       <ThemeProvider>
+        <LanguageBootstrap />
         <App />
         <Toaster position="top-center" richColors offset="80px" />
       </ThemeProvider>

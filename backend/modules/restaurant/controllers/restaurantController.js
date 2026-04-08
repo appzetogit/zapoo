@@ -10,6 +10,7 @@ import { initializeCloudinary } from '../../../config/cloudinary.js';
 import asyncHandler from '../../../shared/middleware/asyncHandler.js';
 import mongoose from 'mongoose';
 import { calculateDistance } from '../../order/services/orderCalculationService.js';
+import { normalizeLocale } from '../../../shared/i18n/localeConstants.js';
 
 const attachRealReviewStats = async (restaurants = []) => {
   if (!Array.isArray(restaurants) || restaurants.length === 0) {
@@ -874,6 +875,36 @@ export const updateRestaurantProfile = asyncHandler(async (req, res) => {
     console.error('Error updating restaurant profile:', error);
     return errorResponse(res, 500, 'Failed to update restaurant profile');
   }
+});
+
+export const getRestaurantPreferences = asyncHandler(async (req, res) => {
+  const restaurant = await Restaurant.findById(req.restaurant._id).select('preferences').lean();
+  if (!restaurant) {
+    return errorResponse(res, 404, 'Restaurant not found');
+  }
+
+  return successResponse(res, 200, 'Preferences retrieved successfully', {
+    preferences: {
+      language: restaurant.preferences?.language || 'en'
+    }
+  });
+});
+
+export const updateRestaurantPreferences = asyncHandler(async (req, res) => {
+  const restaurant = await Restaurant.findById(req.restaurant._id);
+  if (!restaurant) {
+    return errorResponse(res, 404, 'Restaurant not found');
+  }
+
+  restaurant.preferences = restaurant.preferences || {};
+  restaurant.preferences.language = normalizeLocale(req.body?.language);
+  await restaurant.save();
+
+  return successResponse(res, 200, 'Preferences updated successfully', {
+    preferences: {
+      language: restaurant.preferences.language
+    }
+  });
 });
 
 /**

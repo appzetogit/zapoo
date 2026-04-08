@@ -3,9 +3,11 @@ import { useNavigate } from "react-router-dom"
 import { ArrowLeft, Wallet } from "lucide-react"
 import BottomNavOrders from "../components/BottomNavOrders"
 import { restaurantAPI } from "@/lib/api"
+import { useTranslation } from "react-i18next"
 
 export default function WithdrawalHistoryPage() {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const [withdrawalHistoryTab, setWithdrawalHistoryTab] = useState('pending')
   const [withdrawalRequests, setWithdrawalRequests] = useState([])
   const [loadingWithdrawalRequests, setLoadingWithdrawalRequests] = useState(false)
@@ -39,12 +41,12 @@ export default function WithdrawalHistoryPage() {
           <button
             onClick={() => navigate("/restaurant/hub-finance")}
             className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
-            aria-label="Go back"
+            aria-label={t("restaurant.withdrawalHistory.aria.goBack")}
           >
             <ArrowLeft className="w-6 h-6 text-gray-900" />
           </button>
           <div className="flex-1">
-            <h1 className="text-lg font-bold text-gray-900">Withdrawal History</h1>
+            <h1 className="text-lg font-bold text-gray-900">{t("restaurant.withdrawalHistory.title")}</h1>
           </div>
         </div>
       </div>
@@ -60,7 +62,7 @@ export default function WithdrawalHistoryPage() {
                 : "bg-gray-100 text-gray-600 hover:bg-gray-200"
             }`}
           >
-            Withdrawal Pending
+            {t("restaurant.withdrawalHistory.tabs.pending")}
           </button>
           <button
             onClick={() => setWithdrawalHistoryTab('successful')}
@@ -70,7 +72,7 @@ export default function WithdrawalHistoryPage() {
                 : "bg-gray-100 text-gray-600 hover:bg-gray-200"
             }`}
           >
-            Withdrawal Successful
+            {t("restaurant.withdrawalHistory.tabs.successful")}
           </button>
         </div>
       </div>
@@ -78,7 +80,7 @@ export default function WithdrawalHistoryPage() {
       {/* Content */}
       <div className="flex-1 overflow-y-auto px-4 py-6">
         {loadingWithdrawalRequests ? (
-          <div className="py-8 text-center text-gray-500">Loading...</div>
+          <div className="py-8 text-center text-gray-500">{t("restaurant.withdrawalHistory.loading")}</div>
         ) : (
           <>
             {withdrawalHistoryTab === 'pending' ? (
@@ -88,7 +90,7 @@ export default function WithdrawalHistoryPage() {
                   .length === 0 ? (
                   <div className="text-center py-12">
                     <Wallet className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                    <p className="text-gray-500 text-lg font-medium">No pending withdrawal requests</p>
+                    <p className="text-gray-500 text-lg font-medium">{t("restaurant.withdrawalHistory.empty.pending")}</p>
                   </div>
                 ) : (
                   withdrawalRequests
@@ -104,17 +106,17 @@ export default function WithdrawalHistoryPage() {
                               ₹{request.amount?.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </p>
                             <p className="text-xs text-gray-600">
-                              Requested: {request.requestedAt ? new Date(request.requestedAt).toLocaleString('en-IN', {
+                              {t("restaurant.withdrawalHistory.labels.requested")}: {request.requestedAt ? new Date(request.requestedAt).toLocaleString('en-IN', {
                                 day: 'numeric',
                                 month: 'short',
                                 year: 'numeric',
                                 hour: '2-digit',
                                 minute: '2-digit'
-                              }) : 'N/A'}
+                              }) : t("restaurant.withdrawalHistory.common.na")}
                             </p>
                           </div>
                           <span className="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">
-                            Pending
+                            {t("restaurant.withdrawalHistory.status.pending")}
                           </span>
                         </div>
                       </div>
@@ -128,7 +130,7 @@ export default function WithdrawalHistoryPage() {
                   .length === 0 ? (
                   <div className="text-center py-12">
                     <Wallet className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                    <p className="text-gray-500 text-lg font-medium">No successful withdrawals</p>
+                    <p className="text-gray-500 text-lg font-medium">{t("restaurant.withdrawalHistory.empty.successful")}</p>
                   </div>
                 ) : (
                   withdrawalRequests
@@ -144,17 +146,17 @@ export default function WithdrawalHistoryPage() {
                               ₹{request.amount?.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </p>
                             <p className="text-xs text-gray-600">
-                              Processed: {request.processedAt ? new Date(request.processedAt).toLocaleString('en-IN', {
+                              {t("restaurant.withdrawalHistory.labels.processed")}: {request.processedAt ? new Date(request.processedAt).toLocaleString('en-IN', {
                                 day: 'numeric',
                                 month: 'short',
                                 year: 'numeric',
                                 hour: '2-digit',
                                 minute: '2-digit'
-                              }) : 'N/A'}
+                              }) : t("restaurant.withdrawalHistory.common.na")}
                             </p>
                           </div>
                           <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
-                            {request.status === 'Approved' ? 'Approved' : 'Processed'}
+                            {request.status === 'Approved' ? t("restaurant.withdrawalHistory.status.approved") : t("restaurant.withdrawalHistory.status.processed")}
                           </span>
                         </div>
                       </div>
@@ -170,4 +172,3 @@ export default function WithdrawalHistoryPage() {
     </div>
   )
 }
-

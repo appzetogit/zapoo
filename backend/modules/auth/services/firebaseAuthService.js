@@ -49,7 +49,21 @@ class FirebaseAuthService {
       if (!projectId || !clientEmail || !privateKey) {
         if (process.env.FIREBASE_SERVICE_ACCOUNT) {
           try {
-            const sa = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+            let serviceAccountRaw = process.env.FIREBASE_SERVICE_ACCOUNT.trim();
+
+            // Some env setups wrap JSON in quotes: '{"..."}' or "{\"...\"}"
+            if (
+              (serviceAccountRaw.startsWith("'") && serviceAccountRaw.endsWith("'")) ||
+              (serviceAccountRaw.startsWith('"') && serviceAccountRaw.endsWith('"'))
+            ) {
+              serviceAccountRaw = serviceAccountRaw.slice(1, -1);
+            }
+
+            if (serviceAccountRaw.includes('\\"')) {
+              serviceAccountRaw = serviceAccountRaw.replace(/\\"/g, '"');
+            }
+
+            const sa = JSON.parse(serviceAccountRaw);
             projectId = sa.project_id;
             clientEmail = sa.client_email;
             privateKey = sa.private_key;

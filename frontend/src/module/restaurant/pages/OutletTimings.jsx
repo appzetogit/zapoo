@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import Lenis from "lenis";
+import { useTranslation } from "react-i18next";
 import { ArrowLeft, ChevronUp, ChevronDown, Clock, Edit2 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { MobileTimePicker } from "@mui/x-date-pickers/MobileTimePicker";
@@ -137,6 +138,7 @@ const getDefaultDays = () => ({
   }
 });
 export default function OutletTimings() {
+  const { t } = useTranslation();
   const companyName = useCompanyName();
   const navigate = useNavigate();
   const [expandedDay, setExpandedDay] = useState("Monday");
@@ -353,15 +355,24 @@ export default function OutletTimings() {
     }));
   };
   const dayNames = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+  const dayKeyMap = {
+    Monday: "monday",
+    Tuesday: "tuesday",
+    Wednesday: "wednesday",
+    Thursday: "thursday",
+    Friday: "friday",
+    Saturday: "saturday",
+    Sunday: "sunday",
+  };
   return <LocalizationProvider dateAdapter={AdapterDateFns}>
       <div className="min-h-screen bg-white overflow-x-hidden">
         {/* Header */}
         <div className="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-50">
           <div className="flex items-center gap-3">
-            <button onClick={() => navigate("/restaurant")} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors" aria-label="Go back">
+            <button onClick={() => navigate("/restaurant")} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors" aria-label={t("restaurant.outletTimings.aria.goBack")}>
               <ArrowLeft className="w-6 h-6 text-gray-900" />
             </button>
-            <h1 className="text-lg font-bold text-gray-900">Outlet timings</h1>
+            <h1 className="text-lg font-bold text-gray-900">{t("restaurant.outletTimings.title")}</h1>
           </div>
         </div>
 
@@ -398,10 +409,16 @@ export default function OutletTimings() {
                   <div className={`w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-color transition-all ${isExpanded ? "bg-gray-100" : ""}`}>
                     <button onClick={() => toggleDay(day)} className="flex items-center gap-3 flex-1 text-left">
                       {isExpanded ? <ChevronUp className="w-5 h-5 text-gray-700" /> : <ChevronDown className="w-5 h-5 text-gray-700" />}
-                      <span className="text-base font-medium text-gray-900">{day}</span>
+                      <span className="text-base font-medium text-gray-900">
+                        {t(`restaurant.outletTimings.days.${dayKeyMap[day] || "monday"}`)}
+                      </span>
                     </button>
                     <div className="flex items-center gap-3">
-                      <span className="text-sm text-gray-700">{dayData.isOpen ? "Open" : "Close"}</span>
+                      <span className="text-sm text-gray-700">
+                        {dayData.isOpen
+                          ? t("restaurant.outletTimings.status.open")
+                          : t("restaurant.outletTimings.status.close")}
+                      </span>
                       <div onClick={e => e.stopPropagation()}>
                         <Switch checked={dayData.isOpen} onCheckedChange={() => toggleDayOpen(day)} className="data-[state=checked]:bg-green-500 data-[state=unchecked]:bg-gray-300" />
                       </div>
@@ -428,7 +445,7 @@ export default function OutletTimings() {
                               <div className="space-y-2">
                                 <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
                                   <Clock className="w-4 h-4" />
-                                  Opening time
+                                  {t("restaurant.outletTimings.fields.openingTime")}
                                 </label>
                                 <div className="border border-gray-200 rounded-md px-3 py-2 bg-gray-50/60">
                                   <MobileTimePicker value={stringToTime(dayData.openingTime)} onChange={newValue => {
@@ -443,7 +460,7 @@ export default function OutletTimings() {
                             textField: {
                               variant: "outlined",
                               size: "small",
-                              placeholder: "Select opening time",
+                              placeholder: t("restaurant.outletTimings.placeholders.openingTime"),
                               sx: {
                                 "& .MuiOutlinedInput-root": {
                                   height: "36px",
@@ -468,7 +485,7 @@ export default function OutletTimings() {
                           }} format="hh:mm a" />
                                 </div>
                                 <p className="text-xs text-gray-500">
-                                  Current: {formatTime12Hour(dayData.openingTime)}
+                                  {t("restaurant.outletTimings.labels.current")}: {formatTime12Hour(dayData.openingTime)}
                                 </p>
                               </div>
 
@@ -476,7 +493,7 @@ export default function OutletTimings() {
                               <div className="space-y-2">
                                 <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
                                   <Clock className="w-4 h-4" />
-                                  Closing time
+                                  {t("restaurant.outletTimings.fields.closingTime")}
                                 </label>
                                 <div className="border border-gray-200 rounded-md px-3 py-2 bg-gray-50/60">
                                   <MobileTimePicker value={stringToTime(dayData.closingTime)} onChange={newValue => {
@@ -491,7 +508,7 @@ export default function OutletTimings() {
                             textField: {
                               variant: "outlined",
                               size: "small",
-                              placeholder: "Select closing time",
+                              placeholder: t("restaurant.outletTimings.placeholders.closingTime"),
                               sx: {
                                 "& .MuiOutlinedInput-root": {
                                   height: "36px",
@@ -516,10 +533,10 @@ export default function OutletTimings() {
                           }} format="hh:mm a" />
                                 </div>
                                 <p className="text-xs text-gray-500">
-                                  Current: {formatTime12Hour(dayData.closingTime)}
+                                  {t("restaurant.outletTimings.labels.current")}: {formatTime12Hour(dayData.closingTime)}
                                 </p>
                               </div>
-                            </> : <p className="text-sm text-gray-500 pl-6">This day is closed</p>}
+                            </> : <p className="text-sm text-gray-500 pl-6">{t("restaurant.outletTimings.labels.dayClosed")}</p>}
                         </div>
                       </motion.div>}
                   </AnimatePresence>

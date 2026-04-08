@@ -18,6 +18,7 @@ import { initRazorpayPayment } from "@/lib/utils/razorpay";
 import { toast } from "sonner";
 import { getCompanyNameAsync } from "@/lib/utils/businessSettings";
 import DynamicEtaText from "../../components/DynamicEtaText";
+import { useTranslation } from "react-i18next";
 
 // Removed hardcoded suggested items - now fetching approved addons from backend
 // Coupons will be fetched from backend based on items in cart
@@ -90,6 +91,7 @@ const isRestaurantCustomDeliveryPricingEnabled = restaurant => {
 };
 
 export default function Cart() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
 
   // Defensive check: Ensure CartProvider is available
@@ -101,12 +103,12 @@ export default function Cart() {
     // Return early with error message
     return <div className="min-h-screen flex items-center justify-center bg-[#f5f5f5] dark:bg-[#0a0a0a]">
         <div className="text-center p-8">
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">Cart Error</h2>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">{t("user.cart.error.title")}</h2>
           <p className="text-gray-600 dark:text-gray-400">
-            Cart functionality is not available. Please refresh the page.
+            {t("user.cart.error.description")}
           </p>
           <button onClick={() => navigate('/')} className="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
-            Go to Home
+            {t("user.cart.error.goHome")}
           </button>
         </div>
       </div>;
@@ -201,18 +203,18 @@ export default function Cart() {
   const defaultPayment = getDefaultPaymentMethod();
   const paymentOptions = [{
     value: "razorpay",
-    label: "Razorpay",
-    description: "Pay online instantly",
+    label: t("user.cart.paymentOptions.razorpay.label"),
+    description: t("user.cart.paymentOptions.razorpay.description"),
     accent: "bg-blue-600 text-white"
   }, {
     value: "wallet",
-    label: "Wallet",
-    description: walletBalance > 0 ? `Balance available: Rs ${walletBalance.toFixed(0)}` : "Use your wallet balance",
+    label: t("user.cart.paymentOptions.wallet.label"),
+    description: walletBalance > 0 ? t("user.cart.paymentOptions.wallet.balanceAvailable", { amount: walletBalance.toFixed(0) }) : t("user.cart.paymentOptions.wallet.description"),
     accent: "bg-emerald-100 text-emerald-700"
   }, {
     value: "cash",
-    label: "Cash on Delivery",
-    description: "Pay when your order arrives",
+    label: t("user.cart.paymentOptions.cash.label"),
+    description: t("user.cart.paymentOptions.cash.description"),
     accent: "bg-orange-100 text-orange-700"
   }];
   const selectedPaymentOption = paymentOptions.find(option => option.value === selectedPaymentMethod) || paymentOptions[0];
@@ -653,11 +655,11 @@ export default function Cart() {
   );
   const deliveryPricingWarningMessage = deliveryPricingMisconfigured
     ? (pricingMeta?.pricingDiagnostics?.[0]?.message ||
-      'Delivery could not be priced. Check zone, distance slabs, and the delivery rate grid in restaurant settings.')
+      t("user.cart.ui.deliveryPricingWarning"))
     : '';
 
   // Restaurant name from data or cart
-  const restaurantName = restaurantData?.name || cart[0]?.restaurant || "Restaurant";
+  const restaurantName = restaurantData?.name || cart[0]?.restaurant || t("user.cart.ui.restaurant");
 
   // Handler to select address by label (Home, Office, Other)
   const handleSelectAddressByLabel = async label => {
@@ -675,7 +677,7 @@ export default function Cart() {
       const longitude = coordinates[0];
       const latitude = coordinates[1];
       if (!latitude || !longitude) {
-        toast.error(`Invalid coordinates for ${label} address`);
+        toast.error(t("user.cart.toast.invalidCoordinates", { label }));
         return;
       }
 
@@ -704,13 +706,13 @@ export default function Cart() {
         formattedAddress: address.additionalDetails ? `${address.additionalDetails}, ${address.street}, ${address.city}, ${address.state}${address.zipCode ? ` ${address.zipCode}` : ''}` : `${address.street}, ${address.city}, ${address.state}${address.zipCode ? ` ${address.zipCode}` : ''}`
       };
       localStorage.setItem("userLocation", JSON.stringify(locationData));
-      toast.success(`${label} address selected!`);
+      toast.success(t("user.cart.toast.addressSelected", { label }));
 
       // Force page reload to update location
       window.location.reload();
     } catch (error) {
       console.error(`Error selecting ${label} address:`, error);
-      toast.error(`Failed to select ${label} address. Please try again.`);
+      toast.error(t("user.cart.toast.failedToSelectAddress", { label }));
     }
   };
   const handleApplyCoupon = async coupon => {
@@ -782,11 +784,11 @@ export default function Cart() {
   };
   const handlePlaceOrder = async () => {
     if (!defaultAddress) {
-      alert("Please add a delivery address");
+      alert(t("user.cart.toast.pleaseAddDeliveryAddress"));
       return;
     }
     if (cart.length === 0) {
-      alert("Your cart is empty");
+      alert(t("user.cart.toast.cartEmpty"));
       return;
     }
     setIsPlacingOrder(true);
@@ -845,7 +847,7 @@ export default function Cart() {
             restaurantId: item.restaurantId
           }))
         });
-        alert('Error: Restaurant information is missing. Please refresh the page and try again.');
+        alert(t("user.cart.toast.restaurantInfoMissingWithRefresh"));
         setIsPlacingOrder(false);
         return;
       }
@@ -877,16 +879,16 @@ export default function Cart() {
         // Automatically clean cart to keep items from the restaurant matching restaurantData
         if (finalRestaurantId && finalRestaurantName) {
           cleanCartForRestaurant(finalRestaurantId, finalRestaurantName);
-          toast.error('Cart contained items from different restaurants. Items from other restaurants have been removed.');
+          toast.error(t("user.cart.toast.itemsFromDifferentRestaurantsRemoved"));
         } else {
           // If restaurantData is not available, keep items from first restaurant in cart
           const firstRestaurantId = cart[0]?.restaurantId;
           const firstRestaurantName = cart[0]?.restaurant;
           if (firstRestaurantId && firstRestaurantName) {
             cleanCartForRestaurant(firstRestaurantId, firstRestaurantName);
-            toast.error('Cart contained items from different restaurants. Items from other restaurants have been removed.');
+            toast.error(t("user.cart.toast.itemsFromDifferentRestaurantsRemoved"));
           } else {
-            toast.error('Cart contains items from different restaurants. Please clear cart and try again.');
+            toast.error(t("user.cart.toast.itemsFromDifferentRestaurants"));
           }
         }
         setIsPlacingOrder(false);
@@ -919,7 +921,7 @@ export default function Cart() {
             restaurantDataName: restaurantData?.name,
             cartRestaurantName: cartRestaurantNames[0]
           });
-          alert(`Error: Cart items belong to "${cartRestaurantNames[0] || 'Unknown Restaurant'}" but restaurant data doesn't match. Please refresh the page and try again.`);
+          alert(t("user.cart.toast.restaurantDataMismatchWithCart", { restaurant: cartRestaurantNames[0] || t("user.cart.ui.unknownRestaurant") }));
           setIsPlacingOrder(false);
           return;
         }
@@ -933,7 +935,7 @@ export default function Cart() {
             cartRestaurantName: cartRestaurantName,
             finalRestaurantName: finalRestaurantName
           });
-          alert(`Error: Cart items belong to "${cartRestaurantName}" but restaurant data shows "${finalRestaurantName}". Please refresh the page and try again.`);
+          alert(t("user.cart.toast.restaurantNameMismatch", { cartRestaurantName, finalRestaurantName }));
           setIsPlacingOrder(false);
           return;
         }
@@ -952,7 +954,7 @@ export default function Cart() {
           cartRestaurantName: cart[0]?.restaurant,
           finalRestaurantName: finalRestaurantName
         });
-        alert('Error: Restaurant information mismatch detected. Please refresh the page and try again.');
+        alert(t("user.cart.toast.restaurantInfoMismatchDetected"));
         setIsPlacingOrder(false);
         return;
       }
@@ -972,7 +974,7 @@ export default function Cart() {
 
       // Check wallet balance if wallet payment selected
       if (selectedPaymentMethod === "wallet" && walletBalance < total) {
-        toast.error(`Insufficient wallet balance. Required: ₹${total.toFixed(0)}, Available: ₹${walletBalance.toFixed(0)}`);
+        toast.error(t("user.cart.toast.insufficientWalletBalance", { required: total.toFixed(0), available: walletBalance.toFixed(0) }));
         setIsPlacingOrder(false);
         return;
       }
@@ -986,7 +988,7 @@ export default function Cart() {
 
       // Cash flow: order placed without online payment
       if (selectedPaymentMethod === "cash") {
-        toast.success("Order placed with Cash on Delivery");
+        toast.success(t("user.cart.toast.orderPlacedCod"));
         setPlacedOrderId(order?.orderId || order?.id || null);
         setShowOrderSuccess(true);
         clearCart();
@@ -996,7 +998,7 @@ export default function Cart() {
 
       // Wallet flow: order placed with wallet payment (already processed in backend)
       if (selectedPaymentMethod === "wallet") {
-        toast.success("Order placed with Wallet payment");
+        toast.success(t("user.cart.toast.orderPlacedWallet"));
         setPlacedOrderId(order?.orderId || order?.id || null);
         setShowOrderSuccess(true);
         clearCart();
@@ -1017,7 +1019,7 @@ export default function Cart() {
           razorpay,
           order
         });
-        throw new Error(razorpay ? "Razorpay payment gateway is not configured. Please contact support." : "Failed to initialize payment");
+        throw new Error(razorpay ? t("user.cart.toast.razorpayNotConfigured") : t("user.cart.toast.failedToInitializePayment"));
       }
       // Get user info for Razorpay prefill
       const userInfo = userProfile || {};
@@ -1066,11 +1068,11 @@ export default function Cart() {
               clearCart();
               setIsPlacingOrder(false);
             } else {
-              throw new Error(verifyResponse.data.message || "Payment verification failed");
+              throw new Error(verifyResponse.data.message || t("user.cart.toast.paymentVerificationFailed"));
             }
           } catch (error) {
             console.error("❌ Payment verification error:", error);
-            const errorMessage = error?.response?.data?.message || error?.message || "Payment verification failed. Please contact support.";
+            const errorMessage = error?.response?.data?.message || error?.message || t("user.cart.toast.paymentVerificationFailed");
             alert(errorMessage);
             setIsPlacingOrder(false);
           }
@@ -1079,7 +1081,7 @@ export default function Cart() {
           console.error("❌ Razorpay payment error:", error);
           // Don't show alert for user cancellation
           if (error?.code !== 'PAYMENT_CANCELLED' && error?.message !== 'PAYMENT_CANCELLED') {
-            const errorMessage = error?.description || error?.message || "Payment failed. Please try again.";
+            const errorMessage = error?.description || error?.message || t("user.cart.toast.paymentFailed");
             alert(errorMessage);
           }
           setIsPlacingOrder(false);
@@ -1090,7 +1092,7 @@ export default function Cart() {
       });
     } catch (error) {
       console.error("❌ Order creation error:", error);
-      let errorMessage = "Failed to create order. Please try again.";
+      let errorMessage = t("user.cart.toast.failedToCreateOrder");
 
       // Handle network errors
       if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
@@ -1113,7 +1115,7 @@ export default function Cart() {
       }
       // Handle timeout errors
       else if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
-        errorMessage = "Request timed out. The server is taking too long to respond. Please try again.";
+        errorMessage = t("user.cart.toast.requestTimedOut");
       }
       // Handle other axios errors
       else if (error.response) {
@@ -1143,17 +1145,17 @@ export default function Cart() {
                 <ArrowLeft className="h-4 w-4" />
               </Button>
             </Link>
-            <span className="font-semibold text-gray-800 dark:text-white">Cart</span>
+            <span className="font-semibold text-gray-800 dark:text-white">{t("user.cart.ui.cart")}</span>
           </div>
         </div>
         <div className="flex flex-col items-center justify-center py-20 px-4">
           <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
             <Utensils className="h-10 w-10 text-gray-400" />
           </div>
-          <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-1">Your cart is empty</h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mb-4 text-center">Add items from a restaurant to start a new order</p>
+          <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-1">{t("user.cart.ui.yourCartIsEmpty")}</h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-4 text-center">{t("user.cart.ui.emptyCartHint")}</p>
           <Link to="/">
-            <Button className="bg-[#FF5200] hover:opacity-90 text-white">Browse Restaurants</Button>
+            <Button className="bg-[#FF5200] hover:opacity-90 text-white">{t("user.cart.ui.browseRestaurants")}</Button>
           </Link>
         </div>
       </AnimatedPage>;
@@ -1175,10 +1177,10 @@ export default function Cart() {
                   <DynamicEtaText
                     restaurantId={restaurantId}
                     items={etaItems}
-                    fallback={restaurantData?.estimatedDeliveryTime || "10-15 mins"}
+                    fallback={restaurantData?.estimatedDeliveryTime || t("user.cart.ui.defaultEtaShort")}
                   />{" "}
-                  to <span className="font-semibold">Location</span>
-                  <span className="text-gray-400 dark:text-gray-500 ml-1 text-xs md:text-sm">{defaultAddress ? formatFullAddress(defaultAddress) || defaultAddress?.formattedAddress || defaultAddress?.address || defaultAddress?.city || "Select address" : "Select address"}</span>
+                  {t("user.cart.ui.to")} <span className="font-semibold">{t("user.cart.ui.location")}</span>
+                  <span className="text-gray-400 dark:text-gray-500 ml-1 text-xs md:text-sm">{defaultAddress ? formatFullAddress(defaultAddress) || defaultAddress?.formattedAddress || defaultAddress?.address || defaultAddress?.city || t("user.cart.ui.selectAddress") : t("user.cart.ui.selectAddress")}</span>
                 </p>
               </div>
             </div>
@@ -1195,7 +1197,7 @@ export default function Cart() {
         {savings > 0 && <div className="bg-blue-100 dark:bg-blue-900/20 px-4 md:px-6 py-2 md:py-3 flex-shrink-0">
             <div className="max-w-7xl mx-auto">
               <p className="text-sm md:text-base font-medium text-blue-800 dark:text-blue-200">
-                🎉 You saved ₹{savings} on this order
+                {t("user.cart.ui.youSavedOnOrder", { amount: savings })}
               </p>
             </div>
           </div>}
@@ -1216,7 +1218,7 @@ export default function Cart() {
                       <div className="flex-1 min-w-0">
                         <p className="text-sm md:text-base font-medium text-gray-800 dark:text-gray-200 leading-tight">{item.name}</p>
                         <button className="text-xs md:text-sm text-blue-600 dark:text-blue-400 font-medium flex items-center gap-0.5 mt-0.5">
-                          Edit <ChevronRight className="h-3 w-3 md:h-4 md:w-4" />
+                          {t("user.cart.ui.edit")} <ChevronRight className="h-3 w-3 md:h-4 md:w-4" />
                         </button>
                       </div>
 
@@ -1244,7 +1246,7 @@ export default function Cart() {
                 {/* Add more items */}
                 <button onClick={() => navigate(-1)} className="flex items-center gap-2 mt-4 md:mt-6 text-[#FF5200] dark:text-[#FF5200]">
                   <Plus className="h-4 w-4 md:h-5 md:w-5" />
-                  <span className="text-sm md:text-base font-medium">Add more items</span>
+                  <span className="text-sm md:text-base font-medium">{t("user.cart.ui.addMoreItems")}</span>
                 </button>
               </div>
 
@@ -1253,17 +1255,17 @@ export default function Cart() {
               <div className="bg-white dark:bg-[#1a1a1a] px-4 md:px-6 py-3 md:py-4 rounded-lg md:rounded-xl flex flex-col sm:flex-row gap-2 md:gap-3">
                 <button onClick={() => setShowNoteInput(!showNoteInput)} className="flex-1 flex items-center gap-2 px-3 md:px-4 py-2 md:py-3 border border-gray-200 dark:border-gray-700 rounded-lg md:rounded-xl text-sm md:text-base text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800">
                   <FileText className="h-4 w-4 md:h-5 md:w-5" />
-                  <span className="truncate">{note || "Add a note for the restaurant"}</span>
+                  <span className="truncate">{note || t("user.cart.ui.addNoteForRestaurant")}</span>
                 </button>
                 <button onClick={() => setSendCutlery(!sendCutlery)} className={`flex items-center gap-2 px-3 md:px-4 py-2 md:py-3 border rounded-lg md:rounded-xl text-sm md:text-base ${sendCutlery ? 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300' : 'border-[#FF5200] dark:border-[#FF5200] text-[#FF5200] dark:text-[#FF5200] bg-[#FF5200]/10 dark:bg-[#FF5200]/20'}`}>
                   <Utensils className="h-4 w-4 md:h-5 md:w-5" />
-                  <span className="whitespace-nowrap">{sendCutlery ? "Don't send cutlery" : "No cutlery"}</span>
+                  <span className="whitespace-nowrap">{sendCutlery ? t("user.cart.ui.dontSendCutlery") : t("user.cart.ui.noCutlery")}</span>
                 </button>
               </div>
 
               {/* Note Input */}
               {showNoteInput && <div className="bg-white dark:bg-[#1a1a1a] px-4 md:px-6 py-3 md:py-4 rounded-lg md:rounded-xl">
-                  <textarea value={note} onChange={e => setNote(e.target.value)} placeholder="Add cooking instructions, allergies, etc." className="w-full border border-gray-200 dark:border-gray-700 rounded-lg md:rounded-xl p-3 md:p-4 text-sm md:text-base resize-none h-20 md:h-24 focus:outline-none focus:border-[#FF5200] dark:focus:border-[#FF5200] bg-white dark:bg-[#0a0a0a] text-gray-900 dark:text-gray-100" />
+                  <textarea value={note} onChange={e => setNote(e.target.value)} placeholder={t("user.cart.ui.notePlaceholder")} className="w-full border border-gray-200 dark:border-gray-700 rounded-lg md:rounded-xl p-3 md:p-4 text-sm md:text-base resize-none h-20 md:h-24 focus:outline-none focus:border-[#FF5200] dark:focus:border-[#FF5200] bg-white dark:bg-[#0a0a0a] text-gray-900 dark:text-gray-100" />
                 </div>}
 
               {/* Complete your meal section - Approved Addons */}
@@ -1272,7 +1274,7 @@ export default function Cart() {
                     <div className="w-6 h-6 md:w-8 md:h-8 bg-gray-100 dark:bg-gray-800 rounded flex items-center justify-center">
                       <span className="text-xs md:text-base">🍽️</span>
                     </div>
-                    <span className="text-sm md:text-base font-semibold text-gray-800 dark:text-gray-200">Complete your meal with</span>
+                    <span className="text-sm md:text-base font-semibold text-gray-800 dark:text-gray-200">{t("user.cart.ui.completeYourMealWith")}</span>
                   </div>
                   {loadingAddons ? <div className="flex gap-3 md:gap-4 overflow-x-auto pb-2 -mx-4 md:-mx-6 px-4 md:px-6 scrollbar-hide">
                       {[1, 2, 3].map(i => <div key={i} className="flex-shrink-0 w-28 md:w-36 animate-pulse">
@@ -1304,7 +1306,7 @@ export default function Cart() {
                           restaurantName,
                           cartItem: cart[0]
                         });
-                        toast.error('Restaurant information is missing. Please refresh the page.');
+                        toast.error(t("user.cart.toast.restaurantInfoMissing"));
                         return;
                       }
                       addToCart({
@@ -1334,34 +1336,34 @@ export default function Cart() {
                     <div className="flex items-center gap-2 md:gap-3">
                       <Tag className="h-4 w-4 md:h-5 md:w-5 text-[#FF5200] dark:text-[#FF5200]" />
                       <div>
-                        <p className="text-sm md:text-base font-medium text-[#FF5200] dark:text-[#FF5200]">'{appliedCoupon.code}' applied</p>
-                        <p className="text-xs md:text-sm text-[#FF5200] dark:text-[#FF5200]">You saved ₹{discount}</p>
+                        <p className="text-sm md:text-base font-medium text-[#FF5200] dark:text-[#FF5200]">{t("user.cart.ui.couponApplied", { code: appliedCoupon.code })}</p>
+                        <p className="text-xs md:text-sm text-[#FF5200] dark:text-[#FF5200]">{t("user.cart.ui.youSavedAmount", { amount: discount })}</p>
                       </div>
                     </div>
-                    <button onClick={handleRemoveCoupon} className="text-gray-500 dark:text-gray-400 text-xs md:text-sm font-medium">Remove</button>
+                    <button onClick={handleRemoveCoupon} className="text-gray-500 dark:text-gray-400 text-xs md:text-sm font-medium">{t("user.cart.ui.remove")}</button>
                   </div> : loadingCoupons ? <div className="flex items-center gap-2 md:gap-3">
                     <Percent className="h-4 w-4 md:h-5 md:w-5 text-gray-600 dark:text-gray-400" />
-                    <p className="text-sm md:text-base text-gray-500 dark:text-gray-400">Loading coupons...</p>
+                    <p className="text-sm md:text-base text-gray-500 dark:text-gray-400">{t("user.cart.ui.loadingCoupons")}</p>
                   </div> : combinedAvailableCoupons.length > 0 ? <div>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2 md:gap-3">
                         <Percent className="h-4 w-4 md:h-5 md:w-5 text-gray-600 dark:text-gray-400" />
                         <div>
                           <p className="text-sm md:text-base font-medium text-gray-800 dark:text-gray-200">
-                            Save ₹{combinedAvailableCoupons[0].discount} with '{combinedAvailableCoupons[0].code}'
+                            {t("user.cart.ui.saveWithCoupon", { amount: combinedAvailableCoupons[0].discount, code: combinedAvailableCoupons[0].code })}
                           </p>
                           {combinedAvailableCoupons.length > 1 && <button onClick={() => setShowCoupons(!showCoupons)} className="text-xs md:text-sm text-blue-600 dark:text-blue-400 font-medium">
-                              View all coupons →
+                              {t("user.cart.ui.viewAllCoupons")}
                             </button>}
                         </div>
                       </div>
                       <Button size="sm" variant="outline" className="h-7 md:h-8 text-xs md:text-sm border-[#FF5200] dark:border-[#FF5200] text-[#FF5200] dark:text-[#FF5200] hover:bg-[#FF5200]/10 dark:hover:bg-[#FF5200]/20" onClick={() => handleApplyCoupon(combinedAvailableCoupons[0])} disabled={subtotal < combinedAvailableCoupons[0].minOrder}>
-                        {subtotal < combinedAvailableCoupons[0].minOrder ? `Min ₹${combinedAvailableCoupons[0].minOrder}` : 'APPLY'}
+                        {subtotal < combinedAvailableCoupons[0].minOrder ? t("user.cart.ui.minAmount", { amount: combinedAvailableCoupons[0].minOrder }) : t("user.cart.ui.apply")}
                       </Button>
                     </div>
                   </div> : <div className="flex items-center gap-2 md:gap-3">
                     <Percent className="h-4 w-4 md:h-5 md:w-5 text-gray-600 dark:text-gray-400" />
-                    <p className="text-sm md:text-base text-gray-500 dark:text-gray-400">No coupons available</p>
+                    <p className="text-sm md:text-base text-gray-500 dark:text-gray-400">{t("user.cart.ui.noCouponsAvailable")}</p>
                   </div>}
 
                 {/* Coupons List */}
@@ -1372,7 +1374,7 @@ export default function Cart() {
                           <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400">{coupon.description}</p>
                         </div>
                         <Button size="sm" variant="outline" className="h-6 md:h-7 text-xs md:text-sm border-[#FF5200] dark:border-[#FF5200] text-[#FF5200] dark:text-[#FF5200] hover:bg-[#FF5200]/10 dark:hover:bg-[#FF5200]/20" onClick={() => handleApplyCoupon(coupon)} disabled={subtotal < coupon.minOrder}>
-                          {subtotal < coupon.minOrder ? `Min ₹${coupon.minOrder}` : 'APPLY'}
+                          {subtotal < coupon.minOrder ? t("user.cart.ui.minAmount", { amount: coupon.minOrder }) : t("user.cart.ui.apply")}
                         </Button>
                       </div>)}
                   </div>}
@@ -1384,12 +1386,12 @@ export default function Cart() {
                   <Clock className="h-4 w-4 md:h-5 md:w-5 text-gray-500 dark:text-gray-400" />
                   <div className="flex-1">
                     <p className="text-sm md:text-base text-gray-800 dark:text-gray-200">
-                      Delivery in{" "}
+                      {t("user.cart.ui.deliveryIn")}{" "}
                       <span className="font-semibold">
                         <DynamicEtaText
                           restaurantId={restaurantId}
                           items={etaItems}
-                          fallback={restaurantData?.estimatedDeliveryTime || "10-15 mins"}
+                          fallback={restaurantData?.estimatedDeliveryTime || t("user.cart.ui.defaultEtaShort")}
                         />
                       </span>
                     </p>
@@ -1402,7 +1404,7 @@ export default function Cart() {
                 <button onClick={() => setShowFleetOptions(!showFleetOptions)} className="flex items-center justify-between w-full">
                   <div className="flex items-center gap-3 md:gap-4">
                     <Truck className="h-4 w-4 md:h-5 md:w-5 text-gray-500 dark:text-gray-400" />
-                    <span className="text-sm md:text-base text-gray-800 dark:text-gray-200">Choose delivery fleet type</span>
+                    <span className="text-sm md:text-base text-gray-800 dark:text-gray-200">{t("user.cart.ui.chooseDeliveryFleetType")}</span>
                   </div>
                   {showFleetOptions ? <ChevronUp className="h-4 w-4 md:h-5 md:w-5 text-gray-400" /> : <ChevronDown className="h-4 w-4 md:h-5 md:w-5 text-gray-400" />}
                 </button>
@@ -1410,21 +1412,21 @@ export default function Cart() {
                 {showFleetOptions && <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 mt-3 md:mt-4">
                     <button onClick={() => setDeliveryFleet("standard")} className={`p-3 md:p-4 rounded-lg md:rounded-xl border-2 text-left transition-colors ${deliveryFleet === "standard" ? "border-[#FF5200] dark:border-[#FF5200] bg-[#FF5200]/10 dark:bg-[#FF5200]/20" : "border-gray-200 dark:border-gray-700"}`}>
                       <div className="flex items-center justify-between mb-1 md:mb-2">
-                        <span className="text-sm md:text-base font-semibold text-gray-800 dark:text-gray-200">Standard Fleet</span>
+                        <span className="text-sm md:text-base font-semibold text-gray-800 dark:text-gray-200">{t("user.cart.ui.standardFleet")}</span>
                         <div className="w-8 h-8 md:w-10 md:h-10 bg-orange-100 dark:bg-orange-900/20 rounded-full flex items-center justify-center">
                           <Truck className="h-4 w-4 md:h-5 md:w-5 text-orange-600 dark:text-orange-400" />
                         </div>
                       </div>
-                      <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400">Our standard food delivery experience</p>
+                      <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400">{t("user.cart.ui.standardFleetDescription")}</p>
                     </button>
                     <button onClick={() => setDeliveryFleet("veg")} className={`p-3 md:p-4 rounded-lg md:rounded-xl border-2 text-left transition-colors ${deliveryFleet === "veg" ? "border-[#FF5200] dark:border-[#FF5200] bg-[#FF5200]/10 dark:bg-[#FF5200]/20" : "border-gray-200 dark:border-gray-700"}`}>
                       <div className="flex items-center justify-between mb-1 md:mb-2">
-                        <span className="text-sm md:text-base font-semibold text-gray-800 dark:text-gray-200">Special Veg-only Fleet</span>
+                        <span className="text-sm md:text-base font-semibold text-gray-800 dark:text-gray-200">{t("user.cart.ui.specialVegOnlyFleet")}</span>
                         <div className="w-8 h-8 md:w-10 md:h-10 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center">
                           <Leaf className="h-4 w-4 md:h-5 md:w-5 text-green-600 dark:text-green-400" />
                         </div>
                       </div>
-                      <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400">Fleet delivering only from Pure Veg restaurants</p>
+                      <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400">{t("user.cart.ui.specialVegOnlyFleetDescription")}</p>
                     </button>
                   </div>}
               </div>
@@ -1435,10 +1437,10 @@ export default function Cart() {
                     <MapPin className="h-4 w-4 md:h-5 md:w-5 text-gray-500 dark:text-gray-400" />
                     <div className="flex-1">
                       <p className="text-sm md:text-base text-gray-800 dark:text-gray-200">
-                        Delivery at <span className="font-semibold">Location</span>
+                        {t("user.cart.ui.deliveryAt")} <span className="font-semibold">{t("user.cart.ui.location")}</span>
                       </p>
                       <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400 line-clamp-2">
-                        {defaultAddress ? formatFullAddress(defaultAddress) || defaultAddress?.formattedAddress || defaultAddress?.address || "Add delivery address" : "Add delivery address"}
+                        {defaultAddress ? formatFullAddress(defaultAddress) || defaultAddress?.formattedAddress || defaultAddress?.address || t("user.cart.ui.addDeliveryAddress") : t("user.cart.ui.addDeliveryAddress")}
                       </p>
                       {/* Address Selection Buttons */}
                       <div className="flex gap-2 mt-2">
@@ -1449,7 +1451,7 @@ export default function Cart() {
                           e.stopPropagation();
                           handleSelectAddressByLabel(label);
                         }} className={`text-xs md:text-sm px-2 md:px-3 py-1 md:py-1.5 rounded-md border transition-colors ${isSelected ? 'border-[#FF5200] bg-orange-50 dark:bg-orange-900/20 text-[#FF5200] font-medium' : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600'}`}>
-                              {label}
+                              {t(`user.cart.addressLabel.${label.toLowerCase()}`)}
                             </button>;
                       })}
                       </div>
@@ -1465,7 +1467,7 @@ export default function Cart() {
                   <div className="flex items-center gap-3 md:gap-4">
                     <Phone className="h-4 w-4 md:h-5 md:w-5 text-gray-500 dark:text-gray-400" />
                     <p className="text-sm md:text-base text-gray-800 dark:text-gray-200">
-                      {userProfile?.name || "Your Name"}, <span className="font-medium">{userProfile?.phone || "+91-XXXXXXXXXX"}</span>
+                      {userProfile?.name || t("user.cart.ui.yourName")}, <span className="font-medium">{userProfile?.phone || "+91-XXXXXXXXXX"}</span>
                     </p>
                   </div>
                   <ChevronRight className="h-4 w-4 md:h-5 md:w-5 text-gray-400" />
@@ -1479,12 +1481,12 @@ export default function Cart() {
                     <FileText className="h-4 w-4 md:h-5 md:w-5 text-gray-500 dark:text-gray-400" />
                     <div className="text-left">
                       <div className="flex items-center gap-2 md:gap-3 flex-wrap">
-                        <span className="text-sm md:text-base text-gray-800 dark:text-gray-200">Total Bill</span>
+                        <span className="text-sm md:text-base text-gray-800 dark:text-gray-200">{t("user.cart.ui.totalBill")}</span>
                         <span className="text-sm md:text-base text-gray-400 dark:text-gray-500 line-through">₹{totalBeforeDiscount.toFixed(0)}</span>
                         <span className="text-sm md:text-base font-semibold text-gray-800 dark:text-gray-200">₹{total.toFixed(0)}</span>
-                        {savings > 0 && <span className="text-xs md:text-sm bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 px-1.5 md:px-2 py-0.5 rounded font-medium">You saved ₹{savings}</span>}
+                        {savings > 0 && <span className="text-xs md:text-sm bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 px-1.5 md:px-2 py-0.5 rounded font-medium">{t("user.cart.ui.youSavedAmount", { amount: savings })}</span>}
                       </div>
-                      <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400">Incl. taxes and charges</p>
+                      <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400">{t("user.cart.ui.includingTaxesAndCharges")}</p>
                     </div>
                   </div>
                   <ChevronRight className="h-4 w-4 md:h-5 md:w-5 text-gray-400" />
@@ -1492,13 +1494,13 @@ export default function Cart() {
 
                 {showBillDetails && <div className="mt-3 md:mt-4 pt-3 md:pt-4 border-t border-dashed dark:border-gray-700 space-y-2 md:space-y-3">
                     <div className="flex justify-between text-sm md:text-base">
-                      <span className="text-gray-600 dark:text-gray-400">Item Total</span>
+                      <span className="text-gray-600 dark:text-gray-400">{t("user.cart.ui.itemTotal")}</span>
                       <span className="text-gray-800 dark:text-gray-200">₹{subtotal.toFixed(0)}</span>
                     </div>
                     <div className="flex justify-between text-sm md:text-base">
-                      <span className="text-gray-600 dark:text-gray-400">Delivery Fee</span>
+                      <span className="text-gray-600 dark:text-gray-400">{t("user.cart.ui.deliveryFee")}</span>
                       <span className={deliveryFee === 0 ? "text-red-600 dark:text-red-400" : "text-gray-800 dark:text-gray-200"}>
-                        {deliveryFee === null ? "…" : deliveryFee === 0 ? "FREE" : `₹${deliveryFee}`}
+                        {deliveryFee === null ? "…" : deliveryFee === 0 ? t("user.cart.ui.free") : `₹${deliveryFee}`}
                       </span>
                     </div>
                     {deliveryPricingMisconfigured && (
@@ -1507,19 +1509,19 @@ export default function Cart() {
                       </p>
                     )}
                     <div className="flex justify-between text-sm md:text-base">
-                      <span className="text-gray-600 dark:text-gray-400">Platform Fee</span>
+                      <span className="text-gray-600 dark:text-gray-400">{t("user.cart.ui.platformFee")}</span>
                       <span className="text-gray-800 dark:text-gray-200">₹{platformFee}</span>
                     </div>
                     <div className="flex justify-between text-sm md:text-base">
-                      <span className="text-gray-600 dark:text-gray-400">GST and Restaurant Charges</span>
+                      <span className="text-gray-600 dark:text-gray-400">{t("user.cart.ui.gstAndRestaurantCharges")}</span>
                       <span className="text-gray-800 dark:text-gray-200">₹{gstCharges}</span>
                     </div>
                     {discount > 0 && <div className="flex justify-between text-sm md:text-base text-red-600 dark:text-red-400">
-                        <span>Coupon Discount</span>
+                        <span>{t("user.cart.ui.couponDiscount")}</span>
                         <span>-₹{discount}</span>
                       </div>}
                     <div className="flex justify-between text-sm md:text-base font-semibold pt-2 md:pt-3 border-t dark:border-gray-700">
-                      <span>To Pay</span>
+                      <span>{t("user.cart.ui.toPay")}</span>
                       <span>₹{total.toFixed(0)}</span>
                     </div>
                   </div>}
@@ -1532,16 +1534,16 @@ export default function Cart() {
               <div className="lg:sticky lg:top-24 space-y-4 md:space-y-6">
                 {/* Bill Summary Card */}
                 <div className="bg-white dark:bg-[#1a1a1a] px-4 md:px-6 py-4 md:py-5 rounded-lg md:rounded-xl border border-gray-200 dark:border-gray-700">
-                  <h3 className="text-base md:text-lg font-semibold text-gray-800 dark:text-gray-200 mb-3 md:mb-4">Order Summary</h3>
+                  <h3 className="text-base md:text-lg font-semibold text-gray-800 dark:text-gray-200 mb-3 md:mb-4">{t("user.cart.ui.orderSummary")}</h3>
                   <div className="space-y-2 md:space-y-3">
                     <div className="flex justify-between text-sm md:text-base">
-                      <span className="text-gray-600 dark:text-gray-400">Item Total</span>
+                      <span className="text-gray-600 dark:text-gray-400">{t("user.cart.ui.itemTotal")}</span>
                       <span className="text-gray-800 dark:text-gray-200">₹{subtotal.toFixed(0)}</span>
                     </div>
                     <div className="flex justify-between text-sm md:text-base">
-                      <span className="text-gray-600 dark:text-gray-400">Delivery Fee</span>
+                      <span className="text-gray-600 dark:text-gray-400">{t("user.cart.ui.deliveryFee")}</span>
                       <span className={deliveryFee === 0 ? "text-red-600 dark:text-red-400" : "text-gray-800 dark:text-gray-200"}>
-                        {deliveryFee === null ? "…" : deliveryFee === 0 ? "FREE" : `₹${deliveryFee}`}
+                        {deliveryFee === null ? "…" : deliveryFee === 0 ? t("user.cart.ui.free") : `₹${deliveryFee}`}
                       </span>
                     </div>
                     {deliveryPricingMisconfigured && (
@@ -1550,19 +1552,19 @@ export default function Cart() {
                       </p>
                     )}
                     <div className="flex justify-between text-sm md:text-base">
-                      <span className="text-gray-600 dark:text-gray-400">Platform Fee</span>
+                      <span className="text-gray-600 dark:text-gray-400">{t("user.cart.ui.platformFee")}</span>
                       <span className="text-gray-800 dark:text-gray-200">₹{platformFee}</span>
                     </div>
                     <div className="flex justify-between text-sm md:text-base">
-                      <span className="text-gray-600 dark:text-gray-400">GST</span>
+                      <span className="text-gray-600 dark:text-gray-400">{t("user.cart.ui.gst")}</span>
                       <span className="text-gray-800 dark:text-gray-200">₹{gstCharges}</span>
                     </div>
                     {discount > 0 && <div className="flex justify-between text-sm md:text-base text-red-600 dark:text-red-400">
-                        <span>Discount</span>
+                        <span>{t("user.cart.ui.discount")}</span>
                         <span>-₹{discount}</span>
                       </div>}
                     <div className="flex justify-between text-base md:text-lg font-bold pt-3 md:pt-4 border-t dark:border-gray-700">
-                      <span>Total</span>
+                      <span>{t("user.cart.ui.total")}</span>
                       <span className="text-green-600 dark:text-green-400">₹{total.toFixed(0)}</span>
                     </div>
                   </div>
@@ -1584,10 +1586,10 @@ export default function Cart() {
                   <CreditCard className="h-4 w-4 text-gray-600 dark:text-gray-300" />
                   <div className="leading-tight">
                     <p className="text-[11px] md:text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                      PAY USING
+                      {t("user.cart.ui.payUsing")}
                     </p>
                     <p className="text-sm md:text-base font-medium text-gray-800 dark:text-gray-200">
-                      {selectedPaymentMethod === "razorpay" ? "Razorpay" : selectedPaymentMethod === "wallet" ? "Wallet" : "Cash on Delivery"}
+                      {selectedPaymentMethod === "razorpay" ? t("user.cart.paymentOptions.razorpay.label") : selectedPaymentMethod === "wallet" ? t("user.cart.paymentOptions.wallet.label") : t("user.cart.paymentOptions.cash.label")}
                     </p>
                   </div>
                 </div>
@@ -1599,7 +1601,7 @@ export default function Cart() {
                         {selectedPaymentOption.label}
                       </p>
                       <p className="truncate text-[11px] text-gray-500 dark:text-gray-400">
-                        Tap to change
+                        {t("user.cart.ui.tapToChange")}
                       </p>
                     </div>
                     <ChevronDown className="h-4 w-4 shrink-0 text-gray-500 dark:text-gray-400" />
@@ -1610,10 +1612,10 @@ export default function Cart() {
               <Button size="lg" onClick={handlePlaceOrder} disabled={isPlacingOrder || selectedPaymentMethod === "wallet" && walletBalance < total} className="w-full bg-green-700 hover:bg-green-800 dark:bg-green-600 dark:hover:bg-green-700 text-white px-6 md:px-10 h-14 md:h-16 rounded-lg md:rounded-xl text-base md:text-lg font-bold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed">
                 {(selectedPaymentMethod === "razorpay" || selectedPaymentMethod === "wallet") && <div className="text-left mr-3 md:mr-4">
                     <p className="text-sm md:text-base opacity-90">₹{total.toFixed(0)}</p>
-                    <p className="text-xs md:text-sm opacity-75">TOTAL</p>
+                    <p className="text-xs md:text-sm opacity-75">{t("user.cart.ui.totalUpper")}</p>
                   </div>}
                 <span className="font-bold text-base md:text-lg">
-                  {isPlacingOrder ? "Processing..." : selectedPaymentMethod === "razorpay" ? "Select Payment" : selectedPaymentMethod === "wallet" ? walletBalance >= total ? "Place Order" : "Insufficient Balance" : "Place Order"}
+                  {isPlacingOrder ? t("user.cart.ui.processing") : selectedPaymentMethod === "razorpay" ? t("user.cart.ui.selectPayment") : selectedPaymentMethod === "wallet" ? walletBalance >= total ? t("user.cart.ui.placeOrder") : t("user.cart.ui.insufficientBalance") : t("user.cart.ui.placeOrder")}
                 </span>
                 <ChevronRight className="h-5 w-5 md:h-6 md:w-6 ml-2" />
               </Button>
@@ -1628,10 +1630,10 @@ export default function Cart() {
           <div className="mx-auto mt-3 h-1.5 w-12 rounded-full bg-gray-300 dark:bg-gray-700" />
           <div className="px-5 pb-5 pt-4">
             <DialogTitle className="text-base font-semibold text-gray-900 dark:text-white">
-              Choose Payment Method
+              {t("user.cart.ui.choosePaymentMethod")}
             </DialogTitle>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Pick the option that feels best for checkout on mobile.
+              {t("user.cart.ui.choosePaymentMethodDescription")}
             </p>
 
             <div className="mt-4 space-y-3">
@@ -1664,7 +1666,7 @@ export default function Cart() {
             </div>
 
             <button type="button" onClick={() => setShowPaymentSheet(false)} className="mt-4 w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-[#202020]">
-              Cancel
+              {t("common.cancel")}
             </button>
           </div>
         </DialogContent>
@@ -1681,7 +1683,7 @@ export default function Cart() {
       }}>
             <div className="px-6 py-8">
               {/* Title */}
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Placing your order</h2>
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">{t("user.cart.ui.placingYourOrder")}</h2>
 
               {/* Payment Info */}
               <div className="flex items-center gap-4 mb-5">
@@ -1690,7 +1692,7 @@ export default function Cart() {
                 </div>
                 <div>
                   <p className="text-lg font-semibold text-gray-900 dark:text-white">
-                    {selectedPaymentMethod === "razorpay" ? `Pay ₹${total.toFixed(2)} online (Razorpay)` : selectedPaymentMethod === "wallet" ? `Pay ₹${total.toFixed(2)} from Wallet` : `Pay on delivery (COD)`}
+                    {selectedPaymentMethod === "razorpay" ? t("user.cart.ui.payOnlineRazorpay", { amount: total.toFixed(2) }) : selectedPaymentMethod === "wallet" ? t("user.cart.ui.payFromWallet", { amount: total.toFixed(2) }) : t("user.cart.ui.payOnDeliveryCod")}
                   </p>
                 </div>
               </div>
@@ -1704,12 +1706,12 @@ export default function Cart() {
                   </svg>
                 </div>
                 <div>
-                  <p className="text-lg font-semibold text-gray-900 dark:text-white">Delivering to Location</p>
+                  <p className="text-lg font-semibold text-gray-900 dark:text-white">{t("user.cart.ui.deliveringToLocation")}</p>
                   <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
-                    {defaultAddress ? formatFullAddress(defaultAddress) || defaultAddress?.formattedAddress || defaultAddress?.address || "Address" : "Add address"}
+                    {defaultAddress ? formatFullAddress(defaultAddress) || defaultAddress?.formattedAddress || defaultAddress?.address || t("user.cart.ui.address") : t("user.cart.ui.addAddress")}
                   </p>
                   <p className="text-sm text-gray-500 dark:text-gray-400">
-                    {defaultAddress ? formatFullAddress(defaultAddress) || "Address" : "Address"}
+                    {defaultAddress ? formatFullAddress(defaultAddress) || t("user.cart.ui.address") : t("user.cart.ui.address")}
                   </p>
                 </div>
               </div>
@@ -1736,7 +1738,7 @@ export default function Cart() {
             setIsPlacingOrder(false);
           }} className="w-full text-right">
                 <span className="text-green-600 font-semibold text-base hover:text-green-700 transition-colors">
-                  CANCEL
+                  {t("common.cancel")}
                 </span>
               </button>
             </div>
@@ -1842,14 +1844,14 @@ export default function Cart() {
 
               {/* Order Placed Message (Merged) */}
               <div className="text-center mb-2">
-                <h2 className="text-3xl md:text-5xl font-black text-[#FF5200] mb-3 tracking-tight">Order Placed!</h2>
+                <h2 className="text-3xl md:text-5xl font-black text-[#FF5200] mb-3 tracking-tight">{t("user.cart.ui.orderPlaced")}</h2>
                 <div className="flex items-center justify-center gap-2 mb-6">
                   <MapPin className="w-5 h-5 text-red-500" />
                   <h3 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">
-                    {defaultAddress?.city || "Your Location"}
+                    {defaultAddress?.city || t("user.cart.ui.yourLocation")}
                   </h3>
                 </div>
-                <p className="text-base md:text-xl text-gray-600 dark:text-gray-300 font-medium mb-8 md:mb-10">Your delicious food is being prepared with care</p>
+                <p className="text-base md:text-xl text-gray-600 dark:text-gray-300 font-medium mb-8 md:mb-10">{t("user.cart.ui.orderPreparedWithCare")}</p>
               </div>
 
               {/* Order Details Preview Card */}
@@ -1867,9 +1869,9 @@ export default function Cart() {
                     <MapPin className="w-6 h-6 text-indigo-600 dark:text-indigo-300" />
                   </div>
                   <div className="text-left">
-                    <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest leading-none mb-1">Delivering to</p>
+                    <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest leading-none mb-1">{t("user.cart.ui.deliveringTo")}</p>
                     <p className="text-sm font-bold text-gray-800 dark:text-gray-100 truncate max-w-[120px] md:max-w-[160px]">
-                      {defaultAddress?.formattedAddress?.split(',')[0] || defaultAddress?.city || "Your Location"}
+                      {defaultAddress?.formattedAddress?.split(',')[0] || defaultAddress?.city || t("user.cart.ui.yourLocation")}
                     </p>
                   </div>
                 </div>
@@ -1877,14 +1879,14 @@ export default function Cart() {
                 <div className="h-10 w-[1px] bg-gray-200 dark:bg-gray-700 mx-2" />
 
                 <div className="text-right flex flex-col items-end">
-                  <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest leading-none mb-1">Estimated Time</p>
+                  <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest leading-none mb-1">{t("user.cart.ui.estimatedTime")}</p>
                   <div className="flex items-center gap-1.5 font-bold text-gray-800 dark:text-gray-100">
                     <Clock className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />
                     <span className="text-sm">
                       <DynamicEtaText
                         restaurantId={restaurantId}
                         items={etaItems}
-                        fallback={restaurantData?.estimatedDeliveryTime || "25-30 mins"}
+                        fallback={restaurantData?.estimatedDeliveryTime || t("user.cart.ui.defaultEtaLong")}
                       />
                     </span>
                   </div>
@@ -1905,7 +1907,7 @@ export default function Cart() {
           }} transition={{
             delay: 0.7
           }} onClick={handleGoToOrders} className="w-full h-16 md:h-20 bg-gray-900 text-white rounded-[1.5rem] md:rounded-[2rem] font-black text-lg md:text-xl shadow-[0_20px_40px_-10px_rgba(0,0,0,0.2)] hover:shadow-gray-300 transition-all flex items-center justify-center gap-3 group">
-                Track Your Order
+                {t("user.cart.ui.trackYourOrder")}
                 <ChevronRight className="w-6 h-6 group-hover:translate-x-1.5 transition-transform" />
               </motion.button>
 
@@ -2101,5 +2103,3 @@ export default function Cart() {
       `}</style>
     </div>;
 }
-
-

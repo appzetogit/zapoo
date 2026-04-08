@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { localizedTextSchema } from '../../../shared/i18n/localizedText.js';
 
 const cancellationPolicySchema = new mongoose.Schema(
   {
@@ -7,10 +8,18 @@ const cancellationPolicySchema = new mongoose.Schema(
       default: 'Cancellation Policy',
       trim: true
     },
+    localizedTitle: {
+      type: localizedTextSchema,
+      default: () => ({ en: 'Cancellation Policy', hi: '', bn: '' })
+    },
     content: {
       type: String,
       required: true,
       default: ''
+    },
+    localizedContent: {
+      type: localizedTextSchema,
+      default: () => ({ en: '', hi: '', bn: '' })
     },
     isActive: {
       type: Boolean,
@@ -31,4 +40,3 @@ const cancellationPolicySchema = new mongoose.Schema(
 cancellationPolicySchema.index({ isActive: 1 });
 
 export default mongoose.model('CancellationPolicy', cancellationPolicySchema);
-

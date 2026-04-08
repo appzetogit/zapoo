@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import Tier from './Tier.js';
 import * as turf from '@turf/turf';
+import { localizedTextSchema } from '../../../shared/i18n/localizedText.js';
 
 const coordinateSchema = new mongoose.Schema({
   latitude: {
@@ -20,6 +21,10 @@ const zoneSchema = new mongoose.Schema(
       required: true,
       trim: true
     },
+    localizedName: {
+      type: localizedTextSchema,
+      default: () => ({ en: '', hi: '', bn: '' })
+    },
     serviceLocation: {
       type: String,
       required: false,
@@ -35,6 +40,10 @@ const zoneSchema = new mongoose.Schema(
       type: String,
       required: false,
       trim: true
+    },
+    localizedZoneName: {
+      type: localizedTextSchema,
+      default: () => ({ en: '', hi: '', bn: '' })
     },
     restaurantId: {
       type: mongoose.Schema.Types.ObjectId,

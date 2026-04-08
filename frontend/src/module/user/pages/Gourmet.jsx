@@ -1,14 +1,15 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { heroBannerAPI } from "@/lib/api";
-import api from "@/lib/api";
-import { useLocation } from "../hooks/useLocation";
-import { useZone } from "../hooks/useZone";
-import { toast } from "sonner";
-import FeaturedStyleRestaurantCard from "../components/FeaturedStyleRestaurantCard";
 
+import FeaturedStyleRestaurantCard from "../components/FeaturedStyleRestaurantCard";
+import { useState, useEffect } from "react"
+import { Link, useNavigate } from "react-router-dom"
+import { ArrowLeft, Star, Clock, Bookmark, BadgePercent, Loader2 } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+import { heroBannerAPI } from "@/lib/api"
+import { useLocation } from "../hooks/useLocation"
+import { useZone } from "../hooks/useZone"
+import { toast } from "sonner"
+import { useTranslation } from "react-i18next"
 import gourmetBanner from "@/assets/groumetpagebanner.png";
 
 export default function Gourmet() {
@@ -119,8 +120,8 @@ export default function Gourmet() {
       <div className="px-4 sm:px-6 md:px-8 lg:px-10 py-6 md:py-8 lg:py-10 space-y-4 md:space-y-6">
         <div className="max-w-7xl mx-auto space-y-4 md:space-y-6">
           <div className="mb-2">
-            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">Premium Gourmet Restaurants</h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Exquisite dishes delivered to your doorstep</p>
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">{t("user.gourmet.title")}</h1>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{t("user.gourmet.subtitle")}</p>
           </div>
 
           <p className="text-xs sm:text-sm font-semibold text-gray-400 dark:text-gray-500 tracking-widest uppercase">
@@ -130,7 +131,7 @@ export default function Gourmet() {
           {loading && (
             <div className="flex flex-col items-center justify-center py-20">
               <Loader2 className="h-10 w-10 animate-spin text-gray-400" />
-              <p className="mt-4 text-gray-500 dark:text-gray-400">Loading Gourmet restaurants...</p>
+              <p className="mt-4 text-gray-500 dark:text-gray-400">{t("user.gourmet.loading")}</p>
             </div>
           )}
 
@@ -147,7 +148,7 @@ export default function Gourmet() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
               {gourmetRestaurants.length === 0 ? (
                 <div className="col-span-full text-center py-12">
-                  <p className="text-gray-500 dark:text-gray-400">No Gourmet restaurants available at the moment</p>
+                  <p className="text-gray-500 dark:text-gray-400">{t("user.gourmet.empty")}</p>
                 </div>
               ) : (
                 gourmetRestaurants.map((restaurant, index) => {

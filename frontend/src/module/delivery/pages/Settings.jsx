@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { motion } from "framer-motion"
 import { useNavigate } from "react-router-dom"
+import { useTranslation } from "react-i18next"
 import { 
   ArrowLeft,
   Bell,
@@ -11,6 +12,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Switch } from "@/components/ui/switch"
 
 export default function Settings() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [settings, setSettings] = useState({
     notifications: true,
@@ -28,22 +30,22 @@ export default function Settings() {
   const settingOptions = [
     {
       id: "notifications",
-      label: "Push Notifications",
-      description: "Receive notifications about new orders",
+      label: t("delivery.settingsPage.options.notifications.label"),
+      description: t("delivery.settingsPage.options.notifications.description"),
       icon: Bell,
       value: settings.notifications
     },
     {
       id: "locationServices",
-      label: "Location Services",
-      description: "Allow app to access your location",
+      label: t("delivery.settingsPage.options.locationServices.label"),
+      description: t("delivery.settingsPage.options.locationServices.description"),
       icon: Globe,
       value: settings.locationServices
     },
     {
       id: "biometricAuth",
-      label: "Biometric Authentication",
-      description: "Use fingerprint or face ID to login",
+      label: t("delivery.settingsPage.options.biometricAuth.label"),
+      description: t("delivery.settingsPage.options.biometricAuth.description"),
       icon: Shield,
       value: settings.biometricAuth
     }
@@ -56,10 +58,11 @@ export default function Settings() {
         <button 
           onClick={() => navigate("/delivery/profile")}
           className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+          aria-label={t("delivery.settingsPage.aria.goBack")}
         >
           <ArrowLeft className="w-5 h-5 text-gray-600" />
         </button>
-        <h1 className="text-lg md:text-xl font-bold text-gray-900">Settings</h1>
+        <h1 className="text-lg md:text-xl font-bold text-gray-900">{t("delivery.settingsPage.title")}</h1>
       </div>
 
       {/* Main Content */}

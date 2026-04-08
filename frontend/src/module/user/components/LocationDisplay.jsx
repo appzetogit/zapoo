@@ -1,4 +1,5 @@
 import { MapPin, Loader2, AlertCircle } from "lucide-react"
+import { useTranslation } from "react-i18next"
 import { Button } from "@/components/ui/button"
 import { useLocationSimple } from "../hooks/useLocationSimple"
 
@@ -23,6 +24,7 @@ export default function LocationDisplay({
   showIcon = true,
   onLocationClick 
 }) {
+  const { t } = useTranslation()
   const { location, loading, error, permissionGranted, requestLocation } = useLocationSimple()
 
   // Determine what to display
@@ -30,7 +32,7 @@ export default function LocationDisplay({
     ? location.area  // Primary: Show area name (e.g., "New Palasia")
     : location?.city 
     ? location.city  // Fallback: Show city if area not available
-    : "Select location"  // Default: Show placeholder
+    : t("user.locationDisplay.selectLocation")  // Default: Show placeholder
 
   // Handle click
   const handleClick = async () => {
@@ -55,7 +57,7 @@ export default function LocationDisplay({
         disabled
       >
         <Loader2 className="h-4 w-4 animate-spin" />
-        <span className="text-sm font-medium">Getting location...</span>
+        <span className="text-sm font-medium">{t("user.locationDisplay.gettingLocation")}</span>
       </Button>
     )
   }
@@ -69,7 +71,7 @@ export default function LocationDisplay({
         onClick={handleClick}
       >
         <AlertCircle className="h-4 w-4" />
-        <span className="text-sm font-medium">Location unavailable</span>
+        <span className="text-sm font-medium">{t("user.locationDisplay.locationUnavailable")}</span>
       </Button>
     )
   }
@@ -83,7 +85,7 @@ export default function LocationDisplay({
     >
       {showIcon && <MapPin className="h-4 w-4 text-red-500" fill="currentColor" />}
       <div className="flex flex-col items-start">
-        <span className="text-xs text-gray-500">Delivering to</span>
+        <span className="text-xs text-gray-500">{t("user.locationDisplay.deliveringTo")}</span>
         <span className="text-sm font-semibold text-gray-900">{displayText}</span>
       </div>
     </Button>
@@ -101,14 +103,15 @@ export default function LocationDisplay({
  * ```
  */
 export function CompactLocationDisplay({ className = "" }) {
+  const { t } = useTranslation()
   const { location, loading, error, requestLocation } = useLocationSimple()
 
-  const displayText = location?.area || location?.city || "Select"
+  const displayText = location?.area || location?.city || t("user.locationDisplay.select")
 
   if (loading && !location) {
     return (
       <span className={`text-sm font-medium ${className}`}>
-        Loading...
+        {t("user.locationDisplay.loading")}
       </span>
     )
   }
@@ -135,13 +138,14 @@ export function CompactLocationDisplay({ className = "" }) {
  * ```
  */
 export function FullLocationDisplay({ className = "" }) {
+  const { t } = useTranslation()
   const { location, loading, error, requestLocation } = useLocationSimple()
 
   if (loading && !location) {
     return (
       <div className={`flex items-center gap-2 ${className}`}>
         <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
-        <span className="text-gray-500">Getting location...</span>
+        <span className="text-gray-500">{t("user.locationDisplay.gettingLocation")}</span>
       </div>
     )
   }
@@ -150,7 +154,7 @@ export function FullLocationDisplay({ className = "" }) {
     return (
       <div className={`flex items-center gap-2 text-red-500 ${className}`}>
         <AlertCircle className="h-5 w-5" />
-        <span>Location unavailable: {error}</span>
+        <span>{t("user.locationDisplay.locationUnavailableWithError", { error })}</span>
       </div>
     )
   }
@@ -159,7 +163,7 @@ export function FullLocationDisplay({ className = "" }) {
     return (
       <Button variant="outline" onClick={requestLocation} className={className}>
         <MapPin className="h-4 w-4 mr-2" />
-        Select Location
+        {t("user.locationDisplay.selectLocation")}
       </Button>
     )
   }
@@ -169,9 +173,9 @@ export function FullLocationDisplay({ className = "" }) {
       <div className="flex items-center gap-2">
         <MapPin className="h-5 w-5 text-red-500" fill="currentColor" />
         <div className="flex flex-col">
-          <span className="text-xs text-gray-500">Delivering to</span>
+          <span className="text-xs text-gray-500">{t("user.locationDisplay.deliveringTo")}</span>
           <span className="text-lg font-bold text-gray-900">
-            {location.area || location.city || "Current Location"}
+            {location.area || location.city || t("user.locationDisplay.currentLocation")}
           </span>
         </div>
       </div>
@@ -183,4 +187,3 @@ export function FullLocationDisplay({ className = "" }) {
     </div>
   )
 }
-

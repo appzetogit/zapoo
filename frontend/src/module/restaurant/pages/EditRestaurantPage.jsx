@@ -15,9 +15,11 @@ import {
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { getRestaurantData, updateRestaurantData } from "../utils/restaurantManagement"
+import { useTranslation } from "react-i18next"
 
 export default function EditRestaurantPage() {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const [activeLanguage, setActiveLanguage] = useState("english")
 
   // Lenis smooth scrolling
@@ -92,10 +94,10 @@ export default function EditRestaurantPage() {
   }, [])
 
   const languages = [
-    { id: "english", label: "English" },
-    { id: "bengali", label: "Bengali - বাংলা" },
-    { id: "arabic", label: "Arabic - العربية" },
-    { id: "spanish", label: "Spanish" }
+    { id: "english", label: t("restaurant.editRestaurant.languages.english") },
+    { id: "bengali", label: t("restaurant.editRestaurant.languages.bengali") },
+    { id: "arabic", label: t("restaurant.editRestaurant.languages.arabic") },
+    { id: "spanish", label: t("restaurant.editRestaurant.languages.spanish") }
   ]
 
   const handleInputChange = (field, value) => {
@@ -133,7 +135,7 @@ export default function EditRestaurantPage() {
 
     // Validate required fields
     if (!formData.restaurantName.english || !formData.address || !formData.phoneNumber) {
-      alert("Please fill in all required fields (Restaurant Name, Address, Phone Number)")
+      alert(t("restaurant.editRestaurant.alerts.requiredFields"))
       return
     }
 
@@ -144,7 +146,7 @@ export default function EditRestaurantPage() {
       navigate("/restaurant")
     } catch (error) {
       console.error("Error saving restaurant data:", error)
-      alert("Error saving restaurant data. Please try again.")
+      alert(t("restaurant.editRestaurant.alerts.saveFailed"))
     }
   }
 
@@ -156,10 +158,12 @@ export default function EditRestaurantPage() {
           <button
             onClick={() => navigate("/restaurant")}
             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            type="button"
+            aria-label={t("restaurant.editRestaurant.aria.back")}
           >
             <ArrowLeft className="w-5 h-5 text-gray-600" />
           </button>
-          <h1 className="text-lg md:text-xl font-bold text-gray-900">Edit Restaurant</h1>
+          <h1 className="text-lg md:text-xl font-bold text-gray-900">{t("restaurant.editRestaurant.title")}</h1>
         </div>
       </div>
 
@@ -169,7 +173,7 @@ export default function EditRestaurantPage() {
           {/* Restaurant Name */}
           <Card className="bg-white shadow-sm border-0">
             <CardContent className="p-4 md:p-6">
-              <h2 className="text-base md:text-lg font-semibold text-gray-900 mb-4">Restaurant Name</h2>
+              <h2 className="text-base md:text-lg font-semibold text-gray-900 mb-4">{t("restaurant.editRestaurant.fields.restaurantName")}</h2>
 
               {/* Language Tabs */}
               <div className="flex gap-2 mb-4 overflow-x-auto scrollbar-hide">
@@ -191,14 +195,14 @@ export default function EditRestaurantPage() {
               {/* Name Input */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Restaurant Name ({languages.find(l => l.id === activeLanguage)?.label.split(" - ")[0]})
+                  {t("restaurant.editRestaurant.fields.restaurantNameWithLang", { language: languages.find(l => l.id === activeLanguage)?.label.split(" - ")[0] })}
                 </label>
                 <input
                   type="text"
                   value={formData.restaurantName[activeLanguage]}
                   onChange={(e) => handleInputChange("restaurantName", e.target.value)}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none"
-                  placeholder="Enter restaurant name"
+                  placeholder={t("restaurant.editRestaurant.placeholders.restaurantName")}
                 />
               </div>
             </CardContent>
@@ -207,12 +211,12 @@ export default function EditRestaurantPage() {
           {/* Contact */}
           <Card className="bg-white shadow-sm border-0">
             <CardContent className="p-4 md:p-6">
-              <h2 className="text-base md:text-lg font-semibold text-gray-900 mb-4">Contact</h2>
+              <h2 className="text-base md:text-lg font-semibold text-gray-900 mb-4">{t("restaurant.editRestaurant.fields.contact")}</h2>
 
               {/* Phone Number */}
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Phone Number <span className="text-red-500">*</span>
+                  {t("restaurant.editRestaurant.fields.phoneNumber")} <span className="text-red-500">*</span>
                 </label>
                 <div className="flex items-center gap-2">
                   <div className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-l-lg bg-gray-50">
@@ -224,7 +228,7 @@ export default function EditRestaurantPage() {
                     value={formData.phoneNumber}
                     onChange={(e) => handleInputChange("phoneNumber", e.target.value)}
                     className="flex-1 px-4 py-2 border border-gray-300 rounded-r-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none"
-                    placeholder="01747410000"
+                    placeholder={t("restaurant.editRestaurant.placeholders.phoneNumber")}
                   />
                 </div>
               </div>
@@ -232,14 +236,14 @@ export default function EditRestaurantPage() {
               {/* Address */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Address
+                  {t("restaurant.editRestaurant.fields.address")}
                 </label>
                 <input
                   type="text"
                   value={formData.address}
                   onChange={(e) => handleInputChange("address", e.target.value)}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none"
-                  placeholder="Enter address"
+                  placeholder={t("restaurant.editRestaurant.placeholders.address")}
                 />
               </div>
             </CardContent>
@@ -249,17 +253,17 @@ export default function EditRestaurantPage() {
           <Card className="bg-white shadow-sm border-0">
             <CardContent className="p-4 md:p-6">
               <h2 className="text-base md:text-lg font-semibold text-gray-900 mb-2">
-                Restaurant Logo<span className="text-red-500">*</span>
+                {t("restaurant.editRestaurant.fields.restaurantLogo")}<span className="text-red-500">*</span>
               </h2>
               <p className="text-xs md:text-sm text-gray-500 mb-4">
-                JPG, JPEG, PNG Less Than 1MB (Ratio 1:1)
+                {t("restaurant.editRestaurant.hints.logo")}
               </p>
               <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 md:p-8 flex flex-col items-center justify-center min-h-[150px]">
                 {formData.logo ? (
                   <div className="relative w-32 h-32 rounded-lg overflow-hidden">
                     <img
                       src={formData.logo}
-                      alt="Restaurant Logo"
+                      alt={t("restaurant.editRestaurant.fields.restaurantLogo")}
                       className="w-full h-full object-cover"
                     />
                     <button
@@ -282,7 +286,7 @@ export default function EditRestaurantPage() {
                         onChange={(e) => handleImageUpload("logo", e.target.files[0])}
                         className="hidden"
                       />
-                      <span className="text-sm text-gray-600 underline">Upload Logo</span>
+                      <span className="text-sm text-gray-600 underline">{t("restaurant.editRestaurant.actions.uploadLogo")}</span>
                     </label>
                   </>
                 )}
@@ -294,17 +298,17 @@ export default function EditRestaurantPage() {
           <Card className="bg-white shadow-sm border-0">
             <CardContent className="p-4 md:p-6">
               <h2 className="text-base md:text-lg font-semibold text-gray-900 mb-2">
-                Restaurant Cover<span className="text-red-500">*</span>
+                {t("restaurant.editRestaurant.fields.restaurantCover")}<span className="text-red-500">*</span>
               </h2>
               <p className="text-xs md:text-sm text-gray-500 mb-4">
-                JPG, JPEG, PNG Less Than 1MB (Ratio 2:1)
+                {t("restaurant.editRestaurant.hints.cover")}
               </p>
               <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 md:p-8 flex flex-col items-center justify-center min-h-[200px]">
                 {formData.cover ? (
                   <div className="relative w-full rounded-lg overflow-hidden">
                     <img
                       src={formData.cover}
-                      alt="Restaurant Cover"
+                      alt={t("restaurant.editRestaurant.fields.restaurantCover")}
                       className="w-full h-auto object-cover"
                     />
                     <button
@@ -325,7 +329,7 @@ export default function EditRestaurantPage() {
                         onChange={(e) => handleImageUpload("cover", e.target.files[0])}
                         className="hidden"
                       />
-                      <span className="text-sm text-gray-600 underline">Upload Cover</span>
+                      <span className="text-sm text-gray-600 underline">{t("restaurant.editRestaurant.actions.uploadCover")}</span>
                     </label>
                   </>
                 )}
@@ -336,33 +340,33 @@ export default function EditRestaurantPage() {
           {/* Meta Data */}
           <Card className="bg-white shadow-sm border-0">
             <CardContent className="p-4 md:p-6">
-              <h2 className="text-base md:text-lg font-semibold text-gray-900 mb-4">Meta Data</h2>
+              <h2 className="text-base md:text-lg font-semibold text-gray-900 mb-4">{t("restaurant.editRestaurant.fields.metaData")}</h2>
 
               {/* Title */}
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Title
+                  {t("restaurant.editRestaurant.fields.title")}
                 </label>
                 <input
                   type="text"
                   value={formData.metaTitle}
                   onChange={(e) => handleInputChange("metaTitle", e.target.value)}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none"
-                  placeholder="Enter meta title"
+                  placeholder={t("restaurant.editRestaurant.placeholders.metaTitle")}
                 />
               </div>
 
               {/* Description */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Description
+                  {t("restaurant.editRestaurant.fields.description")}
                 </label>
                 <textarea
                   value={formData.metaDescription}
                   onChange={(e) => handleInputChange("metaDescription", e.target.value)}
                   rows={4}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none resize-none"
-                  placeholder="Enter meta description"
+                  placeholder={t("restaurant.editRestaurant.placeholders.metaDescription")}
                 />
               </div>
             </CardContent>
@@ -371,13 +375,13 @@ export default function EditRestaurantPage() {
           {/* Meta Image */}
           <Card className="bg-white shadow-sm border-0">
             <CardContent className="p-4 md:p-6">
-              <h2 className="text-base md:text-lg font-semibold text-gray-900 mb-4">Meta Image</h2>
+              <h2 className="text-base md:text-lg font-semibold text-gray-900 mb-4">{t("restaurant.editRestaurant.fields.metaImage")}</h2>
               <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 md:p-8 flex flex-col items-center justify-center min-h-[150px]">
                 {formData.metaImage ? (
                   <div className="relative w-full rounded-lg overflow-hidden">
                     <img
                       src={formData.metaImage}
-                      alt="Meta Image"
+                      alt={t("restaurant.editRestaurant.fields.metaImage")}
                       className="w-full h-auto object-cover"
                     />
                     <button
@@ -398,7 +402,7 @@ export default function EditRestaurantPage() {
                         onChange={(e) => handleImageUpload("metaImage", e.target.files[0])}
                         className="hidden"
                       />
-                      <span className="text-sm text-gray-600 underline">Upload Meta Image</span>
+                      <span className="text-sm text-gray-600 underline">{t("restaurant.editRestaurant.actions.uploadMetaImage")}</span>
                     </label>
                   </>
                 )}
@@ -412,7 +416,7 @@ export default function EditRestaurantPage() {
               type="submit"
               className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg text-base md:text-lg"
             >
-              Update
+              {t("restaurant.editRestaurant.actions.update")}
             </Button>
           </div>
         </form>
@@ -422,4 +426,3 @@ export default function EditRestaurantPage() {
     </div>
   )
 }
-

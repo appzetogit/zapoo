@@ -2,6 +2,7 @@ import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { motion, AnimatePresence } from "framer-motion"
 import Lenis from "lenis"
+import { useTranslation } from "react-i18next"
 import {
   ArrowLeft,
   Edit,
@@ -16,6 +17,7 @@ import OptimizedImage from "@/components/OptimizedImage"
 import { ImageIcon } from "lucide-react"
 
 export default function ContactDetails() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [invitedUsers, setInvitedUsers] = useState([])
   
@@ -175,7 +177,7 @@ export default function ContactDetails() {
 
   // Delete user
   const handleDeleteInvite = async (userId) => {
-    if (window.confirm("Are you sure you want to remove this user?")) {
+    if (window.confirm(t("restaurant.contactDetails.confirm.removeUser"))) {
       try {
         const response = await restaurantAPI.deleteStaff(userId)
         
@@ -185,11 +187,14 @@ export default function ContactDetails() {
           // Dispatch event to notify other components
           window.dispatchEvent(new Event("invitesUpdated"))
         } else {
-          throw new Error("Failed to delete user")
+          throw new Error(t("restaurant.contactDetails.errors.deleteFailed"))
         }
       } catch (error) {
         console.error("Error deleting user:", error)
-        const errorMessage = error.response?.data?.message || error.message || "Failed to remove user. Please try again."
+        const errorMessage =
+          error.response?.data?.message ||
+          error.message ||
+          t("restaurant.contactDetails.errors.removeFailed")
         alert(errorMessage)
       }
     }
@@ -204,11 +209,11 @@ export default function ContactDetails() {
           <button
             onClick={() => navigate("/restaurant")}
             className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
-            aria-label="Go back"
+            aria-label={t("restaurant.contactDetails.aria.goBack")}
           >
             <ArrowLeft className="w-6 h-6 text-gray-900" />
           </button>
-          <h1 className="text-lg font-bold text-gray-900">Contact details</h1>
+          <h1 className="text-lg font-bold text-gray-900">{t("restaurant.contactDetails.title")}</h1>
         </div>
       </div>
 
@@ -216,13 +221,13 @@ export default function ContactDetails() {
       <div className=" bg-gray-100 space-y-6">
         {/* Owner Section */}
         <div>
-          <h2 className="px-4 text-base font-bold text-gray-900 my-3">Owner</h2>
+          <h2 className="px-4 text-base font-bold text-gray-900 my-3">{t("restaurant.contactDetails.sections.owner")}</h2>
           <div className="bg-white rounded-0 p-4 flex items-center gap-4">
             <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center shrink-0 overflow-hidden">
               {ownerData.photo ? (
                 <OptimizedImage
                   src={ownerData.photo}
-                  alt="Owner profile"
+                  alt={t("restaurant.contactDetails.aria.ownerProfile")}
                   className="w-full h-full object-cover"
                 />
               ) : (
@@ -231,19 +236,19 @@ export default function ContactDetails() {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-base font-bold text-gray-900 mb-1">
-                {loading ? "Loading..." : (ownerData.name || "N/A")}
+                {loading ? t("restaurant.contactDetails.common.loading") : (ownerData.name || t("restaurant.contactDetails.common.na"))}
               </p>
               <p className="text-sm text-gray-900 font-normal">
-                {loading ? "Loading..." : (ownerData.phone || "N/A")}
+                {loading ? t("restaurant.contactDetails.common.loading") : (ownerData.phone || t("restaurant.contactDetails.common.na"))}
               </p>
               <p className="text-sm text-gray-900 font-normal">
-                {loading ? "Loading..." : (ownerData.email || "N/A")}
+                {loading ? t("restaurant.contactDetails.common.loading") : (ownerData.email || t("restaurant.contactDetails.common.na"))}
               </p>
             </div>
             <button
               onClick={handleEditOwner}
               className="p-2 hover:bg-gray-100 rounded-lg transition-colors shrink-0"
-              aria-label="Edit owner"
+              aria-label={t("restaurant.contactDetails.aria.editOwner")}
             >
               <Edit className="w-5 h-5 text-blue-600" />
             </button>
@@ -253,13 +258,13 @@ export default function ContactDetails() {
         {/* Relationship Manager Section */}
         {rmData && (
           <div>
-            <h2 className="px-4 text-base font-bold text-gray-900 mb-3">Zapoo Relationship Manager</h2>
+            <h2 className="px-4 text-base font-bold text-gray-900 mb-3">{t("restaurant.contactDetails.sections.relationshipManager")}</h2>
             <div className="bg-white rounded-0 p-4 flex items-center gap-4">
               <div className="w-12 h-12 bg-blue-100 border border-blue-300 rounded-full flex items-center justify-center shrink-0 overflow-hidden">
                 {rmData.profileImage?.url ? (
                   <OptimizedImage
                     src={rmData.profileImage.url}
-                    alt="RM profile"
+                    alt={t("restaurant.contactDetails.aria.rmProfile")}
                     className="w-full h-full object-cover"
                   />
                 ) : (
@@ -268,22 +273,22 @@ export default function ContactDetails() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-base font-bold text-gray-900 mb-1">
-                  {rmData.name || "N/A"}
+                  {rmData.name || t("restaurant.contactDetails.common.na")}
                 </p>
                 <a 
                   href={`tel:${rmData.phone}`}
                   className="text-sm text-blue-600 font-normal hover:underline block"
                 >
-                  {rmData.phone || "N/A"}
+                  {rmData.phone || t("restaurant.contactDetails.common.na")}
                 </a>
                 <p className="text-sm text-gray-900 font-normal">
-                  {rmData.email || "N/A"}
+                  {rmData.email || t("restaurant.contactDetails.common.na")}
                 </p>
               </div>
               <a
                 href={`tel:${rmData.phone}`}
                 className="p-2 hover:bg-gray-100 rounded-lg transition-colors shrink-0"
-                aria-label="Call Relationship Manager"
+                aria-label={t("restaurant.contactDetails.aria.callRm")}
               >
                 <Phone className="w-5 h-5 text-blue-600" />
               </a>
@@ -293,16 +298,16 @@ export default function ContactDetails() {
 
         {/* Manager Section */}
         <div>
-          <h2 className="px-4 text-base font-bold text-gray-900 mb-3">Manager</h2>
+          <h2 className="px-4 text-base font-bold text-gray-900 mb-3">{t("restaurant.contactDetails.sections.manager")}</h2>
           {invitedUsers.filter(invite => invite.role === "manager").length === 0 ? (
             <div className="bg-white rounded-0 p-4">
               <p className="text-sm text-gray-900 font-normal">
-                No one added as manager yet.{" "}
+                {t("restaurant.contactDetails.empty.manager")}{" "}
                 <button
                   onClick={() => handleInviteClick("manager")}
                   className="text-blue-600 hover:text-blue-700 transition-colors"
                 >
-                  Add someone
+                  {t("restaurant.contactDetails.actions.addSomeone")}
                 </button>
               </p>
             </div>
@@ -310,7 +315,7 @@ export default function ContactDetails() {
             <div className="space-y-3">
               {loadingStaff ? (
                 <div className="bg-white rounded-0 p-4">
-                  <p className="text-sm text-gray-500">Loading...</p>
+                  <p className="text-sm text-gray-500">{t("restaurant.contactDetails.common.loading")}</p>
                 </div>
               ) : (
                 invitedUsers
@@ -335,13 +340,13 @@ export default function ContactDetails() {
                               <button
                                 onClick={() => handleDeleteInvite(user.id)}
                                 className="text-red-600 text-xs font-normal hover:text-red-700 transition-colors ml-auto"
-                                aria-label="Delete user"
+                                aria-label={t("restaurant.contactDetails.aria.deleteUser")}
                               >
                                 <Trash2 className="w-5 h-5" />
                               </button>
                             </div>
                             <p className="text-base font-bold text-gray-900 mb-0.5 ">
-                              {user.name || "N/A"}
+                              {user.name || t("restaurant.contactDetails.common.na")}
                             </p>
                             <p className="text-sm text-gray-900 font-normal">
                               {user.phone || user.email}
@@ -358,16 +363,16 @@ export default function ContactDetails() {
 
         {/* Staff Section */}
         <div>
-          <h2 className="px-4 text-base font-bold text-gray-900 mb-3">Staff</h2>
+          <h2 className="px-4 text-base font-bold text-gray-900 mb-3">{t("restaurant.contactDetails.sections.staff")}</h2>
           {invitedUsers.filter(invite => invite.role === "staff").length === 0 ? (
             <div className="bg-white rounded-0 p-4">
               <p className="text-sm text-gray-900 font-normal">
-                No one added as staff yet.{" "}
+                {t("restaurant.contactDetails.empty.staff")}{" "}
                 <button
                   onClick={() => handleInviteClick("staff")}
                   className="text-blue-600 hover:text-blue-700 transition-colors"
                 >
-                  Add someone
+                  {t("restaurant.contactDetails.actions.addSomeone")}
                 </button>
               </p>
             </div>
@@ -375,7 +380,7 @@ export default function ContactDetails() {
             <div className="space-y-3">
               {loadingStaff ? (
                 <div className="bg-white rounded-0 p-4">
-                  <p className="text-sm text-gray-500">Loading...</p>
+                  <p className="text-sm text-gray-500">{t("restaurant.contactDetails.common.loading")}</p>
                 </div>
               ) : (
                 invitedUsers
@@ -400,13 +405,13 @@ export default function ContactDetails() {
                               <button
                                 onClick={() => handleDeleteInvite(user.id)}
                                 className="text-red-600 text-xs font-normal hover:text-red-700 transition-colors ml-auto"
-                                aria-label="Delete user"
+                                aria-label={t("restaurant.contactDetails.aria.deleteUser")}
                               >
                                 <Trash2 className="w-5 h-5" />
                               </button>
                             </div>
                             <p className="text-base font-bold text-gray-900 mb-0.5">
-                              {user.name || "N/A"}
+                              {user.name || t("restaurant.contactDetails.common.na")}
                             </p>
                             <p className="text-sm text-gray-900 font-normal">
                               {user.phone || user.email}
@@ -430,7 +435,7 @@ export default function ContactDetails() {
         className="fixed bottom-6 right-4 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold shadow-lg flex items-center gap-2 transition-colors z-40"
       >
         <Plus className="w-5 h-5" />
-        <span>Add user</span>
+        <span>{t("restaurant.contactDetails.actions.addUser")}</span>
       </motion.button>
 
     </div>

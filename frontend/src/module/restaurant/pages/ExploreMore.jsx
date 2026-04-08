@@ -2,12 +2,14 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import Lenis from "lenis";
-import { ArrowLeft, Search, User, UserRound, Store, ChevronRight, Info, Clock, Users, Truck, FileText, Star, MessageSquare, HelpCircle, Edit, IndianRupee, Receipt, X, MapPin, Zap } from "lucide-react";
+import { ArrowLeft, Search, User, UserRound, Store, ChevronRight, Info, Clock, Users, Truck, FileText, Star, MessageSquare, HelpCircle, Edit, IndianRupee, Receipt, X, MapPin, Zap, Languages } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { clearModuleAuth, clearAuthData } from "@/lib/utils/auth";
 import { restaurantAPI } from "@/lib/api";
 import { firebaseAuth } from "@/lib/firebase";
+import { useTranslation } from "react-i18next";
 export default function ExploreMore() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [profileOpen, setProfileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -63,20 +65,20 @@ export default function ExploreMore() {
 
   // Get user data from restaurant data
   const userData = restaurantData ? {
-    name: restaurantData.ownerName || restaurantData.name || "Restaurant Owner",
-    phone: restaurantData.ownerPhone || restaurantData.phone || "N/A",
-    email: restaurantData.ownerEmail || restaurantData.email || "N/A",
-    role: "OWNER",
+    name: restaurantData.ownerName || restaurantData.name || t("restaurant.exploreMore.profile.restaurantOwner"),
+    phone: restaurantData.ownerPhone || restaurantData.phone || t("restaurant.exploreMore.common.na"),
+    email: restaurantData.ownerEmail || restaurantData.email || t("restaurant.exploreMore.common.na"),
+    role: t("restaurant.exploreMore.profile.roleOwner"),
     profileImage: restaurantData.profileImage
   } : {
-    name: "Loading...",
+    name: t("restaurant.exploreMore.common.loading"),
     phone: "",
     email: "",
-    role: "OWNER"
+    role: t("restaurant.exploreMore.profile.roleOwner")
   };
 
   // Get restaurant display data
-  const restaurantDisplayName = restaurantData?.name || "Loading...";
+  const restaurantDisplayName = restaurantData?.name || t("restaurant.exploreMore.common.loading");
   const restaurantDisplayAddress = restaurantData?.location ? formatAddress(restaurantData.location) : "";
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const handleLogout = async () => {
@@ -259,94 +261,99 @@ export default function ExploreMore() {
   // Section data
   const manageOutletItems = [{
     id: 1,
-    label: "Outlet info",
+    label: t("restaurant.exploreMore.items.outletInfo"),
     icon: Info,
     route: "/restaurant/outlet-info"
   }, {
     id: 2,
-    label: "Outlet timings",
+    label: t("restaurant.exploreMore.items.outletTimings"),
     icon: Clock,
     route: "/restaurant/outlet-timings"
   }, {
     id: 4,
-    label: "Manage staff",
+    label: t("restaurant.exploreMore.items.manageStaff"),
     icon: Users,
     route: "/restaurant/contact-details"
   }];
   const settingsItems = [{
     id: 4,
-    label: "Zone Setup",
+    label: t("restaurant.exploreMore.items.zoneSetup"),
     icon: MapPin,
     route: "/restaurant/zone-setup"
   }, {
     id: 5,
-    label: "Delivery setup",
+    label: t("restaurant.exploreMore.items.deliverySetup"),
     icon: Truck,
     route: "/restaurant/delivery-pricing"
+  }, {
+    id: 6,
+    label: t("restaurant.exploreMore.items.changeLanguage"),
+    icon: Languages,
+    route: "/restaurant/change-language"
   }];
   const ordersItems = [{
     id: 1,
-    label: "Order history",
+    label: t("restaurant.exploreMore.items.orderHistory"),
     icon: FileText,
     route: "/restaurant/orders/all"
   }, {
     id: 2,
-    label: "Complaints",
+    label: t("restaurant.exploreMore.items.complaints"),
     icon: Star,
     route: "/restaurant/feedback?tab=complaints"
   }, {
     id: 3,
-    label: "Reviews",
+    label: t("restaurant.exploreMore.items.reviews"),
     icon: MessageSquare,
     route: "/restaurant/feedback"
   }];
   const helpItems = [{
     id: 1,
-    label: "Help centre",
+    label: t("restaurant.exploreMore.items.helpCentre"),
     icon: HelpCircle,
     route: "/restaurant/help-centre"
   }, {
     id: 3,
-    label: "Share your feedback",
+    label: t("restaurant.exploreMore.items.shareFeedback"),
     icon: Edit,
     route: "/restaurant/Share-Feedback"
   }];
   const accountingItems = [{
     id: 1,
-    label: "Payout",
+    label: t("restaurant.exploreMore.items.payout"),
     icon: IndianRupee,
     route: "/restaurant/hub-finance"
   }, {
     id: 2,
-    label: "Invoices",
+    label: t("restaurant.exploreMore.items.invoices"),
     icon: Receipt,
     route: "/restaurant/hub-finance?tab=invoices"
   }, {
     id: 3,
-    label: "Subscription",
+    label: t("restaurant.exploreMore.items.subscription"),
     icon: Zap,
     route: "/restaurant/subscription"
   }];
 
   // All sections with their items
   const allSections = [{
-    title: "Manage outlet",
+    title: t("restaurant.exploreMore.sections.manageOutlet"),
     items: manageOutletItems,
     key: "manage-outlet"
   }, {
-    title: "Settings",
+    title: t("restaurant.exploreMore.sections.settings"),
     items: settingsItems,
     key: "settings"
   }, {
-    title: "Orders",
+    title: t("restaurant.exploreMore.sections.orders"),
     items: ordersItems,
     key: "orders"
   }, {
-    title: "Help",
+    title: t("restaurant.exploreMore.sections.help"),
     items: helpItems,
     key: "help"
   }, {
-    title: "Accounting",
+    title: t("restaurant.exploreMore.sections.accounting"),
     items: accountingItems,
     key: "accounting"
   }];
@@ -455,16 +462,16 @@ export default function ExploreMore() {
     }} className="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-50">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3 flex-1">
-            <button onClick={() => navigate("/restaurant")} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors" aria-label="Go back">
+            <button onClick={() => navigate("/restaurant")} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors" aria-label={t("restaurant.exploreMore.aria.goBack")}>
               <ArrowLeft className="w-6 h-6 text-gray-900" />
             </button>
-            <h1 className="text-lg font-bold text-gray-900">Explore more</h1>
+            <h1 className="text-lg font-bold text-gray-900">{t("restaurant.exploreMore.title")}</h1>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={() => setSearchOpen(true)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors" aria-label="Search">
+            <button onClick={() => setSearchOpen(true)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors" aria-label={t("restaurant.exploreMore.aria.search")}>
               <Search className="w-5 h-5 text-gray-900" />
             </button>
-            <button onClick={() => setProfileOpen(true)} className="p-2 hover:bg-gray-100 bg-gray-200 rounded-full transition-colors" aria-label="Profile">
+            <button onClick={() => setProfileOpen(true)} className="p-2 hover:bg-gray-100 bg-gray-200 rounded-full transition-colors" aria-label={t("restaurant.exploreMore.aria.profile")}>
               <UserRound className="w-5 h-5 text-gray-900 " />
             </button>
           </div>
@@ -528,8 +535,8 @@ export default function ExploreMore() {
         duration: 0.3
       }} className="text-center py-12">
             <Search className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <p className="text-lg font-semibold text-gray-900 mb-2">No results found</p>
-            <p className="text-sm text-gray-500">Try searching with different keywords</p>
+            <p className="text-lg font-semibold text-gray-900 mb-2">{t("restaurant.exploreMore.search.noResultsTitle")}</p>
+            <p className="text-sm text-gray-500">{t("restaurant.exploreMore.search.noResultsSubtitle")}</p>
           </motion.div>}
         <motion.div initial={{
         opacity: 0
@@ -575,12 +582,12 @@ export default function ExploreMore() {
                 <button onClick={() => {
               setSearchOpen(false);
               setSearchQuery("");
-            }} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors" aria-label="Close search">
+            }} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors" aria-label={t("restaurant.exploreMore.aria.closeSearch")}>
                   <ArrowLeft className="w-6 h-6 text-gray-900" />
                 </button>
                 <div className="flex-1 relative">
-                  <input type="text" placeholder="Search features..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} autoFocus className="w-full px-4 py-2 pr-10 bg-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-500" />
-                  {searchQuery && <button onClick={() => setSearchQuery("")} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-200 rounded-full transition-colors" aria-label="Clear search">
+                  <input type="text" placeholder={t("restaurant.exploreMore.search.placeholder")} value={searchQuery} onChange={e => setSearchQuery(e.target.value)} autoFocus className="w-full px-4 py-2 pr-10 bg-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-500" />
+                  {searchQuery && <button onClick={() => setSearchQuery("")} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-200 rounded-full transition-colors" aria-label={t("restaurant.exploreMore.aria.clearSearch")}>
                       <X className="w-4 h-4 text-gray-600" />
                     </button>}
                 </div>
@@ -617,12 +624,12 @@ export default function ExploreMore() {
                         </div>)}
                     </div> : <div className="text-center py-12 px-4">
                       <Search className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                      <p className="text-lg font-semibold text-gray-900 mb-2">No results found</p>
-                      <p className="text-sm text-gray-500">Try searching with different keywords</p>
+                      <p className="text-lg font-semibold text-gray-900 mb-2">{t("restaurant.exploreMore.search.noResultsTitle")}</p>
+                      <p className="text-sm text-gray-500">{t("restaurant.exploreMore.search.noResultsSubtitle")}</p>
                     </div> : <div className="text-center py-12 px-4">
                     <Search className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                    <p className="text-base font-medium text-gray-900 mb-1">Search for features</p>
-                    <p className="text-sm text-gray-500">Type to search for outlet settings, orders, and more</p>
+                    <p className="text-base font-medium text-gray-900 mb-1">{t("restaurant.exploreMore.search.idleTitle")}</p>
+                    <p className="text-sm text-gray-500">{t("restaurant.exploreMore.search.idleSubtitle")}</p>
                   </div>}
               </div>
             </motion.div>
@@ -657,8 +664,8 @@ export default function ExploreMore() {
         }} className="fixed bottom-0 left-0 right-0 bg-white rounded-0 shadow-2xl z-50 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
               {/* Header */}
               <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 sticky top-0 bg-white z-10">
-                <h2 className="text-lg font-bold text-gray-900">My profile</h2>
-                <button onClick={() => setProfileOpen(false)} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors" aria-label="Close">
+                <h2 className="text-lg font-bold text-gray-900">{t("restaurant.exploreMore.profile.title")}</h2>
+                <button onClick={() => setProfileOpen(false)} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors" aria-label={t("restaurant.exploreMore.aria.close")}>
                   <X className="w-5 h-5 text-gray-900" />
                 </button>
               </div>
@@ -674,7 +681,7 @@ export default function ExploreMore() {
                   {/* User Details */}
                   <div className="flex-1 min-w-0">
                     <h3 className="text-base font-bold text-gray-900 mb-1">
-                      {loadingRestaurant ? "Loading..." : userData.name}
+                      {loadingRestaurant ? t("restaurant.exploreMore.common.loading") : userData.name}
                     </h3>
                     {userData.phone && <p className="text-sm text-gray-900 mb-1">
                         {userData.phone}
@@ -693,12 +700,12 @@ export default function ExploreMore() {
               <div className="px-6 pb-6 space-y-3">
                 {/* Logout Button */}
                 <button onClick={handleLogout} disabled={isLoggingOut} className="w-full bg-red-600 hover:bg-red-700 disabled:bg-red-400 disabled:cursor-not-allowed text-white font-semibold py-3 px-4 rounded-lg transition-colors">
-                  {isLoggingOut ? "Logging out..." : "Logout"}
+                  {isLoggingOut ? t("restaurant.exploreMore.profile.loggingOut") : t("restaurant.exploreMore.profile.logout")}
                 </button>
 
                 {/* Logout from all devices Button */}
                 <button onClick={handleLogoutAllDevices} disabled={isLoggingOut} className="w-full bg-white border-2 border-red-600 text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed font-semibold py-3 px-4 rounded-lg transition-colors">
-                  {isLoggingOut ? "Logging out..." : "Logout from all devices"}
+                  {isLoggingOut ? t("restaurant.exploreMore.profile.loggingOut") : t("restaurant.exploreMore.profile.logoutAllDevices")}
                 </button>
               </div>
 
@@ -709,21 +716,21 @@ export default function ExploreMore() {
                 e.preventDefault();
                 // Navigate to terms of service
               }}>
-                    Terms of Service
+                    {t("restaurant.exploreMore.footer.terms")}
                   </a>
                   <span className="text-gray-400">|</span>
                   <a href="#" className="hover:text-gray-700 transition-colors border-b border-dotted border-gray-400" onClick={e => {
                 e.preventDefault();
                 // Navigate to privacy policy
               }}>
-                    Privacy Policy
+                    {t("restaurant.exploreMore.footer.privacy")}
                   </a>
                   <span className="text-gray-400">|</span>
                   <a href="#" className="hover:text-gray-700 transition-colors border-b border-dotted border-gray-400" onClick={e => {
                 e.preventDefault();
                 // Navigate to code of conduct
               }}>
-                    Code of Conduct
+                    {t("restaurant.exploreMore.footer.codeOfConduct")}
                   </a>
                 </div>
               </div>

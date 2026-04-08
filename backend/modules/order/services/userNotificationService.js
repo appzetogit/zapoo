@@ -62,22 +62,28 @@ export async function notifyUserOrderUpdate(orderId, status) {
 
     // Send FCM notification (always send, even if socket connected)
     const normalizedStatus = status || order.status;
+    let templateKey = 'user_order_update';
     let title = 'Order Update';
     let body = `Your order #${order.orderId} status is now ${normalizedStatus}`;
     if (normalizedStatus === 'delivered') {
-      title = 'Order Delivered! 🍽️';
-      body = 'Your food has arrived! Enjoy your meal 😋';
+      templateKey = 'user_order_delivered';
+      title = 'Order Delivered!';
+      body = 'Your food has arrived! Enjoy your meal.';
     } else if (normalizedStatus === 'out_for_delivery') {
-      title = 'Order Out for Delivery 🚴';
+      templateKey = 'user_order_out_for_delivery';
+      title = 'Order Out for Delivery';
       body = 'Our delivery partner is on the way!';
     } else if (normalizedStatus === 'cancelled') {
-      title = 'Order Cancelled ❌';
+      templateKey = 'user_order_cancelled';
+      title = 'Order Cancelled';
       body = 'Your order has been cancelled.';
     } else if (normalizedStatus === 'preparing' || normalizedStatus === 'confirmed') {
-      title = 'Order Accepted 🍳';
+      templateKey = 'user_order_accepted';
+      title = 'Order Accepted';
       body = 'The restaurant is preparing your food.';
     } else if (normalizedStatus === 'ready') {
-      title = 'Order Ready 🥡';
+      templateKey = 'user_order_ready';
+      title = 'Order Ready';
       body = 'Your food is ready for pickup.';
     }
 
@@ -85,7 +91,12 @@ export async function notifyUserOrderUpdate(orderId, status) {
       orderId: order.orderId,
       orderMongoId: order._id?.toString?.() || orderId,
       status: normalizedStatus,
-      type: 'order_update'
+      type: 'order_update',
+      templateKey,
+      templateVars: {
+        orderId: order.orderId,
+        status: normalizedStatus
+      }
     });
   } catch (error) {
     console.error('Error notifying user about order update:', error);

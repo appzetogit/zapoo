@@ -184,11 +184,16 @@ export async function notifyRestaurantNewOrder(order, restaurantId, paymentMetho
     // Send FCM notification to restaurant (always send)
     try {
       const normalizedRestaurantId = restaurantId?.toString() || restaurantId;
-      await sendNotificationToUser(normalizedRestaurantId, 'restaurant', '🔔 New Order Received!', `Order #${order.orderId} for ₹${order.pricing?.total ?? 0}`, {
+      await sendNotificationToUser(normalizedRestaurantId, 'restaurant', 'New Order Received!', `Order #${order.orderId} for ₹${order.pricing?.total ?? 0}`, {
         orderId: order.orderId,
         orderMongoId: order._id?.toString(),
         status: order.status,
-        type: 'new_order'
+        type: 'new_order',
+        templateKey: 'restaurant_new_order',
+        templateVars: {
+          orderId: order.orderId,
+          total: order.pricing?.total ?? 0
+        }
       });
     } catch (pushError) {
       console.error('❌ [FCM] Error sending restaurant new order notification:', pushError);

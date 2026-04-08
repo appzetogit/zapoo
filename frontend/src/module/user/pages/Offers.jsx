@@ -6,11 +6,13 @@ import { Card, CardContent } from "@/components/ui/card"
 import { restaurantAPI } from "@/lib/api"
 import { useLocation } from "../hooks/useLocation"
 import { toast } from "sonner"
+import { useTranslation } from "react-i18next"
 
 // Import banner image
 import offerBanner from "@/assets/offerpagebanner.png"
 
 export default function Offers() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const { location } = useLocation()
   const [offers, setOffers] = useState([])
@@ -39,7 +41,7 @@ export default function Offers() {
       } catch (err) {
         console.error('Error fetching offers:', err)
         console.error('Error details:', err?.response?.data || err?.message)
-        const errorMessage = err?.response?.data?.message || err?.message || 'Failed to load offers'
+        const errorMessage = err?.response?.data?.message || err?.message || t("user.offers.errorFallback")
         setError(errorMessage)
         toast.error(errorMessage)
       } finally {
@@ -66,7 +68,7 @@ export default function Offers() {
         <div className="absolute inset-0 z-0">
           <img 
             src={offerBanner} 
-            alt="Great Offers" 
+            alt={t("user.offers.bannerAlt")}
             className="w-full h-full object-cover"
           />
         </div>
@@ -79,7 +81,7 @@ export default function Offers() {
         {loading && (
           <div className="flex flex-col items-center justify-center py-20">
             <Loader2 className="h-10 w-10 animate-spin text-gray-400" />
-            <p className="mt-4 text-gray-500 dark:text-gray-400">Loading offers...</p>
+            <p className="mt-4 text-gray-500 dark:text-gray-400">{t("user.offers.loading")}</p>
           </div>
         )}
 
@@ -87,7 +89,7 @@ export default function Offers() {
         {error && !loading && (
           <div className="flex flex-col items-center justify-center py-20">
             <p className="text-red-500 dark:text-red-400 text-center">{error}</p>
-            <Button onClick={() => window.location.reload()} className="mt-4">Retry</Button>
+            <Button onClick={() => window.location.reload()} className="mt-4">{t("user.offers.retry")}</Button>
           </div>
         )}
 
@@ -153,7 +155,7 @@ export default function Offers() {
           
             {offers.length === 0 && !loading && (
               <div className="text-center py-12">
-                <p className="text-gray-500 dark:text-gray-400">No offers available at the moment</p>
+                <p className="text-gray-500 dark:text-gray-400">{t("user.offers.empty")}</p>
               </div>
             )}
           </>

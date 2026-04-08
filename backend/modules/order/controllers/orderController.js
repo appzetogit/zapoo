@@ -16,6 +16,7 @@ import etaWebSocketService from '../services/etaWebSocketService.js';
 import OrderEvent from '../models/OrderEvent.js';
 import UserWallet from '../../user/models/UserWallet.js';
 import { computeOrderPreparationTimeMinutes } from '../services/preparationTimeService.js';
+import { resolveLocaleFromRequest } from '../../../shared/i18n/localeResolver.js';
 const logger = winston.createLogger({
   level: 'info',
   format: winston.format.json(),
@@ -29,6 +30,7 @@ const logger = winston.createLogger({
  */
 export const createOrder = async (req, res) => {
   try {
+    const locale = resolveLocaleFromRequest(req);
     const userId = req.user?._id || req.user?.id;
     if (!userId) {
       return res.status(401).json({
@@ -187,6 +189,7 @@ export const createOrder = async (req, res) => {
       couponCode: pricing.couponCode,
       deliveryFleet: deliveryFleet || 'standard',
       userId,
+      locale,
     });
 
     // Create the order
@@ -470,11 +473,15 @@ export const createOrder = async (req, res) => {
         const {
           sendNotificationToUser
         } = await import('../../notification/utils/pushNotificationHelper.js');
-        await sendNotificationToUser(userId, 'user', '✅ Order Placed Successfully!', `Your order #${order.orderId} has been placed. Waiting for restaurant to prepare.`, {
+        await sendNotificationToUser(userId, 'user', 'Order Placed Successfully!', `Your order #${order.orderId} has been placed. Waiting for restaurant to prepare.`, {
           orderId: order.orderId,
           orderMongoId: order._id?.toString(),
           status: order.status,
-          type: 'new_order'
+          type: 'new_order',
+          templateKey: 'user_order_placed',
+          templateVars: {
+            orderId: order.orderId
+          }
         });
       } catch (fcmError) {
         logger.error('❌ Error sending FCM notification to user for COD order:', fcmError);
@@ -733,11 +740,15 @@ export const verifyOrderPayment = async (req, res) => {
       const {
         sendNotificationToUser
       } = await import('../../notification/utils/pushNotificationHelper.js');
-      await sendNotificationToUser(userId, 'user', '✅ Payment Successful! Order Confirmed', `Your order #${order.orderId} has been confirmed.`, {
+      await sendNotificationToUser(userId, 'user', 'Payment Successful! Order Confirmed', `Your order #${order.orderId} has been confirmed.`, {
         orderId: order.orderId,
         orderMongoId: order._id?.toString(),
         status: order.status,
-        type: 'payment_success'
+        type: 'payment_success',
+        templateKey: 'user_payment_success',
+        templateVars: {
+          orderId: order.orderId
+        }
       });
     } catch (pushError) {
       logger.error('❌ [FCM] Error sending to user:', pushError);
@@ -1090,6 +1101,7 @@ export const cancelOrder = async (req, res) => {
  */
 export const calculateOrder = async (req, res) => {
   try {
+    const locale = resolveLocaleFromRequest(req);
     const {
       items,
       restaurantId,
@@ -1177,6 +1189,7 @@ export const calculateOrder = async (req, res) => {
       couponCode,
       deliveryFleet: deliveryFleet || 'standard',
       userId: req.user?._id || req.user?.id || null,
+      locale,
     });
     res.json({
       success: true,

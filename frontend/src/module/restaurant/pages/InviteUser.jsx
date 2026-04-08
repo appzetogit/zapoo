@@ -2,6 +2,7 @@ import { useState, useEffect } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { motion, AnimatePresence } from "framer-motion"
 import Lenis from "lenis"
+import { useTranslation } from "react-i18next"
 import {
   ArrowLeft,
   ChevronDown,
@@ -55,6 +56,7 @@ const countryCodes = [
 ]
 
 export default function InviteUser() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const roleFromUrl = searchParams.get("role") || "staff"
@@ -97,17 +99,17 @@ export default function InviteUser() {
   // Phone number validation
   const validatePhone = (phone) => {
     if (!phone.trim()) {
-      setPhoneError("Phone number is required")
+      setPhoneError(t("restaurant.inviteUser.validation.phoneRequired"))
       return false
     }
     // Remove any non-digit characters for validation
     const digitsOnly = phone.replace(/\D/g, "")
     if (digitsOnly.length < 10) {
-      setPhoneError("Phone number must be at least 10 digits")
+      setPhoneError(t("restaurant.inviteUser.validation.phoneMinLength"))
       return false
     }
     if (digitsOnly.length > 15) {
-      setPhoneError("Phone number is too long")
+      setPhoneError(t("restaurant.inviteUser.validation.phoneMaxLength"))
       return false
     }
     setPhoneError("")
@@ -117,12 +119,12 @@ export default function InviteUser() {
   // Email validation
   const validateEmail = (email) => {
     if (!email.trim()) {
-      setEmailError("Email is required")
+      setEmailError(t("restaurant.inviteUser.validation.emailRequired"))
       return false
     }
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email)) {
-      setEmailError("Please enter a valid email address")
+      setEmailError(t("restaurant.inviteUser.validation.emailInvalid"))
       return false
     }
     setEmailError("")
@@ -152,11 +154,11 @@ export default function InviteUser() {
   // Name validation
   const validateName = (name) => {
     if (!name.trim()) {
-      setNameError("Name is required")
+      setNameError(t("restaurant.inviteUser.validation.nameRequired"))
       return false
     }
     if (name.trim().length < 2) {
-      setNameError("Name must be at least 2 characters")
+      setNameError(t("restaurant.inviteUser.validation.nameMinLength"))
       return false
     }
     setNameError("")
@@ -236,11 +238,14 @@ export default function InviteUser() {
         // Show success dialog
         setShowUserAddedDialog(true)
       } else {
-        throw new Error("Invalid response from server")
+        throw new Error(t("restaurant.inviteUser.validation.invalidServerResponse"))
       }
     } catch (error) {
       console.error("Error adding user:", error)
-      const errorMessage = error.response?.data?.message || error.message || "Failed to add user. Please try again."
+      const errorMessage =
+        error.response?.data?.message ||
+        error.message ||
+        t("restaurant.inviteUser.validation.addFailed")
       alert(errorMessage)
     }
   }
@@ -270,11 +275,11 @@ export default function InviteUser() {
             <button
               onClick={() => navigate(-1)}
               className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
-              aria-label="Go back"
+              aria-label={t("restaurant.inviteUser.aria.goBack")}
             >
               <ArrowLeft className="w-6 h-6 text-gray-900" />
             </button>
-            <h1 className="text-lg font-bold text-gray-900">Add user</h1>
+            <h1 className="text-lg font-bold text-gray-900">{t("restaurant.inviteUser.title")}</h1>
           </div>
         </div>
       </div>
@@ -283,12 +288,12 @@ export default function InviteUser() {
       <div className="px-4 py-6 space-y-6">
         {/* Name Input Section */}
         <div>
-          <label className="text-sm font-medium text-gray-700 mb-2 block">Name *</label>
+          <label className="text-sm font-medium text-gray-700 mb-2 block">{t("restaurant.inviteUser.fields.name")} *</label>
           <Input
             type="text"
             value={name}
             onChange={handleNameChange}
-            placeholder="Enter full name"
+            placeholder={t("restaurant.inviteUser.placeholders.name")}
             className={`w-full h-12 border-gray-200 rounded-lg ${nameError ? "border-red-500" : ""}`}
           />
           {nameError && (
@@ -298,7 +303,7 @@ export default function InviteUser() {
 
         {/* Phone Number Input Section */}
         <div>
-          <label className="text-sm font-medium text-gray-700 mb-2 block">Phone number *</label>
+          <label className="text-sm font-medium text-gray-700 mb-2 block">{t("restaurant.inviteUser.fields.phone")} *</label>
           <div className="flex gap-2 items-stretch">
             <Select value={countryCode} onValueChange={setCountryCode}>
               <SelectTrigger className="w-[100px] h-12! border-gray-200 rounded-lg flex items-center shrink-0">
@@ -324,7 +329,7 @@ export default function InviteUser() {
               type="tel"
               value={phoneNumber}
               onChange={handlePhoneChange}
-              placeholder="Enter phone number"
+              placeholder={t("restaurant.inviteUser.placeholders.phone")}
               className={`flex-1 h-12 border-gray-200 rounded-lg ${phoneError ? "border-red-500" : ""}`}
               maxLength={15}
             />
@@ -340,19 +345,19 @@ export default function InviteUser() {
             }}
             className="text-blue-600 text-sm font-normal hover:text-blue-700 transition-colors mt-2"
           >
-            Add by email instead
+            {t("restaurant.inviteUser.actions.addByEmail")}
           </button>
         </div>
 
         {/* Email Input Section (shown when add by email is clicked) */}
         {addMethod === "email" && (
           <div>
-            <label className="text-sm font-medium text-gray-700 mb-2 block">Email address *</label>
+            <label className="text-sm font-medium text-gray-700 mb-2 block">{t("restaurant.inviteUser.fields.email")} *</label>
             <Input
               type="email"
               value={email}
               onChange={handleEmailChange}
-              placeholder="Enter email address"
+              placeholder={t("restaurant.inviteUser.placeholders.email")}
               className={`w-full h-12 border-gray-200 rounded-lg ${emailError ? "border-red-500" : ""}`}
             />
             {emailError && (
@@ -366,20 +371,20 @@ export default function InviteUser() {
               }}
               className="text-blue-600 text-sm font-normal hover:text-blue-700 transition-colors mt-2"
             >
-              Add by phone instead
+              {t("restaurant.inviteUser.actions.addByPhone")}
             </button>
           </div>
         )}
 
         {/* Photo Upload Section */}
         <div>
-          <label className="text-sm font-medium text-gray-700 mb-2 block">Photo (Optional)</label>
+          <label className="text-sm font-medium text-gray-700 mb-2 block">{t("restaurant.inviteUser.fields.photoOptional")}</label>
           <div className="flex items-center gap-4">
             <div className="h-20 w-20 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden border-2 border-gray-200">
               {photoPreview ? (
                 <img
                   src={photoPreview}
-                  alt="Staff photo preview"
+                  alt={t("restaurant.inviteUser.aria.photoPreview")}
                   className="w-full h-full object-cover"
                 />
               ) : (
@@ -393,7 +398,7 @@ export default function InviteUser() {
                   <button
                     onClick={handleRemovePhoto}
                     className="text-red-600 hover:text-red-700"
-                    aria-label="Remove photo"
+                    aria-label={t("restaurant.inviteUser.aria.removePhoto")}
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -404,7 +409,7 @@ export default function InviteUser() {
                   className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white border border-gray-300 text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-50 transition-colors"
                 >
                   <Upload className="w-4 h-4" />
-                  <span>Upload Photo</span>
+                  <span>{t("restaurant.inviteUser.actions.uploadPhoto")}</span>
                 </label>
               )}
               <input
@@ -421,7 +426,7 @@ export default function InviteUser() {
         {/* User Role Selection */}
         <div>
           <h2 className="text-base font-bold text-gray-900 mb-0 bg-gray-100 -mx-4 px-4 py-2">
-            Select user role
+            {t("restaurant.inviteUser.sections.selectRole")}
           </h2>
           <div className="mt-2 border-b border-gray-200">
             {["staff", "manager"].map((role, index, arr) => (
@@ -432,7 +437,9 @@ export default function InviteUser() {
                   index < arr.length - 1 ? "border-b border-gray-200" : ""
                 }`}
               >
-                <span className="text-base font-normal text-gray-900 capitalize">{role}</span>
+                <span className="text-base font-normal text-gray-900 capitalize">
+                  {t(`restaurant.inviteUser.roles.${role}`)}
+                </span>
                 <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
                   selectedRole === role
                     ? "border-blue-600 bg-blue-600"
@@ -459,7 +466,7 @@ export default function InviteUser() {
               : "bg-gray-200 text-gray-500 cursor-not-allowed"
           } transition-colors`}
         >
-          Add user
+          {t("restaurant.inviteUser.actions.addUser")}
         </Button>
       </div>
 
@@ -471,10 +478,17 @@ export default function InviteUser() {
               <CheckCircle2 className="w-8 h-8 text-green-600" />
             </div>
             <DialogTitle className="text-lg font-semibold text-gray-900 text-center">
-              {selectedRole === 'manager' ? 'Manager added successfully!' : 'Staff added successfully!'}
+              {selectedRole === "manager"
+                ? t("restaurant.inviteUser.success.managerTitle")
+                : t("restaurant.inviteUser.success.staffTitle")}
             </DialogTitle>
             <DialogDescription className="mt-2 text-sm text-gray-600">
-              {name} has been successfully added as {selectedRole === 'manager' ? 'manager' : 'staff'} to your outlet.
+              {t("restaurant.inviteUser.success.description", {
+                name,
+                role: selectedRole === "manager"
+                  ? t("restaurant.inviteUser.roles.manager")
+                  : t("restaurant.inviteUser.roles.staff"),
+              })}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -482,7 +496,7 @@ export default function InviteUser() {
               onClick={handleUserAddedClose}
               className="w-full bg-blue-600 hover:bg-blue-700 text-white"
             >
-              Done
+              {t("restaurant.inviteUser.actions.done")}
             </Button>
           </DialogFooter>
         </DialogContent>

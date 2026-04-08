@@ -14,6 +14,8 @@ import {
   deleteAdmin,
   getAdminProfile,
   updateAdminProfile,
+  getAdminPreferences,
+  updateAdminPreferences,
   changeAdminPassword,
   getUsers,
   getUserById,
@@ -260,6 +262,8 @@ router.delete("/admins/:id", deleteAdmin);
 // Profile Management
 router.get("/profile", getAdminProfile);
 router.put("/profile", updateAdminProfile);
+router.get("/preferences", getAdminPreferences);
+router.put("/preferences", updateAdminPreferences);
 
 // Push Notifications (FCM Broadcast)
 // POST /api/admin/notifications/broadcast

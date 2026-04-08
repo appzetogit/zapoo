@@ -2,9 +2,11 @@ import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { motion, AnimatePresence } from "framer-motion"
 import { ArrowLeft, Edit, Phone, Users, ChevronDown, X, ArrowRight } from "lucide-react"
+import { useTranslation } from "react-i18next"
 
 export default function PhoneNumbersPage() {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const [editingNumber, setEditingNumber] = useState(null) // { type: 'orderReminder1' | 'orderReminder2' | 'restaurantPage' }
   const [countryCode, setCountryCode] = useState("+91")
   const [phoneNumber, setPhoneNumber] = useState("")
@@ -132,10 +134,11 @@ export default function PhoneNumbersPage() {
           <button
             onClick={() => navigate(-1)}
             className="p-1 rounded-full hover:bg-gray-100"
+            aria-label={t("restaurant.phoneNumbers.aria.goBack")}
           >
             <ArrowLeft className="w-5 h-5 text-gray-700" />
           </button>
-          <h1 className="text-xl font-bold text-gray-900">Important contacts</h1>
+          <h1 className="text-xl font-bold text-gray-900">{t("restaurant.phoneNumbers.title")}</h1>
         </div>
       </div>
 
@@ -149,9 +152,9 @@ export default function PhoneNumbersPage() {
               <Users className="w-5 h-5 text-gray-700" />
             </div>
             <div className="flex-1">
-              <h2 className="text-base font-bold text-gray-900">Order reminder numbers</h2>
+              <h2 className="text-base font-bold text-gray-900">{t("restaurant.phoneNumbers.sections.orderReminder.title")}</h2>
               <p className="text-xs text-gray-600 mt-1">
-                Should always be available for Zomato to reach out for live order support and order reminders.
+                {t("restaurant.phoneNumbers.sections.orderReminder.subtitle")}
               </p>
             </div>
           </div>
@@ -160,7 +163,7 @@ export default function PhoneNumbersPage() {
             {/* Order reminder number #1 */}
             <div className="flex items-center justify-between py-2">
               <div className="flex-1">
-                <p className="text-sm text-gray-700 mb-1">Order reminder number #1</p>
+                <p className="text-sm text-gray-700 mb-1">{t("restaurant.phoneNumbers.sections.orderReminder.number1")}</p>
                 <p className="text-base font-semibold text-gray-900">{getDisplayNumber("orderReminder1")}</p>
               </div>
               <button
@@ -174,7 +177,7 @@ export default function PhoneNumbersPage() {
             {/* Order reminder number #2 */}
             <div className="flex items-center justify-between py-2 border-t border-gray-100">
               <div className="flex-1">
-                <p className="text-sm text-gray-700 mb-1">Order reminder number #2</p>
+                <p className="text-sm text-gray-700 mb-1">{t("restaurant.phoneNumbers.sections.orderReminder.number2")}</p>
                 <p className="text-base font-semibold text-gray-900">{getDisplayNumber("orderReminder2")}</p>
               </div>
               <button
@@ -194,9 +197,9 @@ export default function PhoneNumbersPage() {
               <Phone className="w-5 h-5 text-gray-700" />
             </div>
             <div className="flex-1">
-              <h2 className="text-base font-bold text-gray-900">Restaurant page number</h2>
+              <h2 className="text-base font-bold text-gray-900">{t("restaurant.phoneNumbers.sections.restaurantPage.title")}</h2>
               <p className="text-xs text-gray-600 mt-1">
-                Number for Zomato customers to call your restaurant.
+                {t("restaurant.phoneNumbers.sections.restaurantPage.subtitle")}
               </p>
             </div>
           </div>
@@ -221,7 +224,7 @@ export default function PhoneNumbersPage() {
           onClick={() => navigate("/restaurant/contact-details")}
           className="w-full flex items-center justify-between py-4 text-blue-600 hover:text-blue-700 transition-colors"
         >
-          <span className="text-sm font-medium">Manage contact details for your staff</span>
+          <span className="text-sm font-medium">{t("restaurant.phoneNumbers.actions.manageStaffContacts")}</span>
           <ArrowRight className="w-5 h-5" />
         </button>
       </div>
@@ -246,7 +249,7 @@ export default function PhoneNumbersPage() {
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center justify-between px-4 py-4 border-b border-gray-200">
-                <h2 className="text-lg font-bold text-gray-900">Edit phone number</h2>
+                <h2 className="text-lg font-bold text-gray-900">{t("restaurant.phoneNumbers.editModal.title")}</h2>
                 <button
                   onClick={handleCancelEdit}
                   className="p-1 rounded-full hover:bg-gray-100"
@@ -259,7 +262,7 @@ export default function PhoneNumbersPage() {
                   {/* Country Code Selector */}
                   <div>
                     <label className="block text-sm font-medium text-gray-900 mb-2">
-                      Country code
+                      {t("restaurant.phoneNumbers.editModal.countryCode")}
                     </label>
                     <button
                       onClick={() => setIsCountryCodeOpen(true)}
@@ -278,13 +281,13 @@ export default function PhoneNumbersPage() {
                   {/* Phone Number Input */}
                   <div>
                     <label className="block text-sm font-medium text-gray-900 mb-2">
-                      Phone number
+                      {t("restaurant.phoneNumbers.editModal.phoneNumber")}
                     </label>
                     <input
                       type="tel"
                       value={phoneNumber}
                       onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ''))}
-                      placeholder="Enter phone number"
+                      placeholder={t("restaurant.phoneNumbers.editModal.phonePlaceholder")}
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                   </div>
@@ -295,7 +298,7 @@ export default function PhoneNumbersPage() {
                   onClick={handleCancelEdit}
                   className="flex-1 py-3 px-4 border border-gray-300 rounded-lg text-sm font-semibold text-gray-900 bg-white hover:bg-gray-50 transition-colors"
                 >
-                  Cancel
+                  {t("restaurant.phoneNumbers.actions.cancel")}
                 </button>
                 <button
                   onClick={handleSaveEdit}
@@ -306,7 +309,7 @@ export default function PhoneNumbersPage() {
                       : "bg-gray-300 text-gray-500 cursor-not-allowed"
                   }`}
                 >
-                  Save
+                  {t("restaurant.phoneNumbers.actions.save")}
                 </button>
               </div>
             </motion.div>
@@ -334,7 +337,7 @@ export default function PhoneNumbersPage() {
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center justify-between px-4 py-4 border-b border-gray-200">
-                <h2 className="text-lg font-bold text-gray-900">Select country code</h2>
+                <h2 className="text-lg font-bold text-gray-900">{t("restaurant.phoneNumbers.countryModal.title")}</h2>
                 <button
                   onClick={() => setIsCountryCodeOpen(false)}
                   className="p-1 rounded-full hover:bg-gray-100"
@@ -391,7 +394,7 @@ export default function PhoneNumbersPage() {
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center justify-between px-4 py-4 border-b border-gray-200">
-                <h2 className="text-lg font-bold text-gray-900">Verify OTP</h2>
+                <h2 className="text-lg font-bold text-gray-900">{t("restaurant.phoneNumbers.otpModal.title")}</h2>
                 <button
                   onClick={handleCancelOtp}
                   className="p-1 rounded-full hover:bg-gray-100"
@@ -403,7 +406,7 @@ export default function PhoneNumbersPage() {
                 <div className="space-y-6">
                   <div className="text-center">
                     <p className="text-sm text-gray-600 mb-2">
-                      We've sent a 6-digit OTP to
+                      {t("restaurant.phoneNumbers.otpModal.subtitle")}
                     </p>
                     <p className="text-base font-semibold text-gray-900">
                       {pendingPhoneData ? `${pendingPhoneData.countryCode}-${pendingPhoneData.phoneNumber}` : ""}
@@ -433,7 +436,7 @@ export default function PhoneNumbersPage() {
                       onClick={handleResendOtp}
                       className="text-sm text-blue-600 hover:text-blue-700 font-medium"
                     >
-                      Resend OTP
+                      {t("restaurant.phoneNumbers.otpModal.resend")}
                     </button>
                   </div>
                 </div>
@@ -443,7 +446,7 @@ export default function PhoneNumbersPage() {
                   onClick={handleCancelOtp}
                   className="flex-1 py-3 px-4 border border-gray-300 rounded-lg text-sm font-semibold text-gray-900 bg-white hover:bg-gray-50 transition-colors"
                 >
-                  Cancel
+                  {t("restaurant.phoneNumbers.actions.cancel")}
                 </button>
                 <button
                   onClick={handleVerifyOtp}
@@ -454,7 +457,7 @@ export default function PhoneNumbersPage() {
                       : "bg-gray-300 text-gray-500 cursor-not-allowed"
                   }`}
                 >
-                  Verify
+                  {t("restaurant.phoneNumbers.actions.verify")}
                 </button>
               </div>
             </motion.div>

@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { motion } from "framer-motion"
+import { useTranslation } from "react-i18next"
 import { 
   ChevronLeft, 
   Search, 
@@ -15,47 +16,48 @@ import {
 } from "lucide-react"
 import BottomNavOrders from "../components/BottomNavOrders"
 
-const helpTopics = [
-  {
-    id: 1,
-    icon: Power,
-    title: "Outlet online / offline status",
-    subtitle: "Current status & details",
-    path: "/restaurant/status"
-  },
-  {
-    id: 2,
-    icon: Utensils,
-    title: "Order related issues",
-    subtitle: "Cancellations & delivery related concerns",
-    path: "/restaurant/orders/all"
-  },
-  {
-    id: 3,
-    icon: Building2,
-    title: "Restaurant",
-    subtitle: "Timings, contacts, FSSAI, bank details, location etc.",
-    path: "/restaurant/outlet-info"
-  },
-  {
-    id: 5,
-    icon: FileText,
-    title: "Menu",
-    subtitle: "Items, photos, prices, charges etc.",
-    path: "/restaurant/hub-menu"
-  },
-  {
-    id: 6,
-    icon: Wallet,
-    title: "Payments",
-    subtitle: "Statement of account, invoices etc.",
-    path: "/restaurant/hub-finance"
-  }
-]
-
 export default function HelpCentre() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [searchQuery, setSearchQuery] = useState("")
+
+  const helpTopics = [
+    {
+      id: 1,
+      icon: Power,
+      title: t("restaurant.helpCentre.topics.outletStatus.title"),
+      subtitle: t("restaurant.helpCentre.topics.outletStatus.subtitle"),
+      path: "/restaurant/status"
+    },
+    {
+      id: 2,
+      icon: Utensils,
+      title: t("restaurant.helpCentre.topics.orderIssues.title"),
+      subtitle: t("restaurant.helpCentre.topics.orderIssues.subtitle"),
+      path: "/restaurant/orders/all"
+    },
+    {
+      id: 3,
+      icon: Building2,
+      title: t("restaurant.helpCentre.topics.restaurant.title"),
+      subtitle: t("restaurant.helpCentre.topics.restaurant.subtitle"),
+      path: "/restaurant/outlet-info"
+    },
+    {
+      id: 5,
+      icon: FileText,
+      title: t("restaurant.helpCentre.topics.menu.title"),
+      subtitle: t("restaurant.helpCentre.topics.menu.subtitle"),
+      path: "/restaurant/hub-menu"
+    },
+    {
+      id: 6,
+      icon: Wallet,
+      title: t("restaurant.helpCentre.topics.payments.title"),
+      subtitle: t("restaurant.helpCentre.topics.payments.subtitle"),
+      path: "/restaurant/hub-finance"
+    }
+  ]
 
   const filteredTopics = helpTopics.filter(topic =>
     topic.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -71,10 +73,11 @@ export default function HelpCentre() {
             <button
               onClick={() => navigate(-1)}
               className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+              aria-label={t("restaurant.helpCentre.aria.goBack")}
             >
               <ChevronLeft className="w-6 h-6 text-gray-900" />
             </button>
-            <h1 className="text-lg font-bold text-gray-900">Help centre</h1>
+            <h1 className="text-lg font-bold text-gray-900">{t("restaurant.helpCentre.title")}</h1>
           </div>
           <div className="flex items-center gap-4">
             <button className="p-1 hover:bg-gray-100 rounded-full transition-colors">
@@ -92,7 +95,7 @@ export default function HelpCentre() {
         {/* How can we help you section */}
         <div className="mb-6">
           <h2 className="text-base font-bold text-gray-900 mb-3">
-            How can we help you
+            {t("restaurant.helpCentre.howCanWeHelp")}
           </h2>
           
           {/* Search Bar */}
@@ -102,7 +105,7 @@ export default function HelpCentre() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by issue"
+              placeholder={t("restaurant.helpCentre.searchPlaceholder")}
               className="w-full pl-10 pr-4 py-3 text-sm text-gray-900 placeholder-gray-400 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-400"
             />
           </div>
@@ -153,7 +156,7 @@ export default function HelpCentre() {
         {filteredTopics.length === 0 && (
           <div className="text-center py-12">
             <p className="text-sm text-gray-500">
-              No help topics found matching "{searchQuery}"
+              {t("restaurant.helpCentre.empty", { query: searchQuery })}
             </p>
           </div>
         )}

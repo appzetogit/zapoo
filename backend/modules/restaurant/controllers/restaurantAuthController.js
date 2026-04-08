@@ -879,6 +879,7 @@ export const getCurrentRestaurant = asyncHandler(async (req, res) => {
       businessModel: r.businessModel,
       subscription: r.subscription,
       relationshipManager: r.relationshipManager,
+      preferences: r.preferences || { language: 'en' },
       // Zone / tier (for outlet info & delivery pricing context)
       zoneId: zoneIdOut,
       tierId: tierIdOut,
@@ -936,7 +937,10 @@ export const firebaseGoogleLogin = asyncHandler(async (req, res) => {
     return errorResponse(res, 400, 'Firebase ID token is required');
   }
 
-  // Ensure Firebase Admin is configured
+  // Ensure Firebase Admin is configured (initialize lazily on first request)
+  if (!firebaseAuthService.isEnabled()) {
+    await firebaseAuthService.init();
+  }
   if (!firebaseAuthService.isEnabled()) {
     return errorResponse(res, 500, 'Firebase Auth is not configured. Please set FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL and FIREBASE_PRIVATE_KEY in backend .env');
   }
@@ -1046,9 +1050,11 @@ export const firebaseGoogleLogin = asyncHandler(async (req, res) => {
       }
     }
 
-    // Ensure restaurant is active
-    if (!restaurant.isActive) {
-      logger.warn('Inactive restaurant attempted login', {
+    // Distinguish pending approval from truly deactivated accounts.
+    // Pending restaurants can login to continue onboarding.
+    const isPendingApproval = !restaurant.isActive && !restaurant.approvedAt && !restaurant.rejectedAt;
+    if (!restaurant.isActive && !isPendingApproval) {
+      logger.warn('Deactivated restaurant attempted Google login', {
         restaurantId: restaurant._id,
         email
       });
@@ -1069,7 +1075,13 @@ export const firebaseGoogleLogin = asyncHandler(async (req, res) => {
       sameSite: 'strict',
       maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
     });
-    return successResponse(res, 200, 'Firebase Google authentication successful', {
+    return successResponse(
+      res,
+      200,
+      isPendingApproval
+        ? 'Google authentication successful. Your account is pending admin approval.'
+        : 'Firebase Google authentication successful',
+      {
       accessToken: tokens.accessToken,
       restaurant: {
         id: restaurant._id,
@@ -1081,6 +1093,7 @@ export const firebaseGoogleLogin = asyncHandler(async (req, res) => {
         signupMethod: restaurant.signupMethod,
         profileImage: restaurant.profileImage,
         isActive: restaurant.isActive,
+        isPendingApproval,
         onboarding: restaurant.onboarding
       }
     });

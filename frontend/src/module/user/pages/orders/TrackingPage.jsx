@@ -1,6 +1,8 @@
 import React from 'react';
 import { GoogleMap, LoadScript, Marker, Polyline } from '@react-google-maps/api';
 import { ArrowLeft, Share2, RefreshCcw, Home, UtensilsCrossed, ChevronRight, Shield, Phone } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { getCurrentLanguage } from '@/lib/i18n/language.js';
 
 // --- 1. Google Map Styles (Light Theme - as shown in image) ---
 const lightMapStyle = [
@@ -55,6 +57,7 @@ const userPos = { lat: 22.75, lng: 75.89 };
 const center = { lat: 22.735, lng: 75.875 };
 
 const TrackingPage = () => {
+  const { t } = useTranslation();
 
   return (
     <div className="relative min-h-screen bg-gray-900 font-sans overflow-hidden">
@@ -64,15 +67,15 @@ const TrackingPage = () => {
         <div className="flex items-center justify-between text-white mb-3">
           <ArrowLeft className="w-6 h-6 cursor-pointer" />
           <div className="flex items-center gap-2">
-            <span className="font-semibold text-lg">Sagar Restaurant</span>
+            <span className="font-semibold text-lg">{t("user.trackingPage.restaurantName")}</span>
           </div>
           <Share2 className="w-5 h-5 cursor-pointer" />
         </div>
         
         <div className="text-center text-white">
-          <h2 className="text-2xl font-bold mb-3">Order placed</h2>
+          <h2 className="text-2xl font-bold mb-3">{t("user.trackingPage.orderPlaced")}</h2>
           <div className="flex items-center justify-center gap-2 bg-[#1a4d31] w-fit mx-auto px-4 py-2 rounded-full">
-            <span className="text-sm font-medium">Food preparation will begin shortly</span>
+            <span className="text-sm font-medium">{t("user.trackingPage.foodPreparationSoon")}</span>
             <RefreshCcw className="w-4 h-4 text-green-200" />
           </div>
         </div>
@@ -80,7 +83,10 @@ const TrackingPage = () => {
 
       {/* --- 3. Google Map Background --- */}
       <div className="absolute top-0 left-0 w-full h-full z-0">
-        <LoadScript googleMapsApiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "YOUR_GOOGLE_MAPS_API_KEY"}> 
+        <LoadScript
+          googleMapsApiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "YOUR_GOOGLE_MAPS_API_KEY"}
+          language={getCurrentLanguage()}
+        >
           <GoogleMap
             mapContainerStyle={containerStyle}
             center={center}
@@ -125,9 +131,9 @@ const TrackingPage = () => {
 
         {/* Map Overlay - Arrival Time Card */}
         <div className="absolute bottom-[50vh] left-4 right-4 z-10 bg-white rounded-xl p-4 shadow-lg border border-gray-200">
-          <p className="text-xs text-gray-600 mb-1 uppercase">ARRIVING IN</p>
-          <p className="text-3xl font-bold text-red-600 mb-1">80 mins</p>
-          <p className="text-sm text-gray-600 mb-2">45.1 km away</p>
+          <p className="text-xs text-gray-600 mb-1 uppercase">{t("user.trackingPage.arrivingIn")}</p>
+          <p className="text-3xl font-bold text-red-600 mb-1">{t("user.trackingPage.arrivalMins", { mins: 80 })}</p>
+          <p className="text-sm text-gray-600 mb-2">{t("user.trackingPage.distanceAway", { km: "45.1" })}</p>
           <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
             <div className="h-full bg-[#23633F] rounded-full" style={{ width: '60%' }}></div>
           </div>
@@ -143,7 +149,7 @@ const TrackingPage = () => {
               <div className="w-12 h-12 rounded-full bg-red-900/30 flex items-center justify-center">
                 <UtensilsCrossed className="w-6 h-6 text-red-400" />
               </div>
-              <p className="font-semibold text-white">Food is Cooking</p>
+              <p className="font-semibold text-white">{t("user.trackingPage.foodCooking")}</p>
             </div>
           </div>
 
@@ -152,7 +158,7 @@ const TrackingPage = () => {
             <div className="flex items-center gap-3">
               <Shield className="w-6 h-6 text-gray-400" />
               <span className="flex-1 text-left font-medium text-white">
-                Learn about delivery partner safety
+                {t("user.trackingPage.deliveryPartnerSafety")}
               </span>
               <ChevronRight className="w-5 h-5 text-gray-500" />
             </div>
@@ -161,7 +167,7 @@ const TrackingPage = () => {
           {/* Delivery Details Banner */}
           <div className="bg-yellow-900/30 rounded-xl p-4 border border-yellow-800/50">
             <p className="text-yellow-300 font-medium text-center">
-              All your delivery details in one place 👋
+              {t("user.trackingPage.deliveryDetailsBanner")}
             </p>
           </div>
 
@@ -170,10 +176,10 @@ const TrackingPage = () => {
             <div className="flex items-center gap-3">
               <Phone className="w-5 h-5 text-gray-400" />
               <div className="flex-1">
-                <p className="font-semibold text-white">Ajay Panchal</p>
+                <p className="font-semibold text-white">{t("user.trackingPage.contactName")}</p>
                 <p className="text-sm text-gray-400">+91 7610416911</p>
               </div>
-              <span className="text-green-400 font-medium text-sm cursor-pointer">Edit</span>
+              <span className="text-green-400 font-medium text-sm cursor-pointer">{t("user.trackingPage.edit")}</span>
             </div>
           </div>
 
@@ -182,10 +188,10 @@ const TrackingPage = () => {
             <div className="flex items-center gap-3">
               <Home className="w-5 h-5 text-gray-400" />
               <div className="flex-1">
-                <p className="font-semibold text-white">Delivery at Location</p>
-                <p className="text-sm text-gray-400">X2RJ+QHR, Dewas, Madhya Pradesh 45...</p>
+                <p className="font-semibold text-white">{t("user.trackingPage.deliveryAtLocation")}</p>
+                <p className="text-sm text-gray-400">{t("user.trackingPage.deliveryAddressSample")}</p>
               </div>
-              <span className="text-green-400 font-medium text-sm cursor-pointer">Edit</span>
+              <span className="text-green-400 font-medium text-sm cursor-pointer">{t("user.trackingPage.edit")}</span>
             </div>
           </div>
         </div>
@@ -195,4 +201,3 @@ const TrackingPage = () => {
 };
 
 export default TrackingPage;
-

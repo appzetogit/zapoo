@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
+import { useTranslation } from "react-i18next"
 import {
   Trophy,
   ChevronLeft,
@@ -17,6 +18,7 @@ import { restaurantAPI } from "@/lib/api"
 import Loader from "@/components/Loader"
 
 export default function RestaurantChallenges() {
+    const { t, i18n } = useTranslation()
     const navigate = useNavigate()
     const [challenges, setChallenges] = useState([])
     const [filter, setFilter] = useState("all")
@@ -37,11 +39,11 @@ export default function RestaurantChallenges() {
                 // Backend returns { challenges: [...] }
                 setChallenges(res.data.data.challenges || [])
             } else {
-                setError("Failed to fetch challenges")
+                setError(t("restaurant.challenges.errors.fetchFailed"))
             }
         } catch (err) {
             console.error(err)
-            setError("Something went wrong while fetching challenges")
+            setError(t("restaurant.challenges.errors.unexpected"))
         } finally {
             setLoading(false)
         }
@@ -56,9 +58,9 @@ export default function RestaurantChallenges() {
 
     const getFrequencyLabel = (freq) => {
         switch (freq) {
-            case 'daily': return 'Daily'
-            case 'weekly': return 'Weekly'
-            case 'monthly': return 'Monthly'
+            case 'daily': return t("restaurant.challenges.frequency.daily")
+            case 'weekly': return t("restaurant.challenges.frequency.weekly")
+            case 'monthly': return t("restaurant.challenges.frequency.monthly")
             default: return freq
         }
     }
@@ -92,12 +94,12 @@ export default function RestaurantChallenges() {
                     <div className="flex items-center gap-3">
                         <button
                             onClick={() => navigate(-1)}
-                            className="p-2 -ml-2 hover:bg-blue-50 rounded-full transition-colors"
-                        >
-                            <ChevronLeft className="w-6 h-6 text-slate-700" />
-                        </button>
-                        <h1 className="text-xl font-bold bg-gradient-to-r from-blue-700 to-sky-500 bg-clip-text text-transparent">
-                            Business Challenges
+                                className="p-2 -ml-2 hover:bg-blue-50 rounded-full transition-colors"
+                            >
+                                <ChevronLeft className="w-6 h-6 text-slate-700" />
+                            </button>
+                            <h1 className="text-xl font-bold bg-gradient-to-r from-blue-700 to-sky-500 bg-clip-text text-transparent">
+                            {t("restaurant.challenges.title")}
                         </h1>
                     </div>
                     <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center">
@@ -116,19 +118,19 @@ export default function RestaurantChallenges() {
                     <div className="relative z-10">
                         <div className="flex items-center gap-2 mb-2">
                             <Zap className="w-5 h-5 text-yellow-400 fill-yellow-400" />
-                            <span className="text-sm font-medium uppercase tracking-wider opacity-80">Growth Booster</span>
+                            <span className="text-sm font-medium uppercase tracking-wider opacity-80">{t("restaurant.challenges.hero.badge")}</span>
                         </div>
-                        <h2 className="text-3xl font-extrabold mb-2">Unlock Your Potential</h2>
+                        <h2 className="text-3xl font-extrabold mb-2">{t("restaurant.challenges.hero.title")}</h2>
                         <p className="text-blue-100 max-w-sm mb-6 leading-relaxed">
-                            Complete active challenges to boost your visibility, earn extra commissions, and scale your brand. Rewards are applied automatically when you hit the target.
+                            {t("restaurant.challenges.hero.description")}
                         </p>
                         <div className="flex gap-4">
                             <div className="bg-white/15 backdrop-blur-sm rounded-2xl px-4 py-3 border border-white/20">
-                                <div className="text-xs opacity-80 mb-1">Total Rewards</div>
+                                <div className="text-xs opacity-80 mb-1">{t("restaurant.challenges.hero.totalRewards")}</div>
                                 <div className="text-lg font-bold">₹0.00</div>
                             </div>
                             <div className="bg-white/15 backdrop-blur-sm rounded-2xl px-4 py-3 border border-white/20">
-                                <div className="text-xs opacity-80 mb-1">Rank</div>
+                                <div className="text-xs opacity-80 mb-1">{t("restaurant.challenges.hero.rank")}</div>
                                 <div className="text-lg font-bold">Top 15%</div>
                             </div>
                         </div>
@@ -147,7 +149,7 @@ export default function RestaurantChallenges() {
                             : "bg-white text-slate-600 border border-slate-200 hover:border-blue-300"
                             }`}
                     >
-                        All Challenges
+                        {t("restaurant.challenges.filters.all")}
                     </button>
                     <button
                         onClick={() => setFilter("active")}
@@ -156,7 +158,7 @@ export default function RestaurantChallenges() {
                             : "bg-white text-slate-600 border border-slate-200 hover:border-blue-300"
                             }`}
                     >
-                        Active
+                        {t("restaurant.challenges.filters.active")}
                     </button>
                     <button
                         onClick={() => setFilter("completed")}
@@ -165,7 +167,7 @@ export default function RestaurantChallenges() {
                             : "bg-white text-slate-600 border border-slate-200 hover:border-blue-300"
                             }`}
                     >
-                        Completed
+                        {t("restaurant.challenges.filters.completed")}
                     </button>
                 </div>
 
@@ -216,18 +218,20 @@ export default function RestaurantChallenges() {
                                                     <div className="flex items-center gap-3 mt-1">
                                                         <div className="flex items-center gap-1 text-xs font-medium text-slate-500">
                                                             <Target className="w-3.5 h-3.5" />
-                                                            Target: {target}
+                                                            {t("restaurant.challenges.labels.target")}: {target}
                                                         </div>
                                                         <div className="flex items-center gap-1 text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
                                                             <Zap className="w-3 h-3 fill-blue-600" />
-                                                            {challenge.rewardType === 'free_banner' ? 'Reward: Free Banner (1 day)' : `Reward: ₹${challenge.rewardValue}`}
+                                                            {challenge.rewardType === 'free_banner'
+                                                              ? t("restaurant.challenges.labels.rewardFreeBanner")
+                                                              : t("restaurant.challenges.labels.rewardAmount", { amount: challenge.rewardValue })}
                                                         </div>
                                                     </div>
                                                 </div>
                                             </div>
                                             <div className="text-right">
                                                 <div className="text-2xl font-black text-slate-900 leading-none">{percentage}%</div>
-                                                <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400 mt-1">Progress</div>
+                                                <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400 mt-1">{t("restaurant.challenges.labels.progress")}</div>
                                             </div>
                                         </div>
 
@@ -247,7 +251,7 @@ export default function RestaurantChallenges() {
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500">
                                                 <Clock className="w-4 h-4" />
-                                                Expires: {new Date(challenge.endDate).toLocaleDateString('en-IN', {
+                                                {t("restaurant.challenges.labels.expires")}: {new Date(challenge.endDate).toLocaleDateString(i18n.language === "bn" ? "bn-IN" : i18n.language === "hi" ? "hi-IN" : "en-IN", {
                                                     day: '2-digit',
                                                     month: 'short'
                                                 })}
@@ -260,7 +264,7 @@ export default function RestaurantChallenges() {
                                                 }}
                                                 className="flex items-center gap-1 text-xs font-bold text-blue-600 group-hover:gap-2 transition-all"
                                             >
-                                                View Details <ChevronRight className="w-4 h-4" />
+                                                {t("restaurant.challenges.actions.viewDetails")} <ChevronRight className="w-4 h-4" />
                                             </button>
                                         </div>
                                     </motion.div>
@@ -271,9 +275,11 @@ export default function RestaurantChallenges() {
                                 <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-slate-100">
                                     <Trophy className="w-10 h-10 text-slate-300" />
                                 </div>
-                                <h3 className="text-xl font-bold text-slate-900 mb-2">No Challenges Found</h3>
+                                <h3 className="text-xl font-bold text-slate-900 mb-2">{t("restaurant.challenges.empty.title")}</h3>
                                 <p className="text-slate-500 max-w-xs mx-auto">
-                                    There are no {filter !== "all" ? filter : ""} challenges at the moment. Keep an eye out for upcoming growth boosters!
+                                    {t("restaurant.challenges.empty.description", {
+                                      filter: filter !== "all" ? t(`restaurant.challenges.filters.${filter}`) : "",
+                                    })}
                                 </p>
                             </div>
                         )}
@@ -305,45 +311,45 @@ export default function RestaurantChallenges() {
 
                         <div className="space-y-3 text-sm text-slate-700">
                             <div className="flex items-center justify-between">
-                                <span className="font-medium">Frequency</span>
+                                <span className="font-medium">{t("restaurant.challenges.details.frequency")}</span>
                                 <span className="px-2 py-0.5 text-[11px] rounded-full bg-blue-50 text-blue-700 font-semibold border border-blue-100">
                                     {getFrequencyLabel(selectedChallenge.frequency)}
                                 </span>
                             </div>
                             <div className="flex items-center justify-between">
-                                <span className="font-medium">Target</span>
+                                <span className="font-medium">{t("restaurant.challenges.details.target")}</span>
                                 <span>{selectedChallenge.targetValue}</span>
                             </div>
                             <div className="flex items-center justify-between">
-                                <span className="font-medium">Reward</span>
+                                <span className="font-medium">{t("restaurant.challenges.details.reward")}</span>
                                 <span>
                                     {selectedChallenge.rewardType === 'free_banner'
-                                        ? 'Free banner (1 day)'
-                                        : `₹${selectedChallenge.rewardValue}`}
+                                        ? t("restaurant.challenges.labels.freeBanner")
+                                        : t("restaurant.challenges.labels.amountWithCurrency", { amount: selectedChallenge.rewardValue })}
                                 </span>
                             </div>
                             <div className="flex items-center justify-between">
-                                <span className="font-medium">Validity</span>
+                                <span className="font-medium">{t("restaurant.challenges.details.validity")}</span>
                                 <span>
                                     {selectedChallenge.startDate
-                                        ? `${new Date(selectedChallenge.startDate).toLocaleDateString('en-IN', {
+                                        ? `${new Date(selectedChallenge.startDate).toLocaleDateString(i18n.language === "bn" ? "bn-IN" : i18n.language === "hi" ? "hi-IN" : "en-IN", {
                                             day: '2-digit',
                                             month: 'short'
-                                        })} → ${new Date(selectedChallenge.endDate).toLocaleDateString('en-IN', {
+                                        })} → ${new Date(selectedChallenge.endDate).toLocaleDateString(i18n.language === "bn" ? "bn-IN" : i18n.language === "hi" ? "hi-IN" : "en-IN", {
                                             day: '2-digit',
                                             month: 'short'
                                         })}`
-                                        : '—'}
+                                        : t("restaurant.challenges.common.dash")}
                                 </span>
                             </div>
                             <div className="flex items-center justify-between">
-                                <span className="font-medium">Current progress</span>
+                                <span className="font-medium">{t("restaurant.challenges.details.currentProgress")}</span>
                                 <span>
                                     {selectedChallenge.progress?.currentProgress || 0}/{selectedChallenge.targetValue}
                                 </span>
                             </div>
                             <div className="flex items-center justify-between">
-                                <span className="font-medium">Status</span>
+                                <span className="font-medium">{t("restaurant.challenges.details.status")}</span>
                                 <span className="capitalize">{selectedChallenge.progress?.status || selectedChallenge.status}</span>
                             </div>
                         </div>
@@ -353,7 +359,7 @@ export default function RestaurantChallenges() {
                             onClick={closeDetails}
                             className="mt-5 w-full py-2.5 rounded-2xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors"
                         >
-                            Got it
+                            {t("restaurant.challenges.actions.gotIt")}
                         </button>
                     </motion.div>
                 </div>

@@ -7,6 +7,8 @@ import Restaurant from '../../restaurant/models/Restaurant.js';
 import User from '../../auth/models/User.js';
 import admin from 'firebase-admin';
 import { calculateDistance } from '../../order/services/orderCalculationService.js';
+import { resolveLocaleFromRequest } from '../../../shared/i18n/localeResolver.js';
+import { resolveLocalizedText } from '../../../shared/i18n/localizedText.js';
 
 /**
  * POST /api/notification-requests
@@ -380,6 +382,7 @@ export const updateNotificationSettings = asyncHandler(async (req, res) => {
  * filtered by the restaurant's deliveryRange so users only see relevant ones.
  */
 export const getUserNotifications = asyncHandler(async (req, res) => {
+  const locale = resolveLocaleFromRequest(req);
   const { latitude, longitude } = req.query;
   const userLat = latitude != null ? parseFloat(latitude) : null;
   const userLng = longitude != null ? parseFloat(longitude) : null;
@@ -398,5 +401,11 @@ export const getUserNotifications = asyncHandler(async (req, res) => {
     });
   }
 
-  return successResponse(res, 200, 'Notifications fetched', { notifications });
+  return successResponse(res, 200, 'Notifications fetched', {
+    notifications: notifications.map((notification) => ({
+      ...notification,
+      title: resolveLocalizedText(notification.localizedTitle, locale, notification.title),
+      description: resolveLocalizedText(notification.localizedDescription, locale, notification.description)
+    }))
+  });
 });

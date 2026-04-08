@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react"
 import { useNavigate } from "react-router-dom"
 import Lenis from "lenis"
+import { useTranslation } from "react-i18next"
 import {
   ArrowLeft,
   User,
@@ -25,6 +26,7 @@ import { firebaseAuth } from "@/lib/firebase"
 const STORAGE_KEY = "restaurant_owner_contact"
 
 export default function EditOwner() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [ownerData, setOwnerData] = useState({
     name: "",
@@ -155,7 +157,7 @@ export default function EditOwner() {
           }
         } catch (error) {
           console.error("Error uploading profile image:", error)
-          alert("Failed to upload profile image. Please try again.")
+          alert(t("restaurant.editOwner.alerts.uploadImageFailed"))
           setSaving(false)
           return
         }
@@ -196,11 +198,13 @@ export default function EditOwner() {
         // Navigate back
         navigate(-1)
       } else {
-        throw new Error("Invalid response from server")
+        throw new Error(t("restaurant.editOwner.alerts.invalidServerResponse"))
       }
     } catch (error) {
       console.error("Error saving owner data:", error)
-      alert(`Failed to save owner details: ${error.response?.data?.message || error.message || "Please try again."}`)
+      alert(t("restaurant.editOwner.alerts.saveFailed", {
+        message: error.response?.data?.message || error.message || t("restaurant.editOwner.alerts.tryAgain")
+      }))
     } finally {
       setSaving(false)
     }
@@ -252,7 +256,9 @@ export default function EditOwner() {
       }, 300)
     } catch (error) {
       console.error("Error deleting account:", error)
-      alert(`Failed to delete account: ${error.response?.data?.message || error.message || "Please try again."}`)
+      alert(t("restaurant.editOwner.alerts.deleteFailed", {
+        message: error.response?.data?.message || error.message || t("restaurant.editOwner.alerts.tryAgain")
+      }))
       setIsDeleting(false)
     }
   }
@@ -265,11 +271,11 @@ export default function EditOwner() {
           <button
             onClick={() => navigate(-1)}
             className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
-            aria-label="Go back"
+            aria-label={t("restaurant.editOwner.aria.goBack")}
           >
             <ArrowLeft className="w-6 h-6 text-gray-900" />
           </button>
-          <h1 className="text-lg font-bold text-gray-900">Contact details</h1>
+          <h1 className="text-lg font-bold text-gray-900">{t("restaurant.editOwner.title")}</h1>
         </div>
       </div>
 
@@ -284,7 +290,7 @@ export default function EditOwner() {
               ) : formData.photo ? (
                 <OptimizedImage
                   src={formData.photo}
-                  alt="Owner profile"
+                  alt={t("restaurant.editOwner.aria.ownerProfile")}
                   className="w-full h-full object-cover"
                 />
               ) : (
@@ -297,7 +303,7 @@ export default function EditOwner() {
             disabled={loading || saving}
             className="text-blue-600 text-sm font-normal hover:text-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Edit photo
+            {t("restaurant.editOwner.actions.editPhoto")}
           </button>
           <input
             ref={fileInputRef}
@@ -313,13 +319,13 @@ export default function EditOwner() {
         <div className="space-y-4">
           {/* Name Field */}
           <div>
-            <label className="text-sm font-medium text-gray-700 mb-2 block">Name</label>
+            <label className="text-sm font-medium text-gray-700 mb-2 block">{t("restaurant.editOwner.fields.name")}</label>
             <div className="relative">
               <Input
                 type="text"
-                value={loading ? "Loading..." : formData.name}
+                value={loading ? t("restaurant.editOwner.common.loading") : formData.name}
                 onChange={(e) => handleInputChange("name", e.target.value)}
-                placeholder="Enter name"
+                placeholder={t("restaurant.editOwner.placeholders.name")}
                 className="w-full pr-10"
                 disabled={loading || saving}
               />
@@ -329,13 +335,13 @@ export default function EditOwner() {
 
           {/* Phone Number Field */}
           <div>
-            <label className="text-sm font-medium text-gray-700 mb-2 block">Phone number</label>
+            <label className="text-sm font-medium text-gray-700 mb-2 block">{t("restaurant.editOwner.fields.phone")}</label>
             <div className="relative">
               <Input
                 type="tel"
-                value={loading ? "Loading..." : formData.phone}
+                value={loading ? t("restaurant.editOwner.common.loading") : formData.phone}
                 onChange={(e) => handleInputChange("phone", e.target.value)}
-                placeholder="Enter phone number"
+                placeholder={t("restaurant.editOwner.placeholders.phone")}
                 className="w-full pr-10 focus-visible:border-black focus-visible:ring-0"
                 disabled={loading || saving}
               />
@@ -345,13 +351,13 @@ export default function EditOwner() {
 
           {/* Email Field */}
           <div>
-            <label className="text-sm font-medium text-gray-700 mb-2 block">Email</label>
+            <label className="text-sm font-medium text-gray-700 mb-2 block">{t("restaurant.editOwner.fields.email")}</label>
             <div className="relative">
               <Input
                 type="email"
-                value={loading ? "Loading..." : formData.email}
+                value={loading ? t("restaurant.editOwner.common.loading") : formData.email}
                 onChange={(e) => handleInputChange("email", e.target.value)}
-                placeholder="Enter email address"
+                placeholder={t("restaurant.editOwner.placeholders.email")}
                 className="w-full pr-10 focus-visible:border-black focus-visible:ring-0"
                 disabled={loading || saving}
               />
@@ -367,7 +373,7 @@ export default function EditOwner() {
             className="flex items-center gap-2 text-red-600 hover:text-red-700 transition-colors"
           >
             <Trash2 className="w-5 h-5" />
-            <span className="text-sm font-normal">Delete your Zomato account</span>
+            <span className="text-sm font-normal">{t("restaurant.editOwner.actions.deleteAccount")}</span>
           </button>
         </div>
       </div>
@@ -380,11 +386,10 @@ export default function EditOwner() {
               <span className="text-2xl leading-none text-red-600">!</span>
             </div>
             <DialogTitle className="text-base font-semibold text-gray-900 text-center">
-              You are about to delete your Zomato account
+              {t("restaurant.editOwner.deleteDialog.title")}
             </DialogTitle>
             <DialogDescription className="mt-2 text-sm text-gray-600">
-              All information associated with your account will be deleted, and you will lose access to your restaurant permanently.
-              This information cannot be recovered once the account is deleted. Are you sure you want to proceed?
+              {t("restaurant.editOwner.deleteDialog.description")}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="flex flex-col gap-2 sm:flex-col">
@@ -393,7 +398,7 @@ export default function EditOwner() {
               disabled={isDeleting}
               className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isDeleting ? "Deleting..." : "Confirm"}
+              {isDeleting ? t("restaurant.editOwner.actions.deleting") : t("restaurant.editOwner.actions.confirm")}
             </Button>
             <Button
               variant="outline"
@@ -401,7 +406,7 @@ export default function EditOwner() {
               disabled={isDeleting}
               className="w-full disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Cancel
+              {t("restaurant.editOwner.actions.cancel")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -418,7 +423,7 @@ export default function EditOwner() {
               : "bg-gray-200 text-gray-500 cursor-not-allowed"
           } transition-colors`}
         >
-          {saving ? "Saving..." : "Save"}
+          {saving ? t("restaurant.editOwner.actions.saving") : t("restaurant.editOwner.actions.save")}
         </Button>
       </div>
     </div>

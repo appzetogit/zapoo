@@ -2,12 +2,14 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import Lenis from "lenis";
+import { useTranslation } from "react-i18next";
 import { ArrowLeft, Search, Power } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { clearModuleAuth } from "@/lib/utils/auth";
 import { authAPI } from "@/lib/api";
 import { firebaseAuth } from "@/lib/firebase";
 export default function SwitchOutlet() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [showOffline, setShowOffline] = useState(true);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -15,8 +17,8 @@ export default function SwitchOutlet() {
   // Mock outlet data - replace with actual data from your API/store
   const outlets = [{
     id: 20959122,
-    name: "Kadhai Chammach Restaurant",
-    address: "By Pass Road (South)",
+    name: t("restaurant.switchOutlet.sample.name"),
+    address: t("restaurant.switchOutlet.sample.address"),
     image: "/api/placeholder/80/80",
     // Replace with actual image URL
     status: "offline" // "online" or "offline"
@@ -122,17 +124,17 @@ export default function SwitchOutlet() {
     }} className="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-50">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3 flex-1">
-            <button onClick={() => navigate(-1)} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors" aria-label="Go back">
+            <button onClick={() => navigate(-1)} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors" aria-label={t("restaurant.switchOutlet.aria.goBack")}>
               <ArrowLeft className="w-6 h-6 text-gray-900" />
             </button>
             <div className="flex-1">
-              <h1 className="text-lg font-bold text-gray-900">Switch outlet</h1>
+              <h1 className="text-lg font-bold text-gray-900">{t("restaurant.switchOutlet.title")}</h1>
               <p className="text-sm text-gray-600 mt-0.5">
-                You are mapped to {mappedOutletsCount} outlet{mappedOutletsCount !== 1 ? 's' : ''}
+                {t("restaurant.switchOutlet.mappedOutlets", { count: mappedOutletsCount })}
               </p>
             </div>
           </div>
-          <button onClick={() => {}} className="p-2 hover:bg-gray-100 rounded-lg transition-colors" aria-label="Search">
+          <button onClick={() => {}} className="p-2 hover:bg-gray-100 rounded-lg transition-colors" aria-label={t("restaurant.switchOutlet.aria.search")}>
             <Search className="w-5 h-5 text-gray-900" />
           </button>
         </div>
@@ -153,7 +155,7 @@ export default function SwitchOutlet() {
       }} className="flex items-center gap-3 mb-6">
           <Checkbox id="show-offline" checked={showOffline} onCheckedChange={setShowOffline} className="w-5 h-5 border-2 border-gray-300 rounded data-[state=checked]:bg-red-600 text-white data-[state=checked]:border-red-600" />
           <label htmlFor="show-offline" className="text-sm font-light text-red-600 cursor-pointer">
-            Show outlets currently offline
+            {t("restaurant.switchOutlet.actions.showOffline")}
           </label>
         </motion.div>
 
@@ -194,7 +196,7 @@ export default function SwitchOutlet() {
                     {outlet.address}
                   </p>
                   <p className="text-xs text-gray-600">
-                    Outlet ID: {outlet.id}
+                    {t("restaurant.switchOutlet.labels.outletId")}: {outlet.id}
                   </p>
                   
                 </div>
@@ -203,7 +205,9 @@ export default function SwitchOutlet() {
                   <div className="flex p-2 rounded-b-lg items-center w-full bg-gray-200 border border-blue-200 gap-1.5 mt-3">
                     <Power className={`w-4 h-4 ${outlet.status === "offline" ? "text-red-600" : "text-green-600"}`} />
                     <span className={`text-sm font-medium ${outlet.status === "offline" ? "text-red-600" : "text-green-600"}`}>
-                      {outlet.status === "offline" ? "Offline" : "Online"}
+                      {outlet.status === "offline"
+                        ? t("restaurant.switchOutlet.status.offline")
+                        : t("restaurant.switchOutlet.status.online")}
                     </span>
                   </div>
             </motion.div>)}
@@ -221,7 +225,7 @@ export default function SwitchOutlet() {
         delay: 0.2
       }} className="mb-6">
           <p className="text-sm text-gray-900 leading-relaxed">
-            Couldn't find the outlet you are looking for? Logout and try again with a different account.
+            {t("restaurant.switchOutlet.helpText")}
           </p>
         </motion.div>
 
@@ -238,7 +242,9 @@ export default function SwitchOutlet() {
       }} onClick={handleLogout} disabled={isLoggingOut} className="flex items-center gap-2 text-red-600 hover:text-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
           <Power className={`w-5 h-5 ${isLoggingOut ? 'animate-spin' : ''}`} />
           <span className="text-base font-medium">
-            {isLoggingOut ? "Logging out..." : "Logout"}
+            {isLoggingOut
+              ? t("restaurant.switchOutlet.actions.loggingOut")
+              : t("restaurant.switchOutlet.actions.logout")}
           </span>
         </motion.button>
       </div>

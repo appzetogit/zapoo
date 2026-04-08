@@ -6,14 +6,15 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import apiClient from "@/lib/api"
+import { useTranslation } from "react-i18next"
 
-const ORDER_NOTIFICATIONS = [
+const buildOrderNotifications = (t) => [
   {
     id: 1,
     type: "order",
-    title: "Order Confirmed",
-    message: "Your order #12345 has been confirmed and is being prepared",
-    time: "2 minutes ago",
+    title: t("user.notifications.sample.orderConfirmedTitle"),
+    message: t("user.notifications.sample.orderConfirmedMessage"),
+    time: t("user.notifications.sample.twoMinutesAgo"),
     read: false,
     icon: CheckCircle2,
     iconColor: "text-green-600"
@@ -21,9 +22,9 @@ const ORDER_NOTIFICATIONS = [
   {
     id: 2,
     type: "offer",
-    title: "Special Offer",
-    message: "Get 50% off on your next order above INR 500",
-    time: "1 hour ago",
+    title: t("user.notifications.sample.specialOfferTitle"),
+    message: t("user.notifications.sample.specialOfferMessage"),
+    time: t("user.notifications.sample.oneHourAgo"),
     read: false,
     icon: Tag,
     iconColor: "text-red-600"
@@ -31,9 +32,9 @@ const ORDER_NOTIFICATIONS = [
   {
     id: 3,
     type: "promotion",
-    title: "New Restaurant Added",
-    message: "Check out the new Italian restaurant in your area",
-    time: "3 hours ago",
+    title: t("user.notifications.sample.newRestaurantTitle"),
+    message: t("user.notifications.sample.newRestaurantMessage"),
+    time: t("user.notifications.sample.threeHoursAgo"),
     read: true,
     icon: Gift,
     iconColor: "text-blue-600"
@@ -41,9 +42,9 @@ const ORDER_NOTIFICATIONS = [
   {
     id: 4,
     type: "order",
-    title: "Order Delivered",
-    message: "Your order #12340 has been delivered successfully",
-    time: "Yesterday",
+    title: t("user.notifications.sample.orderDeliveredTitle"),
+    message: t("user.notifications.sample.orderDeliveredMessage"),
+    time: t("user.notifications.sample.yesterday"),
     read: true,
     icon: CheckCircle2,
     iconColor: "text-green-600"
@@ -51,9 +52,9 @@ const ORDER_NOTIFICATIONS = [
   {
     id: 5,
     type: "alert",
-    title: "Payment Failed",
-    message: "Your payment for order #12338 failed. Please try again",
-    time: "2 days ago",
+    title: t("user.notifications.sample.paymentFailedTitle"),
+    message: t("user.notifications.sample.paymentFailedMessage"),
+    time: t("user.notifications.sample.twoDaysAgo"),
     read: true,
     icon: AlertCircle,
     iconColor: "text-orange-600"
@@ -61,24 +62,24 @@ const ORDER_NOTIFICATIONS = [
   {
     id: 6,
     type: "offer",
-    title: "Weekend Special",
-    message: "Enjoy free delivery on all orders this weekend",
-    time: "3 days ago",
+    title: t("user.notifications.sample.weekendSpecialTitle"),
+    message: t("user.notifications.sample.weekendSpecialMessage"),
+    time: t("user.notifications.sample.threeDaysAgo"),
     read: true,
     icon: Tag,
     iconColor: "text-red-600"
   }
 ]
 
-function formatTime(isoString) {
+function formatTime(isoString, t) {
   try {
     const d = new Date(isoString)
     const diffMs = Date.now() - d.getTime()
     const diffMin = Math.floor(diffMs / 60000)
-    if (diffMin < 1) return "Just now"
-    if (diffMin < 60) return `${diffMin}m ago`
+    if (diffMin < 1) return t("user.notifications.time.justNow")
+    if (diffMin < 60) return t("user.notifications.time.minutesAgo", { count: diffMin })
     const diffHr = Math.floor(diffMin / 60)
-    if (diffHr < 24) return `${diffHr}h ago`
+    if (diffHr < 24) return t("user.notifications.time.hoursAgo", { count: diffHr })
     return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short" })
   } catch {
     return ""
@@ -86,6 +87,8 @@ function formatTime(isoString) {
 }
 
 export default function Notifications() {
+  const { t } = useTranslation()
+  const ORDER_NOTIFICATIONS = buildOrderNotifications(t)
   const [promoNotifs, setPromoNotifs] = useState([])
   const [readPromoIds, setReadPromoIds] = useState(new Set())
 
@@ -138,7 +141,9 @@ export default function Notifications() {
           </Link>
           <div className="flex items-center gap-2 sm:gap-3 flex-1">
             <Bell className="h-5 w-5 sm:h-6 sm:w-6 text-red-600 fill-red-600" />
-            <h1 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-gray-800 dark:text-white">Notifications</h1>
+            <h1 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-gray-800 dark:text-white">
+              {t("user.notifications.title")}
+            </h1>
             {totalUnread > 0 && (
               <Badge className="bg-red-600 text-white text-xs md:text-sm">{totalUnread}</Badge>
             )}
@@ -150,7 +155,7 @@ export default function Notifications() {
             <div className="flex items-center gap-2 mb-3">
               <Megaphone className="h-4 w-4 text-[#FF5200]" />
               <h2 className="text-sm font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wide">
-                Promotions and Offers
+                {t("user.notifications.promotionsAndOffers")}
               </h2>
               {unreadPromoCount > 0 && (
                 <Badge className="bg-[#FF5200] text-white text-xs">{unreadPromoCount}</Badge>
@@ -186,7 +191,7 @@ export default function Notifications() {
                           </p>
                           <div className="flex items-center gap-1 text-xs md:text-sm text-gray-500 dark:text-gray-400">
                             <Clock className="h-3 w-3 md:h-4 md:w-4" />
-                            <span>{formatTime(notif.sentAt)}</span>
+                            <span>{formatTime(notif.sentAt, t)}</span>
                           </div>
                         </div>
                       </div>
@@ -202,7 +207,9 @@ export default function Notifications() {
           {promoNotifs.length > 0 && (
             <div className="flex items-center gap-2 mb-3">
               <Bell className="h-4 w-4 text-gray-500" />
-              <h2 className="text-sm font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wide">Orders and Updates</h2>
+              <h2 className="text-sm font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wide">
+                {t("user.notifications.ordersAndUpdates")}
+              </h2>
               {unreadOrderCount > 0 && (
                 <Badge className="bg-red-600 text-white text-xs">{unreadOrderCount}</Badge>
               )}
@@ -247,8 +254,12 @@ export default function Notifications() {
         {ORDER_NOTIFICATIONS.length === 0 && promoNotifs.length === 0 && (
           <div className="text-center py-12 md:py-16 lg:py-20">
             <Bell className="h-16 w-16 md:h-20 md:w-20 lg:h-24 lg:w-24 text-gray-300 dark:text-gray-600 mx-auto mb-4 md:mb-5 lg:mb-6" />
-            <h3 className="text-lg md:text-xl lg:text-2xl font-semibold text-gray-700 dark:text-gray-300 mb-2 md:mb-3">No notifications</h3>
-            <p className="text-sm md:text-base text-gray-500 dark:text-gray-400">You're all caught up!</p>
+            <h3 className="text-lg md:text-xl lg:text-2xl font-semibold text-gray-700 dark:text-gray-300 mb-2 md:mb-3">
+              {t("user.notifications.emptyTitle")}
+            </h3>
+            <p className="text-sm md:text-base text-gray-500 dark:text-gray-400">
+              {t("user.notifications.emptyDescription")}
+            </p>
           </div>
         )}
       </div>

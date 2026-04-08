@@ -1,6 +1,12 @@
 import admin from 'firebase-admin';
 import DeviceToken from '../models/DeviceToken.js';
 import User from '../../auth/models/User.js';
+import Restaurant from '../../restaurant/models/Restaurant.js';
+import Delivery from '../../delivery/models/Delivery.js';
+import Admin from '../../admin/models/Admin.js';
+import { renderNotificationTemplate } from '../../../shared/i18n/notificationTemplates.js';
+import { normalizeLocale } from '../../../shared/i18n/localeConstants.js';
+import { resolveLocalizedText } from '../../../shared/i18n/localizedText.js';
 
 /**
  * Resolve a Firebase Admin app instance that has messaging enabled.
@@ -152,9 +158,26 @@ export async function sendNotificationToUser(userId, role, title, body, data = {
       ...data
     };
 
+    const recipientLocale = await resolveRecipientLocale(userId, role);
+    let resolvedTitle = title;
+    let resolvedBody = body;
+
+    if (data?.templateKey) {
+      const rendered = await renderNotificationTemplate(
+        data.templateKey,
+        data.templateVars || {},
+        recipientLocale
+      );
+      resolvedTitle = rendered.title;
+      resolvedBody = rendered.body;
+    } else {
+      resolvedTitle = resolveLocalizedText(title, recipientLocale, typeof title === 'string' ? title : '');
+      resolvedBody = resolveLocalizedText(body, recipientLocale, typeof body === 'string' ? body : '');
+    }
+
     const payload = {
-      title,
-      body,
+      title: resolvedTitle,
+      body: resolvedBody,
       data: enrichedData
     };
     const tokensRaw = await DeviceToken.find({
@@ -179,4 +202,27 @@ export async function sendNotificationToUser(userId, role, title, body, data = {
   } catch (error) {
     console.error(`[FCM] Error in sendNotificationToUser for ${userId}:`, error);
   }
+}
+
+async function resolveRecipientLocale(userId, role) {
+  const normalizedRole = role || 'user';
+
+  if (normalizedRole === 'user') {
+    const user = await User.findById(userId).select('preferences.language').lean();
+    return normalizeLocale(user?.preferences?.language);
+  }
+  if (normalizedRole === 'restaurant') {
+    const restaurant = await Restaurant.findById(userId).select('preferences.language').lean();
+    return normalizeLocale(restaurant?.preferences?.language);
+  }
+  if (normalizedRole === 'delivery') {
+    const delivery = await Delivery.findById(userId).select('preferences.language').lean();
+    return normalizeLocale(delivery?.preferences?.language);
+  }
+  if (normalizedRole === 'admin') {
+    const adminUser = await Admin.findById(userId).select('preferences.language').lean();
+    return normalizeLocale(adminUser?.preferences?.language);
+  }
+
+  return 'en';
 }

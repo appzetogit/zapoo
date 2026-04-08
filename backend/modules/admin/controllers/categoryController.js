@@ -2,6 +2,10 @@ import AdminCategoryManagement from '../models/AdminCategoryManagement.js';
 import { successResponse, errorResponse } from '../../../shared/utils/response.js';
 import { asyncHandler } from '../../../shared/middleware/asyncHandler.js';
 import { uploadToCloudinary } from '../../../shared/utils/cloudinaryService.js';
+import { resolveLocaleFromRequest } from '../../../shared/i18n/localeResolver.js';
+import { normalizeLocale } from '../../../shared/i18n/localeConstants.js';
+import { resolveLocalizedText, toLocalizedText } from '../../../shared/i18n/localizedText.js';
+import { buildLocalizedText } from '../../../shared/i18n/translationService.js';
 import winston from 'winston';
 const logger = winston.createLogger({
   level: 'info',
@@ -11,25 +15,79 @@ const logger = winston.createLogger({
   })]
 });
 
+const mergeLocalizedValue = (existingValue, localizedOverride, fallback = '') => {
+  const merged = toLocalizedText(existingValue, fallback);
+  if (localizedOverride && typeof localizedOverride === 'object') {
+    for (const locale of ['en', 'hi', 'bn']) {
+      if (typeof localizedOverride[locale] === 'string') {
+        merged[locale] = localizedOverride[locale];
+      }
+    }
+  }
+  return merged;
+};
+
+const maybeTranslate = async (localizedValue, sourceLocale, autoTranslate, explicitOverrides = null) => {
+  if (sourceLocale === 'en' && autoTranslate && localizedValue.en) {
+    try {
+      const translated = await buildLocalizedText(localizedValue.en);
+      if (!explicitOverrides?.hi) localizedValue.hi = translated.hi || localizedValue.hi;
+      if (!explicitOverrides?.bn) localizedValue.bn = translated.bn || localizedValue.bn;
+    } catch (error) {
+      logger.warn(`[i18n] Category translation failed: ${error.message}`);
+    }
+  }
+  return localizedValue;
+};
+
+const resolveCategoryForLocale = (category, locale) => ({
+  ...category,
+  name: resolveLocalizedText(category.localizedName, locale, category.name || ''),
+  description: resolveLocalizedText(category.localizedDescription, locale, category.description || ''),
+});
+
+const parseMaybeJSON = (value) => {
+  if (!value) return undefined;
+  if (typeof value === 'object') return value;
+  if (typeof value !== 'string') return undefined;
+  try {
+    return JSON.parse(value);
+  } catch (_) {
+    return undefined;
+  }
+};
+
+const parseBoolean = (value, fallback = false) => {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') {
+    if (value.toLowerCase() === 'true') return true;
+    if (value.toLowerCase() === 'false') return false;
+  }
+  return fallback;
+};
+
 /**
  * Get All Categories (Public - for user frontend)
  * GET /api/categories/public
  */
 export const getPublicCategories = asyncHandler(async (req, res) => {
   try {
+    const locale = resolveLocaleFromRequest(req);
     // Only get active categories for public access
     const categories = await AdminCategoryManagement.find({
       status: true
     }).select('name image _id type').sort({
       createdAt: -1
     }).lean();
-    const formattedCategories = categories.map(category => ({
+    const formattedCategories = categories.map(category => {
+      const localized = resolveCategoryForLocale(category, locale);
+      return {
       id: category._id.toString(),
-      name: category.name,
+      name: localized.name,
       image: category.image,
       type: category.type || null,
-      slug: category.name.toLowerCase().replace(/\s+/g, '-')
-    }));
+      slug: (localized.name || category.name || '').toLowerCase().replace(/\s+/g, '-')
+    }});
     return successResponse(res, 200, 'Categories retrieved successfully', {
       categories: formattedCategories
     });
@@ -45,6 +103,7 @@ export const getPublicCategories = asyncHandler(async (req, res) => {
  */
 export const getCategories = asyncHandler(async (req, res) => {
   try {
+    const locale = resolveLocaleFromRequest(req);
     const {
       limit = 100,
       offset = 0,
@@ -65,6 +124,36 @@ export const getCategories = asyncHandler(async (req, res) => {
         }
       }, {
         description: {
+          $regex: search,
+          $options: 'i'
+        }
+      }, {
+        'localizedName.en': {
+          $regex: search,
+          $options: 'i'
+        }
+      }, {
+        'localizedName.hi': {
+          $regex: search,
+          $options: 'i'
+        }
+      }, {
+        'localizedName.bn': {
+          $regex: search,
+          $options: 'i'
+        }
+      }, {
+        'localizedDescription.en': {
+          $regex: search,
+          $options: 'i'
+        }
+      }, {
+        'localizedDescription.hi': {
+          $regex: search,
+          $options: 'i'
+        }
+      }, {
+        'localizedDescription.bn': {
           $regex: search,
           $options: 'i'
         }
@@ -93,7 +182,7 @@ export const getCategories = asyncHandler(async (req, res) => {
 
     // Add serial numbers
     const categoriesWithSl = categories.map((category, index) => ({
-      ...category,
+      ...resolveCategoryForLocale(category, locale),
       sl: parseInt(offset) + index + 1,
       id: category._id.toString()
     }));
@@ -116,6 +205,7 @@ export const getCategories = asyncHandler(async (req, res) => {
  */
 export const getCategoryById = asyncHandler(async (req, res) => {
   try {
+    const locale = resolveLocaleFromRequest(req);
     const {
       id
     } = req.params;
@@ -125,7 +215,7 @@ export const getCategoryById = asyncHandler(async (req, res) => {
     }
     return successResponse(res, 200, 'Category retrieved successfully', {
       category: {
-        ...category,
+        ...resolveCategoryForLocale(category, locale),
         id: category._id.toString()
       }
     });
@@ -141,11 +231,17 @@ export const getCategoryById = asyncHandler(async (req, res) => {
  */
 export const createCategory = asyncHandler(async (req, res) => {
   try {
+    const localeForResponse = resolveLocaleFromRequest(req);
     const {
       name,
       image,
       status,
-      type
+      type,
+      description,
+      localizedName,
+      localizedDescription,
+      locale,
+      autoTranslate = true
     } = req.body;
 
     // Validation
@@ -191,21 +287,45 @@ export const createCategory = asyncHandler(async (req, res) => {
     }
 
     // Create new category
+    const parsedLocalizedName = parseMaybeJSON(localizedName);
+    const parsedLocalizedDescription = parseMaybeJSON(localizedDescription);
+    const sourceLocale = normalizeLocale(locale || 'en');
+    const shouldAutoTranslate = parseBoolean(autoTranslate, true);
+    let nextLocalizedName = mergeLocalizedValue(parsedLocalizedName, parsedLocalizedName, name.trim());
+    let nextLocalizedDescription = mergeLocalizedValue(
+      parsedLocalizedDescription,
+      parsedLocalizedDescription,
+      String(description || '').trim()
+    );
+    nextLocalizedName[sourceLocale] = name.trim();
+    nextLocalizedDescription[sourceLocale] = String(description || '').trim();
+    if (!nextLocalizedName.en) nextLocalizedName.en = name.trim();
+    if (!nextLocalizedDescription.en) nextLocalizedDescription.en = String(description || '').trim();
+    nextLocalizedName = await maybeTranslate(nextLocalizedName, sourceLocale, shouldAutoTranslate, parsedLocalizedName);
+    nextLocalizedDescription = await maybeTranslate(
+      nextLocalizedDescription,
+      sourceLocale,
+      shouldAutoTranslate,
+      parsedLocalizedDescription
+    );
+
     const categoryData = {
-      name: name.trim(),
+      name: nextLocalizedName.en,
+      localizedName: nextLocalizedName,
       image: imageUrl,
       type: type && type.trim() ? type.trim() : undefined,
       priority: 'Normal',
       // Default priority
       status: status !== undefined ? status : true,
-      description: '',
+      description: nextLocalizedDescription.en,
+      localizedDescription: nextLocalizedDescription,
       createdBy: req.user._id,
       updatedBy: req.user._id
     };
     const category = await AdminCategoryManagement.create(categoryData);
     return successResponse(res, 201, 'Category created successfully', {
       category: {
-        ...category.toObject(),
+        ...resolveCategoryForLocale(category.toObject(), localeForResponse),
         id: category._id.toString()
       }
     });
@@ -224,6 +344,7 @@ export const createCategory = asyncHandler(async (req, res) => {
  */
 export const updateCategory = asyncHandler(async (req, res) => {
   try {
+    const localeForResponse = resolveLocaleFromRequest(req);
     const {
       id
     } = req.params;
@@ -231,8 +352,17 @@ export const updateCategory = asyncHandler(async (req, res) => {
       name,
       image,
       status,
-      type
+      type,
+      description,
+      localizedName,
+      localizedDescription,
+      locale,
+      autoTranslate = true
     } = req.body;
+    const parsedLocalizedName = parseMaybeJSON(localizedName);
+    const parsedLocalizedDescription = parseMaybeJSON(localizedDescription);
+    const sourceLocale = normalizeLocale(locale || 'en');
+    const shouldAutoTranslate = parseBoolean(autoTranslate, true);
     const category = await AdminCategoryManagement.findById(id);
     if (!category) {
       return errorResponse(res, 404, 'Category not found');
@@ -282,7 +412,37 @@ export const updateCategory = asyncHandler(async (req, res) => {
     }
 
     // Update fields
-    if (name !== undefined) category.name = name.trim();
+    if (name !== undefined || localizedName !== undefined) {
+      let nextLocalizedName = mergeLocalizedValue(
+        category.localizedName,
+        parsedLocalizedName,
+        category.name || ''
+      );
+      if (name !== undefined) nextLocalizedName[sourceLocale] = name.trim();
+      if (!nextLocalizedName.en) nextLocalizedName.en = category.name || name?.trim() || '';
+      nextLocalizedName = await maybeTranslate(nextLocalizedName, sourceLocale, shouldAutoTranslate, parsedLocalizedName);
+      category.localizedName = nextLocalizedName;
+      category.name = nextLocalizedName.en;
+    }
+    if (description !== undefined || localizedDescription !== undefined) {
+      let nextLocalizedDescription = mergeLocalizedValue(
+        category.localizedDescription,
+        parsedLocalizedDescription,
+        category.description || ''
+      );
+      if (description !== undefined) nextLocalizedDescription[sourceLocale] = String(description || '').trim();
+      if (!nextLocalizedDescription.en) {
+        nextLocalizedDescription.en = category.description || String(description || '').trim();
+      }
+      nextLocalizedDescription = await maybeTranslate(
+        nextLocalizedDescription,
+        sourceLocale,
+        shouldAutoTranslate,
+        parsedLocalizedDescription
+      );
+      category.localizedDescription = nextLocalizedDescription;
+      category.description = nextLocalizedDescription.en;
+    }
     if (imageUrl !== undefined) category.image = imageUrl;
     if (type !== undefined) category.type = type && type.trim() ? type.trim() : undefined;
     if (status !== undefined) category.status = status;
@@ -290,7 +450,7 @@ export const updateCategory = asyncHandler(async (req, res) => {
     await category.save();
     return successResponse(res, 200, 'Category updated successfully', {
       category: {
-        ...category.toObject(),
+        ...resolveCategoryForLocale(category.toObject(), localeForResponse),
         id: category._id.toString()
       }
     });
@@ -332,6 +492,7 @@ export const deleteCategory = asyncHandler(async (req, res) => {
  */
 export const toggleCategoryStatus = asyncHandler(async (req, res) => {
   try {
+    const locale = resolveLocaleFromRequest(req);
     const {
       id
     } = req.params;
@@ -344,7 +505,7 @@ export const toggleCategoryStatus = asyncHandler(async (req, res) => {
     await category.save();
     return successResponse(res, 200, 'Category status updated successfully', {
       category: {
-        ...category.toObject(),
+        ...resolveCategoryForLocale(category.toObject(), locale),
         id: category._id.toString()
       }
     });
@@ -360,6 +521,7 @@ export const toggleCategoryStatus = asyncHandler(async (req, res) => {
  */
 export const updateCategoryPriority = asyncHandler(async (req, res) => {
   try {
+    const locale = resolveLocaleFromRequest(req);
     const {
       id
     } = req.params;
@@ -378,7 +540,7 @@ export const updateCategoryPriority = asyncHandler(async (req, res) => {
     await category.save();
     return successResponse(res, 200, 'Category priority updated successfully', {
       category: {
-        ...category.toObject(),
+        ...resolveCategoryForLocale(category.toObject(), locale),
         id: category._id.toString()
       }
     });

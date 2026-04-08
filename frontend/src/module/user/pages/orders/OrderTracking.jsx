@@ -14,6 +14,7 @@ import { useLocation as useUserLocation } from "../../hooks/useLocation";
 import DeliveryTrackingMap from "../../components/DeliveryTrackingMap";
 import { orderAPI, restaurantAPI, userAPI, telephonyAPI } from "@/lib/api";
 import circleIcon from "@/assets/circleicon.png";
+import { useTranslation } from "react-i18next";
 
 const hasOrderBeenPickedUp = apiOrder => {
   const deliveryStatus = apiOrder?.deliveryState?.status;
@@ -197,6 +198,7 @@ const SectionItem = ({
     {rightContent || showArrow && <ChevronRight className="w-5 h-5 text-gray-400" />}
   </motion.button>;
 export default function OrderTracking() {
+  const { t } = useTranslation();
   const {
     orderId
   } = useParams();
@@ -230,7 +232,7 @@ export default function OrderTracking() {
   const [isSavingInstructions, setIsSavingInstructions] = useState(false);
   const [isCallingRestaurant, setIsCallingRestaurant] = useState(false);
   const defaultAddress = getDefaultAddress();
-  const customerName = order?.userName || order?.userId?.fullName || order?.userId?.name || userProfile?.fullName || userProfile?.name || 'Customer';
+  const customerName = order?.userName || order?.userId?.fullName || order?.userId?.name || userProfile?.fullName || userProfile?.name || t("user.orderTracking.customer");
   const customerPhone = order?.userPhone || order?.userId?.phone || userProfile?.phone || defaultAddress?.phone || "";
   const currentDeliveryInstructions = order?.address?.deliveryInstructions || "";
   useEffect(() => {
@@ -373,7 +375,7 @@ export default function OrderTracking() {
           // Transform API order to match component structure
           const transformedOrder = {
             id: apiOrder.orderId || apiOrder._id,
-            restaurant: apiOrder.restaurantName || 'Restaurant',
+            restaurant: apiOrder.restaurantName || t("user.orderTracking.restaurant"),
             restaurantId: apiOrder.restaurantId || null,
             // Include restaurantId for location access
             userId: apiOrder.userId || null,
@@ -400,7 +402,7 @@ export default function OrderTracking() {
             total: apiOrder.pricing?.total || 0,
             status: apiOrder.status || 'pending',
             deliveryPartner: apiOrder.deliveryPartnerId ? {
-              name: apiOrder.deliveryPartnerId.name || 'Delivery Partner',
+              name: apiOrder.deliveryPartnerId.name || t("user.orderTracking.deliveryPartner"),
               avatar: null
             } : null,
             deliveryPartnerId: apiOrder.deliveryPartnerId?._id || apiOrder.deliveryPartnerId || apiOrder.assignmentInfo?.deliveryPartnerId || null,
@@ -411,11 +413,11 @@ export default function OrderTracking() {
           setOrder(transformedOrder);
           setOrderStatus(deriveTrackingUiStatus(apiOrder));
         } else {
-          throw new Error('Order not found');
+          throw new Error(t("user.orderTracking.orderNotFound"));
         }
       } catch (err) {
         console.error('Error fetching order:', err);
-        setError(err.response?.data?.message || err.message || 'Failed to fetch order');
+        setError(err.response?.data?.message || err.message || t("user.orderTracking.failedToFetchOrder"));
       } finally {
         setLoading(false);
       }
@@ -464,7 +466,7 @@ export default function OrderTracking() {
           duration: 5000,
           icon: '🏍️',
           position: 'top-center',
-          description: estimatedDeliveryTime ? `Estimated delivery in ${Math.round(estimatedDeliveryTime / 60)} minutes` : undefined
+          description: estimatedDeliveryTime ? t("user.orderTracking.estimatedDeliveryInMins", { mins: Math.round(estimatedDeliveryTime / 60) }) : undefined
         });
 
         // Optional: Vibrate device if supported
@@ -484,11 +486,11 @@ export default function OrderTracking() {
     // Check if order can be cancelled (only Razorpay orders that aren't delivered/cancelled)
     if (!order) return;
     if (order.status === 'cancelled') {
-      toast.error('Order is already cancelled');
+      toast.error(t("user.orderTracking.toast.orderAlreadyCancelled"));
       return;
     }
     if (order.status === 'delivered') {
-      toast.error('Cannot cancel a delivered order');
+      toast.error(t("user.orderTracking.toast.cannotCancelDelivered"));
       return;
     }
 
@@ -502,7 +504,7 @@ export default function OrderTracking() {
     if (!order) return;
 
     if (order.status === "cancelled" || order.status === "delivered") {
-      toast.error("Calls are not allowed for cancelled or delivered orders");
+      toast.error(t("user.orderTracking.toast.callsNotAllowed"));
       return;
     }
 
@@ -547,11 +549,11 @@ export default function OrderTracking() {
         ...prev,
         userPhone: trimmedPhone || null
       } : prev);
-      toast.success("Customer number updated");
+      toast.success(t("user.orderTracking.toast.customerNumberUpdated"));
       setShowPhoneDialog(false);
     } catch (error) {
       console.error("Error updating customer number:", error);
-      toast.error(error?.response?.data?.message || "Failed to update customer number");
+      toast.error(error?.response?.data?.message || t("user.orderTracking.toast.failedToUpdateCustomerNumber"));
     } finally {
       setIsSavingPhone(false);
     }
@@ -568,18 +570,18 @@ export default function OrderTracking() {
           deliveryInstructions: trimmedInstructions
         }
       } : prev);
-      toast.success(trimmedInstructions ? "Delivery instructions updated" : "Delivery instructions cleared");
+      toast.success(trimmedInstructions ? t("user.orderTracking.toast.deliveryInstructionsUpdated") : t("user.orderTracking.toast.deliveryInstructionsCleared"));
       setShowInstructionsDialog(false);
     } catch (error) {
       console.error("Error updating delivery instructions:", error);
-      toast.error(error?.response?.data?.message || "Failed to update delivery instructions");
+      toast.error(error?.response?.data?.message || t("user.orderTracking.toast.failedToUpdateDeliveryInstructions"));
     } finally {
       setIsSavingInstructions(false);
     }
   };
   const handleConfirmCancel = async () => {
     if (!cancellationReason.trim()) {
-      toast.error('Please provide a reason for cancellation');
+      toast.error(t("user.orderTracking.toast.provideCancellationReason"));
       return;
     }
     setIsCancelling(true);
@@ -587,7 +589,7 @@ export default function OrderTracking() {
       const response = await orderAPI.cancelOrder(orderId, cancellationReason.trim());
       if (response.data?.success) {
         const paymentMethod = order?.payment?.method || order?.paymentMethod;
-        const successMessage = response.data?.message || (paymentMethod === 'cash' || paymentMethod === 'cod' ? 'Order cancelled successfully. No refund required as payment was not made.' : 'Order cancelled successfully. Refund will be processed after admin approval.');
+        const successMessage = response.data?.message || (paymentMethod === 'cash' || paymentMethod === 'cod' ? t("user.orderTracking.toast.orderCancelledNoRefund") : t("user.orderTracking.toast.orderCancelledRefundAfterApproval"));
         toast.success(successMessage);
         setShowCancelDialog(false);
         setCancellationReason("");
@@ -602,11 +604,11 @@ export default function OrderTracking() {
           }
         }
       } else {
-        toast.error(response.data?.message || 'Failed to cancel order');
+        toast.error(response.data?.message || t("user.orderTracking.toast.failedToCancelOrder"));
       }
     } catch (error) {
       console.error('Error cancelling order:', error);
-      toast.error(error.response?.data?.message || 'Failed to cancel order');
+      toast.error(error.response?.data?.message || t("user.orderTracking.toast.failedToCancelOrder"));
     } finally {
       setIsCancelling(false);
     }
@@ -649,7 +651,7 @@ export default function OrderTracking() {
         }
         const transformedOrder = {
           id: apiOrder.orderId || apiOrder._id,
-          restaurant: apiOrder.restaurantName || 'Restaurant',
+          restaurant: apiOrder.restaurantName || t("user.orderTracking.restaurant"),
           restaurantId: apiOrder.restaurantId || null,
           // Include restaurantId for location access
           userId: apiOrder.userId || null,
@@ -676,7 +678,7 @@ export default function OrderTracking() {
           total: apiOrder.pricing?.total || 0,
           status: apiOrder.status || 'pending',
           deliveryPartner: apiOrder.deliveryPartnerId ? {
-            name: apiOrder.deliveryPartnerId.name || 'Delivery Partner',
+            name: apiOrder.deliveryPartnerId.name || t("user.orderTracking.deliveryPartner"),
             avatar: null
           } : null,
           deliveryPartnerId: apiOrder.deliveryPartnerId?._id || apiOrder.deliveryPartnerId || apiOrder.assignmentInfo?.deliveryPartnerId || null,
@@ -699,7 +701,7 @@ export default function OrderTracking() {
     return <AnimatedPage className="min-h-screen bg-gray-50 p-4">
         <div className="max-w-lg mx-auto text-center py-20">
           <Loader2 className="w-8 h-8 animate-spin text-gray-600 mx-auto mb-4" />
-          <p className="text-gray-600">Loading order details...</p>
+          <p className="text-gray-600">{t("user.orderTracking.loadingOrderDetails")}</p>
         </div>
       </AnimatedPage>;
   }
@@ -708,43 +710,43 @@ export default function OrderTracking() {
   if (error || !order) {
     return <AnimatedPage className="min-h-screen bg-gray-50 p-4">
         <div className="max-w-lg mx-auto text-center py-20">
-          <h1 className="text-lg sm:text-xl md:text-2xl font-bold mb-4">Order Not Found</h1>
-          <p className="text-gray-600 mb-6">{error || 'The order you\'re looking for doesn\'t exist.'}</p>
+          <h1 className="text-lg sm:text-xl md:text-2xl font-bold mb-4">{t("user.orderTracking.orderNotFound")}</h1>
+          <p className="text-gray-600 mb-6">{error || t("user.orderTracking.orderNotFoundDescription")}</p>
           <Link to="/user/orders">
-            <Button>Back to Orders</Button>
+            <Button>{t("user.orderTracking.backToOrders")}</Button>
           </Link>
         </div>
       </AnimatedPage>;
   }
   const statusConfig = {
     placed: {
-      title: "Order placed",
-      subtitle: "Food preparation will begin shortly",
+      title: t("user.orderTracking.status.placed.title"),
+      subtitle: t("user.orderTracking.status.placed.subtitle"),
       color: "bg-green-700"
     },
     preparing: {
-      title: "Preparing your order",
-      subtitle: `Arriving in ${estimatedTime} mins`,
+      title: t("user.orderTracking.status.preparing.title"),
+      subtitle: t("user.orderTracking.status.preparing.subtitle", { mins: estimatedTime }),
       color: "bg-green-700"
     },
     ready: {
-      title: "Order is ready",
-      subtitle: "Waiting for delivery partner pickup",
+      title: t("user.orderTracking.status.ready.title"),
+      subtitle: t("user.orderTracking.status.ready.subtitle"),
       color: "bg-green-700"
     },
     pickup: {
-      title: "Order picked up",
-      subtitle: `Arriving in ${estimatedTime} mins`,
+      title: t("user.orderTracking.status.pickup.title"),
+      subtitle: t("user.orderTracking.status.pickup.subtitle", { mins: estimatedTime }),
       color: "bg-green-700"
     },
     delivered: {
-      title: "Order delivered",
-      subtitle: "Enjoy your meal!",
+      title: t("user.orderTracking.status.delivered.title"),
+      subtitle: t("user.orderTracking.status.delivered.subtitle"),
       color: "bg-green-600"
     },
     cancelled: {
-      title: "Order cancelled",
-      subtitle: "This order has been cancelled",
+      title: t("user.orderTracking.status.cancelled.title"),
+      subtitle: t("user.orderTracking.status.cancelled.subtitle"),
       color: "bg-red-600"
     }
   };
@@ -779,7 +781,7 @@ export default function OrderTracking() {
           }} transition={{
             delay: 0.9
           }} className="text-2xl font-bold text-gray-900 mt-6">
-                Order Confirmed!
+                {t("user.orderTracking.orderConfirmed")}
               </motion.h1>
               <motion.p initial={{
             opacity: 0,
@@ -790,7 +792,7 @@ export default function OrderTracking() {
           }} transition={{
             delay: 1.1
           }} className="text-gray-600 mt-2">
-                Your order has been placed successfully
+                {t("user.orderTracking.orderPlacedSuccessfully")}
               </motion.p>
               <motion.div initial={{
             opacity: 0
@@ -800,7 +802,7 @@ export default function OrderTracking() {
             delay: 1.5
           }} className="mt-8">
                 <div className="w-8 h-8 border-2 border-green-500 border-t-transparent rounded-full animate-spin mx-auto" />
-                <p className="text-sm text-gray-500 mt-3">Loading order details...</p>
+                <p className="text-sm text-gray-500 mt-3">{t("user.orderTracking.loadingOrderDetails")}</p>
               </motion.div>
             </motion.div>
           </motion.div>}
@@ -854,7 +856,7 @@ export default function OrderTracking() {
             <span className="text-sm">{currentStatus.subtitle}</span>
             {orderStatus === 'preparing' && <>
                 <span className="w-1 h-1 rounded-full bg-white" />
-                <span className="text-sm text-green-200">On time</span>
+                <span className="text-sm text-green-200">{t("user.orderTracking.onTime")}</span>
               </>}
             <motion.button onClick={handleRefresh} className="ml-1" animate={{
             rotate: isRefreshing ? 360 : 0
@@ -891,7 +893,7 @@ export default function OrderTracking() {
                   <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center overflow-hidden">
                     <img src={circleIcon} alt="Order ready" className="w-full h-full object-cover" />
                   </div>
-                  <p className="font-semibold text-gray-900">Order is ready for pickup</p>
+                  <p className="font-semibold text-gray-900">{t("user.orderTracking.orderReadyForPickup")}</p>
                 </div>
               </motion.div>;
         }
@@ -911,7 +913,7 @@ export default function OrderTracking() {
                   <div className="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center overflow-hidden">
                     <img src={circleIcon} alt="Food cooking" className="w-full h-full object-cover" />
                   </div>
-                  <p className="font-semibold text-gray-900">Food is Cooking</p>
+                  <p className="font-semibold text-gray-900">{t("user.orderTracking.foodIsCooking")}</p>
                 </div>
               </motion.div>;
         }
@@ -934,7 +936,7 @@ export default function OrderTracking() {
       }}>
           <Shield className="w-6 h-6 text-gray-600" />
           <span className="flex-1 text-left font-medium text-gray-900">
-            Learn about delivery partner safety
+            {t("user.orderTracking.learnSafety")}
           </span>
           <ChevronRight className="w-5 h-5 text-gray-400" />
         </motion.button>
@@ -950,7 +952,7 @@ export default function OrderTracking() {
         delay: 0.65
       }}>
           <p className="text-yellow-800 font-medium">
-            All your delivery details in one place 👇
+            {t("user.orderTracking.deliveryDetailsBanner")}
           </p>
         </motion.div>
 
@@ -964,8 +966,8 @@ export default function OrderTracking() {
       }} transition={{
         delay: 0.7
       }}>
-          <SectionItem icon={Phone} title={customerName} subtitle={customerPhone || 'Phone number not available'} onClick={() => setShowPhoneDialog(true)} rightContent={<span className="text-green-600 font-medium text-sm">Edit</span>} />
-          <SectionItem icon={HomeIcon} title="Delivery at Location" subtitle={(() => {
+          <SectionItem icon={Phone} title={customerName} subtitle={customerPhone || t("user.orderTracking.phoneNumberUnavailable")} onClick={() => setShowPhoneDialog(true)} rightContent={<span className="text-green-600 font-medium text-sm">{t("user.orderTracking.edit")}</span>} />
+          <SectionItem icon={HomeIcon} title={t("user.orderTracking.deliveryAtLocation")} subtitle={(() => {
           // Priority 1: Use order address formattedAddress (live location address)
           if (order?.address?.formattedAddress && order.address.formattedAddress !== "Select location") {
             return order.address.formattedAddress;
@@ -1001,9 +1003,9 @@ export default function OrderTracking() {
               return defaultAddressParts.join(', ');
             }
           }
-          return 'Add delivery address';
+          return t("user.orderTracking.addDeliveryAddress");
         })()} showArrow={false} subtitleClassName="whitespace-normal break-words leading-5" />
-          <SectionItem icon={MessageSquare} title="Add delivery instructions" subtitle={currentDeliveryInstructions || "Help your delivery partner find you faster"} onClick={() => setShowInstructionsDialog(true)} subtitleClassName={currentDeliveryInstructions ? "whitespace-normal break-words leading-5" : "truncate"} />
+          <SectionItem icon={MessageSquare} title={t("user.orderTracking.addDeliveryInstructions")} subtitle={currentDeliveryInstructions || t("user.orderTracking.helpDeliveryPartner")} onClick={() => setShowInstructionsDialog(true)} subtitleClassName={currentDeliveryInstructions ? "whitespace-normal break-words leading-5" : "truncate"} />
         </motion.div>
 
         {/* Restaurant Section */}
@@ -1022,7 +1024,7 @@ export default function OrderTracking() {
             </div>
             <div className="flex-1">
               <p className="font-semibold text-gray-900">{order.restaurant}</p>
-              <p className="text-sm text-gray-500">{order.address?.city || 'Local Area'}</p>
+              <p className="text-sm text-gray-500">{order.address?.city || t("user.orderTracking.localArea")}</p>
             </div>
             <motion.button
               type="button"
@@ -1046,7 +1048,7 @@ export default function OrderTracking() {
             <div className="flex items-start gap-3">
               <Receipt className="w-5 h-5 text-gray-500 mt-0.5" />
               <div className="flex-1">
-                <p className="font-medium text-gray-900">Order #{order?.id || order?.orderId || 'N/A'}</p>
+                <p className="font-medium text-gray-900">{t("user.orderTracking.orderNumber", { id: order?.id || order?.orderId || "N/A" })}</p>
                 <div className="mt-2 space-y-1">
                   {order?.items?.map((item, index) => <div key={index} className="flex items-center gap-2 text-sm text-gray-600">
                       <span className="w-4 h-4 rounded border border-green-600 flex items-center justify-center">
@@ -1071,7 +1073,7 @@ export default function OrderTracking() {
       }} transition={{
         delay: 0.8
       }}>
-          <SectionItem icon={CircleSlash} title="Cancel order" subtitle="" onClick={handleCancelOrder} />
+          <SectionItem icon={CircleSlash} title={t("user.orderTracking.cancelOrder")} subtitle="" onClick={handleCancelOrder} />
         </motion.div>
 
       </div>
@@ -1083,22 +1085,22 @@ export default function OrderTracking() {
           <div className="px-5 pb-5 pt-4">
             <DialogHeader className="space-y-1 border-b border-green-50 pb-4 text-left">
               <DialogTitle className="text-lg font-semibold text-gray-900">
-              Edit customer number
+              {t("user.orderTracking.editCustomerNumber")}
               </DialogTitle>
               <p className="pr-8 text-sm leading-5 text-gray-500">
-                Keep the pickup contact updated so the delivery partner can reach you easily.
+                {t("user.orderTracking.editCustomerNumberDesc")}
               </p>
             </DialogHeader>
             <div className="space-y-2 pt-4">
               <label className="block text-sm font-medium text-gray-700">
-                Phone number
+                {t("user.orderTracking.phoneNumber")}
               </label>
               <div className="rounded-2xl border border-green-100 bg-green-50/50 p-2">
                 <input
                   type="tel"
                   value={editablePhone}
                   onChange={e => setEditablePhone(e.target.value)}
-                  placeholder="Enter phone number"
+                  placeholder={t("user.orderTracking.enterPhoneNumber")}
                   className="w-full rounded-xl border border-green-200 bg-white px-4 py-3 text-base text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-green-500 focus:ring-2 focus:ring-green-100"
                   disabled={isSavingPhone}
                 />
@@ -1106,10 +1108,10 @@ export default function OrderTracking() {
             </div>
             <div className="mt-5 flex gap-3">
               <Button type="button" variant="outline" className="h-11 flex-1 rounded-xl border-gray-200 text-gray-700" onClick={() => setShowPhoneDialog(false)} disabled={isSavingPhone}>
-                Cancel
+                {t("common.cancel")}
               </Button>
               <Button type="button" className="h-11 flex-1 rounded-xl bg-green-600 text-white shadow-sm hover:bg-green-700" onClick={handleSavePhone} disabled={isSavingPhone}>
-                {isSavingPhone ? "Saving..." : "Save"}
+                {isSavingPhone ? t("common.saving") : t("common.save")}
               </Button>
             </div>
           </div>
@@ -1122,21 +1124,21 @@ export default function OrderTracking() {
           <div className="px-5 pb-5 pt-4">
             <DialogHeader className="space-y-1 border-b border-green-50 pb-4 text-left">
               <DialogTitle className="text-lg font-semibold text-gray-900">
-                Delivery instructions
+                {t("user.orderTracking.deliveryInstructions")}
               </DialogTitle>
               <p className="pr-8 text-sm leading-5 text-gray-500">
-                Add a short note for the delivery partner like landmark, gate number, or entry guidance.
+                {t("user.orderTracking.deliveryInstructionsDesc")}
               </p>
             </DialogHeader>
             <div className="space-y-2 pt-4">
               <label className="block text-sm font-medium text-gray-700">
-                Instructions
+                {t("user.orderTracking.instructions")}
               </label>
               <div className="rounded-2xl border border-green-100 bg-green-50/50 p-2">
                 <Textarea
                   value={deliveryInstructions}
                   onChange={e => setDeliveryInstructions(e.target.value)}
-                  placeholder="Example: Ring bell at flat 302, use side gate near the pharmacy."
+                  placeholder={t("user.orderTracking.instructionsPlaceholder")}
                   className="min-h-[120px] w-full resize-none rounded-xl border border-green-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-green-500 focus:ring-2 focus:ring-green-100"
                   disabled={isSavingInstructions}
                 />
@@ -1144,10 +1146,10 @@ export default function OrderTracking() {
             </div>
             <div className="mt-5 flex gap-3">
               <Button type="button" variant="outline" className="h-11 flex-1 rounded-xl border-gray-200 text-gray-700" onClick={() => setShowInstructionsDialog(false)} disabled={isSavingInstructions}>
-                Cancel
+                {t("common.cancel")}
               </Button>
               <Button type="button" className="h-11 flex-1 rounded-xl bg-green-600 text-white shadow-sm hover:bg-green-700" onClick={handleSaveDeliveryInstructions} disabled={isSavingInstructions}>
-                {isSavingInstructions ? "Saving..." : "Save"}
+                {isSavingInstructions ? t("common.saving") : t("common.save")}
               </Button>
             </div>
           </div>
@@ -1158,25 +1160,25 @@ export default function OrderTracking() {
         <DialogContent className="sm:max-w-xl w-[95%] max-w-[600px]">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold text-gray-900">
-              Cancel Order
+              {t("user.orderTracking.cancelOrder")}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-5 py-6 px-2">
             <div className="space-y-2 w-full">
-              <Textarea value={cancellationReason} onChange={e => setCancellationReason(e.target.value)} placeholder="e.g., Changed my mind, Wrong address, etc." className="w-full min-h-[100px] resize-none border-2 border-gray-300 rounded-lg px-4 py-3 text-sm focus:border-red-500 focus:ring-2 focus:ring-red-200 focus:outline-none transition-colors disabled:bg-gray-100 disabled:cursor-not-allowed disabled:border-gray-200" disabled={isCancelling} />
+              <Textarea value={cancellationReason} onChange={e => setCancellationReason(e.target.value)} placeholder={t("user.orderTracking.cancellationReasonPlaceholder")} className="w-full min-h-[100px] resize-none border-2 border-gray-300 rounded-lg px-4 py-3 text-sm focus:border-red-500 focus:ring-2 focus:ring-red-200 focus:outline-none transition-colors disabled:bg-gray-100 disabled:cursor-not-allowed disabled:border-gray-200" disabled={isCancelling} />
             </div>
             <div className="flex gap-3 pt-2">
               <Button variant="outline" onClick={() => {
               setShowCancelDialog(false);
               setCancellationReason("");
             }} disabled={isCancelling} className="flex-1">
-                Cancel
+                {t("common.cancel")}
               </Button>
               <Button onClick={handleConfirmCancel} disabled={isCancelling || !cancellationReason.trim()} className="flex-1 bg-red-600 hover:bg-red-700 text-white">
                 {isCancelling ? <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Cancelling...
-                  </> : 'Confirm Cancellation'}
+                    {t("user.orderTracking.cancelling")}
+                  </> : t("user.orderTracking.confirmCancellation")}
               </Button>
             </div>
           </div>

@@ -1,41 +1,43 @@
 import { motion } from "framer-motion"
 import { useNavigate } from "react-router-dom"
 import { ArrowLeft, ChevronRight } from "lucide-react"
+import { useTranslation } from "react-i18next"
 import BottomNavOrders from "../components/BottomNavOrders"
 import freebiesIcon from "@/assets/hub/icons/delite your customers/freebies.png"
 import percentageDiscountIcon from "@/assets/hub/icons/delite your customers/percentagediscount.png"
 import flatPriceIcon from "@/assets/hub/icons/delite your customers/flatprice.png"
 import bogoIcon from "@/assets/hub/icons/delite your customers/bogo.png"
 
-const menuDiscountTypes = [
-  {
-    id: "freebies",
-    title: "Freebies",
-    description: "Give a complimentary dish to delight your high value customers",
-    icon: freebiesIcon,
-  },
-  {
-    id: "percentage",
-    title: "Percentage discount",
-    description: "Flat percentage discount on select items",
-    icon: percentageDiscountIcon,
-  },
-  {
-    id: "flat-price",
-    title: "Flat price",
-    description: "Select items at fixed prices like ₹99, ₹129, ₹129, etc",
-    icon: flatPriceIcon,
-  },
-  {
-    id: "bogo",
-    title: "BOGO",
-    description: "Buy 1 Get 1 free offer on selected items",
-    icon: bogoIcon,
-  },
-]
-
 export default function ChooseMenuDiscountType() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
+
+  const menuDiscountTypes = [
+    {
+      id: "freebies",
+      title: t("restaurant.chooseMenuDiscountType.types.freebies.title"),
+      description: t("restaurant.chooseMenuDiscountType.types.freebies.description"),
+      icon: freebiesIcon,
+    },
+    {
+      id: "percentage",
+      title: t("restaurant.chooseMenuDiscountType.types.percentage.title"),
+      description: t("restaurant.chooseMenuDiscountType.types.percentage.description"),
+      icon: percentageDiscountIcon,
+    },
+    {
+      id: "flat-price",
+      title: t("restaurant.chooseMenuDiscountType.types.flatPrice.title"),
+      description: t("restaurant.chooseMenuDiscountType.types.flatPrice.description"),
+      icon: flatPriceIcon,
+    },
+    {
+      id: "bogo",
+      title: t("restaurant.chooseMenuDiscountType.types.bogo.title"),
+      description: t("restaurant.chooseMenuDiscountType.types.bogo.description"),
+      icon: bogoIcon,
+    },
+  ]
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
@@ -45,10 +47,11 @@ export default function ChooseMenuDiscountType() {
           <button
             onClick={() => navigate("/restaurant/hub-growth/create-offers")}
             className="p-1 rounded-full hover:bg-gray-100"
+            aria-label={t("restaurant.chooseMenuDiscountType.aria.goBack")}
           >
             <ArrowLeft className="w-5 h-5 text-gray-700" />
           </button>
-          <h1 className="text-lg font-bold text-gray-900">Delight your customers</h1>
+          <h1 className="text-lg font-bold text-gray-900">{t("restaurant.chooseMenuDiscountType.title")}</h1>
         </div>
       </div>
 
@@ -73,7 +76,7 @@ export default function ChooseMenuDiscountType() {
           
           <div className="relative z-10 pr-20">
             <h2 className="text-xl font-bold text-white leading-tight">
-              Choose your menu discount type
+              {t("restaurant.chooseMenuDiscountType.chooseMenuDiscount")}
             </h2>
           </div>
         </div>

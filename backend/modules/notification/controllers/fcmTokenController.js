@@ -2,6 +2,13 @@ import { asyncHandler } from '../../../shared/middleware/asyncHandler.js';
 import { successResponse, errorResponse } from '../../../shared/utils/response.js';
 import DeviceToken from '../models/DeviceToken.js';
 
+function normalizeDevicePlatform(platform) {
+    const value = String(platform || 'web').toLowerCase().trim();
+    if (value === 'ios') return 'ios';
+    if (value === 'android' || value === 'app' || value === 'mobile') return 'android';
+    return 'web';
+}
+
 /**
  * Unified endpoint to save FCM device tokens.
  * Works for users, restaurants, delivery partners, and admins.
@@ -16,7 +23,8 @@ export const saveDeviceToken = asyncHandler(async (req, res) => {
     console.log(`[FCM-Backend] SAVE REQUEST ARRIVED: role=${role}, bodyRole=${req.body.role}`);
 
     let userId;
-    console.log(`[FCM-Backend] Request to save token: role=${role}, deviceToken=${deviceToken.substring(0, 10)}..., platform=${platform}`);
+    const normalizedPlatform = normalizeDevicePlatform(platform);
+    console.log(`[FCM-Backend] Request to save token: role=${role}, deviceToken=${deviceToken.substring(0, 10)}..., platform=${normalizedPlatform}`);
     switch (role) {
         case 'user':
             userId = req.user?._id;
@@ -47,9 +55,31 @@ export const saveDeviceToken = asyncHandler(async (req, res) => {
     // Update if exists, or create new
     await DeviceToken.findOneAndUpdate(
         { deviceToken },
-        { userId, role, platform: platform.toLowerCase(), isActive: true },
+        { userId, role, platform: normalizedPlatform, isActive: true },
         { upsert: true, new: true }
     );
+
+    // Backward compatibility for user flows that still read from User document fields.
+    if (role === 'user') {
+        try {
+            const { default: User } = await import('../../auth/models/User.js');
+            const legacyTokenField = normalizedPlatform === 'web' ? 'fcmTokenWeb' : 'fcmTokenMobile';
+
+            await User.findByIdAndUpdate(userId, {
+                $addToSet: { fcmTokens: deviceToken },
+                $set: { [legacyTokenField]: deviceToken }
+            });
+
+            const user = await User.findById(userId).select('fcmTokens');
+            if (user?.fcmTokens?.length > 10) {
+                user.fcmTokens = user.fcmTokens.slice(-10);
+                await user.save();
+            }
+        } catch (syncErr) {
+            // Do not break token registration if legacy sync fails.
+            console.warn(`[FCM-Backend] Legacy User FCM sync failed: ${syncErr.message}`);
+        }
+    }
 
     // Limit tokens per user/role (e.g., max 5 devices)
     const count = await DeviceToken.countDocuments({ userId, role });

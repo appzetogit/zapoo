@@ -5,6 +5,7 @@ import { getRedisClient } from '../../../config/redis.js';
 import { uploadToCloudinary } from '../../../shared/utils/cloudinaryService.js';
 import axios from 'axios';
 import winston from 'winston';
+import { normalizeLocale } from '../../../shared/i18n/localeConstants.js';
 const logger = winston.createLogger({
   level: 'info',
   format: winston.format.json(),
@@ -168,6 +169,70 @@ export const updateUserProfile = asyncHandler(async (req, res) => {
     });
     return errorResponse(res, 500, 'Failed to update profile');
   }
+});
+
+export const getUserPreferences = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user._id).select('preferences').lean();
+  if (!user) {
+    return errorResponse(res, 404, 'User profile not found');
+  }
+
+  return successResponse(res, 200, 'Preferences retrieved successfully', {
+    preferences: {
+      language: user.preferences?.language || 'en',
+      notifications: user.preferences?.notifications || {
+        orders: true,
+        offers: true,
+        updates: true
+      },
+      vegMode: Boolean(user.preferences?.vegMode)
+    }
+  });
+});
+
+export const updateUserPreferences = asyncHandler(async (req, res) => {
+  const {
+    language,
+    notifications,
+    vegMode
+  } = req.body || {};
+
+  const user = await User.findById(req.user._id);
+  if (!user) {
+    return errorResponse(res, 404, 'User profile not found');
+  }
+
+  user.preferences = user.preferences || {};
+
+  if (language !== undefined) {
+    user.preferences.language = normalizeLocale(language);
+  }
+
+  if (vegMode !== undefined) {
+    user.preferences.vegMode = Boolean(vegMode);
+  }
+
+  if (notifications && typeof notifications === 'object') {
+    user.preferences.notifications = {
+      ...user.preferences.notifications?.toObject?.(),
+      ...user.preferences.notifications,
+      ...notifications
+    };
+  }
+
+  await user.save();
+
+  return successResponse(res, 200, 'Preferences updated successfully', {
+    preferences: {
+      language: user.preferences?.language || 'en',
+      notifications: user.preferences?.notifications || {
+        orders: true,
+        offers: true,
+        updates: true
+      },
+      vegMode: Boolean(user.preferences?.vegMode)
+    }
+  });
 });
 
 /**

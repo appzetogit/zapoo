@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { localizedTextSchema } from '../../../shared/i18n/localizedText.js';
 
 const termsAndConditionSchema = new mongoose.Schema(
   {
@@ -7,10 +8,18 @@ const termsAndConditionSchema = new mongoose.Schema(
       default: 'Terms and Conditions',
       trim: true
     },
+    localizedTitle: {
+      type: localizedTextSchema,
+      default: () => ({ en: 'Terms and Conditions', hi: '', bn: '' })
+    },
     content: {
       type: String,
       required: true,
       default: ''
+    },
+    localizedContent: {
+      type: localizedTextSchema,
+      default: () => ({ en: '', hi: '', bn: '' })
     },
     isActive: {
       type: Boolean,
@@ -31,4 +40,3 @@ const termsAndConditionSchema = new mongoose.Schema(
 termsAndConditionSchema.index({ isActive: 1 });
 
 export default mongoose.model('TermsAndCondition', termsAndConditionSchema);
-

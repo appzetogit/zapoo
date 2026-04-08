@@ -2,6 +2,7 @@ import axios from "axios";
 import { toast } from "sonner";
 import { API_BASE_URL } from "./config.js";
 import { getRoleFromToken, clearModuleAuth } from "../utils/auth.js";
+import { getCurrentLanguage } from "../i18n/language.js";
 
 // Network error tracking to prevent spam
 const networkErrorState = {
@@ -95,6 +96,7 @@ apiClient.interceptors.request.use(config => {
   if (!config.headers) {
     config.headers = {};
   }
+  config.headers["X-Locale"] = getCurrentLanguage();
 
   // Debug logging for FormData requests
   if (import.meta.env.DEV && config.data instanceof FormData) { }
