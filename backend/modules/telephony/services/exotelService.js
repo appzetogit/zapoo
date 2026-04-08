@@ -45,6 +45,38 @@ const formatIndianNumber = (phone) => {
   return `+91${normalized}`;
 };
 
+const extractCallSid = (data) => {
+  if (!data) return undefined;
+
+  if (typeof data === "object") {
+    return (
+      data?.Call?.Sid ||
+      data?.Call?.sid ||
+      data?.call?.Sid ||
+      data?.call?.sid ||
+      data?.call_sid ||
+      data?.sid ||
+      undefined
+    );
+  }
+
+  const text = String(data);
+
+  try {
+    const parsed = JSON.parse(text);
+    return extractCallSid(parsed);
+  } catch {
+    // ignore JSON parse errors and try XML extraction below
+  }
+
+  return (
+    text.match(/<Sid>\s*([^<]+)\s*<\/Sid>/i)?.[1] ||
+    text.match(/"call_sid"\s*:\s*"([^"]+)"/i)?.[1] ||
+    text.match(/"Sid"\s*:\s*"([^"]+)"/i)?.[1] ||
+    undefined
+  );
+};
+
 export const generateHangupXML = (reason = "routing_failed") => {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
@@ -94,7 +126,7 @@ export const initiateBridgeCall = async ({
     throw new Error("Missing required parameters for Exotel bridge call");
   }
 
-  const url = `${getBaseUrl()}/Calls/connect`;
+  const url = `${getBaseUrl()}/Calls/connect.json`;
   const payload = new URLSearchParams({
     From: fromPhone,
     To: toPhone,
@@ -140,12 +172,15 @@ export const initiateBridgeCall = async ({
     });
 
     const data = response.data || {};
-    const callSid =
-      data.Call && (data.Call.Sid || data.Call.sid)
-        ? data.Call.Sid || data.Call.sid
-        : undefined;
+    const callSid = extractCallSid(data);
 
     if (!callSid) {
+      console.error("[MASKING][EXOTEL][RAW_RESPONSE_NO_SID]", {
+        url,
+        data,
+        dataType: typeof data,
+        timestamp: new Date(),
+      });
       throw new Error("Exotel response missing Call SID");
     }
 
