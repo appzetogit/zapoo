@@ -132,6 +132,9 @@ const deliverySchema = new mongoose.Schema(
     // --- Profile ---
     name: { type: String, required: true, trim: true },
     email: { type: String, lowercase: true, trim: true, sparse: true },
+    // FCM tokens (separate web/app slots for deterministic targeting)
+    fcmTokenWeb: { type: String, trim: true, default: null, select: false },
+    fcmTokenApp: { type: String, trim: true, default: null, select: false },
     profileImage: { url: String, publicId: String },
     dateOfBirth: Date,
     gender: { type: String, enum: ['male', 'female', 'other', 'prefer-not-to-say'] },

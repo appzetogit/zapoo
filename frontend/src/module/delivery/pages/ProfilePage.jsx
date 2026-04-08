@@ -23,9 +23,10 @@ import {
   Trophy,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-import { deliveryAPI, notificationAPI } from "@/lib/api";
+import { deliveryAPI } from "@/lib/api";
 import { toast } from "sonner";
 import { clearModuleAuth } from "@/lib/utils/auth";
+import { revokeFcmTokenOnLogout } from "@/lib/utils/fcmTokenLifecycle";
 import alertSound from "@/assets/audio/alert.mp3";
 import originalSound from "@/assets/audio/original.mp3";
 
@@ -160,18 +161,7 @@ export default function ProfilePage() {
       return;
     }
     try {
-      // Remove FCM token before standard logout
-      const savedToken = localStorage.getItem(`fcm_token_registered_delivery_VAL`);
-      if (savedToken) {
-        console.log("[Logout] Removing FCM token for delivery...");
-        try {
-          await notificationAPI.removeToken(savedToken);
-          localStorage.removeItem(`fcm_token_registered_delivery_VAL`);
-          localStorage.removeItem(`fcm_token_registered_delivery`);
-        } catch (err) {
-          console.warn("FCM token removal failed:", err);
-        }
-      }
+      await revokeFcmTokenOnLogout("delivery");
       // Call logout API
       await deliveryAPI.logout();
     } catch (error) {

@@ -8,6 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { clearModuleAuth } from "@/lib/utils/auth";
 import { authAPI } from "@/lib/api";
 import { firebaseAuth } from "@/lib/firebase";
+import { revokeFcmTokenOnLogout } from "@/lib/utils/fcmTokenLifecycle";
 export default function SwitchOutlet() {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -51,6 +52,7 @@ export default function SwitchOutlet() {
     try {
       // Call backend logout API to invalidate refresh token
       try {
+        await revokeFcmTokenOnLogout("restaurant");
         await authAPI.logout();
       } catch (apiError) {
         // Continue with logout even if API call fails (network issues, etc.)

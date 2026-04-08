@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { clearModuleAuth, clearAuthData } from "@/lib/utils/auth";
 import { restaurantAPI } from "@/lib/api";
 import { firebaseAuth } from "@/lib/firebase";
+import { revokeFcmTokenOnLogout } from "@/lib/utils/fcmTokenLifecycle";
 import { useTranslation } from "react-i18next";
 export default function ExploreMore() {
   const { t } = useTranslation();
@@ -89,6 +90,7 @@ export default function ExploreMore() {
     try {
       // Call backend logout API to invalidate refresh token
       try {
+        await revokeFcmTokenOnLogout("restaurant");
         await restaurantAPI.logout();
       } catch (apiError) {
         // Continue with logout even if API call fails (network issues, etc.)
@@ -155,6 +157,7 @@ export default function ExploreMore() {
     try {
       // Call backend logout API to invalidate refresh token
       try {
+        await revokeFcmTokenOnLogout("restaurant");
         await restaurantAPI.logout();
       } catch (apiError) {
         // Continue with logout even if API call fails (network issues, etc.)

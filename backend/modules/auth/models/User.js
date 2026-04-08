@@ -188,6 +188,14 @@ const userSchema = new mongoose.Schema({
     select: false,
     default: null,
   },
+  fcmTokenApp: {
+    type: String,
+    trim: true,
+    select: false,
+    default: null,
+  },
+  // Legacy alias retained for backward compatibility.
+  // New app/mobile clients should use fcmTokenApp.
   fcmTokenMobile: {
     type: String,
     trim: true,

@@ -189,9 +189,9 @@ export async function sendNotificationToUser(userId, role, title, body, data = {
 
     // Fallback to User model legacy fields if no tokens in DeviceToken and role is 'user'
     if (tokens.length === 0 && role === 'user') {
-      const user = await User.findById(userId).select('fcmTokenWeb fcmTokenMobile fcmTokens').lean();
+      const user = await User.findById(userId).select('fcmTokenWeb fcmTokenApp fcmTokenMobile fcmTokens').lean();
       if (user) {
-        tokens = [user.fcmTokenWeb, user.fcmTokenMobile, ...(Array.isArray(user.fcmTokens) ? user.fcmTokens : [])].filter(Boolean);
+        tokens = [user.fcmTokenWeb, user.fcmTokenApp, user.fcmTokenMobile, ...(Array.isArray(user.fcmTokens) ? user.fcmTokens : [])].filter(Boolean);
       }
     }
     if (tokens.length > 0) {

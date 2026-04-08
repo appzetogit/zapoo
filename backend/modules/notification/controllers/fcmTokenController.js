@@ -9,6 +9,10 @@ function normalizeDevicePlatform(platform) {
     return 'web';
 }
 
+function getLegacyFieldByPlatform(normalizedPlatform) {
+    return normalizedPlatform === 'web' ? 'fcmTokenWeb' : 'fcmTokenApp';
+}
+
 /**
  * Unified endpoint to save FCM device tokens.
  * Works for users, restaurants, delivery partners, and admins.
@@ -59,15 +63,21 @@ export const saveDeviceToken = asyncHandler(async (req, res) => {
         { upsert: true, new: true }
     );
 
-    // Backward compatibility for user flows that still read from User document fields.
-    if (role === 'user') {
-        try {
+    // Sync role-specific document fields so web/app tokens are visible in each module collection.
+    try {
+        const legacyTokenField = getLegacyFieldByPlatform(normalizedPlatform);
+
+        if (role === 'user') {
             const { default: User } = await import('../../auth/models/User.js');
-            const legacyTokenField = normalizedPlatform === 'web' ? 'fcmTokenWeb' : 'fcmTokenMobile';
+            const setPayload = { [legacyTokenField]: deviceToken };
+            // Keep legacy alias in sync for older reads.
+            if (legacyTokenField === 'fcmTokenApp') {
+                setPayload.fcmTokenMobile = deviceToken;
+            }
 
             await User.findByIdAndUpdate(userId, {
                 $addToSet: { fcmTokens: deviceToken },
-                $set: { [legacyTokenField]: deviceToken }
+                $set: setPayload
             });
 
             const user = await User.findById(userId).select('fcmTokens');
@@ -75,10 +85,20 @@ export const saveDeviceToken = asyncHandler(async (req, res) => {
                 user.fcmTokens = user.fcmTokens.slice(-10);
                 await user.save();
             }
-        } catch (syncErr) {
-            // Do not break token registration if legacy sync fails.
-            console.warn(`[FCM-Backend] Legacy User FCM sync failed: ${syncErr.message}`);
+        } else if (role === 'restaurant') {
+            const { default: Restaurant } = await import('../../restaurant/models/Restaurant.js');
+            await Restaurant.findByIdAndUpdate(userId, {
+                $set: { [legacyTokenField]: deviceToken }
+            });
+        } else if (role === 'delivery') {
+            const { default: Delivery } = await import('../../delivery/models/Delivery.js');
+            await Delivery.findByIdAndUpdate(userId, {
+                $set: { [legacyTokenField]: deviceToken }
+            });
         }
+    } catch (syncErr) {
+        // Do not break token registration if legacy/module-field sync fails.
+        console.warn(`[FCM-Backend] Module FCM field sync failed: ${syncErr.message}`);
     }
 
     // Limit tokens per user/role (e.g., max 5 devices)

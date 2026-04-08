@@ -4,9 +4,10 @@ import AnimatedPage from "../../components/AnimatedPage"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { useState } from "react"
-import { authAPI, notificationAPI } from "@/lib/api"
+import { authAPI } from "@/lib/api"
 import { firebaseAuth } from "@/lib/firebase"
 import { clearModuleAuth } from "@/lib/utils/auth"
+import { revokeFcmTokenOnLogout } from "@/lib/utils/fcmTokenLifecycle"
 
 export default function Logout() {
   const navigate = useNavigate()
@@ -20,14 +21,7 @@ export default function Logout() {
     try {
       // Call backend logout API to invalidate refresh token
       try {
-        // Remove FCM token before standard logout
-        const savedToken = localStorage.getItem(`fcm_token_registered_user_VAL`);
-        if (savedToken) {
-          console.log("[Logout] Removing FCM token for user...");
-          await notificationAPI.removeToken(savedToken);
-          localStorage.removeItem(`fcm_token_registered_user_VAL`);
-          localStorage.removeItem(`fcm_token_registered_user`);
-        }
+        await revokeFcmTokenOnLogout("user")
         await authAPI.logout()
       } catch (apiError) {
         // Continue with logout even if API call fails (network issues, etc.)

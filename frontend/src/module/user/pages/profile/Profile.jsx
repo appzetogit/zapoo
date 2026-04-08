@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { authAPI } from "@/lib/api";
 import { firebaseAuth } from "@/lib/firebase";
 import { clearModuleAuth } from "@/lib/utils/auth";
+import { revokeFcmTokenOnLogout } from "@/lib/utils/fcmTokenLifecycle";
 export default function Profile() {
   const {
     userProfile,
@@ -112,6 +113,7 @@ export default function Profile() {
     try {
       // Call backend logout API to invalidate refresh token
       try {
+        await revokeFcmTokenOnLogout("user");
         await authAPI.logout();
       } catch (apiError) {
         // Continue with logout even if API call fails (network issues, etc.)

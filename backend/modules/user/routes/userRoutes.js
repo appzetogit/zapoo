@@ -54,14 +54,21 @@ router.post('/fcm-token', async (req, res) => {
     const normalizedToken = String(token).trim();
     if (!normalizedToken) return res.status(400).json({ success: false, message: 'Token required' });
 
-    const normalizedPlatform = String(platform).toLowerCase();
-    const tokenField = normalizedPlatform === 'mobile' ? 'fcmTokenMobile' : 'fcmTokenWeb';
+    const normalizedPlatform = String(platform || 'web').toLowerCase().trim();
+    const isWebPlatform = normalizedPlatform === 'web';
+    const tokenField = isWebPlatform ? 'fcmTokenWeb' : 'fcmTokenApp';
 
     const User = (await import('../../auth/models/User.js')).default;
     // Keep legacy token array for backward compatibility and also store platform-specific token.
+    const setPayload = { [tokenField]: normalizedToken };
+    if (!isWebPlatform) {
+      // Keep legacy alias in sync for old reads.
+      setPayload.fcmTokenMobile = normalizedToken;
+    }
+
     await User.findByIdAndUpdate(req.user._id, {
       $addToSet: { fcmTokens: normalizedToken },
-      $set: { [tokenField]: normalizedToken },
+      $set: setPayload,
     });
 
     // If over 10 tokens, trim oldest
@@ -78,7 +85,7 @@ router.post('/fcm-token', async (req, res) => {
         {
           userId: req.user._id,
           role: 'user',
-          platform: normalizedPlatform === 'mobile' ? 'mobile' : 'web',
+          platform: normalizedPlatform === 'ios' ? 'ios' : (isWebPlatform ? 'web' : 'android'),
           isActive: true
         },
         { upsert: true, new: true }
@@ -99,7 +106,7 @@ router.post('/fcm-token', async (req, res) => {
     return res.json({
       success: true,
       message: 'FCM token saved',
-      data: { platform: normalizedPlatform === 'mobile' ? 'mobile' : 'web' },
+      data: { platform: isWebPlatform ? 'web' : 'app' },
     });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });

@@ -5,6 +5,7 @@ import Tier from '../../admin/models/Tier.js';
 import otpService from '../../auth/services/otpService.js';
 import jwtService from '../../auth/services/jwtService.js';
 import firebaseAuthService from '../../auth/services/firebaseAuthService.js';
+import DeviceToken from '../../notification/models/DeviceToken.js';
 import { successResponse, errorResponse } from '../../../shared/utils/response.js';
 import { asyncHandler } from '../../../shared/middleware/asyncHandler.js';
 import { normalizePhoneNumber } from '../../../shared/utils/phoneUtils.js';
@@ -808,6 +809,35 @@ export const refreshToken = asyncHandler(async (req, res) => {
  * POST /api/restaurant/auth/logout
  */
 export const logout = asyncHandler(async (req, res) => {
+  // Best-effort token cleanup so logout consistently removes FCM tokens from DB.
+  try {
+    let restaurantId = req.restaurant?._id ? String(req.restaurant._id) : null;
+    if (!restaurantId) {
+      const authHeader = req.headers.authorization || '';
+      if (authHeader.startsWith('Bearer ')) {
+        const token = authHeader.substring(7);
+        const decoded = jwtService.verifyAccessToken(token);
+        if (decoded?.role === 'restaurant' && decoded?.userId) {
+          restaurantId = String(decoded.userId);
+        }
+      }
+    }
+
+    if (restaurantId) {
+      await Promise.all([
+        DeviceToken.deleteMany({ userId: restaurantId, role: 'restaurant' }),
+        Restaurant.findByIdAndUpdate(restaurantId, {
+          $set: {
+            fcmTokenWeb: null,
+            fcmTokenApp: null
+          }
+        })
+      ]);
+    }
+  } catch (cleanupErr) {
+    logger.warn(`FCM cleanup on restaurant logout failed: ${cleanupErr.message}`);
+  }
+
   // Clear refresh token cookie
   res.clearCookie('refreshToken', {
     httpOnly: true,

@@ -82,12 +82,9 @@ export function useFCMNotification({
 
         console.log(`[FCM] Registering token on backend. Role="${role}", Endpoint="${endpoint}"...`);
         try {
-          // Check if we already failed with 401 recently for this role to prevent spamming
-          const lastFailStatus = sessionStorage.getItem(`fcm_last_fail_status_${role}`);
-          if (lastFailStatus === '401') {
-            console.warn(`[FCM] Skipping registration for role "${role}" due to previous 401. Your account may be inactive.`);
-            return;
-          }
+          // Logged-in sessions should always try to re-register token with backend.
+          // This avoids stale session flags causing "token in localStorage but not in DB" mismatch.
+          sessionStorage.removeItem(`fcm_last_fail_status_${role}`);
 
           const res = await apiClient.post(endpoint, {
             token,

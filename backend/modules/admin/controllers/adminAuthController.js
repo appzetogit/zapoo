@@ -1,4 +1,5 @@
 import Admin from '../models/Admin.js';
+import DeviceToken from '../../notification/models/DeviceToken.js';
 import jwtService from '../../auth/services/jwtService.js';
 import otpService from '../../auth/services/otpService.js';
 import { successResponse, errorResponse } from '../../../shared/utils/response.js';
@@ -263,6 +264,16 @@ export const getCurrentAdmin = asyncHandler(async (req, res) => {
  * POST /api/admin/auth/logout
  */
 export const adminLogout = asyncHandler(async (req, res) => {
+  // Best-effort token cleanup for admin role
+  try {
+    const adminId = req.admin?._id ? String(req.admin._id) : null;
+    if (adminId) {
+      await DeviceToken.deleteMany({ userId: adminId, role: 'admin' });
+    }
+  } catch (cleanupErr) {
+    logger.warn(`FCM cleanup on admin logout failed: ${cleanupErr.message}`);
+  }
+
   // Clear refresh token cookie
   res.cookie('refreshToken', '', {
     httpOnly: true,

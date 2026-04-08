@@ -147,6 +147,19 @@ const restaurantSchema = new mongoose.Schema(
       trim: true,
     },
     primaryContactNumber: String,
+    // FCM tokens (separate web/app slots for deterministic targeting)
+    fcmTokenWeb: {
+      type: String,
+      trim: true,
+      default: null,
+      select: false,
+    },
+    fcmTokenApp: {
+      type: String,
+      trim: true,
+      default: null,
+      select: false,
+    },
     location: locationSchema,
     profileImage: {
       url: String,

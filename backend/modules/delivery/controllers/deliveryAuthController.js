@@ -1,4 +1,5 @@
 import Delivery from '../models/Delivery.js';
+import DeviceToken from '../../notification/models/DeviceToken.js';
 import otpService from '../../auth/services/otpService.js';
 import jwtService from '../../auth/services/jwtService.js';
 import { successResponse, errorResponse } from '../../../shared/utils/response.js';
@@ -310,6 +311,24 @@ export const refreshToken = asyncHandler(async (req, res) => {
  * POST /api/delivery/auth/logout
  */
 export const logout = asyncHandler(async (req, res) => {
+  // Best-effort token cleanup so logout consistently removes FCM tokens from DB.
+  try {
+    const deliveryId = req.delivery?._id ? String(req.delivery._id) : null;
+    if (deliveryId) {
+      await Promise.all([
+        DeviceToken.deleteMany({ userId: deliveryId, role: 'delivery' }),
+        Delivery.findByIdAndUpdate(deliveryId, {
+          $set: {
+            fcmTokenWeb: null,
+            fcmTokenApp: null
+          }
+        })
+      ]);
+    }
+  } catch (cleanupErr) {
+    logger.warn(`FCM cleanup on delivery logout failed: ${cleanupErr.message}`);
+  }
+
   // Get delivery boy from request (set by auth middleware)
   if (req.delivery) {
     // Clear refresh token from database

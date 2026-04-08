@@ -198,6 +198,11 @@ export const adminApproveRequest = asyncHandler(async (req, res) => {
         $nin: [null, '']
       }
     }, {
+      fcmTokenApp: {
+        $exists: true,
+        $nin: [null, '']
+      }
+    }, {
       fcmTokenMobile: {
         $exists: true,
         $nin: [null, '']
@@ -221,12 +226,13 @@ export const adminApproveRequest = asyncHandler(async (req, res) => {
     _id: 1,
     fcmTokens: 1,
     fcmTokenWeb: 1,
+    fcmTokenApp: 1,
     fcmTokenMobile: 1
   }).lean();
   const recipientUserIds = usersWithTokens.map(u => u._id?.toString()).filter(Boolean);
   const tokenSet = new Set();
   for (const user of usersWithTokens) {
-    const rawTokens = [...(Array.isArray(user.fcmTokens) ? user.fcmTokens : []), user.fcmTokenWeb, user.fcmTokenMobile];
+    const rawTokens = [...(Array.isArray(user.fcmTokens) ? user.fcmTokens : []), user.fcmTokenWeb, user.fcmTokenApp, user.fcmTokenMobile];
     for (const rawToken of rawTokens) {
       if (!rawToken || typeof rawToken !== 'string') continue;
       const token = rawToken.trim();
@@ -295,6 +301,14 @@ export const adminApproveRequest = asyncHandler(async (req, res) => {
           }, {
             $unset: {
               fcmTokenWeb: ''
+            }
+          }), User.updateMany({
+            fcmTokenApp: {
+              $in: staleTokens
+            }
+          }, {
+            $unset: {
+              fcmTokenApp: ''
             }
           }), User.updateMany({
             fcmTokenMobile: {

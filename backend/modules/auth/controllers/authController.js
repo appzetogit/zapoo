@@ -3,6 +3,7 @@ import otpService from "../services/otpService.js";
 import jwtService from "../services/jwtService.js";
 import googleAuthService from "../services/googleAuthService.js";
 import firebaseAuthService from "../services/firebaseAuthService.js";
+import DeviceToken from "../../notification/models/DeviceToken.js";
 import { successResponse, errorResponse } from "../../../shared/utils/response.js";
 import { asyncHandler } from "../../../shared/middleware/asyncHandler.js";
 import winston from "winston";
@@ -322,6 +323,35 @@ export const refreshToken = asyncHandler(async (req, res) => {
  * POST /api/auth/logout
  */
 export const logout = asyncHandler(async (req, res) => {
+  // Best-effort token cleanup so logout consistently removes FCM tokens from DB.
+  try {
+    let userId = req.user?._id ? String(req.user._id) : null;
+    if (!userId) {
+      const authHeader = req.headers.authorization || "";
+      if (authHeader.startsWith("Bearer ")) {
+        const token = authHeader.substring(7);
+        const decoded = jwtService.verifyAccessToken(token);
+        userId = decoded?.userId ? String(decoded.userId) : null;
+      }
+    }
+
+    if (userId) {
+      await Promise.all([
+        DeviceToken.deleteMany({ userId, role: "user" }),
+        User.findByIdAndUpdate(userId, {
+          $set: {
+            fcmTokens: [],
+            fcmTokenWeb: null,
+            fcmTokenApp: null,
+            fcmTokenMobile: null
+          }
+        })
+      ]);
+    }
+  } catch (cleanupErr) {
+    logger.warn(`FCM cleanup on user logout failed: ${cleanupErr.message}`);
+  }
+
   // Clear refresh token cookie
   res.clearCookie("refreshToken", {
     httpOnly: true,

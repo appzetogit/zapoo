@@ -22,6 +22,7 @@ import { restaurantAPI } from "@/lib/api"
 import OptimizedImage from "@/components/OptimizedImage"
 import { clearModuleAuth } from "@/lib/utils/auth"
 import { firebaseAuth } from "@/lib/firebase"
+import { revokeFcmTokenOnLogout } from "@/lib/utils/fcmTokenLifecycle"
 
 const STORAGE_KEY = "restaurant_owner_contact"
 
@@ -217,6 +218,7 @@ export default function EditOwner() {
     
     try {
       // Call backend API to delete the account
+      await revokeFcmTokenOnLogout("restaurant")
       await restaurantAPI.deleteAccount()
       
       // Sign out from Firebase if restaurant logged in via Google
