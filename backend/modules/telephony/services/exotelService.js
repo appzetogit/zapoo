@@ -2,6 +2,8 @@ import axios from "axios";
 
 const {
   EXOTEL_SID,
+  EXOTEL_API_KEY,
+  EXOTEL_API_TOKEN,
   EXOTEL_AUTH_TOKEN,
   EXOTEL_SUBDOMAIN,
 } = process.env;
@@ -12,13 +14,18 @@ const getBaseUrl = () => {
 };
 
 const getAuthConfig = () => {
-  if (!EXOTEL_SID || !EXOTEL_AUTH_TOKEN) {
+  const accountSid = EXOTEL_SID;
+  const apiKey = EXOTEL_API_KEY || EXOTEL_SID;
+  const apiToken = EXOTEL_API_TOKEN || EXOTEL_AUTH_TOKEN;
+
+  if (!accountSid || !apiKey || !apiToken) {
     throw new Error("Exotel credentials are not configured");
   }
+
   return {
     auth: {
-      username: EXOTEL_SID,
-      password: EXOTEL_AUTH_TOKEN,
+      username: apiKey,
+      password: apiToken,
     },
   };
 };
@@ -102,6 +109,15 @@ export const initiateBridgeCall = async ({
   }).toString();
 
   try {
+    // DEBUG: trace the credential shape being used for Exotel auth without exposing secrets
+    console.log("[MASKING][EXOTEL][AUTH]", {
+      accountSid: EXOTEL_SID,
+      hasApiKey: Boolean(EXOTEL_API_KEY || EXOTEL_SID),
+      hasApiToken: Boolean(EXOTEL_API_TOKEN || EXOTEL_AUTH_TOKEN),
+      subdomain: EXOTEL_SUBDOMAIN || "api",
+      timestamp: new Date(),
+    });
+
     // DEBUG: trace the outbound Exotel bridge request without exposing credentials
     console.log("[MASKING][EXOTEL][REQUEST]", {
       url,
