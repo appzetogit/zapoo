@@ -675,6 +675,13 @@ export async function notifyNextDeliveryPartner(orderDoc, restaurantLat, restaur
 
     // Skip if delivery partner is not connected to socket
     const connection = await checkDeliveryPartnerConnection(nextId);
+    console.log('🧪 [DeliveryAssign] Candidate connection check', {
+      orderId: orderDoc.orderId || orderId?.toString?.() || String(orderId),
+      candidateId: nextId,
+      connected: Boolean(connection?.connected),
+      room: connection?.room || null,
+      socketCount: connection?.socketCount || 0
+    });
     if (!connection?.connected) {
       console.warn(`⚠️ [DeliveryAssign] Candidate ${nextId} not connected. Skipping.`);
       if (!orderDoc.assignmentInfo.rejectedDeliveryPartnerIds) {
@@ -695,6 +702,11 @@ export async function notifyNextDeliveryPartner(orderDoc, restaurantLat, restaur
 
   // Notify only the current candidate
   if (populated) {
+    console.log('📤 [DeliveryAssign] Sending notifyDeliveryBoyNewOrder', {
+      orderId: populated.orderId || orderDoc.orderId || orderId?.toString?.() || String(orderId),
+      selectedCandidateId: nextId,
+      currentCandidateIndex: idx
+    });
     await notifyDeliveryBoyNewOrder(populated, nextId);
   }
   console.log('✅ [DeliveryAssign] Notified delivery partner:', nextId, 'for order', orderDoc.orderId || orderId);

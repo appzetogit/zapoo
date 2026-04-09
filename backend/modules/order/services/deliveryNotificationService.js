@@ -50,9 +50,19 @@ export async function checkDeliveryPartnerConnection(deliveryPartnerId) {
     const deliveryNamespace = io.of('/delivery');
     const normalizedId = deliveryPartnerId?.toString() || deliveryPartnerId;
     let roomVariations = buildDeliveryRoomVariations(normalizedId, null);
+    console.log('🔎 [DeliverySocketCheck] Checking connection', {
+      deliveryPartnerId: normalizedId,
+      roomVariations
+    });
     for (const room of roomVariations) {
       const sockets = await deliveryNamespace.in(room).fetchSockets();
       if (sockets.length > 0) {
+        console.log('✅ [DeliverySocketCheck] Connected', {
+          deliveryPartnerId: normalizedId,
+          room,
+          socketCount: sockets.length,
+          socketIds: sockets.map(s => s.id)
+        });
         return {
           connected: true,
           room,
@@ -65,9 +75,20 @@ export async function checkDeliveryPartnerConnection(deliveryPartnerId) {
       const delivery = await Delivery.findById(normalizedId).select('deliveryId').lean();
       if (delivery?.deliveryId) {
         roomVariations = buildDeliveryRoomVariations(normalizedId, delivery.deliveryId);
+        console.log('🔎 [DeliverySocketCheck] Retrying with deliveryId-based rooms', {
+          deliveryPartnerId: normalizedId,
+          deliveryId: delivery.deliveryId,
+          roomVariations
+        });
         for (const room of roomVariations) {
           const sockets = await deliveryNamespace.in(room).fetchSockets();
           if (sockets.length > 0) {
+            console.log('✅ [DeliverySocketCheck] Connected (deliveryId room)', {
+              deliveryPartnerId: normalizedId,
+              room,
+              socketCount: sockets.length,
+              socketIds: sockets.map(s => s.id)
+            });
             return {
               connected: true,
               room,
@@ -77,6 +98,10 @@ export async function checkDeliveryPartnerConnection(deliveryPartnerId) {
         }
       }
     }
+    console.warn('⚠️ [DeliverySocketCheck] Not connected in any known room', {
+      deliveryPartnerId: normalizedId,
+      roomVariationsTried: roomVariations
+    });
     return {
       connected: false,
       room: null,
@@ -252,6 +277,12 @@ export async function notifyDeliveryBoyNewOrder(order, deliveryPartnerId) {
 
     // Try multiple room formats to ensure we find the delivery partner
     const roomVariations = buildDeliveryRoomVariations(normalizedDeliveryPartnerId, deliveryPartner?.deliveryId);
+    console.log('📣 [DeliveryNotify] Emitting new_order', {
+      orderId: order.orderId,
+      deliveryPartnerId: normalizedDeliveryPartnerId,
+      deliveryPartnerDeliveryId: deliveryPartner?.deliveryId || null,
+      roomVariations
+    });
 
     // Get all connected sockets in the delivery partner room
     let socketsInRoom = [];
