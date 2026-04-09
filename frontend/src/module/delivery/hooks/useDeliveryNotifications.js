@@ -154,7 +154,59 @@ export const useDeliveryNotifications = () => {
       return obj.id?.toString() || obj._id?.toString() || obj.deliveryId || null;
     };
 
+    const readIdFromKnownStorage = () => {
+      const parseSafe = (raw) => {
+        if (!raw) return null;
+        try {
+          return JSON.parse(raw);
+        } catch {
+          return null;
+        }
+      };
+
+      // Legacy/local fallback keys
+      const deliveryUser = parseSafe(localStorage.getItem('delivery_user'));
+      const deliveryAuthData = parseSafe(sessionStorage.getItem('deliveryAuthData'));
+
+      const candidates = [
+        deliveryUser,
+        deliveryAuthData,
+        deliveryAuthData?.user,
+        deliveryAuthData?.delivery,
+        deliveryAuthData?.deliveryPartner,
+        deliveryAuthData?.data,
+        deliveryAuthData?.data?.user,
+        deliveryAuthData?.data?.deliveryPartner
+      ];
+
+      for (const candidate of candidates) {
+        const id = extractId(candidate);
+        if (id) return id;
+      }
+
+      return null;
+    };
+
+    const readIdFromToken = () => {
+      const token = localStorage.getItem('delivery_accessToken') || localStorage.getItem('accessToken');
+      if (!token) return null;
+      try {
+        const parts = token.split('.');
+        if (parts.length < 2) return null;
+        const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+        return payload?.userId?.toString?.() || payload?.id?.toString?.() || payload?._id?.toString?.() || payload?.sub?.toString?.() || null;
+      } catch {
+        return null;
+      }
+    };
+
     const fetchDeliveryPartnerId = async () => {
+      // Set an immediate fallback ID first so socket can join room even if /me is delayed/fails.
+      const immediateId = readIdFromKnownStorage() || readIdFromToken();
+      if (immediateId) {
+        setDeliveryPartnerId(immediateId);
+      }
+
       try {
         const response = await deliveryAPI.getCurrentDelivery();
         if (response.data?.success && response.data.data) {
@@ -171,19 +223,12 @@ export const useDeliveryNotifications = () => {
       } catch (error) {
         console.error('Error fetching delivery partner:', error);
       }
-      // Fallback to localStorage if API didn't return an ID
-      try {
-        const stored = localStorage.getItem('delivery_user');
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          const fallbackId = extractId(parsed);
-          if (fallbackId) {
-            console.warn('⚠️ Using delivery ID from localStorage fallback');
-            setDeliveryPartnerId(fallbackId);
-          }
-        }
-      } catch (e) {
-        console.warn('⚠️ Failed to read delivery_user from localStorage');
+
+      // Final fallback chain if API failed/no ID
+      const fallbackId = readIdFromKnownStorage() || readIdFromToken();
+      if (fallbackId) {
+        console.warn('⚠️ Using delivery ID from storage/token fallback');
+        setDeliveryPartnerId(fallbackId);
       }
     };
     fetchDeliveryPartnerId();
