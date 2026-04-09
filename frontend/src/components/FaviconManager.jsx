@@ -7,12 +7,13 @@ const FaviconManager = () => {
   useEffect(() => {
     const path = location.pathname;
     let faviconHref = '/zapoo-icon.jpg'; // Default favicon
+    const isModulePath = (base) => path === base || path.startsWith(`${base}/`);
 
-    if (path.startsWith('/admin')) {
+    if (isModulePath('/admin')) {
       faviconHref = '/zapoo-icon.jpg';
-    } else if (path.startsWith('/restaurant')) {
+    } else if (isModulePath('/restaurant')) {
       faviconHref = '/zapoo-rest-logo.jpg';
-    } else if (path.startsWith('/delivery')) {
+    } else if (isModulePath('/delivery')) {
       faviconHref = '/zapoo-delivery-icon.jpg';
     }
 
@@ -35,11 +36,11 @@ const FaviconManager = () => {
     setFavicon(faviconHref);
 
     // Update title as well if needed, though usually handled by page components
-    if (path.startsWith('/admin')) {
+    if (isModulePath('/admin')) {
       document.title = 'Zapoo';
-    } else if (path.startsWith('/restaurant')) {
+    } else if (isModulePath('/restaurant')) {
       document.title = 'Zapoo';
-    } else if (path.startsWith('/delivery')) {
+    } else if (isModulePath('/delivery')) {
       document.title = 'Zapoo';
     } else {
       document.title = 'Zapoo';

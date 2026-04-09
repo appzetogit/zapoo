@@ -57,6 +57,27 @@ export default function OutletInfo() {
   const [showEditRangeDialog, setShowEditRangeDialog] = useState(false)
   const [editRangeValue, setEditRangeValue] = useState(5)
   const [maxDeliveryRange, setMaxDeliveryRange] = useState(20)
+  const [reviewStats, setReviewStats] = useState({
+    averageRating: 0,
+    totalReviews: 0
+  })
+
+  const ratingValueRaw =
+    reviewStats?.averageRating ??
+    restaurantData?.rating ??
+    restaurantData?.avgRating ??
+    restaurantData?.metrics?.averageRating ??
+    0
+  const ratingValue = Number(ratingValueRaw)
+  const displayRating = Number.isFinite(ratingValue) ? ratingValue : 0
+
+  const totalRatingsRaw =
+    reviewStats?.totalReviews ??
+    restaurantData?.totalRatings ??
+    restaurantData?.reviewCount ??
+    restaurantData?.metrics?.totalRatings ??
+    0
+  const totalDeliveryReviews = Number(totalRatingsRaw) || 0
 
   // Format address from location object
   const formatAddress = (location) => {
@@ -149,6 +170,35 @@ export default function OutletInfo() {
           // Set delivery range
           if (data.deliveryRange) {
             setDeliveryRange(data.deliveryRange)
+          }
+        }
+
+        // Fetch rating/review summary from dedicated reviews API
+        // OutletInfo should use live review stats instead of relying only on restaurant profile fields.
+        try {
+          const reviewsRes = await apiClient.get('/restaurant/reviews', {
+            params: { page: 1, limit: 1 }
+          })
+          const stats = reviewsRes?.data?.data?.statistics
+          if (stats) {
+            setReviewStats({
+              averageRating: Number(stats.averageRating || 0),
+              totalReviews: Number(stats.totalReviews || 0)
+            })
+          } else {
+            setReviewStats({
+              averageRating: Number(data?.rating || 0),
+              totalReviews: Number(data?.totalRatings || 0)
+            })
+          }
+        } catch (reviewsError) {
+          // Fallback to restaurant profile stats if reviews API fails
+          setReviewStats({
+            averageRating: Number(data?.rating || 0),
+            totalReviews: Number(data?.totalRatings || 0)
+          })
+          if (reviewsError.code !== 'ERR_NETWORK' && reviewsError.code !== 'ECONNABORTED') {
+            console.warn("OutletInfo reviews summary fetch failed, using fallback fields")
           }
         }
       } catch (error) {
@@ -758,12 +808,12 @@ export default function OutletInfo() {
             >
               <div className="bg-green-700 px-2.5 py-1.5 rounded flex items-center gap-1 shrink-0">
                 <span className="text-white text-sm font-bold">
-                  {restaurantData?.rating?.toFixed(1) || "0.0"}
+                  {displayRating.toFixed(1)}
                 </span>
                 <Star className="w-3.5 h-3.5 text-white fill-white" />
               </div>
               <span className="text-gray-800 text-sm font-normal">
-                {restaurantData?.totalRatings || 0} DELIVERY REVIEWS
+                {totalDeliveryReviews} DELIVERY REVIEWS
               </span>
               <ChevronRight className="w-4 h-4 text-gray-400 shrink-0 ml-auto" />
             </button>

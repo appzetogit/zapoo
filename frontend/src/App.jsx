@@ -39,7 +39,6 @@ const RestaurantChangeLanguage = lazy(() => import("@/module/restaurant/pages/Ch
 const DeliveryPricing = lazy(() => import("@/module/restaurant/pages/DeliveryPricing"))
 const ExploreMore = lazy(() => import("@/module/restaurant/pages/ExploreMore"))
 const RushHour = lazy(() => import("@/module/restaurant/pages/RushHour"))
-const SwitchOutlet = lazy(() => import("@/module/restaurant/pages/SwitchOutlet"))
 const OutletTimings = lazy(() => import("@/module/restaurant/pages/OutletTimings"))
 const DaySlots = lazy(() => import("@/module/restaurant/pages/DaySlots"))
 const OutletInfo = lazy(() => import("@/module/restaurant/pages/OutletInfo"))
@@ -294,14 +293,7 @@ export default function App() {
           }
         />
 
-        <Route
-          path="/restaurant/switch-outlet"
-          element={
-            <ProtectedRoute requiredRole="restaurant" loginPath="/restaurant/login">
-              <SwitchOutlet />
-            </ProtectedRoute>
-          }
-        />
+        <Route path="/restaurant/switch-outlet" element={<Navigate to="/restaurant/explore" replace />} />
         <Route
           path="/restaurant/outlet-timings"
           element={
