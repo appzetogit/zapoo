@@ -180,6 +180,9 @@ export const createOrder = async (req, res) => {
     if (!pricing.couponCode && pricing.appliedCoupon?.code) {
       pricing.couponCode = pricing.appliedCoupon.code;
     }
+    if (!pricing.couponSource && pricing.appliedCoupon?.source) {
+      pricing.couponSource = pricing.appliedCoupon.source;
+    }
 
     // Calculate pricing (Optimized: pass pre-fetched restaurant)
     const pricingData = await calculateOrderPricing({
@@ -216,6 +219,7 @@ export const createOrder = async (req, res) => {
         deliveryFee: pricingData.deliveryFee,
         platformFee: pricingData.platformFee,
         adminDeliveryCost: pricingData.internalAdminDeliveryCost || 0,
+        adminDeliveryGst: pricingData.adminDeliveryGst || 0,
         restaurantPayableToAdmin: pricingData.restaurantPayableToAdmin || 0,
         gstCollected: pricingData.gstCollected || pricingData.tax || 0,
         distanceKm: pricingData.distanceKm || 0,
@@ -224,7 +228,8 @@ export const createOrder = async (req, res) => {
         total: pricingData.total,
         internalRecommendedFee: pricingData.internalRecommendedFee,
         // Track internal fee
-        couponCode: pricing.couponCode
+        couponCode: pricing.couponCode,
+        couponSource: pricing.couponSource || pricingData.appliedCoupon?.source || null
       },
       deliveryFleet: deliveryFleet || 'standard',
       note: note || '',

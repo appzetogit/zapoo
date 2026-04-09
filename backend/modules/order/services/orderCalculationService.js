@@ -413,8 +413,8 @@ const calculateAdminDeliveryCost = ({
 
   if (!matchedDistanceSlab) {
     return {
-      adminDeliveryCost: 0,
-      usedTierBasePay: false,
+      adminDeliveryCost: roundCurrency(tierBasePay),
+      usedTierBasePay: tierBasePay > 0,
       tierBasePay,
     };
   }
@@ -458,20 +458,68 @@ const calculateTierPlatformFee = (tier, defaultPlatformFee) => {
 };
 
 /**
- * Calculate GST (Goods and Services Tax)
- * GST is calculated on subtotal after discounts
+ * Calculate customer GST breakdown.
+ * GST is collected on:
+ * - food subtotal after discount at 5%
+ * - delivery fee at 18%
+ * - platform fee at 18%
  */
-export const calculateGST = async (subtotal, discount = 0, restaurant = null, passedFeeSettings = null) => {
-  const taxableAmount = Math.max(subtotal - discount, 0);
-  const feeSettings = passedFeeSettings || await getFeeSettings();
-  const gstRate = (feeSettings.gstRate || 5) / 100;
+const calculateCustomerGSTBreakdown = ({
+  subtotal = 0,
+  discount = 0,
+  deliveryFee = 0,
+  platformFee = 0,
+}) => {
+  const taxableFoodAmount = Math.max(Number(subtotal || 0) - Number(discount || 0), 0);
+  const foodGst = roundCurrency(taxableFoodAmount * 0.05);
+  const deliveryGst = roundCurrency(Number(deliveryFee || 0) * 0.18);
+  const platformGst = roundCurrency(Number(platformFee || 0) * 0.18);
+  const total = roundCurrency(foodGst + deliveryGst + platformGst);
 
-  const isRegistered = restaurant?.onboarding?.step3?.gst?.isRegistered || false;
-  if (isRegistered) {
-    return 0;
+  return {
+    taxableFoodAmount: roundCurrency(taxableFoodAmount),
+    foodGst,
+    deliveryGst,
+    platformGst,
+    total,
+  };
+};
+
+/**
+ * Backward-compatible GST helper.
+ * If legacy restaurant/fee settings arguments are passed, preserve the old flow.
+ * New billing flow should use `calculateCustomerGSTBreakdown` directly.
+ */
+export const calculateGST = async (
+  subtotal,
+  discount = 0,
+  thirdArg = 0,
+  fourthArg = 0,
+  fifthArg = 0,
+  sixthArg = 0
+) => {
+  const looksLikeLegacyRestaurantArg = thirdArg && typeof thirdArg === 'object' && !Array.isArray(thirdArg);
+  if (looksLikeLegacyRestaurantArg) {
+    const restaurant = thirdArg;
+    const passedFeeSettings = fourthArg;
+    const taxableAmount = Math.max(Number(subtotal || 0) - Number(discount || 0), 0);
+    const feeSettings = passedFeeSettings || await getFeeSettings();
+    const gstRate = (feeSettings.gstRate || 5) / 100;
+
+    const isRegistered = restaurant?.onboarding?.step3?.gst?.isRegistered || false;
+    if (isRegistered) {
+      return 0;
+    }
+
+    return roundCurrency(taxableAmount * gstRate);
   }
 
-  return Math.round(taxableAmount * gstRate);
+  return calculateCustomerGSTBreakdown({
+    subtotal,
+    discount,
+    deliveryFee: thirdArg,
+    platformFee: fourthArg,
+  }).total;
 };
 
 /**
@@ -709,7 +757,7 @@ export const calculateOrderPricing = async ({
     });
 
     const platformFee = roundCurrency(calculateTierPlatformFee(tier, feeSettings.platformFee));
-    const gst = await calculateGST(subtotal, discount, restaurant, feeSettings);
+    const adminDeliveryGst = roundCurrency(adminDeliveryCost * 0.18);
 
     /** After distance/order-value rules; may be zeroed by coupon or global threshold (threshold skipped when custom restaurant pricing is enabled) */
     let finalCustomerDeliveryFee = roundCurrency(customerDeliveryFeeBeforeWaivers);
@@ -732,6 +780,14 @@ export const calculateOrderPricing = async ({
       }
     }
 
+    const gstBreakdown = calculateCustomerGSTBreakdown({
+      subtotal,
+      discount,
+      deliveryFee: finalCustomerDeliveryFee,
+      platformFee,
+    });
+    const gst = gstBreakdown.total;
+
     let internalRecommendedFee = 0;
     let recommendedFeePerItem = Number(feeSettings.recommendedItemFee || 0);
 
@@ -748,7 +804,7 @@ export const calculateOrderPricing = async ({
     }
 
     const total = roundCurrency(subtotal - discount + finalCustomerDeliveryFee + platformFee + gst);
-    const restaurantPayableToAdmin = roundCurrency(adminDeliveryCost + platformFee + gst);
+    const restaurantPayableToAdmin = roundCurrency(adminDeliveryCost + adminDeliveryGst + platformFee + gst);
     const savings = roundCurrency(discount);
 
     const pricingDiagnostics = [];
@@ -792,11 +848,13 @@ export const calculateOrderPricing = async ({
       deliveryFee: finalCustomerDeliveryFee,
       platformFee,
       tax: gst,
+      gstBreakdown,
       total,
       customerPayableTotal: total,
       savings,
       internalRecommendedFee: roundCurrency(internalRecommendedFee),
       internalAdminDeliveryCost: adminDeliveryCost,
+      adminDeliveryGst,
       restaurantPayableToAdmin,
       gstCollected: gst,
       distanceKm,

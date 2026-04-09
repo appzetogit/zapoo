@@ -29,6 +29,30 @@ const orderSettlementSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  couponCode: {
+    type: String,
+    default: null
+  },
+  couponSource: {
+    type: String,
+    enum: ['admin', 'restaurant', null],
+    default: null
+  },
+  couponDiscount: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  restaurantCouponDiscount: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  adminCouponDiscount: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
   deliveryPartnerId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Delivery',
@@ -52,9 +76,12 @@ const orderSettlementSchema = new mongoose.Schema({
     foodPrice: { type: Number, required: true, min: 0 },
     commission: { type: Number, required: true, min: 0 },
     adminDeliveryCost: { type: Number, default: 0, min: 0 },
+    adminDeliveryGst: { type: Number, default: 0, min: 0 },
     platformFee: { type: Number, default: 0, min: 0 },
     gstCollected: { type: Number, default: 0, min: 0 },
     payableToAdmin: { type: Number, default: 0, min: 0 },
+    couponDiscount: { type: Number, default: 0, min: 0 },
+    couponSource: { type: String, enum: ['admin', 'restaurant', null], default: null },
     commissionPercentage: { type: Number, default: 0 },
     netEarning: { type: Number, required: true, min: 0 },
     status: {
@@ -85,10 +112,13 @@ const orderSettlementSchema = new mongoose.Schema({
     commission: { type: Number, required: true, min: 0 },
     platformFee: { type: Number, default: 0, min: 0 },
     adminDeliveryCost: { type: Number, default: 0, min: 0 },
+    adminDeliveryGst: { type: Number, default: 0, min: 0 },
     restaurantPayable: { type: Number, default: 0, min: 0 },
     deliveryFee: { type: Number, required: true, min: 0 },
     gst: { type: Number, required: true, min: 0 },
     recommendedItemFee: { type: Number, default: 0, min: 0 },
+    couponDiscount: { type: Number, default: 0, min: 0 },
+    couponSource: { type: String, enum: ['admin', 'restaurant', null], default: null },
     deliveryMargin: { type: Number, default: 0, min: 0 }, // deliveryFee - deliveryPartnerEarning
     totalEarning: { type: Number, required: true, min: 0 },
     status: {
@@ -215,7 +245,12 @@ orderSettlementSchema.statics.findOrCreateByOrderId = async function (orderId) {
       orderNumber: order.orderId,
       userId: order.userId,
       restaurantId: resolvedRestaurantId,
-      restaurantName: order.restaurantName
+      restaurantName: order.restaurantName,
+      couponCode: order.pricing?.couponCode || null,
+      couponSource: order.pricing?.couponSource || order.pricing?.appliedCoupon?.source || null,
+      couponDiscount: order.pricing?.discount || 0,
+      restaurantCouponDiscount: (order.pricing?.couponSource || order.pricing?.appliedCoupon?.source) === 'restaurant' ? (order.pricing?.discount || 0) : 0,
+      adminCouponDiscount: (order.pricing?.couponSource || order.pricing?.appliedCoupon?.source) === 'admin' ? (order.pricing?.discount || 0) : 0
     });
   }
 

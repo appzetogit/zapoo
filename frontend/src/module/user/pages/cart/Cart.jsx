@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Plus, Minus, ArrowLeft, ChevronRight, Clock, MapPin, Phone, FileText, Utensils, Tag, Percent, Truck, Leaf, Share2, ChevronUp, ChevronDown, X, Check, Settings, CreditCard, Wallet, Building2, Sparkles } from "lucide-react";
+import { Plus, Minus, ArrowLeft, ChevronRight, Clock, MapPin, Phone, FileText, Utensils, Percent, Truck, Leaf, Share2, ChevronUp, ChevronDown, X, Check, Settings, CreditCard, Wallet, Building2, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import confetti from "canvas-confetti";
 import AnimatedPage from "../../components/AnimatedPage";
@@ -15,6 +15,7 @@ import { orderAPI, restaurantAPI, adminAPI, userAPI, API_ENDPOINTS } from "@/lib
 import { useLocationSelector } from "../../components/UserLayout";
 import { API_BASE_URL } from "@/lib/api/config";
 import { initRazorpayPayment } from "@/lib/utils/razorpay";
+import GstBreakdownDialog from "../../components/GstBreakdownDialog";
 import { toast } from "sonner";
 import { getCompanyNameAsync } from "@/lib/utils/businessSettings";
 import DynamicEtaText from "../../components/DynamicEtaText";
@@ -90,6 +91,13 @@ const isRestaurantCustomDeliveryPricingEnabled = restaurant => {
   return v === true || v === "true" || v === 1 || v === "1";
 };
 
+const normalizeCouponSource = source => source === "admin" ? "admin" : "restaurant";
+
+const getCouponIdentity = coupon => {
+  if (!coupon?.code) return "";
+  return `${normalizeCouponSource(coupon?.source)}:${String(coupon.code).trim().toUpperCase()}`;
+};
+
 export default function Cart() {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -138,7 +146,6 @@ export default function Cart() {
     zoneId
   } = useZone(currentLocation); // Get user's zone
 
-  const [showCoupons, setShowCoupons] = useState(false);
   const [appliedCoupon, setAppliedCoupon] = useState(null);
   const [couponCode, setCouponCode] = useState("");
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState("razorpay"); // razorpay | cash | wallet
@@ -147,6 +154,7 @@ export default function Cart() {
   const [showPaymentSheet, setShowPaymentSheet] = useState(false);
   const [deliveryFleet, setDeliveryFleet] = useState("standard");
   const [showFleetOptions, setShowFleetOptions] = useState(false);
+  const [showCoupons, setShowCoupons] = useState(true);
   const [note, setNote] = useState("");
   const [showNoteInput, setShowNoteInput] = useState(false);
   const [sendCutlery, setSendCutlery] = useState(true);
@@ -156,6 +164,7 @@ export default function Cart() {
   const [orderProgress, setOrderProgress] = useState(0);
   const [showOrderSuccess, setShowOrderSuccess] = useState(false);
   const [placedOrderId, setPlacedOrderId] = useState(null);
+  const [showGstBreakdown, setShowGstBreakdown] = useState(false);
   const {
     openLocationSelector
   } = useLocationSelector();
@@ -182,6 +191,31 @@ export default function Cart() {
     platformFee: 5,
     gstRate: 5
   });
+  // Use backend pricing if available, otherwise fallback to database settings
+  const subtotalForCoupons = pricing?.subtotal || cart.reduce((sum, item) => sum + (item.price || 0) * (item.quantity || 1), 0);
+  const customDeliveryOnForCoupons = isRestaurantCustomDeliveryPricingEnabled(restaurantData);
+  const hasApiDeliveryFeeForCoupons = pricing != null && pricing.deliveryFee != null && Number.isFinite(Number(pricing.deliveryFee));
+  let deliveryFeeForCoupons;
+  if (hasApiDeliveryFeeForCoupons) {
+    deliveryFeeForCoupons = Number(pricing.deliveryFee);
+  } else if (appliedCoupon?.freeDelivery) {
+    deliveryFeeForCoupons = 0;
+  } else if (customDeliveryOnForCoupons) {
+    // Do not use global free-delivery threshold for slab pricing â€” avoids false "FREE" when API is slow/errors
+    deliveryFeeForCoupons = loadingPricing && !pricing ? null : Number(feeSettings.deliveryFee);
+  } else if (subtotalForCoupons >= feeSettings.freeDeliveryThreshold) {
+    deliveryFeeForCoupons = 0;
+  } else {
+    deliveryFeeForCoupons = Number(feeSettings.deliveryFee);
+  }
+  const deliveryFeeForTotalsForCoupons = deliveryFeeForCoupons != null ? deliveryFeeForCoupons : Number(feeSettings.deliveryFee);
+  const platformFeeForCoupons = pricing?.platformFee || feeSettings.platformFee;
+  const discountForCoupons = pricing?.discount || (appliedCoupon ? Math.min(appliedCoupon.discount, subtotalForCoupons * 0.5) : 0);
+  const taxableFoodAmountForCoupons = Math.max(subtotalForCoupons - discountForCoupons, 0);
+  const gstChargesForCoupons = pricing?.tax ?? Math.round(((taxableFoodAmountForCoupons * 0.05) + (deliveryFeeForTotalsForCoupons * 0.18) + (platformFeeForCoupons * 0.18)) * 100) / 100;
+  const totalBeforeDiscountForCoupons = subtotalForCoupons + deliveryFeeForTotalsForCoupons + platformFeeForCoupons + gstChargesForCoupons;
+  const totalForCoupons = pricing?.total || totalBeforeDiscountForCoupons - discountForCoupons;
+  const savingsForCoupons = pricing?.savings || discountForCoupons + (subtotalForCoupons > 500 ? 32 : 0);
   const cartCount = getCartCount();
   const savedAddress = getDefaultAddress();
   // Priority: Use live location if available, otherwise use saved address; always normalize coords for pricing API
@@ -484,6 +518,7 @@ export default function Cart() {
                   description: `Save ₹${coupon.originalPrice - coupon.discountedPrice} with '${coupon.couponCode}'`,
                   originalPrice: coupon.originalPrice,
                   discountedPrice: coupon.discountedPrice,
+                  source: "restaurant",
                   itemId: cartItem.id,
                   itemName: cartItem.name
                 });
@@ -506,13 +541,51 @@ export default function Cart() {
 
     [...availableCoupons, ...availableAdminCoupons].forEach(coupon => {
       const code = coupon?.code;
-      if (!code || seen.has(code)) return;
-      seen.add(code);
+      const mergeKey = getCouponIdentity(coupon);
+      if (!code || seen.has(mergeKey)) return;
+      seen.add(mergeKey);
       merged.push(coupon);
     });
 
     return merged;
   }, [availableAdminCoupons, availableCoupons]);
+
+  const appliedCouponKey = useMemo(() => getCouponIdentity(appliedCoupon), [appliedCoupon]);
+
+  const combinedOfferCards = useMemo(() => {
+    return combinedAvailableCoupons
+      .map(coupon => ({
+        ...coupon,
+        isEligible: subtotalForCoupons >= Number(coupon.minOrder || 0),
+        normalizedSource: normalizeCouponSource(coupon?.source),
+        isApplied: appliedCouponKey && getCouponIdentity(coupon) === appliedCouponKey,
+      }))
+      .sort((a, b) => {
+        const aEligible = a.isEligible ? 1 : 0;
+        const bEligible = b.isEligible ? 1 : 0;
+        if (aEligible !== bEligible) return bEligible - aEligible;
+        const aDiscount = Number(a.discount || 0);
+        const bDiscount = Number(b.discount || 0);
+        if (bDiscount !== aDiscount) return bDiscount - aDiscount;
+        return String(a.code || "").localeCompare(String(b.code || ""));
+      });
+  }, [appliedCouponKey, combinedAvailableCoupons, subtotalForCoupons]);
+
+  const recommendedCoupon = useMemo(() => {
+    return combinedOfferCards.find(coupon => coupon.isEligible) || combinedOfferCards[0] || null;
+  }, [combinedOfferCards]);
+
+  const activeCouponCard = useMemo(() => {
+    if (!appliedCoupon) return null;
+    return combinedOfferCards.find(coupon => coupon.isApplied) || {
+      ...appliedCoupon,
+      isEligible: subtotalForCoupons >= Number(appliedCoupon?.minOrder || 0),
+      normalizedSource: normalizeCouponSource(appliedCoupon?.source),
+      isApplied: true
+    };
+  }, [appliedCoupon, combinedOfferCards, subtotalForCoupons]);
+
+  const featuredCouponCard = activeCouponCard || recommendedCoupon;
 
   // Calculate pricing from backend whenever cart, address, or coupon changes
   useEffect(() => {
@@ -553,15 +626,19 @@ export default function Cart() {
             source: "admin"
           }));
           setAvailableAdminCoupons(nextAdminCoupons);
-          if (availableCoupons.length === 0 && nextAdminCoupons.length > 0) {
-            setAvailableCoupons(nextAdminCoupons);
-          }
 
           // Update applied coupon if backend returns one
           if (response.data.data.pricing.appliedCoupon && !appliedCoupon) {
-            const coupon = [...availableCoupons, ...nextAdminCoupons].find(c => c.code === response.data.data.pricing.appliedCoupon.code);
+            const backendAppliedCoupon = response.data.data.pricing.appliedCoupon;
+            const backendAppliedKey = getCouponIdentity(backendAppliedCoupon);
+            const coupon = [...availableCoupons, ...nextAdminCoupons].find(c => getCouponIdentity(c) === backendAppliedKey) || [...availableCoupons, ...nextAdminCoupons].find(c => String(c.code || "").trim().toUpperCase() === String(backendAppliedCoupon.code || "").trim().toUpperCase());
             if (coupon) {
               setAppliedCoupon(coupon);
+            } else if (backendAppliedCoupon?.code) {
+              setAppliedCoupon({
+                ...backendAppliedCoupon,
+                source: normalizeCouponSource(backendAppliedCoupon?.source),
+              });
             }
           }
         }
@@ -639,8 +716,9 @@ export default function Cart() {
   }
   const deliveryFeeForTotals = deliveryFee != null ? deliveryFee : Number(feeSettings.deliveryFee);
   const platformFee = pricing?.platformFee || feeSettings.platformFee;
-  const gstCharges = pricing?.tax || Math.round(subtotal * (feeSettings.gstRate / 100));
   const discount = pricing?.discount || (appliedCoupon ? Math.min(appliedCoupon.discount, subtotal * 0.5) : 0);
+  const taxableFoodAmount = Math.max(subtotal - discount, 0);
+  const gstCharges = pricing?.tax ?? Math.round(((taxableFoodAmount * 0.05) + (deliveryFeeForTotals * 0.18) + (platformFee * 0.18)) * 100) / 100;
   const totalBeforeDiscount = subtotal + deliveryFeeForTotals + platformFee + gstCharges;
   const total = pricing?.total || totalBeforeDiscount - discount;
   const savings = pricing?.savings || discount + (subtotal > 500 ? 32 : 0);
@@ -719,7 +797,6 @@ export default function Cart() {
     if (subtotal >= coupon.minOrder) {
       setAppliedCoupon(coupon);
       setCouponCode(coupon.code);
-      setShowCoupons(false);
 
       // Recalculate pricing with new coupon
       if (cart.length > 0 && defaultAddress) {
@@ -1332,51 +1409,67 @@ export default function Cart() {
 
               {/* Coupon Section */}
               <div className="bg-white dark:bg-[#1a1a1a] px-4 md:px-6 py-3 md:py-4 rounded-lg md:rounded-xl">
-                {appliedCoupon ? <div className="flex items-center justify-between bg-[#FF5200]/10 dark:bg-[#FF5200]/20 border border-[#FF5200]/30 dark:border-[#FF5200]/30 rounded-lg md:rounded-xl p-3 md:p-4">
-                    <div className="flex items-center gap-2 md:gap-3">
-                      <Tag className="h-4 w-4 md:h-5 md:w-5 text-[#FF5200] dark:text-[#FF5200]" />
-                      <div>
-                        <p className="text-sm md:text-base font-medium text-[#FF5200] dark:text-[#FF5200]">{t("user.cart.ui.couponApplied", { code: appliedCoupon.code })}</p>
-                        <p className="text-xs md:text-sm text-[#FF5200] dark:text-[#FF5200]">{t("user.cart.ui.youSavedAmount", { amount: discount })}</p>
-                      </div>
-                    </div>
-                    <button onClick={handleRemoveCoupon} className="text-gray-500 dark:text-gray-400 text-xs md:text-sm font-medium">{t("user.cart.ui.remove")}</button>
-                  </div> : loadingCoupons ? <div className="flex items-center gap-2 md:gap-3">
+                {loadingCoupons ? <div className="flex items-center gap-2 md:gap-3">
                     <Percent className="h-4 w-4 md:h-5 md:w-5 text-gray-600 dark:text-gray-400" />
                     <p className="text-sm md:text-base text-gray-500 dark:text-gray-400">{t("user.cart.ui.loadingCoupons")}</p>
-                  </div> : combinedAvailableCoupons.length > 0 ? <div>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 md:gap-3">
-                        <Percent className="h-4 w-4 md:h-5 md:w-5 text-gray-600 dark:text-gray-400" />
+                  </div> : combinedOfferCards.length > 0 ? <div className="space-y-3 md:space-y-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-2 md:gap-3">
+                        <Percent className="h-4 w-4 md:h-5 md:w-5 text-gray-600 dark:text-gray-400 mt-0.5" />
                         <div>
-                          <p className="text-sm md:text-base font-medium text-gray-800 dark:text-gray-200">
-                            {t("user.cart.ui.saveWithCoupon", { amount: combinedAvailableCoupons[0].discount, code: combinedAvailableCoupons[0].code })}
-                          </p>
-                          {combinedAvailableCoupons.length > 1 && <button onClick={() => setShowCoupons(!showCoupons)} className="text-xs md:text-sm text-blue-600 dark:text-blue-400 font-medium">
-                              {t("user.cart.ui.viewAllCoupons")}
-                            </button>}
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-sm md:text-base font-medium text-gray-800 dark:text-gray-200">
+                              {featuredCouponCard ? t("user.cart.ui.saveWithCoupon", { amount: featuredCouponCard.discount, code: featuredCouponCard.code }) : t("user.cart.ui.noCouponsAvailable")}
+                            </p>
+                            {appliedCoupon && <span className="inline-flex items-center rounded-full bg-[#FF5200]/10 px-2 py-0.5 text-[11px] md:text-xs font-medium text-[#FF5200] dark:bg-[#FF5200]/20 dark:text-[#FF5200]">
+                                {t("user.cart.ui.couponApplied", { code: appliedCoupon.code })}
+                              </span>}
+                          </div>
+                          {featuredCouponCard && <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400 mt-1">{featuredCouponCard.description}</p>}
                         </div>
                       </div>
-                      <Button size="sm" variant="outline" className="h-7 md:h-8 text-xs md:text-sm border-[#FF5200] dark:border-[#FF5200] text-[#FF5200] dark:text-[#FF5200] hover:bg-[#FF5200]/10 dark:hover:bg-[#FF5200]/20" onClick={() => handleApplyCoupon(combinedAvailableCoupons[0])} disabled={subtotal < combinedAvailableCoupons[0].minOrder}>
-                        {subtotal < combinedAvailableCoupons[0].minOrder ? t("user.cart.ui.minAmount", { amount: combinedAvailableCoupons[0].minOrder }) : t("user.cart.ui.apply")}
-                      </Button>
+                      <div className="shrink-0">
+                        {appliedCoupon ? <button onClick={handleRemoveCoupon} className="text-gray-500 dark:text-gray-400 text-xs md:text-sm font-medium">{t("user.cart.ui.remove")}</button> : featuredCouponCard ? <Button size="sm" variant="outline" className="h-7 md:h-8 text-xs md:text-sm border-[#FF5200] dark:border-[#FF5200] text-[#FF5200] dark:text-[#FF5200] hover:bg-[#FF5200]/10 dark:hover:bg-[#FF5200]/20" onClick={() => handleApplyCoupon(featuredCouponCard)} disabled={!featuredCouponCard.isEligible}>
+                              {t("user.cart.ui.apply")}
+                            </Button> : null}
+                      </div>
+                    </div>
+
+                    <div className="border-t dark:border-gray-700 pt-3 md:pt-4 space-y-2 md:space-y-3">
+                      <button
+                        type="button"
+                        onClick={() => setShowCoupons(prev => !prev)}
+                        className="flex w-full items-center justify-between text-left text-xs md:text-sm font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide"
+                      >
+                        <span>{t("user.cart.ui.viewAllCoupons")}</span>
+                        {showCoupons ? <ChevronUp className="h-4 w-4 text-gray-400" /> : <ChevronDown className="h-4 w-4 text-gray-400" />}
+                      </button>
+                      {showCoupons && <div className="space-y-2">
+                        {combinedOfferCards.map(coupon => <div key={getCouponIdentity(coupon) || coupon.code} className={`rounded-lg border p-3 md:p-4 ${coupon.isApplied ? "border-[#FF5200] bg-[#FF5200]/5 dark:bg-[#FF5200]/10" : "border-gray-200 dark:border-gray-700"}`}>
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0 flex-1">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <p className="text-sm md:text-base font-medium text-gray-800 dark:text-gray-200">{coupon.code}</p>
+                                  {coupon.isApplied && <span className="inline-flex items-center rounded-full bg-[#FF5200]/10 px-2 py-0.5 text-[11px] md:text-xs font-medium text-[#FF5200] dark:bg-[#FF5200]/20 dark:text-[#FF5200]">
+                                      {t("user.cart.ui.couponApplied", { code: coupon.code })}
+                                    </span>}
+                                </div>
+                                <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400 mt-1">{coupon.description}</p>
+                              </div>
+                              <div className="shrink-0">
+                                {coupon.isApplied ? <Button size="sm" variant="outline" className="h-6 md:h-7 text-xs md:text-sm border-[#FF5200] dark:border-[#FF5200] text-[#FF5200] dark:text-[#FF5200] hover:bg-[#FF5200]/10 dark:hover:bg-[#FF5200]/20" onClick={handleRemoveCoupon}>
+                                    {t("user.cart.ui.remove")}
+                                  </Button> : <Button size="sm" variant="outline" className="h-6 md:h-7 text-xs md:text-sm border-[#FF5200] dark:border-[#FF5200] text-[#FF5200] dark:text-[#FF5200] hover:bg-[#FF5200]/10 dark:hover:bg-[#FF5200]/20" onClick={() => handleApplyCoupon(coupon)} disabled={!coupon.isEligible}>
+                                    {t("user.cart.ui.apply")}
+                                  </Button>}
+                              </div>
+                            </div>
+                        </div>)}
+                      </div>}
                     </div>
                   </div> : <div className="flex items-center gap-2 md:gap-3">
                     <Percent className="h-4 w-4 md:h-5 md:w-5 text-gray-600 dark:text-gray-400" />
                     <p className="text-sm md:text-base text-gray-500 dark:text-gray-400">{t("user.cart.ui.noCouponsAvailable")}</p>
-                  </div>}
-
-                {/* Coupons List */}
-                {showCoupons && !appliedCoupon && combinedAvailableCoupons.length > 0 && <div className="mt-3 md:mt-4 space-y-2 md:space-y-3 border-t dark:border-gray-700 pt-3 md:pt-4">
-                    {combinedAvailableCoupons.map(coupon => <div key={coupon.code} className="flex items-center justify-between py-2 md:py-3 border-b border-dashed dark:border-gray-700 last:border-0">
-                        <div>
-                          <p className="text-sm md:text-base font-medium text-gray-800 dark:text-gray-200">{coupon.code}</p>
-                          <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400">{coupon.description}</p>
-                        </div>
-                        <Button size="sm" variant="outline" className="h-6 md:h-7 text-xs md:text-sm border-[#FF5200] dark:border-[#FF5200] text-[#FF5200] dark:text-[#FF5200] hover:bg-[#FF5200]/10 dark:hover:bg-[#FF5200]/20" onClick={() => handleApplyCoupon(coupon)} disabled={subtotal < coupon.minOrder}>
-                          {subtotal < coupon.minOrder ? t("user.cart.ui.minAmount", { amount: coupon.minOrder }) : t("user.cart.ui.apply")}
-                        </Button>
-                      </div>)}
                   </div>}
               </div>
 
@@ -1512,10 +1605,16 @@ export default function Cart() {
                       <span className="text-gray-600 dark:text-gray-400">{t("user.cart.ui.platformFee")}</span>
                       <span className="text-gray-800 dark:text-gray-200">₹{platformFee}</span>
                     </div>
-                    <div className="flex justify-between text-sm md:text-base">
-                      <span className="text-gray-600 dark:text-gray-400">{t("user.cart.ui.gstAndRestaurantCharges")}</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowGstBreakdown(true)}
+                      className="flex w-full items-center justify-between text-sm md:text-base text-left"
+                    >
+                      <span className="text-gray-600 dark:text-gray-400 underline underline-offset-4 decoration-dotted">
+                        GST (govt. taxes)
+                      </span>
                       <span className="text-gray-800 dark:text-gray-200">₹{gstCharges}</span>
-                    </div>
+                    </button>
                     {discount > 0 && <div className="flex justify-between text-sm md:text-base text-red-600 dark:text-red-400">
                         <span>{t("user.cart.ui.couponDiscount")}</span>
                         <span>-₹{discount}</span>
@@ -1555,10 +1654,16 @@ export default function Cart() {
                       <span className="text-gray-600 dark:text-gray-400">{t("user.cart.ui.platformFee")}</span>
                       <span className="text-gray-800 dark:text-gray-200">₹{platformFee}</span>
                     </div>
-                    <div className="flex justify-between text-sm md:text-base">
-                      <span className="text-gray-600 dark:text-gray-400">{t("user.cart.ui.gst")}</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowGstBreakdown(true)}
+                      className="flex w-full items-center justify-between text-sm md:text-base text-left"
+                    >
+                      <span className="text-gray-600 dark:text-gray-400 underline underline-offset-4 decoration-dotted">
+                        GST (govt. taxes)
+                      </span>
                       <span className="text-gray-800 dark:text-gray-200">₹{gstCharges}</span>
-                    </div>
+                    </button>
                     {discount > 0 && <div className="flex justify-between text-sm md:text-base text-red-600 dark:text-red-400">
                         <span>{t("user.cart.ui.discount")}</span>
                         <span>-₹{discount}</span>
@@ -1574,6 +1679,17 @@ export default function Cart() {
           </div>
         </div>
       </div>
+
+      <GstBreakdownDialog
+        open={showGstBreakdown}
+        onOpenChange={setShowGstBreakdown}
+        pricing={{
+          subtotal,
+          discount,
+          deliveryFee: deliveryFeeForTotals,
+          platformFee,
+        }}
+      />
 
       {/* Bottom Sticky - Place Order */}
       <div className="bg-white dark:bg-[#1a1a1a] border-t dark:border-gray-800 shadow-lg z-30 flex-shrink-0 fixed bottom-0 left-0 right-0">

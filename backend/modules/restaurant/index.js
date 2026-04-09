@@ -154,13 +154,6 @@ router.get('/rm/call-history', authenticate, checkFeatureAccess('relationship_ma
 router.get('/list', getRestaurants);
 router.get('/under-250', getRestaurantsWithDishesUnder250);
 router.post('/recommended-preview', getRecommendedPreview);
-// Menu and inventory routes must come before /:id to avoid route conflicts
-router.get('/:restaurantId/offers/item/:itemId/coupons', getCouponsByItemIdPublic);
-router.get('/:restaurantId/outlet-timings', getOutletTimingsByRestaurantId);
-router.get('/:id/menu', getMenuByRestaurantId);
-router.get('/:id/addons', getAddonsByRestaurantId);
-router.get('/:id/inventory', getInventoryByRestaurantId);
-router.get('/:id', getRestaurantById);
 
 // Restaurant routes (authenticated - for restaurant module)
 router.get('/owner/me', authenticate, getRestaurantByOwner);
@@ -177,6 +170,14 @@ router.post('/profile/menu-image', authenticate, uploadMiddleware.single('file')
 
 // Delivery status route (authenticated - for restaurant module)
 router.put('/delivery-status', authenticate, updateDeliveryStatus);
+
+// Menu and inventory routes must come before /:id to avoid route conflicts
+router.get('/:restaurantId/offers/item/:itemId/coupons', getCouponsByItemIdPublic);
+router.get('/:restaurantId/outlet-timings', getOutletTimingsByRestaurantId);
+router.get('/:id/menu', getMenuByRestaurantId);
+router.get('/:id/addons', getAddonsByRestaurantId);
+router.get('/:id/inventory', getInventoryByRestaurantId);
+router.get('/:id', getRestaurantById);
 
 // Outlet Timings routes (authenticated - for restaurant module)
 // Must come after all /:id routes to avoid route conflicts

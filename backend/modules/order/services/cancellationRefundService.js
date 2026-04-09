@@ -7,6 +7,7 @@ import AdminWallet from '../../admin/models/AdminWallet.js';
 import AuditLog from '../../admin/models/AuditLog.js';
 import Payment from '../../payment/models/Payment.js';
 import { createRefund } from '../../payment/services/razorpayService.js';
+import { calculateOrderSettlement } from './orderSettlementService.js';
 
 /**
  * Determine cancellation stage based on order status
@@ -598,67 +599,11 @@ export const processWalletRefund = async (orderId, adminId = null, refundAmount 
       orderId
     });
     if (!settlement) {
-      const pricing = order.pricing || {};
-      const subtotal = pricing.subtotal || 0;
-      const deliveryFee = pricing.deliveryFee || 0;
-      const platformFee = pricing.platformFee || 0;
-      const tax = pricing.tax || 0;
-      const total = pricing.total || 0;
-
-      // Calculate earnings (simplified for wallet refunds - we just need the structure)
-      const foodPrice = subtotal;
-      const commission = 0; // For wallet refunds, we don't need actual commission
-      const netEarning = foodPrice; // Simplified
-
-      settlement = new OrderSettlement({
-        orderId: order._id,
-        orderNumber: order.orderId,
-        userId: order.userId?._id || order.userId,
-        restaurantId: order.restaurantId,
-        restaurantName: order.restaurantName || 'Unknown Restaurant',
-        userPayment: {
-          subtotal: subtotal,
-          discount: pricing.discount || 0,
-          deliveryFee: deliveryFee,
-          platformFee: platformFee,
-          gst: tax,
-          packagingFee: 0,
-          total: total
-        },
-        restaurantEarning: {
-          foodPrice: foodPrice,
-          commission: commission,
-          commissionPercentage: 0,
-          netEarning: netEarning,
-          status: 'cancelled'
-        },
-        deliveryPartnerEarning: {
-          basePayout: 0,
-          distance: 0,
-          commissionPerKm: 0,
-          distanceCommission: 0,
-          totalEarning: 0,
-          status: 'cancelled'
-        },
-        adminEarning: {
-          commission: commission,
-          platformFee: platformFee,
-          deliveryFee: deliveryFee,
-          gst: tax,
-          deliveryMargin: 0,
-          totalEarning: platformFee + deliveryFee + tax,
-          status: 'cancelled'
-        },
-        escrowStatus: 'refunded',
-        escrowAmount: total,
-        settlementStatus: 'cancelled',
-        cancellationDetails: {
-          cancelled: true,
-          cancelledAt: order.updatedAt || new Date(),
-          refundStatus: 'pending'
-        }
-      });
-      await settlement.save();
+      await calculateOrderSettlement(order._id);
+      settlement = await OrderSettlement.findOne({ orderId });
+      if (!settlement) {
+        throw new Error('Unable to create settlement for wallet refund');
+      }
     }
 
     // Check if refund already processed

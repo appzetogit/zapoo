@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { getCompanyNameAsync } from "@/lib/utils/businessSettings";
+import GstBreakdownDialog from "../../components/GstBreakdownDialog";
 export default function UserOrderDetails() {
   const navigate = useNavigate();
   const {
@@ -16,6 +17,7 @@ export default function UserOrderDetails() {
   const [loading, setLoading] = useState(true);
   const [callingRestaurant, setCallingRestaurant] = useState(false);
   const [callingDeliveryPartner, setCallingDeliveryPartner] = useState(false);
+  const [showGstBreakdown, setShowGstBreakdown] = useState(false);
   useEffect(() => {
     const fetchOrderDetails = async () => {
       try {
@@ -444,12 +446,16 @@ export default function UserOrderDetails() {
                 </span>
               </div>
             </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">GST (govt. taxes)</span>
+            <button
+              type="button"
+              onClick={() => setShowGstBreakdown(true)}
+              className="flex w-full justify-between text-left"
+            >
+              <span className="text-gray-500 underline underline-offset-4 decoration-dotted">GST (govt. taxes)</span>
               <span className="text-gray-800">
                 ₹{Number(pricing.tax || 0).toFixed(2)}
               </span>
-            </div>
+            </button>
             <div className="flex justify-between">
               <span className="text-gray-500">Delivery partner fee</span>
               <div>
@@ -498,6 +504,17 @@ export default function UserOrderDetails() {
               </div>
             </div>}
         </div>
+
+        <GstBreakdownDialog
+          open={showGstBreakdown}
+          onOpenChange={setShowGstBreakdown}
+          pricing={{
+            subtotal: pricing.subtotal,
+            discount: pricing.discount,
+            deliveryFee: pricing.deliveryFee,
+            platformFee: pricing.platformFee,
+          }}
+        />
 
         {/* User & Delivery Details */}
         <div className="bg-white p-4 rounded-xl shadow-sm space-y-5">

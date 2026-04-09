@@ -113,6 +113,11 @@ const orderSchema = new mongoose.Schema({
       default: 0,
       min: 0
     },
+    adminDeliveryGst: {
+      type: Number,
+      default: 0,
+      min: 0
+    },
     restaurantPayableToAdmin: {
       type: Number,
       default: 0,
@@ -141,6 +146,11 @@ const orderSchema = new mongoose.Schema({
       type: Number,
       default: 0,
       min: 0
+    },
+    couponSource: {
+      type: String,
+      enum: ['admin', 'restaurant', null],
+      default: null
     },
     total: {
       type: Number,

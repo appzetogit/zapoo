@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { ArrowLeft, Check, CreditCard, Loader2, ShieldCheck, FileText } from "lucide-react";
+import { ArrowLeft, Check, CreditCard, Loader2, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { subscriptionAPI } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -239,27 +239,6 @@ export default function SubscriptionCheckout() {
                             <div className="rounded-2xl border border-orange-200 bg-orange-50 p-4">
                                 <p className="text-xs uppercase tracking-wider text-orange-700 font-semibold">Total Bill</p>
                                 <p className="mt-2 text-2xl font-bold text-orange-700">{formatAmount(totalAmount)}</p>
-                            </div>
-                        </div>
-
-                        <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
-                            <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                                <FileText className="w-4 h-4" />
-                                What you are paying for
-                            </div>
-                            <div className="mt-4 space-y-3">
-                                <div className="flex items-center justify-between text-sm">
-                                    <span className="text-gray-600">{plan.name} subscription</span>
-                                    <span className="font-medium text-gray-900">{formatAmount(baseAmount)}</span>
-                                </div>
-                                <div className="flex items-center justify-between text-sm">
-                                    <span className="text-gray-600">GST @ 18%</span>
-                                    <span className="font-medium text-gray-900">{formatAmount(gstAmount)}</span>
-                                </div>
-                                <div className="border-t border-gray-200 pt-3 flex items-center justify-between text-base">
-                                    <span className="font-semibold text-gray-900">Total payable</span>
-                                    <span className="font-bold text-orange-700">{formatAmount(totalAmount)}</span>
-                                </div>
                             </div>
                         </div>
 

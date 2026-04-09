@@ -13,6 +13,7 @@ import { useProfile } from "../../context/ProfileContext"
 import { orderAPI } from "@/lib/api"
 import { initRazorpayPayment } from "@/lib/utils/razorpay"
 import { getCompanyNameAsync } from "@/lib/utils/businessSettings"
+import GstBreakdownDialog from "../../components/GstBreakdownDialog"
 import { toast } from "sonner"
 import { useTranslation } from "react-i18next"
 
@@ -32,6 +33,7 @@ export default function Checkout() {
   const [selectedAddress, setSelectedAddress] = useState(getDefaultAddress()?.id || "")
   const [selectedPayment, setSelectedPayment] = useState(getDefaultPaymentMethod()?.id || "")
   const [isPlacingOrder, setIsPlacingOrder] = useState(false)
+  const [showGstBreakdown, setShowGstBreakdown] = useState(false)
   const [pricing, setPricing] = useState({
     subtotal: 0,
     deliveryFee: 0,
@@ -435,10 +437,16 @@ export default function Checkout() {
                       <span className="text-muted-foreground">{t("user.checkout.platformFee")}</span>
                       <span className="dark:text-gray-200">₹{pricing.platformFee.toFixed(2)}</span>
                     </div>
-                    <div className="flex justify-between text-sm md:text-base">
-                      <span className="text-muted-foreground">{t("user.checkout.gst")}</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowGstBreakdown(true)}
+                      className="flex w-full items-center justify-between text-sm md:text-base text-left"
+                    >
+                      <span className="text-muted-foreground underline underline-offset-4 decoration-dotted">
+                        GST (govt. taxes)
+                      </span>
                       <span className="dark:text-gray-200">₹{pricing.gst.toFixed(2)}</span>
-                    </div>
+                    </button>
                     <div className="flex justify-between font-bold text-lg md:text-xl lg:text-2xl pt-2 md:pt-3 border-t dark:border-gray-700">
                       <span className="dark:text-white">{t("user.checkout.total")}</span>
                       <span className="text-yellow-600 dark:text-yellow-400">
@@ -459,6 +467,16 @@ export default function Checkout() {
             </ScrollReveal>
           </div>
         </div>
+        <GstBreakdownDialog
+          open={showGstBreakdown}
+          onOpenChange={setShowGstBreakdown}
+          pricing={{
+            subtotal: pricing.subtotal,
+            discount: pricing.discount,
+            deliveryFee: pricing.deliveryFee,
+            platformFee: pricing.platformFee,
+          }}
+        />
       </div>
     </AnimatedPage>
   )

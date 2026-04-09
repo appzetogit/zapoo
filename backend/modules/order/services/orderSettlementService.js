@@ -5,9 +5,49 @@ import FeeSettings from '../../admin/models/FeeSettings.js';
 import Zone from '../../admin/models/Zone.js';
 import Tier from '../../admin/models/Tier.js';
 import Restaurant from '../../restaurant/models/Restaurant.js';
+import Offer from '../../restaurant/models/Offer.js';
+import AdminCoupon from '../../admin/models/AdminCoupon.js';
 import mongoose from 'mongoose';
 
 const roundCurrency = (value) => Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
+
+const normalizeCouponSource = source => source === 'admin' ? 'admin' : source === 'restaurant' ? 'restaurant' : null;
+
+const resolveCouponSourceForSettlement = async (order, restaurant) => {
+  const explicitSource = normalizeCouponSource(order?.pricing?.couponSource || order?.pricing?.appliedCoupon?.source);
+  if (explicitSource) return explicitSource;
+
+  const couponCode = order?.pricing?.couponCode;
+  if (!couponCode) return null;
+
+  const now = new Date();
+  if (restaurant?._id) {
+    const restaurantOffer = await Offer.findOne({
+      restaurant: restaurant._id,
+      status: 'active',
+      'items.couponCode': couponCode,
+      startDate: { $lte: now },
+      $or: [
+        { endDate: { $gte: now } },
+        { endDate: null }
+      ]
+    }).select('_id').lean();
+    if (restaurantOffer) return 'restaurant';
+  }
+
+  const adminCoupon = await AdminCoupon.findOne({
+    code: couponCode,
+    status: 'active',
+    validFrom: { $lte: now },
+    $or: [
+      { validUntil: { $gte: now } },
+      { validUntil: null }
+    ]
+  }).select('_id').lean();
+  if (adminCoupon) return 'admin';
+
+  return null;
+};
 
 /**
  * Calculate comprehensive order settlement breakdown
@@ -57,9 +97,14 @@ export const calculateOrderSettlement = async (orderId) => {
       }
     }
 
+    const couponSource = await resolveCouponSourceForSettlement(order, restaurant);
+    const couponDiscount = roundCurrency(order.pricing.discount || 0);
+    const restaurantCouponDiscount = couponSource === 'restaurant' ? couponDiscount : 0;
+    const adminCouponDiscount = couponSource === 'admin' ? couponDiscount : 0;
+
     const userPayment = {
       subtotal: roundCurrency(order.pricing.subtotal || 0),
-      discount: roundCurrency(order.pricing.discount || 0),
+      discount: couponDiscount,
       deliveryFee: roundCurrency(order.pricing.deliveryFee || 0),
       platformFee: roundCurrency(
         order.pricing.platformFee !== undefined && order.pricing.platformFee !== null
@@ -71,30 +116,39 @@ export const calculateOrderSettlement = async (orderId) => {
       total: roundCurrency(order.pricing.total || 0)
     };
 
-    const foodPrice = roundCurrency(userPayment.subtotal - userPayment.discount);
+    const foodPrice = roundCurrency(Math.max(0, userPayment.subtotal - restaurantCouponDiscount));
     const adminDeliveryCost = roundCurrency(order.pricing.adminDeliveryCost || order.pricing.deliveryFee || 0);
+    const adminDeliveryGst = roundCurrency(order.pricing.adminDeliveryGst || adminDeliveryCost * 0.18);
     const platformFee = roundCurrency(
       order.pricing.platformFee !== undefined
         ? order.pricing.platformFee
         : feeSettings?.platformFee || 0
     );
-    const gstCollected = roundCurrency(order.pricing.gstCollected ?? userPayment.gst);
+    const customerGst = roundCurrency(order.pricing.gstCollected ?? userPayment.gst);
+    const gstCollected = roundCurrency(customerGst + adminDeliveryGst);
     const payableToAdmin = roundCurrency(adminDeliveryCost + platformFee + gstCollected);
     const recommendedItemFee = roundCurrency(order.pricing.internalRecommendedFee || 0);
 
     const restaurantGrossCollection = roundCurrency(
-      foodPrice + userPayment.deliveryFee + userPayment.platformFee + userPayment.gst
+      foodPrice + userPayment.deliveryFee + userPayment.platformFee + customerGst
     );
     const restaurantNetEarning = roundCurrency(restaurantGrossCollection - payableToAdmin - recommendedItemFee);
+    const adminRecommendedFee = roundCurrency(recommendedItemFee);
+    const adminBaseEarning = roundCurrency(platformFee + adminDeliveryCost + gstCollected + adminRecommendedFee);
+    const adminCouponSubsidy = roundCurrency(adminCouponDiscount);
+    const adminNetEarning = roundCurrency(Math.max(0, adminBaseEarning - adminCouponSubsidy));
 
     const restaurantEarning = {
       foodPrice,
       commission: 0,
       adminDeliveryCost,
+      adminDeliveryGst,
       platformFee,
       gstCollected,
       payableToAdmin,
       recommendedItemFee,
+      couponDiscount: restaurantCouponDiscount,
+      couponSource,
       commissionPercentage: 0,
       netEarning: restaurantNetEarning,
       status: 'pending'
@@ -146,19 +200,20 @@ export const calculateOrderSettlement = async (orderId) => {
     }
 
     const deliveryMargin = roundCurrency(adminDeliveryCost - deliveryPartnerEarning.totalEarning);
-    const adminRecommendedFee = roundCurrency(restaurantEarning.recommendedItemFee);
-    const adminTotal = roundCurrency(platformFee + adminDeliveryCost + gstCollected + adminRecommendedFee);
 
     const adminEarning = {
       commission: 0,
       platformFee,
       adminDeliveryCost,
+      adminDeliveryGst,
       restaurantPayable: payableToAdmin,
       deliveryFee: adminDeliveryCost,
       gst: gstCollected,
       recommendedItemFee: adminRecommendedFee,
+      couponDiscount: adminCouponDiscount,
+      couponSource,
       deliveryMargin: deliveryMargin,
-      totalEarning: adminTotal,
+      totalEarning: adminNetEarning,
       status: 'pending'
     };
 
@@ -181,6 +236,11 @@ export const calculateOrderSettlement = async (orderId) => {
       escrowStatus: 'pending',
       escrowAmount: userPayment.total,
       settlementStatus: 'pending',
+      couponCode: order.pricing.couponCode || null,
+      couponSource,
+      couponDiscount,
+      restaurantCouponDiscount,
+      adminCouponDiscount,
       settlementWindows: {
         restaurantEligibleAt,
         deliveryPartnerEligibleAt: deliveryEligibleAt
@@ -196,9 +256,15 @@ export const calculateOrderSettlement = async (orderId) => {
           distanceKm: order.pricing.distanceKm || 0,
           customerDeliveryFee: userPayment.deliveryFee,
           adminDeliveryCost,
+          adminDeliveryGst,
           platformFee,
           gstCollected,
-          payableToAdmin
+          payableToAdmin,
+          couponCode: order.pricing.couponCode || null,
+          couponSource,
+          couponDiscount,
+          restaurantCouponDiscount,
+          adminCouponDiscount
         },
         deliveryCommission: deliveryPartnerEarning.distance > 0 ? {
           distance: deliveryPartnerEarning.distance,
