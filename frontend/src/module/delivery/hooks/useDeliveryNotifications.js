@@ -19,6 +19,16 @@ export const useDeliveryNotifications = () => {
   const [orderTaken, setOrderTaken] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
   const [deliveryPartnerId, setDeliveryPartnerId] = useState(null);
+  const debugSessionRef = useRef(Math.random().toString(36).slice(2, 8));
+
+  const debugLog = useCallback((message, data) => {
+    const ts = new Date().toISOString();
+    if (data !== undefined) {
+      console.warn(`[DeliverySocketDebug][${debugSessionRef.current}][${ts}] ${message}`, data);
+      return;
+    }
+    console.warn(`[DeliverySocketDebug][${debugSessionRef.current}][${ts}] ${message}`);
+  }, []);
 
   // Step 3: All callbacks before effects (unconditional)
   // Track user interaction for autoplay policy
@@ -27,8 +37,9 @@ export const useDeliveryNotifications = () => {
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
+      debugLog('Notification sound stopped');
     }
-  }, []);
+  }, [debugLog]);
 
   const isDeliveryPartnerOnline = useCallback(() => {
     try {
@@ -45,6 +56,7 @@ export const useDeliveryNotifications = () => {
   const playNotificationSound = useCallback(() => {
     try {
       if (!isDeliveryPartnerOnline()) {
+        debugLog('Skipping sound: delivery partner is offline');
         stopNotificationSound();
         return;
       }
@@ -71,13 +83,23 @@ export const useDeliveryNotifications = () => {
       if (audioRef.current) {
         // Only play if user has interacted with the page (browser autoplay policy)
         if (!userInteractedRef.current) {
+          debugLog('Skipping sound: browser interaction not detected yet');
           return;
         }
         audioRef.current.currentTime = 0;
+        debugLog('Attempting to play notification sound', {
+          selectedSound
+        });
         audioRef.current.play().catch(error => {
           // Don't log autoplay policy errors as they're expected
           if (!error.message?.includes('user didn\'t interact') && !error.name?.includes('NotAllowedError')) {
             console.warn('Error playing notification sound:', error);
+            debugLog('Sound play failed', {
+              message: error?.message,
+              name: error?.name
+            });
+          } else {
+            debugLog('Sound blocked by browser autoplay policy');
           }
         });
       }
@@ -85,19 +107,27 @@ export const useDeliveryNotifications = () => {
       // Don't log autoplay policy errors
       if (!error.message?.includes('user didn\'t interact') && !error.name?.includes('NotAllowedError')) {
         console.warn('Error playing sound:', error);
+        debugLog('Unexpected sound error', {
+          message: error?.message,
+          name: error?.name
+        });
       }
     }
-  }, [isDeliveryPartnerOnline, stopNotificationSound]);
+  }, [debugLog, isDeliveryPartnerOnline, stopNotificationSound]);
 
   // Step 4: All effects (unconditional hook calls, conditional logic inside)
   // Track user interaction for autoplay policy
   useEffect(() => {
     deliveryPartnerIdRef.current = deliveryPartnerId;
-  }, [deliveryPartnerId]);
+    debugLog('deliveryPartnerId updated', {
+      deliveryPartnerId
+    });
+  }, [debugLog, deliveryPartnerId]);
 
   useEffect(() => {
     const handleUserInteraction = () => {
       userInteractedRef.current = true;
+      debugLog('User interaction detected, sound autoplay unlocked');
       // Remove listeners after first interaction
       document.removeEventListener('click', handleUserInteraction);
       document.removeEventListener('touchstart', handleUserInteraction);
@@ -129,6 +159,9 @@ export const useDeliveryNotifications = () => {
     if (!audioRef.current) {
       audioRef.current = new Audio(soundFile);
       audioRef.current.volume = 0.7;
+      debugLog('Audio initialized', {
+        selectedSound
+      });
     } else {
       // Update audio source if preference changed
       const currentSrc = audioRef.current.src;
@@ -137,15 +170,19 @@ export const useDeliveryNotifications = () => {
         audioRef.current.pause();
         audioRef.current.src = newSrc;
         audioRef.current.load();
+        debugLog('Audio source updated', {
+          selectedSound
+        });
       }
     }
     return () => {
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current = null;
+        debugLog('Audio destroyed on cleanup');
       }
     };
-  }, []); // Note: This runs once on mount. To update dynamically, we'd need to listen to storage events
+  }, [debugLog]); // Note: This runs once on mount. To update dynamically, we'd need to listen to storage events
 
   // Fetch delivery partner ID
   useEffect(() => {
@@ -204,6 +241,9 @@ export const useDeliveryNotifications = () => {
       // Set an immediate fallback ID first so socket can join room even if /me is delayed/fails.
       const immediateId = readIdFromKnownStorage() || readIdFromToken();
       if (immediateId) {
+        debugLog('Setting delivery ID from immediate fallback', {
+          immediateId
+        });
         setDeliveryPartnerId(immediateId);
       }
 
@@ -213,6 +253,9 @@ export const useDeliveryNotifications = () => {
           const deliveryPartner = response.data.data.user || response.data.data.deliveryPartner;
           const id = extractId(deliveryPartner);
           if (id) {
+            debugLog('Setting delivery ID from /delivery/auth/me', {
+              id
+            });
             setDeliveryPartnerId(id);
             return;
           }
@@ -228,11 +271,16 @@ export const useDeliveryNotifications = () => {
       const fallbackId = readIdFromKnownStorage() || readIdFromToken();
       if (fallbackId) {
         console.warn('⚠️ Using delivery ID from storage/token fallback');
+        debugLog('Setting delivery ID from final fallback', {
+          fallbackId
+        });
         setDeliveryPartnerId(fallbackId);
+      } else {
+        debugLog('Failed to resolve delivery ID from API and all fallbacks');
       }
     };
     fetchDeliveryPartnerId();
-  }, []);
+  }, [debugLog]);
 
   // Socket connection effect
   useEffect(() => {
@@ -279,6 +327,11 @@ export const useDeliveryNotifications = () => {
 
     const socketUrl = `${backendUrl}/delivery`;
     console.warn('[DeliverySocket] init', { socketUrl, deliveryPartnerId, API_BASE_URL });
+    debugLog('Socket effect init', {
+      socketUrl,
+      deliveryPartnerId,
+      API_BASE_URL
+    });
     // Warn if trying to connect to localhost in production
     if (import.meta.env.MODE === 'production' && backendUrl.includes('localhost')) {
       console.error('❌ CRITICAL: Trying to connect Socket.IO to localhost in production!');
@@ -313,10 +366,18 @@ export const useDeliveryNotifications = () => {
       return; // Don't try to connect with invalid URL
     }
     if (socketRef.current) {
+      debugLog('Socket instance already exists', {
+        connected: socketRef.current.connected,
+        deliveryPartnerId
+      });
       if (deliveryPartnerId) {
         if (socketRef.current.connected) {
+          debugLog('Emitting join-delivery on existing connected socket', {
+            deliveryPartnerId
+          });
           socketRef.current.emit('join-delivery', deliveryPartnerId);
         } else {
+          debugLog('Socket exists but disconnected, forcing connect()');
           socketRef.current.connect();
         }
       }
@@ -342,12 +403,23 @@ export const useDeliveryNotifications = () => {
     });
     socketRef.current.on('connect', () => {
       setIsConnected(true);
+      debugLog('Socket connected', {
+        socketId: socketRef.current?.id,
+        transport: socketRef.current?.io?.engine?.transport?.name
+      });
       const latestId = deliveryPartnerIdRef.current;
       if (latestId) {
+        debugLog('Emitting join-delivery after connect', {
+          latestId
+        });
         socketRef.current.emit('join-delivery', latestId);
+      } else {
+        debugLog('connect event but latest delivery ID is null');
       }
     });
-    socketRef.current.on('delivery-room-joined', data => {});
+    socketRef.current.on('delivery-room-joined', data => {
+      debugLog('delivery-room-joined ack received', data);
+    });
     socketRef.current.on('connect_error', error => {
       // Only log if it's not a network/polling/websocket error (backend might be down or WebSocket not available)
       // Socket.IO will automatically retry connection and fall back to polling
@@ -355,30 +427,61 @@ export const useDeliveryNotifications = () => {
 
       if (!isTransportError) {
         console.error('❌ Delivery Socket connection error:', error);
+        debugLog('connect_error', {
+          message: error?.message,
+          type: error?.type,
+          description: error?.description
+        });
       } else {
         // Silently handle transport errors - backend might not be running or WebSocket not available
         // Socket.IO will automatically retry with exponential backoff and fall back to polling
         // Only log in development for debugging
         if (process.env.NODE_ENV === 'development') {}
+        debugLog('Transport-level connect_error (expected fallback case)', {
+          message: error?.message,
+          type: error?.type
+        });
       }
       setIsConnected(false);
     });
     socketRef.current.on('disconnect', reason => {
       setIsConnected(false);
+      debugLog('Socket disconnected', {
+        reason
+      });
       if (reason === 'io server disconnect') {
+        debugLog('Server forced disconnect, reconnecting manually');
         socketRef.current.connect();
       }
     });
-    socketRef.current.on('reconnect_attempt', attemptNumber => {});
+    socketRef.current.on('reconnect_attempt', attemptNumber => {
+      debugLog('Reconnect attempt', {
+        attemptNumber
+      });
+    });
     socketRef.current.on('reconnect', attemptNumber => {
       setIsConnected(true);
+      debugLog('Socket reconnected', {
+        attemptNumber
+      });
       const latestId = deliveryPartnerIdRef.current;
       if (latestId) {
+        debugLog('Emitting join-delivery after reconnect', {
+          latestId
+        });
         socketRef.current.emit('join-delivery', latestId);
+      } else {
+        debugLog('reconnect event but latest delivery ID is null');
       }
     });
     socketRef.current.on('new_order', orderData => {
+      debugLog('new_order received', {
+        orderId: orderData?.orderId,
+        orderMongoId: orderData?.orderMongoId,
+        status: orderData?.status
+      });
       if (!isDeliveryPartnerOnline()) {
+        debugLog('Ignoring new_order: delivery partner offline');
         stopNotificationSound();
         return;
       }
@@ -388,7 +491,13 @@ export const useDeliveryNotifications = () => {
 
     // Listen for priority-based order notifications (new_order_available)
     socketRef.current.on('new_order_available', orderData => {
+      debugLog('new_order_available received', {
+        orderId: orderData?.orderId,
+        phase: orderData?.phase,
+        status: orderData?.status
+      });
       if (!isDeliveryPartnerOnline()) {
+        debugLog('Ignoring new_order_available: delivery partner offline');
         stopNotificationSound();
         return;
       }
@@ -397,18 +506,27 @@ export const useDeliveryNotifications = () => {
       playNotificationSound();
     });
     socketRef.current.on('order_taken', data => {
+      debugLog('order_taken received', data);
       stopNotificationSound();
       setOrderTaken(data);
     });
     socketRef.current.on('play_notification_sound', data => {
+      debugLog('play_notification_sound received', data);
       if (!isDeliveryPartnerOnline()) {
+        debugLog('Ignoring play_notification_sound: delivery partner offline');
         stopNotificationSound();
         return;
       }
       playNotificationSound();
     });
     socketRef.current.on('order_ready', orderData => {
+      debugLog('order_ready received', {
+        orderId: orderData?.orderId,
+        mongoId: orderData?.mongoId,
+        status: orderData?.status
+      });
       if (!isDeliveryPartnerOnline()) {
+        debugLog('Ignoring order_ready: delivery partner offline');
         stopNotificationSound();
         return;
       }
@@ -416,13 +534,14 @@ export const useDeliveryNotifications = () => {
       playNotificationSound();
     });
     return () => {
+      debugLog('Socket effect cleanup: disconnecting socket');
       stopNotificationSound();
       if (socketRef.current) {
         socketRef.current.disconnect();
         socketRef.current = null;
       }
     };
-  }, [deliveryPartnerId, isDeliveryPartnerOnline, playNotificationSound, stopNotificationSound]);
+  }, [debugLog, deliveryPartnerId, isDeliveryPartnerOnline, playNotificationSound, stopNotificationSound]);
 
   // Helper functions
   const clearNewOrder = () => {
