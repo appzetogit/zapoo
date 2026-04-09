@@ -11,6 +11,10 @@ import { calculateCancellationRefund } from './cancellationRefundService.js';
 
 const ASSIGNMENT_TIMEOUT_MS = 300000; // 5 minutes to accept
 const assignmentTimeouts = new Map();
+const FIREBASE_ONLINE_TTL_MS = Number(process.env.DELIVERY_ONLINE_TTL_MS || 120000); // 2 minutes
+const STRICT_SOCKET_ONLINE = String(process.env.DELIVERY_STRICT_SOCKET_ONLINE || 'true') !== 'false';
+const ALLOW_MONGO_ONLINE_FALLBACK = String(process.env.DELIVERY_ALLOW_MONGO_ONLINE_FALLBACK || 'false') === 'true';
+const PRESENCE_DEBUG = String(process.env.DELIVERY_PRESENCE_DEBUG || 'true') === 'true';
 
 function clearAssignmentTimeout(orderId) {
   const key = String(orderId);
@@ -67,6 +71,116 @@ function scheduleAssignmentTimeout(orderId) {
   clearAssignmentTimeout(orderId);
   const timeoutId = setTimeout(() => autoCancelIfUnassigned(orderId), ASSIGNMENT_TIMEOUT_MS);
   assignmentTimeouts.set(String(orderId), timeoutId);
+}
+
+function isFirebaseOnlineEntry(data) {
+  const statusRaw = data?.status ?? data?.isOnline ?? '';
+  const status = String(statusRaw).toLowerCase();
+  const isOnline = status === 'online' || status === 'true' || status === '1' || data?.isOnline === true;
+  if (!isOnline) return false;
+
+  const ts = Number(data?.last_updated ?? data?.lastUpdate ?? data?.updatedAt ?? 0);
+  if (!Number.isFinite(ts) || ts <= 0) return false;
+  const age = Date.now() - ts;
+  return age >= 0 && age <= FIREBASE_ONLINE_TTL_MS;
+}
+
+async function filterConnectedPartners(partners, orderTag = '') {
+  if (!STRICT_SOCKET_ONLINE || !Array.isArray(partners) || partners.length === 0) return partners || [];
+  const connected = [];
+  for (const partner of partners) {
+    const partnerId = partner?._id?.toString ? partner._id.toString() : String(partner?._id || '');
+    if (!partnerId) continue;
+    const connection = await checkDeliveryPartnerConnection(partnerId);
+    if (connection?.connected) {
+      connected.push(partner);
+    }
+  }
+  if (connected.length !== partners.length) {
+    console.warn('⚠️ [DeliveryAssign] Filtered disconnected riders from candidate list', {
+      order: orderTag || null,
+      before: partners.length,
+      after: connected.length
+    });
+  }
+  return connected;
+}
+
+async function getRiderPresenceSnapshot(deliveryPartnerId) {
+  const riderId = deliveryPartnerId?.toString?.() || String(deliveryPartnerId || '');
+  const snapshot = {
+    riderId,
+    db: {
+      exists: false,
+      isOnline: false,
+      isActive: false,
+      status: null,
+      lastLocationUpdate: null
+    },
+    firebase: {
+      exists: false,
+      status: null,
+      isOnlineRaw: null,
+      isOnlineDerived: false,
+      lastUpdated: null,
+      lastUpdatedAgeMs: null,
+      freshByTtl: false
+    },
+    socket: {
+      connected: false,
+      room: null,
+      socketCount: 0
+    }
+  };
+
+  try {
+    const rider = await Delivery.findById(riderId)
+      .select('isActive status availability.isOnline availability.lastLocationUpdate')
+      .lean();
+    if (rider) {
+      snapshot.db.exists = true;
+      snapshot.db.isOnline = Boolean(rider?.availability?.isOnline);
+      snapshot.db.isActive = Boolean(rider?.isActive);
+      snapshot.db.status = rider?.status || null;
+      snapshot.db.lastLocationUpdate = rider?.availability?.lastLocationUpdate || null;
+    }
+  } catch (dbErr) {
+    snapshot.db.error = dbErr?.message || 'db_lookup_failed';
+  }
+
+  try {
+    const { getDb } = await import('../../../config/firebaseConfig.js');
+    const db = getDb();
+    const fbSnap = await db.ref(`delivery_boys/${riderId}`).once('value');
+    const data = fbSnap.val();
+    if (data) {
+      const statusRaw = data?.status ?? data?.isOnline ?? '';
+      const status = String(statusRaw).toLowerCase();
+      const isOnline = status === 'online' || status === 'true' || status === '1' || data?.isOnline === true;
+      const lastUpdated = Number(data?.last_updated ?? data?.lastUpdate ?? data?.updatedAt ?? 0);
+      const ageMs = Number.isFinite(lastUpdated) && lastUpdated > 0 ? Date.now() - lastUpdated : null;
+      snapshot.firebase.exists = true;
+      snapshot.firebase.status = data?.status ?? null;
+      snapshot.firebase.isOnlineRaw = data?.isOnline ?? null;
+      snapshot.firebase.isOnlineDerived = isOnline;
+      snapshot.firebase.lastUpdated = Number.isFinite(lastUpdated) && lastUpdated > 0 ? lastUpdated : null;
+      snapshot.firebase.lastUpdatedAgeMs = ageMs;
+      snapshot.firebase.freshByTtl = Number.isFinite(ageMs) ? ageMs >= 0 && ageMs <= FIREBASE_ONLINE_TTL_MS : false;
+    }
+  } catch (fbErr) {
+    snapshot.firebase.error = fbErr?.message || 'firebase_lookup_failed';
+  }
+
+  try {
+    const connection = await checkDeliveryPartnerConnection(riderId);
+    snapshot.socket.connected = Boolean(connection?.connected);
+    snapshot.socket.room = connection?.room || null;
+    snapshot.socket.socketCount = connection?.socketCount || 0;
+  } catch (socketErr) {
+    snapshot.socket.error = socketErr?.message || 'socket_check_failed';
+  }
+
+  return snapshot;
 }
 
 /**
@@ -171,12 +285,7 @@ export async function findNearestDeliveryBoys(restaurantLat, restaurantLng, rest
 
     // Convert to array and filter online (be resilient to string coords)
     let deliveryPartners = Object.entries(boysData)
-      .filter(([id, data]) => {
-        const statusRaw = data?.status ?? data?.isOnline ?? '';
-        const status = String(statusRaw).toLowerCase();
-        const isOnline = status === 'online' || status === 'true' || status === '1' || data?.isOnline === true;
-        return isOnline;
-      })
+      .filter(([id, data]) => isFirebaseOnlineEntry(data))
       .map(([id, data]) => {
         const idStr = String(id);
         const lat = Number(data?.lat);
@@ -225,25 +334,27 @@ export async function findNearestDeliveryBoys(restaurantLat, restaurantLng, rest
         };
       });
     }
-    const firebasePartnerIds = new Set(
-      deliveryPartners
-        .map(p => p?._idStr || (p?._id?.toString ? p._id.toString() : String(p?._id || '')))
-        .filter(Boolean)
-    );
-    const mongoOnlyPartners = await Delivery.find({
-      isActive: true,
-      status: { $in: ['approved', 'active'] },
-      'availability.isOnline': true,
-      'availability.currentLocation.coordinates': { $exists: true, $ne: [0, 0] }
-    }).select('_id name phone zoneId availability.currentLocation').lean();
+    if (ALLOW_MONGO_ONLINE_FALLBACK) {
+      const firebasePartnerIds = new Set(
+        deliveryPartners
+          .map(p => p?._idStr || (p?._id?.toString ? p._id.toString() : String(p?._id || '')))
+          .filter(Boolean)
+      );
+      const mongoOnlyPartners = await Delivery.find({
+        isActive: true,
+        status: { $in: ['approved', 'active'] },
+        'availability.isOnline': true,
+        'availability.currentLocation.coordinates': { $exists: true, $ne: [0, 0] }
+      }).select('_id name phone zoneId availability.currentLocation').lean();
 
-    for (const partner of mongoOnlyPartners) {
-      const key = partner?._id?.toString?.() || String(partner?._id || '');
-      if (!key || firebasePartnerIds.has(key)) continue;
-      deliveryPartners.push({
-        ...partner,
-        _idStr: key
-      });
+      for (const partner of mongoOnlyPartners) {
+        const key = partner?._id?.toString?.() || String(partner?._id || '');
+        if (!key || firebasePartnerIds.has(key)) continue;
+        deliveryPartners.push({
+          ...partner,
+          _idStr: key
+        });
+      }
     }
     const preIdleFilterPartners = deliveryPartners;
     const idlePartners = await filterIdleDeliveryPartners(deliveryPartners);
@@ -347,6 +458,12 @@ export async function findNearestDeliveryBoys(restaurantLat, restaurantLng, rest
         .sort((a, b) => a.distance - b.distance);
     }
 
+    // Final gate: only keep currently socket-connected riders in candidate list
+    deliveryPartnersWithDistance = await filterConnectedPartners(
+      deliveryPartnersWithDistance,
+      `findNearestDeliveryBoys:${restaurantId || 'no_restaurant'}`
+    );
+
     return deliveryPartnersWithDistance.map(partner => ({
       deliveryPartnerId: partner._id.toString(),
       name: partner.name,
@@ -427,12 +544,7 @@ export async function findNearestDeliveryBoy(restaurantLat, restaurantLng, resta
 
     // Convert to array and filter online (be resilient to string coords)
     let deliveryPartners = Object.entries(boysData)
-      .filter(([id, data]) => {
-        const statusRaw = data?.status ?? data?.isOnline ?? '';
-        const status = String(statusRaw).toLowerCase();
-        const isOnline = status === 'online' || status === 'true' || status === '1' || data?.isOnline === true;
-        return isOnline;
-      })
+      .filter(([id, data]) => isFirebaseOnlineEntry(data))
       .map(([id, data]) => {
         const idStr = String(id);
         const lat = Number(data?.lat);
@@ -489,26 +601,28 @@ export async function findNearestDeliveryBoy(restaurantLat, restaurantLng, resta
         };
       });
     }
-    const firebasePartnerIds = new Set(
-      deliveryPartners
-        .map(p => p?._idStr || (p?._id?.toString ? p._id.toString() : String(p?._id || '')))
-        .filter(Boolean)
-    );
-    const mongoOnlyPartners = await Delivery.find({
-      isActive: true,
-      status: { $in: ['approved', 'active'] },
-      'availability.isOnline': true,
-      'availability.currentLocation.coordinates': { $exists: true, $ne: [0, 0] }
-    }).select('_id name phone zoneId availability.currentLocation').lean();
+    if (ALLOW_MONGO_ONLINE_FALLBACK) {
+      const firebasePartnerIds = new Set(
+        deliveryPartners
+          .map(p => p?._idStr || (p?._id?.toString ? p._id.toString() : String(p?._id || '')))
+          .filter(Boolean)
+      );
+      const mongoOnlyPartners = await Delivery.find({
+        isActive: true,
+        status: { $in: ['approved', 'active'] },
+        'availability.isOnline': true,
+        'availability.currentLocation.coordinates': { $exists: true, $ne: [0, 0] }
+      }).select('_id name phone zoneId availability.currentLocation').lean();
 
-    for (const partner of mongoOnlyPartners) {
-      const key = partner?._id?.toString?.() || String(partner?._id || '');
-      if (!key || firebasePartnerIds.has(key)) continue;
-      if (excludeIds && excludeIds.includes(key)) continue;
-      deliveryPartners.push({
-        ...partner,
-        _idStr: key
-      });
+      for (const partner of mongoOnlyPartners) {
+        const key = partner?._id?.toString?.() || String(partner?._id || '');
+        if (!key || firebasePartnerIds.has(key)) continue;
+        if (excludeIds && excludeIds.includes(key)) continue;
+        deliveryPartners.push({
+          ...partner,
+          _idStr: key
+        });
+      }
     }
     const preIdleFilterPartners = deliveryPartners;
     deliveryPartners = await filterIdleDeliveryPartners(deliveryPartners);
@@ -523,7 +637,7 @@ export async function findNearestDeliveryBoy(restaurantLat, restaurantLng, resta
 
     // Calculate distance for each delivery partner and filter by zone if applicable
     const effectiveMaxDistance = Math.min(Number(maxDistance) || 0, 5) + 0.5; // small GPS tolerance
-    const deliveryPartnersWithDistance = deliveryPartners.map(partner => {
+    let deliveryPartnersWithDistance = deliveryPartners.map(partner => {
       const location = partner.availability?.currentLocation;
       if (!location || !location.coordinates || location.coordinates.length < 2) {
         return null;
@@ -552,6 +666,11 @@ export async function findNearestDeliveryBoy(restaurantLat, restaurantLng, resta
         zoneId: partner.zoneId || null
       };
     }).filter(partner => partner !== null && partner.distance <= effectiveMaxDistance).sort((a, b) => a.distance - b.distance); // Sort by distance (nearest first)
+
+    deliveryPartnersWithDistance = await filterConnectedPartners(
+      deliveryPartnersWithDistance,
+      `findNearestDeliveryBoy:${restaurantId || 'no_restaurant'}`
+    );
 
     if (deliveryPartnersWithDistance.length === 0) {
       return null;
@@ -675,6 +794,14 @@ export async function notifyNextDeliveryPartner(orderDoc, restaurantLat, restaur
 
     // Skip if delivery partner is not connected to socket
     const connection = await checkDeliveryPartnerConnection(nextId);
+    if (PRESENCE_DEBUG) {
+      const presence = await getRiderPresenceSnapshot(nextId);
+      console.log('🛰️ [DeliveryPresence] Candidate snapshot', {
+        orderId: orderDoc.orderId || orderId?.toString?.() || String(orderId),
+        candidateId: nextId,
+        presence
+      });
+    }
     console.log('🧪 [DeliveryAssign] Candidate connection check', {
       orderId: orderDoc.orderId || orderId?.toString?.() || String(orderId),
       candidateId: nextId,
