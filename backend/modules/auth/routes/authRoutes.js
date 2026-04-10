@@ -10,7 +10,8 @@ import {
   getCurrentUser,
   googleAuth,
   googleCallback,
-  firebaseGoogleLogin
+  firebaseGoogleLogin,
+  googleNativeLogin
 } from '../controllers/authController.js';
 import { authenticate } from '../middleware/auth.js';
 import { validate } from '../../../shared/middleware/validate.js';
@@ -86,6 +87,9 @@ router.post('/logout', logout);
 // Firebase Google login (using Firebase Auth ID token)
 router.post('/firebase/google-login', firebaseGoogleLogin);
 
+// Native Google login for Flutter/mobile bridges
+router.post('/google/native-login', googleNativeLogin);
+
 // Google OAuth routes
 router.get('/google/:role', googleAuth);
 router.get('/google/:role/callback', googleCallback);
@@ -94,4 +98,3 @@ router.get('/google/:role/callback', googleCallback);
 router.get('/me', authenticate, getCurrentUser);
 
 export default router;
-

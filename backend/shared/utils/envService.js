@@ -96,6 +96,20 @@ export async function getRazorpayCredentials() {
 }
 
 /**
+ * Get Razorpay webhook secret
+ * @returns {Promise<string>}
+ */
+export async function getRazorpayWebhookSecret() {
+  return (
+    await getEnvVar("RAZORPAY_WEBHOOK_SECRET") ||
+    await getEnvVar("RAZORPAY_WEBHOOK_SECRET_KEY") ||
+    process.env.RAZORPAY_WEBHOOK_SECRET ||
+    process.env.RAZORPAY_WEBHOOK_SECRET_KEY ||
+    ""
+  );
+}
+
+/**
  * Get Cloudinary credentials
  * @returns {Promise<Object>} { cloudName, apiKey, apiSecret }
  */

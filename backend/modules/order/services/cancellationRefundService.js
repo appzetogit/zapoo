@@ -6,7 +6,7 @@ import RestaurantWallet from '../../restaurant/models/RestaurantWallet.js';
 import AdminWallet from '../../admin/models/AdminWallet.js';
 import AuditLog from '../../admin/models/AuditLog.js';
 import Payment from '../../payment/models/Payment.js';
-import { createRefund } from '../../payment/services/razorpayService.js';
+import { refundPayment } from '../../refund/services/refundService.js';
 import { calculateOrderSettlement } from './orderSettlementService.js';
 
 /**
@@ -439,9 +439,6 @@ export const processRazorpayRefund = async (orderId, adminId = null) => {
       throw new Error('No refund amount calculated for this order');
     }
 
-    // Convert refund amount to paise (Razorpay uses paise)
-    const refundAmountInPaise = Math.round(refundAmount * 100);
-
     // Update refund status to 'initiated'
     settlement.cancellationDetails.refundStatus = 'initiated';
     settlement.cancellationDetails.refundInitiatedAt = new Date();
@@ -453,44 +450,24 @@ export const processRazorpayRefund = async (orderId, adminId = null) => {
     // Create Razorpay refund
     let razorpayRefund = null;
     try {
-      razorpayRefund = await createRefund(order.payment.razorpayPaymentId, refundAmountInPaise, {
-        orderId: order.orderId,
+      const refundResult = await refundPayment(order.payment.razorpayPaymentId, refundAmount, {
+        orderId: order._id,
+        orderNumber: order.orderId,
         reason: order.cancellationReason || 'Order cancelled by restaurant',
-        cancelledBy: 'restaurant',
-        adminId: adminId || 'system'
+        notes: {
+          orderId: order.orderId,
+          type: 'order_refund',
+          cancelledBy: 'restaurant',
+          adminId: adminId || 'system'
+        }
       });
+      razorpayRefund = refundResult.razorpayRefund;
     } catch (razorpayError) {
       // Update refund status to 'failed'
       settlement.cancellationDetails.refundStatus = 'failed';
       settlement.cancellationDetails.refundFailureReason = razorpayError.message;
       await settlement.save();
       throw new Error(`Failed to create Razorpay refund: ${razorpayError.message}`);
-    }
-
-    // Update Payment model with refund details
-    const payment = await Payment.findOne({
-      orderId: order._id,
-      'razorpay.paymentId': order.payment.razorpayPaymentId
-    });
-    if (payment) {
-      payment.status = 'refunded';
-      payment.refund = {
-        amount: refundAmount,
-        status: refundAmount === order.pricing.total ? 'full' : 'partial',
-        refundId: razorpayRefund.id,
-        refundedAt: new Date(),
-        reason: order.cancellationReason || 'Order cancelled by restaurant'
-      };
-      payment.logs.push({
-        action: 'refunded',
-        timestamp: new Date(),
-        details: {
-          refundId: razorpayRefund.id,
-          amount: refundAmount,
-          razorpayRefundId: razorpayRefund.id
-        }
-      });
-      await payment.save();
     }
 
     // Update settlement with Razorpay refund ID

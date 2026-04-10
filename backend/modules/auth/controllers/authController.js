@@ -631,6 +631,170 @@ export const getCurrentUser = asyncHandler(async (req, res) => {
  * Login / register using Firebase Google ID token
  * POST /api/auth/firebase/google-login
  */
+const finalizeGoogleLogin = async ({
+  res,
+  role = "restaurant",
+  googleId,
+  email,
+  name = "Google User",
+  picture = null,
+  sourceLabel = "Google",
+}) => {
+  const allowedRoles = ["user", "restaurant", "delivery"];
+  const userRole = role || "restaurant";
+  if (!allowedRoles.includes(userRole)) {
+    return errorResponse(res, 400, `Invalid role. Allowed roles: ${allowedRoles.join(", ")}`);
+  }
+
+  if (!email) {
+    logger.error(`${sourceLabel} login failed: Email not found in token`, {
+      googleId
+    });
+    return errorResponse(res, 400, `${sourceLabel} login failed: email not found.`);
+  }
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    logger.error(`${sourceLabel} login failed: Invalid email format`, {
+      email
+    });
+    return errorResponse(res, 400, `Invalid email format received from ${sourceLabel}.`);
+  }
+
+  let user = await User.findOne({
+    role: userRole,
+    $or: [{
+      googleId
+    }, {
+      email
+    }]
+  });
+
+  if (user) {
+    if (!user.googleId) {
+      user.googleId = googleId;
+      user.googleEmail = email;
+      if (!user.profileImage && picture) {
+        user.profileImage = picture;
+      }
+      if (!user.signupMethod) {
+        user.signupMethod = "google";
+      }
+      try {
+        await user.save();
+      } catch (linkError) {
+        if (linkError?.code !== 11000) {
+          throw linkError;
+        }
+        logger.warn("Google ID already linked to another role; proceeding with role-scoped account", {
+          email,
+          role: userRole
+        });
+      }
+    }
+  } else {
+    const userData = {
+      name: String(name || "Google User").trim(),
+      email: email.toLowerCase().trim(),
+      googleId,
+      googleEmail: email.toLowerCase().trim(),
+      role: userRole,
+      signupMethod: "google",
+      profileImage: picture || null,
+      isActive: true
+    };
+    try {
+      user = await User.create(userData);
+    } catch (createError) {
+      if (createError.code === 11000) {
+        logger.warn("Duplicate key error during Google user creation, retrying role-scoped find", {
+          email,
+          role: userRole
+        });
+        user = await User.findOne({
+          email,
+          role: userRole
+        });
+        if (user) {
+          if (!user.googleId) {
+            user.googleId = googleId;
+            user.googleEmail = email;
+            if (!user.profileImage && picture) {
+              user.profileImage = picture;
+            }
+            if (!user.signupMethod) {
+              user.signupMethod = "google";
+            }
+            try {
+              await user.save();
+            } catch (linkError) {
+              if (linkError?.code !== 11000) {
+                throw linkError;
+              }
+              logger.warn("Google ID already linked to another role while linking existing account", {
+                email,
+                role: userRole
+              });
+            }
+          }
+        } else {
+          logger.warn("googleId already exists in another role; creating email-scoped role account", {
+            email,
+            role: userRole
+          });
+          const fallbackUserData = {
+            ...userData,
+            googleId: undefined,
+            googleEmail: undefined
+          };
+          user = await User.create(fallbackUserData);
+        }
+      } else {
+        logger.error(`${sourceLabel} login failed while creating user`, {
+          error: createError.message,
+          email,
+          role: userRole
+        });
+        throw createError;
+      }
+    }
+  }
+
+  if (!user.isActive) {
+    logger.warn("Inactive user attempted login", {
+      userId: user._id,
+      email
+    });
+    return errorResponse(res, 403, "Your account has been deactivated. Please contact support.");
+  }
+
+  const tokens = jwtService.generateTokens({
+    userId: user._id.toString(),
+    role: user.role,
+    email: user.email
+  });
+
+  res.cookie("refreshToken", tokens.refreshToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+    maxAge: 7 * 24 * 60 * 60 * 1000
+  });
+
+  return successResponse(res, 200, `${sourceLabel} authentication successful`, {
+    accessToken: tokens.accessToken,
+    user: {
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      phoneVerified: user.phoneVerified,
+      role: user.role,
+      profileImage: user.profileImage,
+      signupMethod: user.signupMethod
+    }
+  });
+};
 export const firebaseGoogleLogin = asyncHandler(async (req, res) => {
   const {
     idToken,
@@ -661,172 +825,71 @@ export const firebaseGoogleLogin = asyncHandler(async (req, res) => {
     const email = decoded.email || null;
     const name = decoded.name || decoded.display_name || "Google User";
     const picture = decoded.picture || decoded.photo_url || null;
-    const emailVerified = !!decoded.email_verified;
-
-    // Validate email is present
-    if (!email) {
-      logger.error("Firebase Google login failed: Email not found in token", {
-        uid: firebaseUid
-      });
-      return errorResponse(res, 400, "Email not found in Firebase user. Please ensure email is available in your Google account.");
-    }
-
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      logger.error("Firebase Google login failed: Invalid email format", {
-        email
-      });
-      return errorResponse(res, 400, "Invalid email format received from Google.");
-    }
-
-    // Find existing user only within requested role.
-    // This prevents cross-role collisions (same Google account used in another role).
-    let user = await User.findOne({
+    return finalizeGoogleLogin({
+      res,
       role: userRole,
-      $or: [{
-        googleId: firebaseUid
-      }, {
-        email
-      }]
-    });
-    if (user) {
-      // If user exists but googleId not linked yet, link it
-      if (!user.googleId) {
-        user.googleId = firebaseUid;
-        user.googleEmail = email;
-        if (!user.profileImage && picture) {
-          user.profileImage = picture;
-        }
-        // Update signupMethod if not already set
-        if (!user.signupMethod) {
-          user.signupMethod = "google";
-        }
-        try {
-          await user.save();
-        } catch (linkError) {
-          // If googleId is already linked in another role, continue with email+role based auth.
-          if (linkError?.code !== 11000) {
-            throw linkError;
-          }
-          logger.warn("Google ID already linked to another role; proceeding with role-scoped account", {
-            email,
-            role: userRole
-          });
-        }
-      }
-    } else {
-      // Auto-register new user based on Firebase data
-      const userData = {
-        name: name.trim(),
-        email: email.toLowerCase().trim(),
-        googleId: firebaseUid,
-        googleEmail: email.toLowerCase().trim(),
-        role: userRole,
-        signupMethod: "google",
-        profileImage: picture || null,
-        isActive: true
-      };
-      try {
-        user = await User.create(userData);
-      } catch (createError) {
-        // Handle duplicate key error - user might have been created between findOne and create
-        if (createError.code === 11000) {
-          logger.warn("Duplicate key error during user creation, retrying role-scoped find", {
-            email,
-            role: userRole
-          });
-          user = await User.findOne({
-            email,
-            role: userRole
-          });
-          if (user) {
-            // Link Google ID if not already linked
-            if (!user.googleId) {
-              user.googleId = firebaseUid;
-              user.googleEmail = email;
-              if (!user.profileImage && picture) {
-                user.profileImage = picture;
-              }
-              if (!user.signupMethod) {
-                user.signupMethod = "google";
-              }
-              try {
-                await user.save();
-              } catch (linkError) {
-                if (linkError?.code !== 11000) {
-                  throw linkError;
-                }
-                logger.warn("Google ID already linked to another role while linking existing account", {
-                  email,
-                  role: userRole
-                });
-              }
-            }
-          } else {
-            // Most likely duplicate googleId from another role.
-            // Create role-scoped account without googleId and rely on verified Google email.
-            logger.warn("googleId already exists in another role; creating email-scoped role account", {
-              email,
-              role: userRole
-            });
-            const fallbackUserData = {
-              ...userData,
-              googleId: undefined,
-              googleEmail: undefined
-            };
-            user = await User.create(fallbackUserData);
-          }
-        } else {
-          logger.error("Error creating user via Firebase Google login", {
-            error: createError.message,
-            email,
-            role: userRole
-          });
-          throw createError;
-        }
-      }
-    }
-
-    // Ensure user is active
-    if (!user.isActive) {
-      logger.warn("Inactive user attempted login", {
-        userId: user._id,
-        email
-      });
-      return errorResponse(res, 403, "Your account has been deactivated. Please contact support.");
-    }
-
-    // Generate JWT tokens for our app
-    const tokens = jwtService.generateTokens({
-      userId: user._id.toString(),
-      role: user.role,
-      email: user.email
-    });
-
-    // Set refresh token in httpOnly cookie
-    res.cookie("refreshToken", tokens.refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
-    });
-    return successResponse(res, 200, "Firebase Google authentication successful", {
-      accessToken: tokens.accessToken,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        phone: user.phone,
-        phoneVerified: user.phoneVerified,
-        role: user.role,
-        profileImage: user.profileImage,
-        signupMethod: user.signupMethod
-      }
+      googleId: firebaseUid,
+      email,
+      name,
+      picture,
+      sourceLabel: "Firebase Google"
     });
   } catch (error) {
     logger.error(`Error in Firebase Google login: ${error.message}`);
     return errorResponse(res, 400, error.message || "Firebase Google authentication failed");
+  }
+});
+
+/**
+ * Login / register using native Google token (Flutter/mobile bridge)
+ * POST /api/auth/google/native-login
+ */
+export const googleNativeLogin = asyncHandler(async (req, res) => {
+  const {
+    idToken,
+    accessToken,
+    role = "restaurant"
+  } = req.body;
+
+  if (!idToken && !accessToken) {
+    return errorResponse(res, 400, "Google token is required");
+  }
+
+  try {
+    let googleUser = null;
+
+    if (accessToken) {
+      const tokenData = await googleAuthService.getUserInfoFromToken({
+        access_token: accessToken
+      });
+      googleUser = {
+        googleId: tokenData.googleId,
+        email: tokenData.email,
+        name: tokenData.name,
+        picture: tokenData.picture
+      };
+    } else {
+      const payload = await googleAuthService.verifyIdToken(idToken);
+      googleUser = {
+        googleId: payload?.sub || payload?.uid || null,
+        email: payload?.email || null,
+        name: payload?.name || payload?.display_name || payload?.given_name || "Google User",
+        picture: payload?.picture || payload?.photo_url || null
+      };
+    }
+
+    return finalizeGoogleLogin({
+      res,
+      role,
+      googleId: googleUser.googleId,
+      email: googleUser.email,
+      name: googleUser.name,
+      picture: googleUser.picture,
+      sourceLabel: "Native Google"
+    });
+  } catch (error) {
+    logger.error(`Error in native Google login: ${error.message}`);
+    return errorResponse(res, 400, error.message || "Native Google authentication failed");
   }
 });
 

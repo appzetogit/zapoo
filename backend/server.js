@@ -325,7 +325,12 @@ app.use(cors({
 app.use(compression({ level: 6, threshold: 1024 }));
 
 // Body parsing middleware
-app.use(express.json({ limit: '10mb' }));
+const captureRawBody = (req, res, buf) => {
+  if (buf && buf.length) {
+    req.rawBody = buf.toString('utf8');
+  }
+};
+app.use(express.json({ limit: '10mb', verify: captureRawBody }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
 
@@ -364,6 +369,7 @@ app.use('/api/restaurant', restaurantRoutes);
 app.use('/api/delivery', deliveryRoutes);
 app.use('/api/order', orderRoutes);
 app.use('/api/payment', paymentRoutes);
+app.use('/api/payments', paymentRoutes);
 app.use('/api/menu', menuRoutes);
 app.use('/api/campaign', campaignRoutes);
 app.use('/api/notification', notificationRoutes);

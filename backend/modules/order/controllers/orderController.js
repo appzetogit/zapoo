@@ -507,9 +507,9 @@ export const createOrder = async (req, res) => {
       });
     }
 
-    // Note: For Razorpay / online payments, restaurant notification will be sent
-    // after payment verification in verifyOrderPayment. This ensures restaurant
-    // only receives prepaid orders after successful payment.
+    // Note: For Razorpay / online payments, restaurant notification is sent
+    // from the webhook after payment capture. The frontend verification step
+    // only stores gateway identifiers and does not confirm the order.
 
     // Create Razorpay order for online payments
     let razorpayOrder = null;
@@ -523,13 +523,84 @@ export const createOrder = async (req, res) => {
           notes: {
             orderId: order.orderId,
             userId: userId.toString(),
-            restaurantId: restaurantId || 'unknown'
+            restaurantId: restaurantId || 'unknown',
+            type: 'order_payment'
           }
         });
 
         // Update order with Razorpay order ID
         order.payment.razorpayOrderId = razorpayOrder.id;
         await order.save();
+
+        try {
+          const existingPayment = await Payment.findOne({
+            orderId: order._id,
+            'razorpay.orderId': razorpayOrder.id
+          });
+
+          const paymentPayload = {
+            amount: pricingData.total,
+            currency: 'INR',
+            method: 'razorpay',
+            status: 'created',
+            razorpay: {
+              orderId: razorpayOrder.id,
+              receipt: order.orderId,
+              notes: {
+                orderId: order.orderId,
+                userId: userId.toString(),
+                restaurantId: restaurantId || 'unknown',
+                type: 'order_payment'
+              }
+            },
+            gatewayResponse: razorpayOrder
+          };
+
+          if (existingPayment) {
+            existingPayment.amount = paymentPayload.amount;
+            existingPayment.currency = paymentPayload.currency;
+            existingPayment.method = paymentPayload.method;
+            existingPayment.status = paymentPayload.status;
+            existingPayment.razorpay = {
+              ...(existingPayment.razorpay || {}),
+              ...paymentPayload.razorpay
+            };
+            existingPayment.gatewayResponse = paymentPayload.gatewayResponse;
+            existingPayment.logs = existingPayment.logs || [];
+            existingPayment.logs.push({
+              action: 'created',
+              timestamp: new Date(),
+              details: {
+                razorpayOrderId: razorpayOrder.id,
+                amount: pricingData.total,
+                note: 'Razorpay order created; awaiting webhook'
+              },
+              ipAddress: req.ip,
+              userAgent: req.get('user-agent')
+            });
+            await existingPayment.save();
+          } else {
+            await Payment.create({
+              paymentId: `PAY-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+              orderId: order._id,
+              userId,
+              ...paymentPayload,
+              logs: [{
+                action: 'created',
+                timestamp: new Date(),
+                details: {
+                  razorpayOrderId: razorpayOrder.id,
+                  amount: pricingData.total,
+                  note: 'Razorpay order created; awaiting webhook'
+                },
+                ipAddress: req.ip,
+                userAgent: req.get('user-agent')
+              }]
+            });
+          }
+        } catch (paymentCreateError) {
+          logger.error(`Error creating Razorpay payment record: ${paymentCreateError.message}`);
+        }
       } catch (razorpayError) {
         logger.error(`Error creating Razorpay order: ${razorpayError.message}`);
         // Continue with order creation even if Razorpay fails
@@ -636,135 +707,91 @@ export const verifyOrderPayment = async (req, res) => {
     // Verify payment signature
     const isValid = await verifyPayment(razorpayOrderId, razorpayPaymentId, razorpaySignature);
     if (!isValid) {
-      // Update order payment status to failed
-      order.payment.status = 'failed';
-      await order.save();
       return res.status(400).json({
         success: false,
         message: 'Invalid payment signature'
       });
     }
 
-    // Create payment record
-    const payment = new Payment({
-      paymentId: `PAY-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    // Persist gateway identifiers only. Webhook remains the source of truth for final status.
+    let payment = await Payment.findOne({
       orderId: order._id,
-      userId,
-      amount: order.pricing.total,
-      currency: 'INR',
-      method: 'razorpay',
-      status: 'completed',
-      razorpay: {
-        orderId: razorpayOrderId,
-        paymentId: razorpayPaymentId,
-        signature: razorpaySignature
-      },
-      // transactionId is conceptually the external gateway reference; for Razorpay this
-      // is already stored as razorpay.paymentId, so we avoid duplicating the same value.
-      completedAt: new Date(),
-      logs: [{
-        action: 'completed',
-        timestamp: new Date(),
-        details: {
+      'razorpay.orderId': razorpayOrderId
+    });
+
+    if (!payment) {
+      payment = await Payment.create({
+        paymentId: `PAY-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        orderId: order._id,
+        userId,
+        amount: order.pricing.total,
+        currency: 'INR',
+        method: 'razorpay',
+        status: 'created',
+        razorpay: {
+          orderId: razorpayOrderId,
+          paymentId: razorpayPaymentId,
+          signature: razorpaySignature
+        },
+        gatewayResponse: {
           razorpayOrderId,
           razorpayPaymentId
         },
+        logs: [{
+          action: 'created',
+          timestamp: new Date(),
+          details: {
+            razorpayOrderId,
+            razorpayPaymentId,
+            note: 'Signature verified; awaiting webhook confirmation'
+          },
+          ipAddress: req.ip,
+          userAgent: req.get('user-agent')
+        }]
+      });
+    } else {
+      payment.status = 'created';
+      payment.razorpay = {
+        ...(payment.razorpay || {}),
+        orderId: razorpayOrderId,
+        paymentId: razorpayPaymentId,
+        signature: razorpaySignature
+      };
+      payment.gatewayResponse = {
+        ...(payment.gatewayResponse || {}),
+        razorpayOrderId,
+        razorpayPaymentId
+      };
+      payment.logs = payment.logs || [];
+      payment.logs.push({
+        action: 'created',
+        timestamp: new Date(),
+        details: {
+          razorpayOrderId,
+          razorpayPaymentId,
+          note: 'Signature verified; awaiting webhook confirmation'
+        },
         ipAddress: req.ip,
         userAgent: req.get('user-agent')
-      }]
-    });
-    await payment.save();
+      });
+      await payment.save();
+    }
 
-    // Update order status - Keep as pending for restaurant to accept
-    order.payment.status = 'completed';
+    order.payment.status = 'pending';
     order.payment.razorpayPaymentId = razorpayPaymentId;
     order.payment.razorpaySignature = razorpaySignature;
     order.payment.transactionId = razorpayPaymentId;
-    order.status = 'pending'; // Keep as pending instead of confirmed
-    // order.tracking.confirmed = { status: true, timestamp: new Date() };
     await order.save();
 
-    // Calculate order settlement and hold escrow
-    try {
-      // Calculate settlement breakdown
-      await calculateOrderSettlement(order._id);
-
-      // Hold funds in escrow
-      await holdEscrow(order._id, userId, order.pricing.total);
-    } catch (settlementError) {
-      logger.error(`❌ Error calculating settlement for order ${order.orderId}:`, settlementError);
-      // Don't fail payment verification if settlement calculation fails
-      // But log it for investigation
-    }
-
-    // Notify restaurant about confirmed order (payment verified)
-    try {
-      const restaurantId = order.restaurantId?.toString() || order.restaurantId;
-      const restaurantName = order.restaurantName;
-
-      // CRITICAL: Log detailed info before notification
-
-      // Verify order has restaurantId before notifying
-      if (!restaurantId) {
-        logger.error('❌ CRITICAL: Cannot notify restaurant - order.restaurantId is missing!', {
-          orderId: order.orderId,
-          order: {
-            _id: order._id?.toString(),
-            restaurantId: order.restaurantId,
-            restaurantName: order.restaurantName
-          }
-        });
-        throw new Error('Order restaurantId is missing');
-      }
-
-      // Verify order has restaurantName before notifying
-      if (!restaurantName) {
-        logger.warn('⚠️ Order restaurantName is missing:', {
-          orderId: order.orderId,
-          restaurantId: restaurantId
-        });
-      }
-      const notificationResult = await notifyRestaurantNewOrder(order, restaurantId);
-    } catch (notificationError) {
-      logger.error(`❌ CRITICAL: Error notifying restaurant after payment verification:`, {
-        error: notificationError.message,
-        stack: notificationError.stack,
-        orderId: order.orderId,
-        orderMongoId: order._id?.toString(),
-        restaurantId: order.restaurantId,
-        restaurantName: order.restaurantName,
-        orderStatus: order.status
-      });
-      // Don't fail payment verification if notification fails
-      // Order is still saved and restaurant can fetch it via API
-      // But log it as critical for debugging
-    }
-
-    // Notify user about payment success (FCM)
-    try {
-      const {
-        sendNotificationToUser
-      } = await import('../../notification/utils/pushNotificationHelper.js');
-      await sendNotificationToUser(userId, 'user', 'Payment Successful! Order Confirmed', `Your order #${order.orderId} has been confirmed.`, {
-        orderId: order.orderId,
-        orderMongoId: order._id?.toString(),
-        status: order.status,
-        type: 'payment_success',
-        templateKey: 'user_payment_success',
-        templateVars: {
-          orderId: order.orderId
-        }
-      });
-    } catch (pushError) {
-      logger.error('❌ [FCM] Error sending to user:', pushError);
-    }
-    res.json({
+    return res.json({
       success: true,
+      message: 'Payment signature verified. Final confirmation will happen after webhook capture.',
       data: {
         order: {
           id: order._id.toString(),
           orderId: order.orderId,
-          status: order.status
+          status: order.status,
+          paymentStatus: order.payment.status
         },
         payment: {
           id: payment._id.toString(),

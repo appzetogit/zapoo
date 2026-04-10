@@ -209,7 +209,7 @@ export default function Cart() {
     deliveryFeeForCoupons = Number(feeSettings.deliveryFee);
   }
   const deliveryFeeForTotalsForCoupons = deliveryFeeForCoupons != null ? deliveryFeeForCoupons : Number(feeSettings.deliveryFee);
-  const platformFeeForCoupons = pricing?.platformFee || feeSettings.platformFee;
+  const platformFeeForCoupons = pricing?.platformFee ?? feeSettings.platformFee;
   const discountForCoupons = pricing?.discount || (appliedCoupon ? Math.min(appliedCoupon.discount, subtotalForCoupons * 0.5) : 0);
   const taxableFoodAmountForCoupons = Math.max(subtotalForCoupons - discountForCoupons, 0);
   const gstChargesForCoupons = pricing?.tax ?? Math.round(((taxableFoodAmountForCoupons * 0.05) + (deliveryFeeForTotalsForCoupons * 0.18) + (platformFeeForCoupons * 0.18)) * 100) / 100;
@@ -685,7 +685,7 @@ export default function Cart() {
           setFeeSettings({
             deliveryFee: response.data.data.feeSettings.deliveryFee || 25,
             freeDeliveryThreshold: response.data.data.feeSettings.freeDeliveryThreshold || 149,
-            platformFee: response.data.data.feeSettings.platformFee || 5,
+            platformFee: response.data.data.feeSettings.platformFee ?? 5,
             gstRate: response.data.data.feeSettings.gstRate || 5
           });
         }
@@ -715,7 +715,7 @@ export default function Cart() {
     deliveryFee = Number(feeSettings.deliveryFee);
   }
   const deliveryFeeForTotals = deliveryFee != null ? deliveryFee : Number(feeSettings.deliveryFee);
-  const platformFee = pricing?.platformFee || feeSettings.platformFee;
+  const platformFee = pricing?.platformFee ?? feeSettings.platformFee;
   const discount = pricing?.discount || (appliedCoupon ? Math.min(appliedCoupon.discount, subtotal * 0.5) : 0);
   const taxableFoodAmount = Math.max(subtotal - discount, 0);
   const gstCharges = pricing?.tax ?? Math.round(((taxableFoodAmount * 0.05) + (deliveryFeeForTotals * 0.18) + (platformFee * 0.18)) * 100) / 100;

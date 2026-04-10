@@ -1,5 +1,6 @@
 import express from 'express';
 import { initializeRazorpay } from './services/razorpayService.js';
+import { handleRazorpayWebhook } from './webhookHandler.js';
 
 // Initialize Razorpay on module load
 initializeRazorpay();
@@ -15,5 +16,6 @@ router.get('/health', (req, res) => {
   });
 });
 
-export default router;
+router.post('/razorpay/webhook', handleRazorpayWebhook);
 
+export default router;

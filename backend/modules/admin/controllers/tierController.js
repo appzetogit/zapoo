@@ -132,7 +132,7 @@ export const createTier = async (req, res) => {
         distanceSlabs: normalizeDistanceSlabs(safeDistanceSlabs)
       },
       recommendedItemFee: feeSettings.recommendedItemFee,
-      platformFee: feeSettings.platformFee
+      platformFee: platformFee !== undefined ? Number(platformFee) : feeSettings.platformFee
     });
 
     // Sync delivery commission rules for this tier based on its distance slabs

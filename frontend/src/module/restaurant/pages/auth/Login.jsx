@@ -10,7 +10,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
-import { restaurantAPI } from "@/lib/api"
+import { authAPI, restaurantAPI } from "@/lib/api"
 import { firebaseAuth, googleProvider } from "@/lib/firebase"
 import { useCompanyName } from "@/lib/hooks/useCompanyName"
 
@@ -231,6 +231,44 @@ export default function RestaurantLogin() {
     setIsSending(true)
 
     try {
+      const isFlutterBridgeAvailable =
+        typeof window !== "undefined" &&
+        window.flutter_inappwebview &&
+        typeof window.flutter_inappwebview.callHandler === "function"
+
+      if (isFlutterBridgeAvailable) {
+        const result = await window.flutter_inappwebview.callHandler("nativeGoogleSignIn")
+
+        if (result?.success && (result.idToken || result.accessToken)) {
+          const response = await authAPI.googleNativeLogin({
+            idToken: result.idToken || null,
+            accessToken: result.accessToken || null,
+            role: "restaurant",
+          })
+          const data = response?.data?.data || {}
+
+          const accessToken = data.accessToken
+          const restaurant = data.restaurant
+
+          if (!accessToken || !restaurant) {
+            throw new Error("Invalid response from server")
+          }
+
+          setAuthData("restaurant", accessToken, restaurant)
+          window.dispatchEvent(new Event("restaurantAuthChanged"))
+          navigate("/restaurant")
+          return
+        }
+
+        if (result?.success === false) {
+          setIsSending(false)
+          setApiError("Google sign-in was cancelled.")
+          return
+        }
+
+        throw new Error("Flutter Google sign-in did not return a valid token")
+      }
+
       const { signInWithPopup } = await import("firebase/auth")
 
       // Sign in with Google using Firebase Auth

@@ -543,6 +543,51 @@ export default function SignIn() {
       if (!firebaseAuth) {
         throw new Error("Firebase Auth is not initialized. Please check your Firebase configuration.");
       }
+
+      const isFlutterBridgeAvailable =
+        typeof window !== "undefined" &&
+        window.flutter_inappwebview &&
+        typeof window.flutter_inappwebview.callHandler === "function";
+
+      if (isFlutterBridgeAvailable) {
+        try {
+          const result = await window.flutter_inappwebview.callHandler("nativeGoogleSignIn");
+
+          if (result?.success && (result.idToken || result.accessToken)) {
+            const response = await authAPI.googleNativeLogin({
+              idToken: result.idToken || null,
+              accessToken: result.accessToken || null,
+              role: "user",
+            });
+
+            const data = response?.data?.data || {};
+            if (data.accessToken && data.user) {
+              setAuthData("user", data.accessToken, data.user);
+              window.dispatchEvent(new Event("userAuthChanged"));
+              if (window.location.hash.length > 0 || window.location.search.length > 0) {
+                window.history.replaceState({}, document.title, window.location.pathname);
+              }
+              navigate("/user", { replace: true });
+              return;
+            }
+            throw new Error("Native Google login completed but backend response was invalid.");
+          }
+
+          if (result?.success === false) {
+            setIsLoading(false);
+            setApiError("Google sign-in was cancelled.");
+            return;
+          }
+
+          throw new Error("Flutter Google sign-in did not return a valid token.");
+        } catch (bridgeError) {
+          console.error("Flutter Google sign-in bridge error:", bridgeError);
+          setIsLoading(false);
+          setApiError(bridgeError?.message || "Flutter Google sign-in failed. Please try again.");
+          return;
+        }
+      }
+
       const {
         signInWithPopup,
         signInWithRedirect

@@ -134,6 +134,10 @@ export const authAPI = {
       { ttl: 5 * 60 * 1000, force }
     );
   },
+
+  googleNativeLogin: (data) => {
+    return apiClient.post(API_ENDPOINTS.AUTH.NATIVE_GOOGLE_LOGIN, data);
+  },
 };
 
 // Export user API helper functions

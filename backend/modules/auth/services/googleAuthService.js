@@ -173,5 +173,22 @@ class GoogleAuthService {
       throw new Error(`Failed to get user info: ${error.message}`);
     }
   }
+
+  /**
+   * Verify a Google ID token and return its payload.
+   * Useful for native/mobile flows that already have a Google ID token.
+   */
+  async verifyIdToken(idToken) {
+    try {
+      const ticket = await this.oauth2Client.verifyIdToken({
+        idToken,
+        audience: this.clientId
+      });
+      return ticket.getPayload();
+    } catch (error) {
+      logger.error(`Error verifying Google ID token: ${error.message}`);
+      throw new Error(`Invalid or expired Google ID token: ${error.message}`);
+    }
+  }
 }
 export default new GoogleAuthService();

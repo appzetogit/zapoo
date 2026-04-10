@@ -193,7 +193,7 @@ const orderSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery', 'delivered', 'cancelled'],
+    enum: ['pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery', 'delivered', 'cancelled', 'failed', 'refunded'],
     default: 'pending',
     index: true
   },
@@ -296,6 +296,12 @@ const orderSchema = new mongoose.Schema({
     default: null
   },
   cancelledAt: {
+    type: Date
+  },
+  failedAt: {
+    type: Date
+  },
+  refundedAt: {
     type: Date
   },
   cancellationReason: {
@@ -451,6 +457,16 @@ orderSchema.pre('save', function (next) {
       case 'cancelled':
         if (!this.cancelledAt) {
           this.cancelledAt = now;
+        }
+        break;
+      case 'failed':
+        if (!this.failedAt) {
+          this.failedAt = now;
+        }
+        break;
+      case 'refunded':
+        if (!this.refundedAt) {
+          this.refundedAt = now;
         }
         break;
     }

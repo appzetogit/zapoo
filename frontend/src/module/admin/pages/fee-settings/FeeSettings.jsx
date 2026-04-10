@@ -30,6 +30,7 @@ export default function FeeSettings() {
   const [tiers, setTiers] = useState([]);
   const [selectedTierId, setSelectedTierId] = useState("");
   const [selectedTierSlabs, setSelectedTierSlabs] = useState([]);
+  const [selectedTierPlatformFee, setSelectedTierPlatformFee] = useState(5);
 
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -78,9 +79,13 @@ export default function FeeSettings() {
 
         const tier = fetchedTiers.find((t) => String(t._id) === String(initialTierId));
         setSelectedTierSlabs(Array.isArray(tier?.deliveryPricing?.distanceSlabs) ? tier.deliveryPricing.distanceSlabs : []);
+        setSelectedTierPlatformFee(
+          tier?.platformFee ?? data?.platformFee ?? 5,
+        );
       } else {
         setSelectedTierId("");
         setSelectedTierSlabs([]);
+        setSelectedTierPlatformFee(data?.platformFee ?? 5);
       }
     } catch (error) {
       console.error("Error fetching fee settings/tier data:", error);
@@ -97,11 +102,13 @@ export default function FeeSettings() {
   useEffect(() => {
     if (!selectedTierId) {
       setSelectedTierSlabs([]);
+      setSelectedTierPlatformFee(feeSettings.platformFee ?? 5);
       return;
     }
     const tier = tiers.find((t) => String(t._id) === String(selectedTierId));
     setSelectedTierSlabs(Array.isArray(tier?.deliveryPricing?.distanceSlabs) ? tier.deliveryPricing.distanceSlabs : []);
-  }, [selectedTierId, tiers]);
+    setSelectedTierPlatformFee(tier?.platformFee ?? feeSettings.platformFee ?? 5);
+  }, [selectedTierId, tiers, feeSettings.platformFee]);
 
   const hasOverlap = (candidate, slabs, skipId = null, skipIndex = -1) => {
     const cMin = Number(candidate.minKm);
@@ -236,7 +243,7 @@ export default function FeeSettings() {
         adminAPI.createOrUpdateFeeSettings(globalPayload),
         tierAPI.updateTier(selectedTierId, {
           distanceSlabs: tierSlabsPayload,
-          platformFee: Number(feeSettings.platformFee),
+          platformFee: Number(selectedTierPlatformFee),
           recommendedItemFee: Number(feeSettings.recommendedItemFee || 0),
           baseFee: Number(feeSettings.deliveryFee),
           freeDeliveryThreshold: Number(feeSettings.freeDeliveryThreshold),
@@ -466,11 +473,11 @@ export default function FeeSettings() {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="block text-sm font-semibold text-slate-700">Platform Fee (Rs)</label>
+                  <label className="block text-sm font-semibold text-slate-700">Platform Fee (Selected Tier, Rs)</label>
                   <input
                     type="number"
-                    value={feeSettings.platformFee}
-                    onChange={(e) => setFeeSettings((prev) => ({ ...prev, platformFee: e.target.value }))}
+                    value={selectedTierPlatformFee}
+                    onChange={(e) => setSelectedTierPlatformFee(e.target.value)}
                     min="0"
                     step="1"
                     className="w-full px-4 py-2 border border-slate-300 rounded-lg"

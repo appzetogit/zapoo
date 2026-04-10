@@ -35,7 +35,7 @@ const paymentSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['pending', 'processing', 'completed', 'failed', 'refunded', 'cancelled'],
+    enum: ['created', 'success', 'failed', 'pending', 'processing', 'completed', 'refunded', 'cancelled'],
     default: 'pending'
     // Index added in schema.index below
   },
@@ -112,7 +112,7 @@ const paymentSchema = new mongoose.Schema({
   logs: [{
     action: {
       type: String,
-      enum: ['initiated', 'processing', 'completed', 'failed', 'refunded', 'cancelled']
+      enum: ['initiated', 'created', 'processing', 'completed', 'success', 'failed', 'refunded', 'cancelled']
     },
     timestamp: {
       type: Date,
@@ -165,4 +165,3 @@ paymentSchema.pre('save', function (next) {
 });
 
 export default mongoose.model('Payment', paymentSchema);
-
