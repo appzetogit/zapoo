@@ -813,8 +813,8 @@ export const getAddonsByRestaurantId = async (req, res) => {
         addons: []
       });
     }
-    // Show all addons - no filtering (as per user request to show addons "kaise bhi")
-    const allAddons = menu.addons || [];
+    // Public users should only see add-ons after admin approval.
+    const allAddons = (menu.addons || []).filter(addon => addon?.approvalStatus === 'approved' && addon?.isAvailable !== false);
 
     // Log all addons for debugging
 

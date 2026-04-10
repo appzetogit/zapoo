@@ -1280,9 +1280,9 @@ export default function Cart() {
           </div>}
 
         <div className="max-w-7xl mx-auto">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 px-4 md:px-6 py-4 md:py-6">
+          <div className="grid grid-cols-1 gap-4 md:gap-6 px-4 md:px-6 py-4 md:py-6">
             {/* Left Column - Cart Items and Details */}
-            <div className="lg:col-span-2 space-y-2 md:space-y-4">
+            <div className="space-y-2 md:space-y-4">
               {/* Cart Items */}
               <div className="bg-white dark:bg-[#1a1a1a] px-4 md:px-6 py-3 md:py-4 rounded-lg md:rounded-xl">
                 <div className="space-y-3 md:space-y-4">
@@ -1575,7 +1575,6 @@ export default function Cart() {
                     <div className="text-left">
                       <div className="flex items-center gap-2 md:gap-3 flex-wrap">
                         <span className="text-sm md:text-base text-gray-800 dark:text-gray-200">{t("user.cart.ui.totalBill")}</span>
-                        <span className="text-sm md:text-base text-gray-400 dark:text-gray-500 line-through">₹{totalBeforeDiscount.toFixed(0)}</span>
                         <span className="text-sm md:text-base font-semibold text-gray-800 dark:text-gray-200">₹{total.toFixed(0)}</span>
                         {savings > 0 && <span className="text-xs md:text-sm bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 px-1.5 md:px-2 py-0.5 rounded font-medium">{t("user.cart.ui.youSavedAmount", { amount: savings })}</span>}
                       </div>
@@ -1628,54 +1627,6 @@ export default function Cart() {
 
             </div>
 
-            {/* Right Column - Order Summary (Desktop) */}
-            <div className="lg:col-span-1">
-              <div className="lg:sticky lg:top-24 space-y-4 md:space-y-6">
-                {/* Bill Summary Card */}
-                <div className="bg-white dark:bg-[#1a1a1a] px-4 md:px-6 py-4 md:py-5 rounded-lg md:rounded-xl border border-gray-200 dark:border-gray-700">
-                  <h3 className="text-base md:text-lg font-semibold text-gray-800 dark:text-gray-200 mb-3 md:mb-4">{t("user.cart.ui.orderSummary")}</h3>
-                  <div className="space-y-2 md:space-y-3">
-                    <div className="flex justify-between text-sm md:text-base">
-                      <span className="text-gray-600 dark:text-gray-400">{t("user.cart.ui.itemTotal")}</span>
-                      <span className="text-gray-800 dark:text-gray-200">₹{subtotal.toFixed(0)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm md:text-base">
-                      <span className="text-gray-600 dark:text-gray-400">{t("user.cart.ui.deliveryFee")}</span>
-                      <span className={deliveryFee === 0 ? "text-red-600 dark:text-red-400" : "text-gray-800 dark:text-gray-200"}>
-                        {deliveryFee === null ? "…" : deliveryFee === 0 ? t("user.cart.ui.free") : `₹${deliveryFee}`}
-                      </span>
-                    </div>
-                    {deliveryPricingMisconfigured && (
-                      <p className="text-xs text-amber-700 dark:text-amber-400 leading-snug">
-                        {deliveryPricingWarningMessage}
-                      </p>
-                    )}
-                    <div className="flex justify-between text-sm md:text-base">
-                      <span className="text-gray-600 dark:text-gray-400">{t("user.cart.ui.platformFee")}</span>
-                      <span className="text-gray-800 dark:text-gray-200">₹{platformFee}</span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setShowGstBreakdown(true)}
-                      className="flex w-full items-center justify-between text-sm md:text-base text-left"
-                    >
-                      <span className="text-gray-600 dark:text-gray-400 underline underline-offset-4 decoration-dotted">
-                        GST (govt. taxes)
-                      </span>
-                      <span className="text-gray-800 dark:text-gray-200">₹{gstCharges}</span>
-                    </button>
-                    {discount > 0 && <div className="flex justify-between text-sm md:text-base text-red-600 dark:text-red-400">
-                        <span>{t("user.cart.ui.discount")}</span>
-                        <span>-₹{discount}</span>
-                      </div>}
-                    <div className="flex justify-between text-base md:text-lg font-bold pt-3 md:pt-4 border-t dark:border-gray-700">
-                      <span>{t("user.cart.ui.total")}</span>
-                      <span className="text-green-600 dark:text-green-400">₹{total.toFixed(0)}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
       </div>
@@ -2219,3 +2170,4 @@ export default function Cart() {
       `}</style>
     </div>;
 }
+
