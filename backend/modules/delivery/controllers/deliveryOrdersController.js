@@ -737,9 +737,11 @@ export const rejectOrder = asyncHandler(async (req, res) => {
       return errorResponse(res, 400, 'Invalid order ID');
     }
 
-    const orderDoc = await Order.findOne({
-      $or: [{ _id: orderId }, { orderId }]
-    });
+    const orderLookup = mongoose.Types.ObjectId.isValid(orderId) && String(orderId).length === 24
+      ? { $or: [{ _id: orderId }, { orderId }] }
+      : { orderId };
+
+    const orderDoc = await Order.findOne(orderLookup);
     if (!orderDoc) {
       return errorResponse(res, 404, 'Order not found');
     }

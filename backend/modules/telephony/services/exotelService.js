@@ -8,6 +8,17 @@ const {
   EXOTEL_SUBDOMAIN,
 } = process.env;
 
+const getExotelConfig = () => {
+  const sid = EXOTEL_SID?.trim();
+  const subdomain = (EXOTEL_SUBDOMAIN || "api").trim();
+
+  if (!sid) {
+    throw new Error("Exotel account SID is not configured");
+  }
+
+  return { sid, subdomain };
+};
+
 const getBaseUrl = () => {
   const { sid, subdomain } = getExotelConfig();
   const normalizedSubdomain = subdomain
