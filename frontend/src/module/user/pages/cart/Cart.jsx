@@ -1269,7 +1269,7 @@ export default function Cart() {
       </div>
 
       {/* Scrollable Content Area */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden pb-24 md:pb-32">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden pb-40 md:pb-32">
         {/* Savings Banner */}
         {savings > 0 && <div className="bg-blue-100 dark:bg-blue-900/20 px-4 md:px-6 py-2 md:py-3 flex-shrink-0">
             <div className="max-w-7xl mx-auto">
@@ -1284,7 +1284,7 @@ export default function Cart() {
             {/* Left Column - Cart Items and Details */}
             <div className="space-y-2 md:space-y-4">
               {/* Cart Items */}
-              <div className="bg-white dark:bg-[#1a1a1a] px-4 md:px-6 py-3 md:py-4 rounded-lg md:rounded-xl">
+              <div className="bg-white dark:bg-[#1a1a1a] px-4 md:px-6 py-3 md:py-4 rounded-lg md:rounded-xl mb-4 md:mb-0">
                 <div className="space-y-3 md:space-y-4">
                   {cart.map(item => <div key={item.id} className="flex items-start gap-3 md:gap-4">
                       {/* Veg/Non-veg indicator */}

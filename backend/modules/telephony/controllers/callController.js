@@ -317,7 +317,12 @@ export const initiateBridgeCall = async (req, res) => {
     const body = req.body || {};
     const orderId = String(body.orderId || body.order_id || "").trim();
     const targetRole = normalizeTargetRole(body.targetRole || body.target_role || body.intent);
-    const callerRole = normalizeCallerRole(req.user?.role);
+    const callerRole = normalizeCallerRole(
+      req.restaurant?.role ||
+      req.delivery?.role ||
+      req.user?.role ||
+      req.token?.role
+    );
 
     // Debugging the masked-call entry request from frontend to backend.
     debugMaskingFlow("BRIDGE_REQUEST", {
