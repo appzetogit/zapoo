@@ -10,7 +10,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
-import { authAPI, restaurantAPI } from "@/lib/api"
+import { restaurantAPI } from "@/lib/api"
 import { firebaseAuth, googleProvider } from "@/lib/firebase"
 import { useCompanyName } from "@/lib/hooks/useCompanyName"
 
@@ -240,10 +240,9 @@ export default function RestaurantLogin() {
         const result = await window.flutter_inappwebview.callHandler("nativeGoogleSignIn")
 
         if (result?.success && (result.idToken || result.accessToken)) {
-          const response = await authAPI.googleNativeLogin({
+          const response = await restaurantAPI.googleNativeLogin({
             idToken: result.idToken || null,
             accessToken: result.accessToken || null,
-            role: "restaurant",
           })
           const data = response?.data?.data || {}
 
@@ -595,4 +594,3 @@ export default function RestaurantLogin() {
     </div>
   )
 }
-

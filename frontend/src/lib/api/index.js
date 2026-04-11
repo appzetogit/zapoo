@@ -344,6 +344,10 @@ export const restaurantAPI = {
     });
   },
 
+  googleNativeLogin: (data) => {
+    return apiClient.post(API_ENDPOINTS.RESTAURANT.AUTH.NATIVE_GOOGLE_LOGIN, data);
+  },
+
   refreshToken: () => {
     return apiClient.post(API_ENDPOINTS.RESTAURANT.AUTH.REFRESH_TOKEN);
   },

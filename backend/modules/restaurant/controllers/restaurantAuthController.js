@@ -5,6 +5,7 @@ import Tier from '../../admin/models/Tier.js';
 import otpService from '../../auth/services/otpService.js';
 import jwtService from '../../auth/services/jwtService.js';
 import firebaseAuthService from '../../auth/services/firebaseAuthService.js';
+import googleAuthService from '../../auth/services/googleAuthService.js';
 import DeviceToken from '../../notification/models/DeviceToken.js';
 import { successResponse, errorResponse } from '../../../shared/utils/response.js';
 import { asyncHandler } from '../../../shared/middleware/asyncHandler.js';
@@ -958,6 +959,158 @@ export const reverifyRestaurant = asyncHandler(async (req, res) => {
 });
 
 /**
+ * Shared Google login finalizer for restaurant auth.
+ * Accepts normalized Google identity payload and returns restaurant auth response.
+ */
+const finalizeRestaurantGoogleLogin = async ({
+  res,
+  googleId,
+  email,
+  name = 'Restaurant',
+  picture = null,
+  sourceLabel = 'Google'
+}) => {
+  if (!email) {
+    logger.error(`${sourceLabel} login failed: Email not found in token`, {
+      googleId
+    });
+    return errorResponse(res, 400, 'Email not found in Google user. Please ensure email is available in your Google account.');
+  }
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    logger.error(`${sourceLabel} login failed: Invalid email format`, {
+      email
+    });
+    return errorResponse(res, 400, 'Invalid email format received from Google.');
+  }
+
+  let restaurant = await Restaurant.findOne({
+    $or: [{
+      googleId
+    }, {
+      email
+    }]
+  });
+  if (restaurant) {
+    if (!restaurant.googleId) {
+      restaurant.googleId = googleId;
+      restaurant.googleEmail = email;
+      if (!restaurant.profileImage && picture) {
+        restaurant.profileImage = {
+          url: picture
+        };
+      }
+      if (!restaurant.signupMethod) {
+        restaurant.signupMethod = 'google';
+      }
+      await restaurant.save();
+    }
+  } else {
+    const restaurantData = {
+      name: String(name || 'Restaurant').trim(),
+      email: email.toLowerCase().trim(),
+      googleId,
+      googleEmail: email.toLowerCase().trim(),
+      signupMethod: 'google',
+      profileImage: picture ? {
+        url: picture
+      } : null,
+      ownerName: String(name || 'Restaurant').trim(),
+      ownerEmail: email.toLowerCase().trim(),
+      // Set isActive to false - restaurant needs admin approval before becoming active
+      isActive: false
+    };
+    try {
+      restaurant = await Restaurant.create(restaurantData);
+    } catch (createError) {
+      if (createError.code === 11000) {
+        logger.warn('Duplicate key error during restaurant creation, retrying find', {
+          email
+        });
+        restaurant = await Restaurant.findOne({
+          email
+        });
+        if (!restaurant) {
+          logger.error('Restaurant not found after duplicate key error', {
+            email
+          });
+          throw createError;
+        }
+        if (!restaurant.googleId) {
+          restaurant.googleId = googleId;
+          restaurant.googleEmail = email;
+          if (!restaurant.profileImage && picture) {
+            restaurant.profileImage = {
+              url: picture
+            };
+          }
+          if (!restaurant.signupMethod) {
+            restaurant.signupMethod = 'google';
+          }
+          await restaurant.save();
+        }
+      } else {
+        logger.error(`Error creating restaurant via ${sourceLabel} login`, {
+          error: createError.message,
+          email
+        });
+        throw createError;
+      }
+    }
+  }
+
+  // Distinguish pending approval from truly deactivated accounts.
+  // Pending restaurants can login to continue onboarding.
+  const isPendingApproval = !restaurant.isActive && !restaurant.approvedAt && !restaurant.rejectedAt;
+  if (!restaurant.isActive && !isPendingApproval) {
+    logger.warn('Deactivated restaurant attempted Google login', {
+      restaurantId: restaurant._id,
+      email
+    });
+    return errorResponse(res, 403, 'Your restaurant account has been deactivated. Please contact support.');
+  }
+
+  // Generate JWT tokens for our app (email may be null for phone signups)
+  const tokens = jwtService.generateTokens({
+    userId: restaurant._id.toString(),
+    role: 'restaurant',
+    email: restaurant.email || restaurant.phone || restaurant.restaurantId
+  });
+
+  // Set refresh token in httpOnly cookie
+  res.cookie('refreshToken', tokens.refreshToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+  });
+  return successResponse(
+    res,
+    200,
+    isPendingApproval
+      ? 'Google authentication successful. Your account is pending admin approval.'
+      : `${sourceLabel} authentication successful`,
+    {
+      accessToken: tokens.accessToken,
+      restaurant: {
+        id: restaurant._id,
+        restaurantId: restaurant.restaurantId,
+        name: restaurant.name,
+        email: restaurant.email,
+        phone: restaurant.phone,
+        phoneVerified: restaurant.phoneVerified,
+        signupMethod: restaurant.signupMethod,
+        profileImage: restaurant.profileImage,
+        isActive: restaurant.isActive,
+        isPendingApproval,
+        onboarding: restaurant.onboarding
+      }
+    }
+  );
+};
+
+/**
  * Login / register using Firebase Google ID token
  * POST /api/restaurant/auth/firebase/google-login
  */
@@ -983,154 +1136,67 @@ export const firebaseGoogleLogin = asyncHandler(async (req, res) => {
     const email = decoded.email || null;
     const name = decoded.name || decoded.display_name || 'Restaurant';
     const picture = decoded.picture || decoded.photo_url || null;
-    const emailVerified = !!decoded.email_verified;
-
-    // Validate email is present
-    if (!email) {
-      logger.error('Firebase Google login failed: Email not found in token', {
-        uid: firebaseUid
-      });
-      return errorResponse(res, 400, 'Email not found in Firebase user. Please ensure email is available in your Google account.');
-    }
-
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      logger.error('Firebase Google login failed: Invalid email format', {
-        email
-      });
-      return errorResponse(res, 400, 'Invalid email format received from Google.');
-    }
-
-    // Find existing restaurant by firebase UID (stored in googleId) or email
-    let restaurant = await Restaurant.findOne({
-      $or: [{
-        googleId: firebaseUid
-      }, {
-        email
-      }]
-    });
-    if (restaurant) {
-      // If restaurant exists but googleId not linked yet, link it
-      if (!restaurant.googleId) {
-        restaurant.googleId = firebaseUid;
-        restaurant.googleEmail = email;
-        if (!restaurant.profileImage && picture) {
-          restaurant.profileImage = {
-            url: picture
-          };
-        }
-        if (!restaurant.signupMethod) {
-          restaurant.signupMethod = 'google';
-        }
-        await restaurant.save();
-      }
-    } else {
-      // Auto-register new restaurant based on Firebase data
-      const restaurantData = {
-        name: name.trim(),
-        email: email.toLowerCase().trim(),
-        googleId: firebaseUid,
-        googleEmail: email.toLowerCase().trim(),
-        signupMethod: 'google',
-        profileImage: picture ? {
-          url: picture
-        } : null,
-        ownerName: name.trim(),
-        ownerEmail: email.toLowerCase().trim(),
-        // Set isActive to false - restaurant needs admin approval before becoming active
-        isActive: false
-      };
-      try {
-        restaurant = await Restaurant.create(restaurantData);
-      } catch (createError) {
-        // Handle duplicate key error
-        if (createError.code === 11000) {
-          logger.warn('Duplicate key error during restaurant creation, retrying find', {
-            email
-          });
-          restaurant = await Restaurant.findOne({
-            email
-          });
-          if (!restaurant) {
-            logger.error('Restaurant not found after duplicate key error', {
-              email
-            });
-            throw createError;
-          }
-          // Link Google ID if not already linked
-          if (!restaurant.googleId) {
-            restaurant.googleId = firebaseUid;
-            restaurant.googleEmail = email;
-            if (!restaurant.profileImage && picture) {
-              restaurant.profileImage = {
-                url: picture
-              };
-            }
-            if (!restaurant.signupMethod) {
-              restaurant.signupMethod = 'google';
-            }
-            await restaurant.save();
-          }
-        } else {
-          logger.error('Error creating restaurant via Firebase Google login', {
-            error: createError.message,
-            email
-          });
-          throw createError;
-        }
-      }
-    }
-
-    // Distinguish pending approval from truly deactivated accounts.
-    // Pending restaurants can login to continue onboarding.
-    const isPendingApproval = !restaurant.isActive && !restaurant.approvedAt && !restaurant.rejectedAt;
-    if (!restaurant.isActive && !isPendingApproval) {
-      logger.warn('Deactivated restaurant attempted Google login', {
-        restaurantId: restaurant._id,
-        email
-      });
-      return errorResponse(res, 403, 'Your restaurant account has been deactivated. Please contact support.');
-    }
-
-    // Generate JWT tokens for our app (email may be null for phone signups)
-    const tokens = jwtService.generateTokens({
-      userId: restaurant._id.toString(),
-      role: 'restaurant',
-      email: restaurant.email || restaurant.phone || restaurant.restaurantId
-    });
-
-    // Set refresh token in httpOnly cookie
-    res.cookie('refreshToken', tokens.refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
-    });
-    return successResponse(
+    return finalizeRestaurantGoogleLogin({
       res,
-      200,
-      isPendingApproval
-        ? 'Google authentication successful. Your account is pending admin approval.'
-        : 'Firebase Google authentication successful',
-      {
-      accessToken: tokens.accessToken,
-      restaurant: {
-        id: restaurant._id,
-        restaurantId: restaurant.restaurantId,
-        name: restaurant.name,
-        email: restaurant.email,
-        phone: restaurant.phone,
-        phoneVerified: restaurant.phoneVerified,
-        signupMethod: restaurant.signupMethod,
-        profileImage: restaurant.profileImage,
-        isActive: restaurant.isActive,
-        isPendingApproval,
-        onboarding: restaurant.onboarding
-      }
+      googleId: firebaseUid,
+      email,
+      name,
+      picture,
+      sourceLabel: 'Firebase Google'
     });
   } catch (error) {
     logger.error(`Error in Firebase Google login: ${error.message}`);
     return errorResponse(res, 400, error.message || 'Firebase Google authentication failed');
+  }
+});
+
+/**
+ * Login / register using native Google token (Flutter/mobile bridge)
+ * POST /api/restaurant/auth/google/native-login
+ */
+export const googleNativeLogin = asyncHandler(async (req, res) => {
+  const {
+    idToken,
+    accessToken
+  } = req.body;
+
+  if (!idToken && !accessToken) {
+    return errorResponse(res, 400, 'Google token is required');
+  }
+
+  try {
+    let googleUser = null;
+
+    if (accessToken) {
+      const tokenData = await googleAuthService.getUserInfoFromToken({
+        access_token: accessToken
+      });
+      googleUser = {
+        googleId: tokenData.googleId,
+        email: tokenData.email,
+        name: tokenData.name || 'Restaurant',
+        picture: tokenData.picture || null
+      };
+    } else {
+      const payload = await googleAuthService.verifyIdToken(idToken);
+      googleUser = {
+        googleId: payload?.sub || payload?.uid || null,
+        email: payload?.email || null,
+        name: payload?.name || payload?.display_name || payload?.given_name || 'Restaurant',
+        picture: payload?.picture || payload?.photo_url || null
+      };
+    }
+
+    return finalizeRestaurantGoogleLogin({
+      res,
+      googleId: googleUser.googleId,
+      email: googleUser.email,
+      name: googleUser.name,
+      picture: googleUser.picture,
+      sourceLabel: 'Native Google'
+    });
+  } catch (error) {
+    logger.error(`Error in native Google login: ${error.message}`);
+    return errorResponse(res, 400, error.message || 'Native Google authentication failed');
   }
 });

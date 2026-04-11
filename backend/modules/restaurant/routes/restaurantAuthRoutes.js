@@ -9,7 +9,8 @@ import {
   logout,
   getCurrentRestaurant,
   reverifyRestaurant,
-  firebaseGoogleLogin
+  firebaseGoogleLogin,
+  googleNativeLogin
 } from '../controllers/restaurantAuthController.js';
 import { authenticate } from '../middleware/restaurantAuth.js';
 import { validate } from '../../../shared/middleware/validate.js';
@@ -96,6 +97,11 @@ const firebaseGoogleLoginSchema = Joi.object({
   idToken: Joi.string().required()
 });
 
+const nativeGoogleLoginSchema = Joi.object({
+  idToken: Joi.string().optional(),
+  accessToken: Joi.string().optional()
+}).or('idToken', 'accessToken');
+
 // Public routes
 router.post('/send-otp', validate(sendOTPSchema), sendOTP);
 router.post('/verify-otp', validate(verifyOTPSchema), verifyOTP);
@@ -103,6 +109,7 @@ router.post('/register', validate(registerSchema), register);
 router.post('/login', validate(loginSchema), login);
 router.post('/reset-password', validate(resetPasswordSchema), resetPassword);
 router.post('/firebase/google-login', validate(firebaseGoogleLoginSchema), firebaseGoogleLogin);
+router.post('/google/native-login', validate(nativeGoogleLoginSchema), googleNativeLogin);
 
 // Protected routes
 router.post('/refresh-token', refreshToken);
@@ -111,4 +118,3 @@ router.get('/me', authenticate, getCurrentRestaurant);
 router.post('/reverify', authenticate, reverifyRestaurant);
 
 export default router;
-
