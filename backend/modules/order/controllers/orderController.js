@@ -43,6 +43,8 @@ export const createOrder = async (req, res) => {
       address,
       restaurantId,
       restaurantName,
+      customerName,
+      customerPhone,
       pricing,
       deliveryFleet,
       note,
@@ -200,6 +202,8 @@ export const createOrder = async (req, res) => {
       orderId: generatedOrderId,
       // Re-added orderId generation
       userId,
+      customerName: String(customerName || '').trim(),
+      customerPhone: String(customerPhone || '').replace(/\D/g, '').slice(-10),
       restaurantId: assignedRestaurantId,
       restaurantName: assignedRestaurantName,
       items: items.map(item => ({

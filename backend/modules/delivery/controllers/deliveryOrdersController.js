@@ -27,6 +27,22 @@ const logger = winston.createLogger({
   })]
 });
 
+const applyCustomerSnapshot = (order) => {
+  if (!order || typeof order !== 'object') return order;
+  const snapshotName = order.customerName?.trim();
+  const snapshotPhone = order.customerPhone?.trim();
+  if (!snapshotName && !snapshotPhone) return order;
+  const patchedUser = order.userId && typeof order.userId === 'object' ? {
+    ...order.userId,
+    ...(snapshotName ? { name: snapshotName } : {}),
+    ...(snapshotPhone ? { phone: snapshotPhone } : {})
+  } : order.userId;
+  return {
+    ...order,
+    userId: patchedUser
+  };
+};
+
 /**
  * Get Delivery Partner Orders
  * GET /api/delivery/orders
@@ -77,8 +93,9 @@ export const getOrders = asyncHandler(async (req, res) => {
 
     // Get total count
     const total = await Order.countDocuments(query);
+    const patchedOrders = (orders || []).map(applyCustomerSnapshot);
     return successResponse(res, 200, 'Orders retrieved successfully', {
-      orders,
+      orders: patchedOrders,
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
@@ -179,8 +196,9 @@ export const getOrderDetails = asyncHandler(async (req, res) => {
       ...order,
       paymentMethod
     };
+    const patchedOrderWithPayment = applyCustomerSnapshot(orderWithPayment);
     return successResponse(res, 200, 'Order details retrieved successfully', {
-      order: orderWithPayment
+      order: patchedOrderWithPayment
     });
   } catch (error) {
     logger.error(`Error fetching order details: ${error.message}`, {

@@ -117,9 +117,21 @@ export const getRestaurantOrders = asyncHandler(async (req, res) => {
     const ordersWithPaymentMethod = orders.map(o => {
       let paymentMethod = o.payment?.method ?? 'razorpay';
       if (paymentMethod !== 'cash' && codOrderIds.has(o._id?.toString())) paymentMethod = 'cash';
+      const snapshotName = o.customerName?.trim();
+      const snapshotPhone = o.customerPhone?.trim();
+      const patchedUser = o.userId && typeof o.userId === 'object' ? {
+        ...o.userId,
+        ...(snapshotName ? {
+          name: snapshotName
+        } : {}),
+        ...(snapshotPhone ? {
+          phone: snapshotPhone
+        } : {})
+      } : o.userId;
       return {
         ...o,
-        paymentMethod
+        paymentMethod,
+        userId: patchedUser
       };
     });
 
@@ -176,8 +188,22 @@ export const getRestaurantOrderById = asyncHandler(async (req, res) => {
     if (!order) {
       return errorResponse(res, 404, 'Order not found');
     }
+    const snapshotName = order?.customerName?.trim();
+    const snapshotPhone = order?.customerPhone?.trim();
+    const patchedOrder = {
+      ...order,
+      userId: order?.userId && typeof order.userId === 'object' ? {
+        ...order.userId,
+        ...(snapshotName ? {
+          name: snapshotName
+        } : {}),
+        ...(snapshotPhone ? {
+          phone: snapshotPhone
+        } : {})
+      } : order?.userId
+    };
     return successResponse(res, 200, 'Order retrieved successfully', {
-      order
+      order: patchedOrder
     });
   } catch (error) {
     console.error('Error fetching order:', error);

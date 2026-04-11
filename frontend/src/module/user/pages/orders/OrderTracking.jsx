@@ -86,6 +86,7 @@ const DeliveryMap = ({
   order,
   isVisible
 }) => {
+  const { t } = useTranslation();
   const {
     location: userLocation
   } = useUserLocation(); // Get user's live location
@@ -153,7 +154,7 @@ const DeliveryMap = ({
 
   // Delivery boy data
   const deliveryBoyData = order?.deliveryPartner ? {
-    name: order.deliveryPartner.name || 'Delivery Partner',
+    name: order.deliveryPartner.name || t("user.orderTracking.deliveryPartner"),
     avatar: order.deliveryPartner.avatar || null
   } : null;
   if (!isVisible || !orderId || !order) {
@@ -511,7 +512,7 @@ export default function OrderTracking() {
     const businessOrderId = order.id || order.orderId || orderId;
 
     if (!businessOrderId) {
-      toast.error("Order ID not available");
+      toast.error(t("user.orderTracking.toast.orderIdNotAvailable"));
       return;
     }
 
@@ -528,9 +529,9 @@ export default function OrderTracking() {
         orderId: businessOrderId,
         targetRole: "restaurant",
       });
-      toast.success("Call connecting to restaurant");
+      toast.success(t("user.orderTracking.toast.callConnectingToRestaurant"));
     } catch (error) {
-      toast.error(error?.response?.data?.message || "Failed to initiate masked call");
+      toast.error(error?.response?.data?.message || t("user.orderTracking.toast.failedToInitiateMaskedCall"));
     } finally {
       setIsCallingRestaurant(false);
     }

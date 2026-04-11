@@ -14,6 +14,7 @@ import { authAPI } from "@/lib/api";
 import { firebaseAuth } from "@/lib/firebase";
 import { clearModuleAuth } from "@/lib/utils/auth";
 import { revokeFcmTokenOnLogout } from "@/lib/utils/fcmTokenLifecycle";
+import { useTranslation } from "react-i18next";
 export default function Profile() {
   const {
     userProfile,
@@ -24,6 +25,7 @@ export default function Profile() {
   } = useProfile();
   const navigate = useNavigate();
   const companyName = useCompanyName();
+  const { t } = useTranslation();
 
   // Popup states
   const [vegModeOpen, setVegModeOpen] = useState(false);
@@ -33,10 +35,10 @@ export default function Profile() {
 
   // Get first letter of name for avatar
   const avatarInitial = userProfile?.name?.charAt(0)?.toUpperCase() || userProfile?.phone?.charAt(1)?.toUpperCase() || 'U';
-  const displayName = userProfile?.name || userProfile?.phone || 'User';
+  const displayName = userProfile?.name || userProfile?.phone || t("user.profile.defaultUserName");
   // Only show email if it exists and is valid, otherwise show phone or "Not available"
   const hasValidEmail = userProfile?.email && userProfile.email.trim() !== '' && userProfile.email.includes('@');
-  const displayEmail = hasValidEmail ? userProfile.email : userProfile?.phone || 'Not available';
+  const displayEmail = hasValidEmail ? userProfile.email : userProfile?.phone || t("user.profile.notAvailable");
 
   // Calculate profile completion percentage
   const calculateProfileCompletion = () => {
@@ -208,7 +210,7 @@ export default function Profile() {
                 {userProfile?.phone && <p className={`text-sm ${hasValidEmail ? 'text-gray-600 dark:text-gray-400' : 'text-black dark:text-white'} mb-3`}>
                     {userProfile.phone}
                   </p>}
-                {!hasValidEmail && !userProfile?.phone && <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">Not available</p>}
+                {!hasValidEmail && !userProfile?.phone && <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">{t("user.profile.notAvailable")}</p>}
                 {/* <Link to="/user/profile/activity" className="flex items-center gap-1 text-green-600 text-sm font-medium">
                   View activity
                   <ChevronRight className="h-4 w-4" />
@@ -240,7 +242,7 @@ export default function Profile() {
                     <Wallet className="h-5 w-5 text-gray-700 dark:text-gray-300" />
                   </motion.div>
                   <div className="flex-1 min-w-0 flex flex-col">
-                    <span className="text-sm font-medium text-gray-900 dark:text-white whitespace-nowrap">{companyName} Money</span>
+                    <span className="text-sm font-medium text-gray-900 dark:text-white whitespace-nowrap">{t("user.profile.walletMoney", { companyName })}</span>
                     <span className="text-base font-semibold text-orange-600 dark:text-orange-400">₹{userProfile?.wallet?.balance?.toFixed(0) || '0'}</span>
                   </div>
                 </CardContent>
@@ -268,7 +270,7 @@ export default function Profile() {
                     <Tag className="h-5 w-5 text-gray-700 dark:text-gray-300" />
                   </motion.div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">Your coupons</p>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">{t("user.profile.yourCoupons")}</p>
                   </div>
                 </CardContent>
               </Card>
@@ -299,7 +301,7 @@ export default function Profile() {
                   }}>
                       <ShoppingCart className="h-5 w-5 text-gray-700 dark:text-gray-300" />
                     </motion.div>
-                    <span className="text-base font-medium text-gray-900 dark:text-white">Your cart</span>
+                    <span className="text-base font-medium text-gray-900 dark:text-white">{t("user.profile.yourCart")}</span>
                   </div>
                   <motion.div whileHover={{
                   x: 4
@@ -334,7 +336,7 @@ export default function Profile() {
                   }}>
                       <User className="h-5 w-5 text-gray-700 dark:text-gray-300" />
                     </motion.div>
-                    <span className="text-base font-medium text-gray-900 dark:text-white">Your profile</span>
+                    <span className="text-base font-medium text-gray-900 dark:text-white">{t("user.profile.yourProfile")}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <motion.span className={`text-xs font-medium px-2 py-1 rounded ${isComplete ? 'bg-green-100 text-green-700 border border-green-300' : 'bg-yellow-200 text-yellow-800'}`} whileHover={{
@@ -342,7 +344,7 @@ export default function Profile() {
                   }} transition={{
                     duration: 0.2
                   }}>
-                      {profileCompletion}% completed
+                      {t("user.profile.profileCompletion", { percent: profileCompletion })}
                     </motion.span>
                     <motion.div whileHover={{
                     x: 4
@@ -376,7 +378,7 @@ export default function Profile() {
                 }}>
                     <Leaf className="h-5 w-5 text-gray-700 dark:text-gray-300" />
                   </motion.div>
-                  <span className="text-base font-medium text-gray-900 dark:text-white">Veg Mode</span>
+                  <span className="text-base font-medium text-gray-900 dark:text-white">{t("user.profile.vegMode")}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <motion.span className="text-base font-medium text-gray-900 dark:text-white" whileHover={{
@@ -384,7 +386,7 @@ export default function Profile() {
                 }} transition={{
                   duration: 0.2
                 }}>
-                    {vegMode ? 'ON' : 'OFF'}
+                    {vegMode ? t("user.profile.on") : t("user.profile.off")}
                   </motion.span>
                   <motion.div whileHover={{
                   x: 4
@@ -417,7 +419,7 @@ export default function Profile() {
                 }}>
                     <Palette className="h-5 w-5 text-gray-700 dark:text-gray-300" />
                   </motion.div>
-                  <span className="text-base font-medium text-gray-900 dark:text-white">Appearance</span>
+                  <span className="text-base font-medium text-gray-900 dark:text-white">{t("user.profile.appearance.title")}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <motion.span className="text-base font-medium text-gray-900 dark:text-white capitalize" whileHover={{
@@ -425,7 +427,7 @@ export default function Profile() {
                 }} transition={{
                   duration: 0.2
                 }}>
-                    {appearance}
+                    {t(`user.profile.appearance.value.${appearance}`, { defaultValue: appearance })}
                   </motion.span>
                   <motion.div whileHover={{
                   x: 4
@@ -445,7 +447,7 @@ export default function Profile() {
         <div className="mb-3">
           <div className="flex items-center gap-2 mb-2 px-1">
             <div className="w-1 h-4 bg-orange-600 rounded"></div>
-            <h3 className="text-base font-semibold text-gray-900 dark:text-white">Collections</h3>
+            <h3 className="text-base font-semibold text-gray-900 dark:text-white">{t("user.profile.collections")}</h3>
           </div>
           <Link to="/user/profile/favorites">
             <motion.div whileHover={{
@@ -467,7 +469,7 @@ export default function Profile() {
                   }}>
                       <Bookmark className="h-5 w-5 text-gray-700 dark:text-gray-300" />
                     </motion.div>
-                    <span className="text-base font-medium text-gray-900 dark:text-white">Your collections</span>
+                    <span className="text-base font-medium text-gray-900 dark:text-white">{t("user.profile.yourCollections")}</span>
                   </div>
                   <motion.div whileHover={{
                   x: 4
@@ -486,7 +488,7 @@ export default function Profile() {
         <div className="mb-3">
           <div className="flex items-center gap-2 mb-2 px-1">
             <div className="w-1 h-4 bg-orange-600 rounded"></div>
-            <h3 className="text-base font-semibold text-gray-900 dark:text-white">Food Orders</h3>
+            <h3 className="text-base font-semibold text-gray-900 dark:text-white">{t("user.profile.foodOrders")}</h3>
           </div>
           <div className="space-y-2">
             <Link to="/user/orders" className="block">
@@ -509,7 +511,7 @@ export default function Profile() {
                     }}>
                         <Building2 className="h-5 w-5 text-gray-700 dark:text-gray-300" />
                       </motion.div>
-                      <span className="text-base font-medium text-gray-900 dark:text-white">Your orders</span>
+                      <span className="text-base font-medium text-gray-900 dark:text-white">{t("user.profile.yourOrders")}</span>
                     </div>
                     <motion.div whileHover={{
                     x: 4
@@ -530,7 +532,7 @@ export default function Profile() {
         <div className="mb-6 pb-4">
           <div className="flex items-center gap-2 mb-2 px-1">
             <div className="w-1 h-4 bg-orange-600 rounded"></div>
-            <h3 className="text-base font-semibold text-gray-900 dark:text-white">More</h3>
+            <h3 className="text-base font-semibold text-gray-900 dark:text-white">{t("user.profile.more")}</h3>
           </div>
           <div className="space-y-2">
             <Link to="/user/profile/about" className="block">
@@ -553,7 +555,7 @@ export default function Profile() {
                     }}>
                         <Info className="h-5 w-5 text-gray-700 dark:text-gray-300" />
                       </motion.div>
-                      <span className="text-base font-medium text-gray-900 dark:text-white">About</span>
+                      <span className="text-base font-medium text-gray-900 dark:text-white">{t("user.profile.about")}</span>
                     </div>
                     <motion.div whileHover={{
                     x: 4
@@ -587,7 +589,7 @@ export default function Profile() {
                     }}>
                         <PenSquare className="h-5 w-5 text-gray-700 dark:text-gray-300" />
                       </motion.div>
-                      <span className="text-base font-medium text-gray-900 dark:text-white">Send feedback</span>
+                      <span className="text-base font-medium text-gray-900 dark:text-white">{t("user.profile.sendFeedback")}</span>
                     </div>
                     <motion.div whileHover={{
                     x: 4
@@ -621,7 +623,7 @@ export default function Profile() {
                     }}>
                         <AlertTriangle className="h-5 w-5 text-gray-700 dark:text-gray-300" />
                       </motion.div>
-                      <span className="text-base font-medium text-gray-900 dark:text-white">Report a safety emergency</span>
+                      <span className="text-base font-medium text-gray-900 dark:text-white">{t("user.profile.reportSafetyEmergency")}</span>
                     </div>
                     <motion.div whileHover={{
                     x: 4
@@ -655,7 +657,7 @@ export default function Profile() {
                     }}>
                         <SettingsIcon className="h-5 w-5 text-gray-700 dark:text-gray-300" />
                       </motion.div>
-                      <span className="text-base font-medium text-gray-900 dark:text-white">Settings</span>
+                      <span className="text-base font-medium text-gray-900 dark:text-white">{t("user.profile.settings")}</span>
                     </div>
                     <motion.div whileHover={{
                     x: 4
@@ -689,7 +691,7 @@ export default function Profile() {
                     }}>
                         <Languages className="h-5 w-5 text-gray-700 dark:text-gray-300" />
                       </motion.div>
-                      <span className="text-base font-medium text-gray-900 dark:text-white">Language</span>
+                      <span className="text-base font-medium text-gray-900 dark:text-white">{t("common.language")}</span>
                     </div>
                     <motion.div whileHover={{
                     x: 4
@@ -723,7 +725,7 @@ export default function Profile() {
                       <Power className={`h-5 w-5 text-gray-700 dark:text-gray-300 ${isLoggingOut ? 'animate-pulse' : ''}`} />
                     </motion.div>
                     <span className="text-base font-medium text-gray-900 dark:text-white">
-                      {isLoggingOut ? 'Logging out...' : 'Log out'}
+                      {isLoggingOut ? t("user.profile.loggingOut") : t("user.profile.logOut")}
                     </span>
                   </div>
                   <motion.div whileHover={{
@@ -744,9 +746,9 @@ export default function Profile() {
       <Dialog open={vegModeOpen} onOpenChange={setVegModeOpen}>
         <DialogContent className="max-w-sm md:max-w-md lg:max-w-lg w-[calc(100%-2rem)] rounded-2xl p-0 overflow-hidden">
           <DialogHeader className="p-5 pb-3">
-            <DialogTitle className="text-lg font-bold text-gray-900">Veg Mode</DialogTitle>
+            <DialogTitle className="text-lg font-bold text-gray-900">{t("user.profile.vegMode")}</DialogTitle>
             <DialogDescription className="text-sm text-gray-500">
-              Filter restaurants and dishes based on your dietary preferences
+              {t("user.profile.vegModeDescription")}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2 px-5 pb-5">
@@ -759,8 +761,8 @@ export default function Profile() {
                   {vegMode && <Check className="h-3 w-3 text-white" />}
                 </div>
                 <div className="text-left">
-                  <p className="font-medium text-gray-900 text-sm">Veg Mode ON</p>
-                  <p className="text-xs text-gray-500">Show only vegetarian options</p>
+                  <p className="font-medium text-gray-900 text-sm">{t("user.profile.vegModeOnTitle")}</p>
+                  <p className="text-xs text-gray-500">{t("user.profile.vegModeOnDescription")}</p>
                 </div>
               </div>
               <Leaf className={`h-5 w-5 ${vegMode ? 'text-orange-600' : 'text-gray-400'}`} />
@@ -774,8 +776,8 @@ export default function Profile() {
                   {!vegMode && <Check className="h-3 w-3 text-white" />}
                 </div>
                 <div className="text-left">
-                  <p className="font-medium text-gray-900 text-sm">Veg Mode OFF</p>
-                  <p className="text-xs text-gray-500">Show all options</p>
+                  <p className="font-medium text-gray-900 text-sm">{t("user.profile.vegModeOffTitle")}</p>
+                  <p className="text-xs text-gray-500">{t("user.profile.vegModeOffDescription")}</p>
                 </div>
               </div>
             </button>
@@ -787,9 +789,9 @@ export default function Profile() {
       <Dialog open={appearanceOpen} onOpenChange={setAppearanceOpen}>
         <DialogContent className="max-w-sm md:max-w-md lg:max-w-lg w-[calc(100%-2rem)] rounded-2xl p-0 overflow-hidden bg-white dark:bg-[#1a1a1a] border-gray-200 dark:border-gray-800">
           <DialogHeader className="p-5 pb-3">
-            <DialogTitle className="text-lg font-bold text-gray-900 dark:text-white">Appearance</DialogTitle>
+            <DialogTitle className="text-lg font-bold text-gray-900 dark:text-white">{t("user.profile.appearance.title")}</DialogTitle>
             <DialogDescription className="text-sm text-gray-500 dark:text-gray-400">
-              Choose your preferred theme
+              {t("user.profile.appearance.description")}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2 px-5 pb-5">
@@ -802,8 +804,8 @@ export default function Profile() {
               </div>
               <Sun className="h-5 w-5 text-yellow-500 dark:text-yellow-400 flex-shrink-0" />
               <div className="text-left">
-                <p className="font-medium text-gray-900 dark:text-white text-sm">Light</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">Default light theme</p>
+                <p className="font-medium text-gray-900 dark:text-white text-sm">{t("user.profile.appearance.light")}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{t("user.profile.appearance.lightDescription")}</p>
               </div>
             </button>
             <button onClick={() => {
@@ -815,8 +817,8 @@ export default function Profile() {
               </div>
               <Moon className="h-5 w-5 text-gray-600 dark:text-gray-300 flex-shrink-0" />
               <div className="text-left">
-                <p className="font-medium text-gray-900 dark:text-white text-sm">Dark</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">Dark theme</p>
+                <p className="font-medium text-gray-900 dark:text-white text-sm">{t("user.profile.appearance.dark")}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{t("user.profile.appearance.darkDescription")}</p>
               </div>
             </button>
           </div>

@@ -5,7 +5,7 @@ import { Link, useNavigate } from "react-router-dom"
 import { ArrowLeft, Star, Clock, Bookmark, BadgePercent, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { heroBannerAPI } from "@/lib/api"
+import { api, heroBannerAPI } from "@/lib/api"
 import { useLocation } from "../hooks/useLocation"
 import { useZone } from "../hooks/useZone"
 import { toast } from "sonner"
@@ -13,6 +13,7 @@ import { useTranslation } from "react-i18next"
 import gourmetBanner from "@/assets/groumetpagebanner.png";
 
 export default function Gourmet() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { location } = useLocation();
   const { zoneId, isOutOfService } = useZone(location);

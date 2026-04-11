@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X, Bell, ChevronRight } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 /**
  * NotificationPopup
@@ -7,6 +8,7 @@ import { X, Bell, ChevronRight } from 'lucide-react';
  * Auto-dismisses after 7s. Slides in from the top.
  */
 export default function NotificationPopup({ notification, onClose }) {
+    const { t } = useTranslation();
     const [visible, setVisible] = useState(false);
     const [leaving, setLeaving] = useState(false);
 
@@ -78,7 +80,7 @@ export default function NotificationPopup({ notification, onClose }) {
                         {/* Text */}
                         <div className="flex-1 min-w-0">
                             <p className="text-[11px] font-semibold text-orange-500 uppercase tracking-wide mb-0.5">
-                                Special Offer
+                                {t("user.notificationPopup.specialOffer")}
                             </p>
                             <p className="text-sm font-bold text-gray-900 leading-snug">
                                 {notification.title}
@@ -94,7 +96,7 @@ export default function NotificationPopup({ notification, onClose }) {
                         <button
                             onClick={dismiss}
                             className="shrink-0 p-1.5 rounded-full hover:bg-gray-100 transition-colors"
-                            aria-label="Close"
+                            aria-label={t("user.notificationPopup.close")}
                         >
                             <X className="w-4 h-4 text-gray-400" />
                         </button>

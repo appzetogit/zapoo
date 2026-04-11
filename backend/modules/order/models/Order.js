@@ -46,6 +46,16 @@ const orderSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
+  customerName: {
+    type: String,
+    trim: true,
+    default: ''
+  },
+  customerPhone: {
+    type: String,
+    trim: true,
+    default: ''
+  },
   restaurantId: {
     type: String,
     required: true

@@ -6,8 +6,10 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { authAPI } from "@/lib/api"
 import { setAuthData as setUserAuthData } from "@/lib/utils/auth"
+import { useTranslation } from "react-i18next"
 
 export default function OTP() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [otp, setOtp] = useState(["", "", "", "", "", ""])
   const [isLoading, setIsLoading] = useState(false)
@@ -206,7 +208,7 @@ export default function OTP() {
       const user = data.user
 
       if (!accessToken || !user) {
-        throw new Error("Invalid response from server")
+        throw new Error(t("user.auth.otp.errors.invalidServerResponse"))
       }
 
       // Clear auth data from sessionStorage
@@ -229,7 +231,7 @@ export default function OTP() {
         err?.response?.data?.message ||
         err?.response?.data?.error ||
         err?.message ||
-        "Failed to verify OTP. Please try again."
+        t("user.auth.otp.errors.failedToVerify")
       setError(message)
     } finally {
       setIsLoading(false)
@@ -240,17 +242,17 @@ export default function OTP() {
     if (isLoading) return
     const trimmedName = name.trim()
     if (!trimmedName) {
-      setNameError("Name is required")
+      setNameError(t("user.auth.otp.validation.nameRequired"))
       return
     }
 
     if (trimmedName.length < 2) {
-      setNameError("Name must be at least 2 characters")
+      setNameError(t("user.auth.otp.validation.nameMin"))
       return
     }
 
     if (!verifiedOtp) {
-      setError("OTP verification step missing. Please request a new OTP.")
+      setError(t("user.auth.otp.errors.verificationStepMissing"))
       return
     }
 
@@ -271,7 +273,7 @@ export default function OTP() {
       const user = data.user
 
       if (!accessToken || !user) {
-        throw new Error("Invalid response from server")
+        throw new Error(t("user.auth.otp.errors.invalidServerResponse"))
       }
 
       // Clear auth data from sessionStorage
@@ -294,7 +296,7 @@ export default function OTP() {
         err?.response?.data?.message ||
         err?.response?.data?.error ||
         err?.message ||
-        "Failed to complete registration. Please try again."
+        t("user.auth.otp.errors.failedToCompleteRegistration")
       setError(message)
     } finally {
       setIsLoading(false)
@@ -319,7 +321,7 @@ export default function OTP() {
         err?.response?.data?.message ||
         err?.response?.data?.error ||
         err?.message ||
-        "Failed to resend OTP. Please try again."
+        t("user.auth.otp.errors.failedToResend")
       setError(message)
     } finally {
       setIsLoading(false)
@@ -380,12 +382,12 @@ export default function OTP() {
         {/* Title & Instructions */}
         <div className="space-y-2">
           <h1 className="text-3xl font-bold text-white tracking-tight">
-            {showNameInput ? "One last thing" : "OTP Verification"}
+            {showNameInput ? t("user.auth.otp.oneLastThing") : t("user.auth.otp.title")}
           </h1>
           <p className="text-white/80 text-sm max-w-[280px] mx-auto leading-relaxed">
             {showNameInput
-              ? "Please tell us your name to complete your profile"
-              : `Please enter the OTP sent to your ${contactType === "email" ? "email" : "mobile number"}`}
+              ? t("user.auth.otp.namePrompt")
+              : t("user.auth.otp.enterOtpSentTo", { target: contactType === "email" ? t("user.auth.otp.email") : t("user.auth.otp.mobileNumber") })}
           </p>
         </div>
       </div>
@@ -405,7 +407,7 @@ export default function OTP() {
           {/* Contact Info Display */}
           {!showNameInput && (
             <div className="text-center mb-10">
-              <p className="text-gray-500 dark:text-gray-400 text-sm mb-1 uppercase tracking-wider font-semibold">Sent to</p>
+              <p className="text-gray-500 dark:text-gray-400 text-sm mb-1 uppercase tracking-wider font-semibold">{t("user.auth.otp.sentTo")}</p>
               <p className="text-xl font-bold text-gray-800 dark:text-white">{contactInfo}</p>
             </div>
           )}
@@ -434,12 +436,12 @@ export default function OTP() {
               {/* Resend Section */}
               <div className="text-center">
                 <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
-                  Didn't receive code?
+                  {t("user.auth.otp.didntReceiveCode")}
                 </p>
                 {resendTimer > 0 ? (
                   <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-gray-50 dark:bg-gray-800 rounded-full border border-gray-100 dark:border-gray-700">
                     <span className="text-xs font-bold text-[#CB202D]">{resendTimer}s</span>
-                    <span className="text-xs text-gray-400 font-medium">remaining</span>
+                    <span className="text-xs text-gray-400 font-medium">{t("user.auth.otp.remaining")}</span>
                   </div>
                 ) : (
                   <button
@@ -448,7 +450,7 @@ export default function OTP() {
                     disabled={isLoading}
                     className="text-[#CB202D] hover:text-[#b51c1c] font-bold text-sm underline active:scale-95 transition-transform"
                   >
-                    Resend OTP
+                    {t("user.auth.otp.resendOtp")}
                   </button>
                 )}
               </div>
@@ -461,7 +463,7 @@ export default function OTP() {
               <div className="space-y-4">
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-gray-500 uppercase tracking-wider ml-1">
-                    Your Full Name
+                    {t("user.auth.otp.yourFullName")}
                   </label>
                   <input
                     type="text"
@@ -471,7 +473,7 @@ export default function OTP() {
                       if (nameError) setNameError("")
                     }}
                     disabled={isLoading}
-                    placeholder="e.g. Rahul Sharma"
+                    placeholder={t("user.auth.otp.namePlaceholder")}
                     className={`w-full h-14 px-5 text-lg bg-gray-50 dark:bg-gray-800 border-2 ${nameError ? "border-red-500" : "border-gray-100 dark:border-gray-700"
                       } rounded-xl focus:border-[#CB202D] focus:ring-4 focus:ring-[#CB202D]/10 outline-none transition-all text-gray-800 dark:text-white`}
                   />
@@ -492,7 +494,7 @@ export default function OTP() {
                   {isLoading ? (
                     <Loader2 className="h-5 w-5 animate-spin" />
                   ) : (
-                    "Complete Registration"
+                    t("user.auth.otp.completeRegistration")
                   )}
                 </Button>
               </div>
@@ -506,14 +508,14 @@ export default function OTP() {
                 disabled={isLoading || otp.join("").length !== 6}
                 className="w-full h-14 bg-[#CB202D] hover:bg-[#b51c1c] text-white font-bold text-lg rounded-xl shadow-lg shadow-red-200 dark:shadow-none transition-all active:scale-[0.98] disabled:bg-gray-100 disabled:text-gray-400 disabled:shadow-none uppercase tracking-wide"
               >
-                {isLoading ? <Loader2 className="h-6 w-6 animate-spin" /> : "Submit"}
+                {isLoading ? <Loader2 className="h-6 w-6 animate-spin" /> : t("user.auth.otp.submit")}
               </Button>
 
               <button
                 onClick={() => navigate("/user/auth/sign-in")}
                 className="block w-full text-sm text-gray-400 font-semibold hover:text-[#CB202D] transition-colors py-2"
               >
-                Change Mobile Number
+                {t("user.auth.otp.changeMobileNumber")}
               </button>
             </div>
           )}

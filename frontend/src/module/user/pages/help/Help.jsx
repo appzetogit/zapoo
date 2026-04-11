@@ -24,166 +24,31 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { useTranslation } from "react-i18next"
 
-const helpCategories = [
-  {
-    id: "ordering",
-    title: "Ordering",
-    icon: Package,
-    color: "text-blue-600",
-    bgColor: "bg-blue-50",
-    description: "Learn how to place and manage orders",
-    topics: [
-      {
-        question: "How do I place an order?",
-        answer: "To place an order, browse restaurants, add items to your cart, and proceed to checkout. Select your delivery address and payment method, then confirm your order."
-      },
-      {
-        question: "Can I modify or cancel my order?",
-        answer: "You can modify or cancel your order within 5 minutes of placing it. After that, please contact support for assistance."
-      },
-      {
-        question: "How do I track my order?",
-        answer: "Go to 'My Orders' in your profile, select the order you want to track, and you'll see real-time updates on your order status."
-      },
-      {
-        question: "What is the minimum order amount?",
-        answer: "The minimum order amount varies by restaurant, typically ranging from $10 to $15. This information is displayed on each restaurant's page."
-      }
-    ]
-  },
-  {
-    id: "payments",
-    title: "Payments",
-    icon: CreditCard,
-    color: "text-green-600",
-    bgColor: "bg-green-50",
-    description: "Payment methods and billing questions",
-    topics: [
-      {
-        question: "What payment methods do you accept?",
-        answer: "We accept all major credit cards, debit cards, digital wallets (Apple Pay, Google Pay), and cash on delivery in select areas."
-      },
-      {
-        question: "Is my payment information secure?",
-        answer: "Yes, we use industry-standard encryption to protect your payment information. We never store your full card details."
-      },
-      {
-        question: "Can I get a refund?",
-        answer: "Refunds are processed for cancelled orders, incorrect items, or quality issues. Contact support within 24 hours of delivery for assistance."
-      },
-      {
-        question: "Why was my payment declined?",
-        answer: "Payment can be declined due to insufficient funds, incorrect card details, or bank restrictions. Please verify your payment method and try again."
-      }
-    ]
-  },
-  {
-    id: "delivery",
-    title: "Delivery",
-    icon: Truck,
-    color: "text-orange-600",
-    bgColor: "bg-orange-50",
-    description: "Delivery times, fees, and tracking",
-    topics: [
-      {
-        question: "What are your delivery times?",
-        answer: "Delivery times typically range from 30-60 minutes, depending on the restaurant and your location. Estimated time is shown before checkout."
-      },
-      {
-        question: "How much is the delivery fee?",
-        answer: "Delivery fees vary by restaurant and distance, typically ranging from $2.99 to $5.99. The exact fee is shown before you place your order."
-      },
-      {
-        question: "What if my order is late?",
-        answer: "If your order is significantly delayed, contact support. We'll investigate and may provide compensation or a refund."
-      }
-    ]
-  },
-  {
-    id: "account",
-    title: "Account & Profile",
-    icon: User,
-    color: "text-purple-600",
-    bgColor: "bg-purple-50",
-    description: "Manage your account and preferences",
-    topics: [
-      {
-        question: "How do I update my profile?",
-        answer: "Go to 'Profile' in the menu, then select 'Edit Profile' to update your name, email, phone number, and other information."
-      },
-      {
-        question: "How do I change my password?",
-        answer: "Go to Profile > Settings > Security to change your password. You'll need to verify your current password first."
-      },
-      {
-        question: "How do I manage my addresses?",
-        answer: "Navigate to Profile > Addresses to view, add, edit, or delete delivery addresses. Set a default address for faster checkout."
-      },
-      {
-        question: "How do I save my favorite restaurants?",
-        answer: "Click the heart icon on any restaurant page to add it to your favorites. View all favorites in Profile > Favorites."
-      }
-    ]
-  },
-  {
-    id: "refunds",
-    title: "Refunds & Returns",
-    icon: Shield,
-    color: "text-red-600",
-    bgColor: "bg-red-50",
-    description: "Refund policy and return process",
-    topics: [
-      {
-        question: "What is your refund policy?",
-        answer: "We offer full refunds for cancelled orders, incorrect items, or quality issues reported within 24 hours of delivery."
-      },
-      {
-        question: "How long do refunds take?",
-        answer: "Refunds are typically processed within 5-7 business days, depending on your payment method. You'll receive a confirmation email."
-      },
-      {
-        question: "Can I return food items?",
-        answer: "Due to food safety regulations, we cannot accept returns of food items. However, we'll provide a full refund for quality issues."
-      },
-      {
-        question: "What if I received the wrong order?",
-        answer: "Contact support immediately with your order number. We'll arrange a replacement or full refund, and you can keep the incorrect order."
-      }
-    ]
-  },
-  {
-    id: "general",
-    title: "General Questions",
-    icon: HelpCircle,
-    color: "text-gray-600",
-    bgColor: "bg-gray-50",
-    description: "Other frequently asked questions",
-    topics: [
-      {
-        question: "Do you offer discounts or promotions?",
-        answer: "Yes! Check the 'Offers' section for current promotions, discount codes, and special deals from restaurants."
-      },
-      {
-        question: "How do I contact customer support?",
-        answer: "You can contact us via phone, email, or live chat. Visit the 'Contact Support' section below for all contact options."
-      },
-      {
-        question: "Is there a mobile app?",
-        answer: "Yes, our mobile app is available for iOS and Android. Download it from the App Store or Google Play for the best experience."
-      },
-      {
-        question: "Do you deliver to my area?",
-        answer: "Enter your delivery address to see available restaurants in your area. We're constantly expanding our delivery zones."
-      }
-    ]
-  }
+const helpCategoryConfig = [
+  { id: "ordering", icon: Package, color: "text-blue-600", bgColor: "bg-blue-50", topicCount: 4 },
+  { id: "payments", icon: CreditCard, color: "text-green-600", bgColor: "bg-green-50", topicCount: 4 },
+  { id: "delivery", icon: Truck, color: "text-orange-600", bgColor: "bg-orange-50", topicCount: 3 },
+  { id: "account", icon: User, color: "text-purple-600", bgColor: "bg-purple-50", topicCount: 4 },
+  { id: "refunds", icon: Shield, color: "text-red-600", bgColor: "bg-red-50", topicCount: 4 },
+  { id: "general", icon: HelpCircle, color: "text-gray-600", bgColor: "bg-gray-50", topicCount: 4 }
 ]
 
 export default function Help() {
+  const { t } = useTranslation()
   const [searchQuery, setSearchQuery] = useState("")
   const [expandedCategory, setExpandedCategory] = useState(null)
   const [expandedQuestion, setExpandedQuestion] = useState(null)
+  const helpCategories = helpCategoryConfig.map((category) => ({
+    ...category,
+    title: t(`user.help.categories.${category.id}.title`),
+    description: t(`user.help.categories.${category.id}.description`),
+    topics: Array.from({ length: category.topicCount }, (_, idx) => ({
+      question: t(`user.help.categories.${category.id}.topics.${idx + 1}.question`),
+      answer: t(`user.help.categories.${category.id}.topics.${idx + 1}.answer`)
+    }))
+  }))
 
   const filteredCategories = helpCategories.filter(category =>
     category.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -207,9 +72,9 @@ export default function Help() {
       <div className="max-w-md md:max-w-2xl lg:max-w-4xl xl:max-w-6xl mx-auto space-y-4 md:space-y-5 lg:space-y-6">
         <ScrollReveal>
           <div className="text-center space-y-3 md:space-y-4 mb-6 md:mb-8">
-            <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold">Help Center</h1>
+            <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold">{t("user.help.title")}</h1>
             <p className="text-base md:text-lg lg:text-xl text-muted-foreground">
-              Find answers to common questions or contact our support team
+              {t("user.help.subtitle")}
             </p>
           </div>
         </ScrollReveal>
@@ -222,7 +87,7 @@ export default function Help() {
                 <Search className="absolute left-3 md:left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 md:h-6 md:w-6 text-muted-foreground" />
                 <Input
                   type="text"
-                  placeholder="Search for help topics, questions, or keywords..."
+                  placeholder={t("user.help.searchPlaceholder")}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-10 md:pl-12 h-12 md:h-14 text-base md:text-lg"
@@ -242,8 +107,8 @@ export default function Help() {
                       <Package className="h-5 w-5 md:h-6 md:w-6 text-primary-orange" />
                     </div>
                     <div>
-                      <h3 className="text-sm md:text-base font-semibold">Track Your Order</h3>
-                      <p className="text-xs md:text-sm text-muted-foreground">View order status</p>
+                      <h3 className="text-sm md:text-base font-semibold">{t("user.help.quickActions.trackOrder")}</h3>
+                      <p className="text-xs md:text-sm text-muted-foreground">{t("user.help.quickActions.trackOrderDescription")}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -255,8 +120,8 @@ export default function Help() {
                       <User className="h-5 w-5 md:h-6 md:w-6 text-blue-600" />
                     </div>
                     <div>
-                      <h3 className="text-sm md:text-base font-semibold">Manage Account</h3>
-                      <p className="text-xs md:text-sm text-muted-foreground">Update profile & settings</p>
+                      <h3 className="text-sm md:text-base font-semibold">{t("user.help.quickActions.manageAccount")}</h3>
+                      <p className="text-xs md:text-sm text-muted-foreground">{t("user.help.quickActions.manageAccountDescription")}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -267,8 +132,8 @@ export default function Help() {
                     <MessageCircle className="h-5 w-5 md:h-6 md:w-6 text-green-600" />
                   </div>
                   <div>
-                    <h3 className="text-sm md:text-base font-semibold">Contact Support</h3>
-                    <p className="text-xs md:text-sm text-muted-foreground">Get help from our team</p>
+                    <h3 className="text-sm md:text-base font-semibold">{t("user.help.quickActions.contactSupport")}</h3>
+                    <p className="text-xs md:text-sm text-muted-foreground">{t("user.help.quickActions.contactSupportDescription")}</p>
                   </div>
                 </div>
               </CardContent>
@@ -278,20 +143,20 @@ export default function Help() {
         {/* Help Categories */}
         <ScrollReveal delay={0.3}>
           <div className="space-y-4 md:space-y-5 lg:space-y-6">
-            <h2 className="text-xl md:text-2xl lg:text-3xl font-bold">Browse by Category</h2>
+            <h2 className="text-xl md:text-2xl lg:text-3xl font-bold">{t("user.help.browseByCategory")}</h2>
             {filteredCategories.length === 0 ? (
               <Card>
                 <CardContent className="py-12 text-center">
                   <HelpCircle className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-                  <p className="text-lg font-semibold mb-2">No results found</p>
+                  <p className="text-lg font-semibold mb-2">{t("user.help.noResultsFound")}</p>
                   <p className="text-muted-foreground mb-4">
-                    Try searching with different keywords
+                    {t("user.help.tryDifferentKeywords")}
                   </p>
                   <Button
                     variant="outline"
                     onClick={() => setSearchQuery("")}
                   >
-                    Clear Search
+                    {t("user.help.clearSearch")}
                   </Button>
                 </CardContent>
               </Card>
@@ -367,10 +232,10 @@ export default function Help() {
             <CardHeader className="p-4 md:p-5 lg:p-6">
               <CardTitle className="text-xl md:text-2xl lg:text-3xl flex items-center gap-2">
                 <MessageCircle className="h-5 w-5 md:h-6 md:w-6 text-primary-orange" />
-                Still Need Help?
+                {t("user.help.stillNeedHelp")}
               </CardTitle>
               <CardDescription className="text-sm md:text-base">
-                Our support team is here to assist you 24/7
+                {t("user.help.supportAvailable")}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4 md:space-y-5 lg:space-y-6 p-4 md:p-5 lg:p-6">
@@ -380,9 +245,9 @@ export default function Help() {
                     <Phone className="h-5 w-5 text-blue-600" />
                   </div>
                   <div>
-                    <h3 className="font-semibold mb-1">Phone Support</h3>
+                    <h3 className="font-semibold mb-1">{t("user.help.phoneSupport")}</h3>
                     <p className="text-sm text-muted-foreground mb-2">
-                      Call us anytime
+                      {t("user.help.phoneSupportDescription")}
                     </p>
                     <a
                       href="tel:+1-800-123-4567"
@@ -397,9 +262,9 @@ export default function Help() {
                     <Mail className="h-5 w-5 text-green-600" />
                   </div>
                   <div>
-                    <h3 className="font-semibold mb-1">Email Support</h3>
+                    <h3 className="font-semibold mb-1">{t("user.help.emailSupport")}</h3>
                     <p className="text-sm text-muted-foreground mb-2">
-                      We'll respond within 24 hours
+                      {t("user.help.emailSupportDescription")}
                     </p>
                     <a
                       href="mailto:support@appzeto.com"
@@ -414,17 +279,17 @@ export default function Help() {
                     <MessageCircle className="h-5 w-5 text-purple-600" />
                   </div>
                   <div>
-                    <h3 className="font-semibold mb-1">Live Chat</h3>
+                    <h3 className="font-semibold mb-1">{t("user.help.liveChat")}</h3>
                     <p className="text-sm text-muted-foreground mb-2">
-                      Available 24/7
+                      {t("user.help.liveChatDescription")}
                     </p>
                     <Button
                       variant="outline"
                       size="sm"
                       className="mt-1"
-                      onClick={() => alert("Live chat would open here")}
+                      onClick={() => alert(t("user.help.liveChatPlaceholder"))}
                     >
-                      Start Chat
+                      {t("user.help.startChat")}
                     </Button>
                   </div>
                 </div>
@@ -432,7 +297,7 @@ export default function Help() {
               <div className="pt-4 border-t">
                 <p className="text-sm text-muted-foreground mb-3">
                   <Clock className="h-4 w-4 inline mr-1" />
-                  Average response time: Less than 5 minutes
+                  {t("user.help.averageResponseTime")}
                 </p>
         </div>
             </CardContent>

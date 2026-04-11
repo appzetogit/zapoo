@@ -10,6 +10,7 @@ import { authAPI } from "@/lib/api";
 import { firebaseAuth, googleProvider, ensureFirebaseInitialized } from "@/lib/firebase";
 import { setAuthData } from "@/lib/utils/auth";
 import loginBanner from "@/assets/loginbanner.png";
+import { useTranslation } from "react-i18next";
 
 // Common country codes
 const countryCodes = [{
@@ -94,6 +95,7 @@ const countryCodes = [{
   flag: "🇸🇪"
 }];
 export default function SignIn() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const isSignUp = searchParams.get("mode") === "signup";
@@ -145,7 +147,7 @@ export default function SignIn() {
         console.error(`❌ Invalid backend response from ${source}`);
         redirectHandledRef.current = false;
         setIsLoading(false);
-        setApiError("Invalid response from server. Please try again.");
+        setApiError(t("user.auth.signIn.errors.invalidServerResponse"));
       }
     } catch (error) {
       console.error(`❌ Error processing user from ${source}:`, error);
@@ -156,7 +158,7 @@ export default function SignIn() {
       });
       redirectHandledRef.current = false;
       setIsLoading(false);
-      let errorMessage = "Failed to complete sign-in. Please try again.";
+      let errorMessage = t("user.auth.signIn.errors.failedToCompleteSignIn");
       if (error?.response?.data?.message) {
         errorMessage = error.response.data.message;
       } else if (error?.message) {
@@ -239,15 +241,15 @@ export default function SignIn() {
         }
 
         // Handle backend errors (500, etc.)
-        let message = "Google sign-in failed. Please try again.";
+        let message = t("user.auth.signIn.errors.googleSignInFailed");
         if (error?.response) {
           // Axios error with response
           const status = error.response.status;
           const responseData = error.response.data || {};
           if (status === 500) {
-            message = responseData.message || responseData.error || "Server error. Please try again later.";
+            message = responseData.message || responseData.error || t("user.auth.signIn.errors.serverError");
           } else if (status === 400 || status === 401) {
-            message = responseData.message || responseData.error || "Authentication failed. Please try again.";
+            message = responseData.message || responseData.error || t("user.auth.signIn.errors.authenticationFailed");
           } else {
             message = responseData.message || responseData.error || errorMessage || message;
           }
@@ -256,9 +258,9 @@ export default function SignIn() {
         } else if (errorCode) {
           // Firebase auth error codes
           if (errorCode === "auth/network-request-failed") {
-            message = "Network error. Please check your connection and try again.";
+            message = t("user.auth.signIn.errors.networkError");
           } else if (errorCode === "auth/invalid-credential") {
-            message = "Invalid credentials. Please try again.";
+            message = t("user.auth.signIn.errors.invalidCredentials");
           } else {
             message = errorMessage || message;
           }
@@ -299,7 +301,7 @@ export default function SignIn() {
           console.error(`❌ Invalid backend response from ${source}`);
           redirectHandledRef.current = false;
           setIsLoading(false);
-          setApiError("Invalid response from server. Please try again.");
+          setApiError(t("user.auth.signIn.errors.invalidServerResponse"));
         }
       } catch (error) {
         console.error(`❌ Error processing user from ${source}:`, error);
@@ -310,7 +312,7 @@ export default function SignIn() {
         });
         redirectHandledRef.current = false;
         setIsLoading(false);
-        let errorMessage = "Failed to complete sign-in. Please try again.";
+        let errorMessage = t("user.auth.signIn.errors.failedToCompleteSignIn");
         if (error?.response?.data?.message) {
           errorMessage = error.response.data.message;
         } else if (error?.message) {
@@ -380,43 +382,43 @@ export default function SignIn() {
 
   const validateEmail = email => {
     if (!email.trim()) {
-      return "Email is required";
+      return t("user.auth.signIn.validation.emailRequired");
     }
     const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
     if (!emailRegex.test(email.trim())) {
-      return "Please enter a valid email address";
+      return t("user.auth.signIn.validation.emailInvalid");
     }
     return "";
   };
   const validatePhone = phone => {
     if (!phone.trim()) {
-      return "Phone number is required";
+      return t("user.auth.signIn.validation.phoneRequired");
     }
     const cleanPhone = phone.replace(/\D/g, "");
     const isIndia = formData.countryCode === "+91";
 
     if (isIndia && cleanPhone.length !== 10) {
-      return "Phone number must be 10 digits";
+      return t("user.auth.signIn.validation.phone10Digits");
     }
 
     if (!isIndia && (cleanPhone.length < 7 || cleanPhone.length > 15)) {
-      return "Phone number must be between 7-15 digits";
+      return t("user.auth.signIn.validation.phoneRange");
     }
     return "";
   };
   const validateName = name => {
     if (!name.trim()) {
-      return "Name is required";
+      return t("user.auth.signIn.validation.nameRequired");
     }
     if (name.trim().length < 2) {
-      return "Name must be at least 2 characters";
+      return t("user.auth.signIn.validation.nameMin");
     }
     if (name.trim().length > 50) {
-      return "Name must be less than 50 characters";
+      return t("user.auth.signIn.validation.nameMax");
     }
     const nameRegex = /^[a-zA-Z\s'-]+$/;
     if (!nameRegex.test(name.trim())) {
-      return "Name can only contain letters, spaces, hyphens, and apostrophes";
+      return t("user.auth.signIn.validation.namePattern");
     }
     return "";
   };
@@ -524,7 +526,7 @@ export default function SignIn() {
       // Navigate to OTP page
       navigate("/user/auth/otp");
     } catch (error) {
-      const message = error?.response?.data?.message || error?.response?.data?.error || "Failed to send OTP. Please try again.";
+      const message = error?.response?.data?.message || error?.response?.data?.error || t("user.auth.signIn.errors.failedToSendOtp");
       setApiError(message);
     } finally {
       setIsLoading(false);
@@ -541,7 +543,7 @@ export default function SignIn() {
 
       // Validate Firebase Auth instance
       if (!firebaseAuth) {
-        throw new Error("Firebase Auth is not initialized. Please check your Firebase configuration.");
+        throw new Error(t("user.auth.signIn.errors.firebaseNotInitialized"));
       }
 
       const isFlutterBridgeAvailable =
@@ -624,15 +626,17 @@ export default function SignIn() {
       redirectHandledRef.current = false;
       const errorCode = error?.code || "";
       const errorMessage = error?.message || "";
-      let message = "Google sign-in failed. Please try again.";
+      let message = t("user.auth.signIn.errors.googleSignInFailed");
       if (errorCode === "auth/configuration-not-found") {
-        message = "Firebase configuration error. Please ensure your domain is authorized in Firebase Console. Current domain: " + window.location.hostname;
+        message = t("user.auth.signIn.errors.firebaseConfiguration", {
+          domain: window.location.hostname
+        });
       } else if (errorCode === "auth/popup-blocked") {
-        message = "Popup was blocked. Please allow popups and try again.";
+        message = t("user.auth.signIn.errors.popupBlocked");
       } else if (errorCode === "auth/popup-closed-by-user") {
-        message = "Sign-in was cancelled. Please try again.";
+        message = t("user.auth.signIn.errors.signInCancelled");
       } else if (errorCode === "auth/network-request-failed") {
-        message = "Network error. Please check your connection and try again.";
+        message = t("user.auth.signIn.errors.networkError");
       } else if (errorMessage) {
         message = errorMessage;
       } else if (error?.response?.data?.message) {
@@ -673,11 +677,11 @@ export default function SignIn() {
       height: "45vh",
       minHeight: "300px"
     }}>
-      <img src={loginBanner} alt="Food Banner" className="w-full h-full object-cover object-center" />
+      <img src={loginBanner} alt={t("user.auth.signIn.bannerAlt")} className="w-full h-full object-cover object-center" />
     </div>
 
     <div className="relative hidden md:block w-full shrink-0 md:w-1/2 md:h-screen md:sticky md:top-0">
-      <img src={loginBanner} alt="Food Banner" className="w-full h-full object-cover object-center" />
+      <img src={loginBanner} alt={t("user.auth.signIn.bannerAlt")} className="w-full h-full object-cover object-center" />
       {/* Overlay gradient for better text readability on desktop */}
       <div className="absolute inset-0 bg-gradient-to-b from-black/20 to-transparent" />
     </div>
@@ -689,10 +693,10 @@ export default function SignIn() {
         {/* Heading */}
         <div className="text-center space-y-2 md:space-y-3">
           <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-black dark:text-white leading-tight">
-            India's #1 Food Delivery App
+            {t("user.auth.signIn.title")}
           </h2>
           <p className="text-sm sm:text-base md:text-lg text-gray-600 dark:text-gray-400">
-            Log in or sign up
+            {t("user.auth.signIn.subtitle")}
           </p>
         </div>
 
@@ -700,7 +704,7 @@ export default function SignIn() {
         <form onSubmit={handleSubmit} className="space-y-4 md:space-y-5">
           {/* Name field for sign up - hidden by default, shown only when needed */}
           {isSignUp && <div className="space-y-2">
-            <Input id="name" name="name" placeholder="Enter your full name" value={formData.name} onChange={handleChange} className={`text-base md:text-lg h-12 md:h-14 bg-white dark:bg-[#1a1a1a] text-black dark:text-white ${errors.name ? "border-red-500" : "border-gray-300 dark:border-gray-700"} transition-colors`} aria-invalid={errors.name ? "true" : "false"} />
+            <Input id="name" name="name" placeholder={t("user.auth.signIn.placeholders.fullName")} value={formData.name} onChange={handleChange} className={`text-base md:text-lg h-12 md:h-14 bg-white dark:bg-[#1a1a1a] text-black dark:text-white ${errors.name ? "border-red-500" : "border-gray-300 dark:border-gray-700"} transition-colors`} aria-invalid={errors.name ? "true" : "false"} />
             {errors.name && <div className="flex items-center gap-1 text-xs text-red-600">
               <AlertCircle className="h-3 w-3" />
               <span>{errors.name}</span>
@@ -711,7 +715,7 @@ export default function SignIn() {
           {authMethod === "phone" && <div className="space-y-2">
             <div className="flex gap-2 items-stretch">
               <Select value={formData.countryCode} onValueChange={handleCountryCodeChange}>
-                <SelectTrigger className="w-[100px] md:w-[120px] !h-12 md:!h-14 border-gray-300 dark:border-gray-700 bg-white dark:bg-[#1a1a1a] text-black dark:text-white rounded-lg flex items-center transition-colors" size="default" aria-label="Select country code">
+                <SelectTrigger className="w-[100px] md:w-[120px] !h-12 md:!h-14 border-gray-300 dark:border-gray-700 bg-white dark:bg-[#1a1a1a] text-black dark:text-white rounded-lg flex items-center transition-colors" size="default" aria-label={t("user.auth.signIn.selectCountryCode")}>
                   <SelectValue>
                     <span className="flex items-center gap-2 text-sm md:text-base">
                       <span>{selectedCountry.flag}</span>
@@ -728,7 +732,7 @@ export default function SignIn() {
                   </SelectItem>)}
                 </SelectContent>
               </Select>
-              <Input id="phone" name="phone" type="tel" placeholder="Enter Phone Number" value={formData.phone} onChange={handleChange} className={`flex-1 h-12 md:h-14 text-base md:text-lg bg-white dark:bg-[#1a1a1a] text-black dark:text-white border-gray-300 dark:border-gray-700 rounded-lg ${errors.phone ? "border-red-500" : ""} transition-colors`} aria-invalid={errors.phone ? "true" : "false"} />
+              <Input id="phone" name="phone" type="tel" placeholder={t("user.auth.signIn.placeholders.phoneNumber")} value={formData.phone} onChange={handleChange} className={`flex-1 h-12 md:h-14 text-base md:text-lg bg-white dark:bg-[#1a1a1a] text-black dark:text-white border-gray-300 dark:border-gray-700 rounded-lg ${errors.phone ? "border-red-500" : ""} transition-colors`} aria-invalid={errors.phone ? "true" : "false"} />
             </div>
             {errors.phone && <div className="flex items-center gap-1 text-xs text-red-600">
               <AlertCircle className="h-3 w-3" />
@@ -742,7 +746,7 @@ export default function SignIn() {
 
           {/* Email Input */}
           {authMethod === "email" && <div className="space-y-2">
-            <Input id="email" name="email" type="email" placeholder="Enter your email address" value={formData.email} onChange={handleChange} className={`w-full h-12 md:h-14 text-base md:text-lg bg-white dark:bg-[#1a1a1a] text-black dark:text-white border-gray-300 dark:border-gray-700 rounded-lg ${errors.email ? "border-red-500" : ""} transition-colors`} aria-invalid={errors.email ? "true" : "false"} />
+            <Input id="email" name="email" type="email" placeholder={t("user.auth.signIn.placeholders.email")} value={formData.email} onChange={handleChange} className={`w-full h-12 md:h-14 text-base md:text-lg bg-white dark:bg-[#1a1a1a] text-black dark:text-white border-gray-300 dark:border-gray-700 rounded-lg ${errors.email ? "border-red-500" : ""} transition-colors`} aria-invalid={errors.email ? "true" : "false"} />
             {errors.email && <div className="flex items-center gap-1 text-xs text-red-600">
               <AlertCircle className="h-3 w-3" />
               <span>{errors.email}</span>
@@ -755,7 +759,7 @@ export default function SignIn() {
               setAuthMethod("phone");
               setApiError("");
             }} className="text-xs text-[#E23744] hover:underline text-left">
-              Use phone instead
+              {t("user.auth.signIn.usePhoneInstead")}
             </button>
           </div>}
 
@@ -766,7 +770,7 @@ export default function SignIn() {
               rememberMe: checked
             })} className="w-4 h-4 border-2 border-gray-300 rounded data-[state=checked]:bg-[#E23744] data-[state=checked]:border-[#E23744] flex items-center justify-center" />
             <label htmlFor="rememberMe" className="text-sm text-gray-700 dark:text-gray-300 cursor-pointer select-none">
-              Remember my login for faster sign-in
+              {t("user.auth.signIn.rememberMe")}
             </label>
           </div>
 
@@ -774,8 +778,8 @@ export default function SignIn() {
           <Button type="submit" className="w-full h-12 md:h-14 bg-[#D32F2F] hover:bg-[#b71c1c] text-white font-bold text-base md:text-lg rounded-lg transition-all hover:shadow-lg active:scale-[0.98]" disabled={isLoading}>
             {isLoading ? <>
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              {isSignUp ? "Creating Account..." : "Signing In..."}
-            </> : "Continue"}
+              {isSignUp ? t("user.auth.signIn.creatingAccount") : t("user.auth.signIn.signingIn")}
+            </> : t("user.auth.signIn.continue")}
           </Button>
         </form>
 
@@ -786,7 +790,7 @@ export default function SignIn() {
           </div>
           <div className="relative flex justify-center">
             <span className="bg-white dark:bg-[#1a1a1a] px-2 text-sm text-gray-500 dark:text-gray-400">
-              or
+              {t("user.auth.signIn.or")}
             </span>
           </div>
         </div>
@@ -794,7 +798,7 @@ export default function SignIn() {
         {/* Social Login Icons */}
         <div className="flex justify-center gap-4 md:gap-6">
           {/* Google Login */}
-          <button type="button" onClick={handleGoogleSignIn} className="w-12 h-12 md:w-14 md:h-14 rounded-full border border-gray-300 dark:border-gray-700 flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-800 transition-all hover:shadow-md active:scale-95" aria-label="Sign in with Google">
+          <button type="button" onClick={handleGoogleSignIn} className="w-12 h-12 md:w-14 md:h-14 rounded-full border border-gray-300 dark:border-gray-700 flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-800 transition-all hover:shadow-md active:scale-95" aria-label={t("user.auth.signIn.signInWithGoogle")}>
             <svg className="h-6 w-6" viewBox="0 0 24 24">
               <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
               <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
@@ -804,7 +808,7 @@ export default function SignIn() {
           </button>
 
           {/* Email Login */}
-          <button type="button" onClick={handleLoginMethodChange} className="w-12 h-12 md:w-14 md:h-14 rounded-full border border-[#E23744] flex items-center justify-center hover:bg-[#d32f3d] transition-all hover:shadow-md active:scale-95 bg-[#E23744]" aria-label="Sign in with Email">
+          <button type="button" onClick={handleLoginMethodChange} className="w-12 h-12 md:w-14 md:h-14 rounded-full border border-[#E23744] flex items-center justify-center hover:bg-[#d32f3d] transition-all hover:shadow-md active:scale-95 bg-[#E23744]" aria-label={t("user.auth.signIn.signInWithEmail")}>
             {authMethod == "phone" ? <Mail className="h-5 w-5 md:h-6 md:w-6 text-white" /> : <Phone className="h-5 w-5 md:h-6 md:w-6 text-white" />}
           </button>
         </div>
@@ -812,14 +816,14 @@ export default function SignIn() {
         {/* Legal Disclaimer */}
         <div className="text-center text-xs md:text-sm text-gray-500 dark:text-gray-400 pt-4 md:pt-6">
           <p className="mb-1 md:mb-2">
-            By continuing, you agree to our
+            {t("user.auth.signIn.disclaimer")}
           </p>
           <div className="flex justify-center gap-2 flex-wrap">
-            <a href="#" className="underline hover:text-gray-700 dark:hover:text-gray-300 transition-colors">Terms of Service</a>
+            <a href="#" className="underline hover:text-gray-700 dark:hover:text-gray-300 transition-colors">{t("user.auth.signIn.termsOfService")}</a>
             <span>•</span>
-            <a href="#" className="underline hover:text-gray-700 dark:hover:text-gray-300 transition-colors">Privacy Policy</a>
+            <a href="#" className="underline hover:text-gray-700 dark:hover:text-gray-300 transition-colors">{t("user.auth.signIn.privacyPolicy")}</a>
             <span>•</span>
-            <a href="#" className="underline hover:text-gray-700 dark:hover:text-gray-300 transition-colors">Content Policy</a>
+            <a href="#" className="underline hover:text-gray-700 dark:hover:text-gray-300 transition-colors">{t("user.auth.signIn.contentPolicy")}</a>
           </div>
         </div>
       </div>

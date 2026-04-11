@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom"
 import { ArrowLeft, Plus, Share2, UtensilsCrossed, Store, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { useTranslation } from "react-i18next"
 
 // Import banner
 import collectionsBanner from "@/assets/collectionspagebanner.png"
@@ -20,6 +21,7 @@ const gradientColors = [
 ]
 
 export default function Collections() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState("delivery")
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
@@ -67,7 +69,7 @@ export default function Collections() {
         <div className="absolute inset-0 z-0">
           <img
             src={collectionsBanner}
-            alt="Your Collections"
+            alt={t("user.collectionsPage.yourCollections")}
             className="w-full h-full object-cover"
           />
         </div>
@@ -81,7 +83,7 @@ export default function Collections() {
             className={`flex-1 py-4 text-center font-semibold transition-colors relative ${activeTab === "delivery" ? "text-gray-900 dark:text-gray-100" : "text-gray-400 dark:text-gray-500"
               }`}
           >
-            Delivery
+            {t("user.collectionsPage.delivery")}
             {activeTab === "delivery" && (
               <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-20 h-1 bg-blue-500 rounded-full" />
             )}
@@ -141,9 +143,14 @@ export default function Collections() {
 
                   {/* Collection Info */}
                   <div className="absolute bottom-4 left-4 right-4">
-                    <h3 className="text-white font-bold text-lg mb-1">{collection.name}</h3>
+                    <h3 className="text-white font-bold text-lg mb-1">{collection.isDefault ? t("user.collectionsPage.defaultBookmarks") : collection.name}</h3>
                     <p className="text-white/80 text-sm">
-                      {collection.dishes} dish • {collection.restaurants} restaurant
+                      {t("user.collectionsPage.itemCounts", {
+                        dishes: collection.dishes,
+                        dishesLabel: t("user.collectionsPage.dishCount", { count: collection.dishes }),
+                        restaurants: collection.restaurants,
+                        restaurantsLabel: t("user.collectionsPage.restaurantCount", { count: collection.restaurants })
+                      })}
                     </p>
                   </div>
                 </div>
@@ -159,8 +166,8 @@ export default function Collections() {
                 <Plus className="h-6 w-6 text-green-600 dark:text-green-400" />
               </div>
               <div className="text-center">
-                <p className="text-gray-700 dark:text-gray-300 font-semibold">Create a new</p>
-                <p className="text-gray-700 dark:text-gray-300 font-semibold">Collection</p>
+                <p className="text-gray-700 dark:text-gray-300 font-semibold">{t("user.collectionsPage.createNew")}</p>
+                <p className="text-gray-700 dark:text-gray-300 font-semibold">{t("user.collectionsPage.collection")}</p>
               </div>
             </button>
           </div>
@@ -183,7 +190,7 @@ export default function Collections() {
           <div className="relative bg-white dark:bg-[#1a1a1a] rounded-2xl shadow-2xl w-[90%] max-w-sm mx-4 overflow-hidden animate-[slideUp_0.3s_ease-out]">
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b dark:border-gray-800">
-              <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">Create New Collection</h2>
+              <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">{t("user.collectionsPage.createNewCollection")}</h2>
               <button
                 onClick={() => {
                   setIsCreateDialogOpen(false)
@@ -197,9 +204,9 @@ export default function Collections() {
 
             {/* Body */}
             <div className="p-4 space-y-4">
-              <p className="text-sm text-gray-500 dark:text-gray-400">Give your collection a unique name</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">{t("user.collectionsPage.uniqueNamePrompt")}</p>
               <Input
-                placeholder="e.g., Weekend Favorites"
+                placeholder={t("user.collectionsPage.collectionNamePlaceholder")}
                 value={newCollectionName}
                 onChange={(e) => setNewCollectionName(e.target.value)}
                 onKeyDown={(e) => {
@@ -214,7 +221,7 @@ export default function Collections() {
               {/* Preview */}
               {newCollectionName.trim() && (
                 <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-xl">
-                  <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">Preview</p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">{t("user.collectionsPage.preview")}</p>
                   <p className="font-semibold text-gray-800 dark:text-gray-200">{newCollectionName.trim()}</p>
                 </div>
               )}
@@ -230,14 +237,14 @@ export default function Collections() {
                 }}
                 className="flex-1 h-11 rounded-xl font-semibold border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
               >
-                Cancel
+                {t("common.cancel")}
               </Button>
               <Button
                 onClick={handleCreateCollection}
                 disabled={!newCollectionName.trim()}
                 className="flex-1 h-11 bg-green-600 hover:bg-green-700 text-white rounded-xl font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Create Collection
+                {t("user.collectionsPage.createCollection")}
               </Button>
             </div>
           </div>

@@ -45,9 +45,128 @@ export const resources = {
           loading: "Loading...",
           currentLocation: "Current Location"
         },
+        locationExample: {
+          basicHookUsage: "Basic Hook Usage",
+          loadingLocation: "Loading location...",
+          area: "Area",
+          city: "City",
+          state: "State",
+          coordinates: "Coordinates",
+          notAvailable: "Not available",
+          getLocation: "Get Location",
+          selectLocation: "Select location",
+          deliveringTo: "Delivering to",
+          loading: "Loading...",
+          usingLocationDisplayComponent: "Using LocationDisplay Component",
+          fullDisplay: "Full Display",
+          compactDisplayNavbar: "Compact Display (Navbar)",
+          fullLocationDisplay: "Full Location Display",
+          allowLocation: "Allow Location",
+          cart: "Cart",
+          profile: "Profile"
+        },
         userHome: {
           title: "User Module",
           subtitle: "Welcome to the User section"
+        },
+        auth: {
+          signIn: {
+            bannerAlt: "Food Banner",
+            title: "India's #1 Food Delivery App",
+            subtitle: "Log in or sign up",
+            selectCountryCode: "Select country code",
+            placeholders: {
+              fullName: "Enter your full name",
+              phoneNumber: "Enter Phone Number",
+              email: "Enter your email address"
+            },
+            usePhoneInstead: "Use phone instead",
+            rememberMe: "Remember my login for faster sign-in",
+            creatingAccount: "Creating Account...",
+            signingIn: "Signing In...",
+            continue: "Continue",
+            or: "or",
+            signInWithGoogle: "Sign in with Google",
+            signInWithEmail: "Sign in with Email",
+            disclaimer: "By continuing, you agree to our",
+            termsOfService: "Terms of Service",
+            privacyPolicy: "Privacy Policy",
+            contentPolicy: "Content Policy",
+            validation: {
+              emailRequired: "Email is required",
+              emailInvalid: "Please enter a valid email address",
+              phoneRequired: "Phone number is required",
+              phone10Digits: "Phone number must be 10 digits",
+              phoneRange: "Phone number must be between 7-15 digits",
+              nameRequired: "Name is required",
+              nameMin: "Name must be at least 2 characters",
+              nameMax: "Name must be less than 50 characters",
+              namePattern: "Name can only contain letters, spaces, hyphens, and apostrophes"
+            },
+            errors: {
+              invalidServerResponse: "Invalid response from server. Please try again.",
+              failedToCompleteSignIn: "Failed to complete sign-in. Please try again.",
+              googleSignInFailed: "Google sign-in failed. Please try again.",
+              serverError: "Server error. Please try again later.",
+              authenticationFailed: "Authentication failed. Please try again.",
+              networkError: "Network error. Please check your connection and try again.",
+              invalidCredentials: "Invalid credentials. Please try again.",
+              failedToSendOtp: "Failed to send OTP. Please try again.",
+              firebaseNotInitialized: "Firebase Auth is not initialized. Please check your Firebase configuration.",
+              firebaseConfiguration: "Firebase configuration error. Please ensure your domain is authorized in Firebase Console. Current domain: {{domain}}",
+              popupBlocked: "Popup was blocked. Please allow popups and try again.",
+              signInCancelled: "Sign-in was cancelled. Please try again."
+            }
+          },
+          otp: {
+            title: "OTP Verification",
+            oneLastThing: "One last thing",
+            namePrompt: "Please tell us your name to complete your profile",
+            enterOtpSentTo: "Please enter the OTP sent to your {{target}}",
+            email: "email",
+            mobileNumber: "mobile number",
+            sentTo: "Sent to",
+            didntReceiveCode: "Didn't receive code?",
+            remaining: "remaining",
+            resendOtp: "Resend OTP",
+            yourFullName: "Your Full Name",
+            namePlaceholder: "e.g. Rahul Sharma",
+            completeRegistration: "Complete Registration",
+            submit: "Submit",
+            changeMobileNumber: "Change Mobile Number",
+            validation: {
+              nameRequired: "Name is required",
+              nameMin: "Name must be at least 2 characters"
+            },
+            errors: {
+              invalidServerResponse: "Invalid response from server",
+              failedToVerify: "Failed to verify OTP. Please try again.",
+              verificationStepMissing: "OTP verification step missing. Please request a new OTP.",
+              failedToCompleteRegistration: "Failed to complete registration. Please try again.",
+              failedToResend: "Failed to resend OTP. Please try again."
+            }
+          }
+        },
+        notificationPopup: {
+          specialOffer: "Special Offer",
+          close: "Close"
+        },
+        collectionsPage: {
+          yourCollections: "Your Collections",
+          defaultBookmarks: "Bookmarks",
+          delivery: "Delivery",
+          dishCount_one: "{{count}} dish",
+          dishCount_other: "{{count}} dishes",
+          restaurantCount_one: "{{count}} restaurant",
+          restaurantCount_other: "{{count}} restaurants",
+          itemCounts: "{{dishes}} {{dishesLabel}} • {{restaurants}} {{restaurantsLabel}}",
+          createNew: "Create a new",
+          collection: "Collection",
+          createNewCollection: "Create New Collection",
+          uniqueNamePrompt: "Give your collection a unique name",
+          collectionNamePlaceholder: "e.g., Weekend Favorites",
+          preview: "Preview",
+          createCollection: "Create Collection"
         },
         home: {
           exploreMoreHeading: "Explore More",
@@ -496,6 +615,208 @@ export const resources = {
           supportLine: "For any queries, please contact our support team.",
           trackOrder: "Track Order"
         },
+        orderHelp: {
+          na: "N/A",
+          title: "Order Help",
+          orderWithId: "Order {{id}}",
+          orderSummary: "Order Summary",
+          orderId: "Order ID",
+          placedOn: "Placed On",
+          totalAmount: "Total Amount",
+          items: "Items",
+          itemsCount_one: "{{count}} item",
+          itemsCount_other: "{{count}} items",
+          deliveryAddress: "Delivery Address",
+          whatCanWeHelpWith: "What can we help you with?",
+          whatToDo: "What to do:",
+          quickActions: "Quick Actions",
+          trackOrderDescription: "View real-time status",
+          viewInvoiceDescription: "Download receipt",
+          contactSupportDescription: "Get help now",
+          contactSupportForOrder: "Contact Support for This Order",
+          supportReadyDescription: "Our support team is ready to help you with order {{id}}",
+          phoneSupport: "Phone Support",
+          mentionOrder: "Mention order {{id}}",
+          emailSupport: "Email Support",
+          includeOrderInSubject: "Include order {{id}} in subject",
+          startLiveChat: "Start Live Chat",
+          backToAllOrders: "Back to All Orders",
+          helpCenter: "Help Center",
+          orderNotFound: "Order Not Found",
+          orderNotFoundDescription: "We couldn't find an order with ID: {{orderId}}",
+          viewAllOrders: "View All Orders",
+          goToHelpCenter: "Go to Help Center",
+          status: {
+            confirmed: "Confirmed",
+            preparing: "Preparing",
+            outForDelivery: "Out for Delivery",
+            delivered: "Delivered"
+          },
+          toast: {
+            refundRequestPlaceholder: "Refund request would be processed here. Contact support for assistance.",
+            liveChatPlaceholder: "Live chat would open here with order context"
+          },
+          actions: {
+            trackOrder: "Track Order",
+            contactSupport: "Contact Support",
+            viewInvoice: "View Invoice",
+            reportIssue: "Report Issue",
+            viewOrderDetails: "View Order Details",
+            requestRefund: "Request Refund",
+            viewOrder: "View Order"
+          },
+          issues: {
+            "late-delivery": {
+              title: "Order is Late",
+              description: "Your order hasn't arrived within the estimated time",
+              solutions: {
+                1: "Check the order tracking page for real-time updates",
+                2: "Contact the delivery driver if contact information is available",
+                3: "Wait an additional 15-20 minutes as delays can occur",
+                4: "Contact support if the order is more than 30 minutes late"
+              }
+            },
+            "missing-items": {
+              title: "Missing Items",
+              description: "Some items from your order are missing",
+              solutions: {
+                1: "Check your order receipt to verify what was ordered",
+                2: "Check if items were delivered separately",
+                3: "Contact support immediately with your order number",
+                4: "Take photos if possible to help with the investigation"
+              }
+            },
+            "wrong-order": {
+              title: "Wrong Order Received",
+              description: "You received items different from what you ordered",
+              solutions: {
+                1: "Keep the incorrect order - you won't be charged for it",
+                2: "Contact support immediately with your order number",
+                3: "We'll arrange a replacement or full refund",
+                4: "You may be eligible for a discount on your next order"
+              }
+            },
+            "quality-issue": {
+              title: "Quality Issue",
+              description: "Food quality doesn't meet expectations",
+              solutions: {
+                1: "Contact support within 24 hours of delivery",
+                2: "Describe the issue in detail",
+                3: "Take photos if possible",
+                4: "We'll process a full refund or replacement"
+              }
+            },
+            "payment-issue": {
+              title: "Payment Problem",
+              description: "Issues with payment or billing",
+              solutions: {
+                1: "Check your payment method in your profile",
+                2: "Verify the charge on your bank statement",
+                3: "Contact support if you were charged incorrectly",
+                4: "We'll investigate and process a refund if needed"
+              }
+            },
+            "cancel-order": {
+              title: "Cancel Order",
+              description: "Need to cancel your order",
+              solutions: {
+                1: "Orders can be cancelled within 5 minutes of placement",
+                2: "After 5 minutes, contact support for cancellation",
+                3: "If the order is already being prepared, cancellation may not be possible",
+                4: "Refunds are processed automatically for cancelled orders"
+              }
+            }
+          }
+        },
+        help: {
+          title: "Help Center",
+          subtitle: "Find answers to common questions or contact our support team",
+          searchPlaceholder: "Search for help topics, questions, or keywords...",
+          browseByCategory: "Browse by Category",
+          noResultsFound: "No results found",
+          tryDifferentKeywords: "Try searching with different keywords",
+          clearSearch: "Clear Search",
+          stillNeedHelp: "Still Need Help?",
+          supportAvailable: "Our support team is here to assist you 24/7",
+          phoneSupport: "Phone Support",
+          phoneSupportDescription: "Call us anytime",
+          emailSupport: "Email Support",
+          emailSupportDescription: "We'll respond within 24 hours",
+          liveChat: "Live Chat",
+          liveChatDescription: "Available 24/7",
+          liveChatPlaceholder: "Live chat would open here",
+          startChat: "Start Chat",
+          averageResponseTime: "Average response time: Less than 5 minutes",
+          quickActions: {
+            trackOrder: "Track Your Order",
+            trackOrderDescription: "View order status",
+            manageAccount: "Manage Account",
+            manageAccountDescription: "Update profile & settings",
+            contactSupport: "Contact Support",
+            contactSupportDescription: "Get help from our team"
+          },
+          categories: {
+            ordering: {
+              title: "Ordering",
+              description: "Learn how to place and manage orders",
+              topics: {
+                1: { question: "How do I place an order?", answer: "To place an order, browse restaurants, add items to your cart, and proceed to checkout. Select your delivery address and payment method, then confirm your order." },
+                2: { question: "Can I modify or cancel my order?", answer: "You can modify or cancel your order within 5 minutes of placing it. After that, please contact support for assistance." },
+                3: { question: "How do I track my order?", answer: "Go to 'My Orders' in your profile, select the order you want to track, and you'll see real-time updates on your order status." },
+                4: { question: "What is the minimum order amount?", answer: "The minimum order amount varies by restaurant, typically ranging from $10 to $15. This information is displayed on each restaurant's page." }
+              }
+            },
+            payments: {
+              title: "Payments",
+              description: "Payment methods and billing questions",
+              topics: {
+                1: { question: "What payment methods do you accept?", answer: "We accept all major credit cards, debit cards, digital wallets (Apple Pay, Google Pay), and cash on delivery in select areas." },
+                2: { question: "Is my payment information secure?", answer: "Yes, we use industry-standard encryption to protect your payment information. We never store your full card details." },
+                3: { question: "Can I get a refund?", answer: "Refunds are processed for cancelled orders, incorrect items, or quality issues. Contact support within 24 hours of delivery for assistance." },
+                4: { question: "Why was my payment declined?", answer: "Payment can be declined due to insufficient funds, incorrect card details, or bank restrictions. Please verify your payment method and try again." }
+              }
+            },
+            delivery: {
+              title: "Delivery",
+              description: "Delivery times, fees, and tracking",
+              topics: {
+                1: { question: "What are your delivery times?", answer: "Delivery times typically range from 30-60 minutes, depending on the restaurant and your location. Estimated time is shown before checkout." },
+                2: { question: "How much is the delivery fee?", answer: "Delivery fees vary by restaurant and distance, typically ranging from $2.99 to $5.99. The exact fee is shown before you place your order." },
+                3: { question: "What if my order is late?", answer: "If your order is significantly delayed, contact support. We'll investigate and may provide compensation or a refund." }
+              }
+            },
+            account: {
+              title: "Account & Profile",
+              description: "Manage your account and preferences",
+              topics: {
+                1: { question: "How do I update my profile?", answer: "Go to 'Profile' in the menu, then select 'Edit Profile' to update your name, email, phone number, and other information." },
+                2: { question: "How do I change my password?", answer: "Go to Profile > Settings > Security to change your password. You'll need to verify your current password first." },
+                3: { question: "How do I manage my addresses?", answer: "Navigate to Profile > Addresses to view, add, edit, or delete delivery addresses. Set a default address for faster checkout." },
+                4: { question: "How do I save my favorite restaurants?", answer: "Click the heart icon on any restaurant page to add it to your favorites. View all favorites in Profile > Favorites." }
+              }
+            },
+            refunds: {
+              title: "Refunds & Returns",
+              description: "Refund policy and return process",
+              topics: {
+                1: { question: "What is your refund policy?", answer: "We offer full refunds for cancelled orders, incorrect items, or quality issues reported within 24 hours of delivery." },
+                2: { question: "How long do refunds take?", answer: "Refunds are typically processed within 5-7 business days, depending on your payment method. You'll receive a confirmation email." },
+                3: { question: "Can I return food items?", answer: "Due to food safety regulations, we cannot accept returns of food items. However, we'll provide a full refund for quality issues." },
+                4: { question: "What if I received the wrong order?", answer: "Contact support immediately with your order number. We'll arrange a replacement or full refund, and you can keep the incorrect order." }
+              }
+            },
+            general: {
+              title: "General Questions",
+              description: "Other frequently asked questions",
+              topics: {
+                1: { question: "Do you offer discounts or promotions?", answer: "Yes! Check the 'Offers' section for current promotions, discount codes, and special deals from restaurants." },
+                2: { question: "How do I contact customer support?", answer: "You can contact us via phone, email, or live chat. Visit the 'Contact Support' section below for all contact options." },
+                3: { question: "Is there a mobile app?", answer: "Yes, our mobile app is available for iOS and Android. Download it from the App Store or Google Play for the best experience." },
+                4: { question: "Do you deliver to my area?", answer: "Enter your delivery address to see available restaurants in your area. We're constantly expanding our delivery zones." }
+              }
+            }
+          }
+        },
         orderTracking: {
           customer: "Customer",
           restaurant: "Restaurant",
@@ -575,7 +896,50 @@ export const resources = {
             provideCancellationReason: "Please provide a reason for cancellation",
             orderCancelledNoRefund: "Order cancelled successfully. No refund required as payment was not made.",
             orderCancelledRefundAfterApproval: "Order cancelled successfully. Refund will be processed after admin approval.",
-            failedToCancelOrder: "Failed to cancel order"
+            failedToCancelOrder: "Failed to cancel order",
+            orderIdNotAvailable: "Order ID not available",
+            callConnectingToRestaurant: "Call connecting to restaurant",
+            failedToInitiateMaskedCall: "Failed to initiate masked call"
+          }
+        },
+        profile: {
+          defaultUserName: "User",
+          notAvailable: "Not available",
+          walletMoney: "{{companyName}} Money",
+          yourCoupons: "Your coupons",
+          yourCart: "Your cart",
+          yourProfile: "Your profile",
+          profileCompletion: "{{percent}}% completed",
+          vegMode: "Veg Mode",
+          on: "ON",
+          off: "OFF",
+          collections: "Collections",
+          yourCollections: "Your collections",
+          foodOrders: "Food Orders",
+          yourOrders: "Your orders",
+          more: "More",
+          about: "About",
+          sendFeedback: "Send feedback",
+          reportSafetyEmergency: "Report a safety emergency",
+          settings: "Settings",
+          loggingOut: "Logging out...",
+          logOut: "Log out",
+          vegModeDescription: "Filter restaurants and dishes based on your dietary preferences",
+          vegModeOnTitle: "Veg Mode ON",
+          vegModeOnDescription: "Show only vegetarian options",
+          vegModeOffTitle: "Veg Mode OFF",
+          vegModeOffDescription: "Show all options",
+          appearance: {
+            title: "Appearance",
+            description: "Choose your preferred theme",
+            value: {
+              light: "Light",
+              dark: "Dark"
+            },
+            light: "Light",
+            lightDescription: "Default light theme",
+            dark: "Dark",
+            darkDescription: "Dark theme"
           }
         }
       },
@@ -2108,9 +2472,128 @@ export const resources = {
           loading: "लोड हो रहा है...",
           currentLocation: "वर्तमान लोकेशन"
         },
+        locationExample: {
+          basicHookUsage: "बेसिक हुक उपयोग",
+          loadingLocation: "लोकेशन लोड हो रही है...",
+          area: "एरिया",
+          city: "शहर",
+          state: "राज्य",
+          coordinates: "कोऑर्डिनेट्स",
+          notAvailable: "उपलब्ध नहीं",
+          getLocation: "लोकेशन प्राप्त करें",
+          selectLocation: "लोकेशन चुनें",
+          deliveringTo: "डिलीवर किया जा रहा है",
+          loading: "लोड हो रहा है...",
+          usingLocationDisplayComponent: "LocationDisplay कॉम्पोनेंट का उपयोग",
+          fullDisplay: "फुल डिस्प्ले",
+          compactDisplayNavbar: "कॉम्पैक्ट डिस्प्ले (नेवबार)",
+          fullLocationDisplay: "पूरा लोकेशन डिस्प्ले",
+          allowLocation: "लोकेशन अनुमति दें",
+          cart: "कार्ट",
+          profile: "प्रोफाइल"
+        },
         userHome: {
           title: "यूज़र मॉड्यूल",
           subtitle: "यूज़र सेक्शन में आपका स्वागत है"
+        },
+        auth: {
+          signIn: {
+            bannerAlt: "फ़ूड बैनर",
+            title: "भारत का #1 फ़ूड डिलीवरी ऐप",
+            subtitle: "लॉग इन करें या साइन अप करें",
+            selectCountryCode: "देश कोड चुनें",
+            placeholders: {
+              fullName: "अपना पूरा नाम दर्ज करें",
+              phoneNumber: "फोन नंबर दर्ज करें",
+              email: "अपना ईमेल पता दर्ज करें"
+            },
+            usePhoneInstead: "इसके बजाय फोन इस्तेमाल करें",
+            rememberMe: "तेज़ साइन-इन के लिए मेरा लॉगिन याद रखें",
+            creatingAccount: "अकाउंट बनाया जा रहा है...",
+            signingIn: "साइन इन हो रहा है...",
+            continue: "जारी रखें",
+            or: "या",
+            signInWithGoogle: "Google से साइन इन करें",
+            signInWithEmail: "ईमेल से साइन इन करें",
+            disclaimer: "जारी रखकर, आप हमारी इन नीतियों से सहमत हैं",
+            termsOfService: "सेवा की शर्तें",
+            privacyPolicy: "प्राइवेसी पॉलिसी",
+            contentPolicy: "कंटेंट पॉलिसी",
+            validation: {
+              emailRequired: "ईमेल आवश्यक है",
+              emailInvalid: "कृपया वैध ईमेल पता दर्ज करें",
+              phoneRequired: "फोन नंबर आवश्यक है",
+              phone10Digits: "फोन नंबर 10 अंकों का होना चाहिए",
+              phoneRange: "फोन नंबर 7-15 अंकों के बीच होना चाहिए",
+              nameRequired: "नाम आवश्यक है",
+              nameMin: "नाम कम से कम 2 अक्षरों का होना चाहिए",
+              nameMax: "नाम 50 अक्षरों से कम होना चाहिए",
+              namePattern: "नाम में केवल अक्षर, स्पेस, हाइफ़न और अपोस्ट्रॉफी हो सकते हैं"
+            },
+            errors: {
+              invalidServerResponse: "सर्वर से अमान्य प्रतिक्रिया मिली। कृपया फिर से प्रयास करें।",
+              failedToCompleteSignIn: "साइन-इन पूरा नहीं हो सका। कृपया फिर से प्रयास करें।",
+              googleSignInFailed: "Google साइन-इन विफल रहा। कृपया फिर से प्रयास करें।",
+              serverError: "सर्वर त्रुटि। कृपया बाद में फिर प्रयास करें।",
+              authenticationFailed: "प्रमाणीकरण विफल। कृपया फिर से प्रयास करें।",
+              networkError: "नेटवर्क त्रुटि। कृपया अपना कनेक्शन जांचें और फिर से प्रयास करें।",
+              invalidCredentials: "अमान्य क्रेडेंशियल्स। कृपया फिर से प्रयास करें।",
+              failedToSendOtp: "OTP भेजने में विफल। कृपया फिर से प्रयास करें।",
+              firebaseNotInitialized: "Firebase Auth इनिशियलाइज़ नहीं हुआ है। कृपया अपनी Firebase कॉन्फ़िगरेशन जांचें।",
+              firebaseConfiguration: "Firebase कॉन्फ़िगरेशन त्रुटि। कृपया सुनिश्चित करें कि आपका डोमेन Firebase Console में अधिकृत है। वर्तमान डोमेन: {{domain}}",
+              popupBlocked: "पॉपअप ब्लॉक हो गया। कृपया पॉपअप की अनुमति दें और फिर प्रयास करें।",
+              signInCancelled: "साइन-इन रद्द कर दिया गया। कृपया फिर से प्रयास करें।"
+            }
+          },
+          otp: {
+            title: "OTP सत्यापन",
+            oneLastThing: "एक आखिरी बात",
+            namePrompt: "प्रोफाइल पूरा करने के लिए कृपया अपना नाम बताएं",
+            enterOtpSentTo: "कृपया {{target}} पर भेजा गया OTP दर्ज करें",
+            email: "ईमेल",
+            mobileNumber: "मोबाइल नंबर",
+            sentTo: "भेजा गया",
+            didntReceiveCode: "कोड नहीं मिला?",
+            remaining: "शेष",
+            resendOtp: "OTP फिर भेजें",
+            yourFullName: "आपका पूरा नाम",
+            namePlaceholder: "उदा. राहुल शर्मा",
+            completeRegistration: "पंजीकरण पूरा करें",
+            submit: "सबमिट",
+            changeMobileNumber: "मोबाइल नंबर बदलें",
+            validation: {
+              nameRequired: "नाम आवश्यक है",
+              nameMin: "नाम कम से कम 2 अक्षरों का होना चाहिए"
+            },
+            errors: {
+              invalidServerResponse: "सर्वर से अमान्य प्रतिक्रिया मिली",
+              failedToVerify: "OTP सत्यापित नहीं हो सका। कृपया फिर से प्रयास करें।",
+              verificationStepMissing: "OTP सत्यापन चरण गायब है। कृपया नया OTP अनुरोध करें।",
+              failedToCompleteRegistration: "पंजीकरण पूरा नहीं हो सका। कृपया फिर से प्रयास करें।",
+              failedToResend: "OTP फिर से भेजने में विफल। कृपया फिर से प्रयास करें।"
+            }
+          }
+        },
+        notificationPopup: {
+          specialOffer: "स्पेशल ऑफर",
+          close: "बंद करें"
+        },
+        collectionsPage: {
+          yourCollections: "आपके कलेक्शंस",
+          defaultBookmarks: "बुकमार्क्स",
+          delivery: "डिलीवरी",
+          dishCount_one: "{{count}} डिश",
+          dishCount_other: "{{count}} डिश",
+          restaurantCount_one: "{{count}} रेस्टोरेंट",
+          restaurantCount_other: "{{count}} रेस्टोरेंट",
+          itemCounts: "{{dishes}} {{dishesLabel}} • {{restaurants}} {{restaurantsLabel}}",
+          createNew: "नया बनाएं",
+          collection: "कलेक्शन",
+          createNewCollection: "नया कलेक्शन बनाएं",
+          uniqueNamePrompt: "अपने कलेक्शन को एक अलग नाम दें",
+          collectionNamePlaceholder: "उदा., वीकेंड फेवरेट्स",
+          preview: "प्रीव्यू",
+          createCollection: "कलेक्शन बनाएं"
         },
         home: {
           exploreMoreHeading: "और देखें",
@@ -2384,6 +2867,248 @@ export const resources = {
               label: "कैश ऑन डिलीवरी",
               description: "ऑर्डर आने पर भुगतान करें"
             }
+          }
+        },
+        orderHelp: {
+          na: "N/A",
+          title: "Order Help",
+          orderWithId: "Order {{id}}",
+          orderSummary: "Order Summary",
+          orderId: "Order ID",
+          placedOn: "Placed On",
+          totalAmount: "Total Amount",
+          items: "Items",
+          itemsCount_one: "{{count}} item",
+          itemsCount_other: "{{count}} items",
+          deliveryAddress: "Delivery Address",
+          whatCanWeHelpWith: "What can we help you with?",
+          whatToDo: "What to do:",
+          quickActions: "Quick Actions",
+          trackOrderDescription: "View real-time status",
+          viewInvoiceDescription: "Download receipt",
+          contactSupportDescription: "Get help now",
+          contactSupportForOrder: "Contact Support for This Order",
+          supportReadyDescription: "Our support team is ready to help you with order {{id}}",
+          phoneSupport: "Phone Support",
+          mentionOrder: "Mention order {{id}}",
+          emailSupport: "Email Support",
+          includeOrderInSubject: "Include order {{id}} in subject",
+          startLiveChat: "Start Live Chat",
+          backToAllOrders: "Back to All Orders",
+          helpCenter: "Help Center",
+          orderNotFound: "Order Not Found",
+          orderNotFoundDescription: "We couldn't find an order with ID: {{orderId}}",
+          viewAllOrders: "View All Orders",
+          goToHelpCenter: "Go to Help Center",
+          status: {
+            confirmed: "Confirmed",
+            preparing: "Preparing",
+            outForDelivery: "Out for Delivery",
+            delivered: "Delivered"
+          },
+          toast: {
+            refundRequestPlaceholder: "Refund request would be processed here. Contact support for assistance.",
+            liveChatPlaceholder: "Live chat would open here with order context"
+          },
+          actions: {
+            trackOrder: "Track Order",
+            contactSupport: "Contact Support",
+            viewInvoice: "View Invoice",
+            reportIssue: "Report Issue",
+            viewOrderDetails: "View Order Details",
+            requestRefund: "Request Refund",
+            viewOrder: "View Order"
+          },
+          issues: {
+            "late-delivery": {
+              title: "Order is Late",
+              description: "Your order hasn't arrived within the estimated time",
+              solutions: {
+                1: "Check the order tracking page for real-time updates",
+                2: "Contact the delivery driver if contact information is available",
+                3: "Wait an additional 15-20 minutes as delays can occur",
+                4: "Contact support if the order is more than 30 minutes late"
+              }
+            },
+            "missing-items": {
+              title: "Missing Items",
+              description: "Some items from your order are missing",
+              solutions: {
+                1: "Check your order receipt to verify what was ordered",
+                2: "Check if items were delivered separately",
+                3: "Contact support immediately with your order number",
+                4: "Take photos if possible to help with the investigation"
+              }
+            },
+            "wrong-order": {
+              title: "Wrong Order Received",
+              description: "You received items different from what you ordered",
+              solutions: {
+                1: "Keep the incorrect order - you won't be charged for it",
+                2: "Contact support immediately with your order number",
+                3: "We'll arrange a replacement or full refund",
+                4: "You may be eligible for a discount on your next order"
+              }
+            },
+            "quality-issue": {
+              title: "Quality Issue",
+              description: "Food quality doesn't meet expectations",
+              solutions: {
+                1: "Contact support within 24 hours of delivery",
+                2: "Describe the issue in detail",
+                3: "Take photos if possible",
+                4: "We'll process a full refund or replacement"
+              }
+            },
+            "payment-issue": {
+              title: "Payment Problem",
+              description: "Issues with payment or billing",
+              solutions: {
+                1: "Check your payment method in your profile",
+                2: "Verify the charge on your bank statement",
+                3: "Contact support if you were charged incorrectly",
+                4: "We'll investigate and process a refund if needed"
+              }
+            },
+            "cancel-order": {
+              title: "Cancel Order",
+              description: "Need to cancel your order",
+              solutions: {
+                1: "Orders can be cancelled within 5 minutes of placement",
+                2: "After 5 minutes, contact support for cancellation",
+                3: "If the order is already being prepared, cancellation may not be possible",
+                4: "Refunds are processed automatically for cancelled orders"
+              }
+            }
+          }
+        },
+        help: {
+          title: "Help Center",
+          subtitle: "Find answers to common questions or contact our support team",
+          searchPlaceholder: "Search for help topics, questions, or keywords...",
+          browseByCategory: "Browse by Category",
+          noResultsFound: "No results found",
+          tryDifferentKeywords: "Try searching with different keywords",
+          clearSearch: "Clear Search",
+          stillNeedHelp: "Still Need Help?",
+          supportAvailable: "Our support team is here to assist you 24/7",
+          phoneSupport: "Phone Support",
+          phoneSupportDescription: "Call us anytime",
+          emailSupport: "Email Support",
+          emailSupportDescription: "We'll respond within 24 hours",
+          liveChat: "Live Chat",
+          liveChatDescription: "Available 24/7",
+          liveChatPlaceholder: "Live chat would open here",
+          startChat: "Start Chat",
+          averageResponseTime: "Average response time: Less than 5 minutes",
+          quickActions: {
+            trackOrder: "Track Your Order",
+            trackOrderDescription: "View order status",
+            manageAccount: "Manage Account",
+            manageAccountDescription: "Update profile & settings",
+            contactSupport: "Contact Support",
+            contactSupportDescription: "Get help from our team"
+          },
+          categories: {
+            ordering: {
+              title: "Ordering",
+              description: "Learn how to place and manage orders",
+              topics: {
+                1: { question: "How do I place an order?", answer: "To place an order, browse restaurants, add items to your cart, and proceed to checkout. Select your delivery address and payment method, then confirm your order." },
+                2: { question: "Can I modify or cancel my order?", answer: "You can modify or cancel your order within 5 minutes of placing it. After that, please contact support for assistance." },
+                3: { question: "How do I track my order?", answer: "Go to 'My Orders' in your profile, select the order you want to track, and you'll see real-time updates on your order status." },
+                4: { question: "What is the minimum order amount?", answer: "The minimum order amount varies by restaurant, typically ranging from $10 to $15. This information is displayed on each restaurant's page." }
+              }
+            },
+            payments: {
+              title: "Payments",
+              description: "Payment methods and billing questions",
+              topics: {
+                1: { question: "What payment methods do you accept?", answer: "We accept all major credit cards, debit cards, digital wallets (Apple Pay, Google Pay), and cash on delivery in select areas." },
+                2: { question: "Is my payment information secure?", answer: "Yes, we use industry-standard encryption to protect your payment information. We never store your full card details." },
+                3: { question: "Can I get a refund?", answer: "Refunds are processed for cancelled orders, incorrect items, or quality issues. Contact support within 24 hours of delivery for assistance." },
+                4: { question: "Why was my payment declined?", answer: "Payment can be declined due to insufficient funds, incorrect card details, or bank restrictions. Please verify your payment method and try again." }
+              }
+            },
+            delivery: {
+              title: "Delivery",
+              description: "Delivery times, fees, and tracking",
+              topics: {
+                1: { question: "What are your delivery times?", answer: "Delivery times typically range from 30-60 minutes, depending on the restaurant and your location. Estimated time is shown before checkout." },
+                2: { question: "How much is the delivery fee?", answer: "Delivery fees vary by restaurant and distance, typically ranging from $2.99 to $5.99. The exact fee is shown before you place your order." },
+                3: { question: "What if my order is late?", answer: "If your order is significantly delayed, contact support. We'll investigate and may provide compensation or a refund." }
+              }
+            },
+            account: {
+              title: "Account & Profile",
+              description: "Manage your account and preferences",
+              topics: {
+                1: { question: "How do I update my profile?", answer: "Go to 'Profile' in the menu, then select 'Edit Profile' to update your name, email, phone number, and other information." },
+                2: { question: "How do I change my password?", answer: "Go to Profile > Settings > Security to change your password. You'll need to verify your current password first." },
+                3: { question: "How do I manage my addresses?", answer: "Navigate to Profile > Addresses to view, add, edit, or delete delivery addresses. Set a default address for faster checkout." },
+                4: { question: "How do I save my favorite restaurants?", answer: "Click the heart icon on any restaurant page to add it to your favorites. View all favorites in Profile > Favorites." }
+              }
+            },
+            refunds: {
+              title: "Refunds & Returns",
+              description: "Refund policy and return process",
+              topics: {
+                1: { question: "What is your refund policy?", answer: "We offer full refunds for cancelled orders, incorrect items, or quality issues reported within 24 hours of delivery." },
+                2: { question: "How long do refunds take?", answer: "Refunds are typically processed within 5-7 business days, depending on your payment method. You'll receive a confirmation email." },
+                3: { question: "Can I return food items?", answer: "Due to food safety regulations, we cannot accept returns of food items. However, we'll provide a full refund for quality issues." },
+                4: { question: "What if I received the wrong order?", answer: "Contact support immediately with your order number. We'll arrange a replacement or full refund, and you can keep the incorrect order." }
+              }
+            },
+            general: {
+              title: "General Questions",
+              description: "Other frequently asked questions",
+              topics: {
+                1: { question: "Do you offer discounts or promotions?", answer: "Yes! Check the 'Offers' section for current promotions, discount codes, and special deals from restaurants." },
+                2: { question: "How do I contact customer support?", answer: "You can contact us via phone, email, or live chat. Visit the 'Contact Support' section below for all contact options." },
+                3: { question: "Is there a mobile app?", answer: "Yes, our mobile app is available for iOS and Android. Download it from the App Store or Google Play for the best experience." },
+                4: { question: "Do you deliver to my area?", answer: "Enter your delivery address to see available restaurants in your area. We're constantly expanding our delivery zones." }
+              }
+            }
+          }
+        },
+        profile: {
+          defaultUserName: "यूज़र",
+          notAvailable: "उपलब्ध नहीं",
+          walletMoney: "{{companyName}} मनी",
+          yourCoupons: "आपके कूपन",
+          yourCart: "आपका कार्ट",
+          yourProfile: "आपकी प्रोफाइल",
+          profileCompletion: "{{percent}}% पूरा",
+          vegMode: "वेज मोड",
+          on: "चालू",
+          off: "बंद",
+          collections: "कलेक्शंस",
+          yourCollections: "आपके कलेक्शंस",
+          foodOrders: "फूड ऑर्डर्स",
+          yourOrders: "आपके ऑर्डर्स",
+          more: "और",
+          about: "अबाउट",
+          sendFeedback: "फीडबैक भेजें",
+          reportSafetyEmergency: "सुरक्षा आपात स्थिति रिपोर्ट करें",
+          settings: "सेटिंग्स",
+          loggingOut: "लॉगआउट हो रहा है...",
+          logOut: "लॉग आउट",
+          vegModeDescription: "अपनी डाइट पसंद के अनुसार रेस्टोरेंट और डिश फ़िल्टर करें",
+          vegModeOnTitle: "वेज मोड चालू",
+          vegModeOnDescription: "केवल शाकाहारी विकल्प दिखाएं",
+          vegModeOffTitle: "वेज मोड बंद",
+          vegModeOffDescription: "सभी विकल्प दिखाएं",
+          appearance: {
+            title: "अपीयरेंस",
+            description: "अपनी पसंदीदा थीम चुनें",
+            value: {
+              light: "लाइट",
+              dark: "डार्क"
+            },
+            light: "लाइट",
+            lightDescription: "डिफ़ॉल्ट लाइट थीम",
+            dark: "डार्क",
+            darkDescription: "डार्क थीम"
           }
         }
       },
@@ -3917,9 +4642,128 @@ export const resources = {
           loading: "লোড হচ্ছে...",
           currentLocation: "বর্তমান লোকেশন"
         },
+        locationExample: {
+          basicHookUsage: "বেসিক হুক ব্যবহার",
+          loadingLocation: "লোকেশন লোড হচ্ছে...",
+          area: "এলাকা",
+          city: "শহর",
+          state: "রাজ্য",
+          coordinates: "কোঅর্ডিনেটস",
+          notAvailable: "উপলব্ধ নয়",
+          getLocation: "লোকেশন নিন",
+          selectLocation: "লোকেশন নির্বাচন করুন",
+          deliveringTo: "ডেলিভারি হচ্ছে",
+          loading: "লোড হচ্ছে...",
+          usingLocationDisplayComponent: "LocationDisplay কম্পোনেন্ট ব্যবহার",
+          fullDisplay: "ফুল ডিসপ্লে",
+          compactDisplayNavbar: "কমপ্যাক্ট ডিসপ্লে (নেভবার)",
+          fullLocationDisplay: "পূর্ণ লোকেশন ডিসপ্লে",
+          allowLocation: "লোকেশন অনুমতি দিন",
+          cart: "কার্ট",
+          profile: "প্রোফাইল"
+        },
         userHome: {
           title: "ইউজার মডিউল",
           subtitle: "ইউজার সেকশনে স্বাগতম"
+        },
+        auth: {
+          signIn: {
+            bannerAlt: "ফুড ব্যানার",
+            title: "ভারতের #1 ফুড ডেলিভারি অ্যাপ",
+            subtitle: "লগ ইন করুন বা সাইন আপ করুন",
+            selectCountryCode: "দেশ কোড নির্বাচন করুন",
+            placeholders: {
+              fullName: "আপনার পূর্ণ নাম লিখুন",
+              phoneNumber: "ফোন নম্বর লিখুন",
+              email: "আপনার ইমেইল ঠিকানা লিখুন"
+            },
+            usePhoneInstead: "এর বদলে ফোন ব্যবহার করুন",
+            rememberMe: "দ্রুত সাইন-ইনের জন্য আমার লগইন মনে রাখুন",
+            creatingAccount: "অ্যাকাউন্ট তৈরি হচ্ছে...",
+            signingIn: "সাইন ইন হচ্ছে...",
+            continue: "চালিয়ে যান",
+            or: "অথবা",
+            signInWithGoogle: "Google দিয়ে সাইন ইন করুন",
+            signInWithEmail: "ইমেইল দিয়ে সাইন ইন করুন",
+            disclaimer: "চালিয়ে গেলে, আপনি আমাদের এই নীতিগুলিতে সম্মতি দিচ্ছেন",
+            termsOfService: "সেবার শর্তাবলী",
+            privacyPolicy: "গোপনীয়তা নীতি",
+            contentPolicy: "কনটেন্ট নীতি",
+            validation: {
+              emailRequired: "ইমেইল প্রয়োজন",
+              emailInvalid: "অনুগ্রহ করে সঠিক ইমেইল ঠিকানা লিখুন",
+              phoneRequired: "ফোন নম্বর প্রয়োজন",
+              phone10Digits: "ফোন নম্বর 10 সংখ্যার হতে হবে",
+              phoneRange: "ফোন নম্বর 7-15 সংখ্যার মধ্যে হতে হবে",
+              nameRequired: "নাম প্রয়োজন",
+              nameMin: "নাম কমপক্ষে 2 অক্ষরের হতে হবে",
+              nameMax: "নাম 50 অক্ষরের কম হতে হবে",
+              namePattern: "নামে শুধু অক্ষর, স্পেস, হাইফেন এবং অ্যাপোস্ট্রফি থাকতে পারে"
+            },
+            errors: {
+              invalidServerResponse: "সার্ভার থেকে অবৈধ রেসপন্স এসেছে। আবার চেষ্টা করুন।",
+              failedToCompleteSignIn: "সাইন-ইন সম্পূর্ণ করা যায়নি। আবার চেষ্টা করুন।",
+              googleSignInFailed: "Google সাইন-ইন ব্যর্থ হয়েছে। আবার চেষ্টা করুন।",
+              serverError: "সার্ভার ত্রুটি। পরে আবার চেষ্টা করুন।",
+              authenticationFailed: "অথেন্টিকেশন ব্যর্থ হয়েছে। আবার চেষ্টা করুন।",
+              networkError: "নেটওয়ার্ক ত্রুটি। সংযোগ পরীক্ষা করে আবার চেষ্টা করুন।",
+              invalidCredentials: "অবৈধ ক্রেডেনশিয়াল। আবার চেষ্টা করুন।",
+              failedToSendOtp: "OTP পাঠানো যায়নি। আবার চেষ্টা করুন।",
+              firebaseNotInitialized: "Firebase Auth ইনিশিয়ালাইজ হয়নি। আপনার Firebase কনফিগারেশন পরীক্ষা করুন।",
+              firebaseConfiguration: "Firebase কনফিগারেশন ত্রুটি। Firebase Console-এ আপনার ডোমেইন অনুমোদিত আছে কি না নিশ্চিত করুন। বর্তমান ডোমেইন: {{domain}}",
+              popupBlocked: "পপআপ ব্লক করা হয়েছে। পপআপ অনুমতি দিয়ে আবার চেষ্টা করুন।",
+              signInCancelled: "সাইন-ইন বাতিল করা হয়েছে। আবার চেষ্টা করুন।"
+            }
+          },
+          otp: {
+            title: "OTP যাচাইকরণ",
+            oneLastThing: "আরেকটি ছোট বিষয়",
+            namePrompt: "প্রোফাইল সম্পূর্ণ করতে আপনার নামটি জানান",
+            enterOtpSentTo: "অনুগ্রহ করে আপনার {{target}}-এ পাঠানো OTP দিন",
+            email: "ইমেইল",
+            mobileNumber: "মোবাইল নম্বর",
+            sentTo: "পাঠানো হয়েছে",
+            didntReceiveCode: "কোড পাননি?",
+            remaining: "বাকি",
+            resendOtp: "OTP পুনরায় পাঠান",
+            yourFullName: "আপনার পূর্ণ নাম",
+            namePlaceholder: "যেমন: Rahul Sharma",
+            completeRegistration: "রেজিস্ট্রেশন সম্পূর্ণ করুন",
+            submit: "সাবমিট",
+            changeMobileNumber: "মোবাইল নম্বর পরিবর্তন করুন",
+            validation: {
+              nameRequired: "নাম প্রয়োজন",
+              nameMin: "নাম কমপক্ষে 2 অক্ষরের হতে হবে"
+            },
+            errors: {
+              invalidServerResponse: "সার্ভার থেকে অবৈধ রেসপন্স এসেছে",
+              failedToVerify: "OTP যাচাই করা যায়নি। আবার চেষ্টা করুন।",
+              verificationStepMissing: "OTP যাচাইকরণ ধাপ পাওয়া যায়নি। নতুন OTP অনুরোধ করুন।",
+              failedToCompleteRegistration: "রেজিস্ট্রেশন সম্পূর্ণ করা যায়নি। আবার চেষ্টা করুন।",
+              failedToResend: "OTP পুনরায় পাঠানো যায়নি। আবার চেষ্টা করুন।"
+            }
+          }
+        },
+        notificationPopup: {
+          specialOffer: "স্পেশাল অফার",
+          close: "বন্ধ করুন"
+        },
+        collectionsPage: {
+          yourCollections: "আপনার কালেকশনস",
+          defaultBookmarks: "বুকমার্কস",
+          delivery: "ডেলিভারি",
+          dishCount_one: "{{count}} ডিশ",
+          dishCount_other: "{{count}} ডিশ",
+          restaurantCount_one: "{{count}} রেস্টুরেন্ট",
+          restaurantCount_other: "{{count}} রেস্টুরেন্ট",
+          itemCounts: "{{dishes}} {{dishesLabel}} • {{restaurants}} {{restaurantsLabel}}",
+          createNew: "নতুন তৈরি করুন",
+          collection: "কালেকশন",
+          createNewCollection: "নতুন কালেকশন তৈরি করুন",
+          uniqueNamePrompt: "আপনার কালেকশনের জন্য একটি আলাদা নাম দিন",
+          collectionNamePlaceholder: "যেমন, উইকএন্ড ফেভারিটস",
+          preview: "প্রিভিউ",
+          createCollection: "কালেকশন তৈরি করুন"
         },
         home: {
           exploreMoreHeading: "আরও দেখুন",
@@ -4193,6 +5037,248 @@ export const resources = {
               label: "ক্যাশ অন ডেলিভারি",
               description: "অর্ডার পৌঁছালে পেমেন্ট করুন"
             }
+          }
+        },
+        orderHelp: {
+          na: "N/A",
+          title: "Order Help",
+          orderWithId: "Order {{id}}",
+          orderSummary: "Order Summary",
+          orderId: "Order ID",
+          placedOn: "Placed On",
+          totalAmount: "Total Amount",
+          items: "Items",
+          itemsCount_one: "{{count}} item",
+          itemsCount_other: "{{count}} items",
+          deliveryAddress: "Delivery Address",
+          whatCanWeHelpWith: "What can we help you with?",
+          whatToDo: "What to do:",
+          quickActions: "Quick Actions",
+          trackOrderDescription: "View real-time status",
+          viewInvoiceDescription: "Download receipt",
+          contactSupportDescription: "Get help now",
+          contactSupportForOrder: "Contact Support for This Order",
+          supportReadyDescription: "Our support team is ready to help you with order {{id}}",
+          phoneSupport: "Phone Support",
+          mentionOrder: "Mention order {{id}}",
+          emailSupport: "Email Support",
+          includeOrderInSubject: "Include order {{id}} in subject",
+          startLiveChat: "Start Live Chat",
+          backToAllOrders: "Back to All Orders",
+          helpCenter: "Help Center",
+          orderNotFound: "Order Not Found",
+          orderNotFoundDescription: "We couldn't find an order with ID: {{orderId}}",
+          viewAllOrders: "View All Orders",
+          goToHelpCenter: "Go to Help Center",
+          status: {
+            confirmed: "Confirmed",
+            preparing: "Preparing",
+            outForDelivery: "Out for Delivery",
+            delivered: "Delivered"
+          },
+          toast: {
+            refundRequestPlaceholder: "Refund request would be processed here. Contact support for assistance.",
+            liveChatPlaceholder: "Live chat would open here with order context"
+          },
+          actions: {
+            trackOrder: "Track Order",
+            contactSupport: "Contact Support",
+            viewInvoice: "View Invoice",
+            reportIssue: "Report Issue",
+            viewOrderDetails: "View Order Details",
+            requestRefund: "Request Refund",
+            viewOrder: "View Order"
+          },
+          issues: {
+            "late-delivery": {
+              title: "Order is Late",
+              description: "Your order hasn't arrived within the estimated time",
+              solutions: {
+                1: "Check the order tracking page for real-time updates",
+                2: "Contact the delivery driver if contact information is available",
+                3: "Wait an additional 15-20 minutes as delays can occur",
+                4: "Contact support if the order is more than 30 minutes late"
+              }
+            },
+            "missing-items": {
+              title: "Missing Items",
+              description: "Some items from your order are missing",
+              solutions: {
+                1: "Check your order receipt to verify what was ordered",
+                2: "Check if items were delivered separately",
+                3: "Contact support immediately with your order number",
+                4: "Take photos if possible to help with the investigation"
+              }
+            },
+            "wrong-order": {
+              title: "Wrong Order Received",
+              description: "You received items different from what you ordered",
+              solutions: {
+                1: "Keep the incorrect order - you won't be charged for it",
+                2: "Contact support immediately with your order number",
+                3: "We'll arrange a replacement or full refund",
+                4: "You may be eligible for a discount on your next order"
+              }
+            },
+            "quality-issue": {
+              title: "Quality Issue",
+              description: "Food quality doesn't meet expectations",
+              solutions: {
+                1: "Contact support within 24 hours of delivery",
+                2: "Describe the issue in detail",
+                3: "Take photos if possible",
+                4: "We'll process a full refund or replacement"
+              }
+            },
+            "payment-issue": {
+              title: "Payment Problem",
+              description: "Issues with payment or billing",
+              solutions: {
+                1: "Check your payment method in your profile",
+                2: "Verify the charge on your bank statement",
+                3: "Contact support if you were charged incorrectly",
+                4: "We'll investigate and process a refund if needed"
+              }
+            },
+            "cancel-order": {
+              title: "Cancel Order",
+              description: "Need to cancel your order",
+              solutions: {
+                1: "Orders can be cancelled within 5 minutes of placement",
+                2: "After 5 minutes, contact support for cancellation",
+                3: "If the order is already being prepared, cancellation may not be possible",
+                4: "Refunds are processed automatically for cancelled orders"
+              }
+            }
+          }
+        },
+        help: {
+          title: "Help Center",
+          subtitle: "Find answers to common questions or contact our support team",
+          searchPlaceholder: "Search for help topics, questions, or keywords...",
+          browseByCategory: "Browse by Category",
+          noResultsFound: "No results found",
+          tryDifferentKeywords: "Try searching with different keywords",
+          clearSearch: "Clear Search",
+          stillNeedHelp: "Still Need Help?",
+          supportAvailable: "Our support team is here to assist you 24/7",
+          phoneSupport: "Phone Support",
+          phoneSupportDescription: "Call us anytime",
+          emailSupport: "Email Support",
+          emailSupportDescription: "We'll respond within 24 hours",
+          liveChat: "Live Chat",
+          liveChatDescription: "Available 24/7",
+          liveChatPlaceholder: "Live chat would open here",
+          startChat: "Start Chat",
+          averageResponseTime: "Average response time: Less than 5 minutes",
+          quickActions: {
+            trackOrder: "Track Your Order",
+            trackOrderDescription: "View order status",
+            manageAccount: "Manage Account",
+            manageAccountDescription: "Update profile & settings",
+            contactSupport: "Contact Support",
+            contactSupportDescription: "Get help from our team"
+          },
+          categories: {
+            ordering: {
+              title: "Ordering",
+              description: "Learn how to place and manage orders",
+              topics: {
+                1: { question: "How do I place an order?", answer: "To place an order, browse restaurants, add items to your cart, and proceed to checkout. Select your delivery address and payment method, then confirm your order." },
+                2: { question: "Can I modify or cancel my order?", answer: "You can modify or cancel your order within 5 minutes of placing it. After that, please contact support for assistance." },
+                3: { question: "How do I track my order?", answer: "Go to 'My Orders' in your profile, select the order you want to track, and you'll see real-time updates on your order status." },
+                4: { question: "What is the minimum order amount?", answer: "The minimum order amount varies by restaurant, typically ranging from $10 to $15. This information is displayed on each restaurant's page." }
+              }
+            },
+            payments: {
+              title: "Payments",
+              description: "Payment methods and billing questions",
+              topics: {
+                1: { question: "What payment methods do you accept?", answer: "We accept all major credit cards, debit cards, digital wallets (Apple Pay, Google Pay), and cash on delivery in select areas." },
+                2: { question: "Is my payment information secure?", answer: "Yes, we use industry-standard encryption to protect your payment information. We never store your full card details." },
+                3: { question: "Can I get a refund?", answer: "Refunds are processed for cancelled orders, incorrect items, or quality issues. Contact support within 24 hours of delivery for assistance." },
+                4: { question: "Why was my payment declined?", answer: "Payment can be declined due to insufficient funds, incorrect card details, or bank restrictions. Please verify your payment method and try again." }
+              }
+            },
+            delivery: {
+              title: "Delivery",
+              description: "Delivery times, fees, and tracking",
+              topics: {
+                1: { question: "What are your delivery times?", answer: "Delivery times typically range from 30-60 minutes, depending on the restaurant and your location. Estimated time is shown before checkout." },
+                2: { question: "How much is the delivery fee?", answer: "Delivery fees vary by restaurant and distance, typically ranging from $2.99 to $5.99. The exact fee is shown before you place your order." },
+                3: { question: "What if my order is late?", answer: "If your order is significantly delayed, contact support. We'll investigate and may provide compensation or a refund." }
+              }
+            },
+            account: {
+              title: "Account & Profile",
+              description: "Manage your account and preferences",
+              topics: {
+                1: { question: "How do I update my profile?", answer: "Go to 'Profile' in the menu, then select 'Edit Profile' to update your name, email, phone number, and other information." },
+                2: { question: "How do I change my password?", answer: "Go to Profile > Settings > Security to change your password. You'll need to verify your current password first." },
+                3: { question: "How do I manage my addresses?", answer: "Navigate to Profile > Addresses to view, add, edit, or delete delivery addresses. Set a default address for faster checkout." },
+                4: { question: "How do I save my favorite restaurants?", answer: "Click the heart icon on any restaurant page to add it to your favorites. View all favorites in Profile > Favorites." }
+              }
+            },
+            refunds: {
+              title: "Refunds & Returns",
+              description: "Refund policy and return process",
+              topics: {
+                1: { question: "What is your refund policy?", answer: "We offer full refunds for cancelled orders, incorrect items, or quality issues reported within 24 hours of delivery." },
+                2: { question: "How long do refunds take?", answer: "Refunds are typically processed within 5-7 business days, depending on your payment method. You'll receive a confirmation email." },
+                3: { question: "Can I return food items?", answer: "Due to food safety regulations, we cannot accept returns of food items. However, we'll provide a full refund for quality issues." },
+                4: { question: "What if I received the wrong order?", answer: "Contact support immediately with your order number. We'll arrange a replacement or full refund, and you can keep the incorrect order." }
+              }
+            },
+            general: {
+              title: "General Questions",
+              description: "Other frequently asked questions",
+              topics: {
+                1: { question: "Do you offer discounts or promotions?", answer: "Yes! Check the 'Offers' section for current promotions, discount codes, and special deals from restaurants." },
+                2: { question: "How do I contact customer support?", answer: "You can contact us via phone, email, or live chat. Visit the 'Contact Support' section below for all contact options." },
+                3: { question: "Is there a mobile app?", answer: "Yes, our mobile app is available for iOS and Android. Download it from the App Store or Google Play for the best experience." },
+                4: { question: "Do you deliver to my area?", answer: "Enter your delivery address to see available restaurants in your area. We're constantly expanding our delivery zones." }
+              }
+            }
+          }
+        },
+        profile: {
+          defaultUserName: "ইউজার",
+          notAvailable: "উপলব্ধ নয়",
+          walletMoney: "{{companyName}} মানি",
+          yourCoupons: "আপনার কুপন",
+          yourCart: "আপনার কার্ট",
+          yourProfile: "আপনার প্রোফাইল",
+          profileCompletion: "{{percent}}% সম্পন্ন",
+          vegMode: "ভেজ মোড",
+          on: "চালু",
+          off: "বন্ধ",
+          collections: "কালেকশনস",
+          yourCollections: "আপনার কালেকশনস",
+          foodOrders: "ফুড অর্ডার্স",
+          yourOrders: "আপনার অর্ডার",
+          more: "আরও",
+          about: "সম্পর্কে",
+          sendFeedback: "ফিডব্যাক পাঠান",
+          reportSafetyEmergency: "নিরাপত্তা জরুরি অবস্থা রিপোর্ট করুন",
+          settings: "সেটিংস",
+          loggingOut: "লগআউট হচ্ছে...",
+          logOut: "লগ আউট",
+          vegModeDescription: "আপনার ডায়েট পছন্দ অনুযায়ী রেস্টুরেন্ট ও ডিশ ফিল্টার করুন",
+          vegModeOnTitle: "ভেজ মোড চালু",
+          vegModeOnDescription: "শুধু নিরামিষ অপশন দেখান",
+          vegModeOffTitle: "ভেজ মোড বন্ধ",
+          vegModeOffDescription: "সব অপশন দেখান",
+          appearance: {
+            title: "অ্যাপিয়ারেন্স",
+            description: "আপনার পছন্দের থিম বেছে নিন",
+            value: {
+              light: "লাইট",
+              dark: "ডার্ক"
+            },
+            light: "লাইট",
+            lightDescription: "ডিফল্ট লাইট থিম",
+            dark: "ডার্ক",
+            darkDescription: "ডার্ক থিম"
           }
         }
       },

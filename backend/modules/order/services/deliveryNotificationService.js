@@ -256,8 +256,8 @@ export async function notifyDeliveryBoyNewOrder(order, deliveryPartnerId) {
       })),
       total: order.pricing.total,
       deliveryFee: deliveryFeeFromOrder,
-      customerName: orderWithUser.userId?.name || 'Customer',
-      customerPhone: orderWithUser.userId?.phone || '',
+      customerName: order?.customerName?.trim() || orderWithUser.userId?.name || 'Customer',
+      customerPhone: order?.customerPhone?.trim() || orderWithUser.userId?.phone || '',
       status: order.status,
       createdAt: order.createdAt,
       estimatedDeliveryTime: order.estimatedDeliveryTime || 30,
@@ -509,8 +509,8 @@ export async function notifyMultipleDeliveryBoys(order, deliveryPartnerIds, phas
         address: restaurantLocation.formattedAddress || restaurantLocation.address || restaurantAddress,
         formattedAddress: restaurantLocation.formattedAddress || restaurantLocation.address || restaurantAddress
       } : null,
-      customerName: orderWithUser.userId?.name || 'Customer',
-      customerPhone: orderWithUser.userId?.phone || '',
+      customerName: order?.customerName?.trim() || orderWithUser.userId?.name || 'Customer',
+      customerPhone: order?.customerPhone?.trim() || orderWithUser.userId?.phone || '',
       deliveryAddress: orderWithUser.address?.address || orderWithUser.address?.location?.address || orderWithUser.address?.formattedAddress,
       customerLocation: orderWithUser.address?.location ? {
         latitude: orderWithUser.address.location.coordinates?.[1],

@@ -22,116 +22,42 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { useOrders } from "../../context/OrdersContext"
+import { useTranslation } from "react-i18next"
 
-const commonIssues = [
-  {
-    id: "late-delivery",
-    title: "Order is Late",
-    icon: Clock,
-    description: "Your order hasn't arrived within the estimated time",
-    solutions: [
-      "Check the order tracking page for real-time updates",
-      "Contact the delivery driver if contact information is available",
-      "Wait an additional 15-20 minutes as delays can occur",
-      "Contact support if the order is more than 30 minutes late"
-    ],
-    actions: [
-      { label: "Track Order", path: "track" },
-      { label: "Contact Support", path: "support" }
-    ]
-  },
-  {
-    id: "missing-items",
-    title: "Missing Items",
-    icon: Package,
-    description: "Some items from your order are missing",
-    solutions: [
-      "Check your order receipt to verify what was ordered",
-      "Check if items were delivered separately",
-      "Contact support immediately with your order number",
-      "Take photos if possible to help with the investigation"
-    ],
-    actions: [
-      { label: "View Invoice", path: "invoice" },
-      { label: "Report Issue", path: "support" }
-    ]
-  },
-  {
-    id: "wrong-order",
-    title: "Wrong Order Received",
-    icon: XCircle,
-    description: "You received items different from what you ordered",
-    solutions: [
-      "Keep the incorrect order - you won't be charged for it",
-      "Contact support immediately with your order number",
-      "We'll arrange a replacement or full refund",
-      "You may be eligible for a discount on your next order"
-    ],
-    actions: [
-      { label: "View Order Details", path: "track" },
-      { label: "Report Issue", path: "support" }
-    ]
-  },
-  {
-    id: "quality-issue",
-    title: "Quality Issue",
-    icon: AlertCircle,
-    description: "Food quality doesn't meet expectations",
-    solutions: [
-      "Contact support within 24 hours of delivery",
-      "Describe the issue in detail",
-      "Take photos if possible",
-      "We'll process a full refund or replacement"
-    ],
-    actions: [
-      { label: "Report Issue", path: "support" },
-      { label: "Request Refund", path: "refund" }
-    ]
-  },
-  {
-    id: "payment-issue",
-    title: "Payment Problem",
-    icon: CreditCard,
-    description: "Issues with payment or billing",
-    solutions: [
-      "Check your payment method in your profile",
-      "Verify the charge on your bank statement",
-      "Contact support if you were charged incorrectly",
-      "We'll investigate and process a refund if needed"
-    ],
-    actions: [
-      { label: "View Invoice", path: "invoice" },
-      { label: "Contact Support", path: "support" }
-    ]
-  },
-  {
-    id: "cancel-order",
-    title: "Cancel Order",
-    icon: RefreshCw,
-    description: "Need to cancel your order",
-    solutions: [
-      "Orders can be cancelled within 5 minutes of placement",
-      "After 5 minutes, contact support for cancellation",
-      "If the order is already being prepared, cancellation may not be possible",
-      "Refunds are processed automatically for cancelled orders"
-    ],
-    actions: [
-      { label: "Contact Support", path: "support" },
-      { label: "View Order", path: "track" }
-    ]
-  }
+const commonIssueConfig = [
+  { id: "late-delivery", icon: Clock, actionKeys: ["trackOrder", "contactSupport"], actionPaths: ["track", "support"], solutionCount: 4 },
+  { id: "missing-items", icon: Package, actionKeys: ["viewInvoice", "reportIssue"], actionPaths: ["invoice", "support"], solutionCount: 4 },
+  { id: "wrong-order", icon: XCircle, actionKeys: ["viewOrderDetails", "reportIssue"], actionPaths: ["track", "support"], solutionCount: 4 },
+  { id: "quality-issue", icon: AlertCircle, actionKeys: ["reportIssue", "requestRefund"], actionPaths: ["support", "refund"], solutionCount: 4 },
+  { id: "payment-issue", icon: CreditCard, actionKeys: ["viewInvoice", "contactSupport"], actionPaths: ["invoice", "support"], solutionCount: 4 },
+  { id: "cancel-order", icon: RefreshCw, actionKeys: ["contactSupport", "viewOrder"], actionPaths: ["support", "track"], solutionCount: 4 }
 ]
 
 export default function OrderHelp() {
+  const { t, i18n } = useTranslation()
   const { orderId } = useParams()
   const navigate = useNavigate()
   const { getOrderById } = useOrders()
   const order = getOrderById(orderId)
+  const commonIssues = commonIssueConfig.map((issue) => ({
+    id: issue.id,
+    icon: issue.icon,
+    title: t(`user.orderHelp.issues.${issue.id}.title`),
+    description: t(`user.orderHelp.issues.${issue.id}.description`),
+    solutions: Array.from({ length: issue.solutionCount }, (_, idx) =>
+      t(`user.orderHelp.issues.${issue.id}.solutions.${idx + 1}`)
+    ),
+    actions: issue.actionKeys.map((key, idx) => ({
+      label: t(`user.orderHelp.actions.${key}`),
+      path: issue.actionPaths[idx]
+    }))
+  }))
 
   const formatDate = (dateString) => {
-    if (!dateString) return "N/A"
+    if (!dateString) return t("user.orderHelp.na")
     const date = new Date(dateString)
-    return date.toLocaleDateString('en-US', { 
+    const localeMap = { en: "en-US", hi: "hi-IN", bn: "bn-BD" }
+    return date.toLocaleDateString(localeMap[i18n.language] || "en-US", { 
       year: 'numeric', 
       month: 'short', 
       day: 'numeric',
@@ -158,13 +84,13 @@ export default function OrderHelp() {
   const getStatusLabel = (status) => {
     switch (status) {
       case "confirmed":
-        return "Confirmed"
+        return t("user.orderHelp.status.confirmed")
       case "preparing":
-        return "Preparing"
+        return t("user.orderHelp.status.preparing")
       case "outForDelivery":
-        return "Out for Delivery"
+        return t("user.orderHelp.status.outForDelivery")
       case "delivered":
-        return "Delivered"
+        return t("user.orderHelp.status.delivered")
       default:
         return status
     }
@@ -183,7 +109,7 @@ export default function OrderHelp() {
         document.getElementById("contact-support")?.scrollIntoView({ behavior: "smooth" })
         break
       case "refund":
-        alert("Refund request would be processed here. Contact support for assistance.")
+        alert(t("user.orderHelp.toast.refundRequestPlaceholder"))
         break
       default:
         break
@@ -197,16 +123,16 @@ export default function OrderHelp() {
           <Card>
             <CardContent className="py-12 text-center">
               <AlertCircle className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-              <h2 className="text-2xl font-bold mb-2">Order Not Found</h2>
+              <h2 className="text-2xl font-bold mb-2">{t("user.orderHelp.orderNotFound")}</h2>
               <p className="text-muted-foreground mb-6">
-                We couldn't find an order with ID: {orderId}
+                {t("user.orderHelp.orderNotFoundDescription", { orderId })}
               </p>
               <div className="flex gap-4 justify-center">
                 <Link to="/user/orders">
-                  <Button variant="outline">View All Orders</Button>
+                  <Button variant="outline">{t("user.orderHelp.viewAllOrders")}</Button>
                 </Link>
                 <Link to="/user/help">
-                  <Button>Go to Help Center</Button>
+                  <Button>{t("user.orderHelp.goToHelpCenter")}</Button>
                 </Link>
               </div>
             </CardContent>
@@ -228,8 +154,8 @@ export default function OrderHelp() {
               </Button>
             </Link>
             <div>
-              <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold">Order Help</h1>
-              <p className="text-sm md:text-base text-muted-foreground">Order {order.id}</p>
+              <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold">{t("user.orderHelp.title")}</h1>
+              <p className="text-sm md:text-base text-muted-foreground">{t("user.orderHelp.orderWithId", { id: order.id })}</p>
             </div>
           </div>
         </ScrollReveal>
@@ -241,7 +167,7 @@ export default function OrderHelp() {
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2 text-lg md:text-xl lg:text-2xl">
                   <Package className="h-4 w-4 md:h-5 md:w-5 text-primary-orange" />
-                  Order Summary
+                  {t("user.orderHelp.orderSummary")}
                 </CardTitle>
                 <Badge className={`${getStatusColor(order.status)} text-white text-xs md:text-sm`}>
                   {getStatusLabel(order.status)}
@@ -251,20 +177,20 @@ export default function OrderHelp() {
             <CardContent className="space-y-4 md:space-y-5 p-4 md:p-5 lg:p-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5">
                 <div>
-                  <p className="text-sm text-muted-foreground mb-1">Order ID</p>
+                  <p className="text-sm text-muted-foreground mb-1">{t("user.orderHelp.orderId")}</p>
                   <p className="font-semibold">{order.id}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground mb-1">Placed On</p>
+                  <p className="text-sm text-muted-foreground mb-1">{t("user.orderHelp.placedOn")}</p>
                   <p className="font-semibold">{formatDate(order.createdAt)}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground mb-1">Total Amount</p>
+                  <p className="text-sm text-muted-foreground mb-1">{t("user.orderHelp.totalAmount")}</p>
                   <p className="font-semibold text-primary-orange text-xl">${order.total.toFixed(2)}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground mb-1">Items</p>
-                  <p className="font-semibold">{order.items?.length || 0} items</p>
+                  <p className="text-sm text-muted-foreground mb-1">{t("user.orderHelp.items")}</p>
+                  <p className="font-semibold">{t("user.orderHelp.itemsCount", { count: order.items?.length || 0 })}</p>
                 </div>
               </div>
               {order.address && (
@@ -272,7 +198,7 @@ export default function OrderHelp() {
                   <div className="flex items-start gap-2">
                     <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
                     <div>
-                      <p className="text-sm text-muted-foreground mb-1">Delivery Address</p>
+                      <p className="text-sm text-muted-foreground mb-1">{t("user.orderHelp.deliveryAddress")}</p>
                       <p className="text-sm">
                         {order.address.street}
                         {order.address.additionalDetails && `, ${order.address.additionalDetails}`}
@@ -290,7 +216,7 @@ export default function OrderHelp() {
         {/* Common Issues */}
         <ScrollReveal delay={0.2}>
           <div className="space-y-4 md:space-y-5 lg:space-y-6">
-            <h2 className="text-xl md:text-2xl lg:text-3xl font-bold">What can we help you with?</h2>
+            <h2 className="text-xl md:text-2xl lg:text-3xl font-bold">{t("user.orderHelp.whatCanWeHelpWith")}</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5 lg:gap-6">
               {commonIssues.map((issue, index) => {
                 const Icon = issue.icon
@@ -311,7 +237,7 @@ export default function OrderHelp() {
                     </CardHeader>
                     <CardContent className="space-y-3 md:space-y-4 p-4 md:p-5 lg:p-6">
                       <div className="space-y-2">
-                        <p className="text-sm font-semibold">What to do:</p>
+                        <p className="text-sm font-semibold">{t("user.orderHelp.whatToDo")}</p>
                         <ul className="space-y-1 text-sm text-muted-foreground">
                           {issue.solutions.map((solution, idx) => (
                             <li key={idx} className="flex items-start gap-2">
@@ -348,7 +274,7 @@ export default function OrderHelp() {
             <CardHeader className="p-4 md:p-5 lg:p-6">
               <CardTitle className="flex items-center gap-2 text-lg md:text-xl lg:text-2xl">
                 <HelpCircle className="h-4 w-4 md:h-5 md:w-5 text-primary-orange" />
-                Quick Actions
+                {t("user.orderHelp.quickActions")}
               </CardTitle>
             </CardHeader>
             <CardContent className="p-4 md:p-5 lg:p-6">
@@ -358,10 +284,10 @@ export default function OrderHelp() {
                     variant="outline"
                     className="w-full justify-start gap-2 h-auto py-3"
                   >
-                    <Truck className="h-4 w-4" />
-                    <div className="text-left">
-                      <div className="font-semibold">Track Order</div>
-                      <div className="text-xs text-muted-foreground">View real-time status</div>
+                      <Truck className="h-4 w-4" />
+                      <div className="text-left">
+                      <div className="font-semibold">{t("user.orderHelp.actions.trackOrder")}</div>
+                      <div className="text-xs text-muted-foreground">{t("user.orderHelp.trackOrderDescription")}</div>
                     </div>
                   </Button>
                 </Link>
@@ -370,10 +296,10 @@ export default function OrderHelp() {
                     variant="outline"
                     className="w-full justify-start gap-2 h-auto py-3"
                   >
-                    <FileText className="h-4 w-4" />
-                    <div className="text-left">
-                      <div className="font-semibold">View Invoice</div>
-                      <div className="text-xs text-muted-foreground">Download receipt</div>
+                      <FileText className="h-4 w-4" />
+                      <div className="text-left">
+                      <div className="font-semibold">{t("user.orderHelp.actions.viewInvoice")}</div>
+                      <div className="text-xs text-muted-foreground">{t("user.orderHelp.viewInvoiceDescription")}</div>
                     </div>
                   </Button>
                 </Link>
@@ -384,8 +310,8 @@ export default function OrderHelp() {
                 >
                   <MessageCircle className="h-4 w-4" />
                   <div className="text-left">
-                    <div className="font-semibold">Contact Support</div>
-                    <div className="text-xs text-muted-foreground">Get help now</div>
+                    <div className="font-semibold">{t("user.orderHelp.actions.contactSupport")}</div>
+                    <div className="text-xs text-muted-foreground">{t("user.orderHelp.contactSupportDescription")}</div>
                   </div>
                 </Button>
               </div>
@@ -399,10 +325,10 @@ export default function OrderHelp() {
             <CardHeader className="p-4 md:p-5 lg:p-6">
               <CardTitle className="text-xl md:text-2xl lg:text-3xl flex items-center gap-2">
                 <MessageCircle className="h-5 w-5 md:h-6 md:w-6 text-primary-orange" />
-                Contact Support for This Order
+                {t("user.orderHelp.contactSupportForOrder")}
               </CardTitle>
               <CardDescription className="text-sm md:text-base">
-                Our support team is ready to help you with order {order.id}
+                {t("user.orderHelp.supportReadyDescription", { id: order.id })}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4 md:space-y-5 lg:space-y-6 p-4 md:p-5 lg:p-6">
@@ -412,9 +338,9 @@ export default function OrderHelp() {
                     <Phone className="h-5 w-5 text-blue-600" />
                   </div>
                   <div>
-                    <h3 className="font-semibold mb-1">Phone Support</h3>
+                    <h3 className="font-semibold mb-1">{t("user.orderHelp.phoneSupport")}</h3>
                     <p className="text-sm text-muted-foreground mb-2">
-                      Mention order {order.id}
+                      {t("user.orderHelp.mentionOrder", { id: order.id })}
                     </p>
                     <a
                       href="tel:+1-800-123-4567"
@@ -429,9 +355,9 @@ export default function OrderHelp() {
                     <Mail className="h-5 w-5 text-green-600" />
                   </div>
                   <div>
-                    <h3 className="font-semibold mb-1">Email Support</h3>
+                    <h3 className="font-semibold mb-1">{t("user.orderHelp.emailSupport")}</h3>
                     <p className="text-sm text-muted-foreground mb-2">
-                      Include order {order.id} in subject
+                      {t("user.orderHelp.includeOrderInSubject", { id: order.id })}
                     </p>
                     <a
                       href={`mailto:support@appzeto.com?subject=Help with Order ${order.id}`}
@@ -445,10 +371,10 @@ export default function OrderHelp() {
               <div className="pt-4 border-t">
                 <Button
                   className="w-full bg-primary-orange hover:opacity-90"
-                  onClick={() => alert("Live chat would open here with order context")}
+                  onClick={() => alert(t("user.orderHelp.toast.liveChatPlaceholder"))}
                 >
                   <MessageCircle className="h-4 w-4 mr-2" />
-                  Start Live Chat
+                  {t("user.orderHelp.startLiveChat")}
                 </Button>
               </div>
             </CardContent>
@@ -461,13 +387,13 @@ export default function OrderHelp() {
             <Link to="/user/orders" className="flex-1">
               <Button variant="outline" className="w-full">
                 <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to All Orders
+                {t("user.orderHelp.backToAllOrders")}
               </Button>
             </Link>
             <Link to="/user/help" className="flex-1">
               <Button variant="outline" className="w-full">
                 <HelpCircle className="h-4 w-4 mr-2" />
-                Help Center
+                {t("user.orderHelp.helpCenter")}
               </Button>
             </Link>
           </div>

@@ -5,11 +5,71 @@ import Top10Restaurant from '../models/Top10Restaurant.js';
 import GourmetRestaurant from '../models/GourmetRestaurant.js';
 import Under250Banner from '../models/Under250Banner.js';
 import Restaurant from '../../restaurant/models/Restaurant.js';
+import Order from '../../order/models/Order.js';
 import AdminCategoryManagement from '../../admin/models/AdminCategoryManagement.js';
 import Zone from '../../admin/models/Zone.js';
 import { successResponse, errorResponse } from '../../../shared/utils/response.js';
 import { calculateDistance } from '../../order/services/orderCalculationService.js';
 import { getTopRestaurantsForUser } from '../services/topRestaurantsService.js';
+
+const attachRealReviewStats = async (restaurants = []) => {
+  if (!Array.isArray(restaurants) || restaurants.length === 0) return restaurants;
+
+  const restaurantIds = restaurants
+    .map((restaurant) => String(restaurant?._id || ''))
+    .filter((id) => mongoose.Types.ObjectId.isValid(id));
+
+  if (restaurantIds.length === 0) {
+    return restaurants.map((restaurant) => ({
+      ...restaurant,
+      rating: Number(restaurant?.rating || 0),
+      totalRatings: Number(restaurant?.totalRatings || 0)
+    }));
+  }
+
+  const reviewStats = await Order.aggregate([
+    {
+      $match: {
+        status: 'delivered',
+        'review.rating': { $exists: true, $ne: null },
+        restaurantId: { $in: restaurantIds }
+      }
+    },
+    {
+      $group: {
+        _id: '$restaurantId',
+        averageRating: { $avg: '$review.rating' },
+        totalRatings: { $sum: 1 }
+      }
+    }
+  ]);
+
+  const statsMap = new Map(
+    reviewStats.map((entry) => [
+      String(entry._id),
+      {
+        rating: Number(entry.averageRating || 0),
+        totalRatings: Number(entry.totalRatings || 0)
+      }
+    ])
+  );
+
+  return restaurants.map((restaurant) => {
+    const stats = statsMap.get(String(restaurant?._id || ''));
+    if (!stats) {
+      return {
+        ...restaurant,
+        rating: Number(restaurant?.rating || 0),
+        totalRatings: Number(restaurant?.totalRatings || 0)
+      };
+    }
+    return {
+      ...restaurant,
+      rating: Number(stats.rating.toFixed(1)),
+      totalRatings: stats.totalRatings
+    };
+  });
+};
 
 /**
  * Get all active hero banners (public endpoint)
@@ -1137,10 +1197,16 @@ export const getGourmetRestaurants = async (req, res) => {
       .sort({ order: 1, createdAt: -1 })
       .lean();
 
-    let filteredRestaurants = restaurants.map(r => ({
-      ...r.restaurant,
-      _id: r._id
-    }));
+    let filteredRestaurants = restaurants
+      .map(r => {
+        const restaurantDoc = r?.restaurant;
+        if (!restaurantDoc) return null;
+        return {
+          ...restaurantDoc,
+          gourmetId: r?._id ? String(r._id) : null
+        };
+      })
+      .filter(Boolean);
 
     if (activeZoneIds) {
       const activeZoneSet = new Set(activeZoneIds);
@@ -1166,8 +1232,10 @@ export const getGourmetRestaurants = async (req, res) => {
       });
     }
 
+    const enrichedRestaurants = await attachRealReviewStats(filteredRestaurants);
+
     return successResponse(res, 200, 'Gourmet restaurants retrieved successfully', {
-      restaurants: filteredRestaurants
+      restaurants: enrichedRestaurants
     });
   } catch (error) {
     console.error('Error fetching Gourmet restaurants:', error);

@@ -165,6 +165,9 @@ export default function Cart() {
   const [showOrderSuccess, setShowOrderSuccess] = useState(false);
   const [placedOrderId, setPlacedOrderId] = useState(null);
   const [showGstBreakdown, setShowGstBreakdown] = useState(false);
+  const [showContactEditor, setShowContactEditor] = useState(false);
+  const [orderContactName, setOrderContactName] = useState("");
+  const [orderContactPhone, setOrderContactPhone] = useState("");
   const {
     openLocationSelector
   } = useLocationSelector();
@@ -235,6 +238,15 @@ export default function Cart() {
     return normalizeDeliveryAddressForOrder(merged);
   }, [savedAddress, currentLocation]);
   const defaultPayment = getDefaultPaymentMethod();
+
+  useEffect(() => {
+    setOrderContactName(prev => prev || userProfile?.name || "");
+    setOrderContactPhone(prev => {
+      if (prev) return prev;
+      const fallbackPhone = userProfile?.phone || savedAddress?.phone || "";
+      return normalizeIndianPhoneForOrder(fallbackPhone);
+    });
+  }, [savedAddress?.phone, userProfile?.name, userProfile?.phone]);
   const paymentOptions = [{
     value: "razorpay",
     label: t("user.cart.paymentOptions.razorpay.label"),
@@ -1040,6 +1052,8 @@ export default function Cart() {
         address: defaultAddress,
         restaurantId: finalRestaurantId,
         restaurantName: finalRestaurantName,
+        customerName: (orderContactName || userProfile?.name || "").trim(),
+        customerPhone: normalizeIndianPhoneForOrder(orderContactPhone || userProfile?.phone || defaultAddress?.phone || ""),
         pricing: orderPricing,
         deliveryFleet: deliveryFleet || 'standard',
         note: note || "",
@@ -1100,12 +1114,12 @@ export default function Cart() {
       }
       // Get user info for Razorpay prefill
       const userInfo = userProfile || {};
-      const userPhone = userInfo.phone || defaultAddress?.phone || "";
+      const userPhone = normalizeIndianPhoneForOrder(orderContactPhone || userInfo.phone || defaultAddress?.phone || "");
       const userEmail = userInfo.email || "";
-      const userName = userInfo.name || "";
+      const userName = (orderContactName || userInfo.name || "").trim();
 
       // Format phone number (remove non-digits, take last 10 digits)
-      const formattedPhone = userPhone.replace(/\D/g, "").slice(-10);
+      const formattedPhone = normalizeIndianPhoneForOrder(userPhone);
       // Get company name for Razorpay
       const companyName = await getCompanyNameAsync();
 
@@ -1556,15 +1570,45 @@ export default function Cart() {
 
               {/* Contact */}
               <div className="bg-white dark:bg-[#1a1a1a] px-4 md:px-6 py-3 md:py-4 rounded-lg md:rounded-xl">
-                <Link to="/user/profile" className="flex items-center justify-between">
+                <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3 md:gap-4">
                     <Phone className="h-4 w-4 md:h-5 md:w-5 text-gray-500 dark:text-gray-400" />
                     <p className="text-sm md:text-base text-gray-800 dark:text-gray-200">
-                      {userProfile?.name || t("user.cart.ui.yourName")}, <span className="font-medium">{userProfile?.phone || "+91-XXXXXXXXXX"}</span>
+                      {(orderContactName || userProfile?.name || t("user.cart.ui.yourName")).trim() || t("user.cart.ui.yourName")},{" "}
+                      <span className="font-medium">{orderContactPhone || normalizeIndianPhoneForOrder(userProfile?.phone) || "+91-XXXXXXXXXX"}</span>
                     </p>
                   </div>
-                  <ChevronRight className="h-4 w-4 md:h-5 md:w-5 text-gray-400" />
-                </Link>
+                  <button
+                    type="button"
+                    onClick={() => setShowContactEditor(prev => !prev)}
+                    className="text-sm text-[#FF5200] font-medium hover:underline"
+                  >
+                    {showContactEditor ? "Done" : "Edit"}
+                  </button>
+                </div>
+
+                {showContactEditor && (
+                  <div className="mt-3 grid grid-cols-1 gap-2">
+                    <input
+                      type="text"
+                      value={orderContactName}
+                      onChange={(e) => setOrderContactName(e.target.value)}
+                      placeholder="Customer name for this order"
+                      className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-[#111] px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
+                    />
+                    <input
+                      type="tel"
+                      value={orderContactPhone}
+                      onChange={(e) => setOrderContactPhone(normalizeIndianPhoneForOrder(e.target.value))}
+                      placeholder="Customer phone for this order"
+                      maxLength={10}
+                      className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-[#111] px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
+                    />
+                    <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                      This updates contact only for this order, not your profile.
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Bill Details */}
