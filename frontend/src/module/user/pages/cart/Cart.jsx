@@ -86,6 +86,12 @@ const normalizeDeliveryAddressForOrder = address => {
   return copy;
 };
 
+const normalizeIndianPhoneForOrder = (phone = "") => {
+  const digits = String(phone || "").replace(/\D/g, "");
+  if (!digits) return "";
+  return digits.slice(-10);
+};
+
 const isRestaurantCustomDeliveryPricingEnabled = restaurant => {
   const v = restaurant?.deliveryPricingConfig?.isEnabled;
   return v === true || v === "true" || v === 1 || v === "1";
