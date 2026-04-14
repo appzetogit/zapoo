@@ -1,8 +1,10 @@
 import Zone from '../models/Zone.js';
+import Tier from '../models/Tier.js';
 import Restaurant from '../../restaurant/models/Restaurant.js';
 import { successResponse, errorResponse } from '../../../shared/utils/response.js';
 import asyncHandler from '../../../shared/middleware/asyncHandler.js';
 import mongoose from 'mongoose';
+import * as turf from '@turf/turf';
 import { resolveLocaleFromRequest } from '../../../shared/i18n/localeResolver.js';
 import { resolveLocalizedText, toLocalizedText } from '../../../shared/i18n/localizedText.js';
 import { buildLocalizedText } from '../../../shared/i18n/translationService.js';
@@ -43,6 +45,111 @@ function resolveZoneForLocale(zone, locale) {
     zoneName: resolvedZoneName,
     displayName: resolvedZoneName
   };
+}
+
+function toLongitudeLatitude(coord) {
+  if (!coord || typeof coord !== 'object') {
+    throw new Error('Invalid zone coordinate format');
+  }
+
+  const latitude = Number(coord.latitude ?? coord.lat);
+  const longitude = Number(coord.longitude ?? coord.lng);
+
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+    throw new Error('Each coordinate must contain numeric latitude and longitude');
+  }
+
+  return [longitude, latitude];
+}
+
+function closePolygonRingIfNeeded(ring) {
+  if (ring.length === 0) return ring;
+  const first = ring[0];
+  const last = ring[ring.length - 1];
+
+  if (first[0] !== last[0] || first[1] !== last[1]) {
+    return [...ring, first];
+  }
+  return ring;
+}
+
+function buildPolygonFromCoordinates(coordinates) {
+  const ring = closePolygonRingIfNeeded(coordinates.map(toLongitudeLatitude));
+  return turf.polygon([ring]);
+}
+
+function buildPolygonFromZone(zone) {
+  if (
+    zone?.boundary?.type === 'Polygon' &&
+    Array.isArray(zone?.boundary?.coordinates) &&
+    zone.boundary.coordinates.length > 0
+  ) {
+    return turf.polygon(zone.boundary.coordinates);
+  }
+
+  if (Array.isArray(zone?.coordinates) && zone.coordinates.length >= 3) {
+    return buildPolygonFromCoordinates(zone.coordinates);
+  }
+
+  return null;
+}
+
+function hasInteriorOverlap(candidatePolygon, existingPolygon) {
+  const intersection = turf.intersect(
+    turf.featureCollection([candidatePolygon, existingPolygon])
+  );
+
+  if (!intersection) return false;
+  return turf.area(intersection) > 0;
+}
+
+async function validateZoneGeometryConstraints({ coordinates, excludeZoneId = null }) {
+  const candidatePolygon = buildPolygonFromCoordinates(coordinates);
+  const candidateAreaSqKm = turf.area(candidatePolygon) / 1000000;
+
+  const largestActiveTier = await Tier.findOne({ isActive: true })
+    .sort({ maxArea: -1 })
+    .select('name maxArea')
+    .lean();
+
+  if (!largestActiveTier) {
+    return {
+      isValid: false,
+      message: 'No active tiers configured. Please activate at least one tier before creating zones.'
+    };
+  }
+
+  const maxAllowedArea = Number(largestActiveTier.maxArea);
+  if (candidateAreaSqKm > maxAllowedArea) {
+    return {
+      isValid: false,
+      message: `Zone area exceeds maximum allowed area ${maxAllowedArea} km2 (largest active tier: ${largestActiveTier.name}). Computed area: ${candidateAreaSqKm.toFixed(2)} km2.`
+    };
+  }
+
+  const zoneQuery = {};
+  if (excludeZoneId && mongoose.Types.ObjectId.isValid(String(excludeZoneId))) {
+    zoneQuery._id = { $ne: new mongoose.Types.ObjectId(excludeZoneId) };
+  }
+
+  const existingZones = await Zone.find(zoneQuery)
+    .select('_id name zoneName coordinates boundary')
+    .lean();
+
+  for (const existingZone of existingZones) {
+    const existingPolygon = buildPolygonFromZone(existingZone);
+    if (!existingPolygon) continue;
+
+    if (hasInteriorOverlap(candidatePolygon, existingPolygon)) {
+      const existingZoneName = existingZone.zoneName || existingZone.name || String(existingZone._id);
+      return {
+        isValid: false,
+        message: `Zone overlaps with existing zone: ${existingZoneName}`
+      };
+    }
+  }
+
+  return { isValid: true };
 }
 
 /**
@@ -204,6 +311,11 @@ export const createZone = asyncHandler(async (req, res) => {
       }
     }
 
+    const zoneGeometryValidation = await validateZoneGeometryConstraints({ coordinates });
+    if (!zoneGeometryValidation.isValid) {
+      return errorResponse(res, 400, zoneGeometryValidation.message);
+    }
+
     // Check if restaurant exists (only if restaurantId is provided)
     if (restaurantId) {
       const Restaurant = mongoose.model('Restaurant');
@@ -294,6 +406,14 @@ export const updateZone = asyncHandler(async (req, res) => {
         if (!coord.latitude || !coord.longitude) {
           return errorResponse(res, 400, 'Each coordinate must have latitude and longitude');
         }
+      }
+
+      const zoneGeometryValidation = await validateZoneGeometryConstraints({
+        coordinates: updateData.coordinates,
+        excludeZoneId: id
+      });
+      if (!zoneGeometryValidation.isValid) {
+        return errorResponse(res, 400, zoneGeometryValidation.message);
       }
     }
 
