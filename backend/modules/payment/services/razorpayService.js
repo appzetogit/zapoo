@@ -9,6 +9,9 @@ const logger = winston.createLogger({
     format: winston.format.simple()
   })]
 });
+const razorpayDebug = (step, details = {}) => {
+  console.log('[REFUND_DEBUG][razorpayService]', step, details);
+};
 
 // Initialize Razorpay instance
 let razorpayInstance = null;
@@ -17,6 +20,11 @@ const initializeRazorpay = async () => {
     const credentials = await getRazorpayCredentials();
     const keyId = credentials.keyId;
     const keySecret = credentials.keySecret;
+    razorpayDebug('initialize_start', {
+      hasKeyId: Boolean(keyId),
+      hasKeySecret: Boolean(keySecret),
+      keyIdPrefix: keyId ? String(keyId).slice(0, 6) : null
+    });
     if (!keyId || !keySecret) {
       logger.warn('Razorpay credentials not found.');
       return null;
@@ -25,6 +33,9 @@ const initializeRazorpay = async () => {
       razorpayInstance = new Razorpay({
         key_id: keyId,
         key_secret: keySecret
+      });
+      razorpayDebug('initialize_success', {
+        keyIdPrefix: keyId ? String(keyId).slice(0, 6) : null
       });
       return razorpayInstance;
     } catch (error) {
@@ -74,7 +85,20 @@ const createOrder = async options => {
       receipt: options.receipt || `receipt_${Date.now()}`,
       notes: options.notes || {}
     };
+    razorpayDebug('create_order_request', {
+      amount: orderOptions.amount,
+      currency: orderOptions.currency,
+      receipt: orderOptions.receipt,
+      notes: orderOptions.notes || null
+    });
     const order = await razorpay.orders.create(orderOptions);
+    razorpayDebug('create_order_response', {
+      orderId: order?.id || null,
+      amount: order?.amount || null,
+      currency: order?.currency || null,
+      status: order?.status || null,
+      receipt: order?.receipt || null
+    });
     return order;
   } catch (error) {
     logger.error(`Error creating Razorpay order:`, {
@@ -88,6 +112,18 @@ const createOrder = async options => {
         receipt: options.receipt
       },
       stack: error.stack
+    });
+    razorpayDebug('create_order_error', {
+      message: error.message || null,
+      description: error?.error?.description || error?.description || null,
+      code: error?.error?.code || null,
+      reason: error?.error?.reason || null,
+      source: error?.error?.source || null,
+      step: error?.error?.step || null,
+      statusCode: error?.statusCode || null,
+      amount: options.amount || null,
+      currency: options.currency || null,
+      receipt: options.receipt || null
     });
 
     // Return more descriptive error message
@@ -171,10 +207,33 @@ const createRefund = async (paymentId, amount = null, notes = {}) => {
     if (amount !== null && amount !== undefined && amount !== '') {
       refundOptions.amount = amount;
     }
+    razorpayDebug('create_refund_request', {
+      paymentId,
+      amount: refundOptions.amount || null,
+      notes: refundOptions.notes || null
+    });
     const refund = await razorpay.payments.refund(paymentId, refundOptions);
+    razorpayDebug('create_refund_response', {
+      paymentId,
+      refundId: refund?.id || null,
+      status: refund?.status || null,
+      amount: refund?.amount || null,
+      currency: refund?.currency || null
+    });
     return refund;
   } catch (error) {
     logger.error(`Error creating refund: ${error.message}`);
+    razorpayDebug('create_refund_error', {
+      paymentId,
+      message: error.message || null,
+      description: error?.error?.description || error?.description || null,
+      code: error?.error?.code || null,
+      reason: error?.error?.reason || null,
+      source: error?.error?.source || null,
+      step: error?.error?.step || null,
+      statusCode: error?.statusCode || null,
+      amount: amount || null
+    });
     throw error;
   }
 };
