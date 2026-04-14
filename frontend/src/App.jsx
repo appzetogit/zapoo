@@ -47,7 +47,6 @@ const ContactDetails = lazy(() => import("@/module/restaurant/pages/ContactDetai
 const EditOwner = lazy(() => import("@/module/restaurant/pages/EditOwner"))
 const InviteUser = lazy(() => import("@/module/restaurant/pages/InviteUser"))
 const EditCuisines = lazy(() => import("@/module/restaurant/pages/EditCuisines"))
-const EditRestaurantAddress = lazy(() => import("@/module/restaurant/pages/EditRestaurantAddress"))
 const Inventory = lazy(() => import("@/module/restaurant/pages/Inventory"))
 const Feedback = lazy(() => import("@/module/restaurant/pages/Feedback"))
 const ShareFeedback = lazy(() => import("@/module/restaurant/pages/ShareFeedback"))
@@ -358,15 +357,6 @@ export default function App() {
             </ProtectedRoute>
           }
         />
-        <Route
-          path="/restaurant/edit-address"
-          element={
-            <ProtectedRoute requiredRole="restaurant" loginPath="/restaurant/login">
-              <EditRestaurantAddress />
-            </ProtectedRoute>
-          }
-        />
-
         <Route
           path="/restaurant/inventory"
           element={

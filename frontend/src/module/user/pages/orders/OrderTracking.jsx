@@ -590,7 +590,7 @@ export default function OrderTracking() {
       const response = await orderAPI.cancelOrder(orderId, cancellationReason.trim());
       if (response.data?.success) {
         const paymentMethod = order?.payment?.method || order?.paymentMethod;
-        const successMessage = response.data?.message || (paymentMethod === 'cash' || paymentMethod === 'cod' ? t("user.orderTracking.toast.orderCancelledNoRefund") : t("user.orderTracking.toast.orderCancelledRefundAfterApproval"));
+        const successMessage = response.data?.message || (paymentMethod === 'cash' || paymentMethod === 'cod' ? t("user.orderTracking.toast.orderCancelledNoRefund") : t("user.orderTracking.toast.orderCancelledRefundInitiated"));
         toast.success(successMessage);
         setShowCancelDialog(false);
         setCancellationReason("");

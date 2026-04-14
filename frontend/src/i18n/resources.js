@@ -895,7 +895,7 @@ export const resources = {
             failedToUpdateDeliveryInstructions: "Failed to update delivery instructions",
             provideCancellationReason: "Please provide a reason for cancellation",
             orderCancelledNoRefund: "Order cancelled successfully. No refund required as payment was not made.",
-            orderCancelledRefundAfterApproval: "Order cancelled successfully. Refund will be processed after admin approval.",
+            orderCancelledRefundInitiated: "Order cancelled successfully. Refund initiated and will be confirmed by Razorpay webhook.",
             failedToCancelOrder: "Failed to cancel order",
             orderIdNotAvailable: "Order ID not available",
             callConnectingToRestaurant: "Call connecting to restaurant",

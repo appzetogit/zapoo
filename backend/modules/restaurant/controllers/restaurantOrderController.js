@@ -408,13 +408,30 @@ export const rejectOrder = asyncHandler(async (req, res) => {
     order.cancelledAt = new Date();
     await order.save();
 
-    // Calculate refund amount but don't process automatically
-    // Admin will process refund manually via refund button
+    // Trigger Razorpay refund automatically for restaurant rejection.
     try {
+      console.log('[REFUND_DEBUG][restaurantOrderController] rejectOrder_refund_start', {
+        orderId: order.orderId || order._id?.toString?.(),
+        restaurantId: req.restaurant?._id?.toString?.() || req.restaurant?.id || null,
+        reason: reason || 'Rejected by restaurant'
+      });
       const {
-        calculateCancellationRefund
+        initiateRazorpayRefundForOrder
       } = await import('../../order/services/cancellationRefundService.js');
-      await calculateCancellationRefund(order._id, reason || 'Rejected by restaurant');
+      const refundResult = await initiateRazorpayRefundForOrder({
+        orderId: order._id,
+        trigger: 'restaurant',
+        reason: reason || 'Rejected by restaurant'
+      });
+      console.log('[REFUND_DEBUG][restaurantOrderController] rejectOrder_refund_result', {
+        orderId: order.orderId || order._id?.toString?.(),
+        refundInitiated: Boolean(refundResult?.refundInitiated),
+        refundQueued: Boolean(refundResult?.refundQueued),
+        refundSkipped: Boolean(refundResult?.refundSkipped),
+        refundPercent: refundResult?.policy?.refundPercent || null,
+        refundAmount: refundResult?.policy?.refundAmount || null,
+        refundId: refundResult?.refundId || null
+      });
     } catch (refundError) {
       console.error(`❌ Error calculating cancellation refund for order ${order.orderId}:`, refundError);
       // Don't fail order cancellation if refund calculation fails

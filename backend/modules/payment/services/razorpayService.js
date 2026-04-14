@@ -168,7 +168,7 @@ const createRefund = async (paymentId, amount = null, notes = {}) => {
     const refundOptions = {
       notes: notes
     };
-    if (amount) {
+    if (amount !== null && amount !== undefined && amount !== '') {
       refundOptions.amount = amount;
     }
     const refund = await razorpay.payments.refund(paymentId, refundOptions);
