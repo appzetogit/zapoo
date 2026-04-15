@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react"
 import { useNavigate } from "react-router-dom"
-import { motion, AnimatePresence } from "framer-motion"
+import { motion as Motion } from "framer-motion"
 import Lenis from "lenis"
 import {
   ArrowLeft,
@@ -82,6 +82,16 @@ export default function OutletInfo() {
   // Format address from location object
   const formatAddress = (location) => {
     if (!location) return ""
+
+    if (location.formattedAddress && location.formattedAddress.trim() !== "") {
+      const formatted = location.formattedAddress.trim()
+      const isCoordinates = /^-?\d+\.\d+,\s*-?\d+\.\d+$/.test(formatted)
+      if (!isCoordinates) return formatted
+    }
+
+    if (location.address && location.address.trim() !== "") {
+      return location.address.trim()
+    }
 
     const parts = []
     if (location.addressLine1) parts.push(location.addressLine1.trim())
@@ -830,7 +840,7 @@ export default function OutletInfo() {
       {/* Information Cards */}
       <div className="px-4 pb-6 space-y-3">
         {/* Restaurant Name Card */}
-        <motion.div
+        <Motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
@@ -850,11 +860,11 @@ export default function OutletInfo() {
               Edit
             </button>
           </div>
-        </motion.div>
+        </Motion.div>
 
         {/* Relationship Manager Card */}
         {restaurantData?.relationshipManager && (
-          <motion.div
+          <Motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: 0.02 }}
@@ -880,11 +890,11 @@ export default function OutletInfo() {
                 </p>
               </div>
             </div>
-          </motion.div>
+          </Motion.div>
         )}
 
         {/* Cuisine Tags Card */}
-        <motion.div
+        <Motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, delay: 0.05 }}
@@ -904,10 +914,10 @@ export default function OutletInfo() {
               Edit
             </button>
           </div>
-        </motion.div>
+        </Motion.div>
 
         {/* Address Card */}
-        <motion.div
+        <Motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, delay: 0.1 }}
@@ -923,17 +933,11 @@ export default function OutletInfo() {
                 </p>
               </div>
             </div>
-            <button
-              onClick={() => navigate("/restaurant/edit-address")}
-              className="text-blue-600 text-sm font-normal hover:text-blue-700 transition-colors ml-4 shrink-0 self-start"
-            >
-              Edit
-            </button>
           </div>
-        </motion.div>
+        </Motion.div>
 
         {/* Delivery Range Card */}
-        <motion.div
+        <Motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, delay: 0.12 }}
@@ -959,10 +963,10 @@ export default function OutletInfo() {
               Edit
             </button>
           </div>
-        </motion.div>
+        </Motion.div>
 
         {/* Zone (admin-assigned service area) */}
-        <motion.div
+        <Motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, delay: 0.13 }}
@@ -991,10 +995,10 @@ export default function OutletInfo() {
               </div>
             </div>
           </div>
-        </motion.div>
+        </Motion.div>
 
         {/* Delivery tier (distance slabs & platform fees from this tier) */}
-        <motion.div
+        <Motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, delay: 0.14 }}
@@ -1023,10 +1027,10 @@ export default function OutletInfo() {
               </div>
             </div>
           </div>
-        </motion.div>
+        </Motion.div>
 
         {/* Action Cards */}
-        <motion.div
+        <Motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, delay: 0.15 }}
@@ -1055,7 +1059,7 @@ export default function OutletInfo() {
             </div>
             <ChevronRight className="w-5 h-5 text-blue-600" />
           </button>
-        </motion.div>
+        </Motion.div>
       </div>
 
 

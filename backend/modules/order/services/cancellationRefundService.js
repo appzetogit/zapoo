@@ -1,4 +1,4 @@
-import mongoose from 'mongoose';
+﻿import mongoose from 'mongoose';
 import Order from '../models/Order.js';
 import OrderSettlement from '../models/OrderSettlement.js';
 import UserWallet from '../../user/models/UserWallet.js';
@@ -9,24 +9,383 @@ import Payment from '../../payment/models/Payment.js';
 import { refundPayment } from '../../refund/services/refundService.js';
 import { calculateOrderSettlement } from './orderSettlementService.js';
 
+const roundCurrency = value => Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
+const normalizeText = value => String(value || '').toLowerCase().trim();
+const refundDebug = (step, details = {}) => {
+  console.log('[REFUND_DEBUG][cancellationRefundService]', step, details);
+};
+
 /**
  * Determine cancellation stage based on order status
  */
 const getCancellationStage = order => {
-  if (!order.tracking.confirmed.status) {
+  const tracking = order?.tracking || {};
+  if (!tracking.confirmed?.status) {
     return 'pre_accept';
   }
-  if (!order.tracking.preparing.status) {
+  if (!tracking.preparing?.status) {
     return 'post_accept_pre_cook';
   }
-  if (!order.tracking.ready.status) {
+  if (!tracking.ready?.status) {
     return 'post_cook';
   }
   return 'post_pickup';
 };
 
+const hasDeliveryAccepted = order => {
+  const deliveryState = order?.deliveryState || {};
+  const status = normalizeText(deliveryState.status);
+  const phase = normalizeText(deliveryState.currentPhase);
+  return (
+    status === 'accepted' ||
+    status === 'order_confirmed' ||
+    status === 'reached_pickup' ||
+    status === 'en_route_to_delivery' ||
+    phase === 'en_route_to_pickup' ||
+    phase === 'at_pickup' ||
+    phase === 'en_route_to_delivery' ||
+    phase === 'picked_up' ||
+    phase === 'at_delivery' ||
+    phase === 'completed' ||
+    order?.status === 'out_for_delivery'
+  );
+};
+
+export const getRazorpayRefundPolicy = (order, { trigger = 'user', reason = '' } = {}) => {
+  const orderStatus = normalizeText(order?.status);
+  const tracking = order?.tracking || {};
+  const isReady = Boolean(tracking.ready?.status) || orderStatus === 'ready';
+  const isPreparing = Boolean(tracking.preparing?.status) || orderStatus === 'preparing';
+  const isConfirmed = Boolean(tracking.confirmed?.status) || orderStatus === 'confirmed';
+  const isOutForDelivery = Boolean(tracking.outForDelivery?.status) || orderStatus === 'out_for_delivery' || hasDeliveryAccepted(order);
+  const isRejected = trigger === 'restaurant' || normalizeText(reason).includes('reject');
+
+  refundDebug('policy_evaluated', {
+    orderId: order?.orderId || order?._id?.toString?.() || null,
+    status: orderStatus,
+    trigger,
+    stage: getCancellationStage(order),
+    isPreparing,
+    isReady,
+    isOutForDelivery,
+    isRejected
+  });
+
+  if (!order || orderStatus === 'delivered' || orderStatus === 'refunded') {
+    return {
+      eligible: false,
+      refundPercent: 0,
+      refundAmount: 0,
+      stage: orderStatus || 'unknown',
+      reason: 'Order is not refundable in current state'
+    };
+  }
+
+  if (isRejected) {
+    return {
+      eligible: true,
+      refundPercent: 100,
+      refundAmount: roundCurrency(order?.pricing?.total || 0),
+      stage: 'restaurant_rejected',
+      reason: 'Restaurant rejected order'
+    };
+  }
+
+  if (isOutForDelivery || isReady) {
+    return {
+      eligible: false,
+      refundPercent: 0,
+      refundAmount: 0,
+      stage: isOutForDelivery ? 'out_for_delivery' : 'ready',
+      reason: isOutForDelivery ? 'Order is already out for delivery' : 'Preparation complete'
+    };
+  }
+
+  if (isPreparing) {
+    return {
+      eligible: true,
+      refundPercent: 50,
+      refundAmount: roundCurrency((order?.pricing?.total || 0) * 0.5),
+      stage: 'preparing',
+      reason: 'Restaurant started preparing the order'
+    };
+  }
+
+  if (isConfirmed) {
+    return {
+      eligible: true,
+      refundPercent: 100,
+      refundAmount: roundCurrency(order?.pricing?.total || 0),
+      stage: 'confirmed',
+      reason: 'Order not yet prepared'
+    };
+  }
+
+  return {
+    eligible: true,
+    refundPercent: 100,
+    refundAmount: roundCurrency(order?.pricing?.total || 0),
+    stage: 'pending',
+    reason: 'Order not yet accepted'
+  };
+};
+
+const persistRefundIntent = async ({ order, payment, policy, source, reason }) => {
+  const now = new Date();
+  refundDebug('refund_intent_persist_start', {
+    orderId: order?.orderId || order?._id?.toString?.() || null,
+    paymentId: payment?.razorpay?.paymentId || null,
+    source,
+    refundPercent: policy.refundPercent,
+    refundAmount: policy.refundAmount
+  });
+  const refundMeta = {
+    ...(payment?.refund || {}),
+    amount: policy.refundAmount,
+    status: 'pending',
+    refundId: payment?.refund?.refundId || null,
+    refundedAt: null,
+    reason: reason || policy.reason || null
+  };
+
+  if (payment) {
+    payment.refund = refundMeta;
+    payment.logs = payment.logs || [];
+    payment.logs.push({
+      action: 'processing',
+      timestamp: now,
+      details: {
+        source,
+        refundPercent: policy.refundPercent,
+        refundAmount: policy.refundAmount,
+        stage: policy.stage,
+        note: 'Refund intent stored; awaiting gateway capture or refund initiation'
+      }
+    });
+    await payment.save();
+    refundDebug('refund_intent_persisted', {
+      orderId: order?.orderId || order?._id?.toString?.() || null,
+      paymentId: payment?.razorpay?.paymentId || null,
+      refundStatus: payment?.refund?.status || 'pending'
+    });
+  }
+
+  return {
+    refundAmount: policy.refundAmount,
+    refundPercent: policy.refundPercent,
+    source,
+    status: 'pending',
+    reason: reason || policy.reason || null
+  };
+};
+
+export const initiateRazorpayRefundForOrder = async ({ orderId, trigger = 'user', reason = '', adminId = null }) => {
+  refundDebug('refund_flow_start', { orderId, trigger, reason });
+  const order = await Order.findById(orderId);
+  if (!order) {
+    refundDebug('refund_flow_order_missing', { orderId, trigger });
+    throw new Error('Order not found');
+  }
+
+  const policy = getRazorpayRefundPolicy(order, { trigger, reason });
+  let payment = await Payment.findOne({ orderId: order._id }).sort({ createdAt: -1 });
+  refundDebug('refund_flow_payment_lookup', {
+    orderId: order.orderId || order._id?.toString?.(),
+    paymentId: payment?.razorpay?.paymentId || null,
+    paymentStatus: payment?.status || null,
+    policy
+  });
+
+  if (!policy.eligible || policy.refundAmount <= 0) {
+    refundDebug('refund_flow_skipped', {
+      orderId: order.orderId || order._id?.toString?.(),
+      reason: policy.reason,
+      stage: policy.stage
+    });
+    return {
+      order,
+      payment,
+      policy,
+      refundInitiated: false,
+      refundSkipped: true
+    };
+  }
+
+  const paymentId = payment?.razorpay?.paymentId || order.payment?.razorpayPaymentId || null;
+  const paymentCaptured = normalizeText(payment?.status) === 'success' || normalizeText(payment?.status) === 'completed' || normalizeText(order?.payment?.status) === 'completed';
+  refundDebug('refund_flow_capture_check', {
+    orderId: order.orderId || order._id?.toString?.(),
+    paymentId,
+    paymentCaptured
+  });
+
+  if (!payment || !paymentId || !paymentCaptured) {
+    const intent = await persistRefundIntent({
+      order,
+      payment,
+      policy,
+      source: trigger,
+      reason
+    });
+
+    return {
+      order,
+      payment,
+      policy,
+      refundInitiated: false,
+      refundQueued: true,
+      refundIntent: intent
+    };
+  }
+
+  if (payment.refund?.status === 'pending' || payment.refund?.status === 'success' || payment.refund?.status === 'failed') {
+    if (payment.refund?.status === 'success') {
+      refundDebug('refund_flow_already_success', {
+        orderId: order.orderId || order._id?.toString?.(),
+        paymentId,
+        refundId: payment.refund?.refundId || null
+      });
+      return {
+        order,
+        payment,
+        policy,
+        refundInitiated: true,
+        alreadyProcessed: true
+      };
+    }
+  }
+
+  refundDebug('refund_gateway_request', {
+    orderId: order.orderId || order._id?.toString?.(),
+    paymentId,
+    refundAmount: policy.refundAmount,
+    refundPercent: policy.refundPercent,
+    trigger,
+    adminId
+  });
+  const refundResult = await refundPayment(paymentId, policy.refundAmount, {
+    orderId: order._id,
+    orderNumber: order.orderId,
+    reason: reason || policy.reason || 'Refund requested by cancellation/rejection policy',
+    notes: {
+      orderId: order.orderId,
+      source: trigger,
+      refundPercent: String(policy.refundPercent),
+      stage: policy.stage,
+      adminId: adminId || 'system'
+    }
+  });
+
+  const refreshedPayment = await Payment.findById(payment._id);
+  if (refreshedPayment) {
+    refreshedPayment.refund = {
+      ...(refreshedPayment.refund || {}),
+      amount: policy.refundAmount,
+      status: 'pending',
+      refundId: refundResult.refundId || refreshedPayment.refund?.refundId || null,
+      refundedAt: null,
+      reason: reason || policy.reason || null
+    };
+    await refreshedPayment.save();
+    payment = refreshedPayment;
+    refundDebug('refund_payment_updated', {
+      orderId: order.orderId || order._id?.toString?.(),
+      paymentId,
+      refundId: refundResult.refundId || refreshedPayment.refund?.refundId || null,
+      refundStatus: refreshedPayment.refund?.status || 'pending'
+    });
+  }
+
+  refundDebug('refund_flow_initiated', {
+    orderId: order.orderId || order._id?.toString?.(),
+    paymentId,
+    refundId: refundResult.refundId || null,
+    refundAmount: policy.refundAmount
+  });
+  return {
+    order,
+    payment,
+    policy,
+    refundInitiated: true,
+    refundId: refundResult.refundId,
+    razorpayRefund: refundResult.razorpayRefund,
+    refundAmount: policy.refundAmount
+  };
+};
+
+const buildCancellationRefundBreakdown = (order, settlement = null) => {
+  const cancellationStage = getCancellationStage(order);
+  const userPayment = settlement?.userPayment || {
+    subtotal: roundCurrency(order?.pricing?.subtotal || 0),
+    discount: roundCurrency(order?.pricing?.discount || 0),
+    deliveryFee: roundCurrency(order?.pricing?.deliveryFee || 0),
+    platformFee: roundCurrency(order?.pricing?.platformFee || 0),
+    total: roundCurrency(order?.pricing?.total || 0)
+  };
+
+  let refundAmount = 0;
+  let restaurantCompensation = 0;
+
+  switch (cancellationStage) {
+    case 'pre_accept':
+      refundAmount = userPayment.total;
+      break;
+    case 'post_accept_pre_cook':
+      refundAmount = roundCurrency((userPayment.subtotal || 0) - (userPayment.discount || 0) + (userPayment.deliveryFee || 0));
+      break;
+    case 'post_cook':
+      restaurantCompensation = roundCurrency(settlement?.restaurantEarning?.netEarning || 0);
+      refundAmount = roundCurrency((userPayment.deliveryFee || 0) + ((userPayment.platformFee || 0) * 0.5));
+      break;
+    case 'post_pickup':
+      restaurantCompensation = roundCurrency(settlement?.restaurantEarning?.netEarning || 0);
+      break;
+    default:
+      break;
+  }
+
+  return {
+    cancellationStage,
+    userPayment,
+    refundAmount: roundCurrency(refundAmount),
+    restaurantCompensation: roundCurrency(restaurantCompensation)
+  };
+};
+
+const updateSettlementCancellationDetails = async (settlement, breakdown, cancellationReason) => {
+  if (!settlement) {
+    return null;
+  }
+
+  settlement.cancellationDetails = {
+    ...(settlement.cancellationDetails || {}),
+    cancelled: true,
+    cancelledAt: new Date(),
+    cancellationStage: breakdown.cancellationStage,
+    refundAmount: breakdown.refundAmount,
+    restaurantCompensation: breakdown.restaurantCompensation,
+    refundStatus: settlement.cancellationDetails?.refundStatus || 'pending',
+    cancellationReason: cancellationReason || settlement.cancellationDetails?.cancellationReason || null
+  };
+
+  settlement.escrowStatus = 'refunded';
+  settlement.settlementStatus = 'cancelled';
+  if (settlement.restaurantEarning) {
+    settlement.restaurantEarning.status = 'cancelled';
+  }
+  if (settlement.deliveryPartnerEarning) {
+    settlement.deliveryPartnerEarning.status = 'cancelled';
+  }
+  if (settlement.adminEarning) {
+    settlement.adminEarning.status = 'cancelled';
+  }
+
+  await settlement.save();
+  return settlement;
+};
+
 /**
- * Calculate cancellation refund amount without processing (for admin approval)
+ * Calculate cancellation refund amount without processing.
  */
 export const calculateCancellationRefund = async (orderId, cancellationReason) => {
   try {
@@ -37,64 +396,10 @@ export const calculateCancellationRefund = async (orderId, cancellationReason) =
     if (order.status !== 'cancelled') {
       throw new Error('Order is not cancelled');
     }
-    const settlement = await OrderSettlement.findOne({
-      orderId
-    });
-    if (!settlement) {
-      throw new Error('Settlement not found');
-    }
-    const cancellationStage = getCancellationStage(order);
-    const userPayment = settlement.userPayment;
-    let refundAmount = 0;
-    let restaurantCompensation = 0;
+    const settlement = await OrderSettlement.findOne({ orderId });
+    const breakdown = buildCancellationRefundBreakdown(order, settlement);
+    await updateSettlementCancellationDetails(settlement, breakdown, cancellationReason);
 
-    // Calculate refund based on cancellation stage
-    switch (cancellationStage) {
-      case 'pre_accept':
-        // Full refund to user
-        refundAmount = userPayment.total;
-        restaurantCompensation = 0;
-        break;
-      case 'post_accept_pre_cook':
-        // Partial refund (refund everything except platform fee and GST on platform fee)
-        // User gets: subtotal + delivery fee (if not used)
-        refundAmount = userPayment.subtotal - userPayment.discount + userPayment.deliveryFee;
-        restaurantCompensation = 0;
-        break;
-      case 'post_cook':
-        // Restaurant compensated, partial refund to user
-        // Restaurant gets: food cost - commission
-        restaurantCompensation = settlement.restaurantEarning.netEarning;
-        // User gets: delivery fee + platform fee back (or partial)
-        refundAmount = userPayment.deliveryFee + userPayment.platformFee * 0.5; // 50% platform fee refund
-        break;
-      case 'post_pickup':
-        // No refund to user, restaurant compensated
-        refundAmount = 0;
-        restaurantCompensation = settlement.restaurantEarning.netEarning;
-        break;
-      default:
-        refundAmount = 0;
-        restaurantCompensation = 0;
-    }
-
-    // Update settlement with cancellation details (refund status: 'pending' - awaiting admin approval)
-    settlement.cancellationDetails = {
-      cancelled: true,
-      cancelledAt: new Date(),
-      cancellationStage: cancellationStage,
-      refundAmount: refundAmount,
-      restaurantCompensation: restaurantCompensation,
-      refundStatus: 'pending' // Will be updated to 'initiated' when admin processes refund
-    };
-    settlement.escrowStatus = 'refunded';
-    settlement.settlementStatus = 'cancelled';
-    settlement.restaurantEarning.status = 'cancelled';
-    settlement.deliveryPartnerEarning.status = 'cancelled';
-    settlement.adminEarning.status = 'cancelled';
-    await settlement.save();
-
-    // Create audit log
     await AuditLog.createLog({
       entityType: 'order',
       entityId: orderId,
@@ -105,18 +410,19 @@ export const calculateCancellationRefund = async (orderId, cancellationReason) =
         name: 'System'
       },
       transactionDetails: {
-        amount: refundAmount,
+        amount: breakdown.refundAmount,
         type: 'refund',
         status: 'pending',
         orderId: orderId
       },
-      description: `Cancellation refund calculated for order ${settlement.orderNumber}. Stage: ${cancellationStage}, Refund: ₹${refundAmount}, Restaurant Compensation: ₹${restaurantCompensation}. Awaiting admin approval.`
+      description: `Cancellation refund calculated for order ${settlement?.orderNumber || order.orderId}. Stage: ${breakdown.cancellationStage}, Refund: ₹${breakdown.refundAmount}, Restaurant Compensation: ₹${breakdown.restaurantCompensation}. Awaiting refund initiation or webhook confirmation.`
     });
     return {
-      cancellationStage,
-      refundAmount,
-      restaurantCompensation,
-      settlement
+      cancellationStage: breakdown.cancellationStage,
+      refundAmount: breakdown.refundAmount,
+      restaurantCompensation: breakdown.restaurantCompensation,
+      settlement: settlement || null,
+      settlementAvailable: !!settlement
     };
   } catch (error) {
     console.error('Error calculating cancellation refund:', error);
@@ -136,80 +442,30 @@ export const processCancellationRefund = async (orderId, cancellationReason) => 
     if (order.status !== 'cancelled') {
       throw new Error('Order is not cancelled');
     }
-    const settlement = await OrderSettlement.findOne({
-      orderId
-    });
-    if (!settlement) {
-      throw new Error('Settlement not found');
-    }
-    const cancellationStage = getCancellationStage(order);
-    const userPayment = settlement.userPayment;
-    let refundAmount = 0;
-    let restaurantCompensation = 0;
-
-    // Calculate refund based on cancellation stage
-    switch (cancellationStage) {
-      case 'pre_accept':
-        // Full refund to user
-        refundAmount = userPayment.total;
-        restaurantCompensation = 0;
-        break;
-      case 'post_accept_pre_cook':
-        // Partial refund (refund everything except platform fee and GST on platform fee)
-        // User gets: subtotal + delivery fee (if not used)
-        refundAmount = userPayment.subtotal - userPayment.discount + userPayment.deliveryFee;
-        restaurantCompensation = 0;
-        break;
-      case 'post_cook':
-        // Restaurant compensated, partial refund to user
-        // Restaurant gets: food cost - commission
-        restaurantCompensation = settlement.restaurantEarning.netEarning;
-        // User gets: delivery fee + platform fee back (or partial)
-        refundAmount = userPayment.deliveryFee + userPayment.platformFee * 0.5; // 50% platform fee refund
-        break;
-      case 'post_pickup':
-        // No refund to user, restaurant compensated
-        refundAmount = 0;
-        restaurantCompensation = settlement.restaurantEarning.netEarning;
-        break;
-      default:
-        refundAmount = 0;
-        restaurantCompensation = 0;
-    }
-
-    // Update settlement with cancellation details
-    settlement.cancellationDetails = {
-      cancelled: true,
-      cancelledAt: new Date(),
-      cancellationStage: cancellationStage,
-      refundAmount: refundAmount,
-      restaurantCompensation: restaurantCompensation,
-      refundStatus: 'pending'
-    };
-    settlement.escrowStatus = 'refunded';
-    settlement.settlementStatus = 'cancelled';
-    settlement.restaurantEarning.status = 'cancelled';
-    settlement.deliveryPartnerEarning.status = 'cancelled';
-    settlement.adminEarning.status = 'cancelled';
-    await settlement.save();
+    const settlement = await OrderSettlement.findOne({ orderId });
+    const breakdown = buildCancellationRefundBreakdown(order, settlement);
+    await updateSettlementCancellationDetails(settlement, breakdown, cancellationReason);
 
     // Process refund to user
-    if (refundAmount > 0) {
-      await refundToUser(order.userId, orderId, refundAmount, settlement.orderNumber, cancellationReason);
-      settlement.cancellationDetails.refundStatus = 'processed';
+    if (breakdown.refundAmount > 0) {
+      await refundToUser(order.userId, orderId, breakdown.refundAmount, settlement?.orderNumber || order.orderId, cancellationReason);
+      if (settlement?.cancellationDetails) {
+        settlement.cancellationDetails.refundStatus = 'processed';
+      }
     }
 
     // Compensate restaurant if applicable
-    if (restaurantCompensation > 0) {
-      await compensateRestaurant(settlement.restaurantId, orderId, restaurantCompensation, settlement.orderNumber);
+    if (breakdown.restaurantCompensation > 0 && settlement?.restaurantId) {
+      await compensateRestaurant(settlement.restaurantId, orderId, breakdown.restaurantCompensation, settlement.orderNumber);
     }
 
     // Reverse admin earnings (if needed)
-    // For pre_accept and post_accept_pre_cook, reverse admin earnings
-    if (cancellationStage === 'pre_accept' || cancellationStage === 'post_accept_pre_cook') {
+    if (settlement && (breakdown.cancellationStage === 'pre_accept' || breakdown.cancellationStage === 'post_accept_pre_cook')) {
       await reverseAdminEarnings(orderId, settlement.adminEarning, settlement.orderNumber);
     }
-    await settlement.save();
+    if (settlement) {
+      await settlement.save();
+    }
 
     // Create audit log
     await AuditLog.createLog({
@@ -222,18 +478,19 @@ export const processCancellationRefund = async (orderId, cancellationReason) => 
         name: 'System'
       },
       transactionDetails: {
-        amount: refundAmount,
+        amount: breakdown.refundAmount,
         type: 'refund',
         status: 'success',
         orderId: orderId
       },
-      description: `Cancellation refund processed for order ${settlement.orderNumber}. Stage: ${cancellationStage}, Refund: ₹${refundAmount}, Restaurant Compensation: ₹${restaurantCompensation}`
+      description: `Cancellation refund processed for order ${settlement?.orderNumber || order.orderId}. Stage: ${breakdown.cancellationStage}, Refund: ₹${breakdown.refundAmount}, Restaurant Compensation: ₹${breakdown.restaurantCompensation}`
     });
     return {
-      cancellationStage,
-      refundAmount,
-      restaurantCompensation,
-      settlement
+      cancellationStage: breakdown.cancellationStage,
+      refundAmount: breakdown.refundAmount,
+      restaurantCompensation: breakdown.restaurantCompensation,
+      settlement: settlement || null,
+      settlementAvailable: !!settlement
     };
   } catch (error) {
     console.error('Error processing cancellation refund:', error);
@@ -423,29 +680,36 @@ export const processRazorpayRefund = async (orderId, adminId = null) => {
     if (!order.payment.razorpayPaymentId) {
       throw new Error('Razorpay payment ID not found for this order');
     }
-    const settlement = await OrderSettlement.findOne({
-      orderId
-    });
-    if (!settlement) {
-      throw new Error('Settlement not found');
-    }
+    const settlement = await OrderSettlement.findOne({ orderId });
 
-    // Check if refund already processed
-    if (settlement.cancellationDetails?.refundStatus === 'processed' || settlement.cancellationDetails?.refundStatus === 'initiated') {
+    // Check if refund already processed when settlement exists
+    if (settlement?.cancellationDetails?.refundStatus === 'processed' || settlement?.cancellationDetails?.refundStatus === 'initiated') {
       throw new Error('Refund already processed or initiated for this order');
     }
-    const refundAmount = settlement.cancellationDetails?.refundAmount || 0;
+
+    const breakdown = buildCancellationRefundBreakdown(order, settlement);
+    const refundAmount = settlement?.cancellationDetails?.refundAmount || breakdown.refundAmount || 0;
     if (refundAmount <= 0) {
       throw new Error('No refund amount calculated for this order');
     }
 
-    // Update refund status to 'initiated'
-    settlement.cancellationDetails.refundStatus = 'initiated';
-    settlement.cancellationDetails.refundInitiatedAt = new Date();
-    if (adminId) {
-      settlement.cancellationDetails.refundInitiatedBy = adminId;
+    // Update settlement with initiation status when it exists
+    if (settlement) {
+      settlement.cancellationDetails = {
+        ...(settlement.cancellationDetails || {}),
+        cancelled: true,
+        cancelledAt: settlement.cancellationDetails?.cancelledAt || new Date(),
+        cancellationStage: settlement.cancellationDetails?.cancellationStage || breakdown.cancellationStage,
+        refundAmount,
+        restaurantCompensation: settlement.cancellationDetails?.restaurantCompensation || breakdown.restaurantCompensation,
+        refundStatus: 'initiated',
+        refundInitiatedAt: new Date()
+      };
+      if (adminId) {
+        settlement.cancellationDetails.refundInitiatedBy = adminId;
+      }
+      await settlement.save();
     }
-    await settlement.save();
 
     // Create Razorpay refund
     let razorpayRefund = null;
@@ -463,27 +727,35 @@ export const processRazorpayRefund = async (orderId, adminId = null) => {
       });
       razorpayRefund = refundResult.razorpayRefund;
     } catch (razorpayError) {
-      // Update refund status to 'failed'
-      settlement.cancellationDetails.refundStatus = 'failed';
-      settlement.cancellationDetails.refundFailureReason = razorpayError.message;
-      await settlement.save();
+      if (settlement) {
+        settlement.cancellationDetails = {
+          ...(settlement.cancellationDetails || {}),
+          refundStatus: 'failed',
+          refundFailureReason: razorpayError.message
+        };
+        await settlement.save();
+      }
       throw new Error(`Failed to create Razorpay refund: ${razorpayError.message}`);
     }
 
-    // Update settlement with Razorpay refund ID
-    settlement.cancellationDetails.razorpayRefundId = razorpayRefund.id;
-    settlement.cancellationDetails.refundStatus = 'initiated'; // Will be updated to 'processed' via webhook
-    await settlement.save();
+    if (settlement) {
+      settlement.cancellationDetails = {
+        ...(settlement.cancellationDetails || {}),
+        razorpayRefundId: razorpayRefund.id,
+        refundStatus: 'initiated'
+      };
+      await settlement.save();
+    }
 
     // Compensate restaurant if applicable
-    const restaurantCompensation = settlement.cancellationDetails?.restaurantCompensation || 0;
-    if (restaurantCompensation > 0) {
+    const restaurantCompensation = settlement?.cancellationDetails?.restaurantCompensation || breakdown.restaurantCompensation || 0;
+    if (restaurantCompensation > 0 && settlement?.restaurantId) {
       await compensateRestaurant(settlement.restaurantId, orderId, restaurantCompensation, settlement.orderNumber);
     }
 
     // Reverse admin earnings (if needed)
-    const cancellationStage = settlement.cancellationDetails?.cancellationStage;
-    if (cancellationStage === 'pre_accept' || cancellationStage === 'post_accept_pre_cook') {
+    const cancellationStage = settlement?.cancellationDetails?.cancellationStage || breakdown.cancellationStage;
+    if (settlement && (cancellationStage === 'pre_accept' || cancellationStage === 'post_accept_pre_cook')) {
       await reverseAdminEarnings(orderId, settlement.adminEarning, settlement.orderNumber);
     }
 
@@ -506,7 +778,7 @@ export const processRazorpayRefund = async (orderId, adminId = null) => {
         razorpayRefundId: razorpayRefund.id,
         razorpayPaymentId: order.payment.razorpayPaymentId
       },
-      description: `Razorpay refund initiated for order ${settlement.orderNumber}. Refund ID: ${razorpayRefund.id}, Amount: ₹${refundAmount}`
+      description: `Razorpay refund initiated for order ${settlement?.orderNumber || order.orderId}. Refund ID: ${razorpayRefund.id}, Amount: ₹${refundAmount}`
     });
     return {
       success: true,
@@ -551,23 +823,23 @@ export const processWalletRefund = async (orderId, adminId = null, refundAmount 
       }).populate('userId', 'name email phone _id').lean();
     }
     if (!order) {
-      console.error('❌ [processWalletRefund] Order not found:', orderId);
+      console.error('âŒ [processWalletRefund] Order not found:', orderId);
       throw new Error('Order not found');
     }
     if (order.status !== 'cancelled') {
-      console.error('❌ [processWalletRefund] Order is not cancelled:', order.status);
+      console.error('âŒ [processWalletRefund] Order is not cancelled:', order.status);
       throw new Error('Order is not cancelled');
     }
 
     // Check if payment method is wallet (wallet payments don't use Razorpay)
     if (order.payment?.method !== 'wallet') {
-      console.error('❌ [processWalletRefund] Payment method is not wallet:', order.payment?.method);
+      console.error('âŒ [processWalletRefund] Payment method is not wallet:', order.payment?.method);
       throw new Error('This function can only process wallet refunds. Wallet payments do not use Razorpay.');
     }
 
     // Ensure no Razorpay payment ID exists (wallet payments are direct, no Razorpay involved)
     if (order.payment?.razorpayPaymentId) {
-      console.warn('⚠️ [processWalletRefund] Warning: Wallet payment has Razorpay payment ID. This should not happen for wallet payments.');
+      console.warn('âš ï¸ [processWalletRefund] Warning: Wallet payment has Razorpay payment ID. This should not happen for wallet payments.');
       // Don't throw error, just log warning - proceed with wallet refund
     }
 
@@ -649,7 +921,7 @@ export const processWalletRefund = async (orderId, adminId = null, refundAmount 
         const savedWallet = await UserWallet.findById(wallet._id);
         // Verify balance was actually updated
         if (savedWallet && savedWallet.balance !== balanceBeforeSave) {} else {
-          console.error('⚠️ [processWalletRefund] WARNING: Balance may not have been updated correctly!', {
+          console.error('âš ï¸ [processWalletRefund] WARNING: Balance may not have been updated correctly!', {
             balanceBeforeSave,
             balanceAfterSave: wallet.balance,
             savedWalletBalance: savedWallet?.balance
@@ -689,11 +961,11 @@ export const processWalletRefund = async (orderId, adminId = null, refundAmount 
           description: `User refunded for cancelled order ${settlement.orderNumber || order.orderId}`
         });
       } catch (auditError) {
-        console.error('⚠️ [processWalletRefund] Error creating audit log (non-critical):', auditError.message);
+        console.error('âš ï¸ [processWalletRefund] Error creating audit log (non-critical):', auditError.message);
         // Don't throw - audit log failure shouldn't block refund
       }
     } catch (walletError) {
-      console.error('❌ Error refunding to user wallet:', walletError);
+      console.error('âŒ Error refunding to user wallet:', walletError);
       throw new Error(`Failed to refund to user wallet: ${walletError.message}`);
     }
 
@@ -724,20 +996,21 @@ export const processWalletRefund = async (orderId, adminId = null, refundAmount 
           status: 'success',
           orderId: order._id
         },
-        description: `Wallet refund of ₹${refundAmountToProcess} processed for cancelled order ${settlement.orderNumber || order.orderId}`
+        description: `Wallet refund of â‚¹${refundAmountToProcess} processed for cancelled order ${settlement.orderNumber || order.orderId}`
       });
     } catch (auditError) {
-      console.error('⚠️ [processWalletRefund] Error creating order audit log (non-critical):', auditError.message);
+      console.error('âš ï¸ [processWalletRefund] Error creating order audit log (non-critical):', auditError.message);
       // Don't throw - audit log failure shouldn't block refund
     }
     return {
       refundId: `wallet-${order._id}-${Date.now()}`,
       refundAmount: refundAmountToProcess,
       walletRefund: true,
-      message: `Wallet refund of ₹${refundAmountToProcess} processed successfully. Amount has been credited to customer's wallet.`
+      message: `Wallet refund of â‚¹${refundAmountToProcess} processed successfully. Amount has been credited to customer's wallet.`
     };
   } catch (error) {
     console.error('Error processing wallet refund:', error);
     throw error;
   }
 };
+

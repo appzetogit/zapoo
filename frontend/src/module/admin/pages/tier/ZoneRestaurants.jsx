@@ -8,6 +8,29 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, Loader2, Star, TrendingUp, TrendingDown, Filter } from "lucide-react";
 
+const IMAGE_FALLBACK = "https://via.placeholder.com/40";
+
+const getRestaurantImageSrc = (restaurant) => {
+    if (!restaurant) return IMAGE_FALLBACK;
+    return restaurant.imageUrl ||
+        restaurant.profileImage?.url ||
+        restaurant.profileImage ||
+        restaurant.image?.url ||
+        restaurant.image ||
+        IMAGE_FALLBACK;
+};
+
+const getRestaurantLocationText = (restaurant) => {
+    if (!restaurant) return "Location unavailable";
+    return restaurant.locationLabel ||
+        restaurant.location?.formattedAddress ||
+        restaurant.location?.address ||
+        [restaurant.location?.building, restaurant.location?.area, restaurant.location?.city, restaurant.location?.landmark]
+            .filter(Boolean)
+            .join(", ") ||
+        "Location unavailable";
+};
+
 export default function ZoneRestaurants() {
     const { zoneId } = useParams();
     const [data, setData] = useState({ zone: null, restaurants: [], meta: {} });
@@ -25,7 +48,17 @@ export default function ZoneRestaurants() {
             const filterParam = filter !== "all" ? filter : null;
             const res = await tierAPI.getRestaurantsByZone(zoneId, filterParam);
             if (res.data.success) {
-                setData(res.data.data);
+                const payload = res.data.data || {};
+                setData({
+                    ...payload,
+                    restaurants: Array.isArray(payload.restaurants)
+                        ? payload.restaurants.map((restaurant) => ({
+                            ...restaurant,
+                            imageUrl: restaurant.imageUrl || restaurant.profileImage?.url || restaurant.image?.url || restaurant.image || "",
+                            locationLabel: restaurant.locationLabel || restaurant.location?.formattedAddress || restaurant.location?.address || [restaurant.location?.building, restaurant.location?.area, restaurant.location?.city, restaurant.location?.landmark].filter(Boolean).join(", ")
+                        }))
+                        : []
+                });
             }
         } catch (error) {
             console.error("Error fetching restaurants:", error);
@@ -128,11 +161,21 @@ export default function ZoneRestaurants() {
                                         <TableCell>
                                             <div className="flex items-center gap-3">
                                                 <div className="w-8 h-8 rounded-full bg-neutral-100 overflow-hidden">
-                                                    <img src={restaurant.image || '/placeholder.png'} alt="" className="w-full h-full object-cover" loading="lazy" />
+                                                    <img
+                                                        src={getRestaurantImageSrc(restaurant)}
+                                                        alt={restaurant.name || "Restaurant"}
+                                                        className="w-full h-full object-cover"
+                                                        loading="lazy"
+                                                        onError={(event) => {
+                                                            if (event.currentTarget.src !== IMAGE_FALLBACK) {
+                                                                event.currentTarget.src = IMAGE_FALLBACK;
+                                                            }
+                                                        }}
+                                                    />
                                                 </div>
                                                 <div>
                                                     <div className="font-medium text-neutral-900">{restaurant.name}</div>
-                                                    <div className="text-xs text-neutral-500">{restaurant.location?.address}</div>
+                                                    <div className="text-xs text-neutral-500">{getRestaurantLocationText(restaurant)}</div>
                                                 </div>
                                             </div>
                                         </TableCell>

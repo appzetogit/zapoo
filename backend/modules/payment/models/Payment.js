@@ -35,7 +35,7 @@ const paymentSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['created', 'success', 'failed', 'pending', 'processing', 'completed', 'refunded', 'cancelled'],
+    enum: ['created', 'success', 'failed', 'pending', 'processing', 'completed', 'cancelled'],
     default: 'pending'
     // Index added in schema.index below
   },
@@ -88,12 +88,26 @@ const paymentSchema = new mongoose.Schema({
     },
     status: {
       type: String,
-      enum: ['none', 'partial', 'full']
+      enum: ['none', 'pending', 'success', 'failed']
     },
     refundId: String,
     refundedAt: Date,
     reason: String
   },
+  webhookEventHistory: [{
+    event: {
+      type: String,
+      required: true
+    },
+    receivedAt: {
+      type: Date,
+      default: Date.now
+    },
+    payload: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null
+    }
+  }],
   // Timestamps
   initiatedAt: {
     type: Date,

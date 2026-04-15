@@ -441,10 +441,28 @@ export const getRestaurantsByZone = async (req, res) => {
       return errorResponse(res, 404, "Zone not found");
     }
 
+    const getRestaurantImageUrl = (restaurant) => {
+      if (!restaurant) return "";
+      return restaurant.profileImage?.url ||
+        restaurant.profileImage ||
+        restaurant.image?.url ||
+        restaurant.image ||
+        "";
+    };
+
+    const getRestaurantLocationLabel = (location) => {
+      if (!location) return "";
+      return location.formattedAddress ||
+        location.address ||
+        [location.building, location.area, location.city, location.landmark]
+          .filter(Boolean)
+          .join(", ");
+    };
+
     // 1. Find Restaurants in Zone — query by zoneId (set during onboarding auto-detection)
     const restaurants = await Restaurant.find({
       zoneId: zone._id
-    }).select('restaurantId name location ownerName ownerPhone rating totalRatings image profileImage isAcceptingOrders').lean();
+    }).select('restaurantId name slug location ownerName ownerPhone rating totalRatings image profileImage isAcceptingOrders').lean();
     if (restaurants.length === 0) {
       return successResponse(res, 200, "No restaurants found in this zone", {
         zone: {
@@ -458,9 +476,18 @@ export const getRestaurantsByZone = async (req, res) => {
         }
       });
     }
-    const restaurantIds = restaurants.map(r => r.restaurantId);
+    const restaurantIds = Array.from(new Set(
+      restaurants
+        .flatMap(r => {
+          const ids = [];
+          if (r.restaurantId) ids.push(String(r.restaurantId));
+          if (r._id) ids.push(String(r._id));
+          return ids;
+        })
+        .filter(Boolean)
+    ));
 
-    // 2. Aggregate Orders
+    // 2. Aggregate Orders (revenue + order counts)
     const orderStats = await Order.aggregate([{
       $match: {
         restaurantId: {
@@ -480,24 +507,66 @@ export const getRestaurantsByZone = async (req, res) => {
       }
     }]);
 
-    // Map stats to restaurants
+    // 3. Aggregate Ratings (real ratings from order reviews)
+    const ratingStats = await Order.aggregate([{
+      $match: {
+        restaurantId: {
+          $in: restaurantIds
+        },
+        'review.rating': { $exists: true, $ne: null }
+      }
+    }, {
+      $group: {
+        _id: "$restaurantId",
+        ratingSum: { $sum: "$review.rating" },
+        ratingCount: { $sum: 1 }
+      }
+    }]);
+
+    // Map stats to restaurants (by restaurantId stored in orders)
     const statsMap = {};
-    let grandTotalRevenue = 0;
-    let grandTotalOrders = 0;
     orderStats.forEach(stat => {
-      statsMap[stat._id] = stat;
-      grandTotalRevenue += stat.totalRevenue;
-      grandTotalOrders += stat.totalOrders;
+      statsMap[String(stat._id)] = stat;
     });
-    const avgRevenue = restaurants.length > 0 ? grandTotalRevenue / restaurants.length : 0;
+
+    const ratingMap = {};
+    ratingStats.forEach(stat => {
+      ratingMap[String(stat._id)] = stat;
+    });
+
+    const getCombinedStats = (restaurant) => {
+      const idA = restaurant.restaurantId ? String(restaurant.restaurantId) : null;
+      const idB = restaurant._id ? String(restaurant._id) : null;
+      const statsA = idA ? (statsMap[idA] || { totalRevenue: 0, totalOrders: 0 }) : { totalRevenue: 0, totalOrders: 0 };
+      const statsB = idB && idB !== idA ? (statsMap[idB] || { totalRevenue: 0, totalOrders: 0 }) : { totalRevenue: 0, totalOrders: 0 };
+      return {
+        revenue: statsA.totalRevenue + statsB.totalRevenue,
+        orders: statsA.totalOrders + statsB.totalOrders
+      };
+    };
+
+    const getCombinedRating = (restaurant) => {
+      const idA = restaurant.restaurantId ? String(restaurant.restaurantId) : null;
+      const idB = restaurant._id ? String(restaurant._id) : null;
+      const statsA = idA ? (ratingMap[idA] || { ratingSum: 0, ratingCount: 0 }) : { ratingSum: 0, ratingCount: 0 };
+      const statsB = idB && idB !== idA ? (ratingMap[idB] || { ratingSum: 0, ratingCount: 0 }) : { ratingSum: 0, ratingCount: 0 };
+      const ratingSum = statsA.ratingSum + statsB.ratingSum;
+      const ratingCount = statsA.ratingCount + statsB.ratingCount;
+      return {
+        rating: ratingCount > 0 ? Number((ratingSum / ratingCount).toFixed(1)) : 0,
+        totalRatings: ratingCount
+      };
+    };
+
+    const perRestaurantStats = restaurants.map(r => getCombinedStats(r));
+    const totalRevenue = perRestaurantStats.reduce((sum, stat) => sum + stat.revenue, 0);
+    const avgRevenue = restaurants.length > 0 ? totalRevenue / restaurants.length : 0;
 
     // 3. Categorize and Enrich
     let enrichedRestaurants = restaurants.map(r => {
-      const stats = statsMap[r.restaurantId] || {
-        totalRevenue: 0,
-        totalOrders: 0
-      };
-      const revenue = stats.totalRevenue;
+      const stats = getCombinedStats(r);
+      const ratingStats = getCombinedRating(r);
+      const revenue = stats.revenue;
       let performance = 'average';
       // Simple logic: > 20% above avg = best, < 20% below avg = underperforming
       if (revenue > avgRevenue * 1.2) {
@@ -507,9 +576,13 @@ export const getRestaurantsByZone = async (req, res) => {
       }
       return {
         ...r,
+        rating: ratingStats.rating,
+        totalRatings: ratingStats.totalRatings,
+        imageUrl: getRestaurantImageUrl(r),
+        locationLabel: getRestaurantLocationLabel(r.location),
         metrics: {
           revenue,
-          orders: stats.totalOrders,
+          orders: stats.orders,
           performance
         }
       };

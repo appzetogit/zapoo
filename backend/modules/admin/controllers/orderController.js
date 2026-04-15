@@ -1008,7 +1008,7 @@ export const getTransactionReport = asyncHandler(async (req, res) => {
     const completedTransaction = completedOrders.reduce((sum, order) => sum + (order.pricing?.total || 0), 0);
 
     // Calculate refunded transactions
-    const refundedOrders = allOrdersForSummary.filter(order => order.payment?.status === 'refunded' || order.status === 'cancelled');
+    const refundedOrders = allOrdersForSummary.filter(order => order.status === 'refunded' || order.status === 'cancelled');
     const refundedTransaction = refundedOrders.reduce((sum, order) => sum + (order.pricing?.total || 0), 0);
 
     // Calculate recommended item fees from orders
@@ -1682,7 +1682,7 @@ export const processRefund = asyncHandler(async (req, res) => {
       }
     }
 
-    // Get settlement (for wallet payments, settlement might not exist - create one if needed)
+    // Get settlement if it exists. Refund logic can now proceed without it for Razorpay.
     const OrderSettlement = (await import('../../order/models/OrderSettlement.js')).default;
     let settlement = await OrderSettlement.findOne({
       orderId: order._id
@@ -1701,13 +1701,10 @@ export const processRefund = asyncHandler(async (req, res) => {
       if (!settlement) {
         return errorResponse(res, 500, 'Unable to build settlement for wallet refund');
       }
-    } else if (!settlement) {
-      // For non-wallet payments, settlement is required
-      return errorResponse(res, 404, 'Settlement not found for this order');
     }
 
     // Check if refund already processed
-    if (settlement.cancellationDetails?.refundStatus === 'processed' || settlement.cancellationDetails?.refundStatus === 'initiated') {
+    if (settlement?.cancellationDetails?.refundStatus === 'processed' || settlement?.cancellationDetails?.refundStatus === 'initiated') {
       return errorResponse(res, 400, 'Refund already processed or initiated for this order');
     }
 
@@ -1761,12 +1758,6 @@ export const processRefund = asyncHandler(async (req, res) => {
       } = await import('../../order/services/cancellationRefundService.js');
       refundResult = await processWalletRefund(order._id, adminId, finalRefundAmount);
     } else {
-      // For Razorpay, check if refund amount is calculated
-      const refundAmount = settlement.cancellationDetails?.refundAmount || 0;
-      if (refundAmount <= 0) {
-        return errorResponse(res, 400, 'No refund amount calculated for this order');
-      }
-
       // Process Razorpay refund
       const {
         processRazorpayRefund
@@ -1775,7 +1766,7 @@ export const processRefund = asyncHandler(async (req, res) => {
     }
 
     // Update settlement with admin notes if provided
-    if (notes) {
+    if (notes && settlement) {
       settlement.metadata = settlement.metadata || new Map();
       settlement.metadata.set('adminRefundNotes', notes);
       await settlement.save();

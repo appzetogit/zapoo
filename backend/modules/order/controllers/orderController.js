@@ -653,7 +653,8 @@ export const createOrder = async (req, res) => {
 };
 
 /**
- * Verify payment and confirm order
+ * Verify payment signature only.
+ * Final order confirmation is done by the Razorpay webhook after payment.captured.
  */
 export const verifyOrderPayment = async (req, res) => {
   try {
@@ -717,7 +718,8 @@ export const verifyOrderPayment = async (req, res) => {
       });
     }
 
-    // Persist gateway identifiers only. Webhook remains the source of truth for final status.
+    // Persist gateway identifiers only.
+    // Do not confirm the order here. Webhook remains the source of truth for final status.
     let payment = await Payment.findOne({
       orderId: order._id,
       'razorpay.orderId': razorpayOrderId
@@ -1091,16 +1093,57 @@ export const cancelOrder = async (req, res) => {
     order.cancelledAt = new Date();
     await order.save();
 
-    // Calculate refund amount only for online payments (Razorpay) and wallet
+    // Calculate/trigger refund only for online payments (Razorpay) and wallet
     // COD orders don't need refund since payment hasn't been made
     let refundMessage = '';
     if (actualPaymentMethod === 'razorpay' || actualPaymentMethod === 'wallet') {
       try {
+        console.log('[REFUND_DEBUG][orderController] cancelOrder_refund_start', {
+          orderId: order.orderId || order._id?.toString?.(),
+          paymentMethod: actualPaymentMethod,
+          orderStatus: order.status,
+          cancelledBy: order.cancelledBy,
+          reason: reason.trim()
+        });
         const {
-          calculateCancellationRefund
+          initiateRazorpayRefundForOrder
         } = await import('../services/cancellationRefundService.js');
-        await calculateCancellationRefund(order._id, reason);
-        refundMessage = ' Refund will be processed after admin approval.';
+
+        if (actualPaymentMethod === 'razorpay') {
+          const refundResult = await initiateRazorpayRefundForOrder({
+            orderId: order._id,
+            trigger: 'user',
+            reason: reason.trim()
+          });
+
+          if (refundResult?.refundQueued) {
+            refundMessage = ' Refund queued and will be initiated automatically once payment is captured.';
+          } else if (refundResult?.refundInitiated) {
+            refundMessage = ` Refund initiated for ${refundResult.policy?.refundPercent || 0}% and final status will be confirmed by Razorpay webhook.`;
+          } else if (refundResult?.refundSkipped) {
+            refundMessage = ' No refund required as per policy.';
+          }
+
+          console.log('[REFUND_DEBUG][orderController] cancelOrder_refund_result', {
+            orderId: order.orderId || order._id?.toString?.(),
+            refundQueued: Boolean(refundResult?.refundQueued),
+            refundInitiated: Boolean(refundResult?.refundInitiated),
+            refundSkipped: Boolean(refundResult?.refundSkipped),
+            refundPercent: refundResult?.policy?.refundPercent || null,
+            refundAmount: refundResult?.policy?.refundAmount || null,
+            refundId: refundResult?.refundId || null
+          });
+        } else {
+          const {
+            calculateCancellationRefund
+          } = await import('../services/cancellationRefundService.js');
+          await calculateCancellationRefund(order._id, reason);
+          refundMessage = ' Refund will be processed in wallet flow.';
+          console.log('[REFUND_DEBUG][orderController] cancelOrder_wallet_refund_calculated', {
+            orderId: order.orderId || order._id?.toString?.(),
+            reason: reason.trim()
+          });
+        }
       } catch (refundError) {
         logger.error(`Error calculating cancellation refund for order ${order.orderId}:`, refundError);
         // Don't fail the cancellation if refund calculation fails
