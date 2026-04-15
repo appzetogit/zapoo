@@ -15,6 +15,7 @@ import top10Banner from "@/assets/top10pagebanner.png";
 
 export default function Top10() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { location } = useLocation();
   const { zoneId, isOutOfService } = useZone(location);
   const [favorites, setFavorites] = useState(new Set());
@@ -55,7 +56,7 @@ export default function Top10() {
         }
       } catch (err) {
         console.error("Error fetching Top Restaurants:", err);
-        const errorMessage = err?.response?.data?.message || err?.message || "Failed to load Top Restaurants";
+        const errorMessage = err?.response?.data?.message || err?.message || t("user.top10.errorFallback");
         setError(errorMessage);
         toast.error(errorMessage);
         setTop10Restaurants([]);
@@ -114,7 +115,7 @@ export default function Top10() {
           <ArrowLeft className="h-5 w-5 md:h-6 md:w-6 text-white" />
         </button>
         <div className="absolute inset-0 z-0">
-          <img src={top10Banner} alt="Top Restaurants" className="w-full h-full object-cover" />
+          <img src={top10Banner} alt={t("user.top10.title")} className="w-full h-full object-cover" />
         </div>
       </div>
 
@@ -123,15 +124,15 @@ export default function Top10() {
           <div className="mb-2">
             <div className="flex items-center gap-2 mb-1">
               <Trophy className="h-6 w-6 text-yellow-500 fill-yellow-500" />
-              <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">Top Restaurants</h1>
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">{t("user.top10.title")}</h1>
             </div>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Most loved restaurants in your area</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">{t("user.top10.subtitle")}</p>
           </div>
 
           {loading && (
             <div className="flex flex-col items-center justify-center py-20">
               <Loader2 className="h-10 w-10 animate-spin text-gray-400" />
-              <p className="mt-4 text-gray-500 dark:text-gray-400">Loading Top Restaurants...</p>
+              <p className="mt-4 text-gray-500 dark:text-gray-400">{t("user.top10.loading")}</p>
             </div>
           )}
 
@@ -139,7 +140,7 @@ export default function Top10() {
             <div className="flex flex-col items-center justify-center py-20">
               <p className="text-red-500 dark:text-red-400 text-center">{error}</p>
               <Button onClick={() => window.location.reload()} className="mt-4">
-                Retry
+                {t("user.top10.retry")}
               </Button>
             </div>
           )}
@@ -148,7 +149,7 @@ export default function Top10() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
               {top10Restaurants.length === 0 ? (
                 <div className="col-span-full text-center py-12">
-                  <p className="text-gray-500 dark:text-gray-400">No Top Restaurants available at the moment</p>
+                  <p className="text-gray-500 dark:text-gray-400">{t("user.top10.empty")}</p>
                 </div>
               ) : (
                 top10Restaurants.map((restaurant, index) => {

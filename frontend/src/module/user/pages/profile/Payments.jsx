@@ -5,9 +5,11 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { useProfile } from "../../context/ProfileContext"
+import { useTranslation } from "react-i18next"
 
 export default function Payments() {
   const { paymentMethods, deletePaymentMethod, setDefaultPaymentMethod } = useProfile()
+  const { t } = useTranslation()
 
   const formatCardNumber = (cardNumber) => {
     if (!cardNumber) return "****"
@@ -26,13 +28,13 @@ export default function Payments() {
   }
 
   const getCardTypeName = (type) => {
-    if (type === "visa") return "Visa"
-    if (type === "mastercard") return "Mastercard"
-    return "Card"
+    if (type === "visa") return t("user.payments.cardTypes.visa")
+    if (type === "mastercard") return t("user.payments.cardTypes.mastercard")
+    return t("user.payments.cardTypes.card")
   }
 
   const handleDelete = (id) => {
-    if (window.confirm("Are you sure you want to delete this payment method?")) {
+    if (window.confirm(t("user.payments.confirmDelete"))) {
       deletePaymentMethod(id)
     }
   }
@@ -46,15 +48,15 @@ export default function Payments() {
       <div className="max-w-4xl md:max-w-5xl lg:max-w-6xl xl:max-w-7xl mx-auto space-y-4 sm:space-y-6 md:space-y-8 lg:space-y-10">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-4">
           <div>
-            <h1 className="text-lg sm:text-xl md:text-2xl font-bold">Payment Methods</h1>
+            <h1 className="text-lg sm:text-xl md:text-2xl font-bold">{t("user.payments.title")}</h1>
             <p className="text-muted-foreground mt-1 text-sm sm:text-base">
-              Manage your payment methods
+              {t("user.payments.subtitle")}
             </p>
           </div>
           <Link to="/user/profile/payments/new" className="w-full sm:w-auto">
             <Button className="w-full sm:w-auto bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white text-sm sm:text-base">
               <Plus className="h-4 w-4 mr-2" />
-              Add Payment Method
+              {t("user.payments.actions.addPaymentMethod")}
             </Button>
           </Link>
         </div>
@@ -62,14 +64,14 @@ export default function Payments() {
           <Card className="shadow-lg">
             <CardContent className="py-12 text-center">
               <CreditCard className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-xl font-semibold mb-2">No payment methods saved yet</h3>
+              <h3 className="text-xl font-semibold mb-2">{t("user.payments.empty.title")}</h3>
               <p className="text-muted-foreground mb-6">
-                Add your first payment method to get started with orders
+                {t("user.payments.empty.description")}
               </p>
               <Link to="/user/profile/payments/new">
                 <Button className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white">
                   <Plus className="h-4 w-4 mr-2" />
-                  Add Your First Payment Method
+                  {t("user.payments.empty.addFirst")}
                 </Button>
               </Link>
             </CardContent>
@@ -87,10 +89,10 @@ export default function Payments() {
                   <div className="flex items-center justify-between">
                     <CardTitle className="flex items-center gap-2">
                       <CreditCard className={`h-5 w-5 ${payment.isDefault ? "text-yellow-600" : "text-muted-foreground"}`} />
-                      {getCardTypeName(payment.type)} Card
+                      {t("user.payments.cardTypeWithCard", { type: getCardTypeName(payment.type) })}
                     </CardTitle>
                     {payment.isDefault && (
-                      <Badge className="bg-yellow-500 text-white">Default</Badge>
+                      <Badge className="bg-yellow-500 text-white">{t("user.payments.default")}</Badge>
                     )}
                   </div>
                 </CardHeader>
@@ -109,13 +111,13 @@ export default function Payments() {
                     </div>
                     <div className="flex items-center gap-6 text-sm pt-3 border-t border-yellow-200">
                       <div>
-                        <span className="text-muted-foreground">Expires: </span>
+                        <span className="text-muted-foreground">{t("user.payments.expires")} </span>
                         <span className="font-semibold">
                           {formatExpiry(payment.expiryMonth, payment.expiryYear)}
                         </span>
                       </div>
                       <div>
-                        <span className="text-muted-foreground">Type: </span>
+                        <span className="text-muted-foreground">{t("user.payments.type")} </span>
                         <span className="font-semibold capitalize">{getCardTypeName(payment.type)}</span>
                       </div>
                     </div>
@@ -129,13 +131,13 @@ export default function Payments() {
                         className="flex items-center gap-1"
                       >
                         <Check className="h-4 w-4" />
-                        Set as Default
+                        {t("user.payments.actions.setAsDefault")}
                       </Button>
                     )}
                     <Link to={`/user/profile/payments/${payment.id}/edit`}>
                       <Button variant="outline" size="sm" className="flex items-center gap-1">
                         <Edit className="h-4 w-4" />
-                        Edit
+                        {t("user.payments.actions.edit")}
                       </Button>
                     </Link>
                     <Button
@@ -145,7 +147,7 @@ export default function Payments() {
                       className="flex items-center gap-1 text-red-600 hover:text-red-700 hover:border-red-300"
                     >
                       <Trash2 className="h-4 w-4" />
-                      Delete
+                      {t("user.payments.actions.delete")}
                     </Button>
                   </div>
                 </CardContent>

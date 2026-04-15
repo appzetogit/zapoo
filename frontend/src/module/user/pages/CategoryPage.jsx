@@ -14,21 +14,14 @@ import { restaurantAPI, adminAPI } from "@/lib/api"
 import { useProfile } from "../context/ProfileContext"
 import { useLocation } from "../hooks/useLocation"
 import { useZone } from "../hooks/useZone"
+import { useTranslation } from "react-i18next"
 import DynamicEtaText from "../components/DynamicEtaText"
 import { isRestaurantDeliverableNow } from "../utils/restaurantAvailability"
-
-// Filter options
-const filterOptions = [
-  { id: 'under-30-mins', label: 'Under 30 mins' },
-  { id: 'price-match', label: 'Price Match', hasIcon: true },
-  { id: 'flat-50-off', label: 'Flat 50% OFF', hasIcon: true },
-  { id: 'under-250', label: 'Under ₹250' },
-  { id: 'rating-4-plus', label: 'Rating 4.0+' },
-]
 
 // Mock data removed - using backend data only
 
 export default function CategoryPage() {
+  const { t } = useTranslation()
   const { category } = useParams()
   const navigate = useNavigate()
   const { vegMode } = useProfile()
@@ -74,7 +67,7 @@ export default function CategoryPage() {
           
           // Transform API categories to match expected format
           const transformedCategories = [
-            { id: 'all', name: "All", image: foodImages[6] || foodImages[0], slug: 'all' },
+            { id: 'all', name: t("user.categoryPage.all"), image: foodImages[6] || foodImages[0], slug: 'all' },
             ...categoriesArray.map((cat) => ({
               id: cat.slug || cat.id,
               name: cat.name,
@@ -100,19 +93,19 @@ export default function CategoryPage() {
           setCategoryKeywords(keywordsMap)
         } else {
           // Keep default "All" category on error
-          setCategories([{ id: 'all', name: "All", image: foodImages[6] || foodImages[0], slug: 'all' }])
+          setCategories([{ id: 'all', name: t("user.categoryPage.all"), image: foodImages[6] || foodImages[0], slug: 'all' }])
         }
       } catch (error) {
         console.error('Error fetching categories:', error)
         // Keep default "All" category on error
-        setCategories([{ id: 'all', name: "All", image: foodImages[6] || foodImages[0], slug: 'all' }])
+        setCategories([{ id: 'all', name: t("user.categoryPage.all"), image: foodImages[6] || foodImages[0], slug: 'all' }])
       } finally {
         setLoadingCategories(false)
       }
     }
     
     fetchCategories()
-  }, [])
+  }, [t])
 
   // Helper function to check if menu has dishes matching category keywords
   const checkCategoryInMenu = (menu, categoryId) => {
@@ -854,8 +847,8 @@ export default function CategoryPage() {
             
             <div className="flex-1 relative max-w-2xl">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
-              <Input
-                placeholder="Restaurant name or a dish..."
+                <Input
+                placeholder={t("user.categoryPage.searchPlaceholder")}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10 pr-10 h-11 md:h-12 rounded-lg border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-[#1a1a1a] focus:bg-white dark:focus:bg-[#2a2a2a] focus:border-gray-500 dark:focus:border-gray-600 text-sm md:text-base dark:text-white placeholder:text-gray-600 dark:placeholder:text-gray-400"
@@ -878,7 +871,7 @@ export default function CategoryPage() {
             {loadingCategories ? (
               <div className="flex items-center justify-center gap-2 py-4">
                 <Loader2 className="h-5 w-5 animate-spin text-green-600" />
-                <span className="text-sm text-gray-600 dark:text-gray-400">Loading categories...</span>
+                <span className="text-sm text-gray-600 dark:text-gray-400">{t("user.categoryPage.loadingCategories")}</span>
               </div>
             ) : (
               categories && categories.length > 0 ? categories.map((cat) => {
@@ -922,7 +915,7 @@ export default function CategoryPage() {
                 )
               }) : (
                 <div className="flex items-center justify-center py-4">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">No categories available</span>
+                  <span className="text-sm text-gray-600 dark:text-gray-400">{t("user.categoryPage.noCategoriesAvailable")}</span>
                 </div>
               )
             )}
@@ -946,17 +939,17 @@ export default function CategoryPage() {
               className="h-7 md:h-8 px-2.5 md:px-3 rounded-md flex items-center gap-1.5 whitespace-nowrap shrink-0 transition-all bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800"
             >
               <SlidersHorizontal className="h-3.5 w-3.5 md:h-4 md:w-4" />
-              <span className="text-xs md:text-sm font-bold text-black dark:text-white">Filters</span>
+              <span className="text-xs md:text-sm font-bold text-black dark:text-white">{t("user.categoryPage.filters")}</span>
             </Button>
             {[
-              { id: 'under-30-mins', label: 'Under 30 mins' },
-              { id: 'delivery-under-45', label: 'Under 45 mins' },
-              { id: 'rating-4-plus', label: 'Rating 4.0+' },
-              { id: 'rating-45-plus', label: 'Rating 4.5+' },
-              { id: 'distance-under-1km', label: 'Under 1km', icon: MapPin },
-              { id: 'distance-under-2km', label: 'Under 2km', icon: MapPin },
-              { id: 'flat-50-off', label: 'Flat 50% OFF' },
-              { id: 'under-250', label: 'Under ₹250' },
+              { id: 'under-30-mins', label: t("user.categoryPage.filterPills.under30mins") },
+              { id: 'delivery-under-45', label: t("user.categoryPage.filterPills.under45mins") },
+              { id: 'rating-4-plus', label: t("user.categoryPage.filterPills.rating4Plus") },
+              { id: 'rating-45-plus', label: t("user.categoryPage.filterPills.rating45Plus") },
+              { id: 'distance-under-1km', label: t("user.categoryPage.filterPills.under1km"), icon: MapPin },
+              { id: 'distance-under-2km', label: t("user.categoryPage.filterPills.under2km"), icon: MapPin },
+              { id: 'flat-50-off', label: t("user.categoryPage.filterPills.flat50off") },
+              { id: 'under-250', label: t("user.categoryPage.filterPills.under250") },
             ].map((filter) => {
               const Icon = filter.icon
               const isActive = activeFilters.has(filter.id)
@@ -988,7 +981,7 @@ export default function CategoryPage() {
           {/* ALL RESTAURANTS Section */}
           <section className="relative">
             <h2 className="text-xs sm:text-sm md:text-base font-semibold text-gray-400 dark:text-gray-500 tracking-widest uppercase mb-4 md:mb-6">
-              ALL RESTAURANTS
+              {t("user.categoryPage.allRestaurants")}
             </h2>
             
             {/* Loading Overlay */}
@@ -996,7 +989,7 @@ export default function CategoryPage() {
               <div className="absolute inset-0 bg-white/80 dark:bg-[#1a1a1a]/80 backdrop-blur-sm z-10 flex items-center justify-center rounded-lg min-h-[400px]">
                 <div className="flex flex-col items-center gap-3">
                   <Loader2 className="h-8 w-8 text-green-600 animate-spin" strokeWidth={2.5} />
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Loading restaurants...</span>
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{t("user.categoryPage.loadingRestaurants")}</span>
                 </div>
               </div>
             )}
@@ -1122,7 +1115,7 @@ export default function CategoryPage() {
                           <span className="font-medium">
                             <DynamicEtaText
                               restaurantId={restaurant.id}
-                              fallback={restaurant.deliveryTime || 'Not available'}
+                              fallback={restaurant.deliveryTime || t("user.categoryPage.notAvailable")}
                             />
                           </span>
                           {restaurant.distance && (
@@ -1152,8 +1145,8 @@ export default function CategoryPage() {
               <div className="text-center py-12 md:py-16">
                 <p className="text-gray-500 dark:text-gray-400 text-sm md:text-base">
                   {searchQuery
-                    ? `No restaurants found for "${searchQuery}"`
-                    : "No restaurants found with selected filters"}
+                    ? t("user.categoryPage.noRestaurantsForQuery", { query: searchQuery })
+                    : t("user.categoryPage.noRestaurantsWithFilters")}
                 </p>
                 <Button
                   variant="outline"
@@ -1164,7 +1157,7 @@ export default function CategoryPage() {
                     setSelectedCategory('all')
                   }}
                 >
-                  Clear all filters
+                  {t("user.categoryPage.clearAllFilters")}
                 </Button>
               </div>
             )}
@@ -1188,7 +1181,7 @@ export default function CategoryPage() {
                 <div className="absolute bottom-0 left-0 right-0 md:left-1/2 md:right-auto md:-translate-x-1/2 md:max-w-4xl bg-white dark:bg-[#1a1a1a] rounded-t-3xl md:rounded-3xl max-h-[85vh] md:max-h-[90vh] flex flex-col animate-[slideUp_0.3s_ease-out]">
                   {/* Header */}
                   <div className="flex items-center justify-between px-4 md:px-6 py-4 border-b border-gray-200 dark:border-gray-800">
-                    <h2 className="text-lg md:text-xl font-bold text-gray-900 dark:text-white">Filters and sorting</h2>
+                    <h2 className="text-lg md:text-xl font-bold text-gray-900 dark:text-white">{t("user.categoryPage.filtersAndSorting")}</h2>
                     <button 
                       onClick={() => {
                         setActiveFilters(new Set())
@@ -1197,7 +1190,7 @@ export default function CategoryPage() {
                       }}
                       className="text-green-600 dark:text-green-400 font-medium text-sm md:text-base"
                     >
-                      Clear all
+                      {t("user.categoryPage.clearAll")}
                     </button>
                   </div>
                   
@@ -1206,14 +1199,14 @@ export default function CategoryPage() {
                     {/* Left Sidebar - Tabs */}
                     <div className="w-24 sm:w-28 md:w-32 bg-gray-50 dark:bg-[#0a0a0a] border-r border-gray-200 dark:border-gray-800 flex flex-col">
                       {[
-                        { id: 'sort', label: 'Sort By', icon: ArrowDownUp },
-                        { id: 'time', label: 'Time', icon: Timer },
-                        { id: 'rating', label: 'Rating', icon: Star },
-                        { id: 'distance', label: 'Distance', icon: MapPin },
-                        { id: 'price', label: 'Dish Price', icon: IndianRupee },
-                        { id: 'cuisine', label: 'Cuisine', icon: UtensilsCrossed },
-                        { id: 'offers', label: 'Offers', icon: BadgePercent },
-                        { id: 'trust', label: 'Trust', icon: ShieldCheck },
+                        { id: 'sort', label: t("user.categoryPage.tabs.sortBy"), icon: ArrowDownUp },
+                        { id: 'time', label: t("user.categoryPage.tabs.time"), icon: Timer },
+                        { id: 'rating', label: t("user.categoryPage.tabs.rating"), icon: Star },
+                        { id: 'distance', label: t("user.categoryPage.tabs.distance"), icon: MapPin },
+                        { id: 'price', label: t("user.categoryPage.tabs.dishPrice"), icon: IndianRupee },
+                        { id: 'cuisine', label: t("user.categoryPage.tabs.cuisine"), icon: UtensilsCrossed },
+                        { id: 'offers', label: t("user.categoryPage.tabs.offers"), icon: BadgePercent },
+                        { id: 'trust', label: t("user.categoryPage.tabs.trust"), icon: ShieldCheck },
                       ].map((tab) => {
                         const Icon = tab.icon
                         const isActive = activeScrollSection === tab.id || activeFilterTab === tab.id
@@ -1249,14 +1242,14 @@ export default function CategoryPage() {
                         data-section-id="sort"
                         className="space-y-4 mb-8"
                       >
-                        <h3 className="text-lg md:text-xl font-semibold text-gray-900 dark:text-white mb-4">Sort by</h3>
+                        <h3 className="text-lg md:text-xl font-semibold text-gray-900 dark:text-white mb-4">{t("user.categoryPage.sortBy")}</h3>
                         <div className="flex flex-col gap-3">
                           {[
-                            { id: null, label: 'Relevance' },
-                            { id: 'price-low', label: 'Price: Low to High' },
-                            { id: 'price-high', label: 'Price: High to Low' },
-                            { id: 'rating-high', label: 'Rating: High to Low' },
-                            { id: 'rating-low', label: 'Rating: Low to High' },
+                            { id: null, label: t("user.categoryPage.sortOptions.relevance") },
+                            { id: 'price-low', label: t("user.categoryPage.sortOptions.priceLowToHigh") },
+                            { id: 'price-high', label: t("user.categoryPage.sortOptions.priceHighToLow") },
+                            { id: 'rating-high', label: t("user.categoryPage.sortOptions.ratingHighToLow") },
+                            { id: 'rating-low', label: t("user.categoryPage.sortOptions.ratingLowToHigh") },
                           ].map((option) => (
                             <button
                               key={option.id || 'relevance'}
@@ -1281,7 +1274,7 @@ export default function CategoryPage() {
                         data-section-id="time"
                         className="space-y-4 mb-8"
                       >
-                        <h3 className="text-lg md:text-xl font-semibold text-gray-900 dark:text-white mb-4">Delivery Time</h3>
+                        <h3 className="text-lg md:text-xl font-semibold text-gray-900 dark:text-white mb-4">{t("user.categoryPage.deliveryTime")}</h3>
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
                           <button 
                             onClick={() => toggleFilter('under-30-mins')}
@@ -1292,7 +1285,7 @@ export default function CategoryPage() {
                             }`}
                           >
                             <Timer className={`h-6 w-6 md:h-7 md:w-7 ${activeFilters.has('under-30-mins') ? 'text-green-600 dark:text-green-400' : 'text-gray-600 dark:text-gray-400'}`} strokeWidth={1.5} />
-                            <span className={`text-sm md:text-base font-medium ${activeFilters.has('under-30-mins') ? 'text-green-600 dark:text-green-400' : 'text-gray-700 dark:text-gray-300'}`}>Under 30 mins</span>
+                            <span className={`text-sm md:text-base font-medium ${activeFilters.has('under-30-mins') ? 'text-green-600 dark:text-green-400' : 'text-gray-700 dark:text-gray-300'}`}>{t("user.categoryPage.filterPills.under30mins")}</span>
                           </button>
                           <button 
                             onClick={() => toggleFilter('delivery-under-45')}
@@ -1303,7 +1296,7 @@ export default function CategoryPage() {
                             }`}
                           >
                             <Timer className={`h-6 w-6 md:h-7 md:w-7 ${activeFilters.has('delivery-under-45') ? 'text-green-600 dark:text-green-400' : 'text-gray-600 dark:text-gray-400'}`} strokeWidth={1.5} />
-                            <span className={`text-sm md:text-base font-medium ${activeFilters.has('delivery-under-45') ? 'text-green-600 dark:text-green-400' : 'text-gray-700 dark:text-gray-300'}`}>Under 45 mins</span>
+                            <span className={`text-sm md:text-base font-medium ${activeFilters.has('delivery-under-45') ? 'text-green-600 dark:text-green-400' : 'text-gray-700 dark:text-gray-300'}`}>{t("user.categoryPage.filterPills.under45mins")}</span>
                           </button>
                         </div>
                       </div>
@@ -1314,7 +1307,7 @@ export default function CategoryPage() {
                         data-section-id="rating"
                         className="space-y-4 mb-8"
                       >
-                        <h3 className="text-lg md:text-xl font-semibold text-gray-900 dark:text-white mb-4">Restaurant Rating</h3>
+                        <h3 className="text-lg md:text-xl font-semibold text-gray-900 dark:text-white mb-4">{t("user.categoryPage.restaurantRating")}</h3>
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
                           <button 
                             onClick={() => toggleFilter('rating-35-plus')}
@@ -1325,7 +1318,7 @@ export default function CategoryPage() {
                             }`}
                           >
                             <Star className={`h-6 w-6 md:h-7 md:w-7 ${activeFilters.has('rating-35-plus') ? 'text-green-600 fill-green-600 dark:text-green-400 dark:fill-green-400' : 'text-gray-400 dark:text-gray-500'}`} />
-                            <span className={`text-sm md:text-base font-medium ${activeFilters.has('rating-35-plus') ? 'text-green-600 dark:text-green-400' : 'text-gray-700 dark:text-gray-300'}`}>Rated 3.5+</span>
+                            <span className={`text-sm md:text-base font-medium ${activeFilters.has('rating-35-plus') ? 'text-green-600 dark:text-green-400' : 'text-gray-700 dark:text-gray-300'}`}>{t("user.categoryPage.rated35Plus")}</span>
                           </button>
                           <button 
                             onClick={() => toggleFilter('rating-4-plus')}
@@ -1336,7 +1329,7 @@ export default function CategoryPage() {
                             }`}
                           >
                             <Star className={`h-6 w-6 md:h-7 md:w-7 ${activeFilters.has('rating-4-plus') ? 'text-green-600 fill-green-600 dark:text-green-400 dark:fill-green-400' : 'text-gray-400 dark:text-gray-500'}`} />
-                            <span className={`text-sm md:text-base font-medium ${activeFilters.has('rating-4-plus') ? 'text-green-600 dark:text-green-400' : 'text-gray-700 dark:text-gray-300'}`}>Rated 4.0+</span>
+                            <span className={`text-sm md:text-base font-medium ${activeFilters.has('rating-4-plus') ? 'text-green-600 dark:text-green-400' : 'text-gray-700 dark:text-gray-300'}`}>{t("user.categoryPage.filterPills.rating4Plus")}</span>
                           </button>
                           <button 
                             onClick={() => toggleFilter('rating-45-plus')}
@@ -1347,7 +1340,7 @@ export default function CategoryPage() {
                             }`}
                           >
                             <Star className={`h-6 w-6 md:h-7 md:w-7 ${activeFilters.has('rating-45-plus') ? 'text-green-600 fill-green-600 dark:text-green-400 dark:fill-green-400' : 'text-gray-400 dark:text-gray-500'}`} />
-                            <span className={`text-sm md:text-base font-medium ${activeFilters.has('rating-45-plus') ? 'text-green-600 dark:text-green-400' : 'text-gray-700 dark:text-gray-300'}`}>Rated 4.5+</span>
+                            <span className={`text-sm md:text-base font-medium ${activeFilters.has('rating-45-plus') ? 'text-green-600 dark:text-green-400' : 'text-gray-700 dark:text-gray-300'}`}>{t("user.categoryPage.filterPills.rating45Plus")}</span>
                           </button>
                         </div>
                       </div>
@@ -1358,7 +1351,7 @@ export default function CategoryPage() {
                         data-section-id="distance"
                         className="space-y-4 mb-8"
                       >
-                        <h3 className="text-lg md:text-xl font-semibold text-gray-900 dark:text-white mb-4">Distance</h3>
+                        <h3 className="text-lg md:text-xl font-semibold text-gray-900 dark:text-white mb-4">{t("user.categoryPage.tabs.distance")}</h3>
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
                           <button 
                             onClick={() => toggleFilter('distance-under-1km')}
@@ -1369,7 +1362,7 @@ export default function CategoryPage() {
                             }`}
                           >
                             <MapPin className={`h-6 w-6 md:h-7 md:w-7 ${activeFilters.has('distance-under-1km') ? 'text-green-600 dark:text-green-400' : 'text-gray-600 dark:text-gray-400'}`} strokeWidth={1.5} />
-                            <span className={`text-sm md:text-base font-medium ${activeFilters.has('distance-under-1km') ? 'text-green-600 dark:text-green-400' : 'text-gray-700 dark:text-gray-300'}`}>Under 1 km</span>
+                            <span className={`text-sm md:text-base font-medium ${activeFilters.has('distance-under-1km') ? 'text-green-600 dark:text-green-400' : 'text-gray-700 dark:text-gray-300'}`}>{t("user.categoryPage.filterPills.under1km")}</span>
                           </button>
                           <button 
                             onClick={() => toggleFilter('distance-under-2km')}
@@ -1380,7 +1373,7 @@ export default function CategoryPage() {
                             }`}
                           >
                             <MapPin className={`h-6 w-6 md:h-7 md:w-7 ${activeFilters.has('distance-under-2km') ? 'text-green-600 dark:text-green-400' : 'text-gray-600 dark:text-gray-400'}`} strokeWidth={1.5} />
-                            <span className={`text-sm md:text-base font-medium ${activeFilters.has('distance-under-2km') ? 'text-green-600 dark:text-green-400' : 'text-gray-700 dark:text-gray-300'}`}>Under 2 km</span>
+                            <span className={`text-sm md:text-base font-medium ${activeFilters.has('distance-under-2km') ? 'text-green-600 dark:text-green-400' : 'text-gray-700 dark:text-gray-300'}`}>{t("user.categoryPage.filterPills.under2km")}</span>
                           </button>
                         </div>
                       </div>
@@ -1391,7 +1384,7 @@ export default function CategoryPage() {
                         data-section-id="price"
                         className="space-y-4 mb-8"
                       >
-                        <h3 className="text-lg md:text-xl font-semibold text-gray-900 dark:text-white mb-4">Dish Price</h3>
+                        <h3 className="text-lg md:text-xl font-semibold text-gray-900 dark:text-white mb-4">{t("user.categoryPage.tabs.dishPrice")}</h3>
                         <div className="flex flex-col gap-3 md:gap-4">
                           <button 
                             onClick={() => toggleFilter('price-under-200')}
@@ -1401,7 +1394,7 @@ export default function CategoryPage() {
                                 : 'border-gray-200 dark:border-gray-700 hover:border-green-600'
                             }`}
                           >
-                            <span className={`text-sm md:text-base font-medium ${activeFilters.has('price-under-200') ? 'text-green-600 dark:text-green-400' : 'text-gray-700 dark:text-gray-300'}`}>Under ₹200</span>
+                            <span className={`text-sm md:text-base font-medium ${activeFilters.has('price-under-200') ? 'text-green-600 dark:text-green-400' : 'text-gray-700 dark:text-gray-300'}`}>{t("user.categoryPage.under200")}</span>
                           </button>
                           <button 
                             onClick={() => toggleFilter('under-250')}
@@ -1411,7 +1404,7 @@ export default function CategoryPage() {
                                 : 'border-gray-200 dark:border-gray-700 hover:border-green-600'
                             }`}
                           >
-                            <span className={`text-sm md:text-base font-medium ${activeFilters.has('under-250') ? 'text-green-600 dark:text-green-400' : 'text-gray-700 dark:text-gray-300'}`}>Under ₹250</span>
+                            <span className={`text-sm md:text-base font-medium ${activeFilters.has('under-250') ? 'text-green-600 dark:text-green-400' : 'text-gray-700 dark:text-gray-300'}`}>{t("user.categoryPage.filterPills.under250")}</span>
                           </button>
                           <button 
                             onClick={() => toggleFilter('price-under-500')}
@@ -1421,7 +1414,7 @@ export default function CategoryPage() {
                                 : 'border-gray-200 dark:border-gray-700 hover:border-green-600'
                             }`}
                           >
-                            <span className={`text-sm md:text-base font-medium ${activeFilters.has('price-under-500') ? 'text-green-600 dark:text-green-400' : 'text-gray-700 dark:text-gray-300'}`}>Under ₹500</span>
+                            <span className={`text-sm md:text-base font-medium ${activeFilters.has('price-under-500') ? 'text-green-600 dark:text-green-400' : 'text-gray-700 dark:text-gray-300'}`}>{t("user.categoryPage.under500")}</span>
                           </button>
                         </div>
                       </div>
@@ -1432,9 +1425,21 @@ export default function CategoryPage() {
                         data-section-id="cuisine"
                         className="space-y-4 mb-8"
                       >
-                        <h3 className="text-lg md:text-xl font-semibold text-gray-900 dark:text-white mb-4">Cuisine</h3>
+                        <h3 className="text-lg md:text-xl font-semibold text-gray-900 dark:text-white mb-4">{t("user.categoryPage.tabs.cuisine")}</h3>
                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
-                          {['Chinese', 'American', 'Japanese', 'Italian', 'Mexican', 'Indian', 'Asian', 'Seafood', 'Desserts', 'Cafe', 'Healthy'].map((cuisine) => (
+                          {[
+                            t("user.categoryPage.cuisines.chinese"),
+                            t("user.categoryPage.cuisines.american"),
+                            t("user.categoryPage.cuisines.japanese"),
+                            t("user.categoryPage.cuisines.italian"),
+                            t("user.categoryPage.cuisines.mexican"),
+                            t("user.categoryPage.cuisines.indian"),
+                            t("user.categoryPage.cuisines.asian"),
+                            t("user.categoryPage.cuisines.seafood"),
+                            t("user.categoryPage.cuisines.desserts"),
+                            t("user.categoryPage.cuisines.cafe"),
+                            t("user.categoryPage.cuisines.healthy")
+                          ].map((cuisine) => (
                             <button
                               key={cuisine}
                               onClick={() => setSelectedCuisine(selectedCuisine === cuisine ? null : cuisine)}
@@ -1458,7 +1463,7 @@ export default function CategoryPage() {
                         data-section-id="offers"
                         className="space-y-4 mb-8"
                       >
-                        <h3 className="text-lg md:text-xl font-semibold text-gray-900 dark:text-white mb-4">Offers</h3>
+                        <h3 className="text-lg md:text-xl font-semibold text-gray-900 dark:text-white mb-4">{t("user.categoryPage.tabs.offers")}</h3>
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
                           <button 
                             onClick={() => toggleFilter('flat-50-off')}
@@ -1469,7 +1474,7 @@ export default function CategoryPage() {
                             }`}
                           >
                             <BadgePercent className={`h-6 w-6 md:h-7 md:w-7 ${activeFilters.has('flat-50-off') ? 'text-green-600 dark:text-green-400' : 'text-gray-600 dark:text-gray-400'}`} strokeWidth={1.5} />
-                            <span className={`text-sm md:text-base font-medium ${activeFilters.has('flat-50-off') ? 'text-green-600 dark:text-green-400' : 'text-gray-700 dark:text-gray-300'}`}>Flat 50% OFF</span>
+                            <span className={`text-sm md:text-base font-medium ${activeFilters.has('flat-50-off') ? 'text-green-600 dark:text-green-400' : 'text-gray-700 dark:text-gray-300'}`}>{t("user.categoryPage.filterPills.flat50off")}</span>
                           </button>
                           <button 
                             onClick={() => toggleFilter('price-match')}
@@ -1480,7 +1485,7 @@ export default function CategoryPage() {
                             }`}
                           >
                             <BadgePercent className={`h-6 w-6 md:h-7 md:w-7 ${activeFilters.has('price-match') ? 'text-green-600 dark:text-green-400' : 'text-gray-600 dark:text-gray-400'}`} strokeWidth={1.5} />
-                            <span className={`text-sm md:text-base font-medium ${activeFilters.has('price-match') ? 'text-green-600 dark:text-green-400' : 'text-gray-700 dark:text-gray-300'}`}>Price Match</span>
+                            <span className={`text-sm md:text-base font-medium ${activeFilters.has('price-match') ? 'text-green-600 dark:text-green-400' : 'text-gray-700 dark:text-gray-300'}`}>{t("user.categoryPage.priceMatch")}</span>
                           </button>
                         </div>
                       </div>
@@ -1488,13 +1493,13 @@ export default function CategoryPage() {
                       {/* Trust Markers Tab */}
                       {activeFilterTab === 'trust' && (
                         <div className="space-y-4">
-                          <h3 className="text-lg md:text-xl font-semibold text-gray-900 dark:text-white">Trust Markers</h3>
+                          <h3 className="text-lg md:text-xl font-semibold text-gray-900 dark:text-white">{t("user.categoryPage.trustMarkers")}</h3>
                           <div className="flex flex-col gap-3 md:gap-4">
                             <button className="px-4 md:px-5 py-3 md:py-4 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-green-600 text-left transition-colors">
-                              <span className="text-sm md:text-base font-medium text-gray-700 dark:text-gray-300">Top Rated</span>
+                              <span className="text-sm md:text-base font-medium text-gray-700 dark:text-gray-300">{t("user.categoryPage.topRated")}</span>
                             </button>
                             <button className="px-4 md:px-5 py-3 md:py-4 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-green-600 text-left transition-colors">
-                              <span className="text-sm md:text-base font-medium text-gray-700 dark:text-gray-300">Trusted by 1000+ users</span>
+                              <span className="text-sm md:text-base font-medium text-gray-700 dark:text-gray-300">{t("user.categoryPage.trustedByUsers")}</span>
                             </button>
                           </div>
                         </div>
@@ -1508,7 +1513,7 @@ export default function CategoryPage() {
                       onClick={() => setIsFilterOpen(false)}
                       className="flex-1 py-3 md:py-4 text-center font-semibold text-gray-700 dark:text-gray-300 text-sm md:text-base"
                     >
-                      Close
+                      {t("user.categoryPage.close")}
                     </button>
                     <button 
                       onClick={() => {
@@ -1526,8 +1531,8 @@ export default function CategoryPage() {
                       }`}
                     >
                       {activeFilters.size > 0 || sortBy || selectedCuisine
-                        ? 'Show results'
-                        : 'Show results'}
+                        ? t("user.categoryPage.showResults")
+                        : t("user.categoryPage.showResults")}
                     </button>
                   </div>
                 </div>

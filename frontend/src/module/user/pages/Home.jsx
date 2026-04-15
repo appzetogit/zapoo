@@ -174,7 +174,9 @@ const RestaurantImageCarousel = React.memo(({
         e.stopPropagation();
         setDirection(index >= currentIndex ? 1 : -1);
         setCurrentIndex(index);
-      }} className="w-10 h-10 flex items-center justify-center focus:outline-none group/btn rounded-full" aria-label={`Go to image ${index + 1}`}>
+      }} className="w-10 h-10 flex items-center justify-center focus:outline-none group/btn rounded-full" aria-label={t("user.home.goToImage", {
+        index: index + 1
+      })}>
               <div className={`h-1.5 rounded-full transition-all duration-300 ${index === currentIndex ? "w-6 bg-white" : "w-1.5 bg-white/50 group-hover/btn:bg-white/75"}`} />
             </button>)}
         </div>}
@@ -607,12 +609,118 @@ export default function Home() {
 
   // Memoize cartCount to prevent recalculation on every render - use cart directly
   const cartCount = useMemo(() => cart.reduce((total, item) => total + (item.quantity || 0), 0), [cart]);
-  const cityName = location?.city || "Select";
-  const stateName = location?.state || "Location";
+  const cityName = location?.city || t("user.home.select");
+  const stateName = location?.state || t("user.home.location");
 
   // Mock points value - replace with actual points from context/store
   const userPoints = 99;
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
+  const filterTabs = useMemo(() => ([
+    {
+      id: 'sort',
+      label: t("user.home.filterTabs.sortBy"),
+      icon: ArrowDownUp
+    }, {
+      id: 'time',
+      label: t("user.home.filterTabs.time"),
+      icon: Timer
+    }, {
+      id: 'rating',
+      label: t("user.home.filterTabs.rating"),
+      icon: Star
+    }, {
+      id: 'distance',
+      label: t("user.home.filterTabs.distance"),
+      icon: MapPin
+    }, {
+      id: 'price',
+      label: t("user.home.filterTabs.dishPrice"),
+      icon: IndianRupee
+    }, {
+      id: 'cuisine',
+      label: t("user.home.filterTabs.cuisine"),
+      icon: UtensilsCrossed
+    }, {
+      id: 'offers',
+      label: t("user.home.filterTabs.offers"),
+      icon: BadgePercent
+    }, {
+      id: 'trust',
+      label: t("user.home.filterTabs.trust"),
+      icon: ShieldCheck
+    }
+  ]), [t]);
+  const sortOptions = useMemo(() => ([
+    {
+      id: null,
+      label: t("user.home.sortOptions.relevance")
+    }, {
+      id: 'price-low',
+      label: t("user.home.sortOptions.priceLowToHigh")
+    }, {
+      id: 'price-high',
+      label: t("user.home.sortOptions.priceHighToLow")
+    }, {
+      id: 'rating-high',
+      label: t("user.home.sortOptions.ratingHighToLow")
+    }, {
+      id: 'rating-low',
+      label: t("user.home.sortOptions.ratingLowToHigh")
+    }
+  ]), [t]);
+  const cuisineOptions = useMemo(() => ([
+    {
+      id: "Chinese",
+      label: t("user.home.cuisineOptions.chinese")
+    }, {
+      id: "American",
+      label: t("user.home.cuisineOptions.american")
+    }, {
+      id: "Japanese",
+      label: t("user.home.cuisineOptions.japanese")
+    }, {
+      id: "Italian",
+      label: t("user.home.cuisineOptions.italian")
+    }, {
+      id: "Mexican",
+      label: t("user.home.cuisineOptions.mexican")
+    }, {
+      id: "Indian",
+      label: t("user.home.cuisineOptions.indian")
+    }, {
+      id: "Asian",
+      label: t("user.home.cuisineOptions.asian")
+    }, {
+      id: "Seafood",
+      label: t("user.home.cuisineOptions.seafood")
+    }, {
+      id: "Desserts",
+      label: t("user.home.cuisineOptions.desserts")
+    }, {
+      id: "Cafe",
+      label: t("user.home.cuisineOptions.cafe")
+    }, {
+      id: "Healthy",
+      label: t("user.home.cuisineOptions.healthy")
+    }
+  ]), [t]);
+  const quickFilterOptions = useMemo(() => ([
+    {
+      id: 'delivery-under-30',
+      label: t("user.home.quickFilters.under30Mins")
+    }, {
+      id: 'delivery-under-45',
+      label: t("user.home.quickFilters.under45Mins")
+    }, {
+      id: 'distance-under-1km',
+      label: t("user.home.quickFilters.under1Km"),
+      icon: MapPin
+    }, {
+      id: 'distance-under-2km',
+      label: t("user.home.quickFilters.under2Km"),
+      icon: MapPin
+    }
+  ]), [t]);
 
   // Simple filter toggle function
   const toggleFilter = filterId => {
@@ -772,10 +880,10 @@ export default function Home() {
         // Transform API data to match expected format
         const transformedRestaurants = restaurantsArray.map((restaurant, index) => {
           // Use restaurant data if available, otherwise use defaults
-          const deliveryTime = restaurant.estimatedDeliveryTime || "25-30 mins";
+          const deliveryTime = restaurant.estimatedDeliveryTime || t("user.home.fallbacks.deliveryTime2530");
 
           // Calculate distance from user to restaurant
-          let distance = restaurant.distance || "1.2 km";
+          let distance = restaurant.distance || t("user.home.fallbacks.distance1_2km");
 
           // Get restaurant coordinates
           const restaurantLocation = restaurant.location;
@@ -799,7 +907,7 @@ export default function Home() {
           }
 
           // Get first cuisine or default
-          const cuisine = restaurant.cuisines && restaurant.cuisines.length > 0 ? restaurant.cuisines[0] : "Multi-cuisine";
+          const cuisine = restaurant.cuisines && restaurant.cuisines.length > 0 ? restaurant.cuisines[0] : t("user.home.fallbacks.multiCuisine");
 
           // Get cover images (separate from menu images) for carousel
           const coverImages = restaurant.coverImages && restaurant.coverImages.length > 0 ? restaurant.coverImages.map(img => img.url || img) : [];
@@ -830,7 +938,7 @@ export default function Home() {
             // Array of cover images for carousel (separate from menu images)
             priceRange: restaurant.priceRange || "$$",
             // Use from API or default
-            featuredDish: restaurant.featuredDish || (restaurant.cuisines && restaurant.cuisines.length > 0 ? `${restaurant.cuisines[0]} Special` : "Special Dish"),
+            featuredDish: restaurant.featuredDish || (restaurant.cuisines && restaurant.cuisines.length > 0 ? `${restaurant.cuisines[0]} ${t("user.home.fallbacks.specialSuffix")}` : t("user.home.fallbacks.specialDish")),
             featuredPrice: restaurant.featuredPrice || 249,
             // Use from API or default
             offer: offer && !isDefaultOfferValue(offer) ? offer : null,
@@ -1682,21 +1790,7 @@ export default function Home() {
             </motion.div>
 
             {/* Filter Buttons */}
-            {[{
-            id: 'delivery-under-30',
-            label: 'Under 30 mins'
-          }, {
-            id: 'delivery-under-45',
-            label: 'Under 45 mins'
-          }, {
-            id: 'distance-under-1km',
-            label: 'Under 1km',
-            icon: MapPin
-          }, {
-            id: 'distance-under-2km',
-            label: 'Under 2km',
-            icon: MapPin
-          }].map((filter, index) => {
+            {quickFilterOptions.map((filter, index) => {
             const Icon = filter.icon;
             const isActive = activeFilters.has(filter.id);
             return <motion.div key={filter.id} initial={{
@@ -1801,7 +1895,7 @@ export default function Home() {
                           <span className="text-xs sm:text-sm font-semibold text-[#1A9F4F]">
                             <DynamicEtaText
                               restaurantId={restaurant._id || restaurant.restaurantId}
-                              fallback={restaurant.estimatedDeliveryTime || '20-25 mins'}
+                              fallback={restaurant.estimatedDeliveryTime || t("user.home.fallbacks.deliveryTime2025")}
                             />
                           </span>
                         </div>
@@ -1854,22 +1948,22 @@ export default function Home() {
           // Fallback to hardcoded explore more if API returns empty
           [{
             id: 'offers',
-            label: 'Offers',
+            label: t("user.home.exploreItems.offers"),
             image: exploreOffers,
             href: '/user/offers'
           }, {
             id: 'gourmet',
-            label: 'Gourmet',
+            label: t("user.home.exploreItems.gourmet"),
             image: exploreGourmet,
             href: '/user/gourmet'
           }, {
             id: 'top10',
-            label: 'Top Restaurants',
+            label: t("user.home.exploreItems.topRestaurants"),
             image: exploreTop10,
             href: '/user/top-10'
           }, {
             id: 'collection',
-            label: 'Collections',
+            label: t("user.home.exploreItems.collections"),
             image: exploreCollection,
             href: '/user/profile/favorites'
           }].map((item, index) => <motion.div key={item.id} initial={{
@@ -1962,7 +2056,7 @@ export default function Home() {
         }} transition={{
           duration: 0.5
         }}>
-            IN THE SPOTLIGHT
+            {t("user.home.inTheSpotlight")}
           </motion.h2>
           <div className="relative w-full bg-white dark:bg-[#0a0a0a] pt-4 sm:pt-4 pb-1 sm:pb-2">
             <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
@@ -1994,9 +2088,11 @@ export default function Home() {
         }}>
             <div className="flex flex-col gap-0.5 lg:gap-1">
               <h2 className="text-xs sm:text-sm lg:text-base font-semibold text-gray-400 tracking-widest uppercase">
-                {featuredGridRestaurants.length} Restaurants Delivering to You
+                {t("user.home.restaurantsDeliveringToYou", {
+              count: featuredGridRestaurants.length
+            })}
               </h2>
-              <span className="text-base sm:text-lg lg:text-2xl text-gray-500 font-normal">Featured</span>
+              <span className="text-base sm:text-lg lg:text-2xl text-gray-500 font-normal">{t("user.home.featured")}</span>
             </div>
           </motion.div>
           <div className="relative">
@@ -2064,7 +2160,7 @@ export default function Home() {
 
                             {/* Bookmark Icon - Top Right */}
                             <div className="absolute top-3 right-3 md:top-4 md:right-4 z-10 transform transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6">
-                              <Button variant="ghost" size="icon" onClick={handleToggleFavorite} aria-label={favorite ? "Remove from favorites" : "Add to favorites"} className={`h-9 w-9 md:h-11 md:w-11 rounded-full border flex items-center justify-center transition-all duration-300 ${favorite ? "border-red-500 bg-red-50 text-red-500" : "border-white bg-white/90 text-gray-600 hover:bg-white"}`}>
+                              <Button variant="ghost" size="icon" onClick={handleToggleFavorite} aria-label={favorite ? t("user.home.removeFromFavorites") : t("user.home.addToFavorites")} className={`h-9 w-9 md:h-11 md:w-11 rounded-full border flex items-center justify-center transition-all duration-300 ${favorite ? "border-red-500 bg-red-50 text-red-500" : "border-white bg-white/90 text-gray-600 hover:bg-white"}`}>
                                 <Bookmark className={`h-5 w-5 lg:h-6 lg:w-6 transition-all duration-300 ${favorite ? "fill-red-500" : ""}`} />
                               </Button>
                             </div>
@@ -2088,7 +2184,9 @@ export default function Home() {
                                     <span className="text-sm font-bold">{restaurant.rating}</span>
                                   </div>
                                   {restaurant.totalRatings > 0 && <span className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
-                                      {`By ${restaurant.totalRatings >= 1000 ? `${(restaurant.totalRatings / 1000).toFixed(0)}K+` : `${restaurant.totalRatings}+`}`}
+                                      {t("user.home.byRatings", {
+                                  value: restaurant.totalRatings >= 1000 ? `${(restaurant.totalRatings / 1000).toFixed(0)}K+` : `${restaurant.totalRatings}+`
+                                })}
                                     </span>}
                                 </div>
                               </div>
@@ -2099,7 +2197,7 @@ export default function Home() {
                                 <span className="font-semibold text-emerald-700 dark:text-emerald-400">
                                   <DynamicEtaText
                                     restaurantId={restaurant._id || restaurant.id || restaurant.restaurantId}
-                                    fallback={restaurant.deliveryTime || restaurant.estimatedDeliveryTime || '25-30 mins'}
+                                    fallback={restaurant.deliveryTime || restaurant.estimatedDeliveryTime || t("user.home.fallbacks.deliveryTime2530")}
                                   />
                                 </span>
                                 <span className="text-gray-400">|</span>
@@ -2166,13 +2264,13 @@ export default function Home() {
         }}>
               {/* Header */}
               <div className="flex items-center justify-between px-4 py-4 border-b dark:border-gray-800">
-                <h2 className="text-lg font-bold text-gray-900 dark:text-white">Filters and sorting</h2>
+                <h2 className="text-lg font-bold text-gray-900 dark:text-white">{t("user.home.filterModal.title")}</h2>
                 <button onClick={() => {
               setActiveFilters(new Set());
               setSortBy(null);
               setSelectedCuisine(null);
             }} className="text-orange-600 font-medium text-sm">
-                  Clear all
+                  {t("user.home.filterModal.clearAll")}
                 </button>
               </div>
 
@@ -2180,39 +2278,7 @@ export default function Home() {
               <div className="flex flex-1 overflow-hidden">
                 {/* Left Sidebar - Tabs */}
                 <div className="w-24 sm:w-28 bg-gray-50 dark:bg-[#0a0a0a] border-r dark:border-gray-800 flex flex-col">
-                  {[{
-                id: 'sort',
-                label: 'Sort By',
-                icon: ArrowDownUp
-              }, {
-                id: 'time',
-                label: 'Time',
-                icon: Timer
-              }, {
-                id: 'rating',
-                label: 'Rating',
-                icon: Star
-              }, {
-                id: 'distance',
-                label: 'Distance',
-                icon: MapPin
-              }, {
-                id: 'price',
-                label: 'Dish Price',
-                icon: IndianRupee
-              }, {
-                id: 'cuisine',
-                label: 'Cuisine',
-                icon: UtensilsCrossed
-              }, {
-                id: 'offers',
-                label: 'Offers',
-                icon: BadgePercent
-              }, {
-                id: 'trust',
-                label: 'Trust',
-                icon: ShieldCheck
-              }].map(tab => {
+                  {filterTabs.map(tab => {
                 const Icon = tab.icon;
                 const isActive = activeScrollSection === tab.id || activeFilterTab === tab.id;
                 return <button key={tab.id} onClick={() => {
@@ -2236,24 +2302,9 @@ export default function Home() {
                 <div ref={rightContentRef} className="flex-1 overflow-y-auto p-4">
                   {/* Sort By Tab */}
                   <div ref={el => filterSectionRefs.current['sort'] = el} data-section-id="sort" className="space-y-4 mb-8">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Sort by</h3>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">{t("user.home.filterModal.sections.sortBy")}</h3>
                     <div className="flex flex-col gap-3">
-                      {[{
-                    id: null,
-                    label: 'Relevance'
-                  }, {
-                    id: 'price-low',
-                    label: 'Price: Low to High'
-                  }, {
-                    id: 'price-high',
-                    label: 'Price: High to Low'
-                  }, {
-                    id: 'rating-high',
-                    label: 'Rating: High to Low'
-                  }, {
-                    id: 'rating-low',
-                    label: 'Rating: Low to High'
-                  }].map(option => <button key={option.id || 'relevance'} onClick={() => setSortBy(option.id)} className={`px-4 py-3 rounded-xl border text-left transition-colors ${sortBy === option.id ? 'border-orange-600 bg-orange-50 dark:bg-orange-900/20' : 'border-gray-200 dark:border-gray-800 hover:border-orange-600'}`}>
+                      {sortOptions.map(option => <button key={option.id || 'relevance'} onClick={() => setSortBy(option.id)} className={`px-4 py-3 rounded-xl border text-left transition-colors ${sortBy === option.id ? 'border-orange-600 bg-orange-50 dark:bg-orange-900/20' : 'border-gray-200 dark:border-gray-800 hover:border-orange-600'}`}>
                           <span className={`text-sm font-medium ${sortBy === option.id ? 'text-orange-600' : 'text-gray-700 dark:text-gray-300'}`}>
                             {option.label}
                           </span>
@@ -2263,73 +2314,73 @@ export default function Home() {
 
                   {/* Time Tab */}
                   <div ref={el => filterSectionRefs.current['time'] = el} data-section-id="time" className="space-y-4 mb-8">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Delivery Time</h3>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">{t("user.home.filterModal.sections.deliveryTime")}</h3>
                     <div className="grid grid-cols-2 gap-3">
                       <button onClick={() => toggleFilter('delivery-under-30')} className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition-colors ${activeFilters.has('delivery-under-30') ? 'border-orange-600 bg-orange-50 dark:bg-orange-900/20' : 'border-gray-200 dark:border-gray-800 hover:border-orange-600'}`}>
                         <Timer className={`h-6 w-6 ${activeFilters.has('delivery-under-30') ? 'text-orange-600' : 'text-gray-600 dark:text-gray-400'}`} strokeWidth={1.5} />
-                        <span className={`text-sm font-medium ${activeFilters.has('delivery-under-30') ? 'text-orange-600' : 'text-gray-700 dark:text-gray-300'}`}>Under 30 mins</span>
+                        <span className={`text-sm font-medium ${activeFilters.has('delivery-under-30') ? 'text-orange-600' : 'text-gray-700 dark:text-gray-300'}`}>{t("user.home.filterModal.options.under30Mins")}</span>
                       </button>
                       <button onClick={() => toggleFilter('delivery-under-45')} className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition-colors ${activeFilters.has('delivery-under-45') ? 'border-orange-600 bg-orange-50 dark:bg-orange-900/20' : 'border-gray-200 dark:border-gray-800 hover:border-orange-600'}`}>
                         <Timer className={`h-6 w-6 ${activeFilters.has('delivery-under-45') ? 'text-orange-600' : 'text-gray-600 dark:text-gray-400'}`} strokeWidth={1.5} />
-                        <span className={`text-sm font-medium ${activeFilters.has('delivery-under-45') ? 'text-orange-600' : 'text-gray-700 dark:text-gray-300'}`}>Under 45 mins</span>
+                        <span className={`text-sm font-medium ${activeFilters.has('delivery-under-45') ? 'text-orange-600' : 'text-gray-700 dark:text-gray-300'}`}>{t("user.home.filterModal.options.under45Mins")}</span>
                       </button>
                     </div>
                   </div>
 
                   {/* Rating Tab */}
                   <div ref={el => filterSectionRefs.current['rating'] = el} data-section-id="rating" className="space-y-4 mb-8">
-                    <h3 className="text-lg font-semibold text-gray-900  dark:text-white mb-4">Restaurant Rating</h3>
+                    <h3 className="text-lg font-semibold text-gray-900  dark:text-white mb-4">{t("user.home.filterModal.sections.restaurantRating")}</h3>
                     <div className="grid grid-cols-2 gap-3">
                       <button onClick={() => toggleFilter('rating-35-plus')} className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition-colors ${activeFilters.has('rating-35-plus') ? 'border-orange-600 bg-orange-50 dark:bg-orange-900/20' : 'border-gray-200 dark:border-gray-800 hover:border-orange-600'}`}>
                         <Star className={`h-6 w-6 ${activeFilters.has('rating-35-plus') ? 'text-orange-600 fill-orange-600' : 'text-gray-400 dark:text-gray-500'}`} />
-                        <span className={`text-sm font-medium ${activeFilters.has('rating-35-plus') ? 'text-orange-600' : 'text-gray-700 dark:text-gray-300'}`}>Rated 3.5+</span>
+                        <span className={`text-sm font-medium ${activeFilters.has('rating-35-plus') ? 'text-orange-600' : 'text-gray-700 dark:text-gray-300'}`}>{t("user.home.filterModal.options.rated35Plus")}</span>
                       </button>
                       <button onClick={() => toggleFilter('rating-4-plus')} className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition-colors ${activeFilters.has('rating-4-plus') ? 'border-orange-600 bg-orange-50 dark:bg-orange-900/20' : 'border-gray-200 dark:border-gray-800 hover:border-orange-600'}`}>
                         <Star className={`h-6 w-6 ${activeFilters.has('rating-4-plus') ? 'text-orange-600 fill-orange-600' : 'text-gray-400 dark:text-gray-500'}`} />
-                        <span className={`text-sm font-medium ${activeFilters.has('rating-4-plus') ? 'text-orange-600' : 'text-gray-700 dark:text-gray-300'}`}>Rated 4.0+</span>
+                        <span className={`text-sm font-medium ${activeFilters.has('rating-4-plus') ? 'text-orange-600' : 'text-gray-700 dark:text-gray-300'}`}>{t("user.home.filterModal.options.rated40Plus")}</span>
                       </button>
                       <button onClick={() => toggleFilter('rating-45-plus')} className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition-colors ${activeFilters.has('rating-45-plus') ? 'border-orange-600 bg-orange-50 dark:bg-orange-900/20' : 'border-gray-200 dark:border-gray-800 hover:border-orange-600'}`}>
                         <Star className={`h-6 w-6 ${activeFilters.has('rating-45-plus') ? 'text-orange-600 fill-orange-600' : 'text-gray-400 dark:text-gray-500'}`} />
-                        <span className={`text-sm font-medium ${activeFilters.has('rating-45-plus') ? 'text-orange-600' : 'text-gray-700 dark:text-gray-300'}`}>Rated 4.5+</span>
+                        <span className={`text-sm font-medium ${activeFilters.has('rating-45-plus') ? 'text-orange-600' : 'text-gray-700 dark:text-gray-300'}`}>{t("user.home.filterModal.options.rated45Plus")}</span>
                       </button>
                     </div>
                   </div>
 
                   {/* Distance Tab */}
                   <div ref={el => filterSectionRefs.current['distance'] = el} data-section-id="distance" className="space-y-4 mb-8">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Distance</h3>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">{t("user.home.filterModal.sections.distance")}</h3>
                     <div className="grid grid-cols-2 gap-3">
                       <button onClick={() => toggleFilter('distance-under-1km')} className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition-colors ${activeFilters.has('distance-under-1km') ? 'border-orange-600 bg-orange-50 dark:bg-orange-900/20' : 'border-gray-200 dark:border-gray-800 hover:border-orange-600'}`}>
                         <MapPin className={`h-6 w-6 ${activeFilters.has('distance-under-1km') ? 'text-orange-600' : 'text-gray-600 dark:text-gray-400'}`} strokeWidth={1.5} />
-                        <span className={`text-sm font-medium ${activeFilters.has('distance-under-1km') ? 'text-orange-600' : 'text-gray-700 dark:text-gray-300'}`}>Under 1 km</span>
+                        <span className={`text-sm font-medium ${activeFilters.has('distance-under-1km') ? 'text-orange-600' : 'text-gray-700 dark:text-gray-300'}`}>{t("user.home.filterModal.options.under1Km")}</span>
                       </button>
                       <button onClick={() => toggleFilter('distance-under-2km')} className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition-colors ${activeFilters.has('distance-under-2km') ? 'border-orange-600 bg-orange-50 dark:bg-orange-900/20' : 'border-gray-200 dark:border-gray-800 hover:border-orange-600'}`}>
                         <MapPin className={`h-6 w-6 ${activeFilters.has('distance-under-2km') ? 'text-orange-600' : 'text-gray-600 dark:text-gray-400'}`} strokeWidth={1.5} />
-                        <span className={`text-sm font-medium ${activeFilters.has('distance-under-2km') ? 'text-orange-600' : 'text-gray-700 dark:text-gray-300'}`}>Under 2 km</span>
+                        <span className={`text-sm font-medium ${activeFilters.has('distance-under-2km') ? 'text-orange-600' : 'text-gray-700 dark:text-gray-300'}`}>{t("user.home.filterModal.options.under2Km")}</span>
                       </button>
                     </div>
                   </div>
 
                   {/* Price Tab */}
                   <div ref={el => filterSectionRefs.current['price'] = el} data-section-id="price" className="space-y-4 mb-8">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Dish Price</h3>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">{t("user.home.filterModal.sections.dishPrice")}</h3>
                     <div className="flex flex-col gap-3">
                       <button onClick={() => toggleFilter('price-under-200')} className={`px-4 py-3 rounded-xl border text-left transition-colors ${activeFilters.has('price-under-200') ? 'border-orange-600 bg-orange-50 dark:bg-orange-900/20' : 'border-gray-200 dark:border-gray-800 hover:border-orange-600'}`}>
-                        <span className={`text-sm font-medium ${activeFilters.has('price-under-200') ? 'text-orange-600' : 'text-gray-700 dark:text-gray-300'}`}>Under ₹200</span>
+                        <span className={`text-sm font-medium ${activeFilters.has('price-under-200') ? 'text-orange-600' : 'text-gray-700 dark:text-gray-300'}`}>{t("user.home.filterModal.options.under200")}</span>
                       </button>
                       <button onClick={() => toggleFilter('price-under-500')} className={`px-4 py-3 rounded-xl border text-left transition-colors ${activeFilters.has('price-under-500') ? 'border-orange-600 bg-orange-50 dark:bg-orange-900/20' : 'border-gray-200 dark:border-gray-800 hover:border-orange-600'}`}>
-                        <span className={`text-sm font-medium ${activeFilters.has('price-under-500') ? 'text-orange-600' : 'text-gray-700 dark:text-gray-300'}`}>Under ₹500</span>
+                        <span className={`text-sm font-medium ${activeFilters.has('price-under-500') ? 'text-orange-600' : 'text-gray-700 dark:text-gray-300'}`}>{t("user.home.filterModal.options.under500")}</span>
                       </button>
                     </div>
                   </div>
 
                   {/* Cuisine Tab */}
                   <div ref={el => filterSectionRefs.current['cuisine'] = el} data-section-id="cuisine" className="space-y-4 mb-8">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Cuisine</h3>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">{t("user.home.filterModal.sections.cuisine")}</h3>
                     <div className="grid grid-cols-2 gap-3">
-                      {['Chinese', 'American', 'Japanese', 'Italian', 'Mexican', 'Indian', 'Asian', 'Seafood', 'Desserts', 'Cafe', 'Healthy'].map(cuisine => <button key={cuisine} onClick={() => setSelectedCuisine(selectedCuisine === cuisine ? null : cuisine)} className={`px-4 py-3 rounded-xl border text-center transition-colors ${selectedCuisine === cuisine ? 'border-orange-600 bg-orange-50 dark:bg-orange-900/20' : 'border-gray-200 dark:border-gray-800 hover:border-orange-600'}`}>
-                          <span className={`text-sm font-medium ${selectedCuisine === cuisine ? 'text-orange-600' : 'text-gray-700 dark:text-gray-300'}`}>
-                            {cuisine}
+                      {cuisineOptions.map(cuisine => <button key={cuisine.id} onClick={() => setSelectedCuisine(selectedCuisine === cuisine.id ? null : cuisine.id)} className={`px-4 py-3 rounded-xl border text-center transition-colors ${selectedCuisine === cuisine.id ? 'border-orange-600 bg-orange-50 dark:bg-orange-900/20' : 'border-gray-200 dark:border-gray-800 hover:border-orange-600'}`}>
+                          <span className={`text-sm font-medium ${selectedCuisine === cuisine.id ? 'text-orange-600' : 'text-gray-700 dark:text-gray-300'}`}>
+                            {cuisine.label}
                           </span>
                         </button>)}
                     </div>
@@ -2337,23 +2388,23 @@ export default function Home() {
 
                   {/* Trust Markers Tab */}
                   {activeFilterTab === 'trust' && <div ref={el => filterSectionRefs.current['trust'] = el} data-section-id="trust" className="space-y-4 mb-8">
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Trust Markers</h3>
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">{t("user.home.filterModal.sections.trustMarkers")}</h3>
                       <div className="flex flex-col gap-3">
                         <button onClick={() => toggleFilter('top-rated')} className={`px-4 py-3 rounded-xl border text-left transition-colors ${activeFilters.has('top-rated') ? 'border-orange-600 bg-orange-50 dark:bg-orange-900/20' : 'border-gray-200 dark:border-gray-800 hover:border-orange-600'}`}>
-                          <span className={`text-sm font-medium ${activeFilters.has('top-rated') ? 'text-orange-600' : 'text-gray-700 dark:text-gray-300'}`}>Top Rated</span>
+                          <span className={`text-sm font-medium ${activeFilters.has('top-rated') ? 'text-orange-600' : 'text-gray-700 dark:text-gray-300'}`}>{t("user.home.filterModal.options.topRated")}</span>
                         </button>
                         <button onClick={() => toggleFilter('trusted')} className={`px-4 py-3 rounded-xl border text-left transition-colors ${activeFilters.has('trusted') ? 'border-orange-600 bg-orange-50 dark:bg-orange-900/20' : 'border-gray-200 dark:border-gray-800 hover:border-orange-600'}`}>
-                          <span className={`text-sm font-medium ${activeFilters.has('trusted') ? 'text-orange-600' : 'text-gray-700 dark:text-gray-300'}`}>Trusted by 1000+ users</span>
+                          <span className={`text-sm font-medium ${activeFilters.has('trusted') ? 'text-orange-600' : 'text-gray-700 dark:text-gray-300'}`}>{t("user.home.filterModal.options.trustedByUsers")}</span>
                         </button>
                       </div>
                     </div>}
 
                   {/* Offers Tab */}
                   {activeFilterTab === 'offers' && <div ref={el => filterSectionRefs.current['offers'] = el} data-section-id="offers" className="space-y-4 mb-8">
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Offers</h3>
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">{t("user.home.filterModal.sections.offers")}</h3>
                       <div className="flex flex-col gap-3">
                         <button onClick={() => toggleFilter('has-offers')} className={`px-4 py-3 rounded-xl border text-left transition-colors ${activeFilters.has('has-offers') ? 'border-orange-600 bg-orange-50 dark:bg-orange-900/20' : 'border-gray-200 dark:border-gray-800 hover:border-orange-600'}`}>
-                          <span className={`text-sm font-medium ${activeFilters.has('has-offers') ? 'text-orange-600' : 'text-gray-700 dark:text-gray-300'}`}>Restaurants with offers</span>
+                          <span className={`text-sm font-medium ${activeFilters.has('has-offers') ? 'text-orange-600' : 'text-gray-700 dark:text-gray-300'}`}>{t("user.home.filterModal.options.restaurantsWithOffers")}</span>
                         </button>
                       </div>
                     </div>}
@@ -2363,7 +2414,7 @@ export default function Home() {
               {/* Footer */}
               <div className="flex items-center gap-4 px-4 py-4 border-t dark:border-gray-800 bg-white dark:bg-[#1a1a1a]">
                 <button onClick={() => setIsFilterOpen(false)} className="flex-1 py-3 text-center font-semibold text-gray-700 dark:text-gray-300">
-                  Close
+                  {t("user.home.filterModal.close")}
                 </button>
                 <button onClick={async () => {
               // Apply filters
@@ -2443,7 +2494,7 @@ export default function Home() {
 
               {/* Title */}
               <h3 className="text-base font-bold text-gray-900 dark:text-white mb-3">
-                See veg dishes from
+                {t("user.home.vegPopup.title")}
               </h3>
 
               {/* Radio Options */}
@@ -2457,7 +2508,7 @@ export default function Home() {
                     </div>
                   </div>
                   <span className="text-sm font-medium text-gray-900 dark:text-white">
-                    All restaurants
+                    {t("user.home.vegPopup.allRestaurants")}
                   </span>
                 </label>
 
@@ -2470,7 +2521,7 @@ export default function Home() {
                     </div>
                   </div>
                   <span className="text-sm font-medium text-gray-900 dark:text-white">
-                    Pure Veg restaurants only
+                    {t("user.home.vegPopup.pureVegOnly")}
                   </span>
                 </label>
               </div>
@@ -2487,7 +2538,7 @@ export default function Home() {
               setIsApplyingVegMode(false);
             }, 2000);
           }} className="w-full bg-green-600 text-white font-semibold py-2.5 rounded-xl hover:bg-green-700 transition-colors mb-2 text-sm">
-                Apply
+                {t("user.home.vegPopup.apply")}
               </button>
 
               {/* More settings link */}
@@ -2497,7 +2548,7 @@ export default function Home() {
             setVegModeContext(false);
             setPrevVegMode(false);
           }} className="w-full text-green-600 dark:text-green-400 font-medium text-xs hover:text-green-700 dark:hover:text-green-500 transition-colors">
-                More settings
+                {t("user.home.vegPopup.moreSettings")}
               </button>
             </motion.div>
           </>}
@@ -2548,12 +2599,12 @@ export default function Home() {
 
                 {/* Title */}
                 <h2 className="text-2xl font-bold text-gray-900  text-center mb-2">
-                  Switch off Veg Mode?
+                  {t("user.home.switchOffPopup.title")}
                 </h2>
 
                 {/* Description */}
                 <p className="text-gray-600 text-center mb-6 text-sm">
-                  You'll see all restaurants, including those serving non-veg dishes
+                  {t("user.home.switchOffPopup.description")}
                 </p>
 
                 {/* Buttons */}
@@ -2569,7 +2620,7 @@ export default function Home() {
                   setPrevVegMode(false); // Set to false to match current state (veg mode is OFF)
                 }, 2000);
               }} className="w-full bg-transparent text-red-600 font-normal py-1 text-normal rounded-xl hover:bg-red-50 transition-colors text-base">
-                    Switch off
+                    {t("user.home.switchOffPopup.switchOff")}
                   </button>
 
                   <button onClick={() => {
@@ -2578,7 +2629,7 @@ export default function Home() {
                 setVegModeContext(true);
                 // prevVegMode stays true (from before), which is correct
               }} className="w-full text-gray-900 font-normal py-1 text-center rounded-xl hover:bg-gray-200 transition-colors text-base">
-                    Keep using this mode
+                    {t("user.home.switchOffPopup.keepUsing")}
                   </button>
                 </div>
               </div>
@@ -2618,9 +2669,9 @@ export default function Home() {
               {/* Header */}
               <div className="flex items-center justify-between px-5 py-4 sm:px-6 sm:py-5 border-b border-gray-200 dark:border-gray-800 flex-shrink-0">
                 <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">
-                  All Categories
+                  {t("user.home.allCategories")}
                 </h2>
-                <button onClick={() => setShowAllCategoriesModal(false)} className="p-1.5 sm:p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" aria-label="Close">
+                <button onClick={() => setShowAllCategoriesModal(false)} className="p-1.5 sm:p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" aria-label={t("user.home.close")}>
                   <X className="w-5 h-5 sm:w-6 sm:h-6 text-gray-600 dark:text-gray-400" />
                 </button>
               </div>
@@ -2826,7 +2877,7 @@ export default function Home() {
           }} transition={{
             delay: 0.4
           }} className="text-xl font-normal text-gray-800 dark:text-gray-200 text-center relative z-10 mt-56 w-full">
-                Explore veg dishes from all restaurants
+                {t("user.home.vegLoading.exploreVeg")}
               </motion.p>
             </div>
           </motion.div>}
@@ -2898,7 +2949,7 @@ export default function Home() {
             }} transition={{
               delay: 0.4
             }}>
-                  Switching off
+                  {t("user.home.switchingOff.title")}
                 </motion.h2>
                 <motion.p className="text-xl font-normal text-gray-800 dark:text-gray-200" initial={{
               opacity: 0
@@ -2907,7 +2958,7 @@ export default function Home() {
             }} transition={{
               delay: 0.5
             }}>
-                  Veg Mode for you
+                  {t("user.home.switchingOff.subtitle")}
                 </motion.p>
               </motion.div>
             </div>
@@ -2930,7 +2981,7 @@ export default function Home() {
         type: "spring",
         damping: 25
       }} className="fixed bottom-20 left-1/2 -translate-x-1/2 z-[10001] bg-black text-white px-6 py-3 rounded-lg shadow-2xl">
-                <p className="text-sm font-medium">Added to bookmark</p>
+                <p className="text-sm font-medium">{t("user.home.addedToBookmark")}</p>
               </motion.div>}
           </AnimatePresence>, document.body)}
 
@@ -2963,7 +3014,7 @@ export default function Home() {
         }}>
                   {/* Header */}
                   <div className="flex items-center justify-between px-4 pt-6 pb-4 border-b border-gray-200">
-                    <h2 className="text-lg font-bold text-gray-900">Manage Collections</h2>
+                    <h2 className="text-lg font-bold text-gray-900">{t("user.home.manageCollections.title")}</h2>
                     <button onClick={() => setShowManageCollections(false)} className="h-8 w-8 rounded-full bg-gray-700 flex items-center justify-center hover:bg-gray-800 transition-colors">
                       <X className="h-4 w-4 text-white" />
                     </button>
@@ -2981,7 +3032,7 @@ export default function Home() {
                       </div>
                       <div className="flex-1 text-left">
                         <div className="flex items-center justify-between">
-                          <span className="text-base font-medium text-gray-900">Bookmarks</span>
+                          <span className="text-base font-medium text-gray-900">{t("user.home.manageCollections.bookmarks")}</span>
                           {selectedRestaurantSlug && <div onClick={e => e.stopPropagation()}>
                               <Checkbox checked={isFavorite(selectedRestaurantSlug)} onCheckedChange={checked => {
                       if (!checked) {
@@ -2995,9 +3046,9 @@ export default function Home() {
                               <Check className="h-3 w-3 text-white" />
                             </div>}
                         </div>
-                        <p className="text-sm text-gray-500 mt-1">
-                          {getFavorites().length} restaurant{getFavorites().length !== 1 ? 's' : ''}
-                        </p>
+                        <p className="text-sm text-gray-500 mt-1">{t("user.home.manageCollections.bookmarksCount", {
+                      count: getFavorites().length
+                    })}</p>
                       </div>
                     </div>
 
@@ -3008,7 +3059,7 @@ export default function Home() {
                       </div>
                       <div className="flex-1 text-left">
                         <span className="text-base font-medium text-gray-900">
-                          Create new Collection
+                          {t("user.home.manageCollections.createNew")}
                         </span>
                       </div>
                     </button>
@@ -3020,7 +3071,7 @@ export default function Home() {
               setSelectedRestaurantSlug(null);
               setShowManageCollections(false);
             }}>
-                      Done
+                      {t("user.home.manageCollections.done")}
                     </Button>
                   </div>
                 </motion.div>

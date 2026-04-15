@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
+import { useTranslation } from "react-i18next"
 
 // Sample product data - in a real app, this would come from an API
 const productsData = {
@@ -91,6 +92,7 @@ const generateReviews = (productName, totalReviews = 20) => {
 }
 
 export default function ProductDetail() {
+  const { t, i18n } = useTranslation()
   const { id } = useParams()
   const navigate = useNavigate()
   const product = productsData[parseInt(id)]
@@ -158,26 +160,26 @@ export default function ProductDetail() {
   const handleSubmitReview = (e) => {
     e.preventDefault()
     if (!reviewForm.comment.trim()) {
-      alert("Please write a review comment")
+      alert(t("user.productDetail.alerts.reviewCommentRequired"))
       return
     }
 
     const newReview = {
       id: reviews.length + 1,
-      userName: "You",
+      userName: t("user.productDetail.you"),
       userAvatar: `https://ui-avatars.com/api/?name=You&background=ffc107&color=fff&size=128`,
       rating: reviewForm.rating,
       comment: reviewForm.comment,
       date: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }),
       helpful: 0,
       verified: true,
-      orderType: "Delivery"
+      orderType: t("user.productDetail.delivery")
     }
 
     setReviews([newReview, ...reviews])
     setReviewForm({ rating: 5, comment: "" })
     setShowReviewForm(false)
-    alert("Thank you for your review!")
+    alert(t("user.productDetail.alerts.reviewThankYou"))
   }
 
   const handleHelpful = (reviewId) => {
@@ -213,13 +215,13 @@ export default function ProductDetail() {
 
   const handleSubmitReply = (reviewId, replyText) => {
     if (!replyText.trim()) {
-      alert("Please write a reply")
+      alert(t("user.productDetail.alerts.replyRequired"))
       return
     }
 
     const newReply = {
       id: Date.now(),
-      userName: "You",
+      userName: t("user.productDetail.you"),
       userAvatar: `https://ui-avatars.com/api/?name=You&background=ffc107&color=fff&size=128`,
       comment: replyText,
       date: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }),
@@ -254,9 +256,9 @@ export default function ProductDetail() {
     return (
       <AnimatedPage className="min-h-screen bg-gradient-to-b from-yellow-50/30 via-white to-orange-50/20 dark:from-[#0a0a0a] dark:via-[#0a0a0a] dark:to-[#0a0a0a]">
         <div className="max-w-4xl mx-auto px-4 py-20 text-center">
-          <h1 className="text-2xl font-bold mb-4">Product Not Found</h1>
+          <h1 className="text-2xl font-bold mb-4">{t("user.productDetail.productNotFound")}</h1>
           <Link to="/user">
-            <Button>Go Back Home</Button>
+            <Button>{t("user.productDetail.goBackHome")}</Button>
           </Link>
         </div>
       </AnimatedPage>
@@ -313,7 +315,7 @@ export default function ProductDetail() {
                   </div>
                   <span className="text-gray-400">|</span>
                   <span className="text-gray-600 dark:text-gray-300 text-sm sm:text-base md:text-lg underline">
-                    {reviews.length} {reviews.length === 1 ? 'Review' : 'Reviews'}
+                    {reviews.length} {reviews.length === 1 ? t("user.productDetail.review") : t("user.productDetail.reviews")}
                   </span>
                   <span className="text-gray-400">|</span>
                   <Badge variant="outline" className="text-xs sm:text-sm md:text-base">
@@ -325,7 +327,7 @@ export default function ProductDetail() {
                 <div className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extrabold text-primary-orange">
                   ₹{(product.price * 83).toFixed(0)}
                 </div>
-                <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1">per serving</p>
+                <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1">{t("user.productDetail.perServing")}</p>
               </div>
             </div>
           </div>
@@ -338,9 +340,9 @@ export default function ProductDetail() {
             <div className="space-y-4">
               {/* Breadcrumb */}
               <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground flex-wrap">
-                <Link to="/user" className="hover:text-primary-orange transition-colors">Home</Link>
+                <Link to="/user" className="hover:text-primary-orange transition-colors">{t("user.productDetail.home")}</Link>
                 <span>/</span>
-                <span className="text-foreground font-medium truncate">{restaurant?.name || "Restaurant"}</span>
+                <span className="text-foreground font-medium truncate">{restaurant?.name || t("user.productDetail.restaurant")}</span>
                 <span>/</span>
                 <span className="text-foreground font-medium truncate">{product.name}</span>
               </div>
@@ -351,7 +353,7 @@ export default function ProductDetail() {
           {/* Add to Cart */}
           <ScrollReveal delay={0.3}>
             <div className="space-y-4 pb-4 border-b">
-              <h2 className="text-xl font-bold">Order</h2>
+              <h2 className="text-xl font-bold">{t("user.productDetail.order")}</h2>
               {inCart ? (
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-2 border border-yellow-500 rounded-lg">
@@ -376,7 +378,7 @@ export default function ProductDetail() {
                     </Button>
                   </div>
                   <div className="flex-1">
-                    <p className="text-sm text-muted-foreground">In cart</p>
+                    <p className="text-sm text-muted-foreground">{t("user.productDetail.inCart")}</p>
                     <p className="text-lg font-bold text-primary-orange">
                       ₹{(product.price * 83 * (cartItem?.quantity || 0)).toFixed(0)}
                     </p>
@@ -413,7 +415,7 @@ export default function ProductDetail() {
                       className="bg-primary-orange hover:opacity-90 text-white"
                     >
                       <ShoppingBag className="h-5 w-5 mr-2" />
-                      Add to Cart - ₹{(product.price * 83 * quantity).toFixed(0)}
+                      {t("user.productDetail.addToCartWithAmount", { amount: (product.price * 83 * quantity).toFixed(0) })}
                     </Button>
                   </div>
                 </div>
@@ -455,27 +457,27 @@ export default function ProductDetail() {
           {/* Product Details */}
           <ScrollReveal delay={0.2}>
             <div className="space-y-4 md:space-y-6 pb-4 md:pb-6 border-b">
-              <h2 className="text-xl md:text-2xl lg:text-3xl font-bold">Details</h2>
+              <h2 className="text-xl md:text-2xl lg:text-3xl font-bold">{t("user.productDetail.details")}</h2>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 text-sm md:text-base">
                 <div>
-                  <p className="text-muted-foreground mb-1 md:mb-2">Category</p>
+                  <p className="text-muted-foreground mb-1 md:mb-2">{t("user.productDetail.category")}</p>
                   <p className="font-semibold">{product.category}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground mb-1 md:mb-2">Preparation Time</p>
+                  <p className="text-muted-foreground mb-1 md:mb-2">{t("user.productDetail.preparationTime")}</p>
                   <p className="font-semibold">{product.preparationTime}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground mb-1 md:mb-2">Calories</p>
-                  <p className="font-semibold">{product.calories} kcal</p>
+                  <p className="text-muted-foreground mb-1 md:mb-2">{t("user.productDetail.calories")}</p>
+                  <p className="font-semibold">{t("user.productDetail.kcalValue", { calories: product.calories })}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground mb-1 md:mb-2">Ingredients</p>
-                  <p className="font-semibold">{product.ingredients.length} items</p>
+                  <p className="text-muted-foreground mb-1 md:mb-2">{t("user.productDetail.ingredients")}</p>
+                  <p className="font-semibold">{t("user.productDetail.itemsCount", { count: product.ingredients.length })}</p>
                 </div>
               </div>
               <div>
-                <p className="text-muted-foreground mb-2 text-sm">Ingredients</p>
+                <p className="text-muted-foreground mb-2 text-sm">{t("user.productDetail.ingredients")}</p>
                 <div className="flex flex-wrap gap-2">
                   {product.ingredients.map((ingredient, index) => (
                     <Badge key={index} variant="outline" className="text-xs">
@@ -492,15 +494,15 @@ export default function ProductDetail() {
           {orderHistory.length > 0 && (
             <ScrollReveal delay={0.4}>
               <div className="space-y-4 pb-4 border-b">
-                <h2 className="text-xl font-bold">Your Order History</h2>
+                <h2 className="text-xl font-bold">{t("user.productDetail.yourOrderHistory")}</h2>
                 <div className="space-y-3">
                   {orderHistory.map((order) => (
                     <div key={order.id} className="flex items-center justify-between py-3 border-b last:border-0">
                       <div>
-                        <p className="font-semibold">Order {order.id}</p>
+                        <p className="font-semibold">{t("user.productDetail.orderWithId", { id: order.id })}</p>
                         <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
                           <Calendar className="h-3 w-3" />
-                          <span>{new Date(order.createdAt).toLocaleDateString()}</span>
+                          <span>{new Date(order.createdAt).toLocaleDateString(i18n?.language === "hi" ? "hi-IN" : i18n?.language === "bn" ? "bn-BD" : "en-US")}</span>
                           <span>•</span>
                           <span>{order.status}</span>
                         </div>
@@ -744,4 +746,3 @@ export default function ProductDetail() {
     </AnimatedPage>
   )
 }
-

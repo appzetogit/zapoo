@@ -20,8 +20,10 @@ import { restaurantAPI } from "@/lib/api"
 import { isOpenForDeliveryNow } from "../utils/restaurantAvailability"
 import { isModuleAuthenticated } from "@/lib/utils/auth"
 import DynamicEtaText from "../components/DynamicEtaText"
+import { useTranslation } from "react-i18next"
 
 export default function Under250() {
+  const { t } = useTranslation()
   const { location } = useLocation()
   const { zoneId, zoneStatus, isInService, isOutOfService } = useZone(location)
   const navigate = useNavigate()
@@ -41,12 +43,12 @@ export default function Under250() {
   const [under250Restaurants, setUnder250Restaurants] = useState([])
   const [loadingRestaurants, setLoadingRestaurants] = useState(true)
 
-  const sortOptions = [
-    { id: null, label: 'Relevance' },
-    { id: 'rating-high', label: 'Rating: High to Low' },
-    { id: 'delivery-time-low', label: 'Delivery Time: Low to High' },
-    { id: 'distance-low', label: 'Distance: Low to High' },
-  ]
+  const sortOptions = useMemo(() => [
+    { id: null, label: t("user.categoryPage.sortOptions.relevance") },
+    { id: 'rating-high', label: t("user.categoryPage.sortOptions.ratingHighToLow") },
+    { id: 'delivery-time-low', label: t("user.under250.sortOptions.deliveryTimeLowToHigh") },
+    { id: 'distance-low', label: t("user.under250.sortOptions.distanceLowToHigh") },
+  ], [t])
 
   const handleClearAll = () => {
     setSelectedSort(null)
@@ -327,14 +329,14 @@ export default function Under250() {
   const updateItemQuantity = (item, newQuantity, event = null, restaurantName = null) => {
     // Check authentication
     if (!isModuleAuthenticated('user')) {
-      toast.error("Please login to add items to cart")
+      toast.error(t("user.restaurantDetails.toast.loginToAddItems"))
       navigate('/user/auth/sign-in', { state: { from: location.pathname } })
       return
     }
 
     // CRITICAL: Check if user is in service zone
     if (isOutOfService) {
-      toast.error('You are outside the service zone. Please select a location within the service area.')
+      toast.error(t("user.restaurantDetails.toast.outsideServiceZone"))
       return
     }
 
@@ -345,7 +347,7 @@ export default function Under250() {
     }))
 
     // Find restaurant name from the item or use provided parameter
-    const restaurant = restaurantName || item.restaurant || "Under 250"
+    const restaurant = restaurantName || item.restaurant || t("user.under250.title")
 
     // Prepare cart item with all required properties
     const cartItem = {
@@ -422,7 +424,10 @@ export default function Under250() {
     const itemWithRestaurant = {
       ...item,
       restaurant: restaurant.name,
-      description: item.description || `${item.name} from ${restaurant.name}`,
+      description: item.description || t("user.under250.itemDescriptionFallback", {
+        item: item.name,
+        restaurant: restaurant.name
+      }),
       customisable: item.customisable || false,
       notEligibleForCoupons: item.notEligibleForCoupons || false,
     }
@@ -470,7 +475,7 @@ export default function Under250() {
                 {/* Top: Text */}
                 <div className="px-5 pt-5 pb-3 bg-white dark:bg-[#1a1a1a] relative z-10 min-h-[110px]">
                   <h2 className="text-2xl font-extrabold text-gray-900 dark:text-white leading-tight mb-1">
-                    Modern &amp; Trendy
+                    {t("user.under250.bannerTitle")}
                   </h2>
                 </div>
 
@@ -483,7 +488,7 @@ export default function Under250() {
                     className="flex flex-col items-center justify-center bg-orange-500 text-white font-bold text-[10px] leading-tight rounded-full shadow-lg px-3 py-3 text-center uppercase pointer-events-none"
                     style={{ width: '72px', height: '72px' }}
                   >
-                    Order<br />Now
+                    {t("user.home.orderNow")}
                   </div>
                 </div>
 
@@ -492,7 +497,7 @@ export default function Under250() {
                   {bannerImage ? (
                     <img
                       src={bannerImage}
-                      alt="Under 250 Banner"
+                      alt={t("user.under250.bannerAlt")}
                       style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                       loading="eager"
                     />
@@ -569,7 +574,7 @@ export default function Under250() {
             >
               <ArrowDownUp className="h-4 w-4 md:h-5 md:w-5 rotate-90" />
               <span className="text-sm md:text-base font-medium">
-                {selectedSort ? sortOptions.find(opt => opt.id === selectedSort)?.label : 'Sort'}
+                {selectedSort ? sortOptions.find(opt => opt.id === selectedSort)?.label : t("user.under250.sort")}
               </span>
               <ChevronDown className="h-3 w-3 md:h-4 md:w-4" />
             </Button>
@@ -582,7 +587,7 @@ export default function Under250() {
                 }`}
             >
               <Timer className="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5" />
-              <span className="text-xs sm:text-sm md:text-base font-medium">Under 30 mins</span>
+              <span className="text-xs sm:text-sm md:text-base font-medium">{t("user.categoryPage.filterPills.under30mins")}</span>
             </Button>
           </div>
         </section>
@@ -591,14 +596,14 @@ export default function Under250() {
         {/* Restaurant Menu Sections */}
         {loadingRestaurants ? (
           <div className="flex justify-center items-center py-12">
-            <div className="text-gray-500 dark:text-gray-400">Loading restaurants...</div>
+            <div className="text-gray-500 dark:text-gray-400">{t("user.home.loadingRestaurants")}</div>
           </div>
         ) : sortedAndFilteredRestaurants.length === 0 ? (
           <div className="flex justify-center items-center py-12">
             <div className="text-gray-500 dark:text-gray-400">
               {under250Restaurants.length === 0
-                ? "No restaurants with dishes under ₹250 found."
-                : "No restaurants match the selected filters."}
+                ? t("user.under250.noRestaurantsUnder250")
+                : t("user.under250.noRestaurantsWithFilters")}
             </div>
           </div>
         ) : (
@@ -630,7 +635,9 @@ export default function Under250() {
                       <span className="text-xs md:text-sm lg:text-base font-bold">{restaurant.rating}</span>
                     </div>
                     <span className="text-xs md:text-sm lg:text-base text-gray-400 dark:text-gray-500 mt-0.5">
-                      {restaurant.totalRatings > 0 ? `By ${restaurant.totalRatings >= 1000 ? `${(restaurant.totalRatings / 1000).toFixed(1)}K+` : `${restaurant.totalRatings}+`}` : ''}
+                      {restaurant.totalRatings > 0 ? t("user.home.byRatings", {
+                      value: restaurant.totalRatings >= 1000 ? `${(restaurant.totalRatings / 1000).toFixed(1)}K+` : `${restaurant.totalRatings}+`
+                    }) : ''}
                     </span>
                   </div>
                 </div>
@@ -715,7 +722,7 @@ export default function Under250() {
                                     ₹{Math.round(item.price)}
                                   </p>
                                   {item.bestPrice && (
-                                    <p className="text-xs md:text-sm lg:text-base text-gray-500 dark:text-gray-400">Best price</p>
+                                    <p className="text-xs md:text-sm lg:text-base text-gray-500 dark:text-gray-400">{t("user.under250.bestPrice")}</p>
                                   )}
                                 </div>
                                 {quantity > 0 ? (
@@ -725,7 +732,7 @@ export default function Under250() {
                                       size="sm"
                                       className="bg-green-600/10 text-green-500 border-green-500 hover:bg-green-700 hover:text-white h-7 md:h-8 lg:h-9 px-3 md:px-4 lg:px-5 text-xs md:text-sm lg:text-base"
                                     >
-                                      View cart
+                                      {t("user.stickyCart.viewCart")}
                                     </Button>
                                   </Link>
                                 ) : (
@@ -744,7 +751,7 @@ export default function Under250() {
                                       }
                                     }}
                                   >
-                                    Add
+                                    {t("user.under250.add")}
                                   </Button>
                                 )}
                               </div>
@@ -760,7 +767,7 @@ export default function Under250() {
                         variant="outline"
                         className="w-min align-center text-center rounded-lg md:rounded-xl mx-auto bg-gray-50 dark:bg-[#1a1a1a] hover:bg-gray-100 dark:hover:bg-gray-800 dark:text-white text-gray-700 border-gray-200 dark:border-gray-800 h-9 md:h-10 lg:h-11 px-4 md:px-6 lg:px-8 text-sm md:text-base lg:text-lg"
                       >
-                        View full menu <ArrowRight className="h-4 w-4 md:h-5 md:w-5 lg:h-6 lg:w-6 ml-2 text-gray-700 dark:text-gray-300" />
+                        {t("user.under250.viewFullMenu")} <ArrowRight className="h-4 w-4 md:h-5 md:w-5 lg:h-6 lg:w-6 ml-2 text-gray-700 dark:text-gray-300" />
                       </Button>
                     </Link>
                   </div>
@@ -803,12 +810,12 @@ export default function Under250() {
 
               {/* Header */}
               <div className="flex items-center justify-between px-4 md:px-6 py-4 md:py-5 border-b dark:border-gray-800">
-                <h2 className="text-lg md:text-xl lg:text-2xl font-bold text-gray-900 dark:text-white">Sort By</h2>
+                <h2 className="text-lg md:text-xl lg:text-2xl font-bold text-gray-900 dark:text-white">{t("user.categoryPage.tabs.sortBy")}</h2>
                 <button
                   onClick={handleClearAll}
                   className="text-green-600 dark:text-green-400 font-medium text-sm md:text-base"
                 >
-                  Clear all
+                  {t("user.categoryPage.clearAll")}
                 </button>
               </div>
 
@@ -838,7 +845,7 @@ export default function Under250() {
                   onClick={() => setShowSortPopup(false)}
                   className="flex-1 py-3 md:py-4 text-center font-semibold text-gray-700 dark:text-gray-300 text-sm md:text-base"
                 >
-                  Close
+                  {t("user.categoryPage.close")}
                 </button>
                 <button
                   onClick={handleApply}
@@ -847,7 +854,7 @@ export default function Under250() {
                     : 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
                     }`}
                 >
-                  Apply
+                  {t("user.under250.apply")}
                 </button>
               </div>
             </motion.div>
@@ -965,7 +972,10 @@ export default function Under250() {
 
                 {/* Description */}
                 <p className="text-sm md:text-base lg:text-lg text-gray-600 dark:text-gray-400 mb-4 md:mb-6 lg:mb-8 leading-relaxed">
-                  {selectedItem.description || `${selectedItem.name} from ${selectedItem.restaurant || 'Under 250'}`}
+                  {selectedItem.description || t("user.under250.itemDescriptionFallback", {
+                  item: selectedItem.name,
+                  restaurant: selectedItem.restaurant || t("user.under250.title")
+                })}
                 </p>
 
                 {/* Highly Reordered Progress Bar */}
@@ -975,7 +985,7 @@ export default function Under250() {
                       <div className="h-full bg-green-500 rounded-full" style={{ width: '50%' }} />
                     </div>
                     <span className="text-xs text-gray-600 dark:text-gray-400 font-medium whitespace-nowrap">
-                      highly reordered
+                      {t("user.restaurantDetails.highlyReordered")}
                     </span>
                   </div>
                 )}
@@ -983,7 +993,7 @@ export default function Under250() {
                 {/* Not Eligible for Coupons */}
                 {selectedItem.notEligibleForCoupons && (
                   <p className="text-xs text-gray-500 dark:text-gray-400 font-medium mb-4">
-                    NOT ELIGIBLE FOR COUPONS
+                    {t("user.restaurantDetails.notEligibleForCoupons")}
                   </p>
                 )}
               </div>
@@ -1046,7 +1056,7 @@ export default function Under250() {
                     }}
                     disabled={shouldShowGrayscale}
                   >
-                    <span>Add item</span>
+                    <span>{t("user.restaurantDetails.addItem")}</span>
                     <div className="flex items-center gap-1 md:gap-2">
                       {selectedItem.originalPrice && selectedItem.originalPrice > selectedItem.price && (
                         <span className="text-sm md:text-base lg:text-lg line-through text-red-200">

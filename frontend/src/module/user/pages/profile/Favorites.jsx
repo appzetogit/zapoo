@@ -8,9 +8,11 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { useProfile } from "../../context/ProfileContext"
 import { toast } from "sonner"
+import { useTranslation } from "react-i18next"
 
 export default function Favorites() {
   const { getFavorites, removeFavorite, getDishFavorites, removeDishFavorite } = useProfile()
+  const { t } = useTranslation()
   const restaurantFavorites = getFavorites()
   const dishFavorites = getDishFavorites()
   const [activeTab, setActiveTab] = useState("restaurants")
@@ -18,18 +20,18 @@ export default function Favorites() {
   const handleRemoveFavorite = (e, slug) => {
     e.preventDefault()
     e.stopPropagation()
-    if (window.confirm("Remove this restaurant from favorites?")) {
+    if (window.confirm(t("user.favorites.confirm.removeRestaurant"))) {
       removeFavorite(slug)
-      toast.success("Restaurant removed from favorites")
+      toast.success(t("user.favorites.toast.restaurantRemoved"))
     }
   }
 
   const handleRemoveDishFavorite = (e, dishId, restaurantId) => {
     e.preventDefault()
     e.stopPropagation()
-    if (window.confirm("Remove this dish from favorites?")) {
+    if (window.confirm(t("user.favorites.confirm.removeDish"))) {
       removeDishFavorite(dishId, restaurantId)
-      toast.success("Dish removed from favorites")
+      toast.success(t("user.favorites.toast.dishRemoved"))
     }
   }
 
@@ -46,16 +48,16 @@ export default function Favorites() {
                   <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5" />
                 </Button>
               </Link>
-              <h1 className="text-lg sm:text-xl md:text-2xl font-bold">My Favorites</h1>
+              <h1 className="text-lg sm:text-xl md:text-2xl font-bold">{t("user.favorites.title")}</h1>
             </div>
           </ScrollReveal>
           <Card>
             <CardContent className="py-12 text-center">
               <Heart className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-              <p className="text-muted-foreground text-lg mb-4">You haven't added any favorites yet</p>
+              <p className="text-muted-foreground text-lg mb-4">{t("user.favorites.empty.noFavorites")}</p>
               <Link to="/user">
                 <Button className="bg-[#FF5200] hover:opacity-90 text-white">
-                  Explore Restaurants
+                  {t("user.favorites.actions.exploreRestaurants")}
                 </Button>
               </Link>
             </CardContent>
@@ -77,9 +79,14 @@ export default function Favorites() {
                 </Button>
               </Link>
               <div>
-                <h1 className="text-lg sm:text-xl md:text-2xl font-bold">My Favorites</h1>
+                <h1 className="text-lg sm:text-xl md:text-2xl font-bold">{t("user.favorites.title")}</h1>
                 <p className="text-gray-700 dark:text-gray-300 mt-1 text-sm font-semibold">
-                  {dishFavorites.length || 0} {dishFavorites.length === 1 ? "dish" : "dishes"} • {restaurantFavorites.length || 0} {restaurantFavorites.length === 1 ? "restaurant" : "restaurants"}
+                  {t("user.favorites.counts.summary", {
+                    dishes: dishFavorites.length || 0,
+                    dishesLabel: dishFavorites.length === 1 ? t("user.favorites.counts.dish") : t("user.favorites.counts.dishes"),
+                    restaurants: restaurantFavorites.length || 0,
+                    restaurantsLabel: restaurantFavorites.length === 1 ? t("user.favorites.counts.restaurant") : t("user.favorites.counts.restaurants"),
+                  })}
                 </p>
               </div>
             </div>
@@ -95,7 +102,7 @@ export default function Favorites() {
                 : "text-gray-500 hover:text-gray-700"
               }`}
           >
-            Restaurants ({restaurantFavorites.length})
+            {t("user.favorites.tabs.restaurants", { count: restaurantFavorites.length })}
           </button>
           <button
             onClick={() => setActiveTab("dishes")}
@@ -104,7 +111,7 @@ export default function Favorites() {
                 : "text-gray-500 hover:text-gray-700"
               }`}
           >
-            Dishes ({dishFavorites.length})
+            {t("user.favorites.tabs.dishes", { count: dishFavorites.length })}
           </button>
         </div>
 
@@ -114,10 +121,10 @@ export default function Favorites() {
             {restaurantFavorites.length === 0 ? (
               <div className="col-span-full text-center py-12">
                 <Heart className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-                <p className="text-muted-foreground text-lg mb-4">No restaurants saved yet</p>
+                <p className="text-muted-foreground text-lg mb-4">{t("user.favorites.empty.noRestaurants")}</p>
                 <Link to="/user">
                   <Button className="bg-[#FF5200] hover:opacity-90 text-white">
-                    Explore Restaurants
+                    {t("user.favorites.actions.exploreRestaurants")}
                   </Button>
                 </Link>
               </div>
@@ -174,7 +181,7 @@ export default function Favorites() {
                           </div>
                         </div>
                         <Button className="w-full bg-[#FF5200] hover:opacity-90 text-white text-xs py-1.5 h-8">
-                          View Restaurant
+                          {t("user.favorites.actions.viewRestaurant")}
                           <ArrowRight className="h-3 w-3 ml-1" />
                         </Button>
                       </CardContent>
@@ -192,10 +199,10 @@ export default function Favorites() {
             {dishFavorites.length === 0 ? (
               <div className="col-span-full text-center py-12">
                 <Bookmark className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-                <p className="text-muted-foreground text-lg mb-4">No dishes saved yet</p>
+                <p className="text-muted-foreground text-lg mb-4">{t("user.favorites.empty.noDishes")}</p>
                 <Link to="/user">
                   <Button className="bg-[#FF5200] hover:opacity-90 text-white">
-                    Explore Dishes
+                    {t("user.favorites.actions.exploreDishes")}
                   </Button>
                 </Link>
               </div>
@@ -234,7 +241,7 @@ export default function Favorites() {
                               {dish.name}
                             </CardTitle>
                             <p className="text-xs text-muted-foreground line-clamp-1">
-                              {dish.restaurantName || "Restaurant"}
+                              {dish.restaurantName || t("user.favorites.restaurantFallback")}
                             </p>
                           </div>
                           <div className="flex items-center justify-between text-xs pt-2 border-t">
@@ -248,14 +255,14 @@ export default function Favorites() {
                                   <div className="w-1.5 h-1.5 bg-orange-600 rounded-full"></div>
                                 </div>
                               )}
-                              <span className="text-muted-foreground font-medium text-xs">{dish.foodType || "N/A"}</span>
+                              <span className="text-muted-foreground font-medium text-xs">{dish.foodType || t("user.favorites.na")}</span>
                             </div>
                             <div className="text-sm font-bold text-[#FF5200]">
                               ₹{Math.round(dish.price || 0)}
                             </div>
                           </div>
                           <Button className="w-full bg-[#FF5200] hover:opacity-90 text-white text-xs py-1.5 h-8">
-                            View Dish
+                            {t("user.favorites.actions.viewDish")}
                             <ArrowRight className="h-3 w-3 ml-1" />
                           </Button>
                         </CardContent>

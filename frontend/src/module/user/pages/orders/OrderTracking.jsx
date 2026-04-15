@@ -52,6 +52,13 @@ const normalizeEntityId = (value) => {
 
 const normalizePhoneNumber = (value) => (value ? String(value).replace(/[^\d+]/g, "") : "");
 
+const isLocationPlaceholder = (value, translatedPlaceholder) => {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (!normalized) return true;
+  const placeholders = new Set(["select location", String(translatedPlaceholder || "").trim().toLowerCase()]);
+  return placeholders.has(normalized);
+};
+
 // Animated checkmark component
 const AnimatedCheckmark = ({
   delay = 0
@@ -892,7 +899,7 @@ export default function OrderTracking() {
           }}>
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center overflow-hidden">
-                    <img src={circleIcon} alt="Order ready" className="w-full h-full object-cover" />
+                    <img src={circleIcon} alt={t("user.orderTracking.orderReadyAlt")} className="w-full h-full object-cover" />
                   </div>
                   <p className="font-semibold text-gray-900">{t("user.orderTracking.orderReadyForPickup")}</p>
                 </div>
@@ -912,7 +919,7 @@ export default function OrderTracking() {
           }}>
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center overflow-hidden">
-                    <img src={circleIcon} alt="Food cooking" className="w-full h-full object-cover" />
+                    <img src={circleIcon} alt={t("user.orderTracking.foodCookingAlt")} className="w-full h-full object-cover" />
                   </div>
                   <p className="font-semibold text-gray-900">{t("user.orderTracking.foodIsCooking")}</p>
                 </div>
@@ -970,7 +977,7 @@ export default function OrderTracking() {
           <SectionItem icon={Phone} title={customerName} subtitle={customerPhone || t("user.orderTracking.phoneNumberUnavailable")} onClick={() => setShowPhoneDialog(true)} rightContent={<span className="text-green-600 font-medium text-sm">{t("user.orderTracking.edit")}</span>} />
           <SectionItem icon={HomeIcon} title={t("user.orderTracking.deliveryAtLocation")} subtitle={(() => {
           // Priority 1: Use order address formattedAddress (live location address)
-          if (order?.address?.formattedAddress && order.address.formattedAddress !== "Select location") {
+          if (order?.address?.formattedAddress && !isLocationPlaceholder(order.address.formattedAddress, t("user.locationDisplay.selectLocation"))) {
             return order.address.formattedAddress;
           }
 
@@ -988,7 +995,7 @@ export default function OrderTracking() {
           }
 
           // Priority 3: Use defaultAddress formattedAddress (live location address)
-          if (defaultAddress?.formattedAddress && defaultAddress.formattedAddress !== "Select location") {
+          if (defaultAddress?.formattedAddress && !isLocationPlaceholder(defaultAddress.formattedAddress, t("user.locationDisplay.selectLocation"))) {
             return defaultAddress.formattedAddress;
           }
 
@@ -1049,7 +1056,7 @@ export default function OrderTracking() {
             <div className="flex items-start gap-3">
               <Receipt className="w-5 h-5 text-gray-500 mt-0.5" />
               <div className="flex-1">
-                <p className="font-medium text-gray-900">{t("user.orderTracking.orderNumber", { id: order?.id || order?.orderId || "N/A" })}</p>
+                <p className="font-medium text-gray-900">{t("user.orderTracking.orderNumber", { id: order?.id || order?.orderId || t("user.orderTracking.na") })}</p>
                 <div className="mt-2 space-y-1">
                   {order?.items?.map((item, index) => <div key={index} className="flex items-center gap-2 text-sm text-gray-600">
                       <span className="w-4 h-4 rounded border border-green-600 flex items-center justify-center">

@@ -19,6 +19,7 @@ import AddToCartAnimation from "../../components/AddToCartAnimation";
 import { getCompanyNameAsync } from "@/lib/utils/businessSettings";
 import { isModuleAuthenticated } from "@/lib/utils/auth";
 import DynamicEtaText from "../../components/DynamicEtaText";
+import { useTranslation } from "react-i18next";
 
 const PLACEHOLDER_OFFER_TEXTS = new Set([
   "UPTO 50% OFF",
@@ -35,6 +36,7 @@ const isRealOfferText = (value) => {
 };
 
 export default function RestaurantDetails() {
+  const { t } = useTranslation();
   const {
     slug
   } = useParams();
@@ -333,12 +335,12 @@ export default function RestaurantDetails() {
           // Transform API data to match expected format
           const transformedRestaurant = {
             id: actualRestaurant?.restaurantId || actualRestaurant?._id || actualRestaurant?.id || apiRestaurant?.restaurantId || apiRestaurant?._id || null,
-            name: actualRestaurant?.name || apiRestaurant?.name || apiRestaurant?.restaurantName || "Unknown Restaurant",
-            cuisine: actualRestaurant?.cuisines && Array.isArray(actualRestaurant.cuisines) && actualRestaurant.cuisines.length > 0 ? actualRestaurant.cuisines[0] : apiRestaurant?.cuisines && Array.isArray(apiRestaurant.cuisines) && apiRestaurant.cuisines.length > 0 ? apiRestaurant.cuisines[0] : actualRestaurant?.cuisine || apiRestaurant?.cuisine || actualRestaurant?.category || apiRestaurant?.category || "Multi-cuisine",
+            name: actualRestaurant?.name || apiRestaurant?.name || apiRestaurant?.restaurantName || t("user.restaurantDetails.unknownRestaurant"),
+            cuisine: actualRestaurant?.cuisines && Array.isArray(actualRestaurant.cuisines) && actualRestaurant.cuisines.length > 0 ? actualRestaurant.cuisines[0] : apiRestaurant?.cuisines && Array.isArray(apiRestaurant.cuisines) && apiRestaurant.cuisines.length > 0 ? apiRestaurant.cuisines[0] : actualRestaurant?.cuisine || apiRestaurant?.cuisine || actualRestaurant?.category || apiRestaurant?.category || t("user.restaurantDetails.multiCuisine"),
             rating: actualRestaurant?.rating ?? apiRestaurant?.rating ?? actualRestaurant?.averageRating ?? apiRestaurant?.averageRating ?? 4.5,
             reviews: actualRestaurant?.totalRatings ?? apiRestaurant?.totalRatings ?? actualRestaurant?.reviewCount ?? apiRestaurant?.reviewCount ?? actualRestaurant?.reviews?.length ?? apiRestaurant?.reviews?.length ?? 0,
-            deliveryTime: actualRestaurant?.estimatedDeliveryTime || apiRestaurant?.estimatedDeliveryTime || actualRestaurant?.deliveryTime || apiRestaurant?.deliveryTime || actualRestaurant?.avgDeliveryTime || apiRestaurant?.avgDeliveryTime || "25-30 mins",
-            distance: calculatedDistance || actualRestaurant?.distance || apiRestaurant?.distance || actualRestaurant?.distanceFromUser || apiRestaurant?.distanceFromUser || "1.2 km",
+            deliveryTime: actualRestaurant?.estimatedDeliveryTime || apiRestaurant?.estimatedDeliveryTime || actualRestaurant?.deliveryTime || apiRestaurant?.deliveryTime || actualRestaurant?.avgDeliveryTime || apiRestaurant?.avgDeliveryTime || t("user.restaurantDetails.fallbackDeliveryTime"),
+            distance: calculatedDistance || actualRestaurant?.distance || apiRestaurant?.distance || actualRestaurant?.distanceFromUser || apiRestaurant?.distanceFromUser || t("user.restaurantDetails.fallbackDistance"),
             location: formattedAddress,
             locationObject: locationObj,
             // Store full location object for reference
@@ -350,10 +352,10 @@ export default function RestaurantDetails() {
             offerCount: apiRestaurant?.offerCount ?? 0,
             restaurantOffers: {
               goldOffer: {
-                title: apiRestaurant?.restaurantOffers?.goldOffer?.title || "Gold exclusive offer",
-                description: apiRestaurant?.restaurantOffers?.goldOffer?.description || "Free delivery above ₹99",
-                unlockText: apiRestaurant?.restaurantOffers?.goldOffer?.unlockText || "join Gold to unlock",
-                buttonText: apiRestaurant?.restaurantOffers?.goldOffer?.buttonText || "Add Gold - ₹1"
+                title: apiRestaurant?.restaurantOffers?.goldOffer?.title || t("user.restaurantDetails.goldExclusiveOffer"),
+                description: apiRestaurant?.restaurantOffers?.goldOffer?.description || t("user.restaurantDetails.freeDeliveryAbove99"),
+                unlockText: apiRestaurant?.restaurantOffers?.goldOffer?.unlockText || t("user.restaurantDetails.joinGoldToUnlock"),
+                buttonText: apiRestaurant?.restaurantOffers?.goldOffer?.buttonText || t("user.restaurantDetails.addGold")
               },
               coupons: Array.isArray(apiRestaurant?.restaurantOffers?.coupons) ? apiRestaurant.restaurantOffers.coupons : []
             },
@@ -363,7 +365,7 @@ export default function RestaurantDetails() {
             slug: apiRestaurant?.slug || apiRestaurant?.name?.toLowerCase().replace(/\s+/g, '-') || slug || "unknown",
             restaurantId: apiRestaurant?.restaurantId || apiRestaurant?._id || apiRestaurant?.id || null,
             // Add other fields with defaults
-            featuredDish: apiRestaurant?.featuredDish || "Special Dish",
+            featuredDish: apiRestaurant?.featuredDish || t("user.restaurantDetails.specialDish"),
             featuredPrice: apiRestaurant?.featuredPrice ?? 249,
             // Additional safety fields
             openDays: Array.isArray(apiRestaurant?.openDays) ? apiRestaurant.openDays : [],
@@ -470,7 +472,7 @@ export default function RestaurantDetails() {
 
                 // Always create recommended section (even if empty) - will show "No dish Yet" if empty
                 const finalMenuSections = [{
-                  name: "Recommended for you",
+                  name: t("user.restaurantDetails.recommendedForYou"),
                   items: recommendedItems,
                   subsections: []
                 }, ...menuSections];
@@ -660,7 +662,7 @@ export default function RestaurantDetails() {
   const updateItemQuantity = (item, newQuantity, event = null) => {
     // Check authentication
     if (!isModuleAuthenticated('user')) {
-      toast.error("Please login to add items to cart");
+      toast.error(t("user.restaurantDetails.toast.loginToAddItems"));
       navigate('/user/auth/sign-in', {
         state: {
           from: location.pathname
@@ -671,19 +673,19 @@ export default function RestaurantDetails() {
 
     // CRITICAL: Check if user is in service zone or restaurant is available
     if (isOutOfService) {
-      toast.error('You are outside the service zone. Please select a location within the service area.');
+      toast.error(t("user.restaurantDetails.toast.outsideServiceZone"));
       return;
     }
 
     if (outOfRange) {
-      toast.error('This restaurant does not deliver to your current address. Change your delivery location to order.');
+      toast.error(t("user.restaurantDetails.toast.restaurantOutOfRange"));
       return;
     }
 
     // defensive check: ensure item is valid
     if (!item || !item.id) {
       console.error('❌ Cannot update item quantity: Item data is missing!');
-      toast.error('Item information is missing. Please refresh the page.');
+      toast.error(t("user.restaurantDetails.toast.itemInfoMissing"));
       return;
     }
 
@@ -696,7 +698,7 @@ export default function RestaurantDetails() {
     // CRITICAL: Validate restaurant data before adding to cart
     if (!restaurant || !restaurant.name) {
       console.error('❌ Cannot add item to cart: Restaurant data is missing!');
-      toast.error('Restaurant information is missing. Please refresh the page.');
+      toast.error(t("user.restaurantDetails.toast.restaurantInfoMissingRefresh"));
       return;
     }
 
@@ -704,7 +706,7 @@ export default function RestaurantDetails() {
     const validRestaurantId = restaurant?.restaurantId || restaurant?._id || restaurant?.id;
     if (!validRestaurantId) {
       console.error('❌ Cannot add item to cart: Restaurant ID is missing!');
-      toast.error('Restaurant ID is missing. Please refresh the page.');
+      toast.error(t("user.restaurantDetails.toast.restaurantIdMissing"));
       return;
     }
     // Prepare cart item with all required properties
@@ -783,7 +785,7 @@ export default function RestaurantDetails() {
           } catch (error) {
             // Handle restaurant mismatch error
             console.error('❌ Error adding item to cart:', error);
-            toast.error(error.message || 'Cannot add item from different restaurant. Please clear cart first.');
+            toast.error(error.message || t("user.restaurantDetails.toast.cannotAddDifferentRestaurant"));
             return; // Don't update quantity if add failed
           }
         }
@@ -806,7 +808,7 @@ export default function RestaurantDetails() {
         } catch (error) {
           // Handle restaurant mismatch error
           console.error('❌ Error adding item to cart:', error);
-          toast.error(error.message || 'Cannot add item from different restaurant. Please clear cart first.');
+          toast.error(error.message || t("user.restaurantDetails.toast.cannotAddDifferentRestaurant"));
         }
       }
     }
@@ -815,9 +817,9 @@ export default function RestaurantDetails() {
   // Menu categories - dynamically generated from restaurant menu sections
   const menuCategories = restaurant?.menuSections && Array.isArray(restaurant.menuSections) ? restaurant.menuSections.map((section, index) => {
     // Handle section name - check for valid non-empty string
-    let sectionTitle = "Unnamed Section";
+    let sectionTitle = t("user.restaurantDetails.unnamedSection");
     if (index === 0) {
-      sectionTitle = "Recommended for you";
+      sectionTitle = t("user.restaurantDetails.recommendedForYou");
     } else if (section?.name && typeof section.name === 'string' && section.name.trim()) {
       sectionTitle = section.name.trim();
     } else if (section?.title && typeof section.title === 'string' && section.title.trim()) {
@@ -846,19 +848,19 @@ export default function RestaurantDetails() {
   const handleBookmarkClick = item => {
     const restaurantId = restaurant?.restaurantId || restaurant?._id || restaurant?.id;
     if (!restaurantId) {
-      toast.error("Restaurant information is missing");
+      toast.error(t("user.restaurantDetails.toast.restaurantInfoMissing"));
       return;
     }
     const dishId = item.id || item._id;
     if (!dishId) {
-      toast.error("Dish information is missing");
+      toast.error(t("user.restaurantDetails.toast.dishInfoMissing"));
       return;
     }
     const isFavorite = isDishFavorite(dishId, restaurantId);
     if (isFavorite) {
       // If already bookmarked, remove it
       removeDishFavorite(dishId, restaurantId);
-      toast.success("Dish removed from favorites");
+      toast.success(t("user.restaurantDetails.toast.dishRemoved"));
     } else {
       // Add to favorites
       const dishData = {
@@ -876,7 +878,7 @@ export default function RestaurantDetails() {
         customisable: item.customisable
       };
       addDishFavorite(dishData);
-      toast.success("Dish added to favorites");
+      toast.success(t("user.restaurantDetails.toast.dishAdded"));
     }
   };
 
@@ -884,18 +886,18 @@ export default function RestaurantDetails() {
   const handleAddToCollection = () => {
     const restaurantSlug = restaurant?.slug || slug || "";
     if (!restaurantSlug) {
-      toast.error("Restaurant information is missing");
+      toast.error(t("user.restaurantDetails.toast.restaurantInfoMissing"));
       return;
     }
     if (!restaurant) {
-      toast.error("Restaurant data not available");
+      toast.error(t("user.restaurantDetails.toast.restaurantDataUnavailable"));
       return;
     }
     const isAlreadyFavorite = isFavorite(restaurantSlug);
     if (isAlreadyFavorite) {
       // Remove from collection
       removeFavorite(restaurantSlug);
-      toast.success("Restaurant removed from collection");
+      toast.success(t("user.restaurantDetails.toast.restaurantRemovedFromCollection"));
     } else {
       // Add to collection
       addFavorite({
@@ -908,7 +910,7 @@ export default function RestaurantDetails() {
         priceRange: restaurant.priceRange || "",
         image: restaurant.profileImageUrl?.url || restaurant.image || ""
       });
-      toast.success("Restaurant added to collection");
+      toast.success(t("user.restaurantDetails.toast.restaurantAddedToCollection"));
     }
     setShowMenuOptionsSheet(false);
   };
@@ -917,11 +919,15 @@ export default function RestaurantDetails() {
   const handleShareRestaurant = async () => {
     const companyName = await getCompanyNameAsync();
     const restaurantSlug = restaurant?.slug || slug || "";
-    const restaurantName = restaurant?.name || "this restaurant";
+    const restaurantName = restaurant?.name || t("user.restaurantDetails.thisRestaurant");
 
     // Create share URL
     const shareUrl = `${window.location.origin}/user/restaurants/${restaurantSlug}`;
-    const shareText = `Check out ${restaurantName} on ${companyName}! ${shareUrl}`;
+    const shareText = t("user.restaurantDetails.shareRestaurantText", {
+      restaurant: restaurantName,
+      company: companyName,
+      url: shareUrl
+    });
 
     // Try Web Share API first (mobile)
     if (navigator.share) {
@@ -931,7 +937,7 @@ export default function RestaurantDetails() {
           text: shareText,
           url: shareUrl
         });
-        toast.success("Restaurant shared successfully");
+        toast.success(t("user.restaurantDetails.toast.restaurantShared"));
         setShowMenuOptionsSheet(false);
       } catch (error) {
         // User cancelled or error occurred
@@ -954,7 +960,11 @@ export default function RestaurantDetails() {
 
     // Create share URL
     const shareUrl = `${window.location.origin}/user/restaurants/${restaurantSlug}?dish=${dishId}`;
-    const shareText = `Check out ${item.name} from ${restaurant?.name || "this restaurant"}! ${shareUrl}`;
+    const shareText = t("user.restaurantDetails.shareDishText", {
+      dish: item.name,
+      restaurant: restaurant?.name || t("user.restaurantDetails.thisRestaurant"),
+      url: shareUrl
+    });
 
     // Try Web Share API first (mobile)
     if (navigator.share) {
@@ -964,7 +974,7 @@ export default function RestaurantDetails() {
           text: shareText,
           url: shareUrl
         });
-        toast.success("Dish shared successfully");
+        toast.success(t("user.restaurantDetails.toast.dishShared"));
       } catch (error) {
         // User cancelled or error occurred
         if (error.name !== "AbortError") {
@@ -982,7 +992,7 @@ export default function RestaurantDetails() {
   const copyToClipboard = async text => {
     try {
       await navigator.clipboard.writeText(text);
-      toast.success("Link copied to clipboard!");
+      toast.success(t("user.restaurantDetails.toast.linkCopied"));
     } catch (error) {
       // Fallback for older browsers
       const textArea = document.createElement("textarea");
@@ -993,9 +1003,9 @@ export default function RestaurantDetails() {
       textArea.select();
       try {
         document.execCommand("copy");
-        toast.success("Link copied to clipboard!");
+        toast.success(t("user.restaurantDetails.toast.linkCopied"));
       } catch (err) {
-        toast.error("Failed to copy link");
+        toast.error(t("user.restaurantDetails.toast.copyFailed"));
       }
       document.body.removeChild(textArea);
     }
@@ -1170,7 +1180,7 @@ export default function RestaurantDetails() {
         <div className="min-h-screen bg-gray-50 flex items-center justify-center">
           <div className="flex flex-col items-center gap-4">
             <Loader2 className="h-8 w-8 text-green-600 animate-spin" />
-            <span className="text-sm text-gray-600">Loading restaurant...</span>
+            <span className="text-sm text-gray-600">{t("user.restaurantDetails.loadingRestaurant")}</span>
           </div>
         </div>
       </AnimatedPage>;
@@ -1186,14 +1196,16 @@ export default function RestaurantDetails() {
             <AlertCircle className={`h-12 w-12 ${isNetworkError ? 'text-orange-500' : 'text-red-500'}`} />
             <div>
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">
-                {isNetworkError ? 'Connection Error' : isNotFoundError ? 'Restaurant not found' : 'Error'}
+                {isNetworkError ? t("user.restaurantDetails.connectionError") : isNotFoundError ? t("user.restaurantDetails.restaurantNotFound") : t("user.restaurantDetails.error")}
               </h2>
-              <p className="text-sm text-gray-600 mb-4 max-w-md">{restaurantError}</p>
+              <p className="text-sm text-gray-600 mb-4 max-w-md">{isNotFoundError ? t("user.restaurantDetails.restaurantNotFound") : restaurantError}</p>
               {isNetworkError && <p className="text-xs text-gray-500 mb-4">
-                  Make sure the backend server is running at {API_BASE_URL.replace('/api', '')}
+                  {t("user.restaurantDetails.backendRunningAt", {
+                url: API_BASE_URL.replace('/api', '')
+              })}
                 </p>}
               <Button onClick={() => navigate(-1)} variant="outline">
-                Go Back
+                {t("user.restaurantDetails.goBack")}
               </Button>
             </div>
           </div>
@@ -1207,9 +1219,9 @@ export default function RestaurantDetails() {
         <div className="min-h-screen bg-gray-50 flex items-center justify-center">
           <div className="flex flex-col items-center gap-4">
             <AlertCircle className="h-12 w-12 text-red-500" />
-            <span className="text-sm text-gray-600">Restaurant not found</span>
+            <span className="text-sm text-gray-600">{t("user.restaurantDetails.restaurantNotFound")}</span>
             <Button onClick={() => navigate(-1)} variant="outline">
-              Go Back
+              {t("user.restaurantDetails.goBack")}
             </Button>
           </div>
         </div>
@@ -1231,11 +1243,11 @@ export default function RestaurantDetails() {
           <div className="flex items-center gap-3">
             {!(showSearch || effectiveDish) ? <Button variant="outline" className="rounded-full h-10 px-4 border-gray-200 dark:border-gray-800 shadow-sm bg-white dark:bg-[#1a1a1a] flex items-center gap-2 text-gray-900 dark:text-white" onClick={() => setShowSearch(true)}>
                 <Search className="h-4 w-4" />
-                <span className="text-sm font-medium">Search</span>
+                <span className="text-sm font-medium">{t("user.restaurantDetails.search")}</span>
               </Button> : <div className="flex items-center gap-2 flex-1 max-w-md">
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <input type="text" placeholder="Search for dishes..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full pl-10 pr-10 py-2 rounded-full border border-gray-200 dark:border-gray-800 shadow-sm bg-white dark:bg-[#1a1a1a] text-sm dark:text-white focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent" autoFocus onBlur={() => {
+                  <input type="text" placeholder={t("user.restaurantDetails.searchForDishes")} value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full pl-10 pr-10 py-2 rounded-full border border-gray-200 dark:border-gray-800 shadow-sm bg-white dark:bg-[#1a1a1a] text-sm dark:text-white focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent" autoFocus onBlur={() => {
                 if (!searchQuery && !effectiveDish) {
                   setShowSearch(false);
                 }
@@ -1262,13 +1274,13 @@ export default function RestaurantDetails() {
           <div className="flex items-start justify-between">
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-2">
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{restaurant?.name || "Unknown Restaurant"}</h1>
+                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{restaurant?.name || t("user.restaurantDetails.unknownRestaurant")}</h1>
                 <Info className="h-5 w-5 text-gray-400" />
               </div>
               {outOfRange && (
                 <Badge variant="secondary" className="w-fit flex items-center gap-1 px-2 py-0.5 bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200 border border-amber-300 dark:border-amber-700">
                   <AlertCircle className="h-3.5 w-3.5" />
-                  Out of delivery range — change address to order
+                  {t("user.restaurantDetails.outOfDeliveryRangeBadge")}
                 </Badge>
               )}
             </div>
@@ -1277,14 +1289,16 @@ export default function RestaurantDetails() {
                 <Star className="h-3 w-3 fill-white" />
                 {restaurant?.rating ?? 4.5}
               </Badge>
-              <span className="text-xs text-gray-500">By {(restaurant.reviews || 0).toLocaleString()}+</span>
+              <span className="text-xs text-gray-500">{t("user.restaurantDetails.byReviews", {
+              count: (restaurant.reviews || 0).toLocaleString()
+            })}</span>
             </div>
           </div>
 
           {/* Location */}
           <div className="flex items-center gap-1 text-sm text-gray-700 dark:text-gray-300 cursor-pointer" onClick={() => setShowLocationSheet(true)}>
             <MapPin className="h-4 w-4" />
-            <span>{restaurant?.distance || "1.2 km"} · {restaurant?.location || "Location"}</span>
+            <span>{restaurant?.distance || t("user.restaurantDetails.fallbackDistance")} · {restaurant?.location || t("user.restaurantDetails.fallbackLocation")}</span>
             <ChevronDown className="h-4 w-4 text-gray-500" />
           </div>
 
@@ -1295,7 +1309,7 @@ export default function RestaurantDetails() {
               <span>
                 <DynamicEtaText
                   restaurantId={restaurant?._id || restaurant?.restaurantId}
-                  fallback={restaurant?.deliveryTime || "25-30 mins"}
+                  fallback={restaurant?.deliveryTime || t("user.restaurantDetails.fallbackDeliveryTime")}
                 />
               </span>
             </div>
@@ -1331,7 +1345,7 @@ export default function RestaurantDetails() {
             <div className="flex items-center gap-2 w-max">
               <Button variant="outline" size="sm" className="flex items-center gap-1.5 whitespace-nowrap border-gray-300 dark:border-gray-700 bg-white dark:bg-[#1a1a1a] relative" onClick={() => setShowFilterSheet(true)}>
                 <SlidersHorizontal className="h-4 w-4" />
-                Filters
+                {t("user.restaurantDetails.filters")}
                 {activeFilterCount > 0 && <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center font-semibold">
                     {activeFilterCount}
                   </span>}
@@ -1342,7 +1356,7 @@ export default function RestaurantDetails() {
               vegNonVeg: prev.vegNonVeg === "veg" ? null : "veg"
             }))}>
                 <div className="h-3 w-3 rounded-full bg-green-500" />
-                Veg
+                {t("user.restaurantDetails.veg")}
                 {filters.vegNonVeg === "veg" && <X className="h-3 w-3 text-gray-600" />}
               </Button>
               <Button variant="outline" size="sm" className={`flex items-center gap-1.5 whitespace-nowrap border-gray-300 bg-white rounded-full ${filters.vegNonVeg === "non-veg" ? "border-amber-700 bg-amber-50" : ""}`} onClick={() => setFilters(prev => ({
@@ -1350,7 +1364,7 @@ export default function RestaurantDetails() {
               vegNonVeg: prev.vegNonVeg === "non-veg" ? null : "non-veg"
             }))}>
                 <div className="h-3 w-3 rounded-full bg-amber-700" />
-                Non-veg
+                {t("user.restaurantDetails.nonVeg")}
                 {filters.vegNonVeg === "non-veg" && <X className="h-3 w-3 text-gray-600" />}
               </Button>
             </div>
@@ -1364,9 +1378,9 @@ export default function RestaurantDetails() {
           originalIndex
         }, sectionIndex) => {
           // Handle section name - check for valid non-empty string
-          let sectionTitle = "Unnamed Section";
+          let sectionTitle = t("user.restaurantDetails.unnamedSection");
           if (originalIndex === 0) {
-            sectionTitle = "Recommended for you";
+            sectionTitle = t("user.restaurantDetails.recommendedForYou");
           } else if (section?.name && typeof section.name === 'string' && section.name.trim()) {
             sectionTitle = section.name.trim();
           } else if (section?.title && typeof section.title === 'string' && section.title.trim()) {
@@ -1378,7 +1392,7 @@ export default function RestaurantDetails() {
                   {/* Section Header */}
                   {sectionIndex === 0 && <div className="flex items-center justify-between">
                       <h2 className="text-lg font-bold text-gray-900 dark:text-white">
-                        Recommended for you
+                        {t("user.restaurantDetails.recommendedForYou")}
                       </h2>
                       <button onClick={e => {
                 e.stopPropagation();
@@ -1398,7 +1412,7 @@ export default function RestaurantDetails() {
                   {sectionIndex > 0 && <div className="flex items-center justify-between">
                       <div className="space-y-1">
                         <h2 className="text-lg font-bold text-gray-900 dark:text-white">
-                          {section?.name && typeof section.name === 'string' && section.name.trim() ? section.name.trim() : section?.title && typeof section.title === 'string' && section.title.trim() ? section.title.trim() : "Unnamed Section"}
+                          {section?.name && typeof section.name === 'string' && section.name.trim() ? section.name.trim() : section?.title && typeof section.title === 'string' && section.title.trim() ? section.title.trim() : t("user.restaurantDetails.unnamedSection")}
                         </h2>
                         {section.subtitle && <button className="text-sm text-blue-600 dark:text-blue-400 underline">
                             {section.subtitle}
@@ -1423,7 +1437,7 @@ export default function RestaurantDetails() {
                   {/* Direct Items */}
                   {isExpanded && originalIndex === 0 && section.items && section.items.length === 0 && <div className="text-center py-8">
                       <p className="text-gray-500 dark:text-gray-400 text-sm md:text-base">
-                        No dish recommended
+                        {t("user.restaurantDetails.noDishRecommended")}
                       </p>
                     </div>}
                   {isExpanded && section.items && section.items.length > 0 && <div className="space-y-0">
@@ -1452,7 +1466,7 @@ export default function RestaurantDetails() {
                                 {(item.isRecommended === true || (item.isRecommendationRequest === true && (item.recommendationStatus === "pending" || item.recommendationStatus === "approved"))) && (
                                   <Badge className="bg-orange-100 text-[#FF5200] border-none text-[10px] h-5 py-0 px-1.5 flex items-center gap-1 font-bold">
                                     <Star className="w-3 h-3 fill-current" />
-                                    {item.isRecommended === true ? "MUST TRY" : "REQUESTED"}
+                                    {item.isRecommended === true ? t("user.restaurantDetails.mustTry") : t("user.restaurantDetails.requested")}
                                   </Badge>
                                 )}
                               </div>
@@ -1462,7 +1476,7 @@ export default function RestaurantDetails() {
                                   <div className="h-1.5 w-16 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                                     <div className="h-full bg-green-600 w-3/4"></div>
                                   </div>
-                                  <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">Highly reordered</span>
+                                  <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">{t("user.restaurantDetails.highlyReordered")}</span>
                                 </div>}
 
                               <div className="flex items-center gap-3 mt-1">
@@ -1499,7 +1513,7 @@ export default function RestaurantDetails() {
                             {/* Right Side - Image and Add Button */}
                             <div className="relative w-32 h-32 flex-shrink-0 overflow-visible">
                               {item.image || item.images && item.images.length > 0 ? <img src={item.image || item.images[0]} alt={item.name} className="w-full h-full object-cover rounded-2xl shadow-sm" /> : <div className="w-full h-full bg-gray-200 dark:bg-gray-700 rounded-2xl flex items-center justify-center">
-                                  <span className="text-xs text-gray-400">No image</span>
+                                  <span className="text-xs text-gray-400">{t("user.restaurantDetails.noImage")}</span>
                                 </div>}
                               {quantity > 0 ? <motion.div initial={{
                       opacity: 0,
@@ -1542,7 +1556,7 @@ export default function RestaurantDetails() {
                         updateItemQuantity(item, 1, e);
                       }
                     }} disabled={shouldShowGrayscale} className={`absolute bottom-2 left-1/2 -translate-x-1/2 z-20 bg-white border font-bold px-6 py-1.5 rounded-lg shadow-md flex items-center gap-1 transition-colors ${shouldShowGrayscale ? 'border-gray-300 text-gray-400 cursor-not-allowed opacity-50' : 'border-green-600 text-green-600 hover:bg-green-50'}`}>
-                                  ADD <Plus size={14} className="stroke-[3px]" />
+                                  {t("user.restaurantDetails.add")} <Plus size={14} className="stroke-[3px]" />
                                 </motion.button>}
                             </div>
                           </div>;
@@ -1567,7 +1581,7 @@ export default function RestaurantDetails() {
                             {/* Subsection Header */}
                             <div className="flex items-center justify-between">
                               <h3 className="text-base font-semibold text-gray-900 dark:text-white">
-                                {subsection?.name || subsection?.title || "Subsection"}
+                                {subsection?.name || subsection?.title || t("user.restaurantDetails.subsection")}
                               </h3>
                               <button onClick={e => {
                       e.stopPropagation();
@@ -1612,7 +1626,7 @@ export default function RestaurantDetails() {
                                           {(item.isRecommended === true || (item.isRecommendationRequest === true && (item.recommendationStatus === "pending" || item.recommendationStatus === "approved"))) && (
                                             <Badge className="bg-orange-100 text-[#FF5200] border-none text-[10px] h-5 py-0 px-1.5 flex items-center gap-1 font-bold">
                                               <Star className="w-3 h-3 fill-current" />
-                                              {item.isRecommended === true ? "MUST TRY" : "REQUESTED"}
+                                              {item.isRecommended === true ? t("user.restaurantDetails.mustTry") : t("user.restaurantDetails.requested")}
                                             </Badge>
                                           )}
                                         </div>
@@ -1622,7 +1636,7 @@ export default function RestaurantDetails() {
                                             <div className="h-1.5 w-16 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                                               <div className="h-full bg-green-600 w-3/4"></div>
                                             </div>
-                                            <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">Highly reordered</span>
+                                            <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">{t("user.restaurantDetails.highlyReordered")}</span>
                                           </div>}
 
                                         <div className="flex items-center gap-3 mt-1">
@@ -1655,7 +1669,7 @@ export default function RestaurantDetails() {
                                       {/* Right Side - Image and Add Button */}
                                       <div className="relative w-32 h-32 flex-shrink-0 overflow-visible">
                                         {item.image || item.images && item.images.length > 0 ? <img src={item.image || item.images[0]} alt={item.name} className="w-full h-full object-cover rounded-2xl shadow-sm" /> : <div className="w-full h-full bg-gray-200 dark:bg-gray-700 rounded-2xl flex items-center justify-center">
-                                            <span className="text-xs text-gray-400">No image</span>
+                                            <span className="text-xs text-gray-400">{t("user.restaurantDetails.noImage")}</span>
                                           </div>}
                                         {quantity > 0 ? <motion.div initial={{
                             opacity: 0,
@@ -1698,7 +1712,7 @@ export default function RestaurantDetails() {
                         updateItemQuantity(item, 1, e);
                       }
                     }} disabled={shouldShowGrayscale} className={`absolute bottom-2 left-1/2 -translate-x-1/2 z-20 bg-white border font-bold px-6 py-1.5 rounded-lg shadow-md flex items-center gap-1 transition-colors ${shouldShowGrayscale ? 'border-gray-300 text-gray-400 cursor-not-allowed opacity-50' : 'border-green-600 text-green-600 hover:bg-green-50'}`}>
-                                  ADD <Plus size={14} className="stroke-[3px]" />
+                                  {t("user.restaurantDetails.add")} <Plus size={14} className="stroke-[3px]" />
                                 </motion.button>}
                             </div>
                                     </div>;
@@ -1717,12 +1731,12 @@ export default function RestaurantDetails() {
           {outOfRange ? (
             <Button className="bg-amber-600 hover:bg-amber-700 text-white flex items-center gap-2 shadow-lg px-6 py-2.5 rounded-lg cursor-not-allowed" size="lg" disabled>
               <AlertCircle className="h-5 w-5" />
-              Out of delivery range
+              {t("user.restaurantDetails.outOfDeliveryRange")}
             </Button>
           ) : (
             <Button className="bg-gray-800 hover:bg-gray-900 text-white flex items-center gap-2 shadow-lg px-6 py-2.5 rounded-lg" size="lg" onClick={() => setShowMenuSheet(true)}>
               <Utensils className="h-5 w-5" />
-              Menu
+              {t("user.restaurantDetails.menu")}
             </Button>
           )}
         </div>}
@@ -1788,14 +1802,14 @@ export default function RestaurantDetails() {
                     <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-800">
                       <button className="w-full flex items-center justify-between py-3 px-2 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors" onClick={() => setShowLargeOrderMenu(!showLargeOrderMenu)}>
                         <span className="text-base font-semibold text-gray-900 dark:text-white">
-                          LARGE ORDER MENU
+                          {t("user.restaurantDetails.largeOrderMenu")}
                         </span>
                         <ChevronDown className={`h-4 w-4 text-gray-500 dark:text-gray-400 transition-transform ${showLargeOrderMenu ? "rotate-180" : ""}`} />
                       </button>
                       {showLargeOrderMenu && <div className="mt-2 space-y-1 pl-4">
                           {/* Add large order menu items here if needed */}
                           <p className="text-sm text-gray-500 dark:text-gray-400 py-2">
-                            Large order options coming soon
+                            {t("user.restaurantDetails.largeOrderComingSoon")}
                           </p>
                         </div>}
                     </div>
@@ -1805,7 +1819,7 @@ export default function RestaurantDetails() {
                   <div className="border-t border-gray-200 dark:border-gray-800 px-4 py-4 bg-white dark:bg-[#1a1a1a]">
                     <Button variant="outline" className="w-full bg-gray-800 hover:bg-gray-900 text-white border-0 flex items-center justify-center gap-2 py-3 rounded-lg" onClick={() => setShowMenuSheet(false)}>
                       <X className="h-5 w-5" />
-                      Close
+                      {t("user.restaurantDetails.close")}
                     </Button>
                   </div>
                 </motion.div>
@@ -1843,7 +1857,7 @@ export default function RestaurantDetails() {
         }}>
                   {/* Header with X button */}
                   <div className="flex items-center justify-between px-4 pt-3 pb-2 border-b border-gray-200 dark:border-gray-800">
-                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Filters and Sorting</h2>
+                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t("user.restaurantDetails.filtersAndSorting")}</h2>
                     <button onClick={() => setShowFilterSheet(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors">
                       <X className="h-5 w-5 text-gray-600 dark:text-gray-400" />
                     </button>
@@ -1853,65 +1867,65 @@ export default function RestaurantDetails() {
                   <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
                     {/* Sort by */}
                     <div className="space-y-2">
-                      <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Sort by:</h3>
+                      <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{t("user.restaurantDetails.sortBy")}</h3>
                       <div className="flex flex-col gap-1.5">
                         <button onClick={() => setFilters(prev => ({
                   ...prev,
                   sortBy: prev.sortBy === "low-to-high" ? null : "low-to-high"
                 }))} className={`text-left px-4 py-2.5 rounded-lg border-2 transition-all ${filters.sortBy === "low-to-high" ? "border-blue-500 dark:border-blue-400 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400" : "border-gray-200 dark:border-gray-700 bg-white dark:bg-[#2a2a2a] text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600"}`}>
-                          Price - low to high
+                          {t("user.restaurantDetails.priceLowToHigh")}
                         </button>
                         <button onClick={() => setFilters(prev => ({
                   ...prev,
                   sortBy: prev.sortBy === "high-to-low" ? null : "high-to-low"
                 }))} className={`text-left px-4 py-2.5 rounded-lg border-2 transition-all ${filters.sortBy === "high-to-low" ? "border-blue-500 dark:border-blue-400 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400" : "border-gray-200 dark:border-gray-700 bg-white dark:bg-[#2a2a2a] text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600"}`}>
-                          Price - high to low
+                          {t("user.restaurantDetails.priceHighToLow")}
                         </button>
                       </div>
                     </div>
 
                     {/* Veg/Non-veg preference */}
                     <div className="space-y-2">
-                      <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Veg/Non-veg preference:</h3>
+                      <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{t("user.restaurantDetails.vegNonVegPreference")}</h3>
                       <div className="flex gap-2">
                         <button onClick={() => setFilters(prev => ({
                   ...prev,
                   vegNonVeg: prev.vegNonVeg === "veg" ? null : "veg"
                 }))} className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border-2 transition-all flex-1 ${filters.vegNonVeg === "veg" ? "border-green-500 dark:border-green-400 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400" : "border-gray-200 dark:border-gray-700 bg-white dark:bg-[#2a2a2a] text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600"}`}>
                           <div className="h-4 w-4 rounded-full bg-green-500 dark:bg-green-400" />
-                          <span className="font-medium">Veg</span>
+                          <span className="font-medium">{t("user.restaurantDetails.veg")}</span>
                         </button>
                         <button onClick={() => setFilters(prev => ({
                   ...prev,
                   vegNonVeg: prev.vegNonVeg === "non-veg" ? null : "non-veg"
                 }))} className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border-2 transition-all flex-1 ${filters.vegNonVeg === "non-veg" ? "border-amber-700 dark:border-amber-600 bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400" : "border-gray-200 dark:border-gray-700 bg-white dark:bg-[#2a2a2a] text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600"}`}>
                           <div className="h-4 w-4 rounded-full bg-amber-700 dark:bg-amber-600" />
-                          <span className="font-medium">Non-veg</span>
+                          <span className="font-medium">{t("user.restaurantDetails.nonVeg")}</span>
                         </button>
                       </div>
                     </div>
 
                     {/* Top picks */}
                     <div className="space-y-2">
-                      <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Top picks:</h3>
+                      <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{t("user.restaurantDetails.topPicks")}</h3>
                       <button onClick={() => setFilters(prev => ({
                 ...prev,
                 highlyReordered: !prev.highlyReordered
               }))} className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border-2 transition-all w-full ${filters.highlyReordered ? "border-green-500 dark:border-green-400 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400" : "border-gray-200 dark:border-gray-700 bg-white dark:bg-[#2a2a2a] text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600"}`}>
                         <RotateCcw className="h-4 w-4" />
-                        <span className="font-medium">Highly reordered</span>
+                        <span className="font-medium">{t("user.restaurantDetails.highlyReordered")}</span>
                       </button>
                     </div>
 
                     {/* Dietary preference */}
                     <div className="space-y-2">
-                      <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Dietary preference:</h3>
+                      <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{t("user.restaurantDetails.dietaryPreference")}</h3>
                       <button onClick={() => setFilters(prev => ({
                 ...prev,
                 spicy: !prev.spicy
               }))} className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border-2 transition-all w-full ${filters.spicy ? "border-red-500 dark:border-red-400 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400" : "border-gray-200 dark:border-gray-700 bg-white dark:bg-[#2a2a2a] text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600"}`}>
                         <Flame className="h-4 w-4" />
-                        <span className="font-medium">Spicy</span>
+                        <span className="font-medium">{t("user.restaurantDetails.spicy")}</span>
                       </button>
                     </div>
                   </div>
@@ -1926,10 +1940,10 @@ export default function RestaurantDetails() {
                 spicy: false
               });
             }} className="text-red-600 dark:text-red-400 font-medium text-sm hover:text-red-700 dark:hover:text-red-500">
-                      Clear All
+                      {t("user.restaurantDetails.clearAll")}
                     </button>
                     <Button className="bg-gray-300 dark:bg-gray-700 hover:bg-gray-400 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 px-6 py-2.5 rounded-lg font-medium" onClick={() => setShowFilterSheet(false)}>
-                      Apply {activeFilterCount > 0 && `(${activeFilterCount})`}
+                      {t("user.restaurantDetails.apply")} {activeFilterCount > 0 && `(${activeFilterCount})`}
                     </Button>
                   </div>
                 </motion.div>
@@ -1967,12 +1981,12 @@ export default function RestaurantDetails() {
         }}>
                   {/* Header */}
                   <div className="px-4 pt-4 pb-3 border-b border-gray-200 dark:border-gray-800">
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1.5">All delivery outlets for</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1.5">{t("user.restaurantDetails.allDeliveryOutletsFor")}</p>
                     <div className="flex items-center gap-2">
                       <div className="w-8 h-8 bg-red-600 dark:bg-red-500 rounded-lg flex items-center justify-center">
-                        <span className="text-white font-bold text-base">{(restaurant.name || "R").charAt(0).toUpperCase()}</span>
+                        <span className="text-white font-bold text-base">{(restaurant.name || t("user.restaurantDetails.fallbackRestaurantInitial")).charAt(0).toUpperCase()}</span>
                       </div>
-                      <h2 className="text-lg font-bold text-gray-900 dark:text-white">{restaurant?.name || "Unknown Restaurant"}</h2>
+                      <h2 className="text-lg font-bold text-gray-900 dark:text-white">{restaurant?.name || t("user.restaurantDetails.unknownRestaurant")}</h2>
                     </div>
                   </div>
 
@@ -1983,21 +1997,21 @@ export default function RestaurantDetails() {
                             {outlet?.isNearest && <div className="flex items-center gap-1.5 mb-2 px-2 py-1 bg-green-50 dark:bg-green-900/30 rounded-md">
                                 <Zap className="h-3.5 w-3.5 text-green-600 dark:text-green-400 fill-green-600 dark:fill-green-400" />
                                 <span className="text-xs font-semibold text-green-700 dark:text-green-400">
-                                  Nearest available outlet
+                                  {t("user.restaurantDetails.nearestAvailableOutlet")}
                                 </span>
                               </div>}
                             <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
-                              {outlet?.location || "Location"}
+                              {outlet?.location || t("user.restaurantDetails.fallbackLocation")}
                             </h3>
                             <div className="flex items-center justify-between gap-4">
                               <div className="flex items-center gap-3 text-xs text-gray-600 dark:text-gray-400">
                                 <div className="flex items-center gap-1">
                                   <Clock className="h-3.5 w-3.5" />
-                                  <span>{outlet?.deliveryTime || "25-30 mins"}</span>
+                                  <span>{outlet?.deliveryTime || t("user.restaurantDetails.fallbackDeliveryTime")}</span>
                                 </div>
                                 <div className="flex items-center gap-1">
                                   <MapPin className="h-3.5 w-3.5" />
-                                  <span>{outlet?.distance || "1.2 km"}</span>
+                                  <span>{outlet?.distance || t("user.restaurantDetails.fallbackDistance")}</span>
                                 </div>
                               </div>
                               <div className="flex flex-col items-end gap-0.5">
@@ -2008,20 +2022,24 @@ export default function RestaurantDetails() {
                                   </span>
                                 </div>
                                 <span className="text-xs text-gray-500 dark:text-gray-400">
-                                  By {(outlet?.reviews || 0) >= 1000 ? `${((outlet.reviews || 0) / 1000).toFixed(1)}K+` : `${outlet?.reviews || 0}+`}
+                                  {t("user.restaurantDetails.byReviews", {
+                                count: (outlet?.reviews || 0) >= 1000 ? `${((outlet.reviews || 0) / 1000).toFixed(1)}K+` : `${outlet?.reviews || 0}+`
+                              })}
                                 </span>
                               </div>
                             </div>
                           </div>)}
                       </div> : <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                        No outlets available
+                        {t("user.restaurantDetails.noOutletsAvailable")}
                       </div>}
                   </div>
 
                   {/* Footer */}
                   {restaurant?.outlets && Array.isArray(restaurant.outlets) && restaurant.outlets.length > 5 && <div className="border-t border-gray-200 dark:border-gray-800 px-4 py-3 bg-white dark:bg-[#1a1a1a]">
                       <button className="flex items-center justify-center gap-2 text-red-600 dark:text-red-400 font-medium text-sm w-full">
-                        <span>See all {restaurant.outlets.length} outlets</span>
+                        <span>{t("user.restaurantDetails.seeAllOutlets", {
+                      count: restaurant.outlets.length
+                    })}</span>
                         <ChevronDown className="h-4 w-4" />
                       </button>
                     </div>}
@@ -2058,7 +2076,7 @@ export default function RestaurantDetails() {
         }}>
                   {/* Header */}
                   <div className="flex items-center justify-between px-4 pt-6 pb-4 border-b border-gray-200 dark:border-gray-800">
-                    <h2 className="text-lg font-bold text-gray-900 dark:text-white">Manage Collections</h2>
+                    <h2 className="text-lg font-bold text-gray-900 dark:text-white">{t("user.restaurantDetails.manageCollections")}</h2>
                     <button onClick={() => setShowManageCollections(false)} className="h-8 w-8 rounded-full bg-gray-700 dark:bg-gray-600 flex items-center justify-center hover:bg-gray-800 dark:hover:bg-gray-700 transition-colors">
                       <X className="h-4 w-4 text-white" />
                     </button>
@@ -2076,7 +2094,7 @@ export default function RestaurantDetails() {
                       </div>
                       <div className="flex-1 text-left">
                         <div className="flex items-center justify-between">
-                          <span className="text-base font-medium text-gray-900 dark:text-white">Bookmarks</span>
+                          <span className="text-base font-medium text-gray-900 dark:text-white">{t("user.restaurantDetails.bookmarks")}</span>
                           {selectedItem && <Checkbox checked={isDishFavorite(selectedItem.id, restaurant?.restaurantId || restaurant?._id || restaurant?.id)} onCheckedChange={checked => {
                     if (!checked && selectedItem) {
                       const restaurantId = restaurant?.restaurantId || restaurant?._id || restaurant?.id;
@@ -2088,9 +2106,10 @@ export default function RestaurantDetails() {
                               <Check className="h-3 w-3 text-white" />
                             </div>}
                         </div>
-                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                          {getDishFavorites().length} dishes • {getFavorites().length} restaurant
-                        </p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{t("user.restaurantDetails.bookmarksSummary", {
+                      dishes: getDishFavorites().length,
+                      restaurants: getFavorites().length
+                    })}</p>
                       </div>
                     </button>
 
@@ -2101,7 +2120,7 @@ export default function RestaurantDetails() {
                       </div>
                       <div className="flex-1 text-left">
                         <span className="text-base font-medium text-gray-900 dark:text-white">
-                          Create new Collection
+                          {t("user.restaurantDetails.createNewCollection")}
                         </span>
                       </div>
                     </button>
@@ -2112,7 +2131,7 @@ export default function RestaurantDetails() {
                     <Button className="w-full bg-gray-300 dark:bg-gray-700 hover:bg-gray-400 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 py-3 rounded-lg font-medium" onClick={() => {
               setShowManageCollections(false);
             }}>
-                      Done
+                      {t("user.restaurantDetails.done")}
                     </Button>
                   </div>
                 </motion.div>
@@ -2167,7 +2186,7 @@ export default function RestaurantDetails() {
                   {/* Image Section */}
                   <div className="relative w-full h-64 overflow-hidden rounded-t-3xl">
                     {selectedItem.image ? <img src={selectedItem.image} alt={selectedItem.name} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
-                        <span className="text-sm text-gray-400">No image available</span>
+                        <span className="text-sm text-gray-400">{t("user.restaurantDetails.noImageAvailable")}</span>
                       </div>}
                     {/* Bookmark and Share Icons Overlay */}
                     <div className="absolute bottom-4 right-4 flex items-center gap-3">
@@ -2222,13 +2241,13 @@ export default function RestaurantDetails() {
                 }} />
                         </div>
                         <span className="text-xs text-gray-600 dark:text-gray-400 font-medium whitespace-nowrap">
-                          highly reordered
+                          {t("user.restaurantDetails.highlyReordered")}
                         </span>
                       </div>}
 
                     {/* Not Eligible for Coupons */}
                     {selectedItem.notEligibleForCoupons && <p className="text-xs text-gray-500 dark:text-gray-400 font-medium mb-4">
-                        NOT ELIGIBLE FOR COUPONS
+                        {t("user.restaurantDetails.notEligibleForCoupons")}
                       </p>}
                   </div>
 
@@ -2263,7 +2282,7 @@ export default function RestaurantDetails() {
                   setShowItemDetail(false);
                 }
               }} disabled={shouldShowGrayscale}>
-                        <span>Add item</span>
+                        <span>{t("user.restaurantDetails.addItem")}</span>
                         <div className="flex items-center gap-1">
                           {selectedItem.originalPrice && selectedItem.originalPrice > selectedItem.price && <span className="text-sm line-through text-red-200">
                               ₹{Math.round(selectedItem.originalPrice)}
@@ -2311,7 +2330,9 @@ export default function RestaurantDetails() {
                   {/* Header */}
                   <div className="px-4 pt-6 pb-4 border-b border-gray-200 dark:border-gray-800">
                     <h2 className="text-lg font-bold text-gray-900 dark:text-white">
-                      Offers at {restaurant?.name || "Unknown Restaurant"}
+                      {t("user.restaurantDetails.offersAt", {
+                    restaurant: restaurant?.name || t("user.restaurantDetails.unknownRestaurant")
+                  })}
                     </h2>
                   </div>
 
@@ -2320,24 +2341,24 @@ export default function RestaurantDetails() {
                     {/* Gold Exclusive Offer Section */}
                     {restaurant?.restaurantOffers?.goldOffer && <div className="mb-6">
                         <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
-                          {restaurant.restaurantOffers.goldOffer?.title || "Gold exclusive offer"}
+                          {restaurant.restaurantOffers.goldOffer?.title || t("user.restaurantDetails.goldExclusiveOffer")}
                         </h3>
                         <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 flex items-start justify-between gap-4">
                           <div className="flex items-start gap-3 flex-1">
                             <Lock className="h-5 w-5 text-yellow-600 dark:text-yellow-500 flex-shrink-0 mt-0.5" />
                             <div className="flex-1">
                               <p className="text-sm font-medium text-gray-900 dark:text-white mb-1">
-                                {restaurant.restaurantOffers.goldOffer?.description || "Free delivery above ₹99"}
+                                {restaurant.restaurantOffers.goldOffer?.description || t("user.restaurantDetails.freeDeliveryAbove99")}
                               </p>
                               <p className="text-xs text-gray-500 dark:text-gray-400">
-                                {restaurant.restaurantOffers.goldOffer?.unlockText || "join Gold to unlock"}
+                                {restaurant.restaurantOffers.goldOffer?.unlockText || t("user.restaurantDetails.joinGoldToUnlock")}
                               </p>
                             </div>
                           </div>
                           <Button className="bg-red-500 hover:bg-red-600 text-white text-sm px-4 py-2 rounded-lg whitespace-nowrap" onClick={() => {
                   // Handle add gold
                 }}>
-                            {restaurant.restaurantOffers.goldOffer?.buttonText || "Add Gold - ₹1"}
+                            {restaurant.restaurantOffers.goldOffer?.buttonText || t("user.restaurantDetails.addGold")}
                           </Button>
                         </div>
                       </div>}
@@ -2345,7 +2366,7 @@ export default function RestaurantDetails() {
                     {/* Restaurant Coupons Section */}
                     {restaurant?.restaurantOffers?.coupons && Array.isArray(restaurant.restaurantOffers.coupons) && restaurant.restaurantOffers.coupons.length > 0 && <div>
                         <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
-                          Restaurant coupons
+                          {t("user.restaurantDetails.restaurantCoupons")}
                         </h3>
                         <div className="space-y-3">
                           {restaurant.restaurantOffers.coupons.map(coupon => {
@@ -2368,7 +2389,9 @@ export default function RestaurantDetails() {
                                       {coupon.title}
                                     </p>
                                     <p className="text-xs text-gray-500 dark:text-gray-400">
-                                      Use code {coupon.code}
+                                      {t("user.restaurantDetails.useCode", {
+                                    code: coupon.code
+                                  })}
                                     </p>
                                   </div>
                                   <div className="flex items-center gap-2">
@@ -2384,7 +2407,7 @@ export default function RestaurantDetails() {
                                 </button>
                                 {isExpanded && <div className="px-4 pb-4 pt-2 border-t border-gray-100 dark:border-gray-800">
                                     <p className="text-xs text-gray-600 dark:text-gray-400">
-                                      Terms and conditions apply
+                                      {t("user.restaurantDetails.termsApply")}
                                     </p>
                                   </div>}
                               </div>;
@@ -2397,7 +2420,7 @@ export default function RestaurantDetails() {
                   <div className="border-t border-gray-200 dark:border-gray-800 px-4 py-4 bg-white dark:bg-[#1a1a1a]">
                     <Button variant="outline" className="w-full bg-gray-800 dark:bg-gray-700 hover:bg-gray-900 dark:hover:bg-gray-600 text-white border-0 flex items-center justify-center gap-2 py-3 rounded-lg" onClick={() => setShowOffersSheet(false)}>
                       <X className="h-5 w-5" />
-                      Close
+                      {t("user.restaurantDetails.close")}
                     </Button>
                   </div>
                 </motion.div>
@@ -2436,7 +2459,7 @@ export default function RestaurantDetails() {
                   {/* Header */}
                   <div className="px-4 pt-6 pb-4 border-b border-gray-200 dark:border-gray-800">
                     <h2 className="text-lg font-bold text-gray-900 dark:text-white">
-                      {restaurant?.name || "Unknown Restaurant"}
+                      {restaurant?.name || t("user.restaurantDetails.unknownRestaurant")}
                     </h2>
                   </div>
 
@@ -2448,14 +2471,14 @@ export default function RestaurantDetails() {
                       <button className="w-full flex items-center gap-4 px-2 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors text-left" onClick={handleAddToCollection}>
                         <Bookmark className="h-5 w-5 text-gray-700 dark:text-gray-300" />
                         <span className="text-base text-gray-900 dark:text-white">
-                          {isFavorite(restaurant?.slug || slug || "") ? "Remove from Collection" : "Add to Collection"}
+                          {isFavorite(restaurant?.slug || slug || "") ? t("user.restaurantDetails.removeFromCollection") : t("user.restaurantDetails.addToCollection")}
                         </span>
                       </button>
 
                       {/* Share this restaurant */}
                       <button className="w-full flex items-center gap-4 px-2 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors text-left" onClick={handleShareRestaurant}>
                         <Share2 className="h-5 w-5 text-gray-700 dark:text-gray-300" />
-                        <span className="text-base text-gray-900 dark:text-white">Share this restaurant</span>
+                        <span className="text-base text-gray-900 dark:text-white">{t("user.restaurantDetails.shareThisRestaurant")}</span>
                       </button>
 
                     </div>
@@ -2463,7 +2486,7 @@ export default function RestaurantDetails() {
                     {/* Disclaimer Text */}
                     <div className="mt-6 px-2">
                       <p className="text-xs text-gray-500 leading-relaxed">
-                        Menu items, prices, photos and descriptions are set directly by the restaurant. In case you see any incorrect information, please report it to us.
+                        {t("user.restaurantDetails.disclaimer")}
                       </p>
                     </div>
                   </div>

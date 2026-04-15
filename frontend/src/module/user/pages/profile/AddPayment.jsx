@@ -6,10 +6,12 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useProfile } from "../../context/ProfileContext"
+import { useTranslation } from "react-i18next"
 
 export default function AddPayment() {
   const navigate = useNavigate()
   const { addPaymentMethod } = useProfile()
+  const { t } = useTranslation()
   const [formData, setFormData] = useState({
     cardNumber: "",
     cardHolder: "",
@@ -46,19 +48,19 @@ export default function AddPayment() {
       !formData.expiryYear ||
       !formData.cvv
     ) {
-      alert("Please fill in all required fields")
+      alert(t("user.payments.alerts.requiredFields"))
       return
     }
 
     // Validate card number (should be 4 digits for last 4)
     if (formData.cardNumber.length !== 4 || !/^\d+$/.test(formData.cardNumber)) {
-      alert("Please enter the last 4 digits of your card")
+      alert(t("user.payments.alerts.last4Digits"))
       return
     }
 
     // Validate CVV
     if (formData.cvv.length < 3 || !/^\d+$/.test(formData.cvv)) {
-      alert("Please enter a valid CVV")
+      alert(t("user.payments.alerts.validCvv"))
       return
     }
 
@@ -71,16 +73,16 @@ export default function AddPayment() {
       <div className="max-w-2xl md:max-w-3xl lg:max-w-4xl xl:max-w-5xl mx-auto space-y-6 md:space-y-8 lg:space-y-10">
         <Card>
           <CardHeader>
-            <CardTitle className="text-xl sm:text-2xl md:text-3xl">Add Payment Method</CardTitle>
+            <CardTitle className="text-xl sm:text-2xl md:text-3xl">{t("user.payments.add.title")}</CardTitle>
           </CardHeader>
           <CardContent className="p-4 sm:p-5 md:p-6 lg:p-8">
             <form onSubmit={handleSubmit} className="space-y-4 md:space-y-5 lg:space-y-6">
               <div className="space-y-2">
-                <Label htmlFor="cardNumber">Last 4 Digits of Card Number *</Label>
+                <Label htmlFor="cardNumber">{t("user.payments.fields.last4Digits")}</Label>
                 <Input
                   id="cardNumber"
                   name="cardNumber"
-                  placeholder="1234"
+                  placeholder={t("user.payments.placeholders.cardNumber")}
                   value={formData.cardNumber}
                   onChange={handleChange}
                   maxLength={4}
@@ -88,11 +90,11 @@ export default function AddPayment() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="cardHolder">Cardholder Name *</Label>
+                <Label htmlFor="cardHolder">{t("user.payments.fields.cardholderName")}</Label>
                 <Input
                   id="cardHolder"
                   name="cardHolder"
-                  placeholder="John Doe"
+                  placeholder={t("user.payments.placeholders.cardholderName")}
                   value={formData.cardHolder}
                   onChange={handleChange}
                   required
@@ -100,11 +102,11 @@ export default function AddPayment() {
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-5">
                 <div className="space-y-2">
-                  <Label htmlFor="expiryMonth">Expiry Month *</Label>
+                  <Label htmlFor="expiryMonth">{t("user.payments.fields.expiryMonth")}</Label>
                   <Input
                     id="expiryMonth"
                     name="expiryMonth"
-                    placeholder="12"
+                    placeholder={t("user.payments.placeholders.expiryMonth")}
                     value={formData.expiryMonth}
                     onChange={handleChange}
                     maxLength={2}
@@ -112,11 +114,11 @@ export default function AddPayment() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="expiryYear">Expiry Year *</Label>
+                  <Label htmlFor="expiryYear">{t("user.payments.fields.expiryYear")}</Label>
                   <Input
                     id="expiryYear"
                     name="expiryYear"
-                    placeholder="2025"
+                    placeholder={t("user.payments.placeholders.expiryYear")}
                     value={formData.expiryYear}
                     onChange={handleChange}
                     maxLength={4}
@@ -124,11 +126,11 @@ export default function AddPayment() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="cvv">CVV *</Label>
+                  <Label htmlFor="cvv">{t("user.payments.fields.cvv")}</Label>
                   <Input
                     id="cvv"
                     name="cvv"
-                    placeholder="123"
+                    placeholder={t("user.payments.placeholders.cvv")}
                     value={formData.cvv}
                     onChange={handleChange}
                     maxLength={4}
@@ -143,10 +145,10 @@ export default function AddPayment() {
                   onClick={() => navigate("/user/profile/payments")}
                   variant="outline"
                 >
-                  Cancel
+                  {t("user.payments.actions.cancel")}
                 </Button>
                 <Button type="submit" className="flex-1">
-                  Save Payment Method
+                  {t("user.payments.actions.savePaymentMethod")}
                 </Button>
               </div>
             </form>
@@ -156,4 +158,3 @@ export default function AddPayment() {
     </AnimatedPage>
   )
 }
-

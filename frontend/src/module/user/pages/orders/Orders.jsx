@@ -83,6 +83,16 @@ export default function Orders() {
     return status || 'confirmed';
   };
 
+  const getPaymentStatusLabel = status => {
+    const normalized = String(status || "").toLowerCase();
+    if (normalized === "completed") return t("user.orders.paymentStatus.completed");
+    if (normalized === "failed") return t("user.orders.paymentStatus.failed");
+    if (normalized === "pending") return t("user.orders.paymentStatus.pending");
+    if (normalized === "refunded") return t("user.orders.paymentStatus.refunded");
+    if (normalized === "processing") return t("user.orders.paymentStatus.processing");
+    return t("user.orders.paymentStatus.unknown");
+  };
+
   // Auto-show rating popup when order is delivered (only once per order)
   useEffect(() => {
     if (orders.length === 0 || ratingModal.open) {
@@ -176,7 +186,7 @@ export default function Orders() {
               address: order.address || {},
               items: (order.items || []).map(item => ({
                 itemId: item.itemId || item._id || item.id,
-                name: item.name || item.foodName || 'Item',
+                name: item.name || item.foodName || t("user.orders.itemFallback"),
                 quantity: item.quantity || 1,
                 price: item.price || 0,
                 image: item.image || null,
@@ -193,7 +203,7 @@ export default function Orders() {
               // Keep full pricing object for discounts, coupons
               payment: order.payment || {},
               paymentMethod: order.payment?.method || order.paymentMethod,
-              restaurant: order.restaurantId?.name || order.restaurantName || 'Restaurant',
+              restaurant: order.restaurantId?.name || order.restaurantName || t("user.orders.restaurantFallback"),
               restaurantId: order.restaurantId?._id || order.restaurantId,
               restaurantImage: order.restaurantId?.profileImage?.url || order.restaurantId?.profileImage || null,
               restaurantLocation: order.restaurantId?.location?.area || order.restaurantId?.location?.city || order.address?.city || '',
@@ -247,7 +257,7 @@ export default function Orders() {
     }, 20000); // Poll every 20 seconds
 
     return () => clearInterval(pollInterval);
-  }, []);
+  }, [t]);
 
   // Format date helper
   const formatDate = dateString => {
@@ -573,7 +583,7 @@ export default function Orders() {
                           {order.payment.method === 'cash' || order.payment.method === 'cod' ? t("user.orders.paymentMethod.cashOnDelivery") : order.payment.method === 'wallet' ? t("user.orders.paymentMethod.wallet") : order.payment.method === 'razorpay' ? t("user.orders.paymentMethod.online") : order.payment.method || t("user.orders.paymentMethod.na")}
                         </span>
                         {order.payment.status && <span className={`ml-2 px-1.5 py-0.5 rounded text-[10px] font-medium ${order.payment.status === 'completed' ? 'bg-green-100 text-green-700' : order.payment.status === 'failed' ? 'bg-red-100 text-red-700' : order.payment.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-700'}`}>
-                            {order.payment.status}
+                            {getPaymentStatusLabel(order.payment.status)}
                           </span>}
                       </p>}
                     {isDelivered && !paymentFailed && <p className="text-xs font-medium text-green-600 mt-1">{t("user.orders.status.deliveredWithIcon")}</p>}
@@ -643,7 +653,7 @@ export default function Orders() {
 
       {/* Footer Branding */}
       <div className="flex justify-center mt-8 mb-4">
-        <h1 className="text-4xl font-black text-gray-200 tracking-tighter italic">appzeto</h1>
+        <h1 className="text-4xl font-black text-gray-200 tracking-tighter italic">{t("user.orders.brandName")}</h1>
       </div>
 
       {/* Rating & Feedback Modal */}

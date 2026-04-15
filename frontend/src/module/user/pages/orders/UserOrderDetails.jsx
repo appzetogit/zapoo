@@ -7,8 +7,10 @@ import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { getCompanyNameAsync } from "@/lib/utils/businessSettings";
 import GstBreakdownDialog from "../../components/GstBreakdownDialog";
+import { useTranslation } from "react-i18next";
 export default function UserOrderDetails() {
   const navigate = useNavigate();
+  const { t, i18n } = useTranslation();
   const {
     orderId
   } = useParams();
@@ -29,7 +31,7 @@ export default function UserOrderDetails() {
         } else if (response?.data?.order) {
           orderData = response.data.order;
         } else {
-          toast.error("Order not found");
+          toast.error(t("user.orderDetailsPage.orderNotFound"));
           navigate("/user/orders");
           return;
         }
@@ -52,35 +54,35 @@ export default function UserOrderDetails() {
         }
       } catch (error) {
         console.error("Error fetching order details:", error);
-        toast.error(error?.response?.data?.message || "Failed to load order details");
+        toast.error(error?.response?.data?.message || t("user.orderDetailsPage.failedToLoadOrderDetails"));
         navigate("/user/orders");
       } finally {
         setLoading(false);
       }
     };
     fetchOrderDetails();
-  }, [orderId, navigate]);
+  }, [orderId, navigate, t]);
   const handleCopyOrderId = async () => {
     if (!order) return;
     const id = order.orderId || order._id || orderId;
     try {
       await navigator.clipboard.writeText(String(id));
-      toast.success("Order ID copied");
+      toast.success(t("user.orderDetailsPage.toast.orderIdCopied"));
     } catch {
-      toast.error("Failed to copy Order ID");
+      toast.error(t("user.orderDetailsPage.toast.failedToCopyOrderId"));
     }
   };
   if (loading) {
     return <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <p className="text-gray-600 text-sm">Loading order details...</p>
+        <p className="text-gray-600 text-sm">{t("user.orderDetailsPage.loadingOrderDetails")}</p>
       </div>;
   }
   if (!order) {
     return <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center space-y-3">
-          <p className="text-gray-700 text-sm font-medium">Order not found</p>
+          <p className="text-gray-700 text-sm font-medium">{t("user.orderDetailsPage.orderNotFound")}</p>
           <button onClick={() => navigate("/user/orders")} className="px-4 py-2 rounded-lg bg-[#E23744] text-white text-sm font-semibold">
-            Back to Orders
+            {t("user.orderDetailsPage.backToOrders")}
           </button>
         </div>
       </div>;
@@ -88,7 +90,7 @@ export default function UserOrderDetails() {
   const orderIdDisplay = order.orderId || order._id || orderId;
   // Use fetched restaurant data if available, otherwise use order.restaurantId or order.restaurant
   const restaurantObj = restaurant || order.restaurantId || order.restaurant || {};
-  const restaurantName = order.restaurantName || restaurantObj.name || "Restaurant";
+  const restaurantName = order.restaurantName || restaurantObj.name || t("user.orderDetailsPage.restaurantFallback");
 
   // Build restaurant address (try restaurant fields first, then fall back)
   const restaurantLocation = (() => {
@@ -117,7 +119,7 @@ export default function UserOrderDetails() {
     if (order.restaurantAddress) return order.restaurantAddress;
 
     // Don't fallback to user delivery address - show empty or "Address not available"
-    return "Address not available";
+    return t("user.orderDetailsPage.addressNotAvailable");
   })();
   const items = Array.isArray(order.items) ? order.items : [];
   const pricing = order.pricing || {};
@@ -125,11 +127,11 @@ export default function UserOrderDetails() {
   const userPhone = order.userPhone || "";
   const paymentMethod = (() => {
     const m = (order.payment?.method || '').toLowerCase();
-    if (m === 'cash' || m === 'cod') return 'Cash on Delivery';
-    if (m === 'wallet') return 'Wallet';
-    return 'Online';
+    if (m === 'cash' || m === 'cod') return t("user.orderDetailsPage.paymentMethods.cashOnDelivery");
+    if (m === 'wallet') return t("user.orderDetailsPage.paymentMethods.wallet");
+    return t("user.orderDetailsPage.paymentMethods.online");
   })();
-  const paymentDate = order.createdAt ? new Date(order.createdAt).toLocaleString("en-IN", {
+  const paymentDate = order.createdAt ? new Date(order.createdAt).toLocaleString(i18n?.language === "hi" ? "hi-IN" : i18n?.language === "bn" ? "bn-BD" : "en-IN", {
     month: "long",
     day: "numeric",
     year: "numeric",
@@ -150,12 +152,12 @@ export default function UserOrderDetails() {
   const handleCallRestaurant = async () => {
     const businessOrderId = order.orderId || order._id || orderId;
     if (!businessOrderId) {
-      toast.error("Order ID not available");
+      toast.error(t("user.orderDetailsPage.toast.orderIdNotAvailable"));
       return;
     }
 
     if (order.status === "cancelled" || order.status === "delivered") {
-      toast.error("Calls are not allowed for cancelled or delivered orders");
+      toast.error(t("user.orderDetailsPage.toast.callsNotAllowed"));
       return;
     }
 
@@ -172,9 +174,9 @@ export default function UserOrderDetails() {
         orderId: businessOrderId,
         targetRole: "restaurant",
       });
-      toast.success("Call connecting to restaurant");
+      toast.success(t("user.orderDetailsPage.toast.callConnectingRestaurant"));
     } catch (error) {
-      toast.error(error?.response?.data?.message || "Failed to initiate masked call");
+      toast.error(error?.response?.data?.message || t("user.orderDetailsPage.toast.failedToInitiateMaskedCall"));
     } finally {
       setCallingRestaurant(false);
     }
@@ -183,12 +185,12 @@ export default function UserOrderDetails() {
   const handleCallDeliveryPartner = async () => {
     const businessOrderId = order.orderId || order._id || orderId;
     if (!businessOrderId) {
-      toast.error("Order ID not available");
+      toast.error(t("user.orderDetailsPage.toast.orderIdNotAvailable"));
       return;
     }
 
     if (order.status === "cancelled" || order.status === "delivered") {
-      toast.error("Calls are not allowed for cancelled or delivered orders");
+      toast.error(t("user.orderDetailsPage.toast.callsNotAllowed"));
       return;
     }
 
@@ -205,9 +207,9 @@ export default function UserOrderDetails() {
         orderId: businessOrderId,
         targetRole: "delivery_partner",
       });
-      toast.success("Call connecting to delivery partner");
+      toast.success(t("user.orderDetailsPage.toast.callConnectingDeliveryPartner"));
     } catch (error) {
-      toast.error(error?.response?.data?.message || "Failed to initiate masked call");
+      toast.error(error?.response?.data?.message || t("user.orderDetailsPage.toast.failedToInitiateMaskedCall"));
     } finally {
       setCallingDeliveryPartner(false);
     }
@@ -221,7 +223,9 @@ export default function UserOrderDetails() {
       // Title
       doc.setFontSize(16);
       doc.setFont('helvetica', 'bold');
-      doc.text(`${companyName} Order: Summary and Receipt`, 105, 20, {
+      doc.text(t("user.orderDetailsPage.pdf.summaryAndReceipt", {
+        companyName
+      }), 105, 20, {
         align: 'center'
       });
 
@@ -232,54 +236,54 @@ export default function UserOrderDetails() {
 
       // Order ID
       doc.setFont('helvetica', 'bold');
-      doc.text('Order ID:', 20, yPos);
+      doc.text(t("user.orderDetailsPage.pdf.orderId"), 20, yPos);
       doc.setFont('helvetica', 'normal');
       doc.text(orderIdDisplay, 60, yPos);
       yPos += 7;
 
       // Order Time
       doc.setFont('helvetica', 'bold');
-      doc.text('Order Time:', 20, yPos);
+      doc.text(t("user.orderDetailsPage.pdf.orderTime"), 20, yPos);
       doc.setFont('helvetica', 'normal');
-      const orderTimeLines = doc.splitTextToSize(paymentDate || 'N/A', 130);
+      const orderTimeLines = doc.splitTextToSize(paymentDate || t("user.orderDetailsPage.na"), 130);
       doc.text(orderTimeLines, 60, yPos);
       yPos += orderTimeLines.length * 7;
 
       // Customer Name
       doc.setFont('helvetica', 'bold');
-      doc.text('Customer Name:', 20, yPos);
+      doc.text(t("user.orderDetailsPage.pdf.customerName"), 20, yPos);
       doc.setFont('helvetica', 'normal');
-      doc.text(userName || 'Customer', 60, yPos);
+      doc.text(userName || t("user.orderDetailsPage.customer"), 60, yPos);
       yPos += 7;
 
       // Delivery Address
       doc.setFont('helvetica', 'bold');
-      doc.text('Delivery Address:', 20, yPos);
+      doc.text(t("user.orderDetailsPage.pdf.deliveryAddress"), 20, yPos);
       doc.setFont('helvetica', 'normal');
-      const addressLines = doc.splitTextToSize(addressText || 'N/A', 130);
+      const addressLines = doc.splitTextToSize(addressText || t("user.orderDetailsPage.na"), 130);
       doc.text(addressLines, 60, yPos);
       yPos += addressLines.length * 7;
 
       // Restaurant Name
       doc.setFont('helvetica', 'bold');
-      doc.text('Restaurant Name:', 20, yPos);
+      doc.text(t("user.orderDetailsPage.pdf.restaurantName"), 20, yPos);
       doc.setFont('helvetica', 'normal');
       doc.text(restaurantName, 60, yPos);
       yPos += 7;
 
       // Restaurant Address
       doc.setFont('helvetica', 'bold');
-      doc.text('Restaurant Address:', 20, yPos);
+      doc.text(t("user.orderDetailsPage.pdf.restaurantAddress"), 20, yPos);
       doc.setFont('helvetica', 'normal');
-      const restaurantAddressLines = doc.splitTextToSize(restaurantLocation || 'N/A', 130);
+      const restaurantAddressLines = doc.splitTextToSize(restaurantLocation || t("user.orderDetailsPage.na"), 130);
       doc.text(restaurantAddressLines, 60, yPos);
       yPos += restaurantAddressLines.length * 7 + 5;
 
       // Items table
-      const tableData = items.map(item => [item.name || 'Item', String(item.quantity || item.qty || 1), `₹${Number(item.price || 0).toFixed(2)}`, `₹${Number((item.price || 0) * (item.quantity || item.qty || 1)).toFixed(2)}`]);
+      const tableData = items.map(item => [item.name || t("user.orderDetailsPage.item"), String(item.quantity || item.qty || 1), `₹${Number(item.price || 0).toFixed(2)}`, `₹${Number((item.price || 0) * (item.quantity || item.qty || 1)).toFixed(2)}`]);
       autoTable(doc, {
         startY: yPos,
-        head: [['Item', 'Quantity', 'Unit Price', 'Total Price']],
+        head: [[t("user.orderDetailsPage.pdf.item"), t("user.orderDetailsPage.pdf.quantity"), t("user.orderDetailsPage.pdf.unitPrice"), t("user.orderDetailsPage.pdf.totalPrice")]],
         body: tableData,
         theme: 'striped',
         headStyles: {
@@ -317,7 +321,7 @@ export default function UserOrderDetails() {
       // Total
       doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
-      doc.text('Total:', 145, finalY + 10, {
+      doc.text(t("user.orderDetailsPage.pdf.total"), 145, finalY + 10, {
         align: 'right'
       });
       doc.text(`₹${Number(pricing.total || 0).toFixed(2)}`, 195, finalY + 10, {
@@ -327,10 +331,10 @@ export default function UserOrderDetails() {
       // Save PDF instantly
       const fileName = `Order_Summary_${orderIdDisplay}_${Date.now()}.pdf`;
       doc.save(fileName);
-      toast.success("Summary downloaded successfully!");
+      toast.success(t("user.orderDetailsPage.toast.summaryDownloaded"));
     } catch (error) {
       console.error("Error generating PDF:", error);
-      toast.error("Failed to download summary");
+      toast.error(t("user.orderDetailsPage.toast.failedToDownloadSummary"));
     }
   };
   return <div className="min-h-screen bg-gray-50 pb-24 font-sans relative">
@@ -340,7 +344,7 @@ export default function UserOrderDetails() {
           <button type="button" onClick={() => navigate(-1)} className="p-1 rounded-full hover:bg-gray-100">
             <ArrowLeft className="w-6 h-6 text-gray-700 cursor-pointer" />
           </button>
-          <h1 className="text-lg font-semibold text-gray-800">Order Details</h1>
+          <h1 className="text-lg font-semibold text-gray-800">{t("user.orderDetailsPage.title")}</h1>
         </div>
       </div>
 
@@ -353,7 +357,9 @@ export default function UserOrderDetails() {
           </div>
           <div>
             <h2 className="font-semibold text-gray-800">
-              {order.status === "delivered" ? "Order was delivered" : "Order status: " + (order.status || "Processing")}
+              {order.status === "delivered" ? t("user.orderDetailsPage.orderWasDelivered") : t("user.orderDetailsPage.orderStatusWithValue", {
+              status: order.status || t("user.orderDetailsPage.processing")
+            })}
             </h2>
           </div>
         </div>
@@ -376,7 +382,7 @@ export default function UserOrderDetails() {
                 type="button"
                 onClick={handleCallRestaurant}
                 disabled={callingRestaurant}
-                title="Call restaurant via masked number"
+                title={t("user.orderDetailsPage.callRestaurantMasked")}
                 className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center text-[#E23744] hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Phone className="w-4 h-4" />
@@ -386,7 +392,7 @@ export default function UserOrderDetails() {
                   type="button"
                   onClick={handleCallDeliveryPartner}
                   disabled={callingDeliveryPartner}
-                  title="Call delivery partner via masked number"
+                  title={t("user.orderDetailsPage.callDeliveryPartnerMasked")}
                   className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center text-green-600 hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Phone className="w-4 h-4" />
@@ -397,7 +403,9 @@ export default function UserOrderDetails() {
 
           <div className="flex items-center gap-2 mb-4">
             <span className="text-xs text-gray-500 uppercase tracking-wide font-medium">
-              Order ID: #{orderIdDisplay}
+              {t("user.orderDetailsPage.orderIdLabel", {
+              id: orderIdDisplay
+            })}
             </span>
             <button type="button" onClick={handleCopyOrderId}>
               <Copy className="w-3 h-3 text-gray-400 cursor-pointer" />
@@ -427,7 +435,7 @@ export default function UserOrderDetails() {
           <div className="p-4 flex justify-between items-center border-b border-gray-100">
             <div className="flex items-center gap-2">
               <FileText className="w-5 h-5 text-gray-600" />
-              <h3 className="font-semibold text-gray-800">Bill Summary</h3>
+              <h3 className="font-semibold text-gray-800">{t("user.orderDetailsPage.billSummary")}</h3>
             </div>
             <button type="button" onClick={handleDownloadSummary} className="w-7 h-7 rounded-full bg-red-50 flex items-center justify-center text-[#E23744] hover:bg-red-100">
               <Download className="w-4 h-4" />
@@ -436,7 +444,7 @@ export default function UserOrderDetails() {
 
           <div className="p-4 space-y-2 text-sm">
             <div className="flex justify-between">
-              <span className="text-gray-500">Item total</span>
+              <span className="text-gray-500">{t("user.orderDetailsPage.itemTotal")}</span>
               <div>
                 {pricing.originalItemTotal && <span className="text-gray-400 line-through mr-1">
                     ₹{Number(pricing.originalItemTotal).toFixed(2)}
@@ -451,37 +459,37 @@ export default function UserOrderDetails() {
               onClick={() => setShowGstBreakdown(true)}
               className="flex w-full justify-between text-left"
             >
-              <span className="text-gray-500 underline underline-offset-4 decoration-dotted">GST (govt. taxes)</span>
+              <span className="text-gray-500 underline underline-offset-4 decoration-dotted">{t("user.orderDetailsPage.gstGovTaxes")}</span>
               <span className="text-gray-800">
                 ₹{Number(pricing.tax || 0).toFixed(2)}
               </span>
             </button>
             <div className="flex justify-between">
-              <span className="text-gray-500">Delivery partner fee</span>
+              <span className="text-gray-500">{t("user.orderDetailsPage.deliveryPartnerFee")}</span>
               <div>
                 {pricing.originalDeliveryFee && <span className="text-gray-400 line-through mr-1">
                     ₹{Number(pricing.originalDeliveryFee).toFixed(2)}
                   </span>}
                 <span className="text-blue-500 font-medium uppercase">
-                  {pricing.deliveryFee ? `₹${Number(pricing.deliveryFee).toFixed(2)}` : "Free"}
+                  {pricing.deliveryFee ? `₹${Number(pricing.deliveryFee).toFixed(2)}` : t("user.orderDetailsPage.free")}
                 </span>
               </div>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-500">Platform fee</span>
+              <span className="text-gray-500">{t("user.orderDetailsPage.platformFee")}</span>
               <span className="text-gray-800">
                 ₹{Number(pricing.platformFee || 0).toFixed(2)}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-500">Subscription / other fees</span>
+              <span className="text-gray-500">{t("user.orderDetailsPage.subscriptionOtherFees")}</span>
               <span className="text-gray-800">
                 ₹{Number(pricing.subscriptionFee || 0).toFixed(2)}
               </span>
             </div>
 
             <div className="border-t border-gray-100 my-2 pt-2 flex justify-between items-center">
-              <span className="font-bold text-gray-800">Paid</span>
+              <span className="font-bold text-gray-800">{t("user.orderDetailsPage.paid")}</span>
               <span className="font-bold text-gray-800">
                 ₹{Number(pricing.total || 0).toFixed(2)}
               </span>
@@ -499,7 +507,9 @@ export default function UserOrderDetails() {
               <div className="flex items-center justify-center gap-2 pt-1 text-blue-600 font-bold text-sm">
                 <span>🎉</span>
                 <span>
-                  You saved ₹{Number(savings).toFixed(2)} on this order!
+                  {t("user.orderDetailsPage.savedOnOrder", {
+                  amount: Number(savings).toFixed(2)
+                })}
                 </span>
               </div>
             </div>}
@@ -525,7 +535,7 @@ export default function UserOrderDetails() {
             </div>
             <div>
               <h4 className="font-semibold text-gray-800 text-sm">
-                {userName || "Customer"}
+                {userName || t("user.orderDetailsPage.customer")}
               </h4>
               <p className="text-gray-500 text-xs">{userPhone}</p>
             </div>
@@ -538,10 +548,12 @@ export default function UserOrderDetails() {
             </div>
             <div>
               <h4 className="font-semibold text-gray-800 text-sm">
-                Payment method
+                {t("user.orderDetailsPage.paymentMethod")}
               </h4>
               <p className="text-gray-500 text-xs mt-0.5">
-                Paid via: {paymentMethod}
+                {t("user.orderDetailsPage.paidViaWithValue", {
+                method: paymentMethod
+              })}
               </p>
             </div>
           </div>
@@ -553,7 +565,7 @@ export default function UserOrderDetails() {
             </div>
             <div>
               <h4 className="font-semibold text-gray-800 text-sm">
-                Payment date
+                {t("user.orderDetailsPage.paymentDate")}
               </h4>
               <p className="text-gray-500 text-xs mt-0.5">{paymentDate}</p>
             </div>
@@ -566,10 +578,10 @@ export default function UserOrderDetails() {
             </div>
             <div>
               <h4 className="font-semibold text-gray-800 text-sm">
-                Delivery address
+                {t("user.orderDetailsPage.deliveryAddress")}
               </h4>
               <p className="text-gray-500 text-xs mt-0.5 leading-relaxed">
-                {addressText || "Address not available"}
+                {addressText || t("user.orderDetailsPage.addressNotAvailable")}
               </p>
             </div>
           </div>
@@ -580,11 +592,11 @@ export default function UserOrderDetails() {
       <div className="fixed bottom-0 w-full bg-white border-t border-gray-200 p-4 flex gap-3 z-20">
         <button type="button" onClick={() => navigate(`/user/restaurants/${order.restaurantId || ""}`)} className="flex-1 bg-[#E23744] text-white py-3 rounded-lg font-semibold flex items-center justify-center gap-2 hover:bg-red-600 transition-colors">
           <RotateCcw className="w-4 h-4" />
-          Reorder
+          {t("user.orderDetailsPage.reorder")}
         </button>
         <button type="button" onClick={handleDownloadSummary} className="flex-1 bg-white border border-[#E23744] text-[#E23744] py-3 rounded-lg font-semibold flex items-center justify-center gap-2 hover:bg-red-50 transition-colors">
           <Download className="w-4 h-4" />
-          Invoice
+          {t("user.orderDetailsPage.invoice")}
         </button>
       </div>
 
@@ -602,7 +614,7 @@ export default function UserOrderDetails() {
             } : null,
             routeOrderId: orderId
           });
-          toast.error("Order ID not available. Please refresh the page.");
+          toast.error(t("user.orderDetailsPage.toast.orderIdNotAvailableRefresh"));
           return;
         }
 
@@ -611,7 +623,7 @@ export default function UserOrderDetails() {
         navigate(`/user/complaints/submit/${encodeURIComponent(orderIdString)}`);
       }} className="w-full bg-orange-50 border border-orange-200 text-orange-700 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 hover:bg-orange-100 transition-colors">
             <FileText className="w-4 h-4" />
-            Restaurant Complaint
+            {t("user.orderDetailsPage.restaurantComplaint")}
           </button>
         </div>}
     </div>;

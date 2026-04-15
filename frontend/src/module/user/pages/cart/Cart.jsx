@@ -29,11 +29,17 @@ import { useTranslation } from "react-i18next";
  * @param {Object} address - Address object with street, additionalDetails, city, state, zipCode, or formattedAddress
  * @returns {String} Formatted address string
  */
-const formatFullAddress = address => {
+const formatFullAddress = (address, locationPlaceholder = "Select location") => {
   if (!address) return "";
 
+  const isLocationPlaceholder = value => {
+    const normalized = String(value || "").trim().toLowerCase();
+    if (!normalized) return true;
+    return normalized === "select location" || normalized === String(locationPlaceholder || "").trim().toLowerCase();
+  };
+
   // Priority 1: Use formattedAddress if available (for live location addresses)
-  if (address.formattedAddress && address.formattedAddress !== "Select location") {
+  if (address.formattedAddress && !isLocationPlaceholder(address.formattedAddress)) {
     return address.formattedAddress;
   }
 
@@ -49,7 +55,7 @@ const formatFullAddress = address => {
   }
 
   // Priority 3: Use address field if available
-  if (address.address && address.address !== "Select location") {
+  if (address.address && !isLocationPlaceholder(address.address)) {
     return address.address;
   }
   return "";
@@ -106,6 +112,7 @@ const getCouponIdentity = coupon => {
 
 export default function Cart() {
   const { t } = useTranslation();
+  const locationPlaceholderText = t("user.locationDisplay.selectLocation");
   const navigate = useNavigate();
 
   // Defensive check: Ensure CartProvider is available
@@ -229,7 +236,10 @@ export default function Cart() {
   const savedAddress = getDefaultAddress();
   // Priority: Use live location if available, otherwise use saved address; always normalize coords for pricing API
   const defaultAddress = useMemo(() => {
-    const merged = currentLocation?.formattedAddress && currentLocation.formattedAddress !== "Select location" ? {
+    const normalizedCurrentFormatted = String(currentLocation?.formattedAddress || "").trim().toLowerCase();
+    const normalizedPlaceholder = String(locationPlaceholderText || "").trim().toLowerCase();
+    const hasLiveFormattedAddress = !!currentLocation?.formattedAddress && normalizedCurrentFormatted !== "select location" && normalizedCurrentFormatted !== normalizedPlaceholder;
+    const merged = hasLiveFormattedAddress ? {
       ...savedAddress,
       formattedAddress: currentLocation.formattedAddress,
       address: currentLocation.address || currentLocation.formattedAddress,
@@ -242,7 +252,7 @@ export default function Cart() {
       } : savedAddress?.location
     } : savedAddress;
     return normalizeDeliveryAddressForOrder(merged);
-  }, [savedAddress, currentLocation]);
+  }, [savedAddress, currentLocation, locationPlaceholderText]);
   const defaultPayment = getDefaultPaymentMethod();
 
   useEffect(() => {
@@ -533,7 +543,10 @@ export default function Cart() {
                   discount: coupon.originalPrice - coupon.discountedPrice,
                   discountPercentage: coupon.discountPercentage,
                   minOrder: coupon.minOrderValue || 0,
-                  description: `Save ₹${coupon.originalPrice - coupon.discountedPrice} with '${coupon.couponCode}'`,
+                  description: t("user.cart.ui.saveWithCoupon", {
+                    amount: coupon.originalPrice - coupon.discountedPrice,
+                    code: coupon.couponCode
+                  }),
                   originalPrice: coupon.originalPrice,
                   discountedPrice: coupon.discountedPrice,
                   source: "restaurant",
@@ -551,7 +564,7 @@ export default function Cart() {
       setLoadingCoupons(false);
     };
     fetchCouponsForCartItems();
-  }, [cart, restaurantId]);
+  }, [cart, restaurantId, t]);
 
   const combinedAvailableCoupons = useMemo(() => {
     const merged = [];
@@ -1277,7 +1290,7 @@ export default function Cart() {
                     fallback={restaurantData?.estimatedDeliveryTime || t("user.cart.ui.defaultEtaShort")}
                   />{" "}
                   {t("user.cart.ui.to")} <span className="font-semibold">{t("user.cart.ui.location")}</span>
-                  <span className="text-gray-400 dark:text-gray-500 ml-1 text-xs md:text-sm">{defaultAddress ? formatFullAddress(defaultAddress) || defaultAddress?.formattedAddress || defaultAddress?.address || defaultAddress?.city || t("user.cart.ui.selectAddress") : t("user.cart.ui.selectAddress")}</span>
+                  <span className="text-gray-400 dark:text-gray-500 ml-1 text-xs md:text-sm">{defaultAddress ? formatFullAddress(defaultAddress, locationPlaceholderText) || defaultAddress?.formattedAddress || defaultAddress?.address || defaultAddress?.city || t("user.cart.ui.selectAddress") : t("user.cart.ui.selectAddress")}</span>
                 </p>
               </div>
             </div>
@@ -1553,7 +1566,7 @@ export default function Cart() {
                         {t("user.cart.ui.deliveryAt")} <span className="font-semibold">{t("user.cart.ui.location")}</span>
                       </p>
                       <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400 line-clamp-2">
-                        {defaultAddress ? formatFullAddress(defaultAddress) || defaultAddress?.formattedAddress || defaultAddress?.address || t("user.cart.ui.addDeliveryAddress") : t("user.cart.ui.addDeliveryAddress")}
+                        {defaultAddress ? formatFullAddress(defaultAddress, locationPlaceholderText) || defaultAddress?.formattedAddress || defaultAddress?.address || t("user.cart.ui.addDeliveryAddress") : t("user.cart.ui.addDeliveryAddress")}
                       </p>
                       {/* Address Selection Buttons */}
                       <div className="flex gap-2 mt-2">
@@ -1581,7 +1594,7 @@ export default function Cart() {
                     <Phone className="h-4 w-4 md:h-5 md:w-5 text-gray-500 dark:text-gray-400" />
                     <p className="text-sm md:text-base text-gray-800 dark:text-gray-200">
                       {(orderContactName || userProfile?.name || t("user.cart.ui.yourName")).trim() || t("user.cart.ui.yourName")},{" "}
-                      <span className="font-medium">{orderContactPhone || normalizeIndianPhoneForOrder(userProfile?.phone) || "+91-XXXXXXXXXX"}</span>
+                      <span className="font-medium">{orderContactPhone || normalizeIndianPhoneForOrder(userProfile?.phone) || t("user.cart.ui.phoneFallback")}</span>
                     </p>
                   </div>
                   <button
@@ -1589,7 +1602,7 @@ export default function Cart() {
                     onClick={() => setShowContactEditor(prev => !prev)}
                     className="text-sm text-[#FF5200] font-medium hover:underline"
                   >
-                    {showContactEditor ? "Done" : "Edit"}
+                    {showContactEditor ? t("user.cart.ui.done") : t("user.cart.ui.edit")}
                   </button>
                 </div>
 
@@ -1599,19 +1612,19 @@ export default function Cart() {
                       type="text"
                       value={orderContactName}
                       onChange={(e) => setOrderContactName(e.target.value)}
-                      placeholder="Customer name for this order"
+                      placeholder={t("user.cart.ui.customerNameForOrderPlaceholder")}
                       className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-[#111] px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
                     />
                     <input
                       type="tel"
                       value={orderContactPhone}
                       onChange={(e) => setOrderContactPhone(normalizeIndianPhoneForOrder(e.target.value))}
-                      placeholder="Customer phone for this order"
+                      placeholder={t("user.cart.ui.customerPhoneForOrderPlaceholder")}
                       maxLength={10}
                       className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-[#111] px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
                     />
                     <p className="text-[11px] text-gray-500 dark:text-gray-400">
-                      This updates contact only for this order, not your profile.
+                      {t("user.cart.ui.contactUpdateNote")}
                     </p>
                   </div>
                 )}
@@ -1660,7 +1673,7 @@ export default function Cart() {
                       className="flex w-full items-center justify-between text-sm md:text-base text-left"
                     >
                       <span className="text-gray-600 dark:text-gray-400 underline underline-offset-4 decoration-dotted">
-                        GST (govt. taxes)
+                        {t("user.cart.ui.gstGovTaxes")}
                       </span>
                       <span className="text-gray-800 dark:text-gray-200">₹{gstCharges}</span>
                     </button>
@@ -1825,10 +1838,10 @@ export default function Cart() {
                 <div>
                   <p className="text-lg font-semibold text-gray-900 dark:text-white">{t("user.cart.ui.deliveringToLocation")}</p>
                   <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
-                    {defaultAddress ? formatFullAddress(defaultAddress) || defaultAddress?.formattedAddress || defaultAddress?.address || t("user.cart.ui.address") : t("user.cart.ui.addAddress")}
+                    {defaultAddress ? formatFullAddress(defaultAddress, locationPlaceholderText) || defaultAddress?.formattedAddress || defaultAddress?.address || t("user.cart.ui.address") : t("user.cart.ui.addAddress")}
                   </p>
                   <p className="text-sm text-gray-500 dark:text-gray-400">
-                    {defaultAddress ? formatFullAddress(defaultAddress) || t("user.cart.ui.address") : t("user.cart.ui.address")}
+                    {defaultAddress ? formatFullAddress(defaultAddress, locationPlaceholderText) || t("user.cart.ui.address") : t("user.cart.ui.address")}
                   </p>
                 </div>
               </div>
@@ -2220,4 +2233,3 @@ export default function Cart() {
       `}</style>
     </div>;
 }
-

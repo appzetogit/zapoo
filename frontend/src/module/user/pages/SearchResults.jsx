@@ -10,6 +10,7 @@ import { useZone } from "../hooks/useZone";
 import { restaurantAPI, adminAPI } from "@/lib/api";
 import { toast } from "sonner";
 import { X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 // Import shared food images - prevents duplication
 import { foodImages } from "@/constants/images";
@@ -19,28 +20,24 @@ import {
 } from "../utils/restaurantAvailability";
 
 // Filter options
-const filterOptions = [{
+const filterOptionsConfig = [{
   id: 'under-30-mins',
-  label: 'Under 30 mins'
 }, {
   id: 'price-match',
-  label: 'Price Match',
   hasIcon: true
 }, {
   id: 'flat-50-off',
-  label: 'Flat 50% OFF',
   hasIcon: true
 }, {
   id: 'under-250',
-  label: 'Under ₹250'
 }, {
   id: 'rating-4-plus',
-  label: 'Rating 4.0+'
 }];
 
 // Mock data removed - using backend data only
 
 export default function SearchResults() {
+  const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const query = searchParams.get("q") || "";
   const navigate = useNavigate();
@@ -64,11 +61,27 @@ export default function SearchResults() {
   const [loadingRestaurants, setLoadingRestaurants] = useState(true);
   const [categories, setCategories] = useState([{
     id: 'all',
-    name: "All",
+    name: t("user.categoryPage.all"),
     image: foodImages[7]
   }]);
   const [loadingCategories, setLoadingCategories] = useState(true);
   const [categoryKeywords, setCategoryKeywords] = useState({});
+  const filterOptions = useMemo(() => [{
+    ...filterOptionsConfig[0],
+    label: t("user.categoryPage.filterPills.under30mins")
+  }, {
+    ...filterOptionsConfig[1],
+    label: t("user.categoryPage.priceMatch")
+  }, {
+    ...filterOptionsConfig[2],
+    label: t("user.categoryPage.filterPills.flat50off")
+  }, {
+    ...filterOptionsConfig[3],
+    label: t("user.categoryPage.filterPills.under250")
+  }, {
+    ...filterOptionsConfig[4],
+    label: t("user.categoryPage.filterPills.rating4Plus")
+  }], [t]);
 
   // Fetch categories from admin API
   useEffect(() => {
@@ -82,7 +95,7 @@ export default function SearchResults() {
           // Transform API categories to match expected format
           const transformedCategories = [{
             id: 'all',
-            name: "All",
+            name: t("user.categoryPage.all"),
             image: foodImages[7]
           }, ...categoriesArray.map(cat => ({
             id: cat.slug || cat.id,
@@ -113,7 +126,7 @@ export default function SearchResults() {
       }
     };
     fetchCategories();
-  }, []);
+  }, [t]);
 
   // Helper function to check if menu has dishes matching category keywords
   const checkCategoryInMenu = (menu, categoryId) => {
@@ -505,7 +518,7 @@ export default function SearchResults() {
   const handleVoiceSearch = useCallback(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
-      toast.error("Speech Recognition is not supported in this browser.");
+      toast.error(t("user.home.voiceNotSupported"));
       return;
     }
     const recognition = new SpeechRecognition();
@@ -513,7 +526,7 @@ export default function SearchResults() {
     recognition.interimResults = false;
     recognition.maxAlternatives = 1;
     recognition.onstart = () => {
-      toast("Listening...", {
+      toast(t("user.home.listening"), {
         icon: <Mic className="w-4 h-4 text-orange-500 animate-pulse" />
       });
     };
@@ -521,7 +534,7 @@ export default function SearchResults() {
       const transcript = event.results[0][0].transcript;
       setSearchQuery(transcript);
       if (transcript.trim()) {
-        toast.success(`Searching for "${transcript}"`);
+        toast.success(t("user.home.searchingFor", { text: transcript }));
         setSearchParams({
           q: transcript.trim()
         });
@@ -530,13 +543,13 @@ export default function SearchResults() {
     recognition.onerror = event => {
       console.error("Speech recognition error", event.error);
       if (event.error === 'not-allowed') {
-        toast.error("Microphone access denied. Please enable it in browser settings.");
+        toast.error(t("user.home.microphoneDenied"));
       } else {
-        toast.error("Could not hear you. Please try again.");
+        toast.error(t("user.home.couldNotHear"));
       }
     };
     recognition.start();
-  }, [setSearchParams]);
+  }, [setSearchParams, t]);
   const handleSearch = e => {
     e.preventDefault();
     if (searchQuery.trim()) {
@@ -644,7 +657,7 @@ export default function SearchResults() {
 
           <form onSubmit={handleSearch} className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500 dark:text-gray-400" />
-            <Input placeholder="Restaurant name or a dish..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-10 pr-10 h-11 rounded-lg border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-[#1a1a1a] focus:bg-white dark:focus:bg-[#2a2a2a] focus:border-gray-500 dark:focus:border-gray-600 text-sm dark:text-white placeholder:text-gray-600 dark:placeholder:text-gray-400" />
+            <Input placeholder={t("user.categoryPage.searchPlaceholder")} value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-10 pr-10 h-11 rounded-lg border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-[#1a1a1a] focus:bg-white dark:focus:bg-[#2a2a2a] focus:border-gray-500 dark:focus:border-gray-600 text-sm dark:text-white placeholder:text-gray-600 dark:placeholder:text-gray-400" />
             <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
               {searchQuery ? <button type="button" onClick={() => {
                 setSearchQuery("");
@@ -686,7 +699,7 @@ export default function SearchResults() {
           {/* Filter Button */}
           <Button variant="outline" className="h-9 px-3 rounded-lg flex items-center gap-1.5 whitespace-nowrap flex-shrink-0 font-medium bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300">
             <SlidersHorizontal className="h-4 w-4" />
-            <span className="text-sm font-bold text-black dark:text-white">Filters</span>
+            <span className="text-sm font-bold text-black dark:text-white">{t("user.categoryPage.filters")}</span>
             <ChevronDown className="h-3 w-3" />
           </Button>
 
@@ -708,14 +721,14 @@ export default function SearchResults() {
       {/* Loading State */}
       {loadingRestaurants && <div className="flex items-center justify-center py-20">
         <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
-        <span className="ml-3 text-gray-600">Loading restaurants...</span>
+        <span className="ml-3 text-gray-600">{t("user.home.loadingRestaurants")}</span>
       </div>}
 
       {/* Matching results */}
       {!loadingRestaurants && !isBlankSearch && (
         <section>
           <h2 className="text-xs sm:text-sm font-semibold text-gray-400 dark:text-gray-500 tracking-widest uppercase mb-4">
-            MATCHING DISHES & RESTAURANTS
+            {t("user.searchResults.matchingDishesAndRestaurants")}
           </h2>
 
           <div className="space-y-3">
@@ -743,7 +756,7 @@ export default function SearchResults() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="font-semibold text-gray-900 dark:text-white text-sm truncate">{item.name}</div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400 truncate">Dish · {item.restaurantName}</div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400 truncate">{t("user.searchResults.dishWithRestaurant", { restaurant: item.restaurantName })}</div>
                     </div>
                   </div>
                 </Link>
@@ -764,11 +777,11 @@ export default function SearchResults() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="font-semibold text-gray-900 dark:text-white text-sm truncate">{restaurant.name}</div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400 truncate">{restaurant.cuisine || "Restaurant"}</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 truncate">{restaurant.cuisine || t("user.searchResults.restaurantFallback")}</div>
                   </div>
                   {disabled && (
                     <span className="text-[10px] font-semibold text-gray-500 border border-gray-200 rounded-full px-2 py-0.5">
-                      Closed
+                      {t("user.searchResults.closed")}
                     </span>
                   )}
                 </div>
@@ -783,7 +796,7 @@ export default function SearchResults() {
             })}
 
             {matchingDishes.length === 0 && matchingRestaurants.length === 0 && (
-              <div className="text-sm text-gray-500">No matches found.</div>
+              <div className="text-sm text-gray-500">{t("user.searchResults.noMatchesFound")}</div>
             )}
           </div>
         </section>
