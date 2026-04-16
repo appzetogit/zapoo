@@ -10,6 +10,22 @@ import { loadBusinessSettings } from './lib/utils/businessSettings.js';
 import './i18n';
 import LanguageBootstrap from './components/LanguageBootstrap.jsx';
 import { getStoredLanguage } from './lib/i18n/language.js';
+import { resources } from './i18n/resources.js';
+
+console.log('[i18n-debug] main.jsx starting');
+const activeLanguage = getStoredLanguage();
+const supportedLanguages = ['en', 'hi', 'bn'];
+const hasRestaurantDetails = Boolean(resources[activeLanguage]?.translation?.user?.restaurantDetails);
+console.log('[i18n-debug] main.jsx: ./i18n imported before render');
+console.log('[i18n-debug] active language:', activeLanguage);
+console.log('[i18n-debug] supported languages:', supportedLanguages.join(', '));
+console.log('[i18n-debug] user.restaurantDetails present:', hasRestaurantDetails, `for language=${activeLanguage}`);
+if (!supportedLanguages.includes(activeLanguage)) {
+  console.error(`[i18n-debug] unsupported language loaded: ${activeLanguage}. Expected one of ${supportedLanguages.join(', ')}`);
+}
+if (!hasRestaurantDetails) {
+  console.error(`[i18n-debug] missing translation key user.restaurantDetails for active language: ${activeLanguage}`);
+}
 
 // Load business settings on app start (favicon, title)
 // Silently handle errors - this is not critical for app functionality

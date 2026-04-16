@@ -97,7 +97,7 @@ const OptimizedImage = React.memo(({
       link.rel = 'preload'
       link.as = 'image'
       link.href = src
-      link.fetchPriority = 'high'
+      link.setAttribute('fetchpriority', 'high')
       link.crossOrigin = 'anonymous'
       document.head.appendChild(link)
 
@@ -178,7 +178,7 @@ const OptimizedImage = React.memo(({
             className={`w-full h-full ${objectFit === 'cover' ? 'object-cover' : objectFit === 'contain' ? 'object-contain' : ''} ${priority || isLoaded ? 'opacity-100' : 'opacity-0'} ${!priority && 'transition-opacity duration-300'}`}
             loading={priority ? 'eager' : 'lazy'}
             decoding="async"
-            fetchPriority={priority ? 'high' : 'auto'}
+            fetchpriority={priority ? 'high' : 'auto'}
             crossOrigin="anonymous"
             onLoad={handleLoad}
             onError={handleError}

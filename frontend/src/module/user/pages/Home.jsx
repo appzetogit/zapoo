@@ -52,6 +52,7 @@ const RestaurantImageCarousel = React.memo(({
   recommendedItems = [],
   priority = false
 }) => {
+  const { t } = useTranslation();
   const restaurantImages = useMemo(() => {
     const baseImages = Array.isArray(restaurant.images) && restaurant.images.length ? restaurant.images : [restaurant.image];
     return baseImages.filter(Boolean);
