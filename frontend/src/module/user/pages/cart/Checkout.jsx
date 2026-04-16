@@ -141,7 +141,7 @@ export default function Checkout() {
         couponCode: pricing.couponCode,
       }
 
-      const orderResponse = await orderAPI.createOrder({
+      const response = await orderAPI.createOrder({
         items,
         address: defaultAddress,
         restaurantId,
@@ -152,7 +152,11 @@ export default function Checkout() {
         sendCutlery: true,
       })
 
-      const { order, razorpay } = orderResponse.data.data
+      console.log("🔥 Razorpay orderId from backend:", response.data?.razorpay?.orderId || response.data?.data?.razorpay?.orderId)
+
+      const order = response.data?.data?.order || response.data?.order
+      const razorpay = response.data?.data?.razorpay || response.data?.razorpay
+      const razorpayOrderId = response.data?.razorpay?.orderId || response.data?.data?.razorpay?.orderId
 
       if (paymentMethod === "cash") {
         toast.success(t("user.checkout.toast.orderPlacedCod"))
@@ -182,7 +186,7 @@ export default function Checkout() {
         key: razorpay.key,
         amount: razorpay.amount,
         currency: razorpay.currency || "INR",
-        order_id: razorpay.orderId,
+        order_id: razorpayOrderId,
         name: companyName,
         description: `Order ${order.orderId} - ₹${(razorpay.amount / 100).toFixed(2)}`,
         prefill: {

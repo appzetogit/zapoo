@@ -10,6 +10,7 @@ const logger = winston.createLogger({
   })]
 });
 const razorpayDebug = (step, details = {}) => {
+  
   console.log('[REFUND_DEBUG][razorpayService]', step, details);
 };
 
@@ -201,6 +202,18 @@ const createRefund = async (paymentId, amount = null, notes = {}) => {
     throw new Error('Razorpay is not initialized');
   }
   try {
+    if (!paymentId) {
+      throw new Error("Payment ID missing for refund");
+    }
+
+    const orderId = notes?.orderId || notes?.order_id || null;
+    console.log("🔥 Refund Payment ID:", paymentId);
+    console.log("🔥 Refund Request:", {
+      paymentId,
+      amount,
+      orderId,
+    });
+
     const refundOptions = {
       notes: notes
     };
@@ -212,16 +225,18 @@ const createRefund = async (paymentId, amount = null, notes = {}) => {
       amount: refundOptions.amount || null,
       notes: refundOptions.notes || null
     });
-    const refund = await razorpay.payments.refund(paymentId, refundOptions);
+    const refundResponse = await razorpay.payments.refund(paymentId, refundOptions);
+    console.log("✅ Refund Response:", refundResponse);
     razorpayDebug('create_refund_response', {
       paymentId,
-      refundId: refund?.id || null,
-      status: refund?.status || null,
-      amount: refund?.amount || null,
-      currency: refund?.currency || null
+      refundId: refundResponse?.id || null,
+      status: refundResponse?.status || null,
+      amount: refundResponse?.amount || null,
+      currency: refundResponse?.currency || null
     });
-    return refund;
+    return refundResponse;
   } catch (error) {
+    console.error("❌ Refund Error:", error);
     logger.error(`Error creating refund: ${error.message}`);
     razorpayDebug('create_refund_error', {
       paymentId,

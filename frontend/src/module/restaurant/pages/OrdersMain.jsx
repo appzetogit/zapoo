@@ -419,7 +419,9 @@ export default function OrdersMain() {
   // Restaurant notifications hook for real-time orders
   const {
     newOrder,
+    lastOrderStatusUpdate,
     clearNewOrder,
+    clearLastOrderStatusUpdate,
     isConnected
   } = useRestaurantNotifications();
   const rejectReasons = ["Restaurant is too busy", "Item not available", "Outside delivery area", "Kitchen closing soon", "Technical issue", "Other reason"];
@@ -555,6 +557,71 @@ export default function OrdersMain() {
     }
   }, [newOrder]);
 
+  // Auto-dismiss popup if order status changed to a terminal/non-actionable state.
+  useEffect(() => {
+    if (!lastOrderStatusUpdate) return;
+
+    const activePopupOrder = popupOrder || newOrder;
+    const activePopupOrderId = activePopupOrder?.orderId || activePopupOrder?.orderMongoId;
+    if (!activePopupOrderId) {
+      clearLastOrderStatusUpdate();
+      return;
+    }
+
+    const updateOrderId = lastOrderStatusUpdate.orderId;
+    const normalizedPopupStatus = String(lastOrderStatusUpdate.status || '').toLowerCase().trim();
+    if (updateOrderId === activePopupOrderId && ['cancelled', 'ready', 'out_for_delivery', 'delivered', 'refunded', 'failed'].includes(normalizedPopupStatus)) {
+      setShowNewOrderPopup(false);
+      setShowRejectPopup(false);
+      setPopupOrder(null);
+      clearNewOrder();
+      setRejectReason("");
+      setCountdown(240);
+      setPrepTime(11);
+      if (normalizedPopupStatus === 'cancelled') {
+        toast.info('Order was cancelled and removed from pending requests.');
+      }
+    }
+    clearLastOrderStatusUpdate();
+  }, [lastOrderStatusUpdate, popupOrder, newOrder, clearNewOrder, clearLastOrderStatusUpdate]);
+
+  // Fallback: while popup is open, periodically verify latest order status and auto-dismiss if not actionable.
+  useEffect(() => {
+    if (!showNewOrderPopup) return;
+    const activePopupOrder = popupOrder || newOrder;
+    const activeOrderId = activePopupOrder?.orderMongoId || activePopupOrder?.orderId;
+    if (!activeOrderId) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const latestOrderResponse = await restaurantAPI.getOrderById(activeOrderId);
+        const latestOrder = latestOrderResponse?.data?.data?.order;
+        const latestStatus = String(latestOrder?.status || '').toLowerCase().trim();
+        if (!['pending', 'confirmed'].includes(latestStatus)) {
+          setShowNewOrderPopup(false);
+          setShowRejectPopup(false);
+          setPopupOrder(null);
+          clearNewOrder();
+          setRejectReason("");
+          setCountdown(240);
+          setPrepTime(11);
+        }
+      } catch (error) {
+        if (error?.response?.status === 404 || error?.response?.status === 400) {
+          setShowNewOrderPopup(false);
+          setShowRejectPopup(false);
+          setPopupOrder(null);
+          clearNewOrder();
+          setRejectReason("");
+          setCountdown(240);
+          setPrepTime(11);
+        }
+      }
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [showNewOrderPopup, popupOrder, newOrder, clearNewOrder]);
+
   // Track popup state with ref to avoid stale closures
   const showNewOrderPopupRef = useRef(showNewOrderPopup);
   const newOrderRef = useRef(newOrder);
@@ -573,8 +640,12 @@ export default function OrdersMain() {
       try {
         const response = await restaurantAPI.getOrders();
         if (response.data?.success && response.data.data?.orders) {
-          // Find pending orders that haven't been shown yet
-          const pendingOrders = response.data.data.orders.filter(order => order.status === 'pending' && !shownOrdersRef.current.has(order.orderId || order._id));
+          // Find actionable new orders that haven't been shown yet.
+          // Accept flow supports both 'pending' and 'confirmed', so popup should appear for both.
+          const pendingOrders = response.data.data.orders.filter(order =>
+            ['pending', 'confirmed'].includes(String(order.status || '').toLowerCase()) &&
+            !shownOrdersRef.current.has(order.orderId || order._id)
+          );
 
           // Show the most recent pending order in popup (double-check state)
           if (pendingOrders.length > 0 && !showNewOrderPopupRef.current && !newOrderRef.current) {
@@ -690,6 +761,18 @@ export default function OrdersMain() {
     if (orderToAccept?.orderMongoId || orderToAccept?.orderId) {
       try {
         const orderId = orderToAccept.orderMongoId || orderToAccept.orderId;
+        const latestOrderResponse = await restaurantAPI.getOrderById(orderId);
+        const latestOrder = latestOrderResponse?.data?.data?.order;
+        const latestStatus = String(latestOrder?.status || '').toLowerCase().trim();
+        if (['cancelled', 'ready', 'out_for_delivery', 'delivered', 'refunded', 'failed'].includes(latestStatus)) {
+          toast.error(`Order cannot be accepted. Current status: ${latestOrder?.status || latestStatus}`);
+          setShowNewOrderPopup(false);
+          setPopupOrder(null);
+          clearNewOrder();
+          setCountdown(240);
+          setPrepTime(11);
+          return;
+        }
         const response = await restaurantAPI.acceptOrder(orderId, prepTime);
         toast.success('Order accepted successfully');
       } catch (error) {
@@ -731,6 +814,20 @@ export default function OrdersMain() {
     if (orderToReject?.orderMongoId || orderToReject?.orderId) {
       try {
         const orderId = orderToReject.orderMongoId || orderToReject.orderId;
+        const latestOrderResponse = await restaurantAPI.getOrderById(orderId);
+        const latestOrder = latestOrderResponse?.data?.data?.order;
+        const latestStatus = String(latestOrder?.status || '').toLowerCase().trim();
+        if (['cancelled', 'ready', 'out_for_delivery', 'delivered', 'refunded', 'failed'].includes(latestStatus)) {
+          toast.error(`Order cannot be rejected. Current status: ${latestOrder?.status || latestStatus}`);
+          setShowRejectPopup(false);
+          setShowNewOrderPopup(false);
+          setPopupOrder(null);
+          clearNewOrder();
+          setRejectReason("");
+          setCountdown(240);
+          setPrepTime(11);
+          return;
+        }
         await restaurantAPI.rejectOrder(orderId, rejectReason);
       } catch (error) {
         console.error('❌ Error rejecting order:', error);

@@ -62,6 +62,8 @@ export const initRazorpayPayment = async (options) => {
     }
   };
 
+  console.log("🔥 Passing order_id to Razorpay:", options.order_id);
+  console.log("🔥 Razorpay options:", options);
   const paymentObject = new window.Razorpay(razorpayOptions);
   paymentObject.open();
 };

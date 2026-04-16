@@ -8,6 +8,7 @@ import winston from 'winston';
 import { calculateOrderPricing, calculateDistance } from '../services/orderCalculationService.js';
 import { getRazorpayCredentials } from '../../../shared/utils/envService.js';
 import { notifyRestaurantNewOrder } from '../services/restaurantNotificationService.js';
+import { notifyRestaurantOrderUpdate } from '../services/restaurantNotificationService.js';
 import { calculateOrderSettlement } from '../services/orderSettlementService.js';
 import { holdEscrow } from '../services/escrowWalletService.js';
 import { processCancellationRefund } from '../services/cancellationRefundService.js';
@@ -616,10 +617,10 @@ export const createOrder = async (req, res) => {
     if (razorpayOrder) {
       try {
         const credentials = await getRazorpayCredentials();
-        razorpayKeyId = credentials.keyId || process.env.RAZORPAY_KEY_ID || process.env.RAZORPAY_API_KEY;
+        razorpayKeyId = credentials.keyId || process.env.RAZORPAY_API_KEY;
       } catch (error) {
         logger.warn(`Failed to get Razorpay key ID from env service: ${error.message}`);
-        razorpayKeyId = process.env.RAZORPAY_KEY_ID || process.env.RAZORPAY_API_KEY;
+        razorpayKeyId = process.env.RAZORPAY_API_KEY;
       }
     }
     res.status(201).json({
@@ -756,7 +757,13 @@ export const verifyOrderPayment = async (req, res) => {
         }]
       });
     } else {
-      payment.status = 'created';
+      const existingPaymentStatus = String(payment.status || '').toLowerCase().trim();
+      const isFinalizedPayment = existingPaymentStatus === 'success' || existingPaymentStatus === 'completed';
+
+      if (!isFinalizedPayment) {
+        payment.status = 'created';
+      }
+
       payment.razorpay = {
         ...(payment.razorpay || {}),
         orderId: razorpayOrderId,
@@ -775,7 +782,9 @@ export const verifyOrderPayment = async (req, res) => {
         details: {
           razorpayOrderId,
           razorpayPaymentId,
-          note: 'Signature verified; awaiting webhook confirmation'
+          note: isFinalizedPayment
+            ? 'Signature verified after capture; preserving finalized payment status'
+            : 'Signature verified; awaiting webhook confirmation'
         },
         ipAddress: req.ip,
         userAgent: req.get('user-agent')
@@ -783,7 +792,12 @@ export const verifyOrderPayment = async (req, res) => {
       await payment.save();
     }
 
-    order.payment.status = 'pending';
+    const orderPaymentStatus = String(order.payment?.status || '').toLowerCase().trim();
+    const paymentFinalizedForOrder = String(payment.status || '').toLowerCase().trim() === 'success' || String(payment.status || '').toLowerCase().trim() === 'completed';
+    const isOrderPaymentFinalized = orderPaymentStatus === 'completed' || paymentFinalizedForOrder;
+    if (!isOrderPaymentFinalized) {
+      order.payment.status = 'pending';
+    }
     order.payment.razorpayPaymentId = razorpayPaymentId;
     order.payment.razorpaySignature = razorpaySignature;
     order.payment.transactionId = razorpayPaymentId;
@@ -1072,6 +1086,24 @@ export const cancelOrder = async (req, res) => {
         message: 'Cannot cancel a delivered order'
       });
     }
+    if (order.status === 'ready') {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot cancel order after preparation is complete'
+      });
+    }
+    if (order.status === 'out_for_delivery') {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot cancel order once it is out for delivery'
+      });
+    }
+    if (order.status === 'refunded') {
+      return res.status(400).json({
+        success: false,
+        message: 'Order is already refunded'
+      });
+    }
 
     // Get payment method from order or payment record
     const paymentMethod = order.payment?.method;
@@ -1083,20 +1115,20 @@ export const cancelOrder = async (req, res) => {
     // Determine the actual payment method
     const actualPaymentMethod = paymentMethod || paymentMethodFromPayment;
 
+    if ((actualPaymentMethod === 'cash' || actualPaymentMethod === 'cod') && order.status === 'preparing') {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot cancel COD order once preparation has started'
+      });
+    }
+
     // Allow cancellation for all payment methods (Razorpay, COD, Wallet)
     // Only restrict if order is already cancelled or delivered (checked above)
-
-    // Update order status
-    order.status = 'cancelled';
-    order.cancellationReason = reason.trim();
-    order.cancelledBy = 'user';
-    order.cancelledAt = new Date();
-    await order.save();
 
     // Calculate/trigger refund only for online payments (Razorpay) and wallet
     // COD orders don't need refund since payment hasn't been made
     let refundMessage = '';
-    if (actualPaymentMethod === 'razorpay' || actualPaymentMethod === 'wallet') {
+    if (actualPaymentMethod === 'razorpay') {
       try {
         console.log('[REFUND_DEBUG][orderController] cancelOrder_refund_start', {
           orderId: order.orderId || order._id?.toString?.(),
@@ -1121,7 +1153,7 @@ export const cancelOrder = async (req, res) => {
           } else if (refundResult?.refundInitiated) {
             refundMessage = ` Refund initiated for ${refundResult.policy?.refundPercent || 0}% and final status will be confirmed by Razorpay webhook.`;
           } else if (refundResult?.refundSkipped) {
-            refundMessage = ' No refund required as per policy.';
+          refundMessage = ' No refund required as per policy.';
           }
 
           console.log('[REFUND_DEBUG][orderController] cancelOrder_refund_result', {
@@ -1133,20 +1165,39 @@ export const cancelOrder = async (req, res) => {
             refundAmount: refundResult?.policy?.refundAmount || null,
             refundId: refundResult?.refundId || null
           });
-        } else {
-          const {
-            calculateCancellationRefund
-          } = await import('../services/cancellationRefundService.js');
-          await calculateCancellationRefund(order._id, reason);
-          refundMessage = ' Refund will be processed in wallet flow.';
-          console.log('[REFUND_DEBUG][orderController] cancelOrder_wallet_refund_calculated', {
-            orderId: order.orderId || order._id?.toString?.(),
-            reason: reason.trim()
-          });
         }
       } catch (refundError) {
         logger.error(`Error calculating cancellation refund for order ${order.orderId}:`, refundError);
         // Don't fail the cancellation if refund calculation fails
+      }
+    }
+
+    // Update order status
+    order.status = 'cancelled';
+    order.cancellationReason = reason.trim();
+    order.cancelledBy = 'user';
+    order.cancelledAt = new Date();
+    await order.save();
+
+    try {
+      await notifyRestaurantOrderUpdate(order._id.toString(), 'cancelled');
+    } catch (notifyError) {
+      logger.error(`Error notifying restaurant after cancellation for order ${order.orderId}:`, notifyError);
+    }
+
+    if (actualPaymentMethod === 'wallet') {
+      try {
+        const {
+          calculateCancellationRefund
+        } = await import('../services/cancellationRefundService.js');
+        await calculateCancellationRefund(order._id, reason);
+        refundMessage = ' Refund will be processed in wallet flow.';
+        console.log('[REFUND_DEBUG][orderController] cancelOrder_wallet_refund_calculated', {
+          orderId: order.orderId || order._id?.toString?.(),
+          reason: reason.trim()
+        });
+      } catch (refundError) {
+        logger.error(`Error calculating cancellation refund for order ${order.orderId}:`, refundError);
       }
     } else if (actualPaymentMethod === 'cash') {
       refundMessage = ' No refund required as payment was not made.';

@@ -11,6 +11,7 @@ import alertSound from '@/assets/audio/alert.mp3';
 export const useRestaurantNotifications = () => {
   const socketRef = useRef(null);
   const [newOrder, setNewOrder] = useState(null);
+  const [lastOrderStatusUpdate, setLastOrderStatusUpdate] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
   const audioRef = useRef(null);
   const userInteractedRef = useRef(false); // Track user interaction for autoplay policy
@@ -262,7 +263,13 @@ export const useRestaurantNotifications = () => {
     });
 
     // Listen for order status updates
-    socketRef.current.on('order_status_update', data => {});
+    socketRef.current.on('order_status_update', data => {
+      setLastOrderStatusUpdate({
+        orderId: data?.orderId || null,
+        status: data?.status || null,
+        updatedAt: data?.updatedAt || new Date().toISOString()
+      });
+    });
 
     // Load notification sound
     audioRef.current = new Audio(alertSound);
@@ -330,9 +337,14 @@ export const useRestaurantNotifications = () => {
   const clearNewOrder = () => {
     setNewOrder(null);
   };
+  const clearLastOrderStatusUpdate = () => {
+    setLastOrderStatusUpdate(null);
+  };
   return {
     newOrder,
+    lastOrderStatusUpdate,
     clearNewOrder,
+    clearLastOrderStatusUpdate,
     isConnected,
     playNotificationSound
   };

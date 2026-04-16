@@ -1,4 +1,3 @@
-import crypto from 'crypto';
 import Order from '../order/models/Order.js';
 import Payment from './models/Payment.js';
 import OrderSettlement from '../order/models/OrderSettlement.js';
@@ -197,8 +196,7 @@ const handlePaymentCaptured = async ({ paymentEntity, payload }) => {
         _id: order._id
       }
       : {
-        _id: order._id,
-        status: { $ne: 'confirmed' }
+        _id: order._id
       },
     cancelledForRefund
       ? {
@@ -213,7 +211,6 @@ const handlePaymentCaptured = async ({ paymentEntity, payload }) => {
       }
       : {
         $set: {
-          status: 'confirmed',
           'payment.method': 'razorpay',
           'payment.status': 'completed',
           'payment.razorpayOrderId': razorpayOrderId || order.payment?.razorpayOrderId || null,

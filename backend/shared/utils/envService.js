@@ -88,10 +88,9 @@ export async function getRazorpayCredentials() {
   const apiKey = await getEnvVar("RAZORPAY_API_KEY");
   const secretKey = await getEnvVar("RAZORPAY_SECRET_KEY");
 
-  // Fallback to old env var names
   return {
-    keyId: apiKey || process.env.RAZORPAY_KEY_ID || "",
-    keySecret: secretKey || process.env.RAZORPAY_KEY_SECRET || ""
+    keyId: apiKey || process.env.RAZORPAY_API_KEY || "",
+    keySecret: secretKey || process.env.RAZORPAY_SECRET_KEY || ""
   };
 }
 
@@ -101,8 +100,6 @@ export async function getRazorpayCredentials() {
  */
 export async function getRazorpayWebhookSecret() {
   return (
-    await getEnvVar("RAZORPAY_WEBHOOK_SECRET") ||
-    await getEnvVar("RAZORPAY_WEBHOOK_SECRET_KEY") ||
     process.env.RAZORPAY_WEBHOOK_SECRET ||
     process.env.RAZORPAY_WEBHOOK_SECRET_KEY ||
     ""

@@ -269,6 +269,12 @@ export const acceptOrder = asyncHandler(async (req, res) => {
       status: true,
       timestamp: new Date()
     };
+    if (!order.tracking.preparing?.status) {
+      order.tracking.preparing = {
+        status: true,
+        timestamp: new Date()
+      };
+    }
 
     // Handle preparation time update from restaurant
     if (preparationTime) {

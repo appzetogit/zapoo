@@ -12,7 +12,7 @@ router.get('/health', (req, res) => {
   res.json({ 
     success: true, 
     message: 'Payment module is active',
-    razorpayConfigured: !!process.env.RAZORPAY_KEY_ID
+    razorpayConfigured: !!process.env.RAZORPAY_API_KEY
   });
 });
 

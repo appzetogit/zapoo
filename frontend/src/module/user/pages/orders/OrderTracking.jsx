@@ -34,12 +34,21 @@ const hasOrderBeenPickedUp = apiOrder => {
 
 const deriveTrackingUiStatus = apiOrder => {
   if (!apiOrder) return 'placed';
-  if (apiOrder.status === 'cancelled') return 'cancelled';
+  if (apiOrder.status === 'cancelled' || apiOrder.status === 'refunded') return 'cancelled';
   if (apiOrder.status === 'delivered') return 'delivered';
   if (hasOrderBeenPickedUp(apiOrder)) return 'pickup';
   if (apiOrder.status === 'ready') return 'ready';
   if (apiOrder.status === 'preparing') return 'preparing';
   return 'placed';
+};
+
+const isOrderCancelable = (apiOrder) => {
+  if (!apiOrder) return false;
+  const status = String(apiOrder.status || '').toLowerCase().trim();
+  const paymentMethod = String(apiOrder?.payment?.method || apiOrder?.paymentMethod || '').toLowerCase().trim();
+  const isCod = paymentMethod === 'cash' || paymentMethod === 'cod' || paymentMethod === 'cash on delivery';
+  if (isCod && status === 'preparing') return false;
+  return !['cancelled', 'delivered', 'ready', 'out_for_delivery', 'refunded', 'failed'].includes(status);
 };
 
 const normalizeEntityId = (value) => {
@@ -278,8 +287,8 @@ export default function OrderTracking() {
           const newOrderStatus = apiOrder.status;
           const currentOrderStatus = order?.status;
 
-          // Check if order was cancelled
-          if (newOrderStatus === 'cancelled' && currentOrderStatus !== 'cancelled') {
+          // Check if order was cancelled/refunded
+          if ((newOrderStatus === 'cancelled' || newOrderStatus === 'refunded') && currentOrderStatus !== newOrderStatus) {
             setOrderStatus('cancelled');
           }
 
@@ -440,7 +449,6 @@ export default function OrderTracking() {
     if (confirmed) {
       const timer1 = setTimeout(() => {
         setShowConfirmation(false);
-        setOrderStatus('preparing');
       }, 3000);
       return () => clearTimeout(timer1);
     }
@@ -499,6 +507,20 @@ export default function OrderTracking() {
     }
     if (order.status === 'delivered') {
       toast.error(t("user.orderTracking.toast.cannotCancelDelivered"));
+      return;
+    }
+    if (order.status === 'ready') {
+      toast.error("Order cannot be cancelled after preparation is complete.");
+      return;
+    }
+    if (order.status === 'out_for_delivery') {
+      toast.error("Order cannot be cancelled once it is out for delivery.");
+      return;
+    }
+    const paymentMethod = String(order?.payment?.method || order?.paymentMethod || '').toLowerCase().trim();
+    const isCod = paymentMethod === 'cash' || paymentMethod === 'cod' || paymentMethod === 'cash on delivery';
+    if (isCod && order.status === 'preparing') {
+      toast.error("COD order cannot be cancelled once preparation has started.");
       return;
     }
 
@@ -606,10 +628,7 @@ export default function OrderTracking() {
         if (orderResponse.data?.success && orderResponse.data.data?.order) {
           const apiOrder = orderResponse.data.data.order;
           setOrder(apiOrder);
-          // Update orderStatus to cancelled
-          if (apiOrder.status === 'cancelled') {
-            setOrderStatus('cancelled');
-          }
+          setOrderStatus(deriveTrackingUiStatus(apiOrder));
         }
       } else {
         toast.error(response.data?.message || t("user.orderTracking.toast.failedToCancelOrder"));
@@ -1072,7 +1091,7 @@ export default function OrderTracking() {
         </motion.div>
 
         {/* Help Section */}
-        <motion.div className="bg-white rounded-xl shadow-sm overflow-hidden" initial={{
+        {isOrderCancelable(order) && <motion.div className="bg-white rounded-xl shadow-sm overflow-hidden" initial={{
         opacity: 0,
         y: 20
       }} animate={{
@@ -1082,7 +1101,7 @@ export default function OrderTracking() {
         delay: 0.8
       }}>
           <SectionItem icon={CircleSlash} title={t("user.orderTracking.cancelOrder")} subtitle="" onClick={handleCancelOrder} />
-        </motion.div>
+        </motion.div>}
 
       </div>
 

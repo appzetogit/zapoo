@@ -280,10 +280,10 @@ export const createTopupOrder = asyncHandler(async (req, res) => {
     let razorpayKeyId = null;
     try {
       const credentials = await getRazorpayCredentials();
-      razorpayKeyId = credentials.keyId || process.env.RAZORPAY_KEY_ID || process.env.RAZORPAY_API_KEY;
+      razorpayKeyId = credentials.keyId || process.env.RAZORPAY_API_KEY;
     } catch (error) {
       logger.warn(`Failed to get Razorpay key ID: ${error.message}`);
-      razorpayKeyId = process.env.RAZORPAY_KEY_ID || process.env.RAZORPAY_API_KEY;
+      razorpayKeyId = process.env.RAZORPAY_API_KEY;
     }
     if (!razorpayKeyId) {
       logger.error('Razorpay key ID not found');

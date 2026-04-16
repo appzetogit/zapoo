@@ -4,6 +4,47 @@ import { UtensilsCrossed, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useOrders } from '../context/OrdersContext';
 import { orderAPI } from '@/lib/api';
+
+const TERMINAL_STATUSES = new Set([
+  'delivered',
+  'cancelled',
+  'completed',
+  'refunded',
+  'failed',
+  'payment_failed',
+  'rejected'
+]);
+
+const getOrderPrimaryStatus = (order) => String(order?.status || order?.originalStatus || order?.deliveryState?.status || '').toLowerCase().trim();
+
+const getOrderIdentityKey = (order) => {
+  return String(
+    order?.orderId ||
+    order?.id ||
+    order?._id ||
+    order?.payment?.razorpayOrderId ||
+    order?.razorpayOrderId ||
+    ''
+  ).trim();
+};
+
+const mergeOrdersWithApiPrecedence = (contextOrders = [], apiOrders = []) => {
+  const mergedMap = new Map();
+  contextOrders.forEach((order) => {
+    const key = getOrderIdentityKey(order);
+    if (key) mergedMap.set(key, order);
+  });
+  apiOrders.forEach((order) => {
+    const key = getOrderIdentityKey(order);
+    if (key) mergedMap.set(key, order);
+  });
+  return Array.from(mergedMap.values()).sort((a, b) => {
+    const aTime = new Date(a?.createdAt || a?.orderDate || a?.created_at || 0).getTime();
+    const bTime = new Date(b?.createdAt || b?.orderDate || b?.created_at || 0).getTime();
+    return bTime - aTime;
+  });
+};
+
 export default function OrderTrackingCard() {
   const navigate = useNavigate();
   const {
@@ -51,21 +92,10 @@ export default function OrderTrackingCard() {
 
   // Get active order (not delivered) - check both context and API orders
   useEffect(() => {
-    // Combine context orders and API orders
-    const allOrders = [...contextOrders, ...apiOrders];
-
-    // Remove duplicates by ID
-    const uniqueOrders = allOrders.filter((order, index, self) => index === self.findIndex(o => (o.id || o._id) === (order.id || order._id)));
-    // Find active order - any order that is NOT delivered, cancelled, or completed
-    const active = uniqueOrders.find(order => {
-      const status = (order.status || order.deliveryState?.status || '').toLowerCase();
-      const isInactive = status === 'delivered' || status === 'cancelled' || status === 'completed' || status === '';
-      if (isInactive) {
-        return false;
-      }
-
-      // If status exists and is not inactive, it's active
-      return true;
+    const mergedOrders = mergeOrdersWithApiPrecedence(contextOrders, apiOrders);
+    const active = mergedOrders.find((order) => {
+      const status = getOrderPrimaryStatus(order);
+      return Boolean(status) && !TERMINAL_STATUSES.has(status);
     });
     if (active) {
       setActiveOrder(active);
@@ -88,20 +118,16 @@ export default function OrderTrackingCard() {
     // Update more frequently when time is running out (every second if <= 1 minute, otherwise every minute)
     const updateInterval = timeRemaining <= 1 ? 1000 : 60000;
     const interval = setInterval(() => {
-      // Check both context and API orders
-      const allOrders = [...contextOrders, ...apiOrders];
-      const currentActive = allOrders.find(order => {
-        const orderId = order.id || order._id;
-        const activeOrderId = activeOrder.id || activeOrder._id;
-        return orderId === activeOrderId;
-      });
+      const mergedOrders = mergeOrdersWithApiPrecedence(contextOrders, apiOrders);
+      const activeOrderKey = getOrderIdentityKey(activeOrder);
+      const currentActive = mergedOrders.find((order) => getOrderIdentityKey(order) === activeOrderKey);
       if (!currentActive) {
         setActiveOrder(null);
         setTimeRemaining(null);
         return;
       }
-      const status = (currentActive.status || currentActive.deliveryState?.status || '').toLowerCase();
-      if (status === 'delivered' || status === 'cancelled' || status === 'completed') {
+      const status = getOrderPrimaryStatus(currentActive);
+      if (!status || TERMINAL_STATUSES.has(status)) {
         setActiveOrder(null);
         setTimeRemaining(null);
         return;
@@ -141,8 +167,8 @@ export default function OrderTrackingCard() {
   }
 
   // Check if order is delivered or time remaining is 0 - hide card
-  const orderStatus = (activeOrder.status || activeOrder.deliveryState?.status || 'preparing').toLowerCase();
-  if (orderStatus === 'delivered' || orderStatus === 'completed' || timeRemaining === 0) {
+  const orderStatus = getOrderPrimaryStatus(activeOrder) || 'preparing';
+  if (TERMINAL_STATUSES.has(orderStatus) || timeRemaining === 0) {
     return null;
   }
   const restaurantName = activeOrder.restaurant || activeOrder.restaurantName || activeOrder.restaurantName || 'Restaurant';

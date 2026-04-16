@@ -212,11 +212,21 @@ export const initiateRazorpayRefundForOrder = async ({ orderId, trigger = 'user'
   }
 
   const paymentId = payment?.razorpay?.paymentId || order.payment?.razorpayPaymentId || null;
-  const paymentCaptured = normalizeText(payment?.status) === 'success' || normalizeText(payment?.status) === 'completed' || normalizeText(order?.payment?.status) === 'completed';
+  const paymentCapturedFromStatus =
+    normalizeText(payment?.status) === 'success' ||
+    normalizeText(payment?.status) === 'completed' ||
+    normalizeText(order?.payment?.status) === 'completed';
+  const paymentCapturedFromGateway =
+    Boolean(payment?.gatewayResponse?.captured) ||
+    normalizeText(payment?.gatewayResponse?.status) === 'captured' ||
+    normalizeText(payment?.gatewayResponse?.entity?.status) === 'captured';
+  const paymentCaptured = paymentCapturedFromStatus || paymentCapturedFromGateway;
   refundDebug('refund_flow_capture_check', {
     orderId: order.orderId || order._id?.toString?.(),
     paymentId,
-    paymentCaptured
+    paymentCaptured,
+    paymentCapturedFromStatus,
+    paymentCapturedFromGateway
   });
 
   if (!payment || !paymentId || !paymentCaptured) {
