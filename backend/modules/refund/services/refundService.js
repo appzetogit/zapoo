@@ -2,9 +2,7 @@ import Order from '../../order/models/Order.js';
 import Payment from '../../payment/models/Payment.js';
 import Refund from '../models/Refund.js';
 import { createRefund as createRazorpayRefund } from '../../payment/services/razorpayService.js';
-const refundDebug = (step, details = {}) => {
-  console.log('[REFUND_DEBUG][refundService]', step, details);
-};
+const refundDebug = () => {};
 
 const toRupees = (value) => {
   const amount = Number(value || 0);

@@ -11,9 +11,7 @@ import { calculateOrderSettlement } from './orderSettlementService.js';
 
 const roundCurrency = value => Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
 const normalizeText = value => String(value || '').toLowerCase().trim();
-const refundDebug = (step, details = {}) => {
-  console.log('[REFUND_DEBUG][cancellationRefundService]', step, details);
-};
+const refundDebug = () => {};
 
 /**
  * Determine cancellation stage based on order status

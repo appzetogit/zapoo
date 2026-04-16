@@ -152,7 +152,6 @@ export default function Checkout() {
         sendCutlery: true,
       })
 
-      console.log("🔥 Razorpay orderId from backend:", response.data?.razorpay?.orderId || response.data?.data?.razorpay?.orderId)
 
       const order = response.data?.data?.order || response.data?.order
       const razorpay = response.data?.data?.razorpay || response.data?.razorpay
