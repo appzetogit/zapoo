@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, ChevronRight, Wallet, Tag, User, Leaf, Palette, Bookmark, Building2, Moon, Sun, Check, Info, PenSquare, AlertTriangle, Settings as SettingsIcon, Power, ShoppingCart, UtensilsCrossed, Languages } from "lucide-react";
+import { ArrowLeft, ChevronRight, Wallet, Tag, User, Leaf, Palette, Bookmark, Building2, Moon, Sun, Check, Info, PenSquare, AlertTriangle, Power, ShoppingCart, UtensilsCrossed, Languages } from "lucide-react";
 import AnimatedPage from "../../components/AnimatedPage";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -687,40 +687,6 @@ export default function Profile() {
                     }} transition={{
                       duration: 0.3
                     }}>
-                        <SettingsIcon className="h-5 w-5 text-gray-700 dark:text-gray-300" />
-                      </motion.div>
-                      <span className="text-base font-medium text-gray-900 dark:text-white">{t("user.profile.settings")}</span>
-                    </div>
-                    <motion.div whileHover={{
-                    x: 4
-                  }} transition={{
-                    duration: 0.2
-                  }}>
-                      <ChevronRight className="h-5 w-5 text-gray-400 dark:text-gray-500" />
-                    </motion.div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            </Link>
-
-            <Link to="/user/profile/settings" className="block">
-              <motion.div whileHover={{
-              x: 4,
-              scale: 1.01
-            }} transition={{
-              duration: 0.2,
-              type: "spring",
-              stiffness: 300
-            }}>
-                <Card className="bg-white dark:bg-[#1a1a1a] py-0 rounded-xl shadow-sm border-0 dark:border-gray-800 cursor-pointer">
-                  <CardContent className="p-4 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <motion.div className="bg-gray-100 dark:bg-gray-800 rounded-full p-2" whileHover={{
-                      rotate: 15,
-                      scale: 1.1
-                    }} transition={{
-                      duration: 0.3
-                    }}>
                         <Languages className="h-5 w-5 text-gray-700 dark:text-gray-300" />
                       </motion.div>
                       <span className="text-base font-medium text-gray-900 dark:text-white">{t("common.language")}</span>
@@ -776,10 +742,10 @@ export default function Profile() {
 
       {/* Veg Mode Popup */}
       <Dialog open={vegModeOpen} onOpenChange={setVegModeOpen}>
-        <DialogContent className="max-w-sm md:max-w-md lg:max-w-lg w-[calc(100%-2rem)] rounded-2xl p-0 overflow-hidden">
+        <DialogContent className="max-w-sm md:max-w-md lg:max-w-lg w-[calc(100%-2rem)] rounded-2xl p-0 overflow-hidden bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-800">
           <DialogHeader className="p-5 pb-3">
-            <DialogTitle className="text-lg font-bold text-gray-900">{t("user.profile.vegMode")}</DialogTitle>
-            <DialogDescription className="text-sm text-gray-500">
+            <DialogTitle className="text-lg font-bold text-gray-900 dark:text-white">{t("user.profile.vegMode")}</DialogTitle>
+            <DialogDescription className="text-sm text-gray-500 dark:text-gray-400">
               {t("user.profile.vegModeDescription")}
             </DialogDescription>
           </DialogHeader>
@@ -793,11 +759,11 @@ export default function Profile() {
                   {vegMode && <Check className="h-3 w-3 text-white" />}
                 </div>
                 <div className="text-left">
-                  <p className="font-medium text-gray-900 text-sm">{t("user.profile.vegModeOnTitle")}</p>
-                  <p className="text-xs text-gray-500">{t("user.profile.vegModeOnDescription")}</p>
+                  <p className="font-medium text-gray-900 dark:text-white text-sm">{t("user.profile.vegModeOnTitle")}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">{t("user.profile.vegModeOnDescription")}</p>
                 </div>
               </div>
-              <Leaf className={`h-5 w-5 ${vegMode ? 'text-orange-600' : 'text-gray-400'}`} />
+              <Leaf className={`h-5 w-5 ${vegMode ? 'text-orange-600' : 'text-gray-400 dark:text-gray-500'}`} />
             </button>
             <button onClick={() => {
             setVegMode(false);
@@ -808,8 +774,8 @@ export default function Profile() {
                   {!vegMode && <Check className="h-3 w-3 text-white" />}
                 </div>
                 <div className="text-left">
-                  <p className="font-medium text-gray-900 text-sm">{t("user.profile.vegModeOffTitle")}</p>
-                  <p className="text-xs text-gray-500">{t("user.profile.vegModeOffDescription")}</p>
+                  <p className="font-medium text-gray-900 dark:text-white text-sm">{t("user.profile.vegModeOffTitle")}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">{t("user.profile.vegModeOffDescription")}</p>
                 </div>
               </div>
             </button>

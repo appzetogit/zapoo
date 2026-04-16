@@ -6,7 +6,6 @@ import { useTranslation } from "react-i18next"
 import AnimatedPage from "../../components/AnimatedPage"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
-import { Switch } from "@/components/ui/switch"
 import { Button } from "@/components/ui/button"
 import { userAPI } from "@/lib/api"
 import {
@@ -57,15 +56,15 @@ export default function Settings() {
               <ArrowLeft className="h-5 w-5 text-black dark:text-white" />
             </Button>
           </Link>
-          <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-black dark:text-white">{t("user.settings.title")}</h1>
+          <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-black dark:text-white">{t("common.language")}</h1>
         </div>
         <Card className="bg-white dark:bg-[#1a1a1a] border-0 dark:border-gray-800">
           <CardHeader>
-            <CardTitle className="text-gray-900 dark:text-white">{t("user.settings.notificationsPreferences")}</CardTitle>
+            <CardTitle className="text-gray-900 dark:text-white">{t("common.language")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="space-y-3">
-              <Label>{t("common.language")}</Label>
+              <Label>{t("common.chooseLanguage")}</Label>
               <div className="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
                 {LANGUAGES.map((language) => (
                   <button
@@ -88,24 +87,6 @@ export default function Settings() {
               <p className="text-xs text-gray-500 dark:text-gray-400">
                 {savingLanguage ? t("common.savingLanguage") : t("common.languageRefreshNotice")}
               </p>
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label>{t("user.settings.emailNotifications")}</Label>
-                <p className="text-sm text-muted-foreground">
-                  {t("user.settings.emailNotificationsDescription")}
-                </p>
-              </div>
-              <Switch defaultChecked />
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label>{t("user.settings.pushNotifications")}</Label>
-                <p className="text-sm text-muted-foreground">
-                  {t("user.settings.pushNotificationsDescription")}
-                </p>
-              </div>
-              <Switch defaultChecked />
             </div>
           </CardContent>
         </Card>

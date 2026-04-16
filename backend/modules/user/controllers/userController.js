@@ -99,18 +99,29 @@ export const updateUserProfile = asyncHandler(async (req, res) => {
       phone,
       dateOfBirth,
       anniversary,
-      gender
+      gender,
+      profileImage
     } = req.body;
     const user = await User.findById(req.user._id);
     if (!user) {
       return errorResponse(res, 404, 'User profile not found');
     }
 
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[A-Za-z]{3,}$/;
+    const isValidPhone = value => {
+      if (!value) return false;
+      const digits = String(value).trim().replace(/\D/g, '');
+      return digits.length === 10;
+    };
+
     // Update fields
     if (name !== undefined && name !== null) {
       user.name = name.trim();
     }
     if (email !== undefined && email !== null && email.trim() !== '') {
+      if (!emailRegex.test(email.trim())) {
+        return errorResponse(res, 400, 'Invalid email address');
+      }
       // Check if email already exists for another user
       const existingUser = await User.findOne({
         email: email.toLowerCase().trim(),
@@ -123,6 +134,9 @@ export const updateUserProfile = asyncHandler(async (req, res) => {
       user.email = email.toLowerCase().trim();
     }
     if (phone !== undefined && phone !== null) {
+      if (phone.trim() !== '' && !isValidPhone(phone)) {
+        return errorResponse(res, 400, 'Invalid phone number');
+      }
       // Check if phone already exists for another user
       if (phone.trim() !== '') {
         const existingUser = await User.findOne({
@@ -139,7 +153,21 @@ export const updateUserProfile = asyncHandler(async (req, res) => {
 
     // Update additional profile fields (if they exist in schema)
     if (dateOfBirth !== undefined) {
-      user.dateOfBirth = dateOfBirth || null;
+      if (dateOfBirth) {
+        const dob = new Date(dateOfBirth);
+        if (Number.isNaN(dob.getTime())) {
+          return errorResponse(res, 400, 'Invalid date of birth');
+        }
+        if (dob > new Date()) {
+          return errorResponse(res, 400, 'Date of birth cannot be in the future');
+        }
+        user.dateOfBirth = dob;
+      } else {
+        user.dateOfBirth = null;
+      }
+    }
+    if (profileImage !== undefined) {
+      user.profileImage = profileImage || null;
     }
     if (anniversary !== undefined) {
       user.anniversary = anniversary || null;

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, X, Pencil, Loader2 } from "lucide-react";
+import { ArrowLeft, X, Loader2, Camera, ImageUp, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -66,17 +66,55 @@ export default function EditProfile() {
     mobile: initialProfile.mobile ?? initialProfile.phone ?? "",
     email: initialProfile.email ?? "",
     dateOfBirth: initialProfile.dateOfBirth ? typeof initialProfile.dateOfBirth === 'string' ? dayjs(initialProfile.dateOfBirth) : dayjs(initialProfile.dateOfBirth) : null,
-    anniversary: initialProfile.anniversary ? typeof initialProfile.anniversary === 'string' ? dayjs(initialProfile.anniversary) : dayjs(initialProfile.anniversary) : null,
     gender: initialProfile.gender ?? ""
   };
   const [formData, setFormData] = useState(initialFormData);
-  const [initialData] = useState(initialFormData);
+  const [initialData, setInitialData] = useState(initialFormData);
+  const [errors, setErrors] = useState({});
   const [hasChanges, setHasChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [profileImage, setProfileImage] = useState(initialProfile?.profileImage || "");
   const [imagePreview, setImagePreview] = useState(initialProfile?.profileImage || "");
-  const fileInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
+  const galleryInputRef = useRef(null);
+
+  const normalizeFormData = data => ({
+    name: data.name ?? "",
+    mobile: data.mobile ?? "",
+    email: data.email ?? "",
+    dateOfBirth: data.dateOfBirth ? dayjs(data.dateOfBirth).format("YYYY-MM-DD") : "",
+    gender: data.gender ?? ""
+  });
+
+  const validateEmail = email => {
+    const trimmed = email.trim();
+    if (!trimmed) return true;
+    return /^[^\s@]+@[^\s@]+\.[A-Za-z]{3,}$/.test(trimmed);
+  };
+
+  const validatePhone = phone => {
+    const trimmed = phone.trim();
+    if (!trimmed) return true;
+    const digits = trimmed.replace(/\D/g, "");
+    return digits.length === 10;
+  };
+
+  const validateDateOfBirth = dateValue => {
+    if (!dateValue) return true;
+    const dob = dayjs(dateValue);
+    if (!dob.isValid()) return false;
+    return !dob.isAfter(dayjs(), "day");
+  };
+
+  const clearFieldError = field => {
+    setErrors(prev => {
+      if (!prev[field]) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  };
 
   // Update form data when profile changes
   useEffect(() => {
@@ -87,15 +125,18 @@ export default function EditProfile() {
       mobile: profile.mobile ?? profile.phone ?? "",
       email: profile.email ?? "",
       dateOfBirth: profile.dateOfBirth ? typeof profile.dateOfBirth === 'string' ? dayjs(profile.dateOfBirth) : dayjs(profile.dateOfBirth) : null,
-      anniversary: profile.anniversary ? typeof profile.anniversary === 'string' ? dayjs(profile.anniversary) : dayjs(profile.anniversary) : null,
       gender: profile.gender ?? ""
     };
     setFormData(newFormData);
+    setInitialData(newFormData);
 
     // Update profile image
     if (profile.profileImage) {
       setProfileImage(profile.profileImage);
       setImagePreview(profile.profileImage);
+    } else {
+      setProfileImage("");
+      setImagePreview("");
     }
   }, [userProfile]);
 
@@ -104,8 +145,8 @@ export default function EditProfile() {
 
   // Check if form has changes
   useEffect(() => {
-    const currentData = JSON.stringify(formData);
-    const savedData = JSON.stringify(initialData);
+    const currentData = JSON.stringify(normalizeFormData(formData));
+    const savedData = JSON.stringify(normalizeFormData(initialData));
     setHasChanges(currentData !== savedData);
   }, [formData, initialData]);
   const handleChange = (field, value) => {
@@ -113,14 +154,17 @@ export default function EditProfile() {
       ...prev,
       [field]: value
     }));
+    clearFieldError(field);
   };
   const handleClear = field => {
     setFormData(prev => ({
       ...prev,
       [field]: ""
     }));
+    clearFieldError(field);
   };
   const handleImageSelect = async e => {
+    const input = e.target;
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -153,6 +197,12 @@ export default function EditProfile() {
         setImagePreview(imageUrl);
         toast.success('Profile image uploaded successfully');
 
+        const savedProfile = loadProfileFromStorage() || userProfile || {};
+        saveProfileToStorage({
+          ...savedProfile,
+          profileImage: imageUrl
+        });
+
         // Update context
         updateUserProfile({
           profileImage: imageUrl
@@ -168,10 +218,67 @@ export default function EditProfile() {
       setImagePreview(profileImage);
     } finally {
       setIsUploadingImage(false);
+      if (input) {
+        input.value = "";
+      }
+    }
+  };
+  const handleRemoveImage = async () => {
+    if (!profileImage && !imagePreview) return;
+
+    try {
+      setIsUploadingImage(true);
+      const response = await userAPI.updateProfile({
+        profileImage: null
+      });
+      const updatedUser = response?.data?.data?.user || response?.data?.user;
+      const nextProfileImage = updatedUser?.profileImage ?? null;
+
+      setProfileImage("");
+      setImagePreview("");
+      updateUserProfile({
+        ...(updatedUser || {}),
+        profileImage: nextProfileImage
+      });
+
+      saveProfileToStorage({
+        ...(loadProfileFromStorage() || userProfile || {}),
+        ...(updatedUser || {}),
+        profileImage: nextProfileImage
+      });
+
+      window.dispatchEvent(new Event("userAuthChanged"));
+      toast.success('Profile image removed successfully');
+    } catch (error) {
+      console.error('Error removing profile image:', error);
+      toast.error(error?.response?.data?.message || 'Failed to remove profile image');
+    } finally {
+      setIsUploadingImage(false);
     }
   };
   const handleUpdate = async () => {
     if (isSaving) return;
+
+    const nextErrors = {};
+    if (!formData.name.trim()) {
+      nextErrors.name = "Name is required";
+    }
+    if (formData.email && !validateEmail(formData.email)) {
+      nextErrors.email = "Enter a valid email address";
+    }
+    if (formData.mobile && !validatePhone(formData.mobile)) {
+      nextErrors.mobile = "Enter a valid phone number";
+    }
+    if (formData.dateOfBirth && !validateDateOfBirth(formData.dateOfBirth)) {
+      nextErrors.dateOfBirth = "Date of birth cannot be in the future";
+    }
+
+    if (Object.keys(nextErrors).length > 0) {
+      setErrors(nextErrors);
+      toast.error("Please fix the highlighted fields");
+      return;
+    }
+
     try {
       setIsSaving(true);
 
@@ -181,7 +288,6 @@ export default function EditProfile() {
         email: formData.email || undefined,
         phone: formData.mobile || undefined,
         dateOfBirth: formData.dateOfBirth ? formData.dateOfBirth.format('YYYY-MM-DD') : undefined,
-        anniversary: formData.anniversary ? formData.anniversary.format('YYYY-MM-DD') : undefined,
         gender: formData.gender || undefined,
         profileImage: profileImage || undefined // Include profileImage in update
       };
@@ -204,7 +310,6 @@ export default function EditProfile() {
           email: updatedUser.email || formData.email,
           profileImage: updatedUser.profileImage || profileImage,
           dateOfBirth: updatedUser.dateOfBirth || formData.dateOfBirth?.format('YYYY-MM-DD'),
-          anniversary: updatedUser.anniversary || formData.anniversary?.format('YYYY-MM-DD'),
           gender: updatedUser.gender || formData.gender
         });
 
@@ -222,8 +327,6 @@ export default function EditProfile() {
       setIsSaving(false);
     }
   };
-  const handleMobileChange = () => {};
-  const handleEmailChange = () => {};
   const dateFieldSx = {
     '& .MuiOutlinedInput-root': {
       height: '48px',
@@ -264,10 +367,38 @@ export default function EditProfile() {
       },
       '& .MuiSvgIcon-root': {
         color: '#9ca3af'
+      },
+      '& .MuiInputAdornment-root': {
+        color: '#9ca3af'
+      },
+      '& .MuiPickersSectionList-root': {
+        color: '#f3f4f6'
+      },
+      '& .MuiPickersInputBase-sectionsContainer': {
+        color: '#f3f4f6'
+      },
+      '& .MuiPickersInputBase-input': {
+        color: '#f3f4f6',
+        WebkitTextFillColor: '#f3f4f6'
+      },
+      '& .MuiOutlinedInput-input': {
+        color: '#f3f4f6',
+        WebkitTextFillColor: '#f3f4f6'
       }
     },
     '.dark & .MuiInputBase-input': {
+      color: '#f3f4f6',
+      WebkitTextFillColor: '#f3f4f6'
+    },
+    '.dark & .MuiPickersSectionList-root': {
       color: '#f3f4f6'
+    },
+    '.dark & .MuiPickersInputBase-sectionsContainer': {
+      color: '#f3f4f6'
+    },
+    '.dark & .MuiPickersInputBase-input': {
+      color: '#f3f4f6',
+      WebkitTextFillColor: '#f3f4f6'
     },
     '.dark & .MuiInputBase-input::placeholder': {
       color: '#9ca3af',
@@ -296,13 +427,28 @@ export default function EditProfile() {
                 {avatarInitial}
               </AvatarFallback>
             </Avatar>
-            {/* Edit Icon */}
-            <button onClick={() => fileInputRef.current?.click()} disabled={isUploadingImage} className="absolute bottom-0 right-0 w-8 h-8 bg-green-600 rounded-full flex items-center justify-center shadow-lg border-2 border-white hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-              {isUploadingImage ? <Loader2 className="h-4 w-4 text-white animate-spin" /> : <Pencil className="h-4 w-4 text-white" />}
-            </button>
-            <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageSelect} className="hidden" />
           </div>
         </div>
+
+        <div className="flex flex-wrap justify-center gap-2">
+          <Button type="button" variant="outline" onClick={() => cameraInputRef.current?.click()} disabled={isUploadingImage} className="gap-2">
+            {isUploadingImage ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+            Take photo
+          </Button>
+          <Button type="button" variant="outline" onClick={() => galleryInputRef.current?.click()} disabled={isUploadingImage} className="gap-2">
+            {isUploadingImage ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageUp className="h-4 w-4" />}
+            Choose from gallery
+          </Button>
+          {imagePreview && (
+            <Button type="button" variant="ghost" onClick={handleRemoveImage} disabled={isUploadingImage} className="gap-2 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30">
+              <Trash2 className="h-4 w-4" />
+              Remove photo
+            </Button>
+          )}
+        </div>
+
+        <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" onChange={handleImageSelect} className="hidden" />
+        <input ref={galleryInputRef} type="file" accept="image/*" onChange={handleImageSelect} className="hidden" />
 
         {/* Form Card */}
         <Card className="bg-white dark:bg-[#1a1a1a] rounded-xl shadow-sm border-0 dark:border-gray-800">
@@ -318,6 +464,7 @@ export default function EditProfile() {
                     <X className="h-5 w-5" />
                   </button>}
               </div>
+              {errors.name && <p className="text-sm text-red-500">{errors.name}</p>}
             </div>
 
             {/* Mobile Field */}
@@ -326,8 +473,9 @@ export default function EditProfile() {
                 Mobile
               </Label>
               <div className="flex items-center gap-2">
-                <Input id="mobile" type="tel" value={formData.mobile} onChange={e => handleChange('mobile', e.target.value)} className="flex-1 h-12 text-base  border border-gray-300 dark:border-gray-700 focus:border-green-600 focus:ring-1 focus:ring-green-600 rounded-lg bg-white dark:bg-[#1a1a1a] text-gray-900 dark:text-white" placeholder="Mobile" />
+                <Input id="mobile" type="tel" inputMode="numeric" maxLength={10} value={formData.mobile} onChange={e => handleChange('mobile', e.target.value.replace(/\D/g, '').slice(0, 10))} className="flex-1 h-12 text-base  border border-gray-300 dark:border-gray-700 focus:border-green-600 focus:ring-1 focus:ring-green-600 rounded-lg bg-white dark:bg-[#1a1a1a] text-gray-900 dark:text-white" placeholder="Mobile" />
               </div>
+              {errors.mobile && <p className="text-sm text-red-500">{errors.mobile}</p>}
             </div>
 
             {/* Email Field */}
@@ -338,6 +486,7 @@ export default function EditProfile() {
               <div className="flex items-center gap-2">
                 <Input id="email" type="email" value={formData.email} onChange={e => handleChange('email', e.target.value)} className="flex-1 h-12 text-base border border-gray-300 dark:border-gray-700 focus:border-green-600 focus:ring-1 focus:ring-green-600 rounded-lg bg-white dark:bg-[#1a1a1a] text-gray-900 dark:text-white" placeholder="Email" />
               </div>
+              {errors.email && <p className="text-sm text-red-500">{errors.email}</p>}
             </div>
 
             {/* Date of Birth Field */}
@@ -346,25 +495,12 @@ export default function EditProfile() {
                 Date of birth
               </Label>
               <LocalizationProvider dateAdapter={AdapterDayjs}>
-                <DatePicker value={formData.dateOfBirth} onChange={newValue => handleChange('dateOfBirth', newValue)} slotProps={{
+                <DatePicker value={formData.dateOfBirth} onChange={newValue => handleChange('dateOfBirth', newValue)} disableFuture maxDate={dayjs()} slotProps={{
                 textField: {
                   className: "w-full",
-                  sx: dateFieldSx
-                }
-              }} />
-              </LocalizationProvider>
-            </div>
-
-            {/* Anniversary Field */}
-            <div className="space-y-1.5">
-              <Label htmlFor="anniversary" className="text-sm font-medium text-gray-700 dark:text-white">
-                Anniversary <span className="text-gray-400 dark:text-gray-500 font-normal">(Optional)</span>
-              </Label>
-              <LocalizationProvider dateAdapter={AdapterDayjs}>
-                <DatePicker value={formData.anniversary} onChange={newValue => handleChange('anniversary', newValue)} slotProps={{
-                textField: {
-                  className: "w-full",
-                  sx: dateFieldSx
+                  sx: dateFieldSx,
+                  error: !!errors.dateOfBirth,
+                  helperText: errors.dateOfBirth
                 }
               }} />
               </LocalizationProvider>

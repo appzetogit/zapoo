@@ -29,7 +29,12 @@ export default function Privacy() {
       console.error('Error fetching privacy data:', error)
       setPrivacyData({
         title: 'Privacy Policy',
-        content: '<p>Unable to load privacy policy at the moment. Please try again later.</p>'
+        content: `
+          <p>Zapoo collects the information needed to create your account, process orders, enable delivery tracking, and improve your experience across the app.</p>
+          <p>This may include your name, phone number, email, saved addresses, order history, device data, and app usage signals. We use this data to fulfill orders, provide support, send important notifications, and personalize recommendations.</p>
+          <p>We do not sell your personal information. We may share limited data with restaurants, delivery partners, payment providers, and service vendors only when necessary to complete your order or operate the platform.</p>
+          <p>You can request access, updates, or deletion of certain data where applicable, subject to legal and operational requirements.</p>
+        `
       })
     } finally {
       setLoading(false)
@@ -103,4 +108,3 @@ export default function Privacy() {
     </AnimatedPage>
   )
 }
-

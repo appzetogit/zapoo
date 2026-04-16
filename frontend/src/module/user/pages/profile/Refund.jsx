@@ -29,7 +29,12 @@ export default function Refund() {
       console.error('Error fetching refund data:', error)
       setRefundData({
         title: 'Refund Policy',
-        content: '<p>Unable to load refund policy at the moment. Please try again later.</p>'
+        content: `
+          <p>Refunds on Zapoo are considered for eligible issues such as missing items, incorrect items, damaged food, failed payments, or orders not delivered within a reasonable window.</p>
+          <p>If something goes wrong, please contact support as soon as possible with your order number and a clear description of the issue. We may request photos or other details to review the case.</p>
+          <p>Approved refunds are usually returned to the original payment method or Zapoo wallet, depending on the payment type and transaction status.</p>
+          <p>Delivery fees, tips, and certain completed orders may be non-refundable unless required by law or approved as a service exception.</p>
+        `
       })
     } finally {
       setLoading(false)
@@ -103,4 +108,3 @@ export default function Refund() {
     </AnimatedPage>
   )
 }
-

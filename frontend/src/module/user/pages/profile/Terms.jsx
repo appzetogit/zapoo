@@ -29,7 +29,12 @@ export default function Terms() {
       console.error('Error fetching terms data:', error)
       setTermsData({
         title: 'Terms and Conditions',
-        content: '<p>Unable to load terms and conditions at the moment. Please try again later.</p>'
+        content: `
+          <p>These Terms and Conditions govern your use of Zapoo, including ordering food, tracking deliveries, using offers, and accessing account features.</p>
+          <p>By using the app, you agree to provide accurate account details, place lawful orders, and use the platform responsibly. We may refuse, cancel, or limit orders when required for safety, fraud prevention, or service availability.</p>
+          <p>Prices, delivery charges, restaurant availability, and estimated delivery times may change based on location, demand, and partner availability. Any promotional offers are subject to eligibility and may be modified or withdrawn at any time.</p>
+          <p>For the full legal agreement, including limits of liability, disputes, and account suspension rules, please review the complete policy or contact support.</p>
+        `
       })
     } finally {
       setLoading(false)
@@ -103,4 +108,3 @@ export default function Terms() {
     </AnimatedPage>
   )
 }
-

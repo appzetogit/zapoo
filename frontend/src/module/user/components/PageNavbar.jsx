@@ -6,7 +6,7 @@ import { useLocation } from "../hooks/useLocation";
 import { useCart } from "../context/CartContext";
 import { useLocationSelector } from "./UserLayout";
 import { FaLocationDot } from "react-icons/fa6";
-import ThemeToggle from "@/components/ThemeToggle";
+import { useTheme } from "@/context/ThemeContext";
 export default function PageNavbar({
   textColor = "white",
   zIndex = 20,
@@ -23,6 +23,7 @@ export default function PageNavbar({
   const {
     openLocationSelector
   } = useLocationSelector();
+  const { theme } = useTheme();
   const cartCount = getCartCount();
 
   // Function to extract location parts for display
@@ -591,11 +592,12 @@ export default function PageNavbar({
     // Open location selector overlay
     openLocationSelector();
   };
-  const textColorClass = textColor === "white" ? "text-white" : "text-black";
-  const iconFill = textColor === "white" ? "white" : "black";
-  const ringColor = textColor === "white" ? "ring-white/30" : "ring-gray-800/30";
+  const isDarkTheme = theme === "dark";
+  const textColorClass = isDarkTheme || textColor === "white" ? "text-white" : "text-black";
+  const iconFill = isDarkTheme || textColor === "white" ? "white" : "black";
+  const ringColor = isDarkTheme ? "ring-white/20" : (textColor === "white" ? "ring-white/30" : "ring-gray-800/30");
   const zIndexClass = zIndex === 50 ? "z-50" : "z-20";
-  const navBgClass = textColor === "white" ? "bg-white/10 backdrop-blur-md border-b border-white/20" : "bg-white/90 backdrop-blur-md border-b border-black/5 shadow-sm";
+  const navBgClass = isDarkTheme ? "bg-[#1a1a1a]/90 backdrop-blur-md border-b border-gray-800/80 shadow-sm" : (textColor === "white" ? "bg-white/10 backdrop-blur-md border-b border-white/20" : "bg-white/90 backdrop-blur-md border-b border-black/5 shadow-sm");
   return <nav className={`md:hidden relative ${zIndexClass} w-full px-2 sm:px-3 md:px-4 lg:px-6 xl:px-8 py-2 sm:py-3 ${navBgClass}`} onClick={onNavClick}>
       <div className="flex items-center justify-between gap-2 sm:gap-3 md:gap-4 lg:gap-6 max-w-7xl mx-auto">
         {/* Left: Location - Hidden on desktop, shown on mobile */}
@@ -627,13 +629,11 @@ export default function PageNavbar({
         {/* Right: Actions - Hidden on desktop, shown on mobile */}
         <div className="flex md:hidden items-center gap-2 sm:gap-3 flex-shrink-0">
           {/* Theme Toggle */}
-          <ThemeToggle />
-
           {/* Wallet Icon */}
           <Link to="/user/wallet">
             <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-9 sm:w-9 rounded-full p-0 hover:opacity-80 transition-opacity" title="Wallet">
-              <div className={`h-full w-full rounded-full bg-white/20 flex items-center justify-center ring-2 ${ringColor}`}>
-                <Wallet className="h-4 w-4 sm:h-5 sm:w-5 text-gray-800" strokeWidth={2} />
+              <div className={`h-full w-full rounded-full ${isDarkTheme ? "bg-white/10" : "bg-white/20"} flex items-center justify-center ring-2 ${ringColor}`}>
+                <Wallet className={`h-4 w-4 sm:h-5 sm:w-5 ${isDarkTheme ? "text-white/90" : "text-gray-800"}`} strokeWidth={2} />
               </div>
             </Button>
           </Link>
@@ -641,8 +641,8 @@ export default function PageNavbar({
           {/* Cart Icon */}
           <Link to="/user/cart">
             <Button variant="ghost" size="icon" className="relative h-8 w-8 sm:h-9 sm:w-9 rounded-full p-0 hover:opacity-80 transition-opacity" title="Cart">
-              <div className={`h-full w-full rounded-full bg-white/20 flex items-center justify-center ring-2 ${ringColor}`}>
-                <ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5 text-gray-800" strokeWidth={2} />
+              <div className={`h-full w-full rounded-full ${isDarkTheme ? "bg-white/10" : "bg-white/20"} flex items-center justify-center ring-2 ${ringColor}`}>
+                <ShoppingCart className={`h-4 w-4 sm:h-5 sm:w-5 ${isDarkTheme ? "text-white/90" : "text-gray-800"}`} strokeWidth={2} />
               </div>
               {cartCount > 0 && <span className={`absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center ring-2 ${textColor === "white" ? "ring-white/50" : "ring-gray-800/30"}`}>
                   <span className="text-[9px] font-bold text-white">{cartCount > 99 ? "99+" : cartCount}</span>

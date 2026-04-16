@@ -111,7 +111,7 @@ export default function ReportSafetyEmergency() {
                   placeholder="Please provide details about the safety issue..."
                   value={report}
                   onChange={(e) => setReport(e.target.value)}
-                  className="min-h-[150px] md:min-h-[200px] lg:min-h-[250px] w-full resize-y text-sm md:text-base leading-relaxed"
+                  className="min-h-[150px] md:min-h-[200px] lg:min-h-[250px] w-full resize-y rounded-xl border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-[#121212] px-4 py-3 text-sm md:text-base leading-relaxed text-gray-800 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus-visible:ring-2 focus-visible:ring-red-600 focus-visible:border-red-600"
                   dir="ltr"
                   style={{
                     direction: 'ltr',
@@ -164,4 +164,3 @@ export default function ReportSafetyEmergency() {
     </AnimatedPage>
   )
 }
-

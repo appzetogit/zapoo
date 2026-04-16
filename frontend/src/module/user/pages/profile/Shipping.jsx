@@ -29,7 +29,12 @@ export default function Shipping() {
       console.error('Error fetching shipping data:', error)
       setShippingData({
         title: 'Shipping Policy',
-        content: '<p>Unable to load shipping policy at the moment. Please try again later.</p>'
+        content: `
+          <p>Zapoo delivery coverage depends on your selected location, restaurant availability, and active delivery partner support in your area.</p>
+          <p>Estimated delivery times are shown for guidance only and may change because of traffic, weather, preparation time, or high order volume.</p>
+          <p>Delivery charges, minimum order amounts, and service availability can vary by zone, restaurant, and order value.</p>
+          <p>If your address is outside our active service area, we may be unable to complete the order or may suggest alternative nearby options.</p>
+        `
       })
     } finally {
       setLoading(false)
@@ -103,4 +108,3 @@ export default function Shipping() {
     </AnimatedPage>
   )
 }
-

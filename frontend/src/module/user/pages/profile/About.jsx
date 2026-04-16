@@ -5,7 +5,6 @@ import { motion } from "framer-motion"
 import AnimatedPage from "../../components/AnimatedPage"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import zapooFoodLogo from "@/assets/zapoo_logo.png"
 import api from "@/lib/api"
 import { API_ENDPOINTS } from "@/lib/api/config"
 import { useCompanyName } from "@/lib/hooks/useCompanyName"
@@ -23,6 +22,7 @@ const iconMap = {
 export default function About() {
   const companyName = useCompanyName()
   const [loading, setLoading] = useState(true)
+  const [logoError, setLogoError] = useState(false)
   const [aboutData, setAboutData] = useState({
     appName: 'Zapoo',
     version: '1.0.0',
@@ -93,10 +93,11 @@ export default function About() {
               >
                 <div className="relative">
                   <div className="absolute inset-0 bg-orange-400 rounded-full blur-2xl opacity-30 animate-pulse" />
-                  <div className="relative bg-white dark:bg-gray-800 rounded-full p-4 md:p-6 shadow-xl">
+                  <div className="relative bg-white dark:bg-gray-800 rounded-full p-4 md:p-6 shadow-xl overflow-hidden">
                     <img
-                      src={aboutData.logo && aboutData.logo.trim() ? aboutData.logo : zapooFoodLogo}
+                      src={!logoError && aboutData.logo && aboutData.logo.trim() ? aboutData.logo : "/zapoo-logo.jpg"}
                       alt={`${aboutData.appName} Logo`}
+                      onError={() => setLogoError(true)}
                       className="h-16 w-16 md:h-20 md:w-20 object-contain rounded-full"
                     />
                   </div>
@@ -185,7 +186,7 @@ export default function About() {
             <CardContent className="p-5 md:p-6">
               <h3 className="text-lg md:text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                 <FileText className="h-5 w-5 text-gray-600 dark:text-gray-400" />
-                Legal Information
+                Policies & Legal
               </h3>
               <div className="space-y-3">
                 <Link
@@ -199,8 +200,8 @@ export default function About() {
                     <div className="text-base font-medium text-gray-900 dark:text-white group-hover:text-orange-600 dark:group-hover:text-orange-400 transition-colors">
                       Terms and Conditions
                     </div>
-                    <div className="text-sm text-gray-500 dark:text-gray-500">
-                      Read our terms and conditions
+                      <div className="text-sm text-gray-500 dark:text-gray-500">
+                      Know your order, payment, and service terms
                     </div>
                   </div>
                   <ArrowRight className="h-5 w-5 text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300 transition-colors" />
@@ -218,7 +219,7 @@ export default function About() {
                       Privacy Policy
                     </div>
                     <div className="text-sm text-gray-500 dark:text-gray-500">
-                      Learn how we protect your data
+                      Learn how Zapoo collects, stores, and protects your data
                     </div>
                   </div>
                   <ArrowRight className="h-5 w-5 text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300 transition-colors" />
@@ -236,7 +237,7 @@ export default function About() {
                       Content Policy
                     </div>
                     <div className="text-sm text-gray-500 dark:text-gray-500">
-                      Read our content policy
+                      Understand what content is allowed on Zapoo
                     </div>
                   </div>
                   <ArrowRight className="h-5 w-5 text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300 transition-colors" />
@@ -254,7 +255,7 @@ export default function About() {
                       Refund Policy
                     </div>
                     <div className="text-sm text-gray-500 dark:text-gray-500">
-                      Read our refund terms and conditions
+                      See when refunds are applicable for your orders
                     </div>
                   </div>
                   <ArrowRight className="h-5 w-5 text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300 transition-colors" />
@@ -272,7 +273,7 @@ export default function About() {
                       Shipping Policy
                     </div>
                     <div className="text-sm text-gray-500 dark:text-gray-500">
-                      Learn about our shipping terms
+                      Check delivery timelines and shipping coverage
                     </div>
                   </div>
                   <ArrowRight className="h-5 w-5 text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300 transition-colors" />
@@ -290,7 +291,7 @@ export default function About() {
                       Cancellation Policy
                     </div>
                     <div className="text-sm text-gray-500 dark:text-gray-500">
-                      Read our cancellation terms and conditions
+                      See how order cancellations and charges work
                     </div>
                   </div>
                   <ArrowRight className="h-5 w-5 text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300 transition-colors" />
@@ -315,4 +316,3 @@ export default function About() {
     </AnimatedPage>
   )
 }
-

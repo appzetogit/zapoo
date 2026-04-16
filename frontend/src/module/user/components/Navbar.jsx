@@ -12,15 +12,16 @@ import {
 import { useLocation } from "../hooks/useLocation"
 import { useCart } from "../context/CartContext"
 import { useLocationSelector } from "./UserLayout"
-import ThemeToggle from "@/components/ThemeToggle"
 import { getCachedSettings, loadBusinessSettings } from "@/lib/utils/businessSettings"
 import { useTranslation } from "react-i18next"
+import { useTheme } from "@/context/ThemeContext"
 
 export default function Navbar() {
   const { t } = useTranslation()
   const { location, loading } = useLocation()
   const { getCartCount } = useCart()
   const { openLocationSelector } = useLocationSelector()
+  const { theme } = useTheme()
   const cartCount = getCartCount()
   const [logoUrl, setLogoUrl] = useState(null)
   const [companyName, setCompanyName] = useState(null)
@@ -77,6 +78,7 @@ export default function Navbar() {
   const areaName = location?.area && location?.area !== location?.city ? location.area : null
   const cityName = areaName || location?.city || t("user.navbar.select")
   const stateName = location?.state || t("user.navbar.location")
+  const isDark = theme === "dark"
 
   const handleLocationClick = () => {
     // Open location selector overlay
@@ -87,7 +89,7 @@ export default function Navbar() {
   const userPoints = 99
 
   return (
-    <nav className="z-50 w-full backdrop-blur-md bg-gradient-to-b from-page-bg/80 via-page-bg/50 to-page-bg/20 border-b border-gray-200/50">
+    <nav className={`z-50 w-full backdrop-blur-md ${isDark ? "bg-[#1a1a1a]/90 border-b border-gray-800 shadow-sm" : "bg-gradient-to-b from-page-bg/80 via-page-bg/50 to-page-bg/20 border-b border-gray-200/50"}`}>
       <div className="w-full px-3 sm:px-4 md:px-6 lg:px-8">
         <div className="flex h-16 sm:h-18 md:h-20 items-center justify-between gap-2 sm:gap-3 md:gap-4">
           {/* Location Section */}
@@ -104,12 +106,12 @@ export default function Navbar() {
                 </span>
               ) : (
                 <div className="flex flex-col items-start w-full min-w-0">
-                  <span className="text-xs sm:text-sm flex flex-row items-center gap-1 font-semibold text-left text-foreground truncate w-full">
-                    <MapPin className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-black flex-shrink-0" />
+                  <span className={`text-xs sm:text-sm flex flex-row items-center gap-1 font-semibold text-left truncate w-full ${isDark ? "text-white" : "text-foreground"}`}>
+                    <MapPin className={`h-3 w-3 sm:h-3.5 sm:w-3.5 flex-shrink-0 ${isDark ? "text-white" : "text-black"}`} />
                     {cityName}
                   </span>
                   {location?.state && (
-                    <span className="text-[10px] sm:text-xs text-black pt-1 text-left truncate w-full">
+                    <span className={`text-[10px] sm:text-xs pt-1 text-left truncate w-full ${isDark ? "text-gray-300" : "text-black"}`}>
                       {stateName}
                     </span>
                   )}
@@ -126,7 +128,7 @@ export default function Navbar() {
 
 
               size="icon"
-              className="relative h-10 w-10 sm:h-11 sm:w-11 md:h-12 md:w-12 hover:bg-gray-100"
+              className={`relative h-10 w-10 sm:h-11 sm:w-11 md:h-12 md:w-12 ${isDark ? "hover:bg-gray-800" : "hover:bg-gray-100"}`}
               title={t("user.navbar.pointsTitle", { points: userPoints })}
             >
               <Trophy className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 text-primary-orange" />
@@ -137,8 +139,8 @@ export default function Navbar() {
 
             {/* Cart */}
             <Link to="/user/cart">
-              <Button variant="ghost" size="icon" className="relative h-10 w-10 sm:h-11 sm:w-11 md:h-12 md:w-12 hover:bg-gray-100">
-                <ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6" />
+              <Button variant="ghost" size="icon" className={`relative h-10 w-10 sm:h-11 sm:w-11 md:h-12 md:w-12 ${isDark ? "hover:bg-gray-800" : "hover:bg-gray-100"}`}>
+                <ShoppingCart className={`h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 ${isDark ? "text-white/90" : "text-gray-800"}`} />
                 {cartCount > 0 && (
                   <span className="absolute -top-0.5 -right-0.5 sm:-top-1 sm:-right-1 h-4 w-4 sm:h-5 sm:w-5 rounded-full bg-primary-orange text-white text-[10px] sm:text-xs flex items-center justify-center font-semibold">
                     {cartCount > 99 ? "99+" : cartCount}
@@ -147,13 +149,10 @@ export default function Navbar() {
               </Button>
             </Link>
 
-            {/* Theme Toggle */}
-            <ThemeToggle className="h-10 w-10 sm:h-11 sm:w-11 md:h-12 md:w-12" />
-
             {/* Profile */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="rounded-full h-10 w-10 sm:h-11 sm:w-11 md:h-12 md:w-12 hover:bg-gray-100">
+                <Button variant="ghost" size="icon" className={`rounded-full h-10 w-10 sm:h-11 sm:w-11 md:h-12 md:w-12 ${isDark ? "hover:bg-gray-800" : "hover:bg-gray-100"}`}>
                   <Avatar className="h-7 w-7 sm:h-8 sm:w-8 md:h-9 md:w-9">
                     <AvatarFallback className="bg-primary-orange text-white text-xs sm:text-sm md:text-base">
                       A

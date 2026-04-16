@@ -393,12 +393,12 @@ export default function Orders() {
     }
   };
   if (loading) {
-    return <div className="min-h-screen bg-gray-50 pb-10">
-        <div className="bg-white p-4 flex items-center shadow-sm sticky top-0 z-10">
+    return <div className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a] pb-10">
+        <div className="bg-white dark:bg-[#1a1a1a] p-4 flex items-center shadow-sm sticky top-0 z-10 border-b border-gray-100 dark:border-gray-800">
           <Link to="/user">
-            <ArrowLeft className="w-6 h-6 text-gray-700 cursor-pointer" />
+            <ArrowLeft className="w-6 h-6 text-gray-700 dark:text-gray-200 cursor-pointer" />
           </Link>
-          <h1 className="ml-4 text-xl font-semibold text-gray-800">{t("user.orders.title")}</h1>
+          <h1 className="ml-4 text-xl font-semibold text-gray-800 dark:text-white">{t("user.orders.title")}</h1>
         </div>
         <div className="flex items-center justify-center py-20">
           <Loader2 className="w-8 h-8 text-red-500 animate-spin" />
@@ -406,42 +406,42 @@ export default function Orders() {
       </div>;
   }
   if (orders.length === 0) {
-    return <div className="min-h-screen bg-gray-50 pb-10">
-        <div className="bg-white p-4 flex items-center shadow-sm sticky top-0 z-10">
+    return <div className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a] pb-10">
+        <div className="bg-white dark:bg-[#1a1a1a] p-4 flex items-center shadow-sm sticky top-0 z-10 border-b border-gray-100 dark:border-gray-800">
           <Link to="/user">
-            <ArrowLeft className="w-6 h-6 text-gray-700 cursor-pointer" />
+            <ArrowLeft className="w-6 h-6 text-gray-700 dark:text-gray-200 cursor-pointer" />
           </Link>
-          <h1 className="ml-4 text-xl font-semibold text-gray-800">{t("user.orders.title")}</h1>
+          <h1 className="ml-4 text-xl font-semibold text-gray-800 dark:text-white">{t("user.orders.title")}</h1>
         </div>
         <div className="px-4 py-8 text-center">
-          <p className="text-gray-600">{t("user.orders.empty.noOrders")}</p>
+          <p className="text-gray-600 dark:text-gray-400">{t("user.orders.empty.noOrders")}</p>
           <Link to="/user">
             <button className="mt-4 text-red-500 font-medium">{t("user.orders.empty.startOrdering")}</button>
           </Link>
         </div>
       </div>;
   }
-  return <div className="min-h-screen bg-gray-50 pb-10 font-sans">
+  return <div className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a] pb-10 font-sans">
       {/* Header */}
-      <div className="bg-white p-4 flex items-center shadow-sm sticky top-0 z-10">
+      <div className="bg-white dark:bg-[#1a1a1a] p-4 flex items-center shadow-sm sticky top-0 z-10 border-b border-gray-100 dark:border-gray-800">
         <Link to="/user">
-          <ArrowLeft className="w-6 h-6 text-gray-700 cursor-pointer" />
+          <ArrowLeft className="w-6 h-6 text-gray-700 dark:text-gray-200 cursor-pointer" />
         </Link>
-        <h1 className="ml-4 text-xl font-semibold text-gray-800">{t("user.orders.title")}</h1>
+        <h1 className="ml-4 text-xl font-semibold text-gray-800 dark:text-white">{t("user.orders.title")}</h1>
       </div>
 
       {/* Search Bar */}
-      <div className="p-4 bg-white mt-1">
-        <div className="flex items-center bg-white border border-gray-200 rounded-lg px-3 py-2 shadow-sm">
+      <div className="p-4 bg-white dark:bg-[#0a0a0a] mt-1">
+        <div className="flex items-center bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 shadow-sm">
           <Search className="w-5 h-5 text-red-500" />
-          <input type="text" placeholder={t("user.orders.searchPlaceholder")} value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="flex-1 ml-3 outline-none text-gray-600 placeholder-gray-400" />
+          <input type="text" placeholder={t("user.orders.searchPlaceholder")} value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="flex-1 ml-3 outline-none text-gray-600 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500 bg-transparent" />
         </div>
       </div>
 
       {/* Orders List */}
       <div className="px-4 py-2 space-y-4">
-        {filteredOrders.length === 0 ? <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center">
-            <p className="text-gray-600">{t("user.orders.empty.noSearchResults")}</p>
+        {filteredOrders.length === 0 ? <div className="bg-white dark:bg-[#1a1a1a] rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 p-8 text-center">
+            <p className="text-gray-600 dark:text-gray-400">{t("user.orders.empty.noSearchResults")}</p>
           </div> : filteredOrders.map(order => {
         // Check payment method - COD/wallet orders have 'pending' status which is normal
         const isCodOrWallet = order.payment?.method === 'cash' || order.payment?.method === 'cod' || order.payment?.method === 'wallet' || order.paymentMethod === 'cash' || order.paymentMethod === 'cod' || order.paymentMethod === 'wallet';
@@ -457,22 +457,22 @@ export default function Orders() {
         const firstItemImage = order.items?.[0]?.image;
         const restaurantImage = firstItemImage || order.restaurantImage || "https://images.unsplash.com/photo-1604908176997-125188eb3c52?auto=format&fit=crop&w=200&q=80";
         const location = order.restaurantLocation || `${order.address?.city || ''}, ${order.address?.state || ''}`.trim() || t("user.orders.locationNotAvailable");
-        return <div key={order.id} className="relative bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        return <div key={order.id} className="relative bg-white dark:bg-[#1a1a1a] rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden">
                 {/* Card Header: Restaurant Info */}
                 <div className="flex items-start justify-between p-4 pb-2">
                   <div className="flex gap-3">
                     {/* Restaurant Image */}
-                    <div className="w-14 h-14 rounded-lg bg-gray-200 overflow-hidden flex-shrink-0">
+                    <div className="w-14 h-14 rounded-lg bg-gray-200 dark:bg-gray-800 overflow-hidden flex-shrink-0">
                       <img src={restaurantImage} alt={order.restaurant} className="w-full h-full object-cover" onError={e => {
                   e.target.src = "https://images.unsplash.com/photo-1555949258-eb67b1ef0ceb?auto=format&fit=crop&w=100&q=80";
                 }} />
                     </div>
                     
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-gray-800 text-lg leading-tight">{order.restaurant}</h3>
-                      <p className="text-xs text-gray-500 mt-0.5">{location}</p>
-                      {order.orderId && <p className="text-xs text-gray-400 mt-0.5 font-mono">#{order.orderId}</p>}
-                      {order.deliveryPartnerName && <p className="text-xs text-gray-600 mt-1">
+                      <h3 className="font-semibold text-gray-800 dark:text-white text-lg leading-tight">{order.restaurant}</h3>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{location}</p>
+                      {order.orderId && <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 font-mono">#{order.orderId}</p>}
+                      {order.deliveryPartnerName && <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
                           <span className="font-medium">{t("user.orders.deliveryLabel")}:</span> {order.deliveryPartnerName}
                           {order.deliveryPartnerPhone && ` • ${order.deliveryPartnerPhone}`}
                         </p>}
@@ -484,23 +484,23 @@ export default function Orders() {
                     </div>
                   </div>
                   
-                  <button type="button" onClick={() => toggleMenuForOrder(order.id)} className="p-1 rounded-full hover:bg-gray-100 transition-colors">
-                    <MoreVertical className="w-5 h-5 text-gray-400" />
+                  <button type="button" onClick={() => toggleMenuForOrder(order.id)} className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+                    <MoreVertical className="w-5 h-5 text-gray-400 dark:text-gray-500" />
                   </button>
                 </div>
 
                 {/* Three-dots dropdown menu */}
-                {activeMenuOrderId === order.id && <div className="absolute right-3 top-10 z-20 w-40 rounded-xl bg-white shadow-lg border border-gray-100 py-1 text-xs">
-                    <button type="button" onClick={() => handleShareRestaurant(order)} className="w-full text-left px-3 py-2 hover:bg-gray-50 text-gray-800">
+                {activeMenuOrderId === order.id && <div className="absolute right-3 top-10 z-20 w-40 rounded-xl bg-white dark:bg-[#1a1a1a] shadow-lg border border-gray-100 dark:border-gray-800 py-1 text-xs">
+                    <button type="button" onClick={() => handleShareRestaurant(order)} className="w-full text-left px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-800 dark:text-gray-200">
                       {t("user.orders.menu.shareRestaurant")}
                     </button>
-                    <button type="button" onClick={() => handleViewOrderDetails(order)} className="w-full text-left px-3 py-2 hover:bg-gray-50 text-gray-800">
+                    <button type="button" onClick={() => handleViewOrderDetails(order)} className="w-full text-left px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-800 dark:text-gray-200">
                       {t("user.orders.menu.orderDetails")}
                     </button>
                   </div>}
 
                 {/* Separator */}
-                <div className="border-t border-dashed border-gray-200 mx-4 my-1"></div>
+                <div className="border-t border-dashed border-gray-200 dark:border-gray-700 mx-4 my-1"></div>
 
                 {/* Items List */}
                 <div className="px-4 py-2 space-y-2">
@@ -526,48 +526,48 @@ export default function Orders() {
                                 <div className={`w-full h-full rounded-full ${isVeg ? 'bg-green-600' : 'bg-red-600'}`}></div>
                               </div>
                               <div className="flex-1 min-w-0">
-                                <span className="text-sm text-gray-800 font-medium block">
+                                <span className="text-sm text-gray-800 dark:text-gray-200 font-medium block">
                                   {itemQuantity} x {itemName}
                                 </span>
-                                {item.description && <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{item.description}</p>}
+                                {item.description && <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-1">{item.description}</p>}
                               </div>
                               <div className="text-right flex-shrink-0">
-                                <span className="text-sm font-semibold text-gray-800">₹{itemTotal.toFixed(2)}</span>
-                                {itemQuantity > 1 && <p className="text-xs text-gray-500">₹{itemPrice.toFixed(2)} {t("user.orders.each")}</p>}
+                                <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">₹{itemTotal.toFixed(2)}</span>
+                                {itemQuantity > 1 && <p className="text-xs text-gray-500 dark:text-gray-400">₹{itemPrice.toFixed(2)} {t("user.orders.each")}</p>}
                               </div>
                             </div>
                           </div>
                         </div>;
-            }) : <p className="text-sm text-gray-500">{t("user.orders.noItemsFound")}</p>}
+            }) : <p className="text-sm text-gray-500 dark:text-gray-400">{t("user.orders.noItemsFound")}</p>}
                 </div>
 
                 {/* Order Summary */}
-                <div className="px-4 py-3 bg-gray-50 rounded-lg mx-4 mb-2">
+                <div className="px-4 py-3 bg-gray-50 dark:bg-gray-900 rounded-lg mx-4 mb-2">
                   <div className="space-y-1.5">
                     {order.subtotal > 0 && <div className="flex justify-between text-xs">
-                        <span className="text-gray-600">{t("user.orders.summary.subtotal")}</span>
-                        <span className="text-gray-800 font-medium">₹{order.subtotal.toFixed(2)}</span>
+                        <span className="text-gray-600 dark:text-gray-400">{t("user.orders.summary.subtotal")}</span>
+                        <span className="text-gray-800 dark:text-gray-200 font-medium">₹{order.subtotal.toFixed(2)}</span>
                       </div>}
                     {order.deliveryFee > 0 && <div className="flex justify-between text-xs">
-                        <span className="text-gray-600">{t("user.orders.summary.deliveryFee")}</span>
-                        <span className="text-gray-800 font-medium">₹{order.deliveryFee.toFixed(2)}</span>
+                        <span className="text-gray-600 dark:text-gray-400">{t("user.orders.summary.deliveryFee")}</span>
+                        <span className="text-gray-800 dark:text-gray-200 font-medium">₹{order.deliveryFee.toFixed(2)}</span>
                       </div>}
                     {order.tax > 0 && <div className="flex justify-between text-xs">
-                        <span className="text-gray-600">{t("user.orders.summary.tax")}</span>
-                        <span className="text-gray-800 font-medium">₹{order.tax.toFixed(2)}</span>
+                        <span className="text-gray-600 dark:text-gray-400">{t("user.orders.summary.tax")}</span>
+                        <span className="text-gray-800 dark:text-gray-200 font-medium">₹{order.tax.toFixed(2)}</span>
                       </div>}
                     {order.pricing?.discount > 0 && <div className="flex justify-between text-xs">
                         <span className="text-green-600">{t("user.orders.summary.discount")}</span>
                         <span className="text-green-600 font-medium">-₹{order.pricing.discount.toFixed(2)}</span>
                       </div>}
                     {order.pricing?.couponCode && <div className="flex justify-between text-xs">
-                        <span className="text-gray-600">{t("user.orders.summary.couponApplied")}</span>
-                        <span className="text-gray-800 font-medium">{order.pricing.couponCode}</span>
+                        <span className="text-gray-600 dark:text-gray-400">{t("user.orders.summary.couponApplied")}</span>
+                        <span className="text-gray-800 dark:text-gray-200 font-medium">{order.pricing.couponCode}</span>
                       </div>}
-                    <div className="border-t border-gray-200 pt-1.5 mt-1.5">
+                    <div className="border-t border-gray-200 dark:border-gray-700 pt-1.5 mt-1.5">
                       <div className="flex justify-between">
-                        <span className="text-sm font-semibold text-gray-800">{t("user.orders.summary.total")}</span>
-                        <span className="text-base font-bold text-gray-900">₹{order.total.toFixed(2)}</span>
+                        <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">{t("user.orders.summary.total")}</span>
+                        <span className="text-base font-bold text-gray-900 dark:text-white">₹{order.total.toFixed(2)}</span>
                       </div>
                     </div>
                   </div>
@@ -578,11 +578,11 @@ export default function Orders() {
                   <div className="flex-1">
                     <p className="text-xs text-gray-400">{t("user.orders.orderPlacedOn")} {formatDate(order.createdAt)}</p>
                     {order.deliveredAt && <p className="text-xs text-gray-400 mt-0.5">{t("user.orders.deliveredOn")} {formatDate(order.deliveredAt)}</p>}
-                    {order.payment && <p className="text-xs text-gray-500 mt-1">
+                    {order.payment && <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                         {t("user.orders.payment")} <span className="font-medium capitalize">
                           {order.payment.method === 'cash' || order.payment.method === 'cod' ? t("user.orders.paymentMethod.cashOnDelivery") : order.payment.method === 'wallet' ? t("user.orders.paymentMethod.wallet") : order.payment.method === 'razorpay' ? t("user.orders.paymentMethod.online") : order.payment.method || t("user.orders.paymentMethod.na")}
                         </span>
-                        {order.payment.status && <span className={`ml-2 px-1.5 py-0.5 rounded text-[10px] font-medium ${order.payment.status === 'completed' ? 'bg-green-100 text-green-700' : order.payment.status === 'failed' ? 'bg-red-100 text-red-700' : order.payment.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-700'}`}>
+                        {order.payment.status && <span className={`ml-2 px-1.5 py-0.5 rounded text-[10px] font-medium ${order.payment.status === 'completed' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : order.payment.status === 'failed' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : order.payment.status === 'pending' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'}`}>
                             {getPaymentStatusLabel(order.payment.status)}
                           </span>}
                       </p>}
@@ -622,18 +622,18 @@ export default function Orders() {
                       <span className="text-xs font-semibold text-red-500">{t("user.orders.status.paymentFailed")}</span>
                     </div> : isDelivered && order.rating ? <div>
                       <div className="flex items-center gap-1">
-                        <span className="text-sm text-gray-800">{t("user.orders.youRated")}</span>
+                        <span className="text-sm text-gray-800 dark:text-gray-200">{t("user.orders.youRated")}</span>
                         <div className="flex bg-yellow-400 text-white px-1 rounded text-[10px] items-center gap-0.5 h-4">
                           {order.rating}<Star className="w-2 h-2 fill-current" />
                         </div>
                       </div>
                     </div> : isDelivered ? <div>
-                      <p className="text-xs text-gray-500">{t("user.orders.status.orderDelivered")}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">{t("user.orders.status.orderDelivered")}</p>
                       <button type="button" onClick={() => handleOpenRating(order)} className="text-xs text-red-500 font-medium mt-0.5 flex items-center">
                         {t("user.orders.rateOrder")} <span className="ml-0.5">▸</span>
                       </button>
                     </div> : <div>
-                      <p className="text-xs text-gray-500">{order.status === 'preparing' ? t("user.orders.status.preparing") : order.status === 'outForDelivery' ? t("user.orders.status.outForDelivery") : order.status === 'confirmed' ? t("user.orders.status.orderConfirmed") : ''}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">{order.status === 'preparing' ? t("user.orders.status.preparing") : order.status === 'outForDelivery' ? t("user.orders.status.outForDelivery") : order.status === 'confirmed' ? t("user.orders.status.orderConfirmed") : ''}</p>
                       {/* Countdown Timer */}
                       {countdowns[order.id] && countdowns[order.id] > 0 && <div className="flex items-center gap-1 mt-1 text-xs text-orange-600 font-medium">
                           <Clock size={12} />
@@ -653,12 +653,12 @@ export default function Orders() {
 
       {/* Footer Branding */}
       <div className="flex justify-center mt-8 mb-4">
-        <h1 className="text-4xl font-black text-gray-200 tracking-tighter italic">{t("user.orders.brandName")}</h1>
+        <h1 className="text-4xl font-black text-gray-200 dark:text-gray-800 tracking-tighter italic">{t("user.orders.brandName")}</h1>
       </div>
 
       {/* Rating & Feedback Modal */}
       {ratingModal.open && ratingModal.order && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-md rounded-3xl bg-white shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
+          <div className="w-full max-w-md rounded-3xl bg-white dark:bg-[#1a1a1a] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 border border-gray-100 dark:border-gray-800">
             {/* Header with gradient */}
             <div className="bg-gradient-to-r from-[#E23744] to-red-600 px-6 py-5">
               <div className="flex items-center justify-between mb-2">
@@ -678,7 +678,7 @@ export default function Orders() {
             <div className="px-6 py-6">
               {/* Star rating (1–5) */}
               <div className="mb-6">
-                <p className="text-sm font-semibold text-gray-900 mb-4 text-center">
+                <p className="text-sm font-semibold text-gray-900 dark:text-white mb-4 text-center">
                   {t("user.orders.rating.experienceQuestion")}
                 </p>
                 <div className="flex items-center justify-center gap-2 mb-3">
@@ -693,10 +693,10 @@ export default function Orders() {
                 </div>
                 <div className="flex items-center justify-between mt-2 px-2">
                   <span className="text-xs text-red-500 font-medium">{t("user.orders.rating.poor")}</span>
-                  <span className="text-xs text-gray-400">{t("user.orders.rating.average")}</span>
+                  <span className="text-xs text-gray-400 dark:text-gray-500">{t("user.orders.rating.average")}</span>
                   <span className="text-xs text-green-600 font-medium">{t("user.orders.rating.excellent")}</span>
                 </div>
-                {selectedRating && <p className="text-center mt-3 text-sm font-medium text-gray-700">
+                {selectedRating && <p className="text-center mt-3 text-sm font-medium text-gray-700 dark:text-gray-300">
                     {selectedRating === 5 && t("user.orders.rating.legend.five")}
                     {selectedRating === 4 && t("user.orders.rating.legend.four")}
                     {selectedRating === 3 && t("user.orders.rating.legend.three")}
@@ -707,11 +707,11 @@ export default function Orders() {
 
               {/* Feedback textarea */}
               <div className="mb-6">
-                <label className="block text-sm font-semibold text-gray-900 mb-2">
+                <label className="block text-sm font-semibold text-gray-900 dark:text-white mb-2">
                   {t("user.orders.rating.shareFeedback")} <span className="text-gray-400 font-normal">({t("user.orders.optional")})</span>
                 </label>
-                <textarea rows={4} value={feedbackText} onChange={e => setFeedbackText(e.target.value)} className="w-full rounded-xl border-2 border-gray-200 px-4 py-3 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#E23744] focus:border-[#E23744] resize-none transition-all" placeholder={t("user.orders.rating.feedbackPlaceholder")} />
-                <p className="text-xs text-gray-400 mt-1">{t("user.orders.rating.feedbackHint")}</p>
+                <textarea rows={4} value={feedbackText} onChange={e => setFeedbackText(e.target.value)} className="w-full rounded-xl border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-[#121212] px-4 py-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#E23744] focus:border-[#E23744] resize-none transition-all" placeholder={t("user.orders.rating.feedbackPlaceholder")} />
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{t("user.orders.rating.feedbackHint")}</p>
               </div>
 
               {/* Submit Button */}

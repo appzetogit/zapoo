@@ -138,6 +138,9 @@ export function ProfileProvider({ children }) {
     } else {
       root.classList.remove('dark');
     }
+
+    // Keep the app-wide theme context aligned with profile appearance changes
+    window.dispatchEvent(new Event("userAppearanceChanged"))
   }, [appearance])
 
   // Fetch user profile and addresses from API on mount and when authentication changes

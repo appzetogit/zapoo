@@ -29,13 +29,13 @@ export const ThemeProvider = ({ children }) => {
 
   useEffect(() => {
     const root = window.document.documentElement;
-    
+
     // Check if we are in admin, restaurant or delivery module
     const isSpecialModule = /^\/(admin|restaurant|delivery)/.test(location.pathname);
-    
+
     // Remove both classes first
     root.classList.remove('light', 'dark');
-    
+
     if (isSpecialModule) {
       // Force light theme for these modules
       root.classList.add('light');
@@ -43,11 +43,30 @@ export const ThemeProvider = ({ children }) => {
       // Add the current theme class for customer module
       root.classList.add(theme);
     }
-    
-    // Save to localStorage
-    localStorage.setItem('appTheme', theme);
-    localStorage.setItem('userAppearance', theme);
   }, [theme, location.pathname]);
+
+  useEffect(() => {
+    const persistTheme = () => {
+      localStorage.setItem('appTheme', theme);
+      localStorage.setItem('userAppearance', theme);
+    };
+
+    const syncThemeFromStorage = () => {
+      const savedTheme = localStorage.getItem('userAppearance') || localStorage.getItem('appTheme');
+      if (savedTheme && savedTheme !== theme) {
+        setTheme(savedTheme);
+      }
+    };
+
+    persistTheme();
+    window.addEventListener('userAppearanceChanged', syncThemeFromStorage);
+    window.addEventListener('storage', syncThemeFromStorage);
+
+    return () => {
+      window.removeEventListener('userAppearanceChanged', syncThemeFromStorage);
+      window.removeEventListener('storage', syncThemeFromStorage);
+    };
+  }, [theme]);
 
   const toggleTheme = () => {
     setTheme((prevTheme) => (prevTheme === 'light' ? 'dark' : 'light'));

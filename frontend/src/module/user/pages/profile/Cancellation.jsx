@@ -29,7 +29,12 @@ export default function Cancellation() {
       console.error('Error fetching cancellation data:', error)
       setCancellationData({
         title: 'Cancellation Policy',
-        content: '<p>Unable to load cancellation policy at the moment. Please try again later.</p>'
+        content: `
+          <p>You may be able to cancel an order before the restaurant starts preparing it or before the delivery partner is assigned, depending on the order status.</p>
+          <p>Once preparation starts, cancellation may be limited or unavailable because restaurants may have already accepted the order and begun work.</p>
+          <p>For prepaid orders, any eligible refund after cancellation will be processed according to the payment method and cancellation stage.</p>
+          <p>If an order has already been picked up or is close to delivery, cancellation may not be possible and associated charges may still apply.</p>
+        `
       })
     } finally {
       setLoading(false)
@@ -103,4 +108,3 @@ export default function Cancellation() {
     </AnimatedPage>
   )
 }
-

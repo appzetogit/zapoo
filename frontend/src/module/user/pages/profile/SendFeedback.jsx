@@ -86,7 +86,7 @@ export default function SendFeedback() {
                   placeholder="Tell us what you think..."
                   value={feedback}
                   onChange={(e) => setFeedback(e.target.value)}
-                  className="min-h-[250px] md:min-h-[350px] lg:min-h-[400px] w-full resize-y text-sm md:text-base leading-relaxed"
+                  className="min-h-[250px] md:min-h-[350px] lg:min-h-[400px] w-full resize-y rounded-xl border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-[#121212] px-4 py-3 text-sm md:text-base leading-relaxed text-gray-800 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus-visible:ring-2 focus-visible:ring-[#FF5200] focus-visible:border-[#FF5200]"
                   dir="ltr"
                   style={{
                     direction: 'ltr',
@@ -136,4 +136,3 @@ export default function SendFeedback() {
     </AnimatedPage>
   )
 }
-
