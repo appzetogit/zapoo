@@ -2416,7 +2416,6 @@ export default function LocationSelectorOverlay({
                     {userProfile?.name || "User"}, {addressFormData.phone || userProfile?.phone || "Add phone"}
                   </p>
                 </div>
-                <ChevronRight className="h-5 w-5 text-gray-400 shrink-0" />
               </div>
             </div>
 
