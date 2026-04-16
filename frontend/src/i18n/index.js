@@ -2,6 +2,21 @@ import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import { resources } from './resources.js';
 
+const ensureRestaurantDetailsAlias = (allResources) => {
+  Object.values(allResources || {}).forEach((langResource) => {
+    const userNamespace = langResource?.translation?.user;
+    const homeRestaurantDetails = userNamespace?.home?.restaurantDetails;
+    if (!userNamespace) return;
+
+    // Backward-compatibility alias for existing keys used in UI components.
+    if (!userNamespace.restaurantDetails && homeRestaurantDetails) {
+      userNamespace.restaurantDetails = homeRestaurantDetails;
+    }
+  });
+};
+
+ensureRestaurantDetailsAlias(resources);
+
 const getInitialLanguage = () => {
   if (typeof window === 'undefined') {
     return 'en';

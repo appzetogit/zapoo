@@ -44,7 +44,9 @@ export function getCurrentLanguage() {
 
 export function getModuleFromPath(pathname) {
   if (pathname.startsWith('/admin')) return 'admin';
-  if (pathname.startsWith('/restaurant')) return 'restaurant';
   if (pathname.startsWith('/delivery')) return 'delivery';
+  // Match only restaurant module routes like "/restaurant" or "/restaurant/*".
+  // User-facing routes "/restaurants/*" must remain in "user" module.
+  if (pathname === '/restaurant' || pathname.startsWith('/restaurant/')) return 'restaurant';
   return 'user';
 }
