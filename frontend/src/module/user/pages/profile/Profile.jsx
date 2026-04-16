@@ -30,7 +30,6 @@ export default function Profile() {
   // Popup states
   const [vegModeOpen, setVegModeOpen] = useState(false);
   const [appearanceOpen, setAppearanceOpen] = useState(false);
-  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
 
@@ -175,22 +174,8 @@ export default function Profile() {
       setIsLoggingOut(false);
     }
   };
-
-  const handleLogoutClick = () => {
-    setLogoutConfirmOpen(true);
-  };
-
-  const confirmLogout = async () => {
-    setLogoutConfirmOpen(false);
-    await handleLogout();
-  };
-
-  const cancelLogout = () => {
-    setLogoutConfirmOpen(false);
-  };
-
   return <AnimatedPage className="min-h-screen bg-[#f5f5f5] dark:bg-[#0a0a0a]">
-      <div className="max-w-md md:max-w-2xl lg:max-w-4xl xl:max-w-5xl mx-auto px-4 sm:px-6 md:px-8 lg:px-10 xl:px-12 py-4 sm:py-6 md:py-8 lg:py-10 pb-28">
+      <div className="max-w-md md:max-w-2xl lg:max-w-4xl xl:max-w-5xl mx-auto px-4 sm:px-6 md:px-8 lg:px-10 xl:px-12 py-4 sm:py-6 md:py-8 lg:py-10">
         {/* Back Arrow */}
         <div className="mb-4">
           <Link to="/user">
@@ -498,24 +483,7 @@ export default function Profile() {
             </motion.div>
           </Link>
         </div>
-      <Dialog open={logoutConfirmOpen} onOpenChange={setLogoutConfirmOpen}>
-        <DialogContent className="max-w-sm md:max-w-md lg:max-w-lg w-[calc(100%-2rem)] rounded-2xl p-0 overflow-hidden">
-          <DialogHeader className="p-5 pb-3">
-              <DialogTitle className="text-lg font-bold text-gray-900 dark:text-white">Confirm Logout</DialogTitle>
-              <DialogDescription className="text-sm text-gray-500 dark:text-gray-400">
-                Are you sure you want to log out? You will need to sign in again to access your account.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-3 px-5 pb-5">
-              <Button onClick={confirmLogout} className="w-full h-12 bg-red-600 hover:bg-red-700 text-white">
-                Yes, log out
-              </Button>
-              <Button variant="outline" onClick={cancelLogout} className="w-full h-12">
-                No, stay logged in
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+
         {/* Food Orders Section */}
         <div className="mb-3">
           <div className="flex items-center gap-2 mb-2 px-1">
@@ -745,7 +713,7 @@ export default function Profile() {
             type: "spring",
             stiffness: 300
           }}>
-              <Card className="bg-white dark:bg-[#1a1a1a] py-0 rounded-xl shadow-sm border-0 dark:border-gray-800 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed mb-6" onClick={handleLogoutClick}>
+              <Card className="bg-white dark:bg-[#1a1a1a] py-0 rounded-xl shadow-sm border-0 dark:border-gray-800 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed" onClick={handleLogout}>
                 <CardContent className="p-4 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <motion.div className="bg-gray-100 dark:bg-gray-800 rounded-full p-2" whileHover={{

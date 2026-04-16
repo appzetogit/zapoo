@@ -56,7 +56,6 @@ const Coupons = lazy(() => import("../pages/profile/Coupons"))
 const About = lazy(() => import("../pages/profile/About"))
 const Terms = lazy(() => import("../pages/profile/Terms"))
 const Privacy = lazy(() => import("../pages/profile/Privacy"))
-const ContentPolicy = lazy(() => import("../pages/profile/ContentPolicy"))
 const Refund = lazy(() => import("../pages/profile/Refund"))
 const Shipping = lazy(() => import("../pages/profile/Shipping"))
 const Cancellation = lazy(() => import("../pages/profile/Cancellation"))
@@ -253,9 +252,22 @@ export default function UserRouter() {
               </ProtectedRoute>
             }
           />
-          <Route path="/profile/terms" element={<Terms />} />
-          <Route path="/profile/privacy" element={<Privacy />} />
-          <Route path="/profile/content-policy" element={<ContentPolicy />} />
+          <Route
+            path="/profile/terms"
+            element={
+              <ProtectedRoute requiredRole="user" loginPath="/user/auth/sign-in">
+                <Terms />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/profile/privacy"
+            element={
+              <ProtectedRoute requiredRole="user" loginPath="/user/auth/sign-in">
+                <Privacy />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/profile/refund"
             element={

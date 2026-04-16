@@ -1,5 +1,5 @@
   import { useState, useEffect, useRef } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Mail, Phone, AlertCircle, Loader2 } from "lucide-react";
 import AnimatedPage from "../../components/AnimatedPage";
 import { Button } from "@/components/ui/button";
@@ -14,9 +14,85 @@ import { useTranslation } from "react-i18next";
 
 // Common country codes
 const countryCodes = [{
+  code: "+1",
+  country: "US/CA",
+  flag: "🇺🇸"
+}, {
+  code: "+44",
+  country: "UK",
+  flag: "🇬🇧"
+}, {
   code: "+91",
   country: "IN",
   flag: "🇮🇳"
+}, {
+  code: "+86",
+  country: "CN",
+  flag: "🇨🇳"
+}, {
+  code: "+81",
+  country: "JP",
+  flag: "🇯🇵"
+}, {
+  code: "+49",
+  country: "DE",
+  flag: "🇩🇪"
+}, {
+  code: "+33",
+  country: "FR",
+  flag: "🇫🇷"
+}, {
+  code: "+39",
+  country: "IT",
+  flag: "🇮🇹"
+}, {
+  code: "+34",
+  country: "ES",
+  flag: "🇪🇸"
+}, {
+  code: "+61",
+  country: "AU",
+  flag: "🇦🇺"
+}, {
+  code: "+7",
+  country: "RU",
+  flag: "🇷🇺"
+}, {
+  code: "+55",
+  country: "BR",
+  flag: "🇧🇷"
+}, {
+  code: "+52",
+  country: "MX",
+  flag: "🇲🇽"
+}, {
+  code: "+82",
+  country: "KR",
+  flag: "🇰🇷"
+}, {
+  code: "+65",
+  country: "SG",
+  flag: "🇸🇬"
+}, {
+  code: "+971",
+  country: "AE",
+  flag: "🇦🇪"
+}, {
+  code: "+966",
+  country: "SA",
+  flag: "🇸🇦"
+}, {
+  code: "+27",
+  country: "ZA",
+  flag: "🇿🇦"
+}, {
+  code: "+31",
+  country: "NL",
+  flag: "🇳🇱"
+}, {
+  code: "+46",
+  country: "SE",
+  flag: "🇸🇪"
 }];
 export default function SignIn() {
   const { t } = useTranslation();
@@ -302,7 +378,7 @@ export default function SignIn() {
   }, [navigate, searchParams]);
 
   // Get selected country details dynamically
-  const selectedCountry = countryCodes.find(c => c.code === formData.countryCode) || countryCodes[0]; // Default to India (+91)
+  const selectedCountry = countryCodes.find(c => c.code === formData.countryCode) || countryCodes[2]; // Default to India (+91)
 
   const validateEmail = email => {
     if (!email.trim()) {
@@ -340,25 +416,23 @@ export default function SignIn() {
     if (name.trim().length > 50) {
       return t("user.auth.signIn.validation.nameMax");
     }
-    const nameRegex = /^[a-zA-Z\s]+$/;
+    const nameRegex = /^[a-zA-Z\s'-]+$/;
     if (!nameRegex.test(name.trim())) {
-      return "Name can only contain letters and spaces";
+      return t("user.auth.signIn.validation.namePattern");
     }
     return "";
   };
 
   // Handle changes for email/phone/name fields
-const sanitizeNameInput = (value) => value.replace(/[^a-zA-Z\s]/g, "")
-
   const handleInputChange = (e) => {
     const { name, value } = e.target;
 
     if (name === "phone") {
-      // Allow only digits
-      const cleaned = value.replace(/\D/g, "");
-      // Limit based on country code (91 for India is 10 digits)
-      const maxLength = formData.countryCode === "+91" ? 10 : 15;
-      const restrictedValue = cleaned.slice(0, maxLength);
+    // Allow only digits
+    const cleaned = value.replace(/\D/g, "");
+    // Limit based on country code (91 for India is 10 digits)
+    const maxLength = formData.countryCode === "+91" ? 10 : 15;
+    const restrictedValue = cleaned.slice(0, maxLength);
 
       setFormData({
         ...formData,
@@ -369,10 +443,9 @@ const sanitizeNameInput = (value) => value.replace(/[^a-zA-Z\s]/g, "")
         phone: validatePhone(restrictedValue)
       });
     } else {
-      const sanitizedValue = name === "name" ? sanitizeNameInput(value) : value
       setFormData({
         ...formData,
-        [name]: sanitizedValue
+        [name]: value
       });
 
       // Real-time validation
@@ -384,7 +457,7 @@ const sanitizeNameInput = (value) => value.replace(/[^a-zA-Z\s]/g, "")
       } else if (name === "name") {
         setErrors({
           ...errors,
-          name: validateName(sanitizedValue)
+          name: validateName(value)
         });
       }
     }
@@ -453,20 +526,7 @@ const sanitizeNameInput = (value) => value.replace(/[^a-zA-Z\s]/g, "")
       // Navigate to OTP page
       navigate("/user/auth/otp");
     } catch (error) {
-      const response = error?.response?.data;
-      if (response?.errors && Array.isArray(response.errors)) {
-        const emailError = response.errors.find(err => err.field === 'email');
-        if (emailError) {
-          setErrors(prev => ({
-            ...prev,
-            email: t("user.auth.signIn.validation.emailInvalid")
-          }));
-          setApiError("");
-          setIsLoading(false);
-          return;
-        }
-      }
-      const message = response?.message || response?.error || t("user.auth.signIn.errors.failedToSendOtp");
+      const message = error?.response?.data?.message || error?.response?.data?.error || t("user.auth.signIn.errors.failedToSendOtp");
       setApiError(message);
     } finally {
       setIsLoading(false);
@@ -641,7 +701,7 @@ const sanitizeNameInput = (value) => value.replace(/[^a-zA-Z\s]/g, "")
         </div>
 
         {/* Form */}
-        <form noValidate onSubmit={handleSubmit} className="space-y-4 md:space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-4 md:space-y-5">
           {/* Name field for sign up - hidden by default, shown only when needed */}
           {isSignUp && <div className="space-y-2">
             <Input id="name" name="name" placeholder={t("user.auth.signIn.placeholders.fullName")} value={formData.name} onChange={handleChange} className={`text-base md:text-lg h-12 md:h-14 bg-white dark:bg-[#1a1a1a] text-black dark:text-white ${errors.name ? "border-red-500" : "border-gray-300 dark:border-gray-700"} transition-colors`} aria-invalid={errors.name ? "true" : "false"} />
@@ -759,11 +819,11 @@ const sanitizeNameInput = (value) => value.replace(/[^a-zA-Z\s]/g, "")
             {t("user.auth.signIn.disclaimer")}
           </p>
           <div className="flex justify-center gap-2 flex-wrap">
-            <Link to="/profile/terms" className="underline hover:text-gray-700 dark:hover:text-gray-300 transition-colors">{t("user.auth.signIn.termsOfService")}</Link>
+            <a href="#" className="underline hover:text-gray-700 dark:hover:text-gray-300 transition-colors">{t("user.auth.signIn.termsOfService")}</a>
             <span>•</span>
-            <Link to="/profile/privacy" className="underline hover:text-gray-700 dark:hover:text-gray-300 transition-colors">{t("user.auth.signIn.privacyPolicy")}</Link>
+            <a href="#" className="underline hover:text-gray-700 dark:hover:text-gray-300 transition-colors">{t("user.auth.signIn.privacyPolicy")}</a>
             <span>•</span>
-            <Link to="/profile/content-policy" className="underline hover:text-gray-700 dark:hover:text-gray-300 transition-colors">{t("user.auth.signIn.contentPolicy")}</Link>
+            <a href="#" className="underline hover:text-gray-700 dark:hover:text-gray-300 transition-colors">{t("user.auth.signIn.contentPolicy")}</a>
           </div>
         </div>
       </div>
