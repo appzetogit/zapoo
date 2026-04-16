@@ -10,6 +10,7 @@ import AdminCoupon from '../../admin/models/AdminCoupon.js';
 import mongoose from 'mongoose';
 
 const roundCurrency = (value) => Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
+const ADMIN_DELIVERY_GST_RATE = 0.18;
 
 const normalizeCouponSource = source => source === 'admin' ? 'admin' : source === 'restaurant' ? 'restaurant' : null;
 
@@ -118,7 +119,7 @@ export const calculateOrderSettlement = async (orderId) => {
 
     const foodPrice = roundCurrency(Math.max(0, userPayment.subtotal - restaurantCouponDiscount));
     const adminDeliveryCost = roundCurrency(order.pricing.adminDeliveryCost || order.pricing.deliveryFee || 0);
-    const adminDeliveryGst = roundCurrency(order.pricing.adminDeliveryGst || adminDeliveryCost * 0.18);
+    const adminDeliveryGst = roundCurrency(adminDeliveryCost * ADMIN_DELIVERY_GST_RATE);
     const platformFee = roundCurrency(
       order.pricing.platformFee !== undefined
         ? order.pricing.platformFee
@@ -126,7 +127,8 @@ export const calculateOrderSettlement = async (orderId) => {
     );
     const customerGst = roundCurrency(order.pricing.gstCollected ?? userPayment.gst);
     const gstCollected = roundCurrency(customerGst + adminDeliveryGst);
-    const payableToAdmin = roundCurrency(adminDeliveryCost + platformFee + gstCollected);
+    // Recommended item fee remains a separate internal charge and is not part of payableToAdmin.
+    const payableToAdmin = roundCurrency(adminDeliveryCost + adminDeliveryGst + platformFee + customerGst);
     const recommendedItemFee = roundCurrency(order.pricing.internalRecommendedFee || 0);
 
     const restaurantGrossCollection = roundCurrency(

@@ -12,6 +12,7 @@ import { DEFAULT_LOCALE, normalizeLocale } from '../../../shared/i18n/localeCons
 
 const roundCurrency = (value) => Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
 const normalizeCouponCode = (code = '') => String(code || '').trim().toUpperCase();
+const ADMIN_DELIVERY_GST_RATE = 0.18;
 
 /** Treat common truthy shapes from JSON / older clients */
 const isRestaurantCustomDeliveryEnabled = (restaurant) => {
@@ -757,7 +758,7 @@ export const calculateOrderPricing = async ({
     });
 
     const platformFee = roundCurrency(calculateTierPlatformFee(tier, feeSettings.platformFee));
-    const adminDeliveryGst = roundCurrency(adminDeliveryCost * 0.18);
+    const adminDeliveryGst = roundCurrency(adminDeliveryCost * ADMIN_DELIVERY_GST_RATE);
 
     /** After distance/order-value rules; may be zeroed by coupon or global threshold (threshold skipped when custom restaurant pricing is enabled) */
     let finalCustomerDeliveryFee = roundCurrency(customerDeliveryFeeBeforeWaivers);

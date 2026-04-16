@@ -225,17 +225,28 @@ export async function notifyRestaurantOrderUpdate(orderId, status) {
       throw new Error('Order not found');
     }
 
+    const normalizedStatus = status || order.status;
+    const wasPreparingBeforeCancel = Boolean(order?.tracking?.preparing?.status);
+    const isCustomerCancelled = normalizedStatus === 'cancelled' && order?.cancelledBy === 'user';
+    const statusUpdateMessage = isCustomerCancelled
+      ? wasPreparingBeforeCancel
+        ? `Order #${order.orderId} was cancelled by customer during preparation.`
+        : `Order #${order.orderId} was cancelled by customer.`
+      : null;
+
     // Get restaurant namespace
     const restaurantNamespace = io.of('/restaurant');
     restaurantNamespace.to(`restaurant:${order.restaurantId}`).emit('order_status_update', {
       orderId: order.orderId,
-      status,
+      status: normalizedStatus,
+      cancelledBy: order?.cancelledBy || null,
+      cancellationReason: order?.cancellationReason || null,
+      message: statusUpdateMessage,
       updatedAt: new Date()
     });
 
     // Send FCM notification to restaurant for status update (always send)
     try {
-      const normalizedStatus = status || order.status;
       let title = 'Order Update';
       let body = `Order #${order.orderId} status is now ${normalizedStatus}`;
       if (normalizedStatus === 'delivered') {
@@ -244,6 +255,12 @@ export async function notifyRestaurantOrderUpdate(orderId, status) {
       } else if (normalizedStatus === 'cancelled') {
         title = '❌ Order Cancelled';
         body = `Order #${order.orderId} was cancelled.`;
+        if (isCustomerCancelled) {
+          title = 'Order Cancelled by Customer';
+          body = wasPreparingBeforeCancel
+            ? `Order #${order.orderId} was cancelled by customer during preparation.`
+            : `Order #${order.orderId} was cancelled by customer.`;
+        }
       } else if (normalizedStatus === 'ready') {
         title = '🥡 Order Ready';
         body = `Order #${order.orderId} is ready for pickup.`;

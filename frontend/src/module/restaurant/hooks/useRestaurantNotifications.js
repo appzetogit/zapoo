@@ -267,6 +267,9 @@ export const useRestaurantNotifications = () => {
       setLastOrderStatusUpdate({
         orderId: data?.orderId || null,
         status: data?.status || null,
+        cancelledBy: data?.cancelledBy || null,
+        cancellationReason: data?.cancellationReason || null,
+        message: data?.message || null,
         updatedAt: data?.updatedAt || new Date().toISOString()
       });
     });

@@ -1,4 +1,5 @@
 import Order from '../../order/models/Order.js';
+import OrderSettlement from '../../order/models/OrderSettlement.js';
 import Payment from '../../payment/models/Payment.js';
 import Restaurant from '../models/Restaurant.js';
 import { successResponse, errorResponse } from '../../../shared/utils/response.js';
@@ -190,6 +191,10 @@ export const getRestaurantOrderById = asyncHandler(async (req, res) => {
     }
     const snapshotName = order?.customerName?.trim();
     const snapshotPhone = order?.customerPhone?.trim();
+    const settlement = await OrderSettlement.findOne({
+      orderId: order._id
+    }).lean();
+
     const patchedOrder = {
       ...order,
       userId: order?.userId && typeof order.userId === 'object' ? {
@@ -203,7 +208,8 @@ export const getRestaurantOrderById = asyncHandler(async (req, res) => {
       } : order?.userId
     };
     return successResponse(res, 200, 'Order retrieved successfully', {
-      order: patchedOrder
+      order: patchedOrder,
+      settlement: settlement || null
     });
   } catch (error) {
     console.error('Error fetching order:', error);

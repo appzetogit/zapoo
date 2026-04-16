@@ -35,6 +35,18 @@ const filterTabs = [{
   label: "Cancelled"
 }];
 
+function Row({
+  label,
+  value,
+  bold = false,
+  valueClass = ""
+}) {
+  return <div className="flex items-center justify-between gap-3">
+    <span className={`${bold ? 'font-semibold text-gray-800' : 'text-gray-600'}`}>{label}</span>
+    <span className={`${bold ? 'font-semibold text-gray-900' : 'text-gray-800'} ${valueClass}`}>{value}</span>
+  </div>;
+}
+
 // Completed Orders List Component
 function CompletedOrders({
   onSelectOrder
@@ -136,12 +148,14 @@ function CompletedOrders({
         return <div key={order.orderId || order.mongoId} className="w-full bg-white rounded-2xl p-4 mb-3 border border-gray-200">
           <button type="button" onClick={() => onSelectOrder?.({
             orderId: order.orderId,
+            mongoId: order.mongoId,
             status: 'Delivered',
             customerName: order.customerName,
             type: order.type,
             tableOrToken: order.tableOrToken,
             timePlaced: deliveredDate,
-            itemsSummary: order.itemsSummary
+            itemsSummary: order.itemsSummary,
+            amount: order.amount
           })} className="w-full text-left flex gap-3 items-stretch">
             <div className="h-20 w-20 rounded-xl overflow-hidden bg-gray-100 flex items-center justify-center flex-shrink-0 my-auto">
               {order.photoUrl ? <img src={order.photoUrl} alt={order.photoAlt} className="h-full w-full object-cover" /> : <div className="h-full w-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center px-2">
@@ -309,12 +323,14 @@ function CancelledOrders({
         return <div key={order.orderId || order.mongoId} className="w-full bg-white rounded-2xl p-4 mb-3 border border-gray-200">
           <button type="button" onClick={() => onSelectOrder?.({
             orderId: order.orderId,
+            mongoId: order.mongoId,
             status: 'Cancelled',
             customerName: order.customerName,
             type: order.type,
             tableOrToken: order.tableOrToken,
             timePlaced: cancelledDate,
-            itemsSummary: order.itemsSummary
+            itemsSummary: order.itemsSummary,
+            amount: order.amount
           })} className="w-full text-left flex gap-3 items-stretch">
             <div className="h-20 w-20 rounded-xl overflow-hidden bg-gray-100 flex items-center justify-center flex-shrink-0 my-auto">
               {order.photoUrl ? <img src={order.photoUrl} alt={order.photoAlt} className="h-full w-full object-cover" /> : <div className="h-full w-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center px-2">
@@ -382,6 +398,8 @@ export default function OrdersMain() {
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const [isSheetLoading, setIsSheetLoading] = useState(false);
+  const [sheetError, setSheetError] = useState("");
   const contentRef = useRef(null);
   const filterBarRef = useRef(null);
   const touchStartX = useRef(0);
@@ -579,7 +597,7 @@ export default function OrdersMain() {
       setCountdown(240);
       setPrepTime(11);
       if (normalizedPopupStatus === 'cancelled') {
-        toast.info('Order was cancelled and removed from pending requests.');
+        toast.info(lastOrderStatusUpdate.message || 'Order was cancelled and removed from pending requests.');
       }
     }
     clearLastOrderStatusUpdate();
@@ -1129,9 +1147,103 @@ export default function OrdersMain() {
       });
     }
   }, [activeFilter]);
-  const handleSelectOrder = order => {
-    setSelectedOrder(order);
+  const formatMoney = value => `₹${Number(value || 0).toFixed(2)}`;
+
+  const buildFinancialBreakdown = (order, settlement) => {
+    const pricing = order?.pricing || {};
+    const userPayment = settlement?.userPayment || {};
+    const restaurantEarning = settlement?.restaurantEarning || {};
+    const adminEarning = settlement?.adminEarning || {};
+
+    const itemSubtotal = Number(userPayment.subtotal ?? pricing.subtotal ?? 0);
+    const discount = Number(userPayment.discount ?? pricing.discount ?? 0);
+    const userDeliveryFee = Number(userPayment.deliveryFee ?? pricing.deliveryFee ?? 0);
+    const platformFee = Number(userPayment.platformFee ?? pricing.platformFee ?? 0);
+    const userGst = Number(userPayment.gst ?? pricing.tax ?? 0);
+    const userTotal = Number(userPayment.total ?? pricing.total ?? 0);
+
+    const adminDeliveryCost = Number(restaurantEarning.adminDeliveryCost ?? pricing.adminDeliveryCost ?? 0);
+    const adminDeliveryGst = Number(restaurantEarning.adminDeliveryGst ?? pricing.adminDeliveryGst ?? adminDeliveryCost * 0.18);
+    const recommendedItemFee = Number(restaurantEarning.recommendedItemFee ?? pricing.internalRecommendedFee ?? 0);
+    const adminPayableCore = Number(restaurantEarning.payableToAdmin ?? (adminDeliveryCost + adminDeliveryGst + platformFee + userGst));
+    const adminReceivableTotal = Number(adminPayableCore + recommendedItemFee);
+    const restaurantNet = Number(restaurantEarning.netEarning ?? Math.max(0, userTotal - adminReceivableTotal));
+    const deliveryDistanceKm = Number(pricing.distanceKm ?? settlement?.calculationSnapshot?.pricingSnapshot?.distanceKm ?? 0);
+
+    return {
+      user: {
+        itemSubtotal,
+        discount,
+        deliveryFee: userDeliveryFee,
+        platformFee,
+        gst: userGst,
+        total: userTotal
+      },
+      admin: {
+        adminDeliveryCost,
+        adminDeliveryGst,
+        platformFee,
+        userCollectedGst: userGst,
+        recommendedItemFee,
+        payableExcludingRecommended: adminPayableCore,
+        totalReceivable: adminReceivableTotal
+      },
+      restaurant: {
+        netReceivable: restaurantNet
+      },
+      logistics: {
+        distanceKm: deliveryDistanceKm,
+        userDeliveryFee
+      },
+      adminWallet: {
+        deliveryFee: Number(adminEarning.deliveryFee ?? adminEarning.adminDeliveryCost ?? adminDeliveryCost),
+        gst: Number(adminEarning.gst ?? userGst + adminDeliveryGst),
+        recommendedItemFee: Number(adminEarning.recommendedItemFee ?? recommendedItemFee)
+      }
+    };
+  };
+
+  const handleSelectOrder = async order => {
     setIsSheetOpen(true);
+    setIsSheetLoading(true);
+    setSheetError("");
+    setSelectedOrder({
+      ...order,
+      _raw: null,
+      settlement: null,
+      breakdown: null
+    });
+    try {
+      const id = order.mongoId || order.orderId;
+      const response = await restaurantAPI.getOrderById(id);
+      const orderData = response?.data?.data?.order || null;
+      const settlementData = response?.data?.data?.settlement || null;
+      if (!orderData) {
+        throw new Error("Order details unavailable");
+      }
+      const breakdown = buildFinancialBreakdown(orderData, settlementData);
+      setSelectedOrder({
+        ...order,
+        orderId: orderData.orderId || order.orderId,
+        mongoId: orderData._id || order.mongoId,
+        customerName: orderData?.userId?.name || order.customerName,
+        payment: orderData.payment,
+        paymentMethod: orderData.payment?.method || order.paymentMethod,
+        status: orderData.status || order.status,
+        timePlaced: order.timePlaced,
+        amount: Number(orderData?.pricing?.total ?? order.amount ?? 0),
+        itemsSummary: orderData?.items?.map(item => `${item.quantity}x ${item.name}`).join(", ") || order.itemsSummary,
+        items: orderData.items || [],
+        pricing: orderData.pricing || {},
+        settlement: settlementData,
+        breakdown,
+        _raw: orderData
+      });
+    } catch (error) {
+      setSheetError(error?.response?.data?.message || error.message || "Failed to load order breakdown");
+    } finally {
+      setIsSheetLoading(false);
+    }
   };
   const renderContent = () => {
     // If restaurant is not active but onboarding is complete, don't show order lists
@@ -1679,7 +1791,7 @@ export default function OrdersMain() {
       }} exit={{
         opacity: 0
       }} onClick={() => setIsSheetOpen(false)}>
-        <motion.div className="w-full max-w-md mx-auto bg-white rounded-t-3xl p-4 pb-6 shadow-lg" initial={{
+        <motion.div className="w-full max-w-md mx-auto bg-white rounded-t-3xl p-4 pb-6 shadow-lg max-h-[85vh] overflow-y-auto" initial={{
           y: 80
         }} animate={{
           y: 0
@@ -1709,7 +1821,7 @@ export default function OrdersMain() {
             <div className="flex flex-col items-end gap-1">
               <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium border ${selectedOrder.status === "Ready" ? "border-green-500 text-green-600" : "border-gray-800 text-gray-900"}`}>
                 <span className={`h-1.5 w-1.5 rounded-full ${selectedOrder.status === "Ready" ? "bg-green-500" : "bg-gray-800"}`} />
-                {selectedOrder.status}
+                {String(selectedOrder.status || "")}
               </span>
               <span className="text-[11px] text-gray-500">
                 {selectedOrder.timePlaced}
@@ -1718,26 +1830,70 @@ export default function OrdersMain() {
           </div>
 
           <div className="border-t border-gray-100 my-3" />
+          {isSheetLoading ? <div className="py-10 flex items-center justify-center text-sm text-gray-600">
+            <Loader2 className="w-4 h-4 animate-spin mr-2" />
+            Loading bill breakdown...
+          </div> : <>
+            {sheetError && <div className="mb-3 text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+              {sheetError}
+            </div>}
 
-          <div className="mb-3">
-            <p className="text-xs font-medium text-gray-700 mb-1">
-              Items
-            </p>
-            <p className="text-xs text-gray-600">
-              {selectedOrder.itemsSummary}
-            </p>
-          </div>
+            <div className="mb-3">
+              <p className="text-xs font-medium text-gray-700 mb-1">Items</p>
+              <p className="text-xs text-gray-600">{selectedOrder.itemsSummary}</p>
+            </div>
 
-          <div className="flex items-center justify-between text-[11px] text-gray-500 mb-4">
-            {/* Hide ETA for ready orders */}
-            {selectedOrder.status !== 'ready' && selectedOrder.eta && <span>ETA: <span className="font-medium text-black">{selectedOrder.eta}</span></span>}
-            {(() => {
-              const raw = selectedOrder?.paymentMethod ?? selectedOrder?.payment?.method;
-              const m = raw != null ? String(raw).toLowerCase().trim() : '';
-              const isCod = m === 'cash' || m === 'cod' || m === 'cash on delivery';
-              return <span>Payment: <span className={`font-medium ${isCod ? 'text-amber-600' : 'text-black'}`}>{isCod ? 'Cash on Delivery' : 'Paid online'}</span></span>;
-            })()}
-          </div>
+            <div className="flex items-center justify-between text-[11px] text-gray-500 mb-4">
+              {selectedOrder.status !== 'ready' && selectedOrder.eta && <span>ETA: <span className="font-medium text-black">{selectedOrder.eta}</span></span>}
+              {(() => {
+                const raw = selectedOrder?.paymentMethod ?? selectedOrder?.payment?.method;
+                const m = raw != null ? String(raw).toLowerCase().trim() : '';
+                const isCod = m === 'cash' || m === 'cod' || m === 'cash on delivery';
+                return <span>Payment: <span className={`font-medium ${isCod ? 'text-amber-600' : 'text-black'}`}>{isCod ? 'Cash on Delivery' : 'Paid online'}</span></span>;
+              })()}
+            </div>
+
+            {selectedOrder?.breakdown && <div className="space-y-3 mb-4">
+              <div className="rounded-xl border border-gray-100 bg-[#f8fafc] p-3">
+                <p className="text-[11px] font-semibold text-gray-700 mb-2">Customer Bill</p>
+                <div className="space-y-1.5 text-xs">
+                  <Row label="Item subtotal" value={formatMoney(selectedOrder.breakdown.user.itemSubtotal)} />
+                  <Row label="Discount" value={`- ${formatMoney(selectedOrder.breakdown.user.discount)}`} />
+                  <Row label="Delivery fee (user)" value={formatMoney(selectedOrder.breakdown.user.deliveryFee)} />
+                  <Row label="Platform fee" value={formatMoney(selectedOrder.breakdown.user.platformFee)} />
+                  <Row label="GST (user bill)" value={formatMoney(selectedOrder.breakdown.user.gst)} />
+                  <Row bold label="Total paid by user" value={formatMoney(selectedOrder.breakdown.user.total)} />
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-gray-100 bg-white p-3">
+                <p className="text-[11px] font-semibold text-gray-700 mb-2">Admin Receivable</p>
+                <div className="space-y-1.5 text-xs">
+                  <Row label="Delivery cost to admin" value={formatMoney(selectedOrder.breakdown.admin.adminDeliveryCost)} />
+                  <Row label="Delivery GST to admin (18%)" value={formatMoney(selectedOrder.breakdown.admin.adminDeliveryGst)} />
+                  <Row label="Platform fee to admin" value={formatMoney(selectedOrder.breakdown.admin.platformFee)} />
+                  <Row label="GST collected from user" value={formatMoney(selectedOrder.breakdown.admin.userCollectedGst)} />
+                  <Row label="Recommended item charge" value={formatMoney(selectedOrder.breakdown.admin.recommendedItemFee)} />
+                  <Row bold label="Total going to admin" value={formatMoney(selectedOrder.breakdown.admin.totalReceivable)} />
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-blue-100 bg-blue-50 p-3">
+                <p className="text-[11px] font-semibold text-blue-700 mb-2">Restaurant Payout</p>
+                <div className="space-y-1.5 text-xs">
+                  <Row bold label="Restaurant gets" value={formatMoney(selectedOrder.breakdown.restaurant.netReceivable)} valueClass="text-blue-700" />
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-gray-100 bg-white p-3">
+                <p className="text-[11px] font-semibold text-gray-700 mb-2">Delivery Info</p>
+                <div className="space-y-1.5 text-xs">
+                  <Row label="Distance for this order" value={`${Number(selectedOrder.breakdown.logistics.distanceKm || 0).toFixed(2)} km`} />
+                  <Row label="User delivery charge (distance based)" value={formatMoney(selectedOrder.breakdown.logistics.userDeliveryFee)} />
+                </div>
+              </div>
+            </div>}
+          </>}
 
           <button className="w-full bg-[#3B82F6] text-white py-2.5 rounded-xl text-sm font-medium" onClick={() => setIsSheetOpen(false)}>
             Close
@@ -1860,6 +2016,7 @@ function OrderCard({
     </button>}
     <div onClick={() => onSelect?.({
       orderId,
+      mongoId,
       status: displayStatus,
       customerName,
       type,
