@@ -16,9 +16,7 @@ const ALLOWED_EVENTS = new Set([
   'refund.processed',
   'refund.failed'
 ]);
-const webhookDebug = (step, details = {}) => {
-  console.log('[REFUND_DEBUG][webhookHandler]', step, details);
-};
+const webhookDebug = () => {};
 
 const safeJsonParse = (input) => {
   if (!input) return null;

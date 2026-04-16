@@ -1130,13 +1130,6 @@ export const cancelOrder = async (req, res) => {
     let refundMessage = '';
     if (actualPaymentMethod === 'razorpay') {
       try {
-        console.log('[REFUND_DEBUG][orderController] cancelOrder_refund_start', {
-          orderId: order.orderId || order._id?.toString?.(),
-          paymentMethod: actualPaymentMethod,
-          orderStatus: order.status,
-          cancelledBy: order.cancelledBy,
-          reason: reason.trim()
-        });
         const {
           initiateRazorpayRefundForOrder
         } = await import('../services/cancellationRefundService.js');
@@ -1156,15 +1149,6 @@ export const cancelOrder = async (req, res) => {
           refundMessage = ' No refund required as per policy.';
           }
 
-          console.log('[REFUND_DEBUG][orderController] cancelOrder_refund_result', {
-            orderId: order.orderId || order._id?.toString?.(),
-            refundQueued: Boolean(refundResult?.refundQueued),
-            refundInitiated: Boolean(refundResult?.refundInitiated),
-            refundSkipped: Boolean(refundResult?.refundSkipped),
-            refundPercent: refundResult?.policy?.refundPercent || null,
-            refundAmount: refundResult?.policy?.refundAmount || null,
-            refundId: refundResult?.refundId || null
-          });
         }
       } catch (refundError) {
         logger.error(`Error calculating cancellation refund for order ${order.orderId}:`, refundError);
@@ -1192,10 +1176,6 @@ export const cancelOrder = async (req, res) => {
         } = await import('../services/cancellationRefundService.js');
         await calculateCancellationRefund(order._id, reason);
         refundMessage = ' Refund will be processed in wallet flow.';
-        console.log('[REFUND_DEBUG][orderController] cancelOrder_wallet_refund_calculated', {
-          orderId: order.orderId || order._id?.toString?.(),
-          reason: reason.trim()
-        });
       } catch (refundError) {
         logger.error(`Error calculating cancellation refund for order ${order.orderId}:`, refundError);
       }
