@@ -41,7 +41,7 @@ const verifyOTPSchema = Joi.object({
     .default('login'),
   name: Joi.string().when('purpose', {
     is: 'register',
-    then: Joi.required(),
+    then: Joi.string().required().min(2).max(50).pattern(/^[a-zA-Z\s]+$/).message('Name can only contain letters and spaces'),
     otherwise: Joi.optional()
   }),
   role: Joi.string().valid('user', 'restaurant', 'delivery', 'admin').default('user'),
@@ -50,7 +50,7 @@ const verifyOTPSchema = Joi.object({
 }).or('phone', 'email'); // At least one of phone or email must be provided
 
 const registerSchema = Joi.object({
-  name: Joi.string().required().min(2).max(50),
+  name: Joi.string().required().min(2).max(50).pattern(/^[a-zA-Z\s]+$/).message('Name can only contain letters and spaces'),
   email: Joi.string().email().required().lowercase(),
   password: Joi.string().required().min(6).max(100),
   phone: Joi.string().optional().pattern(/^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{1,9}$/),

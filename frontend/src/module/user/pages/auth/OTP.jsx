@@ -168,6 +168,8 @@ export default function OTP() {
     }
   }
 
+  const sanitizeNameInput = (value) => value.replace(/[^a-zA-Z\s]/g, "")
+
   const handleVerify = async (otpValue = null) => {
     if (isLoading) return
     if (showNameInput) {
@@ -248,6 +250,13 @@ export default function OTP() {
 
     if (trimmedName.length < 2) {
       setNameError(t("user.auth.otp.validation.nameMin"))
+      return
+    }
+
+    // Validate name pattern - only letters and spaces allowed
+    const sanitizedName = sanitizeNameInput(trimmedName)
+    if (sanitizedName !== trimmedName) {
+      setNameError("Name can only contain letters and spaces")
       return
     }
 
@@ -469,8 +478,18 @@ export default function OTP() {
                     type="text"
                     value={name}
                     onChange={(e) => {
-                      setName(e.target.value)
-                      if (nameError) setNameError("")
+                      const rawValue = e.target.value
+                      const sanitizedValue = sanitizeNameInput(rawValue)
+                      setName(sanitizedValue)
+                      
+                      // Real-time validation
+                      if (!sanitizedValue.trim()) {
+                        setNameError(t("user.auth.otp.validation.nameRequired"))
+                      } else if (sanitizedValue.trim().length < 2) {
+                        setNameError(t("user.auth.otp.validation.nameMin"))
+                      } else {
+                        setNameError("")
+                      }
                     }}
                     disabled={isLoading}
                     placeholder={t("user.auth.otp.namePlaceholder")}
