@@ -52,10 +52,24 @@ async function autoCancelIfUnassigned(orderId) {
     await order.save();
 
     try {
+      console.log('[REFUND_DEBUG][deliveryAssignmentService] auto_cancel_refund_start', {
+        orderId: order.orderId || orderId,
+        status: order.status,
+        reason: order.cancellationReason
+      });
       const refundResult = await initiateRazorpayRefundForOrder({
         orderId: order._id,
         trigger: 'restaurant',
         reason: order.cancellationReason || 'Delivery partner unavailable'
+      });
+      console.log('[REFUND_DEBUG][deliveryAssignmentService] auto_cancel_refund_result', {
+        orderId: order.orderId || orderId,
+        refundInitiated: Boolean(refundResult?.refundInitiated),
+        refundQueued: Boolean(refundResult?.refundQueued),
+        refundSkipped: Boolean(refundResult?.refundSkipped),
+        refundPercent: refundResult?.policy?.refundPercent || null,
+        refundAmount: refundResult?.policy?.refundAmount || null,
+        refundId: refundResult?.refundId || null
       });
     } catch (refundErr) {
       console.error(`❌ Auto-cancel refund initiation failed for order ${order.orderId}:`, refundErr?.message || refundErr);

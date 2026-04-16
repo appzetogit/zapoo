@@ -45,6 +45,11 @@ export async function processAutoRejectOrders() {
             continue; // Order was already accepted/rejected
           }
 
+          console.log('[REFUND_DEBUG][autoRejectService] auto_reject_refund_start', {
+            orderId: currentOrder.orderId || currentOrder._id?.toString?.(),
+            status: currentOrder.status,
+            elapsedSeconds: Math.floor(elapsedMs / 1000)
+          });
           // Update order status to cancelled
           currentOrder.status = 'cancelled';
           currentOrder.cancellationReason = 'Order not accepted within time limit. Restaurant did not respond in time.';
@@ -62,6 +67,15 @@ export async function processAutoRejectOrders() {
               orderId: currentOrder._id,
               trigger: 'restaurant',
               reason: 'Order not accepted within time limit. Restaurant did not respond in time.'
+            });
+            console.log('[REFUND_DEBUG][autoRejectService] auto_reject_refund_result', {
+              orderId: currentOrder.orderId || currentOrder._id?.toString?.(),
+              refundInitiated: Boolean(refundResult?.refundInitiated),
+              refundQueued: Boolean(refundResult?.refundQueued),
+              refundSkipped: Boolean(refundResult?.refundSkipped),
+              refundPercent: refundResult?.policy?.refundPercent || null,
+              refundAmount: refundResult?.policy?.refundAmount || null,
+              refundId: refundResult?.refundId || null
             });
           } catch (refundError) {
             console.error(`❌ Error calculating cancellation refund for order ${currentOrder.orderId}:`, refundError);
