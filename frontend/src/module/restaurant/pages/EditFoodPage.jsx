@@ -12,11 +12,27 @@ import {
   X,
   Plus,
   Upload,
+  Camera,
   Image as ImageIcon
 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { getFoodById, saveFood } from "../utils/foodManagement"
+
+const isFlutterInAppWebViewAvailable = () =>
+  typeof window !== "undefined" &&
+  typeof window.flutter_inappwebview?.callHandler === "function"
+
+const flutterResultToDataUrl = async (result) => {
+  if (!result || result.success === false) return null
+
+  const base64 = result.base64 ? String(result.base64) : ""
+  if (!base64) return null
+
+  const mimeType = result.mimeType || "image/jpeg"
+  const normalizedBase64 = base64.includes(",") ? base64.split(",")[1] : base64
+  return `data:${mimeType};base64,${normalizedBase64}`
+}
 
 export default function EditFoodPage() {
   const navigate = useNavigate()
@@ -216,6 +232,52 @@ export default function EditFoodPage() {
     }
   }
 
+  const handleGalleryImageSelect = async () => {
+    if (!isFlutterInAppWebViewAvailable()) return false
+
+    try {
+      const result = await window.flutter_inappwebview.callHandler("openGallery", {
+        source: "gallery",
+        accept: "image/*",
+        multiple: false,
+        quality: 0.8
+      })
+      const dataUrl = await flutterResultToDataUrl(result)
+      if (!dataUrl) return false
+      setFormData(prev => ({
+        ...prev,
+        image: dataUrl
+      }))
+      return true
+    } catch (error) {
+      console.error("Failed to select image from Flutter gallery:", error)
+      return false
+    }
+  }
+
+  const handleCameraImageCapture = async () => {
+    if (!isFlutterInAppWebViewAvailable()) return false
+
+    try {
+      const result = await window.flutter_inappwebview.callHandler("openCamera", {
+        source: "camera",
+        accept: "image/*",
+        multiple: false,
+        quality: 0.8
+      })
+      const dataUrl = await flutterResultToDataUrl(result)
+      if (!dataUrl) return false
+      setFormData(prev => ({
+        ...prev,
+        image: dataUrl
+      }))
+      return true
+    } catch (error) {
+      console.error("Failed to capture image from Flutter camera:", error)
+      return false
+    }
+  }
+
   const handleSubmit = (e) => {
     e.preventDefault()
 
@@ -280,15 +342,43 @@ export default function EditFoodPage() {
                     alt={formData.name}
                     className="w-32 h-32 md:w-40 md:h-40 rounded-lg object-cover"
                   />
-                  <label className="absolute bottom-0 right-0 bg-[#ff8100] text-white p-2 rounded-full cursor-pointer hover:bg-[#e67300]">
-                    <Upload className="w-4 h-4" />
+                  <div className="absolute inset-x-0 bottom-0 flex flex-col gap-2 p-2">
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (isFlutterInAppWebViewAvailable()) {
+                          const picked = await handleGalleryImageSelect()
+                          if (picked) return
+                        }
+                        document.getElementById("foodImageUpload")?.click()
+                      }}
+                      className="w-full bg-white/95 text-gray-900 border border-gray-300 rounded-lg px-3 py-2 text-xs font-medium flex items-center justify-center gap-2 shadow-sm"
+                    >
+                      <Upload className="w-4 h-4" />
+                      <span>Choose from gallery</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (isFlutterInAppWebViewAvailable()) {
+                          const picked = await handleCameraImageCapture()
+                          if (picked) return
+                        }
+                        document.getElementById("foodImageUpload")?.click()
+                      }}
+                      className="w-full bg-[#ff8100] text-white rounded-lg px-3 py-2 text-xs font-medium flex items-center justify-center gap-2 shadow-sm hover:bg-[#e67300]"
+                    >
+                      <Camera className="w-4 h-4" />
+                      <span>Take photo</span>
+                    </button>
                     <input
+                      id="foodImageUpload"
                       type="file"
                       accept="image/*"
                       onChange={(e) => handleImageUpload("image", e.target.files[0])}
                       className="hidden"
                     />
-                  </label>
+                  </div>
                 </div>
               </div>
             </CardContent>
@@ -730,4 +820,3 @@ export default function EditFoodPage() {
     </div>
   )
 }
-

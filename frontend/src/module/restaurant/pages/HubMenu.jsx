@@ -1,11 +1,47 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Image as ImageIcon, Grid3x3, ChevronDown, ChevronUp, MoreVertical, Edit, Plus, Utensils, X, Menu, Camera, SlidersHorizontal, ArrowLeft, Trash2, RefreshCw, Loader2 } from "lucide-react";
+import { Search, Image as ImageIcon, Grid3x3, ChevronDown, ChevronUp, MoreVertical, Edit, Plus, Utensils, X, Menu, Camera, Upload, SlidersHorizontal, ArrowLeft, Trash2, RefreshCw, Loader2 } from "lucide-react";
 import BottomNavOrders from "../components/BottomNavOrders";
 // Removed foodManagement - now using backend API directly
 import { useNavigate } from "react-router-dom";
 import { restaurantAPI, uploadAPI } from "@/lib/api";
 import { toast } from "sonner";
+
+const isFlutterInAppWebViewAvailable = () =>
+  typeof window !== "undefined" &&
+  typeof window.flutter_inappwebview?.callHandler === "function";
+
+const readFileAsDataUrl = file =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error("Failed to read file"));
+    reader.readAsDataURL(file);
+  });
+
+const flutterImageResultToFiles = async (result, fallbackNamePrefix) => {
+  if (!result || result.success === false) return [];
+
+  const items = Array.isArray(result.files) && result.files.length ? result.files : [result];
+  const files = [];
+
+  for (let index = 0; index < items.length; index += 1) {
+    const item = items[index];
+    const base64 = item?.base64 ? String(item.base64) : "";
+    if (!base64) continue;
+
+    const mimeType = item?.mimeType || "image/jpeg";
+    const normalizedBase64 = base64.includes(",") ? base64.split(",")[1] : base64;
+    const dataUrl = `data:${mimeType};base64,${normalizedBase64}`;
+    const response = await fetch(dataUrl);
+    const blob = await response.blob();
+    const fileName =
+      item?.fileName || (items.length > 1 ? `${fallbackNamePrefix}-${index + 1}.jpg` : `${fallbackNamePrefix}.jpg`);
+    files.push(new File([blob], fileName, { type: mimeType || blob.type || "image/jpeg" }));
+  }
+
+  return files;
+};
 export default function HubMenu() {
   const navigate = useNavigate();
   const [loadingMenu, setLoadingMenu] = useState(true);
@@ -398,9 +434,8 @@ export default function HubMenu() {
     }
   }, [activeTab]);
 
-  // Handle add-on image add
-  const handleAddonImageAdd = e => {
-    const files = Array.from(e.target.files);
+  const processAddonImageFiles = filesInput => {
+    const files = Array.from(filesInput || []);
     const allowedTypes = ["image/png", "image/jpeg", "image/jpg", "image/webp"];
     const validFiles = files.filter(file => {
       if (!allowedTypes.includes(file.type)) {
@@ -424,8 +459,50 @@ export default function HubMenu() {
     });
     setAddonImages([...addonImages, ...newImagePreviews]);
     setAddonImageFiles(newImageFilesMap);
-    if (addonFileInputRef.current) {
+    return true;
+  };
+
+  // Handle add-on image add
+  const handleAddonImageAdd = e => {
+    const picked = processAddonImageFiles(e.target.files);
+    if (picked && addonFileInputRef.current) {
       addonFileInputRef.current.value = "";
+    }
+  };
+
+  const addAddonImagesFromGallery = async () => {
+    if (!isFlutterInAppWebViewAvailable()) return false;
+    try {
+      const result = await window.flutter_inappwebview.callHandler("openGallery", {
+        source: "gallery",
+        accept: "image/*",
+        multiple: true,
+        quality: 0.8
+      });
+      const files = await flutterImageResultToFiles(result, `addon-image-${Date.now()}`);
+      if (!files.length) return false;
+      return processAddonImageFiles(files);
+    } catch (error) {
+      console.error("Failed to pick add-on images from Flutter gallery:", error);
+      return false;
+    }
+  };
+
+  const captureAddonImageFromCamera = async () => {
+    if (!isFlutterInAppWebViewAvailable()) return false;
+    try {
+      const result = await window.flutter_inappwebview.callHandler("openCamera", {
+        source: "camera",
+        accept: "image/*",
+        multiple: false,
+        quality: 0.8
+      });
+      const files = await flutterImageResultToFiles(result, `addon-image-${Date.now()}`);
+      if (!files.length) return false;
+      return processAddonImageFiles([files[0]]);
+    } catch (error) {
+      console.error("Failed to capture add-on image from Flutter camera:", error);
+      return false;
     }
   };
 
@@ -1855,10 +1932,36 @@ export default function HubMenu() {
 
               {/* Add Image Button */}
               <input ref={addonFileInputRef} type="file" accept="image/*" multiple onChange={handleAddonImageAdd} className="hidden" id="addon-image-upload" />
-              <label htmlFor="addon-image-upload" className="flex items-center justify-center gap-2 px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-[#3B82F6] hover:bg-blue-50 transition-colors">
-                <Camera className="h-5 w-5 text-gray-500" />
-                <span className="text-sm font-medium text-gray-700">Add Images</span>
-              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (isFlutterInAppWebViewAvailable()) {
+                      const picked = await addAddonImagesFromGallery();
+                      if (picked) return;
+                    }
+                    addonFileInputRef.current?.click();
+                  }}
+                  className="flex items-center justify-center gap-2 px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg hover:border-[#3B82F6] hover:bg-blue-50 transition-colors"
+                >
+                  <Upload className="h-5 w-5 text-gray-500" />
+                  <span className="text-sm font-medium text-gray-700">Choose from gallery</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (isFlutterInAppWebViewAvailable()) {
+                      const picked = await captureAddonImageFromCamera();
+                      if (picked) return;
+                    }
+                    addonFileInputRef.current?.click();
+                  }}
+                  className="flex items-center justify-center gap-2 px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg hover:border-[#3B82F6] hover:bg-blue-50 transition-colors"
+                >
+                  <Camera className="h-5 w-5 text-gray-500" />
+                  <span className="text-sm font-medium text-gray-700">Take photo</span>
+                </button>
+              </div>
               <p className="text-xs text-gray-500 mt-1">Add multiple images (PNG, JPG, WEBP - max 5MB each)</p>
             </div>
           </div>

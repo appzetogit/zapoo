@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Trash2, Check, ChevronDown, Edit as EditIcon, Plus, X, Camera, ThumbsUp, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { ArrowLeft, Trash2, Check, ChevronDown, Edit as EditIcon, Plus, X, Camera, Upload, ThumbsUp, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import {
   Select,
@@ -14,6 +14,26 @@ import {
 import api from "@/lib/api";
 import { restaurantAPI, uploadAPI } from "@/lib/api";
 import { toast } from "sonner";
+
+const isFlutterInAppWebViewAvailable = () =>
+  typeof window !== "undefined" &&
+  typeof window.flutter_inappwebview?.callHandler === "function";
+
+const flutterImageResultToFile = async (result, fallbackName) => {
+  if (!result || result.success === false) return null;
+
+  const base64 = result.base64 ? String(result.base64) : "";
+  if (!base64) return null;
+
+  const mimeType = result.mimeType || "image/jpeg";
+  const normalizedBase64 = base64.includes(",") ? base64.split(",")[1] : base64;
+  const dataUrl = `data:${mimeType};base64,${normalizedBase64}`;
+  const response = await fetch(dataUrl);
+  const blob = await response.blob();
+  return new File([blob], result.fileName || fallbackName, {
+    type: mimeType || blob.type || "image/jpeg"
+  });
+};
 export default function ItemDetailsPage() {
   const navigate = useNavigate();
   const {
@@ -334,25 +354,25 @@ export default function ItemDetailsPage() {
   }];
   const handleImageAdd = e => {
     const files = Array.from(e.target.files);
+    handleImageFiles(files);
+  };
 
-    // Validate file types
+  const handleImageFiles = files => {
     const allowedTypes = ["image/png", "image/jpeg", "image/jpg", "image/webp"];
     const validFiles = files.filter(file => {
       if (!allowedTypes.includes(file.type)) {
         toast.error(`${file.name}: Invalid file type. Please upload PNG, JPG, JPEG, or WEBP.`);
         return false;
       }
-      // Validate file size (max 5MB)
-      const maxSize = 5 * 1024 * 1024; // 5MB
+      const maxSize = 5 * 1024 * 1024;
       if (file.size > maxSize) {
         toast.error(`${file.name}: File size exceeds 5MB limit.`);
         return false;
       }
       return true;
     });
-    if (validFiles.length === 0) return;
+    if (validFiles.length === 0) return false;
 
-    // Create preview URLs for display and map them to File objects
     const newImagePreviews = [];
     const newImageFilesMap = new Map(imageFiles);
     validFiles.forEach(file => {
@@ -360,10 +380,47 @@ export default function ItemDetailsPage() {
       newImagePreviews.push(previewUrl);
       newImageFilesMap.set(previewUrl, file);
     });
-    setImages([...images, ...newImagePreviews]);
+    setImages(prev => [...prev, ...newImagePreviews]);
     setImageFiles(newImageFilesMap);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
+    }
+    return true;
+  };
+
+  const pickImagesFromGallery = async () => {
+    if (!isFlutterInAppWebViewAvailable()) return false;
+    try {
+      const result = await window.flutter_inappwebview.callHandler("openGallery", {
+        source: "gallery",
+        accept: "image/*",
+        multiple: true,
+        quality: 0.8
+      });
+      const file = await flutterImageResultToFile(result, `item-image-${Date.now()}.jpg`);
+      if (!file) return false;
+      return handleImageFiles([file]);
+    } catch (error) {
+      console.error("Failed to pick images from Flutter gallery:", error);
+      return false;
+    }
+  };
+
+  const captureImageFromCamera = async () => {
+    if (!isFlutterInAppWebViewAvailable()) return false;
+    try {
+      const result = await window.flutter_inappwebview.callHandler("openCamera", {
+        source: "camera",
+        accept: "image/*",
+        multiple: false,
+        quality: 0.8
+      });
+      const file = await flutterImageResultToFile(result, `item-image-${Date.now()}.jpg`);
+      if (!file) return false;
+      return handleImageFiles([file]);
+    } catch (error) {
+      console.error("Failed to capture image from Flutter camera:", error);
+      return false;
     }
   };
   const handleImageDelete = index => {
@@ -886,15 +943,39 @@ export default function ItemDetailsPage() {
           </div>
         </div>}
 
-        {/* Add image button - redesigned */}
+        {/* Add image buttons - redesigned */}
         <div className="px-4 py-4 bg-white border-t border-gray-100">
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={async () => {
+                if (isFlutterInAppWebViewAvailable()) {
+                  const picked = await pickImagesFromGallery();
+                  if (picked) return;
+                }
+                fileInputRef.current?.click();
+              }}
+              className="flex items-center justify-center gap-2 px-3 py-3 bg-gray-900 text-white rounded-xl text-xs sm:text-sm font-semibold hover:bg-gray-800 transition-all shadow-md hover:shadow-lg active:scale-95"
+            >
+              <Upload className="w-4 h-4" />
+              <span>Gallery</span>
+            </button>
+            <button
+              type="button"
+              onClick={async () => {
+                if (isFlutterInAppWebViewAvailable()) {
+                  const picked = await captureImageFromCamera();
+                  if (picked) return;
+                }
+                fileInputRef.current?.click();
+              }}
+              className="flex items-center justify-center gap-2 px-3 py-3 bg-gray-900 text-white rounded-xl text-xs sm:text-sm font-semibold hover:bg-gray-800 transition-all shadow-md hover:shadow-lg active:scale-95"
+            >
+              <Camera className="w-4 h-4" />
+              <span>Camera</span>
+            </button>
+          </div>
           <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handleImageAdd} className="hidden" id="image-upload" />
-          <label htmlFor="image-upload" className="flex items-center justify-center gap-2.5 px-6 py-3.5 bg-gradient-to-r from-gray-900 to-gray-800 text-white rounded-xl text-sm font-semibold cursor-pointer hover:from-gray-800 hover:to-gray-700 transition-all shadow-md hover:shadow-lg active:scale-95">
-            <div className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center">
-              <Plus className="w-4 h-4" />
-            </div>
-            <span>Add Images</span>
-          </label>
         </div>
       </div>
 
