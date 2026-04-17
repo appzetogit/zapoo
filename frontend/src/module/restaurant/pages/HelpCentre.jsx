@@ -2,17 +2,15 @@ import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { motion } from "framer-motion"
 import { useTranslation } from "react-i18next"
-import { 
-  ChevronLeft, 
-  Search, 
-  Power, 
-  Utensils, 
-  Building2, 
-  FileText, 
+import {
+  ChevronLeft,
+  Search,
+  Power,
+  Utensils,
+  Building2,
+  FileText,
   Wallet,
-  ChevronRight,
-  Languages,
-  ClipboardList
+  ChevronRight
 } from "lucide-react"
 import BottomNavOrders from "../components/BottomNavOrders"
 
@@ -78,14 +76,6 @@ export default function HelpCentre() {
               <ChevronLeft className="w-6 h-6 text-gray-900" />
             </button>
             <h1 className="text-lg font-bold text-gray-900">{t("restaurant.helpCentre.title")}</h1>
-          </div>
-          <div className="flex items-center gap-4">
-            <button className="p-1 hover:bg-gray-100 rounded-full transition-colors">
-              <Languages className="w-6 h-6 text-gray-700" />
-            </button>
-            <button className="p-1 hover:bg-gray-100 rounded-full transition-colors">
-              <ClipboardList className="w-6 h-6 text-gray-700" />
-            </button>
           </div>
         </div>
       </div>

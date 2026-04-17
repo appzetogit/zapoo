@@ -1293,7 +1293,7 @@ export default function RestaurantOnboarding() {
             <Upload className="w-4.5 h-4.5" />
             <span>{step2.menuImages.length > 0 ? "Add more images" : "Choose files"}</span>
           </label>
-          <input id="menuImagesInput" type="file" multiple accept="image/*" capture="environment" className="hidden" onChange={async e => {
+          <input id="menuImagesInput" type="file" multiple accept="image/*" className="hidden" onChange={async e => {
             const files = Array.from(e.target.files || []);
             if (!files.length) return;
             await handleMenuImagesChange(files);
@@ -1382,7 +1382,7 @@ export default function RestaurantOnboarding() {
               <Upload className="w-4.5 h-4.5" />
               <span>{step2.profileImage ? "Change photo" : "Choose file"}</span>
             </label>
-            <input id="profileImageInput" type="file" accept="image/*" capture="environment" className="hidden" onChange={async e => {
+            <input id="profileImageInput" type="file" accept="image/*" className="hidden" onChange={async e => {
               const file = e.target.files?.[0] || null;
               if (file) {
                 await handleSingleImageChange(image => setStep2(prev => ({
@@ -1479,7 +1479,7 @@ export default function RestaurantOnboarding() {
       </div>
       <div>
         <Label className="text-xs text-gray-700">PAN image*</Label>
-        <Input type="file" accept="image/*" capture="environment" onChange={async e => {
+        <Input type="file" accept="image/*" onChange={async e => {
           const file = e.target.files?.[0] || null;
           if (file) {
             await handleSingleImageChange(image => setStep3(prev => ({
@@ -1533,7 +1533,7 @@ export default function RestaurantOnboarding() {
         </div>
         <div>
           <Label className="text-xs text-gray-700">GST certificate image*</Label>
-          <Input type="file" accept="image/*" capture="environment" onChange={async e => {
+          <Input type="file" accept="image/*" onChange={async e => {
             const file = e.target.files?.[0] || null;
             if (file) {
               await handleSingleImageChange(image => setStep3(prev => ({
@@ -1594,7 +1594,7 @@ export default function RestaurantOnboarding() {
       </div>
       <div>
         <Label className="text-xs text-gray-700">FSSAI license image*</Label>
-        <Input type="file" accept="image/*" capture="environment" onChange={async e => {
+        <Input type="file" accept="image/*" onChange={async e => {
           const file = e.target.files?.[0] || null;
           if (file) {
             await handleSingleImageChange(image => setStep3(prev => ({
