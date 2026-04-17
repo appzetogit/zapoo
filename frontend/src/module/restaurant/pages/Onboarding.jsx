@@ -105,6 +105,56 @@ const timeToString = date => {
   const minutes = date.getMinutes().toString().padStart(2, "0");
   return `${hours}:${minutes}`;
 };
+
+const readFileAsDataUrl = file =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error("Failed to read file"));
+    reader.readAsDataURL(file);
+  });
+
+const normalizeAlphabeticText = value => value.replace(/[^a-zA-Z\s]/g, "");
+
+const isDataUrl = value =>
+  typeof value === "string" && value.startsWith("data:");
+
+const isHttpUrl = value =>
+  typeof value === "string" && value.startsWith("http");
+
+const imageValueToFile = async (value, fallbackName) => {
+  if (value instanceof File) {
+    return value;
+  }
+
+  const dataUrl = value?.dataUrl || (isDataUrl(value) ? value : null);
+  if (dataUrl) {
+    const response = await fetch(dataUrl);
+    const blob = await response.blob();
+    const name = value?.name || fallbackName;
+    const type = value?.type || blob.type || "image/jpeg";
+    return new File([blob], name, { type });
+  }
+
+  return null;
+};
+
+const getImagePreviewUrl = value => {
+  if (value instanceof File) {
+    return URL.createObjectURL(value);
+  }
+  if (value?.dataUrl) {
+    return value.dataUrl;
+  }
+  if (value?.url) {
+    return value.url;
+  }
+  if (isDataUrl(value) || isHttpUrl(value)) {
+    return value;
+  }
+  return null;
+};
+
 function TimeSelector({
   label,
   value,
@@ -211,6 +261,122 @@ export default function RestaurantOnboarding() {
     return Math.trunc(n);
   };
 
+  const getPrefilledOwnerEmail = () => {
+    try {
+      const storedUserRaw = localStorage.getItem("restaurant_user");
+      if (storedUserRaw) {
+        const storedUser = JSON.parse(storedUserRaw);
+        const storedEmail =
+          storedUser?.ownerEmail ||
+          storedUser?.email ||
+          storedUser?.contactEmail ||
+          "";
+        if (storedEmail) {
+          return storedEmail;
+        }
+      }
+    } catch (err) {
+      console.error("Failed to read restaurant user email:", err);
+    }
+
+    try {
+      const authDataRaw = sessionStorage.getItem("restaurantAuthData");
+      if (authDataRaw) {
+        const authData = JSON.parse(authDataRaw);
+        return authData?.email || "";
+      }
+    } catch (err) {
+      console.error("Failed to read restaurant auth email:", err);
+    }
+
+    return "";
+  };
+
+  const normalizeIndianPhone = (phone) => {
+    if (!phone) return "";
+    const digits = String(phone).replace(/\D/g, "");
+    if (digits.length <= 10) return digits;
+    return digits.slice(-10);
+  };
+
+  const getPrefilledOwnerPhone = () => {
+    try {
+      const storedUserRaw = localStorage.getItem("restaurant_user");
+      if (storedUserRaw) {
+        const storedUser = JSON.parse(storedUserRaw);
+        const storedPhone =
+          storedUser?.ownerPhone ||
+          storedUser?.phone ||
+          storedUser?.contactNumber ||
+          "";
+        if (storedPhone) {
+          return normalizeIndianPhone(storedPhone);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to read restaurant user phone:", err);
+    }
+
+    try {
+      const authDataRaw = sessionStorage.getItem("restaurantAuthData");
+      if (authDataRaw) {
+        const authData = JSON.parse(authDataRaw);
+        return normalizeIndianPhone(authData?.phone || "");
+      }
+    } catch (err) {
+      console.error("Failed to read restaurant auth phone:", err);
+    }
+
+    return "";
+  };
+
+  const getRestaurantAuthMode = () => {
+    try {
+      const storedMode = localStorage.getItem("restaurant_auth_mode");
+      if (storedMode === "email" || storedMode === "phone") {
+        return storedMode;
+      }
+
+      const storedUserRaw = localStorage.getItem("restaurant_user");
+      if (storedUserRaw) {
+        const storedUser = JSON.parse(storedUserRaw);
+        const ownerEmail =
+          storedUser?.ownerEmail ||
+          storedUser?.email ||
+          storedUser?.contactEmail ||
+          "";
+        const ownerPhone =
+          storedUser?.ownerPhone ||
+          storedUser?.phone ||
+          storedUser?.contactNumber ||
+          "";
+
+        if (ownerEmail && !ownerEmail.endsWith("@restaurant.appzeto.com")) {
+          return "email";
+        }
+        if (ownerPhone) {
+          return "phone";
+        }
+      }
+    } catch (err) {
+      console.error("Failed to determine restaurant auth mode:", err);
+    }
+
+    return "email";
+  };
+
+  const buildStoredImage = async (file) => {
+    const dataUrl = await readFileAsDataUrl(file);
+    return {
+      name: file.name,
+      size: file.size,
+      type: file.type,
+      dataUrl
+    };
+  };
+
+  const authMode = getRestaurantAuthMode();
+
   // Load from localStorage on mount and check URL parameter
   useEffect(() => {
     // Check if step is specified in URL (from OTP login redirect)
@@ -228,7 +394,7 @@ export default function RestaurantOnboarding() {
           restaurantName: localData.step1.restaurantName || "",
           ownerName: localData.step1.ownerName || "",
           ownerEmail: localData.step1.ownerEmail || "",
-          ownerPhone: localData.step1.ownerPhone || "",
+          ownerPhone: normalizeIndianPhone(localData.step1.ownerPhone || ""),
           primaryContactNumber: localData.step1.primaryContactNumber || "",
           location: {
             addressLine1: localData.step1.location?.addressLine1 || "",
@@ -274,12 +440,32 @@ export default function RestaurantOnboarding() {
         setStep(normalizeStep(localData.currentStep));
       }
     }
+
+    const prefilledOwnerEmail = getPrefilledOwnerEmail();
+    if (prefilledOwnerEmail) {
+      setStep1(prev => ({
+        ...prev,
+        ownerEmail: prev.ownerEmail || prefilledOwnerEmail
+      }));
+    }
+
+    const prefilledOwnerPhone = getPrefilledOwnerPhone();
+    if (prefilledOwnerPhone) {
+      setStep1(prev => ({
+        ...prev,
+        ownerPhone: prev.ownerPhone || prefilledOwnerPhone
+      }));
+    }
   }, [searchParams]);
 
   // Save to localStorage whenever step data changes
   useEffect(() => {
     saveOnboardingToLocalStorage(step1, step2, step3, step);
   }, [step1, step2, step3, step]);
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [step]);
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -292,17 +478,17 @@ export default function RestaurantOnboarding() {
         if (data) {
           if (data.step1) {
             setStep1(prev => ({
-              restaurantName: data.step1.restaurantName || baseRestaurantName || "",
-              ownerName: data.step1.ownerName || "",
-              ownerEmail: data.step1.ownerEmail || "",
-              ownerPhone: data.step1.ownerPhone || "",
-              primaryContactNumber: data.step1.primaryContactNumber || "",
+              restaurantName: data.step1.restaurantName || prev.restaurantName || baseRestaurantName || "",
+              ownerName: data.step1.ownerName || prev.ownerName || "",
+              ownerEmail: data.step1.ownerEmail || prev.ownerEmail || getPrefilledOwnerEmail(),
+              ownerPhone: normalizeIndianPhone(data.step1.ownerPhone || prev.ownerPhone || getPrefilledOwnerPhone()),
+              primaryContactNumber: data.step1.primaryContactNumber || prev.primaryContactNumber || "",
               location: {
-                addressLine1: data.step1.location?.addressLine1 || "",
-                addressLine2: data.step1.location?.addressLine2 || "",
-                area: data.step1.location?.area || "",
-                city: data.step1.location?.city || "",
-                landmark: data.step1.location?.landmark || ""
+                addressLine1: data.step1.location?.addressLine1 || prev.location?.addressLine1 || "",
+                addressLine2: data.step1.location?.addressLine2 || prev.location?.addressLine2 || "",
+                area: data.step1.location?.area || prev.location?.area || "",
+                city: data.step1.location?.city || prev.location?.city || "",
+                landmark: data.step1.location?.landmark || prev.location?.landmark || ""
               }
             }));
           } else if (baseRestaurantName) {
@@ -313,39 +499,39 @@ export default function RestaurantOnboarding() {
             }));
           }
           if (data.step2) {
-            setStep2({
+            setStep2(prev => ({
               // Load menu images from URLs if available
-              menuImages: data.step2.menuImageUrls || [],
+              menuImages: data.step2.menuImageUrls?.length ? data.step2.menuImageUrls : prev.menuImages || [],
               // Load profile image URL if available
-              profileImage: data.step2.profileImageUrl || null,
-              cuisines: data.step2.cuisines || [],
-              openingTime: data.step2.deliveryTimings?.openingTime || "",
-              closingTime: data.step2.deliveryTimings?.closingTime || "",
-              openDays: data.step2.openDays || []
-            });
+              profileImage: data.step2.profileImageUrl || prev.profileImage || null,
+              cuisines: data.step2.cuisines?.length ? data.step2.cuisines : prev.cuisines || [],
+              openingTime: data.step2.deliveryTimings?.openingTime || prev.openingTime || "",
+              closingTime: data.step2.deliveryTimings?.closingTime || prev.closingTime || "",
+              openDays: data.step2.openDays?.length ? data.step2.openDays : prev.openDays || []
+            }));
           }
           if (data.step3) {
-            setStep3({
-              panNumber: data.step3.pan?.panNumber || "",
-              nameOnPan: data.step3.pan?.nameOnPan || "",
-              panImage: null,
+            setStep3(prev => ({
+              panNumber: data.step3.pan?.panNumber || prev.panNumber || "",
+              nameOnPan: data.step3.pan?.nameOnPan || prev.nameOnPan || "",
+              panImage: prev.panImage || null,
               // Don't load images from API, user needs to re-upload
-              gstRegistered: data.step3.gst?.isRegistered || false,
-              gstNumber: data.step3.gst?.gstNumber || "",
-              gstLegalName: data.step3.gst?.legalName || "",
-              gstAddress: data.step3.gst?.address || "",
-              gstImage: null,
+              gstRegistered: data.step3.gst?.isRegistered ?? prev.gstRegistered ?? false,
+              gstNumber: data.step3.gst?.gstNumber || prev.gstNumber || "",
+              gstLegalName: data.step3.gst?.legalName || prev.gstLegalName || "",
+              gstAddress: data.step3.gst?.address || prev.gstAddress || "",
+              gstImage: prev.gstImage || null,
               // Don't load images from API, user needs to re-upload
-              fssaiNumber: data.step3.fssai?.registrationNumber || "",
-              fssaiExpiry: data.step3.fssai?.expiryDate ? data.step3.fssai.expiryDate.slice(0, 10) : "",
-              fssaiImage: null,
+              fssaiNumber: data.step3.fssai?.registrationNumber || prev.fssaiNumber || "",
+              fssaiExpiry: data.step3.fssai?.expiryDate ? data.step3.fssai.expiryDate.slice(0, 10) : prev.fssaiExpiry || "",
+              fssaiImage: prev.fssaiImage || null,
               // Don't load images from API, user needs to re-upload
-              accountNumber: data.step3.bank?.accountNumber || "",
-              confirmAccountNumber: data.step3.bank?.accountNumber || "",
-              ifscCode: data.step3.bank?.ifscCode || "",
-              accountHolderName: data.step3.bank?.accountHolderName || "",
-              accountType: data.step3.bank?.accountType || ""
-            });
+              accountNumber: data.step3.bank?.accountNumber || prev.accountNumber || "",
+              confirmAccountNumber: data.step3.bank?.accountNumber || prev.confirmAccountNumber || "",
+              ifscCode: data.step3.bank?.ifscCode || prev.ifscCode || "",
+              accountHolderName: data.step3.bank?.accountHolderName || prev.accountHolderName || "",
+              accountType: data.step3.bank?.accountType || prev.accountType || ""
+            }));
           }
           // Determine which step to show based on completeness
           const stepToShow = determineStepToShow(data);
@@ -467,6 +653,44 @@ export default function RestaurantOnboarding() {
       [field]: sanitizedValue
     }));
   };
+
+  const handleLocationChange = (field, value) => {
+    let sanitizedValue = value;
+    if (field === "city") {
+      sanitizedValue = normalizeAlphabeticText(value);
+    }
+
+    setStep1(prev => ({
+      ...prev,
+      location: {
+        ...prev.location,
+        [field]: sanitizedValue
+      }
+    }));
+  };
+
+  const handleMenuImagesChange = async files => {
+    if (!files.length) return;
+    const storedImages = await Promise.all(files.map(async file => buildStoredImage(file)));
+    setStep2(prev => ({
+      ...prev,
+      menuImages: [...(prev.menuImages || []), ...storedImages]
+    }));
+  };
+
+  const handleSingleImageChange = async (setter, file) => {
+    if (!file) return;
+    const storedImage = await buildStoredImage(file);
+    setter(storedImage);
+  };
+
+  const canUseStoredImage = image =>
+    image instanceof File ||
+    Boolean(image?.dataUrl) ||
+    Boolean(image?.url) ||
+    isDataUrl(image) ||
+    isHttpUrl(image);
+
   const validateStep2 = () => {
     const errors = [];
 
@@ -478,8 +702,10 @@ export default function RestaurantOnboarding() {
       // Verify that menu images are either File objects or have valid URLs
       const validMenuImages = step2.menuImages.filter(img => {
         if (img instanceof File) return true;
+        if (img?.dataUrl && typeof img.dataUrl === 'string') return true;
         if (img?.url && typeof img.url === 'string') return true;
         if (typeof img === 'string' && img.startsWith('http')) return true;
+        if (typeof img === 'string' && img.startsWith('data:')) return true;
         return false;
       });
       if (validMenuImages.length === 0) {
@@ -492,7 +718,7 @@ export default function RestaurantOnboarding() {
       errors.push("Restaurant profile image is required");
     } else {
       // Verify profile image is either a File or has a valid URL
-      const isValidProfileImage = step2.profileImage instanceof File || step2.profileImage?.url && typeof step2.profileImage.url === 'string' || typeof step2.profileImage === 'string' && step2.profileImage.startsWith('http');
+      const isValidProfileImage = canUseStoredImage(step2.profileImage);
       if (!isValidProfileImage) {
         errors.push("Please upload a valid restaurant profile image");
       }
@@ -525,7 +751,7 @@ export default function RestaurantOnboarding() {
     if (!step3.panImage) {
       errors.push("PAN image is required");
     } else {
-      const isValidPanImage = step3.panImage instanceof File || step3.panImage?.url && typeof step3.panImage.url === 'string' || typeof step3.panImage === 'string' && step3.panImage.startsWith('http');
+      const isValidPanImage = canUseStoredImage(step3.panImage);
       if (!isValidPanImage) {
         errors.push("Please upload a valid PAN image");
       }
@@ -550,7 +776,7 @@ export default function RestaurantOnboarding() {
     if (!step3.fssaiImage) {
       errors.push("FSSAI image is required");
     } else {
-      const isValidFssaiImage = step3.fssaiImage instanceof File || step3.fssaiImage?.url && typeof step3.fssaiImage.url === 'string' || typeof step3.fssaiImage === 'string' && step3.fssaiImage.startsWith('http');
+      const isValidFssaiImage = canUseStoredImage(step3.fssaiImage);
       if (!isValidFssaiImage) {
         errors.push("Please upload a valid FSSAI image");
       }
@@ -573,7 +799,7 @@ export default function RestaurantOnboarding() {
       if (!step3.gstImage) {
         errors.push("GST image is required when GST registered");
       } else {
-        const isValidGstImage = step3.gstImage instanceof File || step3.gstImage?.url && typeof step3.gstImage.url === 'string' || typeof step3.gstImage === 'string' && step3.gstImage.startsWith('http');
+        const isValidGstImage = canUseStoredImage(step3.gstImage);
         if (!isValidGstImage) {
           errors.push("Please upload a valid GST image");
         }
@@ -641,9 +867,12 @@ export default function RestaurantOnboarding() {
       } else if (effectiveStep === 2) {
         const menuUploads = [];
         // Upload menu images if they are File objects
-        for (const file of step2.menuImages.filter(f => f instanceof File)) {
+        for (let index = 0; index < step2.menuImages.length; index += 1) {
+          const file = step2.menuImages[index];
+          const uploadableFile = await imageValueToFile(file, `menu-image-${index + 1}.jpg`);
+          if (!uploadableFile) continue;
           try {
-            const uploaded = await handleUpload(file, "appzeto/restaurant/menu");
+            const uploaded = await handleUpload(uploadableFile, "appzeto/restaurant/menu");
             // Verify upload was successful and has valid URL
             if (!uploaded || !uploaded.url) {
               throw new Error(`Failed to upload menu image: ${file.name}`);
@@ -655,7 +884,12 @@ export default function RestaurantOnboarding() {
           }
         }
         // If menuImages already have URLs (from previous save), include them
-        const existingMenuUrls = step2.menuImages.filter(img => !(img instanceof File) && (img?.url || typeof img === 'string' && img.startsWith('http')));
+        const existingMenuUrls = step2.menuImages.filter(img => {
+          if (img instanceof File) return false;
+          if (img?.dataUrl) return false;
+          if (typeof img === 'string' && img.startsWith('data:')) return false;
+          return Boolean(img?.url || (typeof img === 'string' && img.startsWith('http')));
+        });
         const allMenuUrls = [...existingMenuUrls, ...menuUploads];
 
         // Verify we have at least one menu image
@@ -665,9 +899,10 @@ export default function RestaurantOnboarding() {
 
         // Upload profile image if it's a File object
         let profileUpload = null;
-        if (step2.profileImage instanceof File) {
+        if (step2.profileImage instanceof File || step2.profileImage?.dataUrl || typeof step2.profileImage === 'string' && step2.profileImage.startsWith('data:')) {
           try {
-            profileUpload = await handleUpload(step2.profileImage, "appzeto/restaurant/profile");
+            const uploadableProfileImage = await imageValueToFile(step2.profileImage, "restaurant-profile.jpg");
+            profileUpload = await handleUpload(uploadableProfileImage, "appzeto/restaurant/profile");
             // Verify upload was successful and has valid URL
             if (!profileUpload || !profileUpload.url) {
               throw new Error('Failed to upload profile image');
@@ -722,9 +957,10 @@ export default function RestaurantOnboarding() {
       } else if (effectiveStep === 3) {
         // Upload PAN image if it's a File object
         let panImageUpload = null;
-        if (step3.panImage instanceof File) {
+        if (step3.panImage instanceof File || step3.panImage?.dataUrl || typeof step3.panImage === 'string' && step3.panImage.startsWith('data:')) {
           try {
-            panImageUpload = await handleUpload(step3.panImage, "appzeto/restaurant/pan");
+            const uploadablePanImage = await imageValueToFile(step3.panImage, "pan-image.jpg");
+            panImageUpload = await handleUpload(uploadablePanImage, "appzeto/restaurant/pan");
             // Verify upload was successful and has valid URL
             if (!panImageUpload || !panImageUpload.url) {
               throw new Error('Failed to upload PAN image');
@@ -751,9 +987,10 @@ export default function RestaurantOnboarding() {
         // Upload GST image if it's a File object (only if GST registered)
         let gstImageUpload = null;
         if (step3.gstRegistered) {
-          if (step3.gstImage instanceof File) {
+          if (step3.gstImage instanceof File || step3.gstImage?.dataUrl || typeof step3.gstImage === 'string' && step3.gstImage.startsWith('data:')) {
             try {
-              gstImageUpload = await handleUpload(step3.gstImage, "appzeto/restaurant/gst");
+              const uploadableGstImage = await imageValueToFile(step3.gstImage, "gst-image.jpg");
+              gstImageUpload = await handleUpload(uploadableGstImage, "appzeto/restaurant/gst");
               // Verify upload was successful and has valid URL
               if (!gstImageUpload || !gstImageUpload.url) {
                 throw new Error('Failed to upload GST image');
@@ -780,9 +1017,10 @@ export default function RestaurantOnboarding() {
 
         // Upload FSSAI image if it's a File object
         let fssaiImageUpload = null;
-        if (step3.fssaiImage instanceof File) {
+        if (step3.fssaiImage instanceof File || step3.fssaiImage?.dataUrl || typeof step3.fssaiImage === 'string' && step3.fssaiImage.startsWith('data:')) {
           try {
-            fssaiImageUpload = await handleUpload(step3.fssaiImage, "appzeto/restaurant/fssai");
+            const uploadableFssaiImage = await imageValueToFile(step3.fssaiImage, "fssai-image.jpg");
+            fssaiImageUpload = await handleUpload(uploadableFssaiImage, "appzeto/restaurant/fssai");
             // Verify upload was successful and has valid URL
             if (!fssaiImageUpload || !fssaiImageUpload.url) {
               throw new Error('Failed to upload FSSAI image');
@@ -935,16 +1173,28 @@ export default function RestaurantOnboarding() {
         </div>
         <div>
           <Label className="text-xs text-gray-700">Email address*</Label>
-          <Input type="email" value={step1.ownerEmail || ""} onChange={e => setStep1({
-            ...step1,
-            ownerEmail: e.target.value
-          })} className="mt-1 bg-white text-sm text-black placeholder:text-gray-400" placeholder="owner@email.com" />
+          <Input
+            type="email"
+            value={step1.ownerEmail || ""}
+            readOnly={authMode === "email"}
+            tabIndex={authMode === "email" ? -1 : 0}
+            onChange={authMode === "email" ? undefined : e => handleStep1Change("ownerEmail", e.target.value)}
+            className={`mt-1 text-sm text-black placeholder:text-gray-400 ${authMode === "email" ? "bg-gray-100 cursor-not-allowed" : "bg-white"}`}
+            placeholder="owner@email.com"
+          />
         </div>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <Label className="text-xs text-gray-700">Phone number*</Label>
-          <Input value={step1.ownerPhone || ""} onChange={e => handleStep1Change("ownerPhone", e.target.value)} className="mt-1 bg-white text-sm text-black placeholder:text-gray-400" placeholder="+91 98XXXXXX" />
+          <Input
+            value={step1.ownerPhone || ""}
+            readOnly={authMode === "phone"}
+            tabIndex={authMode === "phone" ? -1 : 0}
+            onChange={authMode === "phone" ? undefined : e => handleStep1Change("ownerPhone", e.target.value)}
+            className={`mt-1 text-sm text-black placeholder:text-gray-400 ${authMode === "phone" ? "bg-gray-100 cursor-not-allowed" : "bg-white"}`}
+            placeholder="+91 98XXXXXX"
+          />
         </div>
       </div>
     </section>
@@ -976,13 +1226,7 @@ export default function RestaurantOnboarding() {
           </div>
           <div>
             <Label className="text-xs text-gray-700">City*</Label>
-            <Input value={step1.location?.city || ""} onChange={e => setStep1({
-              ...step1,
-              location: {
-                ...step1.location,
-                city: e.target.value
-              }
-            })} className="mt-1 bg-white text-sm text-black placeholder:text-gray-400" placeholder="City" />
+            <Input value={step1.location?.city || ""} onChange={e => handleLocationChange("city", e.target.value)} className="mt-1 bg-white text-sm text-black placeholder:text-gray-400" placeholder="City" />
           </div>
           <div>
             <Label className="text-xs text-gray-700">Shop no. / building no. (optional)</Label>
@@ -1049,13 +1293,10 @@ export default function RestaurantOnboarding() {
             <Upload className="w-4.5 h-4.5" />
             <span>{step2.menuImages.length > 0 ? "Add more images" : "Choose files"}</span>
           </label>
-          <input id="menuImagesInput" type="file" multiple accept="image/*" className="hidden" onChange={e => {
+          <input id="menuImagesInput" type="file" multiple accept="image/*" capture="environment" className="hidden" onChange={async e => {
             const files = Array.from(e.target.files || []);
             if (!files.length) return;
-            setStep2(prev => ({
-              ...prev,
-              menuImages: [...(prev.menuImages || []), ...files] // Append new files to existing ones
-            }));
+            await handleMenuImagesChange(files);
             // Reset input to allow selecting same file again
             e.target.value = '';
           }} />
@@ -1081,6 +1322,9 @@ export default function RestaurantOnboarding() {
             if (file instanceof File) {
               imageUrl = URL.createObjectURL(file);
               imageName = file.name;
+            } else if (file?.dataUrl) {
+              imageUrl = file.dataUrl;
+              imageName = file.name || `Image ${idx + 1}`;
             } else if (file?.url) {
               // If it's an object with url property (from backend)
               imageUrl = file.url;
@@ -1117,14 +1361,7 @@ export default function RestaurantOnboarding() {
         <div className="flex items-center gap-4">
           <div className="h-20 w-20 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden border border-gray-200 shrink-0">
             {step2.profileImage ? (() => {
-              let imageSrc = null;
-              if (step2.profileImage instanceof File) {
-                imageSrc = URL.createObjectURL(step2.profileImage);
-              } else if (step2.profileImage?.url) {
-                imageSrc = step2.profileImage.url;
-              } else if (typeof step2.profileImage === 'string') {
-                imageSrc = step2.profileImage;
-              }
+              const imageSrc = getImagePreviewUrl(step2.profileImage);
               return imageSrc ? <img src={imageSrc} alt="Restaurant profile" className="w-full h-full object-cover" /> : <ImageIcon className="w-8 h-8 text-gray-400" />;
             })() : <ImageIcon className="w-8 h-8 text-gray-400" />}
           </div>
@@ -1145,13 +1382,13 @@ export default function RestaurantOnboarding() {
               <Upload className="w-4.5 h-4.5" />
               <span>{step2.profileImage ? "Change photo" : "Choose file"}</span>
             </label>
-            <input id="profileImageInput" type="file" accept="image/*" className="hidden" onChange={e => {
+            <input id="profileImageInput" type="file" accept="image/*" capture="environment" className="hidden" onChange={async e => {
               const file = e.target.files?.[0] || null;
               if (file) {
-                setStep2(prev => ({
+                await handleSingleImageChange(image => setStep2(prev => ({
                   ...prev,
-                  profileImage: file
-                }));
+                  profileImage: image
+                })), file);
               }
               e.target.value = '';
             }} />
@@ -1236,16 +1473,22 @@ export default function RestaurantOnboarding() {
           <Label className="text-xs text-gray-700">Name on PAN*</Label>
           <Input placeholder='Name as per PAN' value={step3.nameOnPan || ""} onChange={e => setStep3({
             ...step3,
-            nameOnPan: e.target.value
+            nameOnPan: normalizeAlphabeticText(e.target.value)
           })} className="mt-1 bg-white text-sm text-black placeholder:text-gray-400" />
         </div>
       </div>
       <div>
         <Label className="text-xs text-gray-700">PAN image*</Label>
-        <Input type="file" accept="image/*" onChange={e => setStep3({
-          ...step3,
-          panImage: e.target.files?.[0] || null
-        })} className="mt-1 bg-white text-sm text-black" />
+        <Input type="file" accept="image/*" capture="environment" onChange={async e => {
+          const file = e.target.files?.[0] || null;
+          if (file) {
+            await handleSingleImageChange(image => setStep3(prev => ({
+              ...prev,
+              panImage: image
+            })), file);
+          }
+          e.target.value = '';
+        }} className="mt-1 bg-white text-sm text-black" />
       </div>
     </section>
 
@@ -1278,7 +1521,7 @@ export default function RestaurantOnboarding() {
           <Label className="text-xs text-gray-700">Legal name*</Label>
           <Input value={step3.gstLegalName || ""} onChange={e => setStep3({
             ...step3,
-            gstLegalName: e.target.value
+            gstLegalName: normalizeAlphabeticText(e.target.value)
           })} className="mt-1 bg-white text-sm text-black placeholder:text-gray-400" placeholder="Legal name" />
         </div>
         <div>
@@ -1290,10 +1533,16 @@ export default function RestaurantOnboarding() {
         </div>
         <div>
           <Label className="text-xs text-gray-700">GST certificate image*</Label>
-          <Input type="file" accept="image/*" onChange={e => setStep3({
-            ...step3,
-            gstImage: e.target.files?.[0] || null
-          })} className="mt-1 bg-white text-sm text-black placeholder:text-gray-400" />
+          <Input type="file" accept="image/*" capture="environment" onChange={async e => {
+            const file = e.target.files?.[0] || null;
+            if (file) {
+              await handleSingleImageChange(image => setStep3(prev => ({
+                ...prev,
+                gstImage: image
+              })), file);
+            }
+            e.target.value = '';
+          }} className="mt-1 bg-white text-sm text-black placeholder:text-gray-400" />
         </div>
       </div>}
     </section>
@@ -1345,10 +1594,16 @@ export default function RestaurantOnboarding() {
       </div>
       <div>
         <Label className="text-xs text-gray-700">FSSAI license image*</Label>
-        <Input type="file" accept="image/*" onChange={e => setStep3({
-          ...step3,
-          fssaiImage: e.target.files?.[0] || null
-        })} className="mt-1 bg-white text-sm text-black placeholder:text-gray-400" />
+        <Input type="file" accept="image/*" capture="environment" onChange={async e => {
+          const file = e.target.files?.[0] || null;
+          if (file) {
+            await handleSingleImageChange(image => setStep3(prev => ({
+              ...prev,
+              fssaiImage: image
+            })), file);
+          }
+          e.target.value = '';
+        }} className="mt-1 bg-white text-sm text-black placeholder:text-gray-400" />
       </div>
     </section>
 

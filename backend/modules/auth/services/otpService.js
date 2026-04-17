@@ -12,7 +12,7 @@ const logger = winston.createLogger({
 });
 
 // Test phone numbers that should use default OTP
-const TEST_PHONE_NUMBERS = ['7610416911', '7691810506', '7974161582', '9009925021', '6375095971'];
+const TEST_PHONE_NUMBERS = ['7610416911', '7691810506', '7974161582', '9009925021', '6375095971', '9999999999'];
 
 // Default OTP for test phone numbers
 const DEFAULT_TEST_OTP = '110211';
