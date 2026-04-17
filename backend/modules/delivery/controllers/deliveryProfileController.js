@@ -5,6 +5,7 @@ import { validate } from '../../../shared/middleware/validate.js';
 import Joi from 'joi';
 import winston from 'winston';
 import { normalizeLocale } from '../../../shared/i18n/localeConstants.js';
+import { deleteDeliveryAccountCascade } from '../../../shared/services/accountDeletionService.js';
 const logger = winston.createLogger({
   level: 'info',
   format: winston.format.json(),
@@ -180,5 +181,27 @@ export const reverify = asyncHandler(async (req, res) => {
   } catch (error) {
     logger.error(`Error reverifying delivery partner: ${error.message}`);
     return errorResponse(res, 500, 'Failed to resubmit for verification');
+  }
+});
+
+/**
+ * Delete Delivery Partner account with related data
+ * DELETE /api/delivery/profile
+ */
+export const deleteProfile = asyncHandler(async (req, res) => {
+  try {
+    const deliveryId = req.delivery._id;
+    const existingDelivery = await Delivery.findById(deliveryId).select('_id').lean();
+    if (!existingDelivery) {
+      return errorResponse(res, 404, 'Delivery partner not found');
+    }
+
+    await deleteDeliveryAccountCascade({ deliveryId });
+    return successResponse(res, 200, 'Delivery account deleted successfully');
+  } catch (error) {
+    logger.error(`Error deleting delivery account: ${error.message}`, {
+      error: error.stack
+    });
+    return errorResponse(res, 500, 'Failed to delete delivery account');
   }
 });

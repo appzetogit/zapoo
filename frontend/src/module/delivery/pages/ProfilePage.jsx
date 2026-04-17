@@ -19,10 +19,14 @@ import {
   IndianRupee,
   Sparkles,
   LogOut,
+  Trash2,
   X,
   Trophy,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { deliveryAPI } from "@/lib/api";
 import { toast } from "sonner";
 import { clearModuleAuth } from "@/lib/utils/auth";
@@ -40,6 +44,9 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showAlertSoundPopup, setShowAlertSoundPopup] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteConfirmationText, setDeleteConfirmationText] = useState("");
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [selectedAlertSound, setSelectedAlertSound] = useState(() => {
     // Load from localStorage, default to "zomato_tone"
     return localStorage.getItem('delivery_alert_sound') || 'zomato_tone';
@@ -192,6 +199,54 @@ export default function ProfilePage() {
     }, 100);
   };
 
+  const handleDeleteConfirmationChange = (event) => {
+    setDeleteConfirmationText((event.target.value || "").toUpperCase());
+  };
+
+  const handleDeleteDialogOpenChange = (open) => {
+    if (isDeletingAccount) return;
+    setDeleteConfirmOpen(open);
+    if (!open) {
+      setDeleteConfirmationText("");
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (isDeletingAccount || deleteConfirmationText !== "DELETE") return;
+
+    setIsDeletingAccount(true);
+    try {
+      await revokeFcmTokenOnLogout("delivery");
+      await deliveryAPI.deleteAccount();
+
+      clearModuleAuth("delivery");
+      localStorage.removeItem("delivery_gig_storage");
+      localStorage.removeItem("delivery_module_storage");
+      localStorage.removeItem("app:isOnline");
+      sessionStorage.removeItem("deliveryAuthData");
+
+      const keysToRemove = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith("delivery_")) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach((key) => localStorage.removeItem(key));
+
+      window.dispatchEvent(new Event("deliveryAuthChanged"));
+      window.dispatchEvent(new Event("onlineStatusChanged"));
+      toast.success("Account deleted successfully");
+
+      setDeleteConfirmationText("");
+      setDeleteConfirmOpen(false);
+      navigate("/delivery/sign-in", { replace: true });
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Failed to delete account. Please try again.");
+      setIsDeletingAccount(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-100 text-gray-900 font-poppins overflow-x-hidden">
       {/* Back Button and Profile Section */}
@@ -341,9 +396,58 @@ export default function ProfilePage() {
                 <ArrowRight className="w-5 h-5 text-gray-400" />
               </CardContent>
             </Card>
+            <Card
+              onClick={() => handleDeleteDialogOpenChange(true)}
+              className="mt-3 bg-white py-0 border-0 shadow-none rounded-lg cursor-pointer hover:bg-red-50 transition-colors"
+            >
+              <CardContent className="p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Trash2 className="w-5 h-5 text-[#DC2626]" />
+                  <span className="text-sm font-medium text-[#DC2626]">Delete Account</span>
+                </div>
+                <ArrowRight className="w-5 h-5 text-gray-400" />
+              </CardContent>
+            </Card>
           </div>
         </div>
       </div>
+
+      <Dialog open={deleteConfirmOpen} onOpenChange={handleDeleteDialogOpenChange}>
+        <DialogContent className="w-[calc(100vw-1.5rem)] max-w-sm rounded-2xl p-4 sm:p-5 [&>button]:hidden">
+          <DialogHeader className="space-y-2 text-center">
+            <DialogTitle className="text-base sm:text-lg font-bold text-red-600">Delete Your Account?</DialogTitle>
+            <DialogDescription className="text-sm leading-5 text-gray-600">
+              Are you sure you want to delete your account? All your data will be permanently lost. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <Input
+            placeholder="Type DELETE to confirm"
+            value={deleteConfirmationText}
+            onChange={handleDeleteConfirmationChange}
+            disabled={isDeletingAccount}
+            className="h-11 mt-2"
+          />
+          <DialogFooter className="mt-4 flex-col gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => handleDeleteDialogOpenChange(false)}
+              disabled={isDeletingAccount}
+              className="h-11 w-full"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              className="h-11 w-full bg-red-600 hover:bg-red-700 text-white disabled:opacity-50"
+              onClick={handleDeleteAccount}
+              disabled={isDeletingAccount || deleteConfirmationText !== "DELETE"}
+            >
+              {isDeletingAccount ? "Deleting..." : "Delete Account"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Order Alert Sound Popup */}
       {showAlertSoundPopup && (

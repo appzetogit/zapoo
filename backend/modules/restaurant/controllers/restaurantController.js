@@ -5,12 +5,13 @@ import Order from '../../order/models/Order.js';
 import Tier from '../../admin/models/Tier.js';
 import BusinessSettings from '../../admin/models/BusinessSettings.js';
 import { successResponse, errorResponse } from '../../../shared/utils/response.js';
-import { uploadToCloudinary, deleteFromCloudinary } from '../../../shared/utils/cloudinaryService.js';
+import { uploadToCloudinary } from '../../../shared/utils/cloudinaryService.js';
 import { initializeCloudinary } from '../../../config/cloudinary.js';
 import asyncHandler from '../../../shared/middleware/asyncHandler.js';
 import mongoose from 'mongoose';
 import { calculateDistance } from '../../order/services/orderCalculationService.js';
 import { normalizeLocale } from '../../../shared/i18n/localeConstants.js';
+import { deleteRestaurantAccountCascade } from '../../../shared/services/accountDeletionService.js';
 
 const attachRealReviewStats = async (restaurants = []) => {
   if (!Array.isArray(restaurants) || restaurants.length === 0) {
@@ -1287,44 +1288,10 @@ export const updateDeliveryStatus = asyncHandler(async (req, res) => {
  */
 export const deleteRestaurantAccount = asyncHandler(async (req, res) => {
   try {
-    const restaurantId = req.restaurant._id;
-    const restaurant = await Restaurant.findById(restaurantId);
-    if (!restaurant) {
+    const result = await deleteRestaurantAccountCascade({ restaurantId: req.restaurant._id });
+    if (!result.found) {
       return errorResponse(res, 404, 'Restaurant not found');
     }
-
-    // Delete Cloudinary images if they exist
-    try {
-      // Delete profile image
-      if (restaurant.profileImage?.publicId) {
-        try {
-          await deleteFromCloudinary(restaurant.profileImage.publicId);
-        } catch (error) {
-          console.error('Error deleting profile image from Cloudinary:', error);
-          // Continue with account deletion even if image deletion fails
-        }
-      }
-
-      // Delete menu images
-      if (restaurant.menuImages && Array.isArray(restaurant.menuImages)) {
-        for (const menuImage of restaurant.menuImages) {
-          if (menuImage?.publicId) {
-            try {
-              await deleteFromCloudinary(menuImage.publicId);
-            } catch (error) {
-              console.error('Error deleting menu image from Cloudinary:', error);
-              // Continue with account deletion even if image deletion fails
-            }
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Error deleting images from Cloudinary:', error);
-      // Continue with account deletion even if image deletion fails
-    }
-
-    // Delete the restaurant from database
-    await Restaurant.findByIdAndDelete(restaurantId);
     return successResponse(res, 200, 'Restaurant account deleted successfully');
   } catch (error) {
     console.error('Error deleting restaurant account:', error);

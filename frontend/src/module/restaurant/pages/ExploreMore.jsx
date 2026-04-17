@@ -4,17 +4,24 @@ import { useNavigate } from "react-router-dom";
 import Lenis from "lenis";
 import { ArrowLeft, Search, User, UserRound, Store, ChevronRight, Info, Clock, Users, Truck, FileText, Star, MessageSquare, HelpCircle, Edit, IndianRupee, Receipt, X, MapPin, Zap, Languages } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { clearModuleAuth, clearAuthData } from "@/lib/utils/auth";
 import { restaurantAPI } from "@/lib/api";
 import { firebaseAuth } from "@/lib/firebase";
 import { revokeFcmTokenOnLogout } from "@/lib/utils/fcmTokenLifecycle";
 import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
 export default function ExploreMore() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [profileOpen, setProfileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteConfirmationText, setDeleteConfirmationText] = useState("");
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
   // Restaurant data state
   const [restaurantData, setRestaurantData] = useState(null);
@@ -217,6 +224,55 @@ export default function ExploreMore() {
       });
     } finally {
       setIsLoggingOut(false);
+    }
+  };
+
+  const handleDeleteConfirmationChange = (event) => {
+    setDeleteConfirmationText((event.target.value || "").toUpperCase());
+  };
+
+  const handleDeleteDialogOpenChange = (open) => {
+    if (isDeletingAccount) return;
+    setDeleteConfirmOpen(open);
+    if (!open) {
+      setDeleteConfirmationText("");
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (isDeletingAccount || deleteConfirmationText !== "DELETE") return;
+
+    setIsDeletingAccount(true);
+    try {
+      await revokeFcmTokenOnLogout("restaurant");
+      await restaurantAPI.deleteAccount();
+
+      try {
+        const { signOut } = await import("firebase/auth");
+        if (firebaseAuth.currentUser) {
+          await signOut(firebaseAuth);
+        }
+      } catch (firebaseError) {
+        console.warn("Firebase logout failed after account deletion:", firebaseError);
+      }
+
+      clearModuleAuth("restaurant");
+      localStorage.removeItem("restaurant_onboarding");
+      localStorage.removeItem("restaurant_accessToken");
+      localStorage.removeItem("restaurant_authenticated");
+      localStorage.removeItem("restaurant_user");
+      localStorage.removeItem("restaurant_invited_users");
+      sessionStorage.removeItem("restaurantAuthData");
+      window.dispatchEvent(new Event("restaurantAuthChanged"));
+
+      setDeleteConfirmationText("");
+      setDeleteConfirmOpen(false);
+      setProfileOpen(false);
+      toast.success("Account deleted successfully");
+      navigate("/restaurant/welcome", { replace: true });
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Failed to delete account. Please try again.");
+      setIsDeletingAccount(false);
     }
   };
   // Prevent body scroll when popup is open
@@ -705,6 +761,10 @@ export default function ExploreMore() {
                   {isLoggingOut ? t("restaurant.exploreMore.profile.loggingOut") : t("restaurant.exploreMore.profile.logout")}
                 </button>
 
+                <button onClick={() => handleDeleteDialogOpenChange(true)} disabled={isLoggingOut || isDeletingAccount} className="w-full bg-white border-2 border-red-600 text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed font-semibold py-3 px-4 rounded-lg transition-colors">
+                  {isDeletingAccount ? "Deleting..." : "Delete Account"}
+                </button>
+
                 {/* Logout from all devices Button */}
                 <button onClick={handleLogoutAllDevices} disabled={isLoggingOut} className="w-full bg-white border-2 border-red-600 text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed font-semibold py-3 px-4 rounded-lg transition-colors">
                   {isLoggingOut ? t("restaurant.exploreMore.profile.loggingOut") : t("restaurant.exploreMore.profile.logoutAllDevices")}
@@ -739,6 +799,43 @@ export default function ExploreMore() {
             </motion.div>
           </>}
       </AnimatePresence>
+
+      <Dialog open={deleteConfirmOpen} onOpenChange={handleDeleteDialogOpenChange}>
+        <DialogContent className="w-[calc(100vw-1.5rem)] max-w-sm rounded-2xl p-4 sm:p-5 [&>button]:hidden">
+          <DialogHeader className="space-y-2 text-center">
+            <DialogTitle className="text-base sm:text-lg font-bold text-red-600">Delete Your Account?</DialogTitle>
+            <DialogDescription className="text-sm leading-5 text-gray-600">
+              Are you sure you want to delete your account? All your data will be permanently lost. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <Input
+            placeholder="Type DELETE to confirm"
+            value={deleteConfirmationText}
+            onChange={handleDeleteConfirmationChange}
+            disabled={isDeletingAccount}
+            className="h-11 mt-2"
+          />
+          <DialogFooter className="mt-4 flex-col gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => handleDeleteDialogOpenChange(false)}
+              disabled={isDeletingAccount}
+              className="h-11 w-full"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              className="h-11 w-full bg-red-600 hover:bg-red-700 text-white disabled:opacity-50"
+              onClick={handleDeleteAccount}
+              disabled={isDeletingAccount || deleteConfirmationText !== "DELETE"}
+            >
+              {isDeletingAccount ? "Deleting..." : "Delete Account"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
     </motion.div>;
 }

@@ -6,6 +6,7 @@ import { uploadToCloudinary } from '../../../shared/utils/cloudinaryService.js';
 import axios from 'axios';
 import winston from 'winston';
 import { normalizeLocale } from '../../../shared/i18n/localeConstants.js';
+import { deleteUserAccountCascade } from '../../../shared/services/accountDeletionService.js';
 const logger = winston.createLogger({
   level: 'info',
   format: winston.format.json(),
@@ -718,5 +719,27 @@ export const deleteUserAddress = asyncHandler(async (req, res) => {
       error: error.stack
     });
     return errorResponse(res, 500, 'Failed to delete address');
+  }
+});
+
+/**
+ * Delete user account with related data
+ * DELETE /api/user/profile
+ */
+export const deleteUserAccount = asyncHandler(async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const existingUser = await User.findById(userId).select('_id').lean();
+    if (!existingUser) {
+      return errorResponse(res, 404, 'User not found');
+    }
+
+    await deleteUserAccountCascade({ userId });
+    return successResponse(res, 200, 'User account deleted successfully');
+  } catch (error) {
+    logger.error(`Error deleting user account: ${error.message}`, {
+      error: error.stack
+    });
+    return errorResponse(res, 500, 'Failed to delete user account');
   }
 });

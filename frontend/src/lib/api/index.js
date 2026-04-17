@@ -152,6 +152,11 @@ export const userAPI = {
     return apiClient.put(API_ENDPOINTS.USER.PROFILE, data);
   },
 
+  // Delete user account
+  deleteAccount: () => {
+    return apiClient.delete(API_ENDPOINTS.USER.PROFILE);
+  },
+
   // Upload profile image
   uploadProfileImage: (file) => {
     const formData = new FormData();
@@ -1071,6 +1076,9 @@ export const deliveryAPI = {
   // Update delivery profile
   updateProfile: (data) => {
     return apiClient.put(API_ENDPOINTS.DELIVERY.PROFILE, data);
+  },
+  deleteAccount: () => {
+    return apiClient.delete(API_ENDPOINTS.DELIVERY.PROFILE);
   },
   getPreferences: () => {
     return apiClient.get(API_ENDPOINTS.DELIVERY.PREFERENCES);

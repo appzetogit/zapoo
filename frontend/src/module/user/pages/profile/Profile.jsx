@@ -1,20 +1,21 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
-import { ArrowLeft, ChevronRight, Wallet, Tag, User, Leaf, Palette, Bookmark, Building2, Moon, Sun, Check, Info, PenSquare, AlertTriangle, Power, ShoppingCart, UtensilsCrossed, Languages } from "lucide-react";
+import { ArrowLeft, ChevronRight, Wallet, Tag, User, Leaf, Palette, Bookmark, Building2, Moon, Sun, Check, Info, PenSquare, AlertTriangle, Settings as SettingsIcon, Power, ShoppingCart, UtensilsCrossed, Languages, Trash2 } from "lucide-react";
 import AnimatedPage from "../../components/AnimatedPage";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useProfile } from "../../context/ProfileContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useCompanyName } from "@/lib/hooks/useCompanyName";
 import OptimizedImage from "@/components/OptimizedImage";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { authAPI } from "@/lib/api";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { authAPI, userAPI } from "@/lib/api";
 import { firebaseAuth } from "@/lib/firebase";
 import { clearModuleAuth } from "@/lib/utils/auth";
 import { revokeFcmTokenOnLogout } from "@/lib/utils/fcmTokenLifecycle";
 import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
 export default function Profile() {
   const {
     userProfile,
@@ -32,6 +33,9 @@ export default function Profile() {
   const [appearanceOpen, setAppearanceOpen] = useState(false);
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteConfirmationText, setDeleteConfirmationText] = useState("");
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
 
   // Get first letter of name for avatar
@@ -187,6 +191,52 @@ export default function Profile() {
 
   const cancelLogout = () => {
     setLogoutConfirmOpen(false);
+  };
+
+  const handleDeleteConfirmationChange = (event) => {
+    setDeleteConfirmationText((event.target.value || "").toUpperCase());
+  };
+
+  const handleDeleteDialogOpenChange = (open) => {
+    if (isDeletingAccount) return;
+    setDeleteConfirmOpen(open);
+    if (!open) {
+      setDeleteConfirmationText("");
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (isDeletingAccount || deleteConfirmationText !== "DELETE") return;
+
+    setIsDeletingAccount(true);
+    try {
+      await revokeFcmTokenOnLogout("user");
+      await userAPI.deleteAccount();
+
+      try {
+        const { signOut } = await import("firebase/auth");
+        if (firebaseAuth.currentUser) {
+          await signOut(firebaseAuth);
+        }
+      } catch (firebaseError) {
+        console.warn("Firebase logout failed after account deletion:", firebaseError);
+      }
+
+      clearModuleAuth("user");
+      localStorage.removeItem("accessToken");
+      localStorage.removeItem("user_authenticated");
+      localStorage.removeItem("user_user");
+      localStorage.removeItem("user");
+      window.dispatchEvent(new Event("userAuthChanged"));
+
+      setDeleteConfirmationText("");
+      setDeleteConfirmOpen(false);
+      toast.success("Account deleted successfully");
+      navigate("/user/auth/sign-in", { replace: true });
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Failed to delete account. Please try again.");
+      setIsDeletingAccount(false);
+    }
   };
 
   return <AnimatedPage className="min-h-screen bg-[#f5f5f5] dark:bg-[#0a0a0a]">
@@ -516,6 +566,43 @@ export default function Profile() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={deleteConfirmOpen} onOpenChange={handleDeleteDialogOpenChange}>
+        <DialogContent className="w-[calc(100vw-1.5rem)] max-w-sm rounded-2xl p-4 sm:p-5 [&>button]:hidden">
+          <DialogHeader className="space-y-2 text-center">
+            <DialogTitle className="text-base sm:text-lg font-bold text-red-600">Delete Your Account?</DialogTitle>
+            <DialogDescription className="text-sm leading-5 text-gray-600">
+              Are you sure you want to delete your account? All your data will be permanently lost. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <Input
+            placeholder="Type DELETE to confirm"
+            value={deleteConfirmationText}
+            onChange={handleDeleteConfirmationChange}
+            disabled={isDeletingAccount}
+            className="h-11 mt-2"
+          />
+          <DialogFooter className="mt-4 flex-col gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => handleDeleteDialogOpenChange(false)}
+              disabled={isDeletingAccount}
+              className="h-11 w-full"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handleDeleteAccount}
+              disabled={isDeletingAccount || deleteConfirmationText !== "DELETE"}
+              className="h-11 w-full bg-red-600 hover:bg-red-700 text-white disabled:opacity-50"
+            >
+              {isDeletingAccount ? "Deleting..." : "Delete Account"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
         {/* Food Orders Section */}
         <div className="mb-3">
           <div className="flex items-center gap-2 mb-2 px-1">
@@ -725,6 +812,38 @@ export default function Profile() {
                     <span className="text-base font-medium text-gray-900 dark:text-white">
                       {isLoggingOut ? t("user.profile.loggingOut") : t("user.profile.logOut")}
                     </span>
+                  </div>
+                  <motion.div whileHover={{
+                  x: 4
+                }} transition={{
+                  duration: 0.2
+                }}>
+                    <ChevronRight className="h-5 w-5 text-gray-400 dark:text-gray-500" />
+                  </motion.div>
+                </CardContent>
+              </Card>
+            </motion.div>
+
+            <motion.div whileHover={{
+            x: 4,
+            scale: 1.01
+          }} transition={{
+            duration: 0.2,
+            type: "spring",
+            stiffness: 300
+          }}>
+              <Card className="bg-white dark:bg-[#1a1a1a] py-0 rounded-xl shadow-sm border-0 dark:border-gray-800 cursor-pointer mb-6" onClick={() => handleDeleteDialogOpenChange(true)}>
+                <CardContent className="p-4 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <motion.div className="bg-red-50 dark:bg-red-900/20 rounded-full p-2" whileHover={{
+                    rotate: 15,
+                    scale: 1.1
+                  }} transition={{
+                    duration: 0.3
+                  }}>
+                      <Trash2 className="h-5 w-5 text-red-600 dark:text-red-400" />
+                    </motion.div>
+                    <span className="text-base font-medium text-red-600 dark:text-red-400">Delete Account</span>
                   </div>
                   <motion.div whileHover={{
                   x: 4
