@@ -11,17 +11,27 @@ import { useZone } from "../hooks/useZone"
 import { toast } from "sonner"
 import { useTranslation } from "react-i18next"
 import gourmetBanner from "@/assets/groumetpagebanner.png";
+import { useProfile } from "../context/ProfileContext";
 
 export default function Gourmet() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { location } = useLocation();
   const { zoneId, isOutOfService } = useZone(location);
-  const [favorites, setFavorites] = useState(new Set());
+  const { addFavorite, removeFavorite, isFavorite } = useProfile();
   const [gourmetRestaurants, setGourmetRestaurants] = useState([]);
   const [recommendedPreviewByRestaurantId, setRecommendedPreviewByRestaurantId] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  const getRestaurantImageUrl = (restaurant) => {
+    if (!restaurant) return "";
+    if (typeof restaurant.image === "string" && restaurant.image.trim()) return restaurant.image;
+    if (restaurant.image?.url) return restaurant.image.url;
+    if (typeof restaurant.profileImage === "string" && restaurant.profileImage.trim()) return restaurant.profileImage;
+    if (restaurant.profileImage?.url) return restaurant.profileImage.url;
+    return "";
+  };
 
   useEffect(() => {
     const fetchGourmetRestaurants = async () => {
@@ -95,12 +105,24 @@ export default function Gourmet() {
     };
   }, [gourmetRestaurants]);
 
-  const toggleFavorite = (id) => {
-    setFavorites((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(id)) newSet.delete(id);
-      else newSet.add(id);
-      return newSet;
+  const toggleFavorite = (_id, restaurant) => {
+    const restaurantSlug = restaurant?.slug || restaurant?.name?.toLowerCase().replace(/\s+/g, "-") || "";
+    if (!restaurantSlug) return;
+
+    if (isFavorite(restaurantSlug)) {
+      removeFavorite(restaurantSlug);
+      return;
+    }
+
+    addFavorite({
+      slug: restaurantSlug,
+      name: restaurant?.name || "",
+      cuisine: restaurant?.cuisine || (Array.isArray(restaurant?.cuisines) ? restaurant.cuisines.join(", ") : ""),
+      rating: Number(restaurant?.rating) || 0,
+      deliveryTime: restaurant?.deliveryTime || restaurant?.estimatedDeliveryTime || "",
+      distance: restaurant?.distance || "",
+      priceRange: restaurant?.priceRange || restaurant?.price || "",
+      image: getRestaurantImageUrl(restaurant)
     });
   };
 
@@ -154,7 +176,8 @@ export default function Gourmet() {
               ) : (
                 gourmetRestaurants.map((restaurant, index) => {
                   const restaurantId = restaurant._id || restaurant.restaurantId || restaurant.id;
-                  const isFavorite = favorites.has(restaurantId);
+                  const restaurantSlug = restaurant.slug || restaurant.name?.toLowerCase().replace(/\s+/g, "-") || "";
+                  const favorite = isFavorite(restaurantSlug);
 
                   return (
                     <FeaturedStyleRestaurantCard
@@ -162,7 +185,7 @@ export default function Gourmet() {
                       restaurant={restaurant}
                       recommendedItems={recommendedPreviewByRestaurantId[String(restaurantId)]}
                       priority={index < 3}
-                      favorite={isFavorite}
+                      favorite={favorite}
                       onToggleFavorite={toggleFavorite}
                     />
                   );

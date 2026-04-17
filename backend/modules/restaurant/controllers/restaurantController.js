@@ -1371,6 +1371,39 @@ export const getRestaurantsWithDishesUnder250 = async (req, res) => {
       });
     }
 
+    const restaurantIdsForRatings = restaurants
+      .map((restaurant) => String(restaurant?._id || ''))
+      .filter(Boolean);
+
+    const reviewStats = restaurantIdsForRatings.length > 0
+      ? await Order.aggregate([
+        {
+          $match: {
+            status: 'delivered',
+            'review.rating': { $exists: true, $ne: null },
+            restaurantId: { $in: restaurantIdsForRatings }
+          }
+        },
+        {
+          $group: {
+            _id: '$restaurantId',
+            averageRating: { $avg: '$review.rating' },
+            totalRatings: { $sum: 1 }
+          }
+        }
+      ])
+      : [];
+
+    const reviewStatsByRestaurantId = new Map(
+      reviewStats.map((entry) => [
+        String(entry._id),
+        {
+          rating: Number(entry.averageRating || 0),
+          totalRatings: Number(entry.totalRatings || 0)
+        }
+      ])
+    );
+
     // Process restaurants by bulk-fetching menus and then mapping
     const restaurantIds = restaurants.map(r => r._id);
     const allMenus = await Menu.find({
@@ -1401,6 +1434,14 @@ export const getRestaurantsWithDishesUnder250 = async (req, res) => {
       });
 
       if (dishesUnder250.length > 0) {
+        const liveRatingStats = reviewStatsByRestaurantId.get(String(restaurant._id));
+        const effectiveRating = liveRatingStats
+          ? Number(liveRatingStats.rating.toFixed(1))
+          : Number(restaurant.rating || 0);
+        const effectiveTotalRatings = liveRatingStats
+          ? liveRatingStats.totalRatings
+          : Number(restaurant.totalRatings || 0);
+
         restaurantsWithDishes.push({
           id: restaurant._id.toString(),
           restaurantId: restaurant.restaurantId,
@@ -1409,8 +1450,8 @@ export const getRestaurantsWithDishesUnder250 = async (req, res) => {
           isAcceptingOrders: restaurant.isAcceptingOrders,
           openDays: restaurant.openDays,
           deliveryTimings: restaurant.deliveryTimings,
-          rating: restaurant.rating || 0,
-          totalRatings: restaurant.totalRatings || 0,
+          rating: effectiveRating,
+          totalRatings: effectiveTotalRatings,
           deliveryTime: restaurant.estimatedDeliveryTime || "25-30 mins",
           distance: restaurant.distance || "1.2 km",
           cuisine: restaurant.cuisines?.length > 0 ? restaurant.cuisines.join(' • ') : "Multi-cuisine",
@@ -1447,3 +1488,4 @@ export const getRestaurantsWithDishesUnder250 = async (req, res) => {
     return errorResponse(res, 500, 'Failed to fetch restaurants with dishes under ₹250');
   }
 };
+

@@ -18,6 +18,7 @@ import { initRazorpayPayment } from "@/lib/utils/razorpay";
 import GstBreakdownDialog from "../../components/GstBreakdownDialog";
 import { toast } from "sonner";
 import { getCompanyNameAsync } from "@/lib/utils/businessSettings";
+import { handleShare } from "@/lib/utils/share";
 import DynamicEtaText from "../../components/DynamicEtaText";
 import { useTranslation } from "react-i18next";
 
@@ -1245,6 +1246,30 @@ export default function Cart() {
     navigate(`/user/orders/${placedOrderId}?confirmed=true`);
   };
 
+  const handleCartShare = async () => {
+    try {
+      const companyName = await getCompanyNameAsync();
+      const shareUrl = restaurantData?.slug
+        ? `${window.location.origin}/user/restaurants/${restaurantData.slug}`
+        : window.location.href;
+      const shareText = `Check out ${restaurantName} on ${companyName}. ${shareUrl}`;
+
+      const result = await handleShare({
+        title: `${restaurantName} | ${companyName}`,
+        text: shareText,
+        url: shareUrl,
+      });
+
+      if (result.status === "copied") {
+        toast.success("Link copied");
+      } else if (result.status === "error") {
+        toast.error("Unable to share right now");
+      }
+    } catch (error) {
+      toast.error("Unable to share right now");
+    }
+  };
+
   // Empty cart state - but don't show if order success or placing order modal is active
   if (cart.length === 0 && !showOrderSuccess && !showPlacingOrder) {
     return <AnimatedPage className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a]">
@@ -1294,7 +1319,7 @@ export default function Cart() {
                 </p>
               </div>
             </div>
-            <Button variant="ghost" size="icon" className="h-7 w-7 md:h-8 md:w-8 flex-shrink-0">
+            <Button variant="ghost" size="icon" className="h-7 w-7 md:h-8 md:w-8 flex-shrink-0" onClick={handleCartShare}>
               <Share2 className="h-4 w-4 md:h-5 md:w-5" />
             </Button>
           </div>

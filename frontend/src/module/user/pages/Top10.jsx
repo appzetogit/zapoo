@@ -10,6 +10,7 @@ import { toast } from "sonner"
 import DynamicEtaText from "../components/DynamicEtaText"
 import { useTranslation } from "react-i18next"
 import FeaturedStyleRestaurantCard from "../components/FeaturedStyleRestaurantCard";
+import { useProfile } from "../context/ProfileContext";
 
 import top10Banner from "@/assets/top10pagebanner.png";
 
@@ -18,11 +19,20 @@ export default function Top10() {
   const { t } = useTranslation();
   const { location } = useLocation();
   const { zoneId, isOutOfService } = useZone(location);
-  const [favorites, setFavorites] = useState(new Set());
+  const { addFavorite, removeFavorite, isFavorite } = useProfile();
   const [top10Restaurants, setTop10Restaurants] = useState([]);
   const [recommendedPreviewByRestaurantId, setRecommendedPreviewByRestaurantId] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  const getRestaurantImageUrl = (restaurant) => {
+    if (!restaurant) return "";
+    if (typeof restaurant.image === "string" && restaurant.image.trim()) return restaurant.image;
+    if (restaurant.image?.url) return restaurant.image.url;
+    if (typeof restaurant.profileImage === "string" && restaurant.profileImage.trim()) return restaurant.profileImage;
+    if (restaurant.profileImage?.url) return restaurant.profileImage.url;
+    return "";
+  };
 
   useEffect(() => {
     const fetchTop10Restaurants = async () => {
@@ -96,12 +106,24 @@ export default function Top10() {
     };
   }, [top10Restaurants]);
 
-  const toggleFavorite = (id) => {
-    setFavorites((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(id)) newSet.delete(id);
-      else newSet.add(id);
-      return newSet;
+  const toggleFavorite = (_id, restaurant) => {
+    const restaurantSlug = restaurant?.slug || restaurant?.name?.toLowerCase().replace(/\s+/g, "-") || "";
+    if (!restaurantSlug) return;
+
+    if (isFavorite(restaurantSlug)) {
+      removeFavorite(restaurantSlug);
+      return;
+    }
+
+    addFavorite({
+      slug: restaurantSlug,
+      name: restaurant?.name || "",
+      cuisine: restaurant?.cuisine || (Array.isArray(restaurant?.cuisines) ? restaurant.cuisines.join(", ") : ""),
+      rating: Number(restaurant?.rating) || 0,
+      deliveryTime: restaurant?.deliveryTime || restaurant?.estimatedDeliveryTime || "",
+      distance: restaurant?.distance || "",
+      priceRange: restaurant?.priceRange || restaurant?.price || "",
+      image: getRestaurantImageUrl(restaurant)
     });
   };
 
@@ -154,7 +176,8 @@ export default function Top10() {
               ) : (
                 top10Restaurants.map((restaurant, index) => {
                   const restaurantId = restaurant._id || restaurant.restaurantId || restaurant.id;
-                  const isFavorite = favorites.has(restaurantId);
+                  const restaurantSlug = restaurant.slug || restaurant.name?.toLowerCase().replace(/\s+/g, "-") || "";
+                  const favorite = isFavorite(restaurantSlug);
 
                   return (
                     <FeaturedStyleRestaurantCard
@@ -162,7 +185,7 @@ export default function Top10() {
                       restaurant={restaurant}
                       recommendedItems={recommendedPreviewByRestaurantId[String(restaurantId)]}
                       priority={index < 3}
-                      favorite={isFavorite}
+                      favorite={favorite}
                       onToggleFavorite={toggleFavorite}
                     />
                   );

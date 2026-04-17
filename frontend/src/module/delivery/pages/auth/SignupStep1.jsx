@@ -5,6 +5,8 @@ import { deliveryAPI } from "@/lib/api"
 import { toast } from "sonner"
 
 const SIGNUP_STEP1_DRAFT_KEY = "delivery_signup_step1_draft";
+const INDIAN_VEHICLE_NUMBER_REGEX = /^[A-Z]{2}\d{1,2}[A-Z]{1,3}\d{4}$/;
+const BH_SERIES_VEHICLE_NUMBER_REGEX = /^\d{2}BH\d{4}[A-Z]{1,2}$/;
 
 const DEFAULT_FORM_DATA = {
   name: "",
@@ -57,6 +59,9 @@ export default function SignupStep1() {
     } else if (name === "panNumber") {
       // Allow only alphanumeric and limit to 10
       newValue = value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 10)
+    } else if (name === "vehicleNumber") {
+      // Allow only alphanumeric, normalize to uppercase (e.g., MH12AB1234 / 22BH1234AA)
+      newValue = value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 13)
     } else if (name === "city" || name === "state") {
       // Allow only alphabets and spaces
       newValue = value.replace(/[^a-zA-Z\s]/g, "")
@@ -104,6 +109,17 @@ export default function SignupStep1() {
 
     if (!formData.vehicleNumber.trim()) {
       newErrors.vehicleNumber = "Vehicle number is required"
+    } else {
+      const normalizedVehicleNumber = formData.vehicleNumber
+        .trim()
+        .toUpperCase()
+        .replace(/[\s-]/g, "");
+      if (
+        !INDIAN_VEHICLE_NUMBER_REGEX.test(normalizedVehicleNumber) &&
+        !BH_SERIES_VEHICLE_NUMBER_REGEX.test(normalizedVehicleNumber)
+      ) {
+        newErrors.vehicleNumber = "Invalid vehicle number format (e.g., MH12AB1234)"
+      }
     }
 
     if (!formData.panNumber.trim()) {
@@ -141,7 +157,7 @@ export default function SignupStep1() {
         state: formData.state.trim(),
         vehicleType: formData.vehicleType,
         vehicleName: formData.vehicleName.trim() || null,
-        vehicleNumber: formData.vehicleNumber.trim(),
+        vehicleNumber: formData.vehicleNumber.trim().toUpperCase().replace(/[\s-]/g, ""),
         panNumber: formData.panNumber.trim().toUpperCase(),
         aadharNumber: formData.aadharNumber.replace(/\s/g, "")
       })

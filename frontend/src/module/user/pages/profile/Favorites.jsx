@@ -16,6 +16,16 @@ export default function Favorites() {
   const restaurantFavorites = getFavorites()
   const dishFavorites = getDishFavorites()
   const [activeTab, setActiveTab] = useState("restaurants")
+  const RESTAURANT_FALLBACK_IMAGE = "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&h=600&fit=crop&q=80"
+
+  const getRestaurantImageUrl = (restaurant) => {
+    if (!restaurant) return ""
+    if (typeof restaurant.image === "string" && restaurant.image.trim()) return restaurant.image
+    if (restaurant.image?.url) return restaurant.image.url
+    if (typeof restaurant.profileImage === "string" && restaurant.profileImage.trim()) return restaurant.profileImage
+    if (restaurant.profileImage?.url) return restaurant.profileImage.url
+    return ""
+  }
 
   const handleRemoveFavorite = (e, slug) => {
     e.preventDefault()
@@ -135,12 +145,12 @@ export default function Favorites() {
                     <Card className="overflow-hidden h-full">
                       <div className="h-32 w-full relative overflow-hidden">
                         <img
-                          src={restaurant.image}
+                          src={getRestaurantImageUrl(restaurant) || RESTAURANT_FALLBACK_IMAGE}
                           alt={restaurant.name}
                           className="w-full h-full object-cover"
                           loading="lazy"
                           onError={(e) => {
-                            e.target.src = `https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&h=600&fit=crop&q=80`
+                            e.target.src = RESTAURANT_FALLBACK_IMAGE
                           }}
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
