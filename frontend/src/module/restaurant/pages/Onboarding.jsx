@@ -122,6 +122,10 @@ const isDataUrl = value =>
 const isHttpUrl = value =>
   typeof value === "string" && value.startsWith("http");
 
+const isFlutterInAppWebViewAvailable = () =>
+  typeof window !== "undefined" &&
+  typeof window.flutter_inappwebview?.callHandler === "function";
+
 const imageValueToFile = async (value, fallbackName) => {
   if (value instanceof File) {
     return value;
@@ -137,6 +141,33 @@ const imageValueToFile = async (value, fallbackName) => {
   }
 
   return null;
+};
+
+const flutterBase64ToStoredImage = async (result, fallbackName) => {
+  if (!result || result.success === false) {
+    return null;
+  }
+
+  if (result.file instanceof File) {
+    return buildStoredImage(result.file);
+  }
+
+  const base64 = result.base64 ? String(result.base64) : "";
+  if (!base64) {
+    return null;
+  }
+
+  const mimeType = result.mimeType || "image/jpeg";
+  const normalizedBase64 = base64.includes(",") ? base64.split(",")[1] : base64;
+  const dataUrl = `data:${mimeType};base64,${normalizedBase64}`;
+
+  return {
+    name: result.fileName || fallbackName,
+    size: null,
+    type: mimeType,
+    dataUrl,
+    previewUrl: dataUrl
+  };
 };
 
 const getImagePreviewUrl = value => {
@@ -377,6 +408,47 @@ export default function RestaurantOnboarding() {
       dataUrl,
       previewUrl: URL.createObjectURL(file)
     };
+  };
+
+  const captureMenuImageFromCamera = async () => {
+    if (!isFlutterInAppWebViewAvailable()) return false;
+    try {
+      const result = await window.flutter_inappwebview.callHandler("openCamera", {
+        source: "camera",
+        accept: "image/*",
+        multiple: false,
+        quality: 0.8
+      });
+      const storedImage = await flutterBase64ToStoredImage(result, `menu-image-${Date.now()}.jpg`);
+      if (!storedImage) return false;
+      setStep2(prev => ({
+        ...prev,
+        menuImages: [...(prev.menuImages || []), storedImage]
+      }));
+      return true;
+    } catch (error) {
+      console.error("Failed to capture menu image from Flutter camera:", error);
+      return false;
+    }
+  };
+
+  const captureSingleImageFromCamera = async (setter, fallbackName) => {
+    if (!isFlutterInAppWebViewAvailable()) return false;
+    try {
+      const result = await window.flutter_inappwebview.callHandler("openCamera", {
+        source: "camera",
+        accept: "image/*",
+        multiple: false,
+        quality: 0.8
+      });
+      const storedImage = await flutterBase64ToStoredImage(result, fallbackName);
+      if (!storedImage) return false;
+      setter(storedImage);
+      return true;
+    } catch (error) {
+      console.error("Failed to capture image from Flutter camera:", error);
+      return false;
+    }
   };
 
   const authMode = getRestaurantAuthMode();
@@ -1297,6 +1369,16 @@ export default function RestaurantOnboarding() {
             <Upload className="w-4.5 h-4.5" />
             <span>{step2.menuImages.length > 0 ? "Add more images" : "Choose files"}</span>
           </label>
+          {isFlutterInAppWebViewAvailable() && (
+            <button
+              type="button"
+              onClick={captureMenuImageFromCamera}
+              className="inline-flex justify-center items-center gap-1.5 px-3 py-1.5 rounded-sm bg-blue-600 text-white border border-blue-600 text-xs font-medium w-full"
+            >
+              <Sparkles className="w-4.5 h-4.5" />
+              <span>Take photo</span>
+            </button>
+          )}
           <input id="menuImagesInput" type="file" multiple accept="image/*" className="hidden" onChange={async e => {
             const files = Array.from(e.target.files || []);
             if (!files.length) return;
@@ -1371,6 +1453,21 @@ export default function RestaurantOnboarding() {
               <Upload className="w-4.5 h-4.5" />
               <span>{step2.profileImage ? "Change photo" : "Choose file"}</span>
             </label>
+            {isFlutterInAppWebViewAvailable() && (
+              <button
+                type="button"
+                onClick={async () => {
+                  await captureSingleImageFromCamera(image => setStep2(prev => ({
+                    ...prev,
+                    profileImage: image
+                  })), `restaurant-profile-${Date.now()}.jpg`);
+                }}
+                className="inline-flex justify-center items-center gap-1.5 px-3 py-1.5 rounded-sm bg-blue-600 text-white border border-blue-600 text-xs font-medium w-full"
+              >
+                <Sparkles className="w-4.5 h-4.5" />
+                <span>Take photo</span>
+              </button>
+            )}
             <input id="profileImageInput" type="file" accept="image/*" className="hidden" onChange={async e => {
               const file = e.target.files?.[0] || null;
               if (file) {
@@ -1482,6 +1579,21 @@ export default function RestaurantOnboarding() {
             </p>
           </div>
         )}
+        {isFlutterInAppWebViewAvailable() && (
+          <button
+            type="button"
+            onClick={async () => {
+              await captureSingleImageFromCamera(image => setStep3(prev => ({
+                ...prev,
+                panImage: image
+              })), `pan-image-${Date.now()}.jpg`);
+            }}
+            className="mt-1 inline-flex justify-center items-center gap-1.5 px-3 py-1.5 rounded-sm bg-blue-600 text-white border border-blue-600 text-xs font-medium w-full"
+          >
+            <Sparkles className="w-4.5 h-4.5" />
+            <span>Take photo</span>
+          </button>
+        )}
         <Input type="file" accept="image/*" onChange={async e => {
           const file = e.target.files?.[0] || null;
           if (file) {
@@ -1548,7 +1660,22 @@ export default function RestaurantOnboarding() {
               <p className="text-xs text-gray-600 truncate">
                 {step3.gstImage?.name || "GST image selected"}
               </p>
-            </div>
+          </div>
+        )}
+          {isFlutterInAppWebViewAvailable() && (
+            <button
+              type="button"
+              onClick={async () => {
+                await captureSingleImageFromCamera(image => setStep3(prev => ({
+                  ...prev,
+                  gstImage: image
+                })), `gst-image-${Date.now()}.jpg`);
+              }}
+              className="mt-1 inline-flex justify-center items-center gap-1.5 px-3 py-1.5 rounded-sm bg-blue-600 text-white border border-blue-600 text-xs font-medium w-full"
+            >
+              <Sparkles className="w-4.5 h-4.5" />
+              <span>Take photo</span>
+            </button>
           )}
           <Input type="file" accept="image/*" onChange={async e => {
             const file = e.target.files?.[0] || null;
@@ -1624,6 +1751,21 @@ export default function RestaurantOnboarding() {
               {step3.fssaiImage?.name || "FSSAI image selected"}
             </p>
           </div>
+        )}
+        {isFlutterInAppWebViewAvailable() && (
+          <button
+            type="button"
+            onClick={async () => {
+              await captureSingleImageFromCamera(image => setStep3(prev => ({
+                ...prev,
+                fssaiImage: image
+              })), `fssai-image-${Date.now()}.jpg`);
+            }}
+            className="mt-1 inline-flex justify-center items-center gap-1.5 px-3 py-1.5 rounded-sm bg-blue-600 text-white border border-blue-600 text-xs font-medium w-full"
+          >
+            <Sparkles className="w-4.5 h-4.5" />
+            <span>Take photo</span>
+          </button>
         )}
         <Input type="file" accept="image/*" onChange={async e => {
           const file = e.target.files?.[0] || null;
