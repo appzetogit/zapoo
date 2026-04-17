@@ -1379,7 +1379,7 @@ export default function RestaurantOnboarding() {
               <span>Take photo</span>
             </button>
           )}
-          <input id="menuImagesInput" type="file" multiple accept="image/*" className="hidden" onChange={async e => {
+          <input id="menuImagesInput" type="file" multiple accept=".jpg,.jpeg,.png,.webp" className="hidden" onChange={async e => {
             const files = Array.from(e.target.files || []);
             if (!files.length) return;
             await handleMenuImagesChange(files);
@@ -1468,7 +1468,7 @@ export default function RestaurantOnboarding() {
                 <span>Take photo</span>
               </button>
             )}
-            <input id="profileImageInput" type="file" accept="image/*" className="hidden" onChange={async e => {
+            <input id="profileImageInput" type="file" accept=".jpg,.jpeg,.png,.webp" className="hidden" onChange={async e => {
               const file = e.target.files?.[0] || null;
               if (file) {
                 await handleSingleImageChange(image => setStep2(prev => ({
@@ -1594,7 +1594,7 @@ export default function RestaurantOnboarding() {
             <span>Take photo</span>
           </button>
         )}
-        <Input type="file" accept="image/*" onChange={async e => {
+        <Input type="file" accept=".jpg,.jpeg,.png,.webp" onChange={async e => {
           const file = e.target.files?.[0] || null;
           if (file) {
             await handleSingleImageChange(image => setStep3(prev => ({
@@ -1677,7 +1677,7 @@ export default function RestaurantOnboarding() {
               <span>Take photo</span>
             </button>
           )}
-          <Input type="file" accept="image/*" onChange={async e => {
+          <Input type="file" accept=".jpg,.jpeg,.png,.webp" onChange={async e => {
             const file = e.target.files?.[0] || null;
             if (file) {
               await handleSingleImageChange(image => setStep3(prev => ({
@@ -1767,7 +1767,7 @@ export default function RestaurantOnboarding() {
             <span>Take photo</span>
           </button>
         )}
-        <Input type="file" accept="image/*" onChange={async e => {
+        <Input type="file" accept=".jpg,.jpeg,.png,.webp" onChange={async e => {
           const file = e.target.files?.[0] || null;
           if (file) {
             await handleSingleImageChange(image => setStep3(prev => ({
