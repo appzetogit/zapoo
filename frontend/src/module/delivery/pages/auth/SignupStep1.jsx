@@ -1,25 +1,51 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { ArrowLeft } from "lucide-react"
 import { deliveryAPI } from "@/lib/api"
 import { toast } from "sonner"
 
+const SIGNUP_STEP1_DRAFT_KEY = "delivery_signup_step1_draft";
+
+const DEFAULT_FORM_DATA = {
+  name: "",
+  email: "",
+  address: "",
+  city: "",
+  state: "",
+  vehicleType: "bike",
+  vehicleName: "",
+  vehicleNumber: "",
+  panNumber: "",
+  aadharNumber: ""
+};
+
+const getInitialStep1FormData = () => {
+  try {
+    const raw = localStorage.getItem(SIGNUP_STEP1_DRAFT_KEY);
+    if (!raw) return DEFAULT_FORM_DATA;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return DEFAULT_FORM_DATA;
+    return {
+      ...DEFAULT_FORM_DATA,
+      ...parsed
+    };
+  } catch {
+    return DEFAULT_FORM_DATA;
+  }
+};
+
 export default function SignupStep1() {
   const navigate = useNavigate()
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    address: "",
-    city: "",
-    state: "",
-    vehicleType: "bike",
-    vehicleName: "",
-    vehicleNumber: "",
-    panNumber: "",
-    aadharNumber: ""
-  })
+  const [formData, setFormData] = useState(getInitialStep1FormData)
   const [errors, setErrors] = useState({})
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // Persist step 1 form draft so refresh doesn't clear entered details.
+  useEffect(() => {
+    try {
+      localStorage.setItem(SIGNUP_STEP1_DRAFT_KEY, JSON.stringify(formData));
+    } catch {}
+  }, [formData]);
 
   const handleChange = (e) => {
     const { name, value } = e.target
@@ -31,6 +57,9 @@ export default function SignupStep1() {
     } else if (name === "panNumber") {
       // Allow only alphanumeric and limit to 10
       newValue = value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 10)
+    } else if (name === "city" || name === "state") {
+      // Allow only alphabets and spaces
+      newValue = value.replace(/[^a-zA-Z\s]/g, "")
     }
 
     setFormData(prev => ({
@@ -63,10 +92,14 @@ export default function SignupStep1() {
 
     if (!formData.city.trim()) {
       newErrors.city = "City is required"
+    } else if (!/^[A-Za-z\s]+$/.test(formData.city.trim())) {
+      newErrors.city = "City should contain only alphabets"
     }
 
     if (!formData.state.trim()) {
       newErrors.state = "State is required"
+    } else if (!/^[A-Za-z\s]+$/.test(formData.state.trim())) {
+      newErrors.state = "State should contain only alphabets"
     }
 
     if (!formData.vehicleNumber.trim()) {
@@ -157,11 +190,9 @@ export default function SignupStep1() {
               name="name"
               value={formData.name}
               onChange={handleChange}
-              className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#DC2626] ${errors.name ? "border-red-500" : "border-gray-300"
-                }`}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#DC2626]"
               placeholder="Enter your full name"
             />
-            {errors.name && <p className="text-red-500 text-sm mt-1">{errors.name}</p>}
           </div>
 
           {/* Email */}
@@ -174,11 +205,9 @@ export default function SignupStep1() {
               name="email"
               value={formData.email}
               onChange={handleChange}
-              className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#DC2626] ${errors.email ? "border-red-500" : "border-gray-300"
-                }`}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#DC2626]"
               placeholder="Enter your email"
             />
-            {errors.email && <p className="text-red-500 text-sm mt-1">{errors.email}</p>}
           </div>
 
           {/* Address */}
@@ -191,11 +220,9 @@ export default function SignupStep1() {
               value={formData.address}
               onChange={handleChange}
               rows={3}
-              className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#DC2626] ${errors.address ? "border-red-500" : "border-gray-300"
-                }`}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#DC2626]"
               placeholder="Enter your address"
             />
-            {errors.address && <p className="text-red-500 text-sm mt-1">{errors.address}</p>}
           </div>
 
           {/* City and State */}
@@ -209,11 +236,9 @@ export default function SignupStep1() {
                 name="city"
                 value={formData.city}
                 onChange={handleChange}
-                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#DC2626] ${errors.city ? "border-red-500" : "border-gray-300"
-                  }`}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#DC2626]"
                 placeholder="City"
               />
-              {errors.city && <p className="text-red-500 text-sm mt-1">{errors.city}</p>}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -224,11 +249,9 @@ export default function SignupStep1() {
                 name="state"
                 value={formData.state}
                 onChange={handleChange}
-                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#DC2626] ${errors.state ? "border-red-500" : "border-gray-300"
-                  }`}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#DC2626]"
                 placeholder="State"
               />
-              {errors.state && <p className="text-red-500 text-sm mt-1">{errors.state}</p>}
             </div>
           </div>
 
@@ -275,11 +298,9 @@ export default function SignupStep1() {
               name="vehicleNumber"
               value={formData.vehicleNumber}
               onChange={handleChange}
-              className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#DC2626] ${errors.vehicleNumber ? "border-red-500" : "border-gray-300"
-                }`}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#DC2626]"
               placeholder="e.g., MH12AB1234"
             />
-            {errors.vehicleNumber && <p className="text-red-500 text-sm mt-1">{errors.vehicleNumber}</p>}
           </div>
 
           {/* PAN Number */}
@@ -293,11 +314,9 @@ export default function SignupStep1() {
               value={formData.panNumber}
               onChange={handleChange}
               maxLength={10}
-              className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#DC2626] uppercase ${errors.panNumber ? "border-red-500" : "border-gray-300"
-                }`}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#DC2626] uppercase"
               placeholder="ABCDE1234F"
             />
-            {errors.panNumber && <p className="text-red-500 text-sm mt-1">{errors.panNumber}</p>}
           </div>
 
           {/* Aadhar Number */}
@@ -311,11 +330,9 @@ export default function SignupStep1() {
               value={formData.aadharNumber}
               onChange={handleChange}
               maxLength={12}
-              className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#DC2626] ${errors.aadharNumber ? "border-red-500" : "border-gray-300"
-                }`}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#DC2626]"
               placeholder="1234 5678 9012"
             />
-            {errors.aadharNumber && <p className="text-red-500 text-sm mt-1">{errors.aadharNumber}</p>}
           </div>
 
           {/* Submit Button */}

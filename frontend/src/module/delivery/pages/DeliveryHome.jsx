@@ -1098,7 +1098,8 @@ export default function DeliveryHome() {
     }
     try {
       // Get selected alert sound preference from localStorage
-      const selectedSound = localStorage.getItem('delivery_alert_sound') || 'zomato_tone';
+      const storedSound = localStorage.getItem('delivery_alert_sound');
+      const selectedSound = storedSound === 'zomato_tone' ? 'zapoo_tone' : (storedSound || 'zapoo_tone');
       const soundFile = selectedSound === 'original' ? originalSound : alertSound;
       // Verify sound file exists
       if (!soundFile) {

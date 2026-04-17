@@ -90,7 +90,6 @@ export default function Profile() {
     // Check gender - must be valid value
     const validGenders = ['male', 'female', 'other', 'prefer-not-to-say'];
     const hasGender = !!(userProfile.gender && typeof userProfile.gender === 'string' && userProfile.gender.trim() !== '' && validGenders.includes(userProfile.gender.trim().toLowerCase()));
-e
     // Required fields only (anniversary is NOT counted - it's optional)
     // Only these 5 fields count towards 100%
     const requiredFields = {

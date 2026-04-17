@@ -1,9 +1,34 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { ArrowLeft, Upload, X, Check } from "lucide-react"
 import { deliveryAPI } from "@/lib/api"
 import apiClient from "@/lib/api/axios"
 import { toast } from "sonner"
+
+const SIGNUP_STEP1_DRAFT_KEY = "delivery_signup_step1_draft";
+const SIGNUP_STEP2_DRAFT_KEY = "delivery_signup_step2_uploaded_docs_draft";
+
+const EMPTY_UPLOADED_DOCS = {
+  profilePhoto: null,
+  aadharPhoto: null,
+  panPhoto: null,
+  drivingLicensePhoto: null
+};
+
+const getInitialUploadedDocs = () => {
+  try {
+    const raw = localStorage.getItem(SIGNUP_STEP2_DRAFT_KEY);
+    if (!raw) return EMPTY_UPLOADED_DOCS;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return EMPTY_UPLOADED_DOCS;
+    return {
+      ...EMPTY_UPLOADED_DOCS,
+      ...parsed
+    };
+  } catch {
+    return EMPTY_UPLOADED_DOCS;
+  }
+};
 
 export default function SignupStep2() {
   const navigate = useNavigate()
@@ -13,12 +38,7 @@ export default function SignupStep2() {
     panPhoto: null,
     drivingLicensePhoto: null
   })
-  const [uploadedDocs, setUploadedDocs] = useState({
-    profilePhoto: null,
-    aadharPhoto: null,
-    panPhoto: null,
-    drivingLicensePhoto: null
-  })
+  const [uploadedDocs, setUploadedDocs] = useState(getInitialUploadedDocs)
   const [uploading, setUploading] = useState({
     profilePhoto: false,
     aadharPhoto: false,
@@ -26,6 +46,13 @@ export default function SignupStep2() {
     drivingLicensePhoto: false
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // Persist uploaded document URLs/publicIds so refresh doesn't reset step 2 progress.
+  useEffect(() => {
+    try {
+      localStorage.setItem(SIGNUP_STEP2_DRAFT_KEY, JSON.stringify(uploadedDocs));
+    } catch {}
+  }, [uploadedDocs]);
 
   const handleFileSelect = async (docType, file) => {
     if (!file) return
@@ -111,6 +138,10 @@ export default function SignupStep2() {
       })
 
       if (response?.data?.success) {
+        try {
+          localStorage.removeItem(SIGNUP_STEP1_DRAFT_KEY);
+          localStorage.removeItem(SIGNUP_STEP2_DRAFT_KEY);
+        } catch {}
         toast.success("Signup completed successfully!")
         // Redirect to delivery home page
         setTimeout(() => {
@@ -232,4 +263,3 @@ export default function SignupStep2() {
     </div>
   )
 }
-

@@ -339,6 +339,9 @@ export default function ZoneSetup() {
     });
     existingZonesPolygonsRef.current = [];
 
+    const bounds = new google.maps.LatLngBounds();
+    let hasAnyPathPoint = false;
+
     existingZones.forEach(zone => {
       const rawCoords =
         (Array.isArray(zone?.coordinates) && zone.coordinates.length > 0)
@@ -376,6 +379,11 @@ export default function ZoneSetup() {
       polygon.setMap(map);
       existingZonesPolygonsRef.current.push(polygon);
 
+      path.forEach(point => {
+        bounds.extend(point);
+        hasAnyPathPoint = true;
+      });
+
       const infoWindow = new google.maps.InfoWindow({
         content: `
           <div style="padding: 8px;">
@@ -390,6 +398,11 @@ export default function ZoneSetup() {
         infoWindow.open(map);
       });
     });
+
+    // Ensure all active zones are visible on map.
+    if (hasAnyPathPoint) {
+      map.fitBounds(bounds);
+    }
   };
 
   // Redraw zones when data changes or map is ready

@@ -744,7 +744,7 @@ export const getActiveZonesPublic = asyncHandler(async (req, res) => {
   try {
     const locale = resolveLocaleFromRequest(req);
     const zones = await Zone.find({ isActive: true })
-      .select('name zoneName localizedName localizedZoneName country coordinates isActive')
+      .select('name zoneName localizedName localizedZoneName country coordinates boundary isActive')
       .lean();
 
     return successResponse(res, 200, 'Active zones retrieved successfully', {

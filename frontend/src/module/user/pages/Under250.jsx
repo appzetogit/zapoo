@@ -939,8 +939,8 @@ export default function Under250() {
                 <div className="flex items-start justify-between mb-3 md:mb-4 lg:mb-6">
                   <div className="flex items-center gap-2 md:gap-3 flex-1">
                     {selectedItem.isVeg && (
-                      <div className="h-5 w-5 md:h-6 md:w-6 lg:h-7 lg:w-7 rounded border-2 border-amber-700 dark:border-amber-500 bg-amber-50 dark:bg-amber-900/20 flex items-center justify-center flex-shrink-0">
-                        <div className="h-2.5 w-2.5 md:h-3 md:w-3 lg:h-3.5 lg:w-3.5 rounded-full bg-amber-700 dark:bg-amber-500" />
+                      <div className="h-5 w-5 md:h-6 md:w-6 lg:h-7 lg:w-7 rounded border-2 border-green-600 bg-green-50 dark:bg-green-900/20 flex items-center justify-center flex-shrink-0">
+                        <div className="h-2.5 w-2.5 md:h-3 md:w-3 lg:h-3.5 lg:w-3.5 rounded-full bg-green-600" />
                       </div>
                     )}
                     <h2 className="text-xl md:text-2xl lg:text-3xl xl:text-4xl font-bold text-gray-900 dark:text-white">

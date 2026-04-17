@@ -127,6 +127,16 @@ export default function RestaurantDetails() {
     vegNonVeg: null // "veg" | "non-veg"
   });
 
+  // If global Veg Mode is ON, force-remove any local "non-veg" filter selection.
+  useEffect(() => {
+    if (vegMode === true && filters.vegNonVeg === "non-veg") {
+      setFilters(prev => ({
+        ...prev,
+        vegNonVeg: null
+      }));
+    }
+  }, [vegMode, filters.vegNonVeg]);
+
   // Restaurant data state
   const [restaurant, setRestaurant] = useState(null);
   const [loadingRestaurant, setLoadingRestaurant] = useState(true);
@@ -1327,14 +1337,14 @@ export default function RestaurantDetails() {
                 {t("user.restaurantDetails.veg")}
                 {filters.vegNonVeg === "veg" && <X className="h-3 w-3 text-gray-600" />}
               </Button>
-              <Button variant="outline" size="sm" className={`flex items-center gap-1.5 whitespace-nowrap border-gray-300 bg-white rounded-full ${filters.vegNonVeg === "non-veg" ? "border-amber-700 bg-amber-50" : ""}`} onClick={() => setFilters(prev => ({
+              {vegMode !== true && <Button variant="outline" size="sm" className={`flex items-center gap-1.5 whitespace-nowrap border-gray-300 bg-white rounded-full ${filters.vegNonVeg === "non-veg" ? "border-amber-700 bg-amber-50" : ""}`} onClick={() => setFilters(prev => ({
               ...prev,
               vegNonVeg: prev.vegNonVeg === "non-veg" ? null : "non-veg"
             }))}>
-                <div className="h-3 w-3 rounded-full bg-amber-700" />
-                {t("user.restaurantDetails.nonVeg")}
-                {filters.vegNonVeg === "non-veg" && <X className="h-3 w-3 text-gray-600" />}
-              </Button>
+                  <div className="h-3 w-3 rounded-full bg-amber-700" />
+                  {t("user.restaurantDetails.nonVeg")}
+                  {filters.vegNonVeg === "non-veg" && <X className="h-3 w-3 text-gray-600" />}
+                </Button>}
             </div>
           </div>
         </div>
@@ -1863,13 +1873,13 @@ export default function RestaurantDetails() {
                           <div className="h-4 w-4 rounded-full bg-green-500 dark:bg-green-400" />
                           <span className="font-medium">{t("user.restaurantDetails.veg")}</span>
                         </button>
-                        <button onClick={() => setFilters(prev => ({
+                        {vegMode !== true && <button onClick={() => setFilters(prev => ({
                   ...prev,
                   vegNonVeg: prev.vegNonVeg === "non-veg" ? null : "non-veg"
                 }))} className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border-2 transition-all flex-1 ${filters.vegNonVeg === "non-veg" ? "border-amber-700 dark:border-amber-600 bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400" : "border-gray-200 dark:border-gray-700 bg-white dark:bg-[#2a2a2a] text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600"}`}>
-                          <div className="h-4 w-4 rounded-full bg-amber-700 dark:bg-amber-600" />
-                          <span className="font-medium">{t("user.restaurantDetails.nonVeg")}</span>
-                        </button>
+                            <div className="h-4 w-4 rounded-full bg-amber-700 dark:bg-amber-600" />
+                            <span className="font-medium">{t("user.restaurantDetails.nonVeg")}</span>
+                          </button>}
                       </div>
                     </div>
 
@@ -2172,29 +2182,35 @@ export default function RestaurantDetails() {
 
                   {/* Content Section */}
                   <div className="flex-1 overflow-y-auto px-4 py-4">
-                    {/* Item Name and Indicator */}
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex items-center gap-2 flex-1">
-                        <div className="h-5 w-5 rounded border-2 border-amber-700 dark:border-amber-600 bg-amber-50 dark:bg-amber-900/30 flex items-center justify-center flex-shrink-0">
-                          <div className="h-2.5 w-2.5 rounded-full bg-amber-700 dark:bg-amber-600" />
-                        </div>
-                        <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-                          {selectedItem.name}
-                        </h2>
-                      </div>
-                      {/* Bookmark and Share Icons (Desktop) */}
-                      <div className="hidden md:flex items-center gap-2">
-                        <button onClick={e => {
-                  e.stopPropagation();
-                  handleBookmarkClick(selectedItem);
-                }} className={`h-8 w-8 rounded-full border flex items-center justify-center transition-all duration-300 ${isDishFavorite(selectedItem.id, restaurant?.restaurantId || restaurant?._id || restaurant?.id) ? "border-red-500 dark:border-red-400 bg-red-50 dark:bg-red-900/30 text-red-500 dark:text-red-400" : "border-gray-300 dark:border-gray-700 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"}`}>
-                          <Bookmark className={`h-4 w-4 transition-all duration-300 ${isDishFavorite(selectedItem.id, restaurant?.restaurantId || restaurant?._id || restaurant?.id) ? "fill-red-500 dark:fill-red-400" : ""}`} />
-                        </button>
-                        <button className="h-8 w-8 rounded-full border border-gray-300 dark:border-gray-700 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 flex items-center justify-center transition-colors">
-                          <Share2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </div>
+                    {/*
+                      Keep diet indicator consistent with list cards:
+                      veg -> green, non-veg -> amber.
+                    */}
+                    {(() => {
+                      const selectedItemIsVeg = getDietType(selectedItem) !== "non-veg";
+                      return <div className="flex items-start justify-between mb-3">
+                          <div className="flex items-center gap-2 flex-1">
+                            <div className={`h-5 w-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${selectedItemIsVeg ? "border-green-600 bg-green-50 dark:bg-green-900/30" : "border-amber-700 dark:border-amber-600 bg-amber-50 dark:bg-amber-900/30"}`}>
+                              <div className={`h-2.5 w-2.5 rounded-full ${selectedItemIsVeg ? "bg-green-600" : "bg-amber-700 dark:bg-amber-600"}`} />
+                            </div>
+                            <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                              {selectedItem.name}
+                            </h2>
+                          </div>
+                          {/* Bookmark and Share Icons (Desktop) */}
+                          <div className="hidden md:flex items-center gap-2">
+                            <button onClick={e => {
+                          e.stopPropagation();
+                          handleBookmarkClick(selectedItem);
+                        }} className={`h-8 w-8 rounded-full border flex items-center justify-center transition-all duration-300 ${isDishFavorite(selectedItem.id, restaurant?.restaurantId || restaurant?._id || restaurant?.id) ? "border-red-500 dark:border-red-400 bg-red-50 dark:bg-red-900/30 text-red-500 dark:text-red-400" : "border-gray-300 dark:border-gray-700 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"}`}>
+                              <Bookmark className={`h-4 w-4 transition-all duration-300 ${isDishFavorite(selectedItem.id, restaurant?.restaurantId || restaurant?._id || restaurant?.id) ? "fill-red-500 dark:fill-red-400" : ""}`} />
+                            </button>
+                            <button className="h-8 w-8 rounded-full border border-gray-300 dark:border-gray-700 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 flex items-center justify-center transition-colors">
+                              <Share2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </div>;
+                    })()}
 
                     {/* Description */}
                     <p className="text-sm text-gray-600 dark:text-gray-400 mb-4 leading-relaxed">
