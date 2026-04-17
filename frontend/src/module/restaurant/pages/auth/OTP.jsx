@@ -234,6 +234,12 @@ export default function RestaurantOTP() {
         // Store auth data using utility function to ensure proper module-specific token storage
         setRestaurantAuthData("restaurant", accessToken, restaurant);
 
+        try {
+          localStorage.setItem("restaurant_auth_mode", authData?.method || "email");
+        } catch {
+          // Non-fatal: onboarding will fall back to stored restaurant data
+        }
+
         // Dispatch custom event for same-tab updates
         window.dispatchEvent(new Event("restaurantAuthChanged"));
         sessionStorage.removeItem("restaurantAuthData");

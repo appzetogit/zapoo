@@ -132,7 +132,7 @@ export default function RestaurantLogin() {
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email)) {
-      return "Please enter a valid email address"
+      return "Enter a valid email address"
     }
 
     return ""
@@ -161,6 +161,21 @@ export default function RestaurantLogin() {
 
   const handleEmailLogin = () => {
     setLoginMethod("email")
+  }
+
+  const normalizeEmailErrorMessage = (message) => {
+    if (!message) return "Enter a valid email address"
+
+    const normalized = String(message).trim().toLowerCase()
+    if (
+      normalized === "validation error" ||
+      normalized.includes("must be a valid email") ||
+      normalized.includes("please enter a valid email address")
+    ) {
+      return "Enter a valid email address"
+    }
+
+    return message
   }
 
   const handleSendEmailOTP = async () => {
@@ -197,10 +212,11 @@ export default function RestaurantLogin() {
       // Navigate to OTP page
       navigate("/restaurant/otp")
     } catch (error) {
-      const message =
+      const message = normalizeEmailErrorMessage(
         error?.response?.data?.message ||
         error?.response?.data?.error ||
         "Failed to send OTP. Please try again."
+      )
       setApiError(message)
     } finally {
       setIsSending(false)
