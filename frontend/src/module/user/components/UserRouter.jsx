@@ -14,6 +14,7 @@ const Under250 = lazy(() => import("../pages/Under250"))
 const CategoryPage = lazy(() => import("../pages/CategoryPage"))
 const Restaurants = lazy(() => import("../pages/restaurants/Restaurants"))
 const RestaurantDetails = lazy(() => import("../pages/restaurants/RestaurantDetails"))
+const RestaurantInfo = lazy(() => import("../pages/restaurants/RestaurantInfo"))
 const SearchResults = lazy(() => import("../pages/SearchResults"))
 const ProductDetail = lazy(() => import("../pages/ProductDetail"))
 
@@ -93,6 +94,7 @@ export default function UserRouter() {
           <Route path="/under-250" element={<Under250 />} />
           <Route path="/category/:category" element={<CategoryPage />} />
           <Route path="/restaurants" element={<Restaurants />} />
+          <Route path="/restaurants/:slug/info" element={<RestaurantInfo />} />
           <Route path="/restaurants/:slug" element={<RestaurantDetails />} />
           <Route path="/search" element={<SearchResults />} />
           <Route path="/product/:id" element={<ProductDetail />} />

@@ -55,7 +55,7 @@ export default function ItemDetailsPage() {
   const [itemSizeUnit, setItemSizeUnit] = useState("piece");
   const [itemDescription, setItemDescription] = useState("");
   const [foodType, setFoodType] = useState("Non-Veg");
-  const [basePrice, setBasePrice] = useState("0");
+  const [basePrice, setBasePrice] = useState("");
   const [showCategoryError, setShowCategoryError] = useState(false);
   const [showBasePriceError, setShowBasePriceError] = useState(false);
   const [preparationTime, setPreparationTime] = useState("");
@@ -127,7 +127,7 @@ export default function ItemDetailsPage() {
         setItemSizeUnit(item.itemSizeUnit || "piece");
         setItemDescription(limitWords(item.description || "", maxDescriptionWords));
         setFoodType(item.foodType === "Veg" ? "Veg" : item.foodType === "Egg" ? "Egg" : "Non-Veg");
-        setBasePrice(item.price?.toString() || "0");
+        setBasePrice(item.price === 0 || item.price ? item.price.toString() : "");
         setPreparationTime(item.preparationTime || "");
         setGst(item.gst?.toString() || "5.0");
         setIsRecommended(item.isRecommended || false);
@@ -218,7 +218,7 @@ export default function ItemDetailsPage() {
             setItemSizeUnit(foundItem.itemSizeUnit || "piece");
             setItemDescription(limitWords(foundItem.description || "", maxDescriptionWords));
             setFoodType(foundItem.foodType === "Veg" ? "Veg" : foundItem.foodType === "Egg" ? "Egg" : "Non-Veg");
-            setBasePrice(foundItem.price?.toString() || "0");
+            setBasePrice(foundItem.price === 0 || foundItem.price ? foundItem.price.toString() : "");
             setPreparationTime(foundItem.preparationTime || "");
             setGst(foundItem.gst?.toString() || "5.0");
             setIsRecommended(foundItem.isRecommended || false);

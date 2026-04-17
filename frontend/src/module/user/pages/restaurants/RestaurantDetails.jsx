@@ -1236,7 +1236,14 @@ export default function RestaurantDetails() {
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-2">
                 <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{restaurant?.name || t("user.restaurantDetails.unknownRestaurant")}</h1>
-                <Info className="h-5 w-5 text-gray-400" />
+                <button
+                  type="button"
+                  onClick={() => navigate(`/user/restaurants/${slug}/info`)}
+                  className="h-8 w-8 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                  aria-label="Open restaurant info"
+                >
+                  <Info className="h-5 w-5" />
+                </button>
               </div>
               {outOfRange && (
                 <Badge variant="secondary" className="w-fit flex items-center gap-1 px-2 py-0.5 bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200 border border-amber-300 dark:border-amber-700">

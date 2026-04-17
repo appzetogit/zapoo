@@ -539,7 +539,7 @@ export const getRestaurantById = async (req, res) => {
     };
 
     // Strict field projection for public restaurant profile (deliveryPricingConfig for cart pricing fallback)
-    const projection = 'name slug cuisines rating totalRatings promo profileImage location avgDeliveryTime avgPriceValue isActive isAcceptingOrders featuredDish featuredPrice offer distance deliveryRange estimatedDeliveryTime cuisines deliveryTimings openDays deliveryPricingConfig';
+    const projection = 'name slug cuisines rating totalRatings promo profileImage location avgDeliveryTime avgPriceValue isActive isAcceptingOrders featuredDish featuredPrice offer distance deliveryRange estimatedDeliveryTime cuisines deliveryTimings openDays deliveryPricingConfig ownerName ownerPhone phone primaryContactNumber createdAt onboarding.step3.gst.isRegistered onboarding.step3.gst.gstNumber onboarding.step3.gst.legalName onboarding.step3.gst.address onboarding.step3.fssai.registrationNumber onboarding.step3.fssai.expiryDate';
 
     const restaurant = await Restaurant.findOne(queryConditions)
       .select(projection)
