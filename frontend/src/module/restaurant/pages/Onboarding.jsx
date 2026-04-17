@@ -143,6 +143,9 @@ const getImagePreviewUrl = value => {
   if (value instanceof File) {
     return URL.createObjectURL(value);
   }
+  if (value?.previewUrl) {
+    return value.previewUrl;
+  }
   if (value?.dataUrl) {
     return value.dataUrl;
   }
@@ -371,7 +374,8 @@ export default function RestaurantOnboarding() {
       name: file.name,
       size: file.size,
       type: file.type,
-      dataUrl
+      dataUrl,
+      previewUrl: URL.createObjectURL(file)
     };
   };
 
