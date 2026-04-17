@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { useNavigate } from "react-router-dom"
-import { ArrowLeft, Upload, X, Check } from "lucide-react"
+import { ArrowLeft, Upload, X, Check, Camera } from "lucide-react"
 import { deliveryAPI } from "@/lib/api"
 import apiClient from "@/lib/api/axios"
 import { toast } from "sonner"
@@ -29,6 +29,28 @@ const getInitialUploadedDocs = () => {
     return EMPTY_UPLOADED_DOCS;
   }
 };
+const isFlutterInAppWebViewAvailable = () =>
+  typeof window !== "undefined" &&
+  typeof window.flutter_inappwebview?.callHandler === "function"
+
+const flutterBase64ToFile = async (result, fallbackName) => {
+  if (!result || result.success === false || !result.base64) return null
+
+  let base64Data = String(result.base64)
+  if (base64Data.includes(",")) {
+    base64Data = base64Data.split(",")[1]
+  }
+
+  const byteCharacters = atob(base64Data)
+  const byteNumbers = new Array(byteCharacters.length)
+  for (let i = 0; i < byteCharacters.length; i++) {
+    byteNumbers[i] = byteCharacters.charCodeAt(i)
+  }
+  const byteArray = new Uint8Array(byteNumbers)
+  const mimeType = result.mimeType || "image/jpeg"
+  const blob = new Blob([byteArray], { type: mimeType })
+  return new File([blob], result.fileName || fallbackName, { type: mimeType })
+}
 
 export default function SignupStep2() {
   const navigate = useNavigate()
@@ -118,6 +140,38 @@ export default function SignupStep2() {
     }))
   }
 
+  const captureDocumentFromFlutter = async (docType, source) => {
+    if (!isFlutterInAppWebViewAvailable()) return false
+
+    try {
+      const result = await window.flutter_inappwebview.callHandler(source === "camera" ? "openCamera" : "openGallery", {
+        source,
+        accept: "image/*",
+        multiple: false,
+        quality: 0.8
+      })
+
+      if (!result || result.success === false) return false
+
+      let file = null
+      if (result.file) {
+        file = result.file
+      } else if (result.base64) {
+        file = await flutterBase64ToFile(result, `${docType}-${Date.now()}.jpg`)
+      }
+
+      if (file) {
+        await handleFileSelect(docType, file)
+        return true
+      }
+
+      return false
+    } catch (error) {
+      console.error(`Error capturing ${docType} from Flutter ${source}:`, error)
+      return false
+    }
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
 
@@ -161,6 +215,7 @@ export default function SignupStep2() {
     const file = documents[docType]
     const uploaded = uploadedDocs[docType]
     const isUploading = uploading[docType]
+    const fileInputRef = useRef(null)
 
     return (
       <div className="bg-white rounded-lg p-4 border border-gray-200">
@@ -188,7 +243,7 @@ export default function SignupStep2() {
             </div>
           </div>
         ) : (
-          <label className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-[#DC2626] transition-colors">
+          <div className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-gray-300 rounded-lg transition-colors px-4">
             <div className="flex flex-col items-center justify-center pt-5 pb-6">
               {isUploading ? (
                 <>
@@ -198,12 +253,45 @@ export default function SignupStep2() {
               ) : (
                 <>
                   <Upload className="w-8 h-8 text-gray-400 mb-2" />
-                  <p className="text-sm text-gray-500 mb-1">Click to upload</p>
+                  <p className="text-sm text-gray-500 mb-1">Choose a document image</p>
                   <p className="text-xs text-gray-400">PNG, JPG up to 5MB</p>
                 </>
               )}
             </div>
+            <div className="grid grid-cols-2 gap-3 w-full mt-1">
+              <button
+                type="button"
+                onClick={async () => {
+                  if (isUploading) return
+                  if (isFlutterInAppWebViewAvailable()) {
+                    const picked = await captureDocumentFromFlutter(docType, "gallery")
+                    if (picked) return
+                  }
+                  fileInputRef.current?.click()
+                }}
+                className="flex items-center justify-center gap-2 px-3 py-3 rounded-lg bg-gray-900 text-white text-sm font-semibold hover:bg-gray-800 transition-colors"
+              >
+                <Upload className="w-4 h-4" />
+                <span>Gallery</span>
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (isUploading) return
+                  if (isFlutterInAppWebViewAvailable()) {
+                    const picked = await captureDocumentFromFlutter(docType, "camera")
+                    if (picked) return
+                  }
+                  fileInputRef.current?.click()
+                }}
+                className="flex items-center justify-center gap-2 px-3 py-3 rounded-lg bg-gray-900 text-white text-sm font-semibold hover:bg-gray-800 transition-colors"
+              >
+                <Camera className="w-4 h-4" />
+                <span>Camera</span>
+              </button>
+            </div>
             <input
+              ref={fileInputRef}
               type="file"
               className="hidden"
               accept="image/*"
@@ -212,10 +300,11 @@ export default function SignupStep2() {
                 if (selectedFile) {
                   handleFileSelect(docType, selectedFile)
                 }
+                e.target.value = ""
               }}
               disabled={isUploading}
             />
-          </label>
+          </div>
         )}
       </div>
     )

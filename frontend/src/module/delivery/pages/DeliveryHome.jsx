@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import Lenis from "lenis";
 import { toast } from "sonner";
-import { Lightbulb, HelpCircle, Calendar, Clock, Lock, ArrowRight, ChevronUp, ChevronDown, UtensilsCrossed, Wallet, TrendingUp, CheckCircle, Bell, MapPin, ChefHat, Phone, X, TargetIcon, Play, Pause, IndianRupee, Loader2, Camera } from "lucide-react";
+import { Lightbulb, HelpCircle, Calendar, Clock, Lock, ArrowRight, ChevronUp, ChevronDown, UtensilsCrossed, Wallet, TrendingUp, CheckCircle, Bell, MapPin, ChefHat, Phone, X, TargetIcon, Play, Pause, IndianRupee, Loader2, Camera, Upload } from "lucide-react";
 import BottomPopup from "../components/BottomPopup";
 import FeedNavbar from "../components/FeedNavbar";
 import { Card, CardContent } from "@/components/ui/card";
@@ -2712,6 +2712,68 @@ export default function DeliveryHome() {
    * If user cancels:
    * { success: false } or null
    */
+  const flutterBase64ToFile = async (result, fallbackName) => {
+    if (!result || result.success === false || !result.base64) return null;
+
+    let base64Data = String(result.base64);
+    if (base64Data.includes(',')) {
+      base64Data = base64Data.split(',')[1];
+    }
+
+    const byteCharacters = atob(base64Data);
+    const byteNumbers = new Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }
+    const byteArray = new Uint8Array(byteNumbers);
+    const mimeType = result.mimeType || 'image/jpeg';
+    const blob = new Blob([byteArray], { type: mimeType });
+    return new File([blob], result.fileName || fallbackName, { type: mimeType });
+  };
+
+  const handleGalleryCapture = async () => {
+    try {
+      if (window.flutter_inappwebview && typeof window.flutter_inappwebview.callHandler === 'function') {
+        const result = await window.flutter_inappwebview.callHandler('openGallery', {
+          source: 'gallery',
+          accept: 'image/*',
+          multiple: false,
+          quality: 0.8
+        });
+
+        if (result && result.success) {
+          let file = null;
+          if (result.file) {
+            file = result.file;
+          } else if (result.base64) {
+            file = await flutterBase64ToFile(result, `bill-image-${Date.now()}.jpg`);
+          } else if (result.filePath) {
+            console.warn('⚠️ File path returned, but file reading not implemented');
+            toast.error('File path handling not implemented. Please use base64 or File object.');
+            return;
+          }
+
+          if (file) {
+            await processBillImageFile(file);
+          } else {
+            console.error('❌ No file data in Flutter gallery response:', result);
+            toast.error('Failed to get image from gallery');
+          }
+        }
+      } else {
+        if (fileInputRef.current) {
+          fileInputRef.current.click();
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error opening gallery:', error);
+      toast.error('Failed to open gallery. Please try again.');
+      if (fileInputRef.current) {
+        fileInputRef.current.click();
+      }
+    }
+  };
+
   const handleCameraCapture = async () => {
     try {
       // Check if Flutter InAppWebView handler is available
@@ -7894,23 +7956,51 @@ export default function DeliveryHome() {
           {billImageUploaded ? '✅ Bill image uploaded' : 'Please capture bill image'}
         </p>
 
-        {/* Camera Button */}
-        <div className="flex justify-center mb-4">
-          <button onClick={handleCameraCapture} disabled={isUploadingBill} className={`flex items-center justify-center gap-2 px-6 py-3 rounded-lg transition-colors ${isUploadingBill ? 'bg-gray-400 cursor-not-allowed' : billImageUploaded ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'} text-white font-medium`}>
-            {isUploadingBill ? <>
-              <Loader2 className="w-5 h-5 animate-spin" />
-              <span>Uploading...</span>
-            </> : billImageUploaded ? <>
-              <CheckCircle className="w-5 h-5" />
-              <span>Bill Uploaded</span>
-            </> : <>
-              <Camera className="w-5 h-5" />
-              <span>Capture Bill</span>
-            </>}
+        {/* Gallery + Camera Buttons */}
+        <div className="grid grid-cols-2 gap-3 mb-4">
+          <button
+            onClick={handleGalleryCapture}
+            disabled={isUploadingBill}
+            className={`flex items-center justify-center gap-2 px-4 py-3 rounded-lg transition-colors ${isUploadingBill ? 'bg-gray-400 cursor-not-allowed' : billImageUploaded ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'} text-white font-medium`}
+          >
+            {isUploadingBill ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                <span>Uploading...</span>
+              </>
+            ) : (
+              <>
+                <Upload className="w-5 h-5" />
+                <span>Gallery</span>
+              </>
+            )}
+          </button>
+          <button
+            onClick={handleCameraCapture}
+            disabled={isUploadingBill}
+            className={`flex items-center justify-center gap-2 px-4 py-3 rounded-lg transition-colors ${isUploadingBill ? 'bg-gray-400 cursor-not-allowed' : billImageUploaded ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'} text-white font-medium`}
+          >
+            {isUploadingBill ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                <span>Uploading...</span>
+              </>
+            ) : billImageUploaded ? (
+              <>
+                <CheckCircle className="w-5 h-5" />
+                <span>Bill Uploaded</span>
+              </>
+            ) : (
+              <>
+                <Camera className="w-5 h-5" />
+                <span>Camera</span>
+              </>
+            )}
           </button>
         </div>
 
-        {/* Hidden file input for camera (sr-only keeps it in DOM for mobile camera) */}
+        {/* Hidden file inputs for web fallback */}
+        <input id="bill-gallery-input" ref={fileInputRef} type="file" accept="image/*" onChange={handleBillImageSelect} className="sr-only" />
         <input id="bill-camera-input" ref={cameraInputRef} type="file" accept="image/*" capture="environment" onChange={handleBillImageSelect} className="sr-only" />
       </div>
 

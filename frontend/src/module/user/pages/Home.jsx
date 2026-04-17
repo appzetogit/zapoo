@@ -2541,16 +2541,6 @@ export default function Home() {
           }} className="w-full bg-green-600 text-white font-semibold py-2.5 rounded-xl hover:bg-green-700 transition-colors mb-2 text-sm">
                 {t("user.home.vegPopup.apply")}
               </button>
-
-              {/* More settings link */}
-              <button onClick={() => {
-            setShowVegModePopup(false);
-            // Revert veg mode to OFF if popup is closed without applying
-            setVegModeContext(false);
-            setPrevVegMode(false);
-          }} className="w-full text-green-600 dark:text-green-400 font-medium text-xs hover:text-green-700 dark:hover:text-green-500 transition-colors">
-                {t("user.home.vegPopup.moreSettings")}
-              </button>
             </motion.div>
           </>}
       </AnimatePresence>
