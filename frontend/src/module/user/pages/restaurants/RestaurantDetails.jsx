@@ -20,6 +20,7 @@ import { getCompanyNameAsync } from "@/lib/utils/businessSettings";
 import { isModuleAuthenticated } from "@/lib/utils/auth";
 import DynamicEtaText from "../../components/DynamicEtaText";
 import { useTranslation } from "react-i18next";
+import { handleShare } from "@/lib/utils/share";
 
 const PLACEHOLDER_OFFER_TEXTS = new Set([
   "UPTO 50% OFF",
@@ -929,27 +930,19 @@ export default function RestaurantDetails() {
       url: shareUrl
     });
 
-    // Try Web Share API first (mobile)
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: restaurantName,
-          text: shareText,
-          url: shareUrl
-        });
-        toast.success(t("user.restaurantDetails.toast.restaurantShared"));
-        setShowMenuOptionsSheet(false);
-      } catch (error) {
-        // User cancelled or error occurred
-        if (error.name !== "AbortError") {
-          // Fallback to copy to clipboard
-          await copyToClipboard(shareUrl);
-        }
-      }
-    } else {
-      // Fallback to copy to clipboard
-      await copyToClipboard(shareUrl);
+    const result = await handleShare({
+      title: restaurantName,
+      text: shareText,
+      url: shareUrl
+    });
+
+    if (result.status === "copied") {
+      toast.success(t("user.restaurantDetails.toast.linkCopied"));
+    } else if (result.status === "error") {
+      toast.error(t("user.restaurantDetails.toast.copyFailed"));
     }
+
+    setShowMenuOptionsSheet(false);
   };
 
   // Handle share click
@@ -966,48 +959,16 @@ export default function RestaurantDetails() {
       url: shareUrl
     });
 
-    // Try Web Share API first (mobile)
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: `${item.name} - ${restaurant?.name || ""}`,
-          text: shareText,
-          url: shareUrl
-        });
-        toast.success(t("user.restaurantDetails.toast.dishShared"));
-      } catch (error) {
-        // User cancelled or error occurred
-        if (error.name !== "AbortError") {
-          // Fallback to copy to clipboard
-          await copyToClipboard(shareUrl);
-        }
-      }
-    } else {
-      // Fallback to copy to clipboard
-      await copyToClipboard(shareUrl);
-    }
-  };
+    const result = await handleShare({
+      title: `${item.name} - ${restaurant?.name || ""}`,
+      text: shareText,
+      url: shareUrl
+    });
 
-  // Copy to clipboard helper
-  const copyToClipboard = async text => {
-    try {
-      await navigator.clipboard.writeText(text);
+    if (result.status === "copied") {
       toast.success(t("user.restaurantDetails.toast.linkCopied"));
-    } catch (error) {
-      // Fallback for older browsers
-      const textArea = document.createElement("textarea");
-      textArea.value = text;
-      textArea.style.position = "fixed";
-      textArea.style.opacity = "0";
-      document.body.appendChild(textArea);
-      textArea.select();
-      try {
-        document.execCommand("copy");
-        toast.success(t("user.restaurantDetails.toast.linkCopied"));
-      } catch (err) {
-        toast.error(t("user.restaurantDetails.toast.copyFailed"));
-      }
-      document.body.removeChild(textArea);
+    } else if (result.status === "error") {
+      toast.error(t("user.restaurantDetails.toast.copyFailed"));
     }
   };
 

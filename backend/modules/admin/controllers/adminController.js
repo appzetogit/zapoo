@@ -1496,6 +1496,34 @@ export const getRestaurants = asyncHandler(async (req, res) => {
 });
 
 /**
+ * Get Restaurant By ID (Admin)
+ * GET /api/admin/restaurants/:id
+ */
+export const getRestaurantById = asyncHandler(async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return errorResponse(res, 400, "Invalid restaurant ID");
+    }
+
+    const restaurant = await Restaurant.findById(id).lean();
+    if (!restaurant) {
+      return errorResponse(res, 404, "Restaurant not found");
+    }
+
+    return successResponse(res, 200, "Restaurant retrieved successfully", {
+      restaurant,
+    });
+  } catch (error) {
+    logger.error(`Error fetching restaurant by ID: ${error.message}`, {
+      error: error.stack,
+    });
+    return errorResponse(res, 500, "Failed to fetch restaurant");
+  }
+});
+
+/**
  * Update Restaurant Status (Active/Inactive/Ban)
  * PUT /api/admin/restaurants/:id/status
  */

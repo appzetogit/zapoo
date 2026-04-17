@@ -5,6 +5,7 @@ import { orderAPI, api, API_ENDPOINTS } from "@/lib/api";
 import { toast } from "sonner";
 import { getCompanyNameAsync } from "@/lib/utils/businessSettings";
 import { useTranslation } from "react-i18next";
+import { handleShare } from "@/lib/utils/share";
 export default function Orders() {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -305,15 +306,14 @@ export default function Orders() {
       location: location || t("user.orders.locationNotAvailable")
     });
     try {
-      if (navigator.share) {
-        await navigator.share({
-          title: order.restaurant,
-          text: shareText
-        });
-      } else if (navigator.clipboard && navigator.clipboard.writeText) {
-        await navigator.clipboard.writeText(shareText);
+      const result = await handleShare({
+        title: order.restaurant,
+        text: shareText,
+      });
+
+      if (result.status === "copied") {
         toast.success(t("user.orders.toast.restaurantCopied"));
-      } else {
+      } else if (result.status === "error") {
         toast.info(t("user.orders.toast.sharingNotSupported"));
       }
     } catch (error) {

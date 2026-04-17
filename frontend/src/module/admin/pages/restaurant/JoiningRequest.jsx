@@ -870,7 +870,7 @@ export default function JoiningRequest() {
                           </div>}
                         {restaurantDetails.onboarding?.completedSteps !== undefined && <div>
                             <p className="text-xs text-slate-500 mb-1">Onboarding Steps Completed</p>
-                            <p className="font-medium text-slate-900">{restaurantDetails.onboarding.completedSteps} / 4</p>
+                            <p className="font-medium text-slate-900">{restaurantDetails.onboarding.completedSteps} / 3</p>
                           </div>}
                       </div>
                     </div>}
