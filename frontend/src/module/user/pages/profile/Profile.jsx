@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
 import { ArrowLeft, ChevronRight, Wallet, Tag, User, Leaf, Palette, Bookmark, Building2, Moon, Sun, Check, Info, PenSquare, AlertTriangle, Settings as SettingsIcon, Power, ShoppingCart, UtensilsCrossed, Languages, Trash2 } from "lucide-react";
 import AnimatedPage from "../../components/AnimatedPage";
 import { Card, CardContent } from "@/components/ui/card";
