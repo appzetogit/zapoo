@@ -1320,23 +1320,8 @@ export default function RestaurantOnboarding() {
         {/* Menu image previews */}
         {!!step2.menuImages.length && <div className="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-3">
           {step2.menuImages.map((file, idx) => {
-            // Handle both File objects and URL objects
-            let imageUrl = null;
-            let imageName = `Image ${idx + 1}`;
-            if (file instanceof File) {
-              imageUrl = URL.createObjectURL(file);
-              imageName = file.name;
-            } else if (file?.dataUrl) {
-              imageUrl = file.dataUrl;
-              imageName = file.name || `Image ${idx + 1}`;
-            } else if (file?.url) {
-              // If it's an object with url property (from backend)
-              imageUrl = file.url;
-              imageName = file.name || `Image ${idx + 1}`;
-            } else if (typeof file === 'string') {
-              // If it's a direct URL string
-              imageUrl = file;
-            }
+            const imageUrl = getImagePreviewUrl(file);
+            const imageName = file?.name || `Image ${idx + 1}`;
             return <div key={idx} className="relative aspect-[4/5] rounded-md overflow-hidden bg-gray-100 group">
               {imageUrl ? <img src={imageUrl} alt={`Menu ${idx + 1}`} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-[11px] text-gray-500 px-2 text-center">
                 Preview unavailable
@@ -1483,6 +1468,20 @@ export default function RestaurantOnboarding() {
       </div>
       <div>
         <Label className="text-xs text-gray-700">PAN image*</Label>
+        {step3.panImage && (
+          <div className="mt-2 mb-2 flex items-center gap-3">
+            <div className="h-16 w-16 rounded-md overflow-hidden bg-gray-100 border border-gray-200">
+              {getImagePreviewUrl(step3.panImage) ? (
+                <img src={getImagePreviewUrl(step3.panImage)} alt="PAN preview" className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-[10px] text-gray-500">Preview</div>
+              )}
+            </div>
+            <p className="text-xs text-gray-600 truncate">
+              {step3.panImage?.name || "PAN image selected"}
+            </p>
+          </div>
+        )}
         <Input type="file" accept="image/*" onChange={async e => {
           const file = e.target.files?.[0] || null;
           if (file) {
@@ -1537,6 +1536,20 @@ export default function RestaurantOnboarding() {
         </div>
         <div>
           <Label className="text-xs text-gray-700">GST certificate image*</Label>
+          {step3.gstImage && (
+            <div className="mt-2 mb-2 flex items-center gap-3">
+              <div className="h-16 w-16 rounded-md overflow-hidden bg-gray-100 border border-gray-200">
+                {getImagePreviewUrl(step3.gstImage) ? (
+                  <img src={getImagePreviewUrl(step3.gstImage)} alt="GST preview" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-[10px] text-gray-500">Preview</div>
+                )}
+              </div>
+              <p className="text-xs text-gray-600 truncate">
+                {step3.gstImage?.name || "GST image selected"}
+              </p>
+            </div>
+          )}
           <Input type="file" accept="image/*" onChange={async e => {
             const file = e.target.files?.[0] || null;
             if (file) {
@@ -1598,6 +1611,20 @@ export default function RestaurantOnboarding() {
       </div>
       <div>
         <Label className="text-xs text-gray-700">FSSAI license image*</Label>
+        {step3.fssaiImage && (
+          <div className="mt-2 mb-2 flex items-center gap-3">
+            <div className="h-16 w-16 rounded-md overflow-hidden bg-gray-100 border border-gray-200">
+              {getImagePreviewUrl(step3.fssaiImage) ? (
+                <img src={getImagePreviewUrl(step3.fssaiImage)} alt="FSSAI preview" className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-[10px] text-gray-500">Preview</div>
+              )}
+            </div>
+            <p className="text-xs text-gray-600 truncate">
+              {step3.fssaiImage?.name || "FSSAI image selected"}
+            </p>
+          </div>
+        )}
         <Input type="file" accept="image/*" onChange={async e => {
           const file = e.target.files?.[0] || null;
           if (file) {
