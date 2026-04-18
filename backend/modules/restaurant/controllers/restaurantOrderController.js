@@ -695,7 +695,13 @@ export const markOrderReady = asyncHandler(async (req, res) => {
 
         if (restaurantLat && restaurantLng) {
           console.log('📣 [DeliveryAssign] Broadcast on ready for order', order.orderId || order._id.toString());
-          await broadcastDeliveryRequest(order._id.toString(), restaurantLat, restaurantLng, { trigger: 'ready' });
+          const result = await broadcastDeliveryRequest(order._id.toString(), restaurantLat, restaurantLng, { trigger: 'ready' });
+          console.log('📊 [DeliveryAssign] Ready broadcast recipients', {
+            orderId: order.orderId || null,
+            orderMongoId: order._id?.toString?.() || null,
+            notifiedCount: Number(result?.notifiedCount || 0),
+            candidatesCount: Array.isArray(result?.deliveryPartnerIds) ? result.deliveryPartnerIds.length : 0
+          });
         } else {
           console.error('❌ [DeliveryAssign] Restaurant location missing on ready for order', order.orderId || order._id.toString());
         }
