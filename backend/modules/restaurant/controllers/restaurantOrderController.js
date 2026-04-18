@@ -657,15 +657,43 @@ export const markOrderReady = asyncHandler(async (req, res) => {
     // If no delivery partner assigned yet, broadcast request to all nearby delivery partners (within 5km)
     if (!populatedOrder?.deliveryPartnerId) {
       try {
-        let restaurantCoords = populatedOrder?.restaurantId?.location?.coordinates;
-        if (!Array.isArray(restaurantCoords) || restaurantCoords.length < 2) {
-          // Fallback: fetch restaurant from DB if population is missing location
-          const restaurantDoc = await Restaurant.findById(order.restaurantId).select('location.coordinates').lean();
-          restaurantCoords = restaurantDoc?.location?.coordinates;
+        // Always prefer fresh restaurant location from DB (production may have mixed location shapes in populated doc).
+        const restaurantDoc = await Restaurant.findById(order.restaurantId)
+          .select('location.coordinates location.latitude location.longitude')
+          .lean();
+
+        let restaurantLat = null;
+        let restaurantLng = null;
+        const coords = restaurantDoc?.location?.coordinates;
+        if (Array.isArray(coords) && coords.length >= 2) {
+          const [lng, lat] = coords;
+          if (Number.isFinite(Number(lat)) && Number.isFinite(Number(lng))) {
+            restaurantLat = Number(lat);
+            restaurantLng = Number(lng);
+          }
+        }
+        // Fallback to latitude/longitude fields if present
+        if (!restaurantLat || !restaurantLng) {
+          const lat = restaurantDoc?.location?.latitude;
+          const lng = restaurantDoc?.location?.longitude;
+          if (Number.isFinite(Number(lat)) && Number.isFinite(Number(lng))) {
+            restaurantLat = Number(lat);
+            restaurantLng = Number(lng);
+          }
+        }
+        // Final fallback: whatever came in populated payload
+        if (!restaurantLat || !restaurantLng) {
+          const populatedCoords = populatedOrder?.restaurantId?.location?.coordinates;
+          if (Array.isArray(populatedCoords) && populatedCoords.length >= 2) {
+            const [lng, lat] = populatedCoords;
+            if (Number.isFinite(Number(lat)) && Number.isFinite(Number(lng))) {
+              restaurantLat = Number(lat);
+              restaurantLng = Number(lng);
+            }
+          }
         }
 
-        if (Array.isArray(restaurantCoords) && restaurantCoords.length >= 2) {
-          const [restaurantLng, restaurantLat] = restaurantCoords;
+        if (restaurantLat && restaurantLng) {
           console.log('📣 [DeliveryAssign] Broadcast on ready for order', order.orderId || order._id.toString());
           await broadcastDeliveryRequest(order._id.toString(), restaurantLat, restaurantLng, { trigger: 'ready' });
         } else {

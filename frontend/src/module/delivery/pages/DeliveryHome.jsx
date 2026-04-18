@@ -1369,8 +1369,17 @@ export default function DeliveryHome() {
       try {
         const activeRaw = localStorage.getItem('deliveryActiveOrder');
         const active = activeRaw ? JSON.parse(activeRaw) : null;
-        const activeOrderId = active?.orderId || active?.restaurantInfo?.orderId || active?.restaurantInfo?.id;
-        if (activeOrderId && String(activeOrderId) === String(takenId)) {
+        const activeIds = new Set(
+          [
+            active?.orderId,
+            active?.orderMongoId,
+            active?.publicOrderId,
+            active?.restaurantInfo?.id,
+            active?.restaurantInfo?.orderMongoId,
+            active?.restaurantInfo?.orderId
+          ].map(v => (v != null ? String(v) : '')).filter(Boolean)
+        );
+        if (takenId && activeIds.has(String(takenId))) {
           localStorage.removeItem('deliveryActiveOrder');
         }
       } catch {
@@ -2197,6 +2206,15 @@ export default function DeliveryHome() {
         
         setShowNewOrderPopup(false);
         localStorage.removeItem('deliveryPendingOrder');
+        if (restaurantInfo?.id) {
+          acceptedOrderIdsRef.current.add(String(restaurantInfo.id));
+        }
+        if (restaurantInfo?.orderId) {
+          acceptedOrderIdsRef.current.add(String(restaurantInfo.orderId));
+        }
+        if (typeof clearNewOrder === 'function') {
+          clearNewOrder();
+        }
         setNavigationMode('restaurant');
         setShowDirectionsMap(true);
         return true;
@@ -3575,12 +3593,26 @@ export default function DeliveryHome() {
 
     try {
       const existing = JSON.parse(localStorage.getItem('deliveryActiveOrder') || '{}');
-      const orderId = restaurantInfo?.orderId || restaurantInfo?.id || existing.orderId;
-      if (!orderId) return;
+      const orderMongoId =
+        restaurantInfo?.id ||
+        restaurantInfo?.orderMongoId ||
+        existing.orderMongoId ||
+        existing.restaurantInfo?.id ||
+        null;
+      const publicOrderId =
+        restaurantInfo?.orderId ||
+        existing.publicOrderId ||
+        existing.restaurantInfo?.orderId ||
+        null;
+      const canonicalOrderId = orderMongoId || existing.orderId || publicOrderId;
+      if (!canonicalOrderId) return;
 
       const payload = {
         ...existing,
-        orderId,
+        // Keep a canonical ID for comparisons with socket events (prefer MongoDB id).
+        orderId: canonicalOrderId,
+        orderMongoId: orderMongoId || existing.orderMongoId || null,
+        publicOrderId: publicOrderId || existing.publicOrderId || null,
         acceptedAt: existing.acceptedAt || restaurantInfo?.acceptedAt || new Date().toISOString(),
         restaurantInfo: {
           ...(existing.restaurantInfo || {}),
@@ -3682,9 +3714,18 @@ export default function DeliveryHome() {
         const activeOrderData = localStorage.getItem('deliveryActiveOrder');
         if (activeOrderData) {
           const activeOrder = JSON.parse(activeOrderData);
-          const activeOrderId = activeOrder.orderId || activeOrder.restaurantInfo?.id || activeOrder.restaurantInfo?.orderId;
-          if (activeOrderId === orderId) {
-            acceptedOrderIdsRef.current.add(orderId);
+          const activeIds = new Set(
+            [
+              activeOrder.orderId,
+              activeOrder.orderMongoId,
+              activeOrder.publicOrderId,
+              activeOrder.restaurantInfo?.id,
+              activeOrder.restaurantInfo?.orderMongoId,
+              activeOrder.restaurantInfo?.orderId
+            ].map(v => (v != null ? String(v) : '')).filter(Boolean)
+          );
+          if (activeIds.has(String(orderId))) {
+            acceptedOrderIdsRef.current.add(String(orderId));
             clearNewOrder();
             return;
           }

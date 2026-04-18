@@ -565,6 +565,24 @@ export async function notifyMultipleDeliveryBoys(order, deliveryPartnerIds, phas
           });
           notifiedCount++;
         }
+
+        // Always send FCM push for multi-notify so riders get it even if Socket.IO is flaky (e.g. WebView).
+        try {
+          await sendNotificationToUser(normalizedId, 'delivery', 'New Order Available', `Order #${orderWithUser.orderId} from ${orderNotification.restaurantName || 'restaurant'}`, {
+            orderId: orderWithUser.orderId,
+            orderMongoId: orderWithUser._id?.toString(),
+            status: orderWithUser.status,
+            type: 'new_order_available',
+            phase,
+            templateKey: 'delivery_new_order_available',
+            templateVars: {
+              orderId: orderWithUser.orderId,
+              restaurantName: orderNotification.restaurantName || 'restaurant'
+            }
+          });
+        } catch (pushError) {
+          console.error('❌ [FCM] Error sending delivery new_order_available notification:', pushError);
+        }
       } catch (partnerError) {
         console.error(`❌ Error notifying delivery partner ${deliveryPartnerId}:`, partnerError);
       }

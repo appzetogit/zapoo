@@ -459,11 +459,10 @@ export async function findNearestDeliveryBoys(restaurantLat, restaurantLng, rest
         .sort((a, b) => a.distance - b.distance);
     }
 
-    // Final gate: only keep currently socket-connected riders in candidate list
-    deliveryPartnersWithDistance = await filterConnectedPartners(
-      deliveryPartnersWithDistance,
-      `findNearestDeliveryBoys:${restaurantId || 'no_restaurant'}`
-    );
+    // IMPORTANT:
+    // Do not hard-filter by Socket.IO connection here.
+    // In production (e.g. Flutter WebView wraps), sockets can be flaky or room-join may lag,
+    // but we still want to notify via FCM and/or deliver when they reconnect.
 
     return deliveryPartnersWithDistance.map(partner => ({
       deliveryPartnerId: partner._id.toString(),
