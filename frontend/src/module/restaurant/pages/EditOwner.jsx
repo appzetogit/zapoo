@@ -29,6 +29,11 @@ const STORAGE_KEY = "restaurant_owner_contact"
 export default function EditOwner() {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const [errors, setErrors] = useState({
+    name: "",
+    phone: "",
+    email: "",
+  })
   const [ownerData, setOwnerData] = useState({
     name: "",
     phone: "",
@@ -122,10 +127,53 @@ export default function EditOwner() {
   }, [formData.name, formData.phone, formData.email, ownerData.name, ownerData.phone, ownerData.email, profileImageFile])
 
   const handleInputChange = (field, value) => {
+    const nextValue = field === "phone" ? value.replace(/\D/g, "").slice(0, 10) : value
     setFormData(prev => ({
       ...prev,
-      [field]: value
+      [field]: nextValue
     }))
+    validateField(field, nextValue)
+  }
+
+  const validateField = (field, value) => {
+    let message = ""
+    const trimmed = String(value || "").trim()
+
+    if (field === "name") {
+      if (!trimmed) {
+        message = t("restaurant.editOwner.validation.nameRequired", { defaultValue: "Name is required" })
+      } else if (trimmed.length < 2) {
+        message = t("restaurant.editOwner.validation.nameMinLength", { defaultValue: "Name must be at least 2 characters" })
+      } else if (!/^[A-Za-z\s.'-]+$/.test(trimmed)) {
+        message = t("restaurant.editOwner.validation.nameInvalid", { defaultValue: "Name can contain letters and spaces only" })
+      }
+    }
+
+    if (field === "phone") {
+      if (!trimmed) {
+        message = t("restaurant.editOwner.validation.phoneRequired", { defaultValue: "Phone number is required" })
+      } else if (!/^\d+$/.test(trimmed)) {
+        message = t("restaurant.editOwner.validation.phoneDigitsOnly", { defaultValue: "Phone number must contain digits only" })
+      } else if (trimmed.length !== 10) {
+        message = t("restaurant.editOwner.validation.phoneLength", { defaultValue: "Phone number must be exactly 10 digits" })
+      } else if (!/^[6-9]\d{9}$/.test(trimmed)) {
+        message = t("restaurant.editOwner.validation.phoneInvalid", { defaultValue: "Enter a valid Indian mobile number" })
+      }
+    }
+
+    if (field === "email") {
+      if (!trimmed) {
+        message = t("restaurant.editOwner.validation.emailRequired", { defaultValue: "Email is required" })
+      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+        message = t("restaurant.editOwner.validation.emailInvalid", { defaultValue: "Enter a valid email address" })
+      }
+    }
+
+    setErrors(prev => ({
+      ...prev,
+      [field]: message,
+    }))
+    return !message
   }
 
   const handlePhotoChange = (event) => {
@@ -145,6 +193,14 @@ export default function EditOwner() {
   }
 
   const handleSave = async () => {
+    const isNameValid = validateField("name", formData.name)
+    const isPhoneValid = validateField("phone", formData.phone)
+    const isEmailValid = validateField("email", formData.email)
+
+    if (!isNameValid || !isPhoneValid || !isEmailValid) {
+      return
+    }
+
     try {
       setSaving(true)
 
@@ -166,6 +222,12 @@ export default function EditOwner() {
 
       // Update owner details in backend
       const updatePayload = {
+        // Keep restaurant public identity/contact in sync with contact-details edits
+        // so user app reflects latest values immediately.
+        name: formData.name.trim(),
+        phone: formData.phone.trim(),
+        email: formData.email.trim(),
+        primaryContactNumber: formData.phone.trim(),
         ownerName: formData.name.trim(),
         ownerEmail: formData.email.trim(),
         ownerPhone: formData.phone.trim(),
@@ -328,11 +390,12 @@ export default function EditOwner() {
                 value={loading ? t("restaurant.editOwner.common.loading") : formData.name}
                 onChange={(e) => handleInputChange("name", e.target.value)}
                 placeholder={t("restaurant.editOwner.placeholders.name")}
-                className="w-full pr-10"
+                className={`w-full pr-10 ${errors.name ? "border-red-500 focus-visible:ring-red-500" : ""}`}
                 disabled={loading || saving}
               />
               <Edit className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-blue-600" />
             </div>
+            {errors.name && <p className="mt-1 text-xs text-red-600">{errors.name}</p>}
           </div>
 
           {/* Phone Number Field */}
@@ -344,11 +407,13 @@ export default function EditOwner() {
                 value={loading ? t("restaurant.editOwner.common.loading") : formData.phone}
                 onChange={(e) => handleInputChange("phone", e.target.value)}
                 placeholder={t("restaurant.editOwner.placeholders.phone")}
-                className="w-full pr-10 focus-visible:border-black focus-visible:ring-0"
+                className={`w-full pr-10 focus-visible:border-black focus-visible:ring-0 ${errors.phone ? "border-red-500 focus-visible:ring-red-500 focus-visible:border-red-500" : ""}`}
                 disabled={loading || saving}
+                maxLength={10}
               />
               <Edit className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-blue-600" />
             </div>
+            {errors.phone && <p className="mt-1 text-xs text-red-600">{errors.phone}</p>}
           </div>
 
           {/* Email Field */}
@@ -360,11 +425,12 @@ export default function EditOwner() {
                 value={loading ? t("restaurant.editOwner.common.loading") : formData.email}
                 onChange={(e) => handleInputChange("email", e.target.value)}
                 placeholder={t("restaurant.editOwner.placeholders.email")}
-                className="w-full pr-10 focus-visible:border-black focus-visible:ring-0"
+                className={`w-full pr-10 focus-visible:border-black focus-visible:ring-0 ${errors.email ? "border-red-500 focus-visible:ring-red-500 focus-visible:border-red-500" : ""}`}
                 disabled={loading || saving}
               />
               <Edit className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-blue-600" />
             </div>
+            {errors.email && <p className="mt-1 text-xs text-red-600">{errors.email}</p>}
           </div>
         </div>
 
@@ -418,9 +484,9 @@ export default function EditOwner() {
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-4 z-40">
         <Button
           onClick={handleSave}
-          disabled={!hasChanges || loading || saving}
+          disabled={!hasChanges || loading || saving || Boolean(errors.name || errors.phone || errors.email)}
           className={`w-full py-3 ${
-            hasChanges && !loading && !saving
+            hasChanges && !loading && !saving && !Boolean(errors.name || errors.phone || errors.email)
               ? "bg-black hover:bg-gray-900 text-white" 
               : "bg-gray-200 text-gray-500 cursor-not-allowed"
           } transition-colors`}

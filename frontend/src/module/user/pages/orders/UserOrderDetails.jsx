@@ -217,118 +217,213 @@ export default function UserOrderDetails() {
   const handleDownloadSummary = async () => {
     try {
       const companyName = await getCompanyNameAsync();
-      // Create new PDF document
-      const doc = new jsPDF();
+      const doc = new jsPDF({
+        unit: "pt",
+        format: "a4"
+      });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const margin = 40;
+      const contentWidth = pageWidth - margin * 2;
+      const rightX = pageWidth - margin;
+      const formatCurrency = amount => `INR ${Number(amount || 0).toFixed(2)}`;
 
-      // Title
-      doc.setFontSize(16);
-      doc.setFont('helvetica', 'bold');
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(17);
       doc.text(t("user.orderDetailsPage.pdf.summaryAndReceipt", {
         companyName
-      }), 105, 20, {
-        align: 'center'
+      }), pageWidth / 2, 44, {
+        align: "center"
       });
 
-      // Order details section
-      let yPos = 35;
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
+      let yPos = 84;
+      const labelX = margin + 6;
+      const valueX = margin + 180;
+      const valueWidth = rightX - valueX;
+      const deliveryPartnerName = order.deliveryPartnerName || order.deliveryPartner?.name || order.assignmentInfo?.deliveryPartnerName || "";
+      const detailRows = [
+        [t("user.orderDetailsPage.pdf.orderId"), orderIdDisplay],
+        [t("user.orderDetailsPage.pdf.orderTime"), paymentDate || t("user.orderDetailsPage.na")],
+        [t("user.orderDetailsPage.pdf.customerName"), userName || t("user.orderDetailsPage.customer")],
+        [t("user.orderDetailsPage.pdf.deliveryAddress"), addressText || t("user.orderDetailsPage.na")],
+        [t("user.orderDetailsPage.pdf.restaurantName"), restaurantName || t("user.orderDetailsPage.na")],
+        [t("user.orderDetailsPage.pdf.restaurantAddress"), restaurantLocation || t("user.orderDetailsPage.na")],
+        ["Payment Method", paymentMethod || t("user.orderDetailsPage.na")]
+      ];
+      if (deliveryPartnerName) {
+        detailRows.push(["Delivery partner's Name", deliveryPartnerName]);
+      }
 
-      // Order ID
-      doc.setFont('helvetica', 'bold');
-      doc.text(t("user.orderDetailsPage.pdf.orderId"), 20, yPos);
-      doc.setFont('helvetica', 'normal');
-      doc.text(orderIdDisplay, 60, yPos);
-      yPos += 7;
+      detailRows.forEach(([label, value]) => {
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(10.5);
+        doc.setTextColor(25, 25, 25);
+        doc.text(`${label}:`, labelX, yPos);
 
-      // Order Time
-      doc.setFont('helvetica', 'bold');
-      doc.text(t("user.orderDetailsPage.pdf.orderTime"), 20, yPos);
-      doc.setFont('helvetica', 'normal');
-      const orderTimeLines = doc.splitTextToSize(paymentDate || t("user.orderDetailsPage.na"), 130);
-      doc.text(orderTimeLines, 60, yPos);
-      yPos += orderTimeLines.length * 7;
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(107, 114, 128);
+        const valueLines = doc.splitTextToSize(String(value || t("user.orderDetailsPage.na")), valueWidth);
+        doc.text(valueLines, valueX, yPos);
+        yPos += Math.max(22, valueLines.length * 14);
+      });
 
-      // Customer Name
-      doc.setFont('helvetica', 'bold');
-      doc.text(t("user.orderDetailsPage.pdf.customerName"), 20, yPos);
-      doc.setFont('helvetica', 'normal');
-      doc.text(userName || t("user.orderDetailsPage.customer"), 60, yPos);
-      yPos += 7;
-
-      // Delivery Address
-      doc.setFont('helvetica', 'bold');
-      doc.text(t("user.orderDetailsPage.pdf.deliveryAddress"), 20, yPos);
-      doc.setFont('helvetica', 'normal');
-      const addressLines = doc.splitTextToSize(addressText || t("user.orderDetailsPage.na"), 130);
-      doc.text(addressLines, 60, yPos);
-      yPos += addressLines.length * 7;
-
-      // Restaurant Name
-      doc.setFont('helvetica', 'bold');
-      doc.text(t("user.orderDetailsPage.pdf.restaurantName"), 20, yPos);
-      doc.setFont('helvetica', 'normal');
-      doc.text(restaurantName, 60, yPos);
-      yPos += 7;
-
-      // Restaurant Address
-      doc.setFont('helvetica', 'bold');
-      doc.text(t("user.orderDetailsPage.pdf.restaurantAddress"), 20, yPos);
-      doc.setFont('helvetica', 'normal');
-      const restaurantAddressLines = doc.splitTextToSize(restaurantLocation || t("user.orderDetailsPage.na"), 130);
-      doc.text(restaurantAddressLines, 60, yPos);
-      yPos += restaurantAddressLines.length * 7 + 5;
-
-      // Items table
-      const tableData = items.map(item => [item.name || t("user.orderDetailsPage.item"), String(item.quantity || item.qty || 1), `₹${Number(item.price || 0).toFixed(2)}`, `₹${Number((item.price || 0) * (item.quantity || item.qty || 1)).toFixed(2)}`]);
+      yPos += 8;
+      const tableData = items.map(item => {
+        const qty = Number(item.quantity || item.qty || 1);
+        const unitPrice = Number(item.price || 0);
+        return [item.name || t("user.orderDetailsPage.item"), String(qty), formatCurrency(unitPrice), formatCurrency(unitPrice * qty)];
+      });
       autoTable(doc, {
         startY: yPos,
         head: [[t("user.orderDetailsPage.pdf.item"), t("user.orderDetailsPage.pdf.quantity"), t("user.orderDetailsPage.pdf.unitPrice"), t("user.orderDetailsPage.pdf.totalPrice")]],
         body: tableData,
-        theme: 'striped',
+        theme: "plain",
+        margin: {
+          left: margin,
+          right: margin
+        },
         headStyles: {
-          fillColor: [0, 0, 0],
+          fillColor: [182, 182, 182],
           textColor: 255,
-          fontStyle: 'bold',
-          fontSize: 10
+          fontStyle: "bold",
+          fontSize: 11,
+          halign: "left",
+          cellPadding: {
+            top: 8,
+            right: 10,
+            bottom: 8,
+            left: 10
+          }
+        },
+        bodyStyles: {
+          textColor: [33, 33, 33],
+          fontSize: 11
         },
         styles: {
-          fontSize: 9
+          lineColor: [221, 221, 221],
+          lineWidth: 0,
+          cellPadding: {
+            top: 10,
+            right: 10,
+            bottom: 10,
+            left: 10
+          }
         },
         columnStyles: {
           0: {
-            cellWidth: 80
+            cellWidth: contentWidth * 0.58
           },
           1: {
-            cellWidth: 30,
-            halign: 'center'
+            cellWidth: contentWidth * 0.12,
+            halign: "center"
           },
           2: {
-            cellWidth: 35,
-            halign: 'right'
+            cellWidth: contentWidth * 0.15,
+            halign: "right"
           },
           3: {
-            cellWidth: 35,
-            halign: 'right',
-            fontStyle: 'bold'
+            cellWidth: contentWidth * 0.15,
+            halign: "right",
+            fontStyle: "bold"
+          }
+        },
+        didDrawCell: data => {
+          // horizontal dividers only
+          if (data.section === "head" && data.column.index === 0) {
+            doc.setDrawColor(214, 214, 214);
+            doc.setLineWidth(0.7);
+            doc.line(margin, data.cell.y + data.cell.height, rightX, data.cell.y + data.cell.height);
+          }
+          if (data.section === "body" && data.column.index === 0) {
+            doc.setDrawColor(228, 228, 228);
+            doc.setLineWidth(0.7);
+            doc.line(margin, data.cell.y + data.cell.height, rightX, data.cell.y + data.cell.height);
           }
         }
       });
 
-      // Get final Y position after table (autoTable adds lastAutoTable property)
-      const finalY = doc.lastAutoTable && doc.lastAutoTable.finalY ? doc.lastAutoTable.finalY : yPos + tableData.length * 8 + 20;
+      const subtotal = Number(pricing.subtotal || 0);
+      const discount = Number(pricing.discount || 0);
+      const deliveryFee = Number(pricing.deliveryFee || 0);
+      const platformFee = Number(pricing.platformFee || 0);
+      const tax = Number(pricing.tax || pricing.gstCollected || 0);
+      const total = Number(pricing.total || 0);
+      const itemTotal = items.reduce((sum, item) => {
+        const qty = Number(item.quantity || item.qty || 1);
+        const unitPrice = Number(item.price || 0);
+        return sum + unitPrice * qty;
+      }, 0);
+      const effectiveSubtotal = subtotal > 0 ? subtotal : itemTotal;
+      const breakdownRows = [["Item total", formatCurrency(effectiveSubtotal)]];
+      if (discount > 0) breakdownRows.push(["Discount", `- ${formatCurrency(discount)}`]);
+      if (deliveryFee > 0) breakdownRows.push(["Restaurant Delivery Fee", formatCurrency(deliveryFee)]);
+      if (platformFee > 0) breakdownRows.push(["Platform Fee", formatCurrency(platformFee)]);
+      if (tax > 0) breakdownRows.push(["GST / Tax", formatCurrency(tax)]);
+      breakdownRows.push([t("user.orderDetailsPage.pdf.total"), formatCurrency(total)]);
 
-      // Total
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'bold');
-      doc.text(t("user.orderDetailsPage.pdf.total"), 145, finalY + 10, {
-        align: 'right'
-      });
-      doc.text(`₹${Number(pricing.total || 0).toFixed(2)}`, 195, finalY + 10, {
-        align: 'right'
+      const breakdownStartY = (doc.lastAutoTable?.finalY || yPos) + 12;
+      autoTable(doc, {
+        startY: breakdownStartY,
+        theme: "plain",
+        margin: {
+          left: rightX - 300,
+          right: margin
+        },
+        body: breakdownRows,
+        styles: {
+          fontSize: 11,
+          textColor: [33, 33, 33],
+          cellPadding: {
+            top: 7,
+            right: 0,
+            bottom: 7,
+            left: 0
+          }
+        },
+        columnStyles: {
+          0: {
+            cellWidth: 210,
+            halign: "right"
+          },
+          1: {
+            cellWidth: 90,
+            halign: "right"
+          }
+        }
       });
 
-      // Save PDF instantly
+      const summaryEndY = doc.lastAutoTable?.finalY || breakdownStartY;
+      autoTable(doc, {
+        startY: summaryEndY + 6,
+        theme: "plain",
+        margin: {
+          left: rightX - 300,
+          right: margin
+        },
+        body: [[t("user.orderDetailsPage.pdf.total"), formatCurrency(total)]],
+        styles: {
+          fontSize: 13,
+          fontStyle: "bold",
+          textColor: [20, 20, 20],
+          fillColor: [226, 226, 226],
+          cellPadding: {
+            top: 9,
+            right: 10,
+            bottom: 9,
+            left: 10
+          }
+        },
+        columnStyles: {
+          0: {
+            cellWidth: 210,
+            halign: "right"
+          },
+          1: {
+            cellWidth: 90,
+            halign: "right"
+          }
+        }
+      });
+
       const fileName = `Order_Summary_${orderIdDisplay}_${Date.now()}.pdf`;
       doc.save(fileName);
       toast.success(t("user.orderDetailsPage.toast.summaryDownloaded"));
@@ -628,3 +723,4 @@ export default function UserOrderDetails() {
         </div>}
     </div>;
 }
+

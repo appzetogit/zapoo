@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, Search, MoreVertical, ChevronRight, Star, RotateCcw, AlertCircle, Loader2, Clock } from "lucide-react";
+import { ArrowLeft, Search, MoreVertical, Star, RotateCcw, AlertCircle, Loader2, Clock } from "lucide-react";
 import { orderAPI, api, API_ENDPOINTS } from "@/lib/api";
 import { toast } from "sonner";
 import { getCompanyNameAsync } from "@/lib/utils/businessSettings";
@@ -329,6 +329,13 @@ export default function Orders() {
     setActiveMenuOrderId(null);
     navigate(`/user/orders/${order.id}/details`);
   };
+  const handleOrderCardClick = (event, order) => {
+    const interactiveAncestor = event.target.closest('button, a, input, textarea, select, label, [role="button"]');
+    if (interactiveAncestor && interactiveAncestor !== event.currentTarget) {
+      return;
+    }
+    handleViewOrderDetails(order);
+  };
 
   // Open rating modal for an order
   const handleOpenRating = order => {
@@ -457,7 +464,12 @@ export default function Orders() {
         const firstItemImage = order.items?.[0]?.image;
         const restaurantImage = firstItemImage || order.restaurantImage || "https://images.unsplash.com/photo-1604908176997-125188eb3c52?auto=format&fit=crop&w=200&q=80";
         const location = order.restaurantLocation || `${order.address?.city || ''}, ${order.address?.state || ''}`.trim() || t("user.orders.locationNotAvailable");
-        return <div key={order.id} className="relative bg-white dark:bg-[#1a1a1a] rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden">
+        return <div key={order.id} className="relative bg-white dark:bg-[#1a1a1a] rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden cursor-pointer" role="button" tabIndex={0} onClick={e => handleOrderCardClick(e, order)} onKeyDown={e => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          handleViewOrderDetails(order);
+        }
+      }}>
                 {/* Card Header: Restaurant Info */}
                 <div className="flex items-start justify-between p-4 pb-2">
                   <div className="flex gap-3">
@@ -502,7 +514,7 @@ export default function Orders() {
                 {/* Separator */}
                 <div className="border-t border-dashed border-gray-200 dark:border-gray-700 mx-4 my-1"></div>
 
-                {/* Items List */}
+                {/* Items List (without item images) */}
                 <div className="px-4 py-2 space-y-2">
                   {order.items && order.items.length > 0 ? order.items.map((item, idx) => {
               const isVeg = item.isVeg !== undefined ? item.isVeg : item.category === 'veg' || item.type === 'veg';
@@ -510,32 +522,20 @@ export default function Orders() {
               const itemQuantity = item.quantity || 1;
               const itemPrice = item.price || 0;
               const itemTotal = itemQuantity * itemPrice;
-              const itemImage = item.image || null;
-              return <div key={item._id || item.id || item.itemId || idx} className="flex items-start gap-3">
-                          {/* Item Image */}
-                          {itemImage && <div className="w-12 h-12 rounded-lg bg-gray-100 overflow-hidden flex-shrink-0">
-                              <img src={itemImage} alt={itemName} className="w-full h-full object-cover" onError={e => {
-                    e.target.style.display = 'none';
-                  }} />
-                            </div>}
-                          
+              return <div key={item._id || item.id || item.itemId || idx} className="flex items-start gap-2">
+                          {/* Veg/Non-Veg Icon */}
+                          <div className={`w-4 h-4 border ${isVeg ? 'border-green-600' : 'border-red-600'} flex items-center justify-center p-[2px] flex-shrink-0 mt-0.5`}>
+                            <div className={`w-full h-full rounded-full ${isVeg ? 'bg-green-600' : 'bg-red-600'}`}></div>
+                          </div>
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-start gap-2">
-                              {/* Veg/Non-Veg Icon */}
-                              <div className={`w-4 h-4 border ${isVeg ? 'border-green-600' : 'border-red-600'} flex items-center justify-center p-[2px] flex-shrink-0 mt-0.5`}>
-                                <div className={`w-full h-full rounded-full ${isVeg ? 'bg-green-600' : 'bg-red-600'}`}></div>
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <span className="text-sm text-gray-800 dark:text-gray-200 font-medium block">
-                                  {itemQuantity} x {itemName}
-                                </span>
-                                {item.description && <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-1">{item.description}</p>}
-                              </div>
-                              <div className="text-right flex-shrink-0">
-                                <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">₹{itemTotal.toFixed(2)}</span>
-                                {itemQuantity > 1 && <p className="text-xs text-gray-500 dark:text-gray-400">₹{itemPrice.toFixed(2)} {t("user.orders.each")}</p>}
-                              </div>
-                            </div>
+                            <span className="text-sm text-gray-800 dark:text-gray-200 font-medium block">
+                              {itemQuantity} x {itemName}
+                            </span>
+                            {item.description && <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-1">{item.description}</p>}
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">{"\u20B9"}{itemTotal.toFixed(2)}</span>
+                            {itemQuantity > 1 && <p className="text-xs text-gray-500 dark:text-gray-400">{"\u20B9"}{itemPrice.toFixed(2)} {t("user.orders.each")}</p>}
                           </div>
                         </div>;
             }) : <p className="text-sm text-gray-500 dark:text-gray-400">{t("user.orders.noItemsFound")}</p>}
@@ -573,8 +573,7 @@ export default function Orders() {
                   </div>
                 </div>
 
-                {/* Date and Payment Info */}
-                <div className="px-4 py-2 flex items-center justify-between">
+                {/* Date and Payment Info */}                <div className="px-4 py-2">
                   <div className="flex-1">
                     <p className="text-xs text-gray-400">{t("user.orders.orderPlacedOn")} {formatDate(order.createdAt)}</p>
                     {order.deliveredAt && <p className="text-xs text-gray-400 mt-0.5">{t("user.orders.deliveredOn")} {formatDate(order.deliveredAt)}</p>}
@@ -590,16 +589,7 @@ export default function Orders() {
                     {isRestaurantCancelled && <p className="text-xs font-medium text-red-500 mt-1">{t("user.orders.status.restaurantCancelledWithIcon")}</p>}
                     {isUserCancelled && <p className="text-xs font-medium text-gray-500 mt-1">{t("user.orders.status.cancelledByYouWithIcon")}</p>}
                     {isCancelled && !isRestaurantCancelled && !isUserCancelled && <p className="text-xs font-medium text-gray-500 mt-1">{t("user.orders.status.cancelledWithIcon")}</p>}
-                  </div>
-                  <div className="flex items-center ml-4">
-                    <Link to={`/user/orders/${order.id}`}>
-                      <button className="text-xs text-red-500 font-medium hover:text-red-600 flex items-center gap-1">
-                        {t("user.orders.viewDetails")}
-                        <ChevronRight className="w-4 h-4" />
-                      </button>
-                    </Link>
-                  </div>
-                </div>
+                  </div>                </div>
 
                 {/* Separator */}
                 <div className="border-t border-gray-100 mx-4"></div>
@@ -731,3 +721,4 @@ export default function Orders() {
         </div>}
     </div>;
 }
+

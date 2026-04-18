@@ -539,7 +539,7 @@ export const getRestaurantById = async (req, res) => {
     };
 
     // Strict field projection for public restaurant profile (deliveryPricingConfig for cart pricing fallback)
-    const projection = 'name slug cuisines rating totalRatings promo profileImage location avgDeliveryTime avgPriceValue isActive isAcceptingOrders featuredDish featuredPrice offer distance deliveryRange estimatedDeliveryTime cuisines deliveryTimings openDays deliveryPricingConfig ownerName ownerPhone phone primaryContactNumber createdAt onboarding.step3.gst.isRegistered onboarding.step3.gst.gstNumber onboarding.step3.gst.legalName onboarding.step3.gst.address onboarding.step3.fssai.registrationNumber onboarding.step3.fssai.expiryDate';
+    const projection = 'name slug cuisines rating totalRatings promo profileImage location avgDeliveryTime avgPriceValue isActive isAcceptingOrders featuredDish featuredPrice offer distance deliveryRange estimatedDeliveryTime cuisines deliveryTimings openDays deliveryPricingConfig ownerName ownerEmail ownerPhone email phone primaryContactNumber createdAt onboarding.step3.gst.isRegistered onboarding.step3.gst.gstNumber onboarding.step3.gst.legalName onboarding.step3.gst.address onboarding.step3.fssai.registrationNumber onboarding.step3.fssai.expiryDate';
 
     const restaurant = await Restaurant.findOne(queryConditions)
       .select(projection)
@@ -744,6 +744,9 @@ export const updateRestaurantProfile = asyncHandler(async (req, res) => {
       profileImage,
       menuImages,
       name,
+      phone,
+      email,
+      primaryContactNumber,
       cuisines,
       location,
       ownerName,
@@ -837,9 +840,29 @@ export const updateRestaurantProfile = asyncHandler(async (req, res) => {
     }
     if (ownerEmail !== undefined) {
       updateData.ownerEmail = ownerEmail;
+      // Keep public email in sync when owner email is updated from contact details
+      if (email === undefined) {
+        updateData.email = ownerEmail;
+      }
     }
     if (ownerPhone !== undefined) {
       updateData.ownerPhone = ownerPhone;
+      // Keep public contact numbers in sync when owner phone is updated
+      if (phone === undefined) {
+        updateData.phone = ownerPhone;
+      }
+      if (primaryContactNumber === undefined) {
+        updateData.primaryContactNumber = ownerPhone;
+      }
+    }
+    if (email !== undefined) {
+      updateData.email = email;
+    }
+    if (phone !== undefined) {
+      updateData.phone = phone;
+    }
+    if (primaryContactNumber !== undefined) {
+      updateData.primaryContactNumber = primaryContactNumber;
     }
     if (deliveryRange !== undefined) {
       const rangeNum = Number(deliveryRange);
@@ -867,6 +890,9 @@ export const updateRestaurantProfile = asyncHandler(async (req, res) => {
         ownerName: restaurant.ownerName,
         ownerEmail: restaurant.ownerEmail,
         ownerPhone: restaurant.ownerPhone,
+        email: restaurant.email,
+        phone: restaurant.phone,
+        primaryContactNumber: restaurant.primaryContactNumber,
         deliveryRange: restaurant.deliveryRange,
         zoneId: restaurant.zoneId,
         tierId: restaurant.tierId

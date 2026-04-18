@@ -51,7 +51,8 @@ export default function RestaurantInfo() {
   }, [slug]);
 
   const phoneNumber = useMemo(() => {
-    const raw = restaurant?.phone || restaurant?.ownerPhone || restaurant?.primaryContactNumber || "";
+    // Prefer owner-updated contact fields so user side reflects latest restaurant edits
+    const raw = restaurant?.ownerPhone || restaurant?.primaryContactNumber || restaurant?.phone || "";
     return String(raw).replace(/\D/g, "");
   }, [restaurant]);
 

@@ -5,7 +5,6 @@ import Lenis from "lenis"
 import { useTranslation } from "react-i18next"
 import {
   ArrowLeft,
-  ChevronDown,
   Mail,
   CheckCircle2,
   Upload,
@@ -14,13 +13,6 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import {
   Dialog,
   DialogContent,
@@ -31,30 +23,6 @@ import {
 } from "@/components/ui/dialog"
 import { restaurantAPI } from "@/lib/api"
 
-// Country codes
-const countryCodes = [
-  { code: "+1", country: "US/CA", flag: "🇺🇸" },
-  { code: "+44", country: "UK", flag: "🇬🇧" },
-  { code: "+91", country: "IN", flag: "🇮🇳" },
-  { code: "+86", country: "CN", flag: "🇨🇳" },
-  { code: "+81", country: "JP", flag: "🇯🇵" },
-  { code: "+49", country: "DE", flag: "🇩🇪" },
-  { code: "+33", country: "FR", flag: "🇫🇷" },
-  { code: "+39", country: "IT", flag: "🇮🇹" },
-  { code: "+34", country: "ES", flag: "🇪🇸" },
-  { code: "+61", country: "AU", flag: "🇦🇺" },
-  { code: "+7", country: "RU", flag: "🇷🇺" },
-  { code: "+55", country: "BR", flag: "🇧🇷" },
-  { code: "+52", country: "MX", flag: "🇲🇽" },
-  { code: "+82", country: "KR", flag: "🇰🇷" },
-  { code: "+65", country: "SG", flag: "🇸🇬" },
-  { code: "+971", country: "AE", flag: "🇦🇪" },
-  { code: "+966", country: "SA", flag: "🇸🇦" },
-  { code: "+27", country: "ZA", flag: "🇿🇦" },
-  { code: "+31", country: "NL", flag: "🇳🇱" },
-  { code: "+46", country: "SE", flag: "🇸🇪" },
-]
-
 export default function InviteUser() {
   const { t } = useTranslation()
   const navigate = useNavigate()
@@ -63,7 +31,7 @@ export default function InviteUser() {
   // Ensure role is not "owner" - default to "staff" if owner is provided
   const validRole = roleFromUrl === "owner" ? "staff" : (roleFromUrl === "manager" ? "manager" : "staff")
   
-  const [countryCode, setCountryCode] = useState("+91")
+  const countryCode = "+91"
   const [phoneNumber, setPhoneNumber] = useState("")
   const [email, setEmail] = useState("")
   const [selectedRole, setSelectedRole] = useState(validRole)
@@ -108,7 +76,7 @@ export default function InviteUser() {
       setPhoneError(t("restaurant.inviteUser.validation.phoneMinLength"))
       return false
     }
-    if (digitsOnly.length > 15) {
+    if (digitsOnly.length > 10) {
       setPhoneError(t("restaurant.inviteUser.validation.phoneMaxLength"))
       return false
     }
@@ -132,7 +100,7 @@ export default function InviteUser() {
   }
 
   const handlePhoneChange = (e) => {
-    const value = e.target.value.replace(/\D/g, "") // Only allow digits
+    const value = e.target.value.replace(/\D/g, "").slice(0, 10) // Only allow up to 10 digits
     setPhoneNumber(value)
     if (value) {
       validatePhone(value)
@@ -258,8 +226,6 @@ export default function InviteUser() {
     }, 300)
   }
 
-  const selectedCountry = countryCodes.find(c => c.code === countryCode) || countryCodes[2]
-
   const isFormValid = name.trim().length >= 2 && !nameError && (
     addMethod === "phone" 
       ? phoneNumber.trim().length >= 10 && !phoneError
@@ -305,33 +271,16 @@ export default function InviteUser() {
         <div>
           <label className="text-sm font-medium text-gray-700 mb-2 block">{t("restaurant.inviteUser.fields.phone")} *</label>
           <div className="flex gap-2 items-stretch">
-            <Select value={countryCode} onValueChange={setCountryCode}>
-              <SelectTrigger className="w-[100px] h-12! border-gray-200 rounded-lg flex items-center shrink-0">
-                <SelectValue>
-                  <span className="flex items-center gap-2">
-                    <span className="text-base">{selectedCountry.flag}</span>
-                    <span className="text-sm font-medium text-gray-900">{selectedCountry.code}</span>
-                  </span>
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent className="max-h-[300px] overflow-y-auto">
-                {countryCodes.map((country) => (
-                  <SelectItem key={country.code} value={country.code}>
-                    <span className="flex items-center gap-2">
-                      <span>{country.flag}</span>
-                      <span>{country.code}</span>
-                    </span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="w-[74px] h-12 border border-gray-200 rounded-lg flex items-center justify-center shrink-0 bg-gray-50 text-sm font-medium text-gray-900">
+              {countryCode}
+            </div>
             <Input
               type="tel"
               value={phoneNumber}
               onChange={handlePhoneChange}
               placeholder={t("restaurant.inviteUser.placeholders.phone")}
               className={`flex-1 h-12 border-gray-200 rounded-lg ${phoneError ? "border-red-500" : ""}`}
-              maxLength={15}
+              maxLength={10}
             />
           </div>
           {phoneError && (
@@ -504,3 +453,4 @@ export default function InviteUser() {
     </div>
   )
 }
+

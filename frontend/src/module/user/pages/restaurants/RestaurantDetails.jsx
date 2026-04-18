@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { useLocation as useGeoLocation } from "../../hooks/useLocation";
 import { useZone } from "../../hooks/useZone";
-import { ArrowLeft, Search, MoreVertical, MapPin, Clock, Tag, ChevronDown, Info, Star, SlidersHorizontal, Utensils, Flame, Bookmark, Share2, Plus, Minus, X, RotateCcw, Zap, Check, Lock, Percent, Eye, Users, AlertCircle } from "lucide-react";
+import { ArrowLeft, Search, MoreVertical, MapPin, Clock, Tag, ChevronDown, Info, Star, SlidersHorizontal, Utensils, Bookmark, Share2, Plus, Minus, X, RotateCcw, Zap, Check, Lock, Percent, Eye, Users, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -84,7 +84,6 @@ export default function RestaurantDetails() {
   const [showItemDetail, setShowItemDetail] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
   const [showFilterSheet, setShowFilterSheet] = useState(false);
-  const [showLocationSheet, setShowLocationSheet] = useState(false);
   const [showOffersSheet, setShowOffersSheet] = useState(false);
   const [expandedCoupons, setExpandedCoupons] = useState(new Set());
   const [showMenuSheet, setShowMenuSheet] = useState(false);
@@ -126,9 +125,9 @@ export default function RestaurantDetails() {
     vegNonVeg: null // "veg" | "non-veg"
   });
 
-  // If global Veg Mode is ON, force-remove any local "non-veg" filter selection.
+  // If global Veg Mode is ON, local Veg/Non-veg filter should not apply.
   useEffect(() => {
-    if (vegMode === true && filters.vegNonVeg === "non-veg") {
+    if (vegMode === true && filters.vegNonVeg) {
       setFilters(prev => ({
         ...prev,
         vegNonVeg: null
@@ -1273,10 +1272,9 @@ export default function RestaurantDetails() {
           </div>
 
           {/* Location */}
-          <div className="flex items-center gap-1 text-sm text-gray-700 dark:text-gray-300 cursor-pointer" onClick={() => setShowLocationSheet(true)}>
+          <div className="flex items-center gap-1 text-sm text-gray-700 dark:text-gray-300">
             <MapPin className="h-4 w-4" />
             <span>{restaurant?.distance || t("user.restaurantDetails.fallbackDistance")} · {restaurant?.location || t("user.restaurantDetails.fallbackLocation")}</span>
-            <ChevronDown className="h-4 w-4 text-gray-500" />
           </div>
 
           {/* Delivery Time */}
@@ -1328,14 +1326,14 @@ export default function RestaurantDetails() {
                   </span>}
                 <ChevronDown className="h-3 w-3" />
               </Button>
-              <Button variant="outline" size="sm" className={`flex items-center gap-1.5 whitespace-nowrap border-gray-300 bg-white rounded-full ${filters.vegNonVeg === "veg" ? "border-green-500 bg-green-50" : ""}`} onClick={() => setFilters(prev => ({
+              {vegMode !== true && <Button variant="outline" size="sm" className={`flex items-center gap-1.5 whitespace-nowrap border-gray-300 bg-white rounded-full ${filters.vegNonVeg === "veg" ? "border-green-500 bg-green-50" : ""}`} onClick={() => setFilters(prev => ({
               ...prev,
               vegNonVeg: prev.vegNonVeg === "veg" ? null : "veg"
             }))}>
-                <div className="h-3 w-3 rounded-full bg-green-500" />
-                {t("user.restaurantDetails.veg")}
-                {filters.vegNonVeg === "veg" && <X className="h-3 w-3 text-gray-600" />}
-              </Button>
+                  <div className="h-3 w-3 rounded-full bg-green-500" />
+                  {t("user.restaurantDetails.veg")}
+                  {filters.vegNonVeg === "veg" && <X className="h-3 w-3 text-gray-600" />}
+                </Button>}
               {vegMode !== true && <Button variant="outline" size="sm" className={`flex items-center gap-1.5 whitespace-nowrap border-gray-300 bg-white rounded-full ${filters.vegNonVeg === "non-veg" ? "border-amber-700 bg-amber-50" : ""}`} onClick={() => setFilters(prev => ({
               ...prev,
               vegNonVeg: prev.vegNonVeg === "non-veg" ? null : "non-veg"
@@ -1847,7 +1845,7 @@ export default function RestaurantDetails() {
                     </div>
 
                     {/* Veg/Non-veg preference */}
-                    <div className="space-y-2">
+                    {vegMode !== true && <div className="space-y-2">
                       <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{t("user.restaurantDetails.vegNonVegPreference")}</h3>
                       <div className="flex gap-2">
                         <button onClick={() => setFilters(prev => ({
@@ -1865,7 +1863,7 @@ export default function RestaurantDetails() {
                             <span className="font-medium">{t("user.restaurantDetails.nonVeg")}</span>
                           </button>}
                       </div>
-                    </div>
+                    </div>}
 
                     {/* Top picks */}
                     <div className="space-y-2">
@@ -1879,17 +1877,6 @@ export default function RestaurantDetails() {
                       </button>
                     </div>
 
-                    {/* Dietary preference */}
-                    <div className="space-y-2">
-                      <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{t("user.restaurantDetails.dietaryPreference")}</h3>
-                      <button onClick={() => setFilters(prev => ({
-                ...prev,
-                spicy: !prev.spicy
-              }))} className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border-2 transition-all w-full ${filters.spicy ? "border-red-500 dark:border-red-400 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400" : "border-gray-200 dark:border-gray-700 bg-white dark:bg-[#2a2a2a] text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600"}`}>
-                        <Flame className="h-4 w-4" />
-                        <span className="font-medium">{t("user.restaurantDetails.spicy")}</span>
-                      </button>
-                    </div>
                   </div>
 
                   {/* Bottom Action Bar */}
@@ -1908,103 +1895,6 @@ export default function RestaurantDetails() {
                       {t("user.restaurantDetails.apply")} {activeFilterCount > 0 && `(${activeFilterCount})`}
                     </Button>
                   </div>
-                </motion.div>
-              </>}
-          </AnimatePresence>, document.body)}
-
-      {/* Location Outlets Bottom Sheet - Rendered via Portal */}
-      {typeof window !== "undefined" && createPortal(<AnimatePresence>
-            {showLocationSheet && <>
-                {/* Backdrop */}
-                <motion.div className="fixed inset-0 bg-black/40 z-[9999]" initial={{
-          opacity: 0
-        }} animate={{
-          opacity: 1
-        }} exit={{
-          opacity: 0
-        }} transition={{
-          duration: 0.2
-        }} onClick={() => setShowLocationSheet(false)} />
-
-                {/* Bottom Sheet */}
-                <motion.div className="fixed left-0 right-0 bottom-0 md:left-1/2 md:right-auto md:-translate-x-1/2 md:bottom-auto md:top-1/2 md:-translate-y-1/2 z-[10000] bg-white dark:bg-[#1a1a1a] rounded-t-3xl md:rounded-3xl shadow-2xl h-[75vh] md:h-auto md:max-h-[90vh] md:max-w-xl w-full md:w-auto flex flex-col" initial={{
-          y: "100%"
-        }} animate={{
-          y: 0
-        }} exit={{
-          y: "100%"
-        }} transition={{
-          duration: 0.2,
-          type: "spring",
-          damping: 30,
-          stiffness: 400
-        }} style={{
-          willChange: "transform"
-        }}>
-                  {/* Header */}
-                  <div className="px-4 pt-4 pb-3 border-b border-gray-200 dark:border-gray-800">
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1.5">{t("user.restaurantDetails.allDeliveryOutletsFor")}</p>
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 bg-red-600 dark:bg-red-500 rounded-lg flex items-center justify-center">
-                        <span className="text-white font-bold text-base">{(restaurant.name || t("user.restaurantDetails.fallbackRestaurantInitial")).charAt(0).toUpperCase()}</span>
-                      </div>
-                      <h2 className="text-lg font-bold text-gray-900 dark:text-white">{restaurant?.name || t("user.restaurantDetails.unknownRestaurant")}</h2>
-                    </div>
-                  </div>
-
-                  {/* Outlets List */}
-                  <div className="flex-1 overflow-y-auto px-4 py-3">
-                    {restaurant?.outlets && Array.isArray(restaurant.outlets) && restaurant.outlets.length > 0 ? <div className="space-y-2">
-                        {restaurant.outlets.map(outlet => <div key={outlet?.id || Math.random()} className="p-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-[#2a2a2a]">
-                            {outlet?.isNearest && <div className="flex items-center gap-1.5 mb-2 px-2 py-1 bg-green-50 dark:bg-green-900/30 rounded-md">
-                                <Zap className="h-3.5 w-3.5 text-green-600 dark:text-green-400 fill-green-600 dark:fill-green-400" />
-                                <span className="text-xs font-semibold text-green-700 dark:text-green-400">
-                                  {t("user.restaurantDetails.nearestAvailableOutlet")}
-                                </span>
-                              </div>}
-                            <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
-                              {outlet?.location || t("user.restaurantDetails.fallbackLocation")}
-                            </h3>
-                            <div className="flex items-center justify-between gap-4">
-                              <div className="flex items-center gap-3 text-xs text-gray-600 dark:text-gray-400">
-                                <div className="flex items-center gap-1">
-                                  <Clock className="h-3.5 w-3.5" />
-                                  <span>{outlet?.deliveryTime || t("user.restaurantDetails.fallbackDeliveryTime")}</span>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                  <MapPin className="h-3.5 w-3.5" />
-                                  <span>{outlet?.distance || t("user.restaurantDetails.fallbackDistance")}</span>
-                                </div>
-                              </div>
-                              <div className="flex flex-col items-end gap-0.5">
-                                <div className="flex items-center gap-1">
-                                  <Star className="h-3.5 w-3.5 text-green-600 dark:text-green-400 fill-green-600 dark:fill-green-400" />
-                                  <span className="text-xs font-medium text-gray-900 dark:text-white">
-                                    {outlet?.rating ?? 4.5}
-                                  </span>
-                                </div>
-                                <span className="text-xs text-gray-500 dark:text-gray-400">
-                                  {t("user.restaurantDetails.byReviews", {
-                                count: (outlet?.reviews || 0) >= 1000 ? `${((outlet.reviews || 0) / 1000).toFixed(1)}K+` : `${outlet?.reviews || 0}+`
-                              })}
-                                </span>
-                              </div>
-                            </div>
-                          </div>)}
-                      </div> : <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                        {t("user.restaurantDetails.noOutletsAvailable")}
-                      </div>}
-                  </div>
-
-                  {/* Footer */}
-                  {restaurant?.outlets && Array.isArray(restaurant.outlets) && restaurant.outlets.length > 5 && <div className="border-t border-gray-200 dark:border-gray-800 px-4 py-3 bg-white dark:bg-[#1a1a1a]">
-                      <button className="flex items-center justify-center gap-2 text-red-600 dark:text-red-400 font-medium text-sm w-full">
-                        <span>{t("user.restaurantDetails.seeAllOutlets", {
-                      count: restaurant.outlets.length
-                    })}</span>
-                        <ChevronDown className="h-4 w-4" />
-                      </button>
-                    </div>}
                 </motion.div>
               </>}
           </AnimatePresence>, document.body)}

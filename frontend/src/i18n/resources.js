@@ -1995,13 +1995,13 @@ export const resources = {
           sections: {
             orderReminder: {
               title: "Order reminder numbers",
-              subtitle: "Should always be available for Zomato to reach out for live order support and order reminders.",
+              subtitle: "Should always be available for Zapoo to reach out for live order support and order reminders.",
               number1: "Order reminder number #1",
               number2: "Order reminder number #2"
             },
             restaurantPage: {
               title: "Restaurant page number",
-              subtitle: "Number for Zomato customers to call your restaurant."
+              subtitle: "Number for Zapoo customers to call your restaurant."
             }
           },
           actions: {
@@ -2565,9 +2565,20 @@ export const resources = {
             phone: "Enter phone number",
             email: "Enter email address"
           },
+          validation: {
+            nameRequired: "Name is required",
+            nameMinLength: "Name must be at least 2 characters",
+            nameInvalid: "Name can contain letters and spaces only",
+            phoneRequired: "Phone number is required",
+            phoneDigitsOnly: "Phone number must contain digits only",
+            phoneLength: "Phone number must be exactly 10 digits",
+            phoneInvalid: "Enter a valid Indian mobile number",
+            emailRequired: "Email is required",
+            emailInvalid: "Enter a valid email address"
+          },
           actions: {
             editPhoto: "Edit photo",
-            deleteAccount: "Delete your Zomato account",
+            deleteAccount: "Delete your Zapoo account",
             deleting: "Deleting...",
             confirm: "Confirm",
             cancel: "Cancel",
@@ -2575,7 +2586,7 @@ export const resources = {
             save: "Save"
           },
           deleteDialog: {
-            title: "You are about to delete your Zomato account",
+            title: "You are about to delete your Zapoo account",
             description: "All information associated with your account will be deleted, and you will lose access to your restaurant permanently. This information cannot be recovered once the account is deleted. Are you sure you want to proceed?"
           },
           alerts: {
@@ -4485,7 +4496,7 @@ export const resources = {
             },
             restaurantPage: {
               title: "रेस्तरां पेज नंबर",
-              subtitle: "Zomato ग्राहकों के लिए आपके रेस्तरां को कॉल करने का नंबर।"
+              subtitle: "Zapoo ग्राहकों के लिए आपके रेस्तरां को कॉल करने का नंबर।"
             }
           },
           actions: {
@@ -5051,7 +5062,7 @@ export const resources = {
           },
           actions: {
             editPhoto: "फोटो संपादित करें",
-            deleteAccount: "अपना Zomato अकाउंट हटाएं",
+            deleteAccount: "अपना Zapoo अकाउंट हटाएं",
             deleting: "हटाया जा रहा है...",
             confirm: "पुष्टि करें",
             cancel: "रद्द करें",
@@ -5059,7 +5070,7 @@ export const resources = {
             save: "सेव करें"
           },
           deleteDialog: {
-            title: "आप अपना Zomato अकाउंट हटाने वाले हैं",
+            title: "आप अपना Zapoo अकाउंट हटाने वाले हैं",
             description: "आपके अकाउंट से जुड़ी सभी जानकारी हट जाएगी और आप अपने रेस्तरां का एक्सेस हमेशा के लिए खो देंगे। अकाउंट हटने के बाद यह जानकारी वापस नहीं मिलेगी। क्या आप जारी रखना चाहते हैं?"
           },
           alerts: {
@@ -6968,7 +6979,7 @@ export const resources = {
             },
             restaurantPage: {
               title: "রেস্টুরেন্ট পেজ নম্বর",
-              subtitle: "Zomato গ্রাহকরা আপনার রেস্টুরেন্টে কল করার জন্য এই নম্বর ব্যবহার করবে।"
+              subtitle: "Zapoo গ্রাহকরা আপনার রেস্টুরেন্টে কল করার জন্য এই নম্বর ব্যবহার করবে।"
             }
           },
           actions: {
@@ -7534,7 +7545,7 @@ export const resources = {
           },
           actions: {
             editPhoto: "ছবি সম্পাদনা করুন",
-            deleteAccount: "আপনার Zomato অ্যাকাউন্ট মুছুন",
+            deleteAccount: "আপনার Zapoo অ্যাকাউন্ট মুছুন",
             deleting: "মুছে ফেলা হচ্ছে...",
             confirm: "নিশ্চিত করুন",
             cancel: "বাতিল",
@@ -7542,7 +7553,7 @@ export const resources = {
             save: "সেভ করুন"
           },
           deleteDialog: {
-            title: "আপনি আপনার Zomato অ্যাকাউন্ট মুছতে যাচ্ছেন",
+            title: "আপনি আপনার Zapoo অ্যাকাউন্ট মুছতে যাচ্ছেন",
             description: "আপনার অ্যাকাউন্টের সাথে সম্পর্কিত সব তথ্য মুছে যাবে এবং আপনি স্থায়ীভাবে আপনার রেস্টুরেন্টের অ্যাক্সেস হারাবেন। অ্যাকাউন্ট মুছে গেলে এই তথ্য পুনরুদ্ধার করা যাবে না। আপনি কি নিশ্চিতভাবে এগোতে চান?"
           },
           alerts: {
@@ -7918,3 +7929,4 @@ export const resources = {
     }
   }
 };
+

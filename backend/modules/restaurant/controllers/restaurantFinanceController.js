@@ -40,23 +40,20 @@ export const getRestaurantFinance = asyncHandler(async (req, res) => {
     currentCycleEnd.setDate(currentCycleStart.getDate() + 6);
     currentCycleEnd.setHours(23, 59, 59, 999);
 
-    // Query for restaurant orders - handle multiple restaurantId formats
-    const restaurantIdVariations = [restaurantId];
+    // Query for restaurant orders - support both ObjectId-string and public restaurantId formats
+    const restaurantIdVariations = [
+      restaurant._id?.toString(),
+      restaurant.restaurantId,
+      restaurant.id,
+      restaurantId
+    ].filter(Boolean);
+    const uniqueRestaurantIdVariations = [...new Set(restaurantIdVariations)];
     if (mongoose.Types.ObjectId.isValid(restaurantId)) {
       const objectIdString = new mongoose.Types.ObjectId(restaurantId).toString();
-      if (!restaurantIdVariations.includes(objectIdString)) {
-        restaurantIdVariations.push(objectIdString);
+      if (!uniqueRestaurantIdVariations.includes(objectIdString)) {
+        uniqueRestaurantIdVariations.push(objectIdString);
       }
     }
-    const restaurantIdQuery = {
-      $or: [{
-        restaurantId: {
-          $in: restaurantIdVariations
-        }
-      }, {
-        restaurantId: restaurantId
-      }]
-    };
 
     // Get commission setup and Wallet/Withdrawal info in parallel
     const [restaurantCommission, restaurantWallet, allWithdrawals] = await Promise.all([
@@ -98,7 +95,7 @@ export const getRestaurantFinance = asyncHandler(async (req, res) => {
     // Use aggregation to get data for current and past cycles efficiently
     const getCycleStats = async (start, end) => {
       const orders = await Order.find({
-        ...restaurantIdQuery,
+        restaurantId: { $in: uniqueRestaurantIdVariations },
         status: 'delivered',
         $or: [
           { deliveredAt: { $gte: start, $lte: end } },
