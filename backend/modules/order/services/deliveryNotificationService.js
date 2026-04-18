@@ -583,6 +583,40 @@ export async function notifyMultipleDeliveryBoys(order, deliveryPartnerIds, phas
 }
 
 /**
+ * Notify delivery partners that an order is no longer available (taken by someone else).
+ * Frontend listens to `order_taken` to auto-dismiss the offer popup.
+ * @param {{orderMongoId: string, orderId: string, acceptedBy?: string}} data
+ * @param {Array<string>} deliveryPartnerIds
+ */
+export async function notifyDeliveryPartnersOrderTaken(data, deliveryPartnerIds = []) {
+  try {
+    if (!data?.orderMongoId && !data?.orderId) return;
+    if (!Array.isArray(deliveryPartnerIds) || deliveryPartnerIds.length === 0) return;
+
+    const io = await getIOInstance();
+    if (!io) return;
+
+    const deliveryNamespace = io.of('/delivery');
+    const payload = {
+      orderMongoId: data?.orderMongoId || null,
+      orderId: data?.orderId || null,
+      acceptedBy: data?.acceptedBy || null,
+      timestamp: new Date().toISOString()
+    };
+
+    const uniqueIds = Array.from(new Set(deliveryPartnerIds.map(id => id?.toString?.() || String(id || '')).filter(Boolean)));
+    for (const deliveryPartnerId of uniqueIds) {
+      const rooms = buildDeliveryRoomVariations(deliveryPartnerId, null);
+      rooms.forEach(room => {
+        deliveryNamespace.to(room).emit('order_taken', payload);
+      });
+    }
+  } catch (error) {
+    console.error('❌ Error emitting order_taken to delivery partners:', error);
+  }
+}
+
+/**
  * Notify delivery boy that order is ready for pickup
  * @param {Object} order - Order document
  * @param {string} deliveryPartnerId - Delivery partner ID

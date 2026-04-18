@@ -286,8 +286,21 @@ const handlePaymentCaptured = async ({ paymentEntity, payload }) => {
 
   try {
     const restaurantId = updatedOrder.restaurantId?.toString?.() || updatedOrder.restaurantId;
-    if (restaurantId) {
-      await notifyRestaurantNewOrder(updatedOrder, restaurantId);
+    const alreadyNotifiedAt = updatedOrder.payment?.restaurantNotifiedAt ? new Date(updatedOrder.payment.restaurantNotifiedAt).getTime() : 0;
+    if (restaurantId && !alreadyNotifiedAt) {
+      const result = await notifyRestaurantNewOrder(updatedOrder, restaurantId);
+      if (result?.success) {
+        await Order.findOneAndUpdate(
+          {
+            _id: updatedOrder._id,
+            $or: [
+              { 'payment.restaurantNotifiedAt': null },
+              { 'payment.restaurantNotifiedAt': { $exists: false } }
+            ]
+          },
+          { $set: { 'payment.restaurantNotifiedAt': new Date() } }
+        );
+      }
     }
   } catch (notificationError) {
     console.error('[RAZORPAY_WEBHOOK] Restaurant notification failed:', notificationError);

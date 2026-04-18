@@ -1351,8 +1351,31 @@ export default function DeliveryHome() {
       acceptedOrderIdsRef.current.add(takenId);
       stopAlertSound();
       setShowNewOrderPopup(false);
+      setShowRejectPopup(false);
+      setIsNewOrderPopupMinimized(false);
+      setNewOrderDragY(0);
+      setCountdownSeconds(300);
+      setShowDirectionsMap(false);
+      setShowreachedPickupPopup(false);
+      setShowOrderIdConfirmationPopup(false);
+      setShowReachedDropPopup(false);
+      setShowPaymentPage(false);
+      setShowCustomerReviewPopup(false);
+      setShowOrderDeliveredAnimation(false);
+      setSelectedRestaurant(null);
       clearNewOrder();
       localStorage.removeItem('deliveryPendingOrder');
+      localStorage.removeItem('deliveryAtDropOrderId');
+      try {
+        const activeRaw = localStorage.getItem('deliveryActiveOrder');
+        const active = activeRaw ? JSON.parse(activeRaw) : null;
+        const activeOrderId = active?.orderId || active?.restaurantInfo?.orderId || active?.restaurantInfo?.id;
+        if (activeOrderId && String(activeOrderId) === String(takenId)) {
+          localStorage.removeItem('deliveryActiveOrder');
+        }
+      } catch {
+        // ignore
+      }
       toast.info('This order was accepted by another delivery partner.');
     }
     clearOrderTaken();

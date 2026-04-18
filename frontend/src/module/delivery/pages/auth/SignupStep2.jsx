@@ -69,6 +69,10 @@ export default function SignupStep2() {
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  useEffect(() => {
+    window.scrollTo(0, 0)
+  }, [])
+
   // Persist uploaded document URLs/publicIds so refresh doesn't reset step 2 progress.
   useEffect(() => {
     try {

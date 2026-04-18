@@ -5,9 +5,8 @@ import Restaurant from '../../restaurant/models/Restaurant.js';
 import DeliveryWallet from '../../delivery/models/DeliveryWallet.js';
 import BusinessSettings from '../../admin/models/BusinessSettings.js';
 import mongoose from 'mongoose';
-import { notifyDeliveryBoyNewOrder, checkDeliveryPartnerConnection } from './deliveryNotificationService.js';
-import { notifyRestaurantOrderUpdate } from './restaurantNotificationService.js';
-import { initiateRazorpayRefundForOrder } from './cancellationRefundService.js';
+import { notifyDeliveryBoyNewOrder, checkDeliveryPartnerConnection, notifyMultipleDeliveryBoys } from './deliveryNotificationService.js';
+import { notifyRestaurantOrderMessage } from './restaurantNotificationService.js';
 
 const ASSIGNMENT_TIMEOUT_MS = 300000; // 5 minutes to accept
 const assignmentTimeouts = new Map();
@@ -32,40 +31,38 @@ async function autoCancelIfUnassigned(orderId) {
     if (order.deliveryPartnerId) return;
     if (order.status === 'cancelled' || order.status === 'delivered') return;
     if (!['confirmed', 'preparing', 'ready'].includes(order.status)) return;
-    // If there is no active candidate, don't auto-cancel yet
-    if (!order.assignmentInfo?.currentCandidateId) return;
     // Guard against stale timer if order was just notified
-    const lastNotifiedAt = order.assignmentInfo?.lastNotifiedAt ? new Date(order.assignmentInfo.lastNotifiedAt).getTime() : 0;
-    if (!lastNotifiedAt) {
-      console.warn(`⚠️ [DeliveryAssign] Auto-cancel skipped: missing lastNotifiedAt for order ${order.orderId || orderId}`);
+    const lastNotifiedAtMs = order.assignmentInfo?.lastNotifiedAt ? new Date(order.assignmentInfo.lastNotifiedAt).getTime() : 0;
+    const broadcastNotifiedAtMs = order.assignmentInfo?.broadcastNotifiedAt ? new Date(order.assignmentInfo.broadcastNotifiedAt).getTime() : 0;
+    const effectiveNotifiedAtMs = Math.max(lastNotifiedAtMs, broadcastNotifiedAtMs);
+    if (!effectiveNotifiedAtMs) {
+      console.warn(`⚠️ [DeliveryAssign] Timeout skipped: missing notifiedAt for order ${order.orderId || orderId}`);
       return;
     }
-    const elapsedMs = Date.now() - lastNotifiedAt;
-    if (elapsedMs < ASSIGNMENT_TIMEOUT_MS) {
+    const elapsedMs = Date.now() - effectiveNotifiedAtMs;
+    if (elapsedMs < ASSIGNMENT_TIMEOUT_MS) return;
+
+    // Do NOT auto-cancel orders when no riders accept.
+    // Instead, notify the restaurant so they can resend the request.
+    const previousNoPartnerAtMs = order.assignmentInfo?.noPartnerNotifiedAt
+      ? new Date(order.assignmentInfo.noPartnerNotifiedAt).getTime()
+      : 0;
+    if (previousNoPartnerAtMs && previousNoPartnerAtMs >= effectiveNotifiedAtMs) {
       return;
     }
 
-    order.status = 'cancelled';
-    order.cancellationReason = 'Delivery partner unavailable';
-    order.cancelledBy = 'system';
-    order.cancelledAt = new Date();
+    if (!order.assignmentInfo) order.assignmentInfo = {};
+    order.assignmentInfo.noPartnerNotifiedAt = new Date();
+    order.assignmentInfo.noPartnerReason = 'timeout_no_accept';
+    // Clear sequential candidate (if any) so it doesn't keep the order locked.
+    order.assignmentInfo.currentCandidateId = null;
     await order.save();
 
-    try {
-      const refundResult = await initiateRazorpayRefundForOrder({
-        orderId: order._id,
-        trigger: 'restaurant',
-        reason: order.cancellationReason || 'Delivery partner unavailable'
-      });
-    } catch (refundErr) {
-      console.error(`❌ Auto-cancel refund initiation failed for order ${order.orderId}:`, refundErr?.message || refundErr);
-    }
-
-    try {
-      await notifyRestaurantOrderUpdate(order._id.toString(), 'cancelled');
-    } catch (notifErr) {
-      console.error(`❌ Auto-cancel notify failed for order ${order.orderId}:`, notifErr?.message || notifErr);
-    }
+    await notifyRestaurantOrderMessage(order._id.toString(), {
+      status: order.status,
+      type: 'delivery_assignment_failed',
+      message: `No delivery partners accepted Order #${order.orderId}. You can tap Resend to notify nearby delivery partners again.`
+    });
   } finally {
     clearAssignmentTimeout(orderId);
   }
@@ -848,6 +845,77 @@ export async function notifyNextDeliveryPartner(orderDoc, restaurantLat, restaur
 
 export function clearAssignmentTimer(orderId) {
   clearAssignmentTimeout(orderId);
+}
+
+/**
+ * Broadcast an order request to all nearby delivery partners (within 5km).
+ * First accept wins; others should get an `order_taken` event from accept handler.
+ * @param {string} orderId - MongoDB _id
+ * @param {number} restaurantLat
+ * @param {number} restaurantLng
+ * @param {{trigger?: string}} options
+ * @returns {Promise<{success: boolean, notifiedCount: number, deliveryPartnerIds: Array<string>}>}
+ */
+export async function broadcastDeliveryRequest(orderId, restaurantLat, restaurantLng, { trigger = 'ready' } = {}) {
+  const now = new Date();
+
+  const order = await Order.findById(orderId)
+    .populate('userId', 'name phone')
+    .populate('restaurantId', 'name location address phone ownerPhone')
+    .lean();
+  if (!order) {
+    return { success: false, notifiedCount: 0, deliveryPartnerIds: [] };
+  }
+  if (order.deliveryPartnerId) {
+    return { success: true, notifiedCount: 0, deliveryPartnerIds: [] };
+  }
+  if (!['confirmed', 'preparing', 'ready'].includes(order.status)) {
+    return { success: false, notifiedCount: 0, deliveryPartnerIds: [] };
+  }
+
+  const nearest = await findNearestDeliveryBoys(restaurantLat, restaurantLng, order.restaurantId?._id || order.restaurantId, 5);
+  const candidateIds = (nearest || []).map(db => db.deliveryPartnerId).filter(Boolean);
+  const eligibleIds = await filterByCodCashLimit(candidateIds, order);
+
+  // Reset broadcast tracking + clear sequential fields (if any)
+  await Order.findByIdAndUpdate(orderId, {
+    $set: {
+      'assignmentInfo.notificationPhase': 'broadcast',
+      'assignmentInfo.broadcastNotifiedAt': now,
+      'assignmentInfo.broadcastDeliveryPartnerIds': eligibleIds,
+      'assignmentInfo.broadcastRejectedDeliveryPartnerIds': [],
+      'assignmentInfo.lastNotifiedAt': now,
+      'assignmentInfo.noPartnerNotifiedAt': null,
+      'assignmentInfo.noPartnerReason': null,
+      'assignmentInfo.assignedBy': trigger === 'manual_resend' ? 'manual_resend' : (order.assignmentInfo?.assignedBy || 'manual')
+    },
+    $unset: {
+      'assignmentInfo.currentCandidateId': '',
+      'assignmentInfo.currentCandidateIndex': '',
+      'assignmentInfo.candidateDeliveryPartnerIds': '',
+      'assignmentInfo.rejectedDeliveryPartnerIds': ''
+    }
+  });
+
+  if (!eligibleIds || eligibleIds.length === 0) {
+    // No riders nearby/online; notify restaurant immediately.
+    await Order.findByIdAndUpdate(orderId, {
+      $set: {
+        'assignmentInfo.noPartnerNotifiedAt': now,
+        'assignmentInfo.noPartnerReason': 'no_candidates'
+      }
+    });
+    await notifyRestaurantOrderMessage(orderId.toString(), {
+      status: order.status,
+      type: 'delivery_assignment_failed',
+      message: `No delivery partners found within 5km for Order #${order.orderId}. You can try Resend again after some time.`
+    });
+    return { success: true, notifiedCount: 0, deliveryPartnerIds: [] };
+  }
+
+  await notifyMultipleDeliveryBoys(order, eligibleIds, 'broadcast');
+  scheduleAssignmentTimeout(orderId);
+  return { success: true, notifiedCount: eligibleIds.length, deliveryPartnerIds: eligibleIds };
 }
 
 async function refreshSequentialCandidateQueue(orderDoc, restaurantLat, restaurantLng) {

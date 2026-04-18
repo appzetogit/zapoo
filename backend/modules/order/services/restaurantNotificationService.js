@@ -285,3 +285,42 @@ export async function notifyRestaurantOrderUpdate(orderId, status) {
     throw error;
   }
 }
+
+/**
+ * Send a restaurant-facing message tied to an order (without changing order status).
+ * Uses the existing `order_status_update` socket event so frontend can show it.
+ * @param {string} orderId - MongoDB _id
+ * @param {{status?: string, message: string, type?: string}} params
+ */
+export async function notifyRestaurantOrderMessage(orderId, { status, message, type = 'order_message' } = {}) {
+  try {
+    if (!message) return;
+    const io = await getIOInstance();
+    if (!io) return;
+
+    const order = await Order.findById(orderId).select('orderId restaurantId status').lean();
+    if (!order) return;
+
+    const restaurantNamespace = io.of('/restaurant');
+    restaurantNamespace.to(`restaurant:${order.restaurantId}`).emit('order_status_update', {
+      orderId: order.orderId,
+      status: status || order.status,
+      message,
+      type,
+      updatedAt: new Date()
+    });
+
+    try {
+      await sendNotificationToUser(order.restaurantId?.toString() || order.restaurantId, 'restaurant', 'Delivery Assignment Update', message, {
+        orderId: order.orderId,
+        orderMongoId: order._id?.toString(),
+        status: status || order.status,
+        type
+      });
+    } catch (pushError) {
+      console.error('❌ [FCM] Error sending restaurant message notification:', pushError);
+    }
+  } catch (error) {
+    console.error('Error notifying restaurant with message:', error);
+  }
+}

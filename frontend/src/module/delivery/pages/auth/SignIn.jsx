@@ -96,7 +96,7 @@ export default function DeliverySignIn() {
 
   const handlePhoneChange = (e) => {
     // Only allow digits
-    const value = e.target.value.replace(/\D/g, "")
+    const value = e.target.value.replace(/\D/g, "").slice(0, 10)
     setFormData({
       ...formData,
       phone: value,
@@ -182,6 +182,7 @@ export default function DeliverySignIn() {
                 <input
                   type="tel"
                   inputMode="numeric"
+                  maxLength={10}
                   placeholder="Enter mobile number"
                   value={formData.phone}
                   onChange={handlePhoneChange}
@@ -234,4 +235,3 @@ export default function DeliverySignIn() {
     </div>
   )
 }
-

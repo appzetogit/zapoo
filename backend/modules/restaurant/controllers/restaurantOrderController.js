@@ -6,7 +6,7 @@ import { successResponse, errorResponse } from '../../../shared/utils/response.j
 import asyncHandler from '../../../shared/middleware/asyncHandler.js';
 import { notifyRestaurantOrderUpdate } from '../../order/services/restaurantNotificationService.js';
 import { notifyUserOrderUpdate } from '../../order/services/userNotificationService.js';
-import { notifyNextDeliveryPartner } from '../../order/services/deliveryAssignmentService.js';
+import { broadcastDeliveryRequest } from '../../order/services/deliveryAssignmentService.js';
 import mongoose from 'mongoose';
 
 /**
@@ -654,7 +654,7 @@ export const markOrderReady = asyncHandler(async (req, res) => {
       console.error('Error sending restaurant notification:', notifError);
     }
 
-    // If no delivery partner assigned yet, trigger sequential notification (one-by-one within 5km)
+    // If no delivery partner assigned yet, broadcast request to all nearby delivery partners (within 5km)
     if (!populatedOrder?.deliveryPartnerId) {
       try {
         let restaurantCoords = populatedOrder?.restaurantId?.location?.coordinates;
@@ -666,16 +666,13 @@ export const markOrderReady = asyncHandler(async (req, res) => {
 
         if (Array.isArray(restaurantCoords) && restaurantCoords.length >= 2) {
           const [restaurantLng, restaurantLat] = restaurantCoords;
-          const freshOrder = await Order.findById(order._id);
-          if (freshOrder && !freshOrder.deliveryPartnerId) {
-            console.log('🧭 [DeliveryAssign] Trigger on ready for order', order.orderId || order._id.toString());
-            await notifyNextDeliveryPartner(freshOrder, restaurantLat, restaurantLng);
-          }
+          console.log('📣 [DeliveryAssign] Broadcast on ready for order', order.orderId || order._id.toString());
+          await broadcastDeliveryRequest(order._id.toString(), restaurantLat, restaurantLng, { trigger: 'ready' });
         } else {
           console.error('❌ [DeliveryAssign] Restaurant location missing on ready for order', order.orderId || order._id.toString());
         }
       } catch (assignmentError) {
-        console.error('❌ Error triggering sequential notification on ready:', assignmentError);
+        console.error('❌ Error broadcasting delivery request on ready:', assignmentError);
       }
     }
 

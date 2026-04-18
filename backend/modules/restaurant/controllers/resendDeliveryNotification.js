@@ -2,8 +2,7 @@ import Order from '../../order/models/Order.js';
 import Restaurant from '../models/Restaurant.js';
 import { successResponse, errorResponse } from '../../../shared/utils/response.js';
 import asyncHandler from '../../../shared/middleware/asyncHandler.js';
-import { findNearestDeliveryBoys, filterByCodCashLimit } from '../../order/services/deliveryAssignmentService.js';
-import { notifyMultipleDeliveryBoys } from '../../order/services/deliveryNotificationService.js';
+import { broadcastDeliveryRequest } from '../../order/services/deliveryAssignmentService.js';
 import mongoose from 'mongoose';
 
 /**
@@ -48,70 +47,12 @@ export const resendDeliveryNotification = asyncHandler(async (req, res) => {
     }
     const [restaurantLng, restaurantLat] = restaurantDoc.location.coordinates;
 
-    // Find nearest delivery boys
-    const priorityDeliveryBoys = await findNearestDeliveryBoys(restaurantLat, restaurantLng, restaurantId, 20,
-    // 20km radius for priority
-    10 // Top 10 nearest
-    );
-    if (!priorityDeliveryBoys || priorityDeliveryBoys.length === 0) {
-      // Try with larger radius
-      const allDeliveryBoys = await findNearestDeliveryBoys(restaurantLat, restaurantLng, restaurantId, 50,
-      // 50km radius
-      20 // Top 20 nearest
-      );
-      if (!allDeliveryBoys || allDeliveryBoys.length === 0) {
-        return errorResponse(res, 404, 'No delivery partners available in your area');
-      }
-
-      // Notify all available delivery boys
-      const populatedOrder = await Order.findById(order._id).populate('userId', 'name phone').populate('restaurantId', 'name location address phone ownerPhone').lean();
-      if (populatedOrder) {
-        const deliveryPartnerIds = await filterByCodCashLimit(
-          allDeliveryBoys.map(db => db.deliveryPartnerId), populatedOrder
-        );
-
-        // Update assignment info
-        await Order.findByIdAndUpdate(order._id, {
-          $set: {
-            'assignmentInfo.priorityDeliveryPartnerIds': deliveryPartnerIds,
-            'assignmentInfo.assignedBy': 'manual_resend',
-            'assignmentInfo.assignedAt': new Date()
-          }
-        });
-        if (deliveryPartnerIds.length > 0) {
-          await notifyMultipleDeliveryBoys(populatedOrder, deliveryPartnerIds, 'priority');
-        }
-        return successResponse(res, 200, `Notification sent to ${deliveryPartnerIds.length} delivery partners`, {
-          order: populatedOrder,
-          notifiedCount: deliveryPartnerIds.length
-        });
-      }
-    } else {
-      // Notify priority delivery boys
-      const populatedOrder = await Order.findById(order._id).populate('userId', 'name phone').populate('restaurantId', 'name location address phone ownerPhone').lean();
-      if (populatedOrder) {
-        const priorityIds = await filterByCodCashLimit(
-          priorityDeliveryBoys.map(db => db.deliveryPartnerId), populatedOrder
-        );
-
-        // Update assignment info
-        await Order.findByIdAndUpdate(order._id, {
-          $set: {
-            'assignmentInfo.priorityDeliveryPartnerIds': priorityIds,
-            'assignmentInfo.assignedBy': 'manual_resend',
-            'assignmentInfo.assignedAt': new Date()
-          }
-        });
-        if (priorityIds.length > 0) {
-          await notifyMultipleDeliveryBoys(populatedOrder, priorityIds, 'priority');
-        }
-        return successResponse(res, 200, `Notification sent to ${priorityIds.length} delivery partners`, {
-          order: populatedOrder,
-          notifiedCount: priorityIds.length
-        });
-      }
-    }
-    return errorResponse(res, 500, 'Failed to send notification');
+    const result = await broadcastDeliveryRequest(order._id.toString(), restaurantLat, restaurantLng, { trigger: 'manual_resend' });
+    return successResponse(res, 200, `Notification sent to ${result?.notifiedCount || 0} delivery partners`, {
+      orderId: order.orderId,
+      orderMongoId: order._id?.toString(),
+      notifiedCount: result?.notifiedCount || 0
+    });
   } catch (error) {
     console.error('Error resending delivery notification:', error);
     return errorResponse(res, 500, `Failed to resend notification: ${error.message}`);

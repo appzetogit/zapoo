@@ -579,6 +579,13 @@ export default function OrdersMain() {
   useEffect(() => {
     if (!lastOrderStatusUpdate) return;
 
+    const normalizedUpdateStatus = String(lastOrderStatusUpdate.status || '').toLowerCase().trim();
+    if (normalizedUpdateStatus === 'cancelled') {
+      toast.info(lastOrderStatusUpdate.message || 'Order was cancelled and removed from pending requests.');
+    } else if (lastOrderStatusUpdate.message) {
+      toast.info(lastOrderStatusUpdate.message);
+    }
+
     const activePopupOrder = popupOrder || newOrder;
     const activePopupOrderId = activePopupOrder?.orderId || activePopupOrder?.orderMongoId;
     if (!activePopupOrderId) {
@@ -596,9 +603,6 @@ export default function OrdersMain() {
       setRejectReason("");
       setCountdown(240);
       setPrepTime(11);
-      if (normalizedPopupStatus === 'cancelled') {
-        toast.info(lastOrderStatusUpdate.message || 'Order was cancelled and removed from pending requests.');
-      }
     }
     clearLastOrderStatusUpdate();
   }, [lastOrderStatusUpdate, popupOrder, newOrder, clearNewOrder, clearLastOrderStatusUpdate]);
@@ -2072,8 +2076,8 @@ function OrderCard({
               {type}
               {tableOrToken ? ` • ${tableOrToken}` : ""}
             </p>
-            {/* Delivery Assignment Status - Only show for preparing orders */}
-            {displayStatus === "preparing" && (
+            {/* Delivery Assignment Status (preparing/ready) */}
+            {["preparing", "ready"].includes(displayStatus) && (
               <div className="flex items-center gap-1.5 flex-wrap">
                 <span
                   className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${

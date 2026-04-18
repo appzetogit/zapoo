@@ -1498,7 +1498,7 @@ export default function RestaurantDetails() {
                     }} animate={{
                       opacity: 1,
                       scale: 1
-                    }} className={`absolute -bottom-2 left-1/2 -translate-x-1/2 bg-white border font-bold px-4 py-1.5 rounded-lg shadow-md flex items-center gap-1 ${shouldShowGrayscale ? 'border-gray-300 text-gray-400 cursor-not-allowed opacity-50' : 'border-green-600 text-green-600 hover:bg-green-50'}`}>
+                    }} className={`absolute -bottom-2 left-1/2 -translate-x-1/2 z-20 bg-white border font-bold px-4 py-1.5 rounded-lg shadow-md flex items-center gap-1 ${shouldShowGrayscale ? 'border-gray-300 text-gray-400 cursor-not-allowed opacity-50' : 'border-green-600 text-green-600 hover:bg-green-50'}`}>
                                   <button onClick={e => {
                         e.stopPropagation();
                         if (!shouldShowGrayscale) {
@@ -1516,13 +1516,13 @@ export default function RestaurantDetails() {
                       }} disabled={shouldShowGrayscale} className={shouldShowGrayscale ? 'text-gray-400 cursor-not-allowed' : 'text-green-600 hover:text-green-700'}>
                                     <Plus size={14} className="stroke-[3px]" />
                                   </button>
-                                </motion.div> : <motion.button layoutId={`add-button-${item.id}`} initial={{
+                                </motion.div> : <motion.button initial={{
                       opacity: 0,
                       scale: 0.9
                     }} animate={{
                       opacity: 1,
                       scale: 1
-                                }} transition={{
+                    }} transition={{
                       duration: 0.3,
                       type: "spring",
                       damping: 20,
@@ -1672,18 +1672,18 @@ export default function RestaurantDetails() {
                             }} disabled={shouldShowGrayscale} className={shouldShowGrayscale ? 'text-gray-400 cursor-not-allowed' : 'text-green-600 hover:text-green-700'}>
                                               <Plus size={14} className="stroke-[3px]" />
                                             </button>
-                                          </motion.div> : <motion.button layoutId={`add-button-sub-${item.id}`} initial={{
+                                          </motion.div> : <motion.button initial={{
                             opacity: 0,
                             scale: 0.9
-                          }} animate={{
-                            opacity: 1,
-                            scale: 1
-                          }} transition={{
-                            duration: 0.3,
-                            type: "spring",
-                            damping: 20,
-                            stiffness: 300
-                                        }} onClick={e => {
+                    }} animate={{
+                      opacity: 1,
+                      scale: 1
+                                }} transition={{
+                      duration: 0.3,
+                      type: "spring",
+                      damping: 20,
+                      stiffness: 300
+                    }} onClick={e => {
                       e.stopPropagation();
                       if (!shouldShowGrayscale) {
                         updateItemQuantity(item, 1, e);

@@ -12,6 +12,8 @@ import AdminCommission from '../../admin/models/AdminCommission.js';
 import BusinessSettings from '../../admin/models/BusinessSettings.js';
 import { calculateRoute } from '../../order/services/routeCalculationService.js';
 import { notifyNextDeliveryPartner, clearAssignmentTimer } from '../../order/services/deliveryAssignmentService.js';
+import { notifyDeliveryPartnersOrderTaken } from '../../order/services/deliveryNotificationService.js';
+import { notifyRestaurantOrderMessage } from '../../order/services/restaurantNotificationService.js';
 import {
   evaluateChallengesOnOrderCompleted,
   evaluateChallengesOnDeliveryCompleted,
@@ -290,6 +292,19 @@ export const acceptOrder = asyncHandler(async (req, res) => {
       const notificationPhase = assignmentInfo.notificationPhase;
       const normalizedCurrentId = normalizeId(currentDeliveryId);
 
+      // Keep track of who was notified so we can tell others to remove the request after accept.
+      const broadcastIds = assignmentInfo.broadcastDeliveryPartnerIds || [];
+      const priorityIds = assignmentInfo.priorityDeliveryPartnerIds || [];
+      const expandedIds = assignmentInfo.expandedDeliveryPartnerIds || [];
+      const normalizedBroadcastIds = broadcastIds.map(normalizeId).filter(Boolean);
+      const normalizedPriorityIds = priorityIds.map(normalizeId).filter(Boolean);
+      const normalizedExpandedIds = expandedIds.map(normalizeId).filter(Boolean);
+      const notifiedIdsForTaken = Array.from(new Set([
+        ...normalizedBroadcastIds,
+        ...normalizedPriorityIds,
+        ...normalizedExpandedIds
+      ]));
+
       if (notificationPhase === 'sequential') {
         const currentCandidateId = normalizeId(assignmentInfo.currentCandidateId);
         if (!currentCandidateId || currentCandidateId !== normalizedCurrentId) {
@@ -297,12 +312,11 @@ export const acceptOrder = asyncHandler(async (req, res) => {
           return errorResponse(res, 403, 'This order is not available for you.');
         }
       } else {
-        // Legacy fallback: allow acceptance if delivery boy was notified
-        const priorityIds = assignmentInfo.priorityDeliveryPartnerIds || [];
-        const expandedIds = assignmentInfo.expandedDeliveryPartnerIds || [];
-        const normalizedPriorityIds = priorityIds.map(normalizeId).filter(Boolean);
-        const normalizedExpandedIds = expandedIds.map(normalizeId).filter(Boolean);
-        const wasNotified = normalizedPriorityIds.includes(normalizedCurrentId) || normalizedExpandedIds.includes(normalizedCurrentId);
+        // Broadcast/legacy phases: allow acceptance if delivery partner was notified.
+        const wasNotified =
+          normalizedBroadcastIds.includes(normalizedCurrentId) ||
+          normalizedPriorityIds.includes(normalizedCurrentId) ||
+          normalizedExpandedIds.includes(normalizedCurrentId);
         if (!wasNotified) {
           return errorResponse(res, 403, 'This order is not available for you.');
         }
@@ -337,18 +351,47 @@ export const acceptOrder = asyncHandler(async (req, res) => {
         }
       }
 
-      // Assign order to this delivery partner
+      // Assign order to this delivery partner (atomic: first accept wins)
       try {
-        orderDoc.deliveryPartnerId = delivery._id;
-        orderDoc.assignmentInfo = {
-          ...(orderDoc.assignmentInfo || {}),
-          deliveryPartnerId: currentDeliveryId,
-          assignedAt: new Date(),
-          assignedBy: 'delivery_accept',
-          acceptedFromNotification: true
-        };
-        await orderDoc.save();
+        const assignedAt = new Date();
+        const updated = await Order.findOneAndUpdate(
+          {
+            _id: orderDoc._id,
+            $or: [{ deliveryPartnerId: null }, { deliveryPartnerId: { $exists: false } }]
+          },
+          {
+            $set: {
+              deliveryPartnerId: delivery._id,
+              'assignmentInfo.deliveryPartnerId': currentDeliveryId,
+              'assignmentInfo.assignedAt': assignedAt,
+              'assignmentInfo.assignedBy': 'delivery_accept',
+              'assignmentInfo.acceptedFromNotification': true,
+              'assignmentInfo.noPartnerNotifiedAt': null,
+              'assignmentInfo.noPartnerReason': null
+            }
+          },
+          { new: true }
+        );
+        if (!updated) {
+          return errorResponse(res, 403, 'Order was just assigned to another delivery partner. Please try another order.');
+        }
+        orderDoc = updated;
         clearAssignmentTimer(orderDoc._id.toString());
+
+        // Tell other notified delivery partners to remove the offer.
+        try {
+          const otherPartners = (notifiedIdsForTaken || []).filter(id => id && id !== normalizedCurrentId);
+          await notifyDeliveryPartnersOrderTaken(
+            {
+              orderMongoId: orderDoc._id?.toString?.() || orderDoc._id,
+              orderId: orderDoc.orderId || order.orderId,
+              acceptedBy: currentDeliveryId
+            },
+            otherPartners
+          );
+        } catch (takenErr) {
+          console.warn('⚠️ Failed to emit order_taken:', takenErr?.message || takenErr);
+        }
 
         try {
           const { calculateOrderSettlement } = await import('../../order/services/orderSettlementService.js');
@@ -769,60 +812,101 @@ export const rejectOrder = asyncHandler(async (req, res) => {
     }
 
     const assignmentInfo = orderDoc.assignmentInfo || {};
-    if (assignmentInfo.notificationPhase !== 'sequential') {
-      return errorResponse(res, 400, 'Order rejection not available for this order');
-    }
-
     const currentCandidateId = assignmentInfo.currentCandidateId?.toString();
     const currentDeliveryId = delivery._id.toString();
-    if (!currentCandidateId || currentCandidateId !== currentDeliveryId) {
-      return errorResponse(res, 403, 'Order not available for you');
-    }
+    const phase = assignmentInfo.notificationPhase;
 
-    const rejectedSet = new Set(
-      (assignmentInfo.rejectedDeliveryPartnerIds || []).map(id => id?.toString()).filter(Boolean)
-    );
-    rejectedSet.add(currentDeliveryId);
+    if (phase === 'sequential') {
+      if (!currentCandidateId || currentCandidateId !== currentDeliveryId) {
+        return errorResponse(res, 403, 'Order not available for you');
+      }
 
-    orderDoc.assignmentInfo = {
-      ...(assignmentInfo || {}),
-      rejectedDeliveryPartnerIds: Array.from(rejectedSet),
-      currentCandidateId: null
-    };
-    await orderDoc.save();
-    clearAssignmentTimer(orderDoc._id.toString());
+      const rejectedSet = new Set(
+        (assignmentInfo.rejectedDeliveryPartnerIds || []).map(id => id?.toString()).filter(Boolean)
+      );
+      rejectedSet.add(currentDeliveryId);
 
-    // Notify next candidate in sequence
-    try {
-      const freshOrderDoc = await Order.findById(orderDoc._id).select('orderId restaurantId assignmentInfo deliveryPartnerId');
-      if (!freshOrderDoc || freshOrderDoc.deliveryPartnerId) {
-        return successResponse(res, 200, 'Order rejected successfully', {
-          orderId: orderDoc.orderId || orderDoc._id
+      orderDoc.assignmentInfo = {
+        ...(assignmentInfo || {}),
+        rejectedDeliveryPartnerIds: Array.from(rejectedSet),
+        currentCandidateId: null
+      };
+      await orderDoc.save();
+      clearAssignmentTimer(orderDoc._id.toString());
+
+      // Notify next candidate in sequence (legacy)
+      try {
+        const freshOrderDoc = await Order.findById(orderDoc._id).select('orderId restaurantId assignmentInfo deliveryPartnerId');
+        if (!freshOrderDoc || freshOrderDoc.deliveryPartnerId) {
+          return successResponse(res, 200, 'Order rejected successfully', {
+            orderId: orderDoc.orderId || orderDoc._id
+          });
+        }
+
+        const restaurantId = freshOrderDoc.restaurantId?._id || freshOrderDoc.restaurantId;
+        let restaurant = null;
+        if (restaurantId) {
+          restaurant = await Restaurant.findById(restaurantId).select('location').lean();
+        }
+        if (!restaurant && restaurantId) {
+          restaurant = await Restaurant.findOne({
+            $or: [{ restaurantId }, { _id: restaurantId }]
+          }).select('location').lean();
+        }
+
+        if (restaurant?.location?.coordinates?.length >= 2) {
+          const [restaurantLng, restaurantLat] = restaurant.location.coordinates;
+          const result = await notifyNextDeliveryPartner(freshOrderDoc, restaurantLat, restaurantLng);
+          if (!result?.notified) {
+            console.warn(`⚠️ [DeliveryAssign] No next delivery partner notified after reject for order ${freshOrderDoc.orderId || freshOrderDoc._id}`);
+          }
+        } else {
+          console.warn(`⚠️ [DeliveryAssign] Restaurant location missing while advancing reject flow for order ${freshOrderDoc.orderId || freshOrderDoc._id}`);
+        }
+      } catch (notifyErr) {
+        console.error('❌ Error notifying next delivery partner after reject:', notifyErr);
+      }
+    } else {
+      // Broadcast/priority/expanded offers: rider can reject if they were notified.
+      const notifiedIds = Array.from(new Set([
+        ...(assignmentInfo.broadcastDeliveryPartnerIds || []),
+        ...(assignmentInfo.priorityDeliveryPartnerIds || []),
+        ...(assignmentInfo.expandedDeliveryPartnerIds || [])
+      ].map(id => id?.toString?.() || String(id || '')).filter(Boolean)));
+
+      if (notifiedIds.length === 0) {
+        return errorResponse(res, 400, 'Order rejection not available for this order');
+      }
+      if (!notifiedIds.includes(currentDeliveryId)) {
+        return errorResponse(res, 403, 'Order not available for you');
+      }
+
+      const rejectedSet = new Set(
+        (assignmentInfo.broadcastRejectedDeliveryPartnerIds || []).map(id => id?.toString?.() || String(id || '')).filter(Boolean)
+      );
+      rejectedSet.add(currentDeliveryId);
+
+      orderDoc.assignmentInfo = {
+        ...(assignmentInfo || {}),
+        broadcastRejectedDeliveryPartnerIds: Array.from(rejectedSet)
+      };
+      await orderDoc.save();
+      clearAssignmentTimer(orderDoc._id.toString());
+
+      // If everyone rejected, notify restaurant immediately (no auto-cancel).
+      if (rejectedSet.size >= notifiedIds.length) {
+        await Order.findByIdAndUpdate(orderDoc._id, {
+          $set: {
+            'assignmentInfo.noPartnerNotifiedAt': new Date(),
+            'assignmentInfo.noPartnerReason': 'all_rejected'
+          }
+        });
+        await notifyRestaurantOrderMessage(orderDoc._id.toString(), {
+          status: orderDoc.status,
+          type: 'delivery_assignment_failed',
+          message: `All notified delivery partners rejected Order #${orderDoc.orderId}. You can tap Resend to notify nearby delivery partners again.`
         });
       }
-
-      const restaurantId = freshOrderDoc.restaurantId?._id || freshOrderDoc.restaurantId;
-      let restaurant = null;
-      if (restaurantId) {
-        restaurant = await Restaurant.findById(restaurantId).select('location').lean();
-      }
-      if (!restaurant && restaurantId) {
-        restaurant = await Restaurant.findOne({
-          $or: [{ restaurantId }, { _id: restaurantId }]
-        }).select('location').lean();
-      }
-
-      if (restaurant?.location?.coordinates?.length >= 2) {
-        const [restaurantLng, restaurantLat] = restaurant.location.coordinates;
-        const result = await notifyNextDeliveryPartner(freshOrderDoc, restaurantLat, restaurantLng);
-        if (!result?.notified) {
-          console.warn(`⚠️ [DeliveryAssign] No next delivery partner notified after reject for order ${freshOrderDoc.orderId || freshOrderDoc._id}`);
-        }
-      } else {
-        console.warn(`⚠️ [DeliveryAssign] Restaurant location missing while advancing reject flow for order ${freshOrderDoc.orderId || freshOrderDoc._id}`);
-      }
-    } catch (notifyErr) {
-      console.error('❌ Error notifying next delivery partner after reject:', notifyErr);
     }
 
     return successResponse(res, 200, 'Order rejected successfully', {

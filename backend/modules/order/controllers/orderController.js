@@ -1,6 +1,6 @@
 import Order from '../models/Order.js';
 import Payment from '../../payment/models/Payment.js';
-import { createOrder as createRazorpayOrder, verifyPayment } from '../../payment/services/razorpayService.js';
+import { createOrder as createRazorpayOrder, verifyPayment, fetchPayment } from '../../payment/services/razorpayService.js';
 import Restaurant from '../../restaurant/models/Restaurant.js';
 import Zone from '../../admin/models/Zone.js';
 import mongoose from 'mongoose';
@@ -710,6 +710,37 @@ export const verifyOrderPayment = async (req, res) => {
       });
     }
 
+    // If payment is already completed, retry restaurant notification if it was missed (idempotent).
+    if (String(order.payment?.status || '').toLowerCase().trim() === 'completed') {
+      try {
+        const notifiedAtMs = order.payment?.restaurantNotifiedAt ? new Date(order.payment.restaurantNotifiedAt).getTime() : 0;
+        if (!notifiedAtMs) {
+          const restaurantId = order.restaurantId?.toString?.() || order.restaurantId;
+          if (restaurantId) {
+            const result = await notifyRestaurantNewOrder(order, restaurantId, 'razorpay');
+            if (result?.success) {
+              order.payment.restaurantNotifiedAt = new Date();
+              await order.save();
+            }
+          }
+        }
+      } catch (notifyErr) {
+        logger.warn('⚠️ verifyOrderPayment: restaurant notify retry failed:', notifyErr?.message || notifyErr);
+      }
+      return res.json({
+        success: true,
+        message: 'Payment already completed for this order.',
+        data: {
+          order: {
+            id: order._id.toString(),
+            orderId: order.orderId,
+            status: order.status,
+            paymentStatus: order.payment.status
+          }
+        }
+      });
+    }
+
     // Verify payment signature
     const isValid = await verifyPayment(razorpayOrderId, razorpayPaymentId, razorpaySignature);
     if (!isValid) {
@@ -798,14 +829,92 @@ export const verifyOrderPayment = async (req, res) => {
     if (!isOrderPaymentFinalized) {
       order.payment.status = 'pending';
     }
+    order.payment.method = 'razorpay';
+    order.payment.razorpayOrderId = razorpayOrderId || order.payment.razorpayOrderId;
     order.payment.razorpayPaymentId = razorpayPaymentId;
     order.payment.razorpaySignature = razorpaySignature;
     order.payment.transactionId = razorpayPaymentId;
     await order.save();
 
+    // Fallback: confirm capture from Razorpay and notify restaurant even if webhook is missing.
+    let capturedByGateway = false;
+    try {
+      const gatewayPayment = await fetchPayment(razorpayPaymentId);
+      const gatewayStatus = String(gatewayPayment?.status || '').toLowerCase().trim();
+      capturedByGateway = gatewayStatus === 'captured';
+
+      if (capturedByGateway) {
+        // Upgrade order payment state to completed (webhook-equivalent)
+        order.payment.status = 'completed';
+        order.payment.method = 'razorpay';
+        order.payment.razorpayOrderId = razorpayOrderId || order.payment.razorpayOrderId;
+        order.payment.razorpayPaymentId = razorpayPaymentId;
+        order.payment.transactionId = razorpayPaymentId;
+        await order.save();
+
+        // Update payment record to success (best-effort)
+        try {
+          await Payment.updateMany(
+            { orderId: order._id, method: 'razorpay' },
+            {
+              $set: {
+                status: 'success',
+                'razorpay.orderId': razorpayOrderId,
+                'razorpay.paymentId': razorpayPaymentId
+              },
+              $push: {
+                logs: {
+                  action: 'captured',
+                  timestamp: new Date(),
+                  details: {
+                    razorpayOrderId,
+                    razorpayPaymentId,
+                    note: 'Capture confirmed via verify-payment fallback (webhook unavailable)'
+                  },
+                  ipAddress: req.ip,
+                  userAgent: req.get('user-agent')
+                }
+              }
+            }
+          );
+        } catch (paymentUpdateErr) {
+          logger.warn('⚠️ verifyOrderPayment: payment record update failed:', paymentUpdateErr?.message || paymentUpdateErr);
+        }
+
+        // Settlement + escrow (best-effort)
+        try {
+          await calculateOrderSettlement(order._id);
+          await holdEscrow(order._id, userId, order.pricing?.total || 0);
+        } catch (settlementErr) {
+          logger.error('❌ verifyOrderPayment fallback settlement/escrow failed:', settlementErr);
+        }
+
+        // Notify restaurant once (idempotent)
+        try {
+          const notifiedAtMs = order.payment?.restaurantNotifiedAt ? new Date(order.payment.restaurantNotifiedAt).getTime() : 0;
+          if (!notifiedAtMs) {
+            const restaurantId = order.restaurantId?.toString?.() || order.restaurantId;
+            if (restaurantId) {
+              const result = await notifyRestaurantNewOrder(order, restaurantId, 'razorpay');
+              if (result?.success) {
+                order.payment.restaurantNotifiedAt = new Date();
+                await order.save();
+              }
+            }
+          }
+        } catch (notifyErr) {
+          logger.warn('⚠️ verifyOrderPayment fallback restaurant notification failed:', notifyErr?.message || notifyErr);
+        }
+      }
+    } catch (gatewayErr) {
+      logger.warn('⚠️ verifyOrderPayment: fetchPayment failed; relying on webhook:', gatewayErr?.message || gatewayErr);
+    }
+
     return res.json({
       success: true,
-      message: 'Payment signature verified. Final confirmation will happen after webhook capture.',
+      message: capturedByGateway
+        ? 'Payment captured and order confirmed. Restaurant will receive the order now.'
+        : 'Payment signature verified. Final confirmation will happen after webhook capture.',
       data: {
         order: {
           id: order._id.toString(),

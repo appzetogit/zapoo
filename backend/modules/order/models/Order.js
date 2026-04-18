@@ -188,6 +188,11 @@ const orderSchema = new mongoose.Schema({
       enum: ['pending', 'processing', 'completed', 'failed', 'refunded'],
       default: 'pending'
     },
+    // Used to avoid double-notifying restaurant in webhook vs fallback confirmation flows
+    restaurantNotifiedAt: {
+      type: Date,
+      default: null
+    },
     razorpayOrderId: {
       type: String
     },
@@ -349,7 +354,7 @@ const orderSchema = new mongoose.Schema({
     distance: Number, // Distance in km
     assignedBy: {
       type: String,
-      enum: ['zone_match', 'nearest_distance', 'manual', 'nearest_available', 'delivery_accept']
+      enum: ['zone_match', 'nearest_distance', 'manual', 'nearest_available', 'delivery_accept', 'manual_resend']
     },
     zoneId: String,
     zoneName: String,
@@ -360,9 +365,16 @@ const orderSchema = new mongoose.Schema({
     priorityDeliveryPartnerIds: [String],
     expandedNotifiedAt: Date,
     expandedDeliveryPartnerIds: [String],
+    // Broadcast assignment tracking (notify all nearby riders at once)
+    broadcastNotifiedAt: Date,
+    broadcastDeliveryPartnerIds: [String],
+    broadcastRejectedDeliveryPartnerIds: [String],
+    // When no rider accepts within timeout / all rejected
+    noPartnerNotifiedAt: Date,
+    noPartnerReason: String,
     notificationPhase: {
       type: String,
-      enum: ['none', 'priority', 'expanded', 'immediate', 'sequential'],
+      enum: ['none', 'priority', 'expanded', 'immediate', 'sequential', 'broadcast'],
       default: 'none'
     },
     // Sequential assignment tracking

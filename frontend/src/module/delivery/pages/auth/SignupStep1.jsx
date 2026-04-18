@@ -42,6 +42,10 @@ export default function SignupStep1() {
   const [errors, setErrors] = useState({})
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  useEffect(() => {
+    window.scrollTo(0, 0)
+  }, [])
+
   // Persist step 1 form draft so refresh doesn't clear entered details.
   useEffect(() => {
     try {
@@ -367,4 +371,3 @@ export default function SignupStep1() {
     </div>
   )
 }
-
