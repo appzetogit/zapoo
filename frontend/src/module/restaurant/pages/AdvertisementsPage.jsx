@@ -67,18 +67,21 @@ export default function AdvertisementsPage() {
         return;
       }
 
-      const {
-        orderId,
-        amount,
-        currency,
-        key
-      } = orderRes.data.data;
+      const paymentData = orderRes?.data?.data || {};
+      const orderId = paymentData.orderId || paymentData.order_id || null;
+      const amount = paymentData.amount;
+      const currency = paymentData.currency || "INR";
+      const key = paymentData.key || paymentData.keyId || paymentData.key_id || null;
       adPaymentUiDebug("create_order_payload_for_checkout", {
         orderId,
         amount,
         currency,
         keyPrefix: key ? String(key).slice(0, 6) : null
       });
+
+      if (!orderId || !key) {
+        throw new Error("Razorpay is not configured for ad payment (missing orderId/key)");
+      }
 
       // 2. Get Restaurant & Company Info
       // Use restaurantAPI because restaurant owners are authenticated via restaurant token

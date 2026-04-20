@@ -770,6 +770,13 @@ export const createAdPaymentOrder = async (req, res) => {
       });
     }
 
+    adPaymentDebug('create_payment_order_response_sent', {
+      adId: String(ad._id),
+      orderId: order.id,
+      hasKey: Boolean(razorpayKeyId),
+      keyPrefix: String(razorpayKeyId).slice(0, 6)
+    });
+
     res.status(200).json({
       success: true,
       data: {
