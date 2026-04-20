@@ -111,6 +111,26 @@ const getCouponIdentity = coupon => {
   return `${normalizeCouponSource(coupon?.source)}:${String(coupon.code).trim().toUpperCase()}`;
 };
 
+const formatOrderEtaText = (order, fallbackText = "25-30 mins") => {
+  if (!order || typeof order !== "object") return fallbackText;
+
+  const formatted = String(order?.eta?.formatted || "").trim();
+  if (formatted) return formatted;
+
+  const etaMin = Number(order?.eta?.min);
+  const etaMax = Number(order?.eta?.max);
+  if (Number.isFinite(etaMin) && Number.isFinite(etaMax)) {
+    return `${etaMin}-${etaMax} mins`;
+  }
+
+  const estimatedDeliveryTime = Number(order?.estimatedDeliveryTime);
+  if (Number.isFinite(estimatedDeliveryTime) && estimatedDeliveryTime > 0) {
+    return `${estimatedDeliveryTime} mins`;
+  }
+
+  return fallbackText;
+};
+
 export default function Cart() {
   const { t } = useTranslation();
   const locationPlaceholderText = t("user.locationDisplay.selectLocation");
@@ -176,6 +196,7 @@ export default function Cart() {
   const [orderProgress, setOrderProgress] = useState(0);
   const [showOrderSuccess, setShowOrderSuccess] = useState(false);
   const [placedOrderId, setPlacedOrderId] = useState(null);
+  const [placedOrderEtaText, setPlacedOrderEtaText] = useState("");
   const [showGstBreakdown, setShowGstBreakdown] = useState(false);
   const [showContactEditor, setShowContactEditor] = useState(false);
   const [orderContactName, setOrderContactName] = useState("");
@@ -899,6 +920,7 @@ export default function Cart() {
       return;
     }
     setIsPlacingOrder(true);
+    setPlacedOrderEtaText("");
 
     // Use API_BASE_URL from config (supports both dev and production)
 
@@ -1099,6 +1121,7 @@ export default function Cart() {
       if (selectedPaymentMethod === "cash") {
         toast.success(t("user.cart.toast.orderPlacedCod"));
         setPlacedOrderId(order?.orderId || order?.id || null);
+        setPlacedOrderEtaText(formatOrderEtaText(order, restaurantData?.estimatedDeliveryTime || t("user.cart.ui.defaultEtaLong")));
         setShowOrderSuccess(true);
         clearCart();
         setIsPlacingOrder(false);
@@ -1109,6 +1132,7 @@ export default function Cart() {
       if (selectedPaymentMethod === "wallet") {
         toast.success(t("user.cart.toast.orderPlacedWallet"));
         setPlacedOrderId(order?.orderId || order?.id || null);
+        setPlacedOrderEtaText(formatOrderEtaText(order, restaurantData?.estimatedDeliveryTime || t("user.cart.ui.defaultEtaLong")));
         setShowOrderSuccess(true);
         clearCart();
         setIsPlacingOrder(false);
@@ -1173,6 +1197,7 @@ export default function Cart() {
               // Payment successful
 
               setPlacedOrderId(order.orderId);
+              setPlacedOrderEtaText(formatOrderEtaText(order, restaurantData?.estimatedDeliveryTime || t("user.cart.ui.defaultEtaLong")));
               setShowOrderSuccess(true);
               clearCart();
               setIsPlacingOrder(false);
@@ -1241,6 +1266,7 @@ export default function Cart() {
   };
   const handleGoToOrders = () => {
     setShowOrderSuccess(false);
+    setPlacedOrderEtaText("");
     navigate(`/user/orders/${placedOrderId}?confirmed=true`);
   };
 
@@ -2015,11 +2041,7 @@ export default function Cart() {
                   <div className="flex items-center gap-1.5 font-bold text-gray-800 dark:text-gray-100">
                     <Clock className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />
                     <span className="text-sm">
-                      <DynamicEtaText
-                        restaurantId={restaurantId}
-                        items={etaItems}
-                        fallback={restaurantData?.estimatedDeliveryTime || t("user.cart.ui.defaultEtaLong")}
-                      />
+                      {placedOrderEtaText || restaurantData?.estimatedDeliveryTime || t("user.cart.ui.defaultEtaLong")}
                     </span>
                   </div>
                 </div>

@@ -417,6 +417,7 @@ export default function OrdersMain() {
   const [prepTime, setPrepTime] = useState(11);
   const [countdown, setCountdown] = useState(240); // 4 minutes in seconds
   const [isDetailsExpanded, setIsDetailsExpanded] = useState(true);
+  const [isNoteExpanded, setIsNoteExpanded] = useState(false);
   const [showRejectPopup, setShowRejectPopup] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const [showCancelPopup, setShowCancelPopup] = useState(false);
@@ -761,6 +762,12 @@ export default function OrdersMain() {
       return () => clearInterval(timer);
     }
   }, [showNewOrderPopup, countdown]);
+
+  useEffect(() => {
+    if (!showNewOrderPopup) {
+      setIsNoteExpanded(false);
+    }
+  }, [showNewOrderPopup]);
 
   // Format countdown time
   const formatTime = seconds => {
@@ -1500,9 +1507,6 @@ export default function OrdersMain() {
                 </p>
               </div>
               <div className="flex items-center gap-4">
-                <button onClick={handlePrint} className="p-1.5 hover:bg-gray-50 rounded-lg transition-colors group" aria-label="Print">
-                  <Printer className="w-[20px] h-[20px] text-gray-700 group-hover:text-black" />
-                </button>
                 <button onClick={toggleMute} className="p-1.5 hover:bg-gray-50 rounded-lg transition-colors group" aria-label={isMuted ? "Unmute" : "Mute"}>
                   {isMuted ? <VolumeX className="w-[20px] h-[20px] text-gray-700 group-hover:text-black" /> : <Volume2 className="w-[20px] h-[20px] text-gray-700 group-hover:text-black" />}
                 </button>
@@ -1580,6 +1584,25 @@ export default function OrdersMain() {
                 <span className="text-[14px] font-bold text-gray-600">Send cutlery</span>
               </div>
 
+              {/* Customer note */}
+              {String((popupOrder || newOrder)?.note || '').trim() && <div className="mb-6">
+                <button onClick={() => setIsNoteExpanded(prev => !prev)} className="w-full p-4 bg-yellow-50/80 rounded-xl border border-yellow-100 flex items-start justify-between gap-3 text-left hover:bg-yellow-100/70 transition-colors">
+                  <div className="flex items-start gap-3 min-w-0">
+                    <MessageSquare className="w-5 h-5 text-yellow-700 mt-0.5 shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-[13px] font-bold text-yellow-900">Note</p>
+                    </div>
+                  </div>
+                  <ChevronDown className={`w-4 h-4 text-yellow-700 shrink-0 transition-transform ${isNoteExpanded ? 'rotate-180' : ''}`} />
+                </button>
+
+                {isNoteExpanded && <div className="mt-2 p-3 bg-white rounded-lg border border-yellow-100">
+                  <p className="text-[13px] text-gray-800 whitespace-pre-wrap break-words">
+                    {String((popupOrder || newOrder)?.note || '').trim()}
+                  </p>
+                </div>}
+              </div>}
+
               {/* Total bill */}
               <div className="mb-6 flex items-center justify-between py-5 border-y border-gray-100">
                 <div className="flex items-center gap-3">
@@ -1646,12 +1669,6 @@ export default function OrdersMain() {
                 </button>
               </div>
 
-              {/* Need Help Link */}
-              <div className="mt-8 pb-2">
-                <button className="text-[14px] font-bold text-gray-600 hover:text-gray-900 transition-colors underline underline-offset-4 mx-auto block decoration-gray-300 hover:decoration-gray-900">
-                  Need help with this order?
-                </button>
-              </div>
             </div>
           </motion.div>
         </motion.div>
@@ -2093,7 +2110,7 @@ function OrderCard({
                   />
                   {deliveryPartnerId ? "Assigned" : "Not Assigned"}
                 </span>
-                {!deliveryPartnerId && (
+                {!deliveryPartnerId && displayStatus !== "preparing" && (
                   <ResendNotificationButton
                     orderId={orderId}
                     mongoId={mongoId}

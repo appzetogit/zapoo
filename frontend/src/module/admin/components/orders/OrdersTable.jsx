@@ -25,21 +25,42 @@ const getPaymentStatusColor = (paymentStatus) => {
   return "text-slate-600"
 }
 
-export default function OrdersTable({ orders, visibleColumns, onViewOrder, onPrintOrder, onRefund }) {
-  const [currentPage, setCurrentPage] = useState(1)
-  const itemsPerPage = 10
-  const totalPages = Math.ceil(orders.length / itemsPerPage)
-  
-  // Reset to page 1 when orders change
+export default function OrdersTable({
+  orders,
+  visibleColumns,
+  onViewOrder,
+  onPrintOrder,
+  onRefund,
+  currentPage: currentPageProp,
+  totalPages: totalPagesProp,
+  totalItems: totalItemsProp,
+  itemsPerPage: itemsPerPageProp = 10,
+  onPageChange,
+  isPageLoading = false,
+  isPrefetching = false,
+}) {
+  const [internalCurrentPage, setInternalCurrentPage] = useState(1)
+  const isServerPagination = typeof onPageChange === "function"
+  const currentPage = isServerPagination ? currentPageProp || 1 : internalCurrentPage
+  const itemsPerPage = itemsPerPageProp || 10
+  const totalPages = isServerPagination ? Math.max(totalPagesProp || 1, 1) : Math.ceil(orders.length / itemsPerPage)
+  const totalItems = isServerPagination ? (totalItemsProp || orders.length) : orders.length
+
   useEffect(() => {
-    setCurrentPage(1)
-  }, [orders.length])
-  
+    if (!isServerPagination) {
+      setInternalCurrentPage(1)
+    }
+  }, [isServerPagination, orders.length])
+
   const paginatedOrders = useMemo(() => {
+    if (isServerPagination) {
+      return orders
+    }
+
     const start = (currentPage - 1) * itemsPerPage
     const end = start + itemsPerPage
     return orders.slice(start, end)
-  }, [orders, currentPage])
+  }, [isServerPagination, orders, currentPage, itemsPerPage])
 
   const formatRestaurantName = (name) => {
     if (name === "Cafe Monarch") return "Café Monarch"
@@ -381,13 +402,21 @@ export default function OrdersTable({ orders, visibleColumns, onViewOrder, onPri
         <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
           <div className="text-sm text-slate-600">
             Showing <span className="font-semibold">{(currentPage - 1) * itemsPerPage + 1}</span> to{" "}
-            <span className="font-semibold">{Math.min(currentPage * itemsPerPage, orders.length)}</span> of{" "}
-            <span className="font-semibold">{orders.length}</span> orders
+            <span className="font-semibold">
+              {Math.min((currentPage - 1) * itemsPerPage + paginatedOrders.length, totalItems)}
+            </span>{" "}
+            of <span className="font-semibold">{totalItems}</span> orders
+            {isPrefetching && (
+              <span className="inline-flex items-center gap-1 ml-3 text-xs text-slate-500">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                Loading next page...
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-              disabled={currentPage === 1}
+              onClick={() => (isServerPagination ? onPageChange(currentPage - 1) : setInternalCurrentPage(prev => Math.max(1, prev - 1)))}
+              disabled={currentPage === 1 || isPageLoading}
               className="px-3 py-1.5 text-sm font-medium rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >
               Previous
@@ -407,7 +436,8 @@ export default function OrdersTable({ orders, visibleColumns, onViewOrder, onPri
                 return (
                   <button
                     key={pageNum}
-                    onClick={() => setCurrentPage(pageNum)}
+                    onClick={() => (isServerPagination ? onPageChange(pageNum) : setInternalCurrentPage(pageNum))}
+                    disabled={isPageLoading}
                     className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-all ${
                       currentPage === pageNum
                         ? "bg-emerald-500 text-white shadow-md"
@@ -420,8 +450,8 @@ export default function OrdersTable({ orders, visibleColumns, onViewOrder, onPri
               })}
             </div>
             <button
-              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-              disabled={currentPage === totalPages}
+              onClick={() => (isServerPagination ? onPageChange(currentPage + 1) : setInternalCurrentPage(prev => Math.min(totalPages, prev + 1)))}
+              disabled={currentPage === totalPages || isPageLoading}
               className="px-3 py-1.5 text-sm font-medium rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >
               Next

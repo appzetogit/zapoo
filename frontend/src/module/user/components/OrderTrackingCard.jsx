@@ -28,6 +28,19 @@ const getOrderIdentityKey = (order) => {
   ).trim();
 };
 
+const getEstimatedMinutesFromOrder = (order) => {
+  const etaMax = Number(order?.eta?.max);
+  if (Number.isFinite(etaMax) && etaMax > 0) return etaMax;
+
+  const etaMin = Number(order?.eta?.min);
+  if (Number.isFinite(etaMin) && etaMin > 0) return etaMin;
+
+  const estimatedDeliveryTime = Number(order?.estimatedDeliveryTime ?? order?.estimatedTime ?? order?.estimated_delivery_time);
+  if (Number.isFinite(estimatedDeliveryTime) && estimatedDeliveryTime > 0) return estimatedDeliveryTime;
+
+  return 35;
+};
+
 const mergeOrdersWithApiPrecedence = (contextOrders = [], apiOrders = []) => {
   const mergedMap = new Map();
   contextOrders.forEach((order) => {
@@ -101,7 +114,7 @@ export default function OrderTrackingCard() {
       setActiveOrder(active);
       // Calculate estimated delivery time
       const orderTime = new Date(active.createdAt || active.orderDate || active.created_at || active.date || Date.now());
-      const estimatedMinutes = active.estimatedDeliveryTime || active.estimatedTime || active.estimated_delivery_time || 35;
+      const estimatedMinutes = getEstimatedMinutesFromOrder(active);
       const deliveryTime = new Date(orderTime.getTime() + estimatedMinutes * 60000);
       const remaining = Math.max(0, Math.floor((deliveryTime - new Date()) / 60000));
       setTimeRemaining(remaining);
@@ -133,7 +146,7 @@ export default function OrderTrackingCard() {
         return;
       }
       const orderTime = new Date(currentActive.createdAt || currentActive.orderDate || currentActive.created_at || Date.now());
-      const estimatedMinutes = currentActive.estimatedDeliveryTime || currentActive.estimatedTime || currentActive.estimated_delivery_time || 35;
+      const estimatedMinutes = getEstimatedMinutesFromOrder(currentActive);
       const deliveryTime = new Date(orderTime.getTime() + estimatedMinutes * 60000);
       const remaining = Math.max(0, Math.floor((deliveryTime - new Date()) / 60000));
       setTimeRemaining(remaining);

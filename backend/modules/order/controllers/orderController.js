@@ -306,6 +306,26 @@ export const createOrder = async (req, res) => {
     }
     await order.save();
 
+    const buildOrderResponse = () => {
+      const etaMin = Number(order?.eta?.min);
+      const etaMax = Number(order?.eta?.max);
+      const hasEtaRange = Number.isFinite(etaMin) && Number.isFinite(etaMax);
+      const estimatedDeliveryTime = Number(order?.estimatedDeliveryTime);
+
+      return {
+        id: order._id.toString(),
+        orderId: order.orderId,
+        status: order.status,
+        total: pricingData.total,
+        estimatedDeliveryTime: Number.isFinite(estimatedDeliveryTime) ? estimatedDeliveryTime : null,
+        eta: hasEtaRange ? {
+          min: etaMin,
+          max: etaMax,
+          formatted: `${etaMin}-${etaMax} mins`
+        } : null
+      };
+    };
+
     // Log order creation for debugging
 
     // For wallet payments, check balance and deduct before creating order
@@ -398,12 +418,7 @@ export const createOrder = async (req, res) => {
         return res.status(201).json({
           success: true,
           data: {
-            order: {
-              id: order._id.toString(),
-              orderId: order.orderId,
-              status: order.status,
-              total: pricingData.total
-            },
+            order: buildOrderResponse(),
             razorpay: null,
             wallet: {
               balance: wallet.balance,
@@ -501,12 +516,7 @@ export const createOrder = async (req, res) => {
       return res.status(201).json({
         success: true,
         data: {
-          order: {
-            id: order._id.toString(),
-            orderId: order.orderId,
-            status: order.status,
-            total: pricingData.total
-          },
+          order: buildOrderResponse(),
           razorpay: null
         }
       });
@@ -626,12 +636,7 @@ export const createOrder = async (req, res) => {
     res.status(201).json({
       success: true,
       data: {
-        order: {
-          id: order._id.toString(),
-          orderId: order.orderId,
-          status: order.status,
-          total: pricingData.total
-        },
+        order: buildOrderResponse(),
         razorpay: razorpayOrder ? {
           orderId: razorpayOrder.id,
           amount: razorpayOrder.amount,
@@ -710,6 +715,26 @@ export const verifyOrderPayment = async (req, res) => {
       });
     }
 
+    const buildVerificationOrderResponse = () => {
+      const etaMin = Number(order?.eta?.min);
+      const etaMax = Number(order?.eta?.max);
+      const hasEtaRange = Number.isFinite(etaMin) && Number.isFinite(etaMax);
+      const estimatedDeliveryTime = Number(order?.estimatedDeliveryTime);
+
+      return {
+        id: order._id.toString(),
+        orderId: order.orderId,
+        status: order.status,
+        paymentStatus: order.payment.status,
+        estimatedDeliveryTime: Number.isFinite(estimatedDeliveryTime) ? estimatedDeliveryTime : null,
+        eta: hasEtaRange ? {
+          min: etaMin,
+          max: etaMax,
+          formatted: `${etaMin}-${etaMax} mins`
+        } : null
+      };
+    };
+
     // If payment is already completed, retry restaurant notification if it was missed (idempotent).
     if (String(order.payment?.status || '').toLowerCase().trim() === 'completed') {
       try {
@@ -731,12 +756,7 @@ export const verifyOrderPayment = async (req, res) => {
         success: true,
         message: 'Payment already completed for this order.',
         data: {
-          order: {
-            id: order._id.toString(),
-            orderId: order.orderId,
-            status: order.status,
-            paymentStatus: order.payment.status
-          }
+          order: buildVerificationOrderResponse()
         }
       });
     }
@@ -916,12 +936,7 @@ export const verifyOrderPayment = async (req, res) => {
         ? 'Payment captured and order confirmed. Restaurant will receive the order now.'
         : 'Payment signature verified. Final confirmation will happen after webhook capture.',
       data: {
-        order: {
-          id: order._id.toString(),
-          orderId: order.orderId,
-          status: order.status,
-          paymentStatus: order.payment.status
-        },
+        order: buildVerificationOrderResponse(),
         payment: {
           id: payment._id.toString(),
           paymentId: payment.paymentId,
@@ -998,7 +1013,7 @@ export const getUserOrders = async (req, res) => {
       .sort({ createdAt: -1 })
       .limit(parseInt(limit))
       .skip(skip)
-      .select('orderId status pricing items address createdAt restaurantName restaurantId')
+      .select('orderId status pricing items address createdAt restaurantName restaurantId estimatedDeliveryTime eta')
       .populate('restaurantId', 'name slug profileImage address location')
       .lean();
     const total = await Order.countDocuments(query);

@@ -89,8 +89,14 @@ export default function OrdersPage({ statusKey = "all" }) {
     (page) => ({
       page,
       limit: PAGE_SIZE,
-      status: statusKey === "all" ? undefined : statusKey === "restaurant-cancelled" ? "cancelled" : statusKey,
+      status:
+        statusKey === "all" || statusKey === "offline-payments"
+          ? undefined
+          : statusKey === "restaurant-cancelled"
+            ? "cancelled"
+            : statusKey,
       cancelledBy: statusKey === "restaurant-cancelled" ? "restaurant" : undefined,
+      paymentType: statusKey === "offline-payments" ? "cod" : undefined,
     }),
     [statusKey],
   )

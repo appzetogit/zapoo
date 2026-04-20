@@ -22,7 +22,8 @@ export const getOrders = asyncHandler(async (req, res) => {
       paymentStatus,
       zone,
       customer,
-      cancelledBy
+      cancelledBy,
+      paymentType
     } = req.query;
 
     // Build query
@@ -30,6 +31,11 @@ export const getOrders = asyncHandler(async (req, res) => {
 
     // Status filter
     if (status && status !== 'all') {
+      if (status === 'offline-payments') {
+        query['payment.method'] = {
+          $in: ['cash', 'cod']
+        };
+      } else {
       // Map frontend status keys to backend status values
       const statusMap = {
         'scheduled': 'scheduled',
@@ -43,9 +49,7 @@ export const getOrders = asyncHandler(async (req, res) => {
         // Restaurant cancelled orders
         'payment-failed': 'pending',
         // Payment failed orders have pending status
-        'refunded': 'cancelled',
-        // Refunded orders might be cancelled
-        'offline-payments': 'pending' // Offline payment orders
+        'refunded': 'cancelled' // Refunded orders might be cancelled
       };
       const mappedStatus = statusMap[status] || status;
       query.status = mappedStatus;
@@ -55,6 +59,7 @@ export const getOrders = asyncHandler(async (req, res) => {
         query.cancellationReason = {
           $regex: /rejected by restaurant|restaurant rejected|restaurant cancelled/i
         };
+      }
       }
     }
 
@@ -69,6 +74,21 @@ export const getOrders = asyncHandler(async (req, res) => {
     // Payment status filter
     if (paymentStatus) {
       query['payment.status'] = paymentStatus.toLowerCase();
+    }
+
+    if (paymentType) {
+      const normalizedPaymentType = String(paymentType).toLowerCase();
+      if (normalizedPaymentType === 'cod' || normalizedPaymentType === 'cash') {
+        query['payment.method'] = {
+          $in: ['cash', 'cod']
+        };
+      } else if (normalizedPaymentType === 'wallet') {
+        query['payment.method'] = 'wallet';
+      } else if (normalizedPaymentType === 'online') {
+        query['payment.method'] = {
+          $nin: ['cash', 'cod', 'wallet']
+        };
+      }
     }
 
     // Date range filter

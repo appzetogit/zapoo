@@ -86,6 +86,7 @@ export default function HubMenu() {
   const [uploadingAddonImages, setUploadingAddonImages] = useState(false);
   const [editingAddon, setEditingAddon] = useState(null); // Store addon being edited
   const addonFileInputRef = useRef(null);
+  const addonCameraInputRef = useRef(null);
 
   // Restaurant info - fetch from backend
   const restaurantName = restaurantData?.name || "";
@@ -465,8 +466,9 @@ export default function HubMenu() {
   // Handle add-on image add
   const handleAddonImageAdd = e => {
     const picked = processAddonImageFiles(e.target.files);
-    if (picked && addonFileInputRef.current) {
-      addonFileInputRef.current.value = "";
+    if (picked) {
+      if (addonFileInputRef.current) addonFileInputRef.current.value = "";
+      if (addonCameraInputRef.current) addonCameraInputRef.current.value = "";
     }
   };
 
@@ -1931,7 +1933,24 @@ export default function HubMenu() {
               </div>}
 
               {/* Add Image Button */}
-              <input ref={addonFileInputRef} type="file" accept="image/*" multiple onChange={handleAddonImageAdd} className="hidden" id="addon-image-upload" />
+              <input
+                ref={addonFileInputRef}
+                type="file"
+                accept=".png,.jpg,.jpeg,.webp"
+                multiple
+                onChange={handleAddonImageAdd}
+                className="hidden"
+                id="addon-image-upload"
+              />
+              <input
+                ref={addonCameraInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={handleAddonImageAdd}
+                className="hidden"
+                id="addon-camera-upload"
+              />
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <button
                   type="button"
@@ -1954,7 +1973,7 @@ export default function HubMenu() {
                       const picked = await captureAddonImageFromCamera();
                       if (picked) return;
                     }
-                    addonFileInputRef.current?.click();
+                    addonCameraInputRef.current?.click();
                   }}
                   className="flex items-center justify-center gap-2 px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg hover:border-[#3B82F6] hover:bg-blue-50 transition-colors"
                 >
