@@ -15,6 +15,13 @@ export default function AdvertisementsPage() {
   const [loading, setLoading] = useState(true);
   const [advertisements, setAdvertisements] = useState([]);
   const [processingPayment, setProcessingPayment] = useState(false);
+  const adPaymentUiDebug = (step, meta = {}) => {
+    try {
+      console.log("[AD_PAYMENT_UI_DEBUG]", step, meta);
+    } catch (_) {
+      // no-op
+    }
+  };
   const fetchAds = async () => {
     try {
       setLoading(true);
@@ -33,11 +40,25 @@ export default function AdvertisementsPage() {
   }, []);
   const handlePayNow = async ad => {
     try {
+      adPaymentUiDebug("pay_now_clicked", {
+        adId: ad?._id || null,
+        adStatus: ad?.status || null,
+        paymentStatus: ad?.paymentStatus || null,
+        totalCost: ad?.totalCost || null
+      });
       setProcessingPayment(true);
       toast.loading("Initializing payment...");
 
       // 1. Create Order
       const orderRes = await marketingAPI.createAdPaymentOrder(ad._id);
+      adPaymentUiDebug("create_order_response", {
+        adId: ad?._id || null,
+        success: Boolean(orderRes?.data?.success),
+        hasData: Boolean(orderRes?.data?.data),
+        orderId: orderRes?.data?.data?.orderId || orderRes?.data?.data?.order_id || null,
+        amount: orderRes?.data?.data?.amount || null,
+        currency: orderRes?.data?.data?.currency || null
+      });
       if (orderRes.data?.data?.freeActivation) {
         toast.dismiss();
         toast.success("Free banner reward applied. Your ad is ready for admin banner upload.");
@@ -52,15 +73,33 @@ export default function AdvertisementsPage() {
         currency,
         key
       } = orderRes.data.data;
+      adPaymentUiDebug("create_order_payload_for_checkout", {
+        orderId,
+        amount,
+        currency,
+        keyPrefix: key ? String(key).slice(0, 6) : null
+      });
 
       // 2. Get Restaurant & Company Info
       // Use restaurantAPI because restaurant owners are authenticated via restaurant token
       const restaurantRes = await restaurantAPI.getCurrentRestaurant();
       const restaurant = restaurantRes.data.data?.restaurant || restaurantRes.data.restaurant || {};
       const companyName = await getCompanyNameAsync();
+      adPaymentUiDebug("prefill_resolved", {
+        hasRestaurant: Boolean(restaurant),
+        hasName: Boolean(restaurant.name || restaurant.ownerName),
+        hasEmail: Boolean(restaurant.email || restaurant.ownerEmail),
+        hasContact: Boolean(restaurant.ownerPhone || restaurant.phone || restaurant.primaryContactNumber)
+      });
       toast.dismiss();
 
       // 3. Open Razorpay
+      adPaymentUiDebug("checkout_init_call", {
+        adId: ad?._id || null,
+        orderId,
+        amount,
+        currency
+      });
       await initRazorpayPayment({
         key,
         amount,
@@ -79,6 +118,12 @@ export default function AdvertisementsPage() {
         },
         handler: async response => {
           try {
+            adPaymentUiDebug("checkout_handler_received", {
+              adId: ad?._id || null,
+              razorpay_payment_id: response?.razorpay_payment_id || null,
+              razorpay_order_id: response?.razorpay_order_id || null,
+              has_signature: Boolean(response?.razorpay_signature)
+            });
             toast.loading("Verifying payment...");
 
             // 4. Verify Payment
@@ -88,6 +133,11 @@ export default function AdvertisementsPage() {
               razorpayOrderId: response.razorpay_order_id,
               razorpaySignature: response.razorpay_signature
             });
+            adPaymentUiDebug("verify_api_success", {
+              adId: ad?._id || null,
+              razorpay_order_id: response?.razorpay_order_id || null,
+              razorpay_payment_id: response?.razorpay_payment_id || null
+            });
             toast.dismiss();
             toast.success("Payment successful! Your ad is now live.");
 
@@ -95,6 +145,10 @@ export default function AdvertisementsPage() {
             fetchAds();
           } catch (verifyErr) {
             console.error(verifyErr);
+            adPaymentUiDebug("verify_api_error", {
+              adId: ad?._id || null,
+              message: verifyErr?.response?.data?.message || verifyErr?.message || null
+            });
             toast.dismiss();
             toast.error("Payment verification failed. Please contact support.");
           } finally {
@@ -103,15 +157,30 @@ export default function AdvertisementsPage() {
         },
         onError: err => {
           console.error(err);
+          adPaymentUiDebug("checkout_error_callback", {
+            adId: ad?._id || null,
+            message: err?.error?.description || err?.message || String(err),
+            code: err?.error?.code || null,
+            source: err?.error?.source || null,
+            step: err?.error?.step || null,
+            reason: err?.error?.reason || null
+          });
           toast.error("Payment failed. Please try again.");
           setProcessingPayment(false);
         },
         onClose: () => {
+          adPaymentUiDebug("checkout_closed_by_user", {
+            adId: ad?._id || null
+          });
           setProcessingPayment(false);
         }
       });
     } catch (error) {
       console.error(error);
+      adPaymentUiDebug("pay_now_catch_error", {
+        adId: ad?._id || null,
+        message: error?.response?.data?.message || error?.message || null
+      });
       toast.dismiss();
       toast.error(error.response?.data?.message || "Failed to initiate payment");
       setProcessingPayment(false);
