@@ -7,7 +7,6 @@ import OrdersTable from "../../components/orders/OrdersTable"
 import FilterPanel from "../../components/orders/FilterPanel"
 import ViewOrderDialog from "../../components/orders/ViewOrderDialog"
 import SettingsDialog from "../../components/orders/SettingsDialog"
-import RefundModal from "../../components/orders/RefundModal"
 import { useOrdersManagement } from "../../components/orders/useOrdersManagement"
 
 const PAGE_SIZE = 10
@@ -44,7 +43,7 @@ const statusConfig = {
     icon: Package,
   },
   canceled: {
-    title: "Canceled Orders",
+    title: "Cancelled Orders",
     color: "rose",
     icon: Package,
   },
@@ -81,9 +80,6 @@ export default function OrdersPage({ statusKey = "all" }) {
   const [currentPage, setCurrentPage] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
   const [totalPages, setTotalPages] = useState(1)
-  const [processingRefund, setProcessingRefund] = useState(null)
-  const [refundModalOpen, setRefundModalOpen] = useState(false)
-  const [selectedOrderForRefund, setSelectedOrderForRefund] = useState(null)
 
   const buildOrdersParams = useCallback(
     (page) => ({
@@ -92,9 +88,7 @@ export default function OrdersPage({ statusKey = "all" }) {
       status:
         statusKey === "all" || statusKey === "offline-payments"
           ? undefined
-          : statusKey === "restaurant-cancelled"
-            ? "cancelled"
-            : statusKey,
+          : statusKey,
       cancelledBy: statusKey === "restaurant-cancelled" ? "restaurant" : undefined,
       paymentType: statusKey === "offline-payments" ? "cod" : undefined,
     }),
@@ -201,86 +195,6 @@ export default function OrdersPage({ statusKey = "all" }) {
     await fetchPage(page)
   }
 
-  const handleRefund = (order) => {
-    const isWalletPayment = order.paymentType === "Wallet" || order.payment?.method === "wallet"
-    if (isWalletPayment) {
-      setSelectedOrderForRefund(order)
-      setRefundModalOpen(true)
-    } else {
-      const confirmMessage = `Are you sure you want to process refund for order ${order.orderId}?\n\nThis will initiate a Razorpay refund to the customer's original payment method.`
-      if (!confirm(confirmMessage)) {
-        return
-      }
-      processRefund(order, null)
-    }
-  }
-
-  const processRefund = async (order, refundAmount = null) => {
-    const orderIdToUse = order.id || order._id || order.orderId
-    if (!orderIdToUse) {
-      toast.error("Order ID not found. Please refresh the page and try again.")
-      return
-    }
-
-    try {
-      setProcessingRefund(orderIdToUse)
-      const requestData = refundAmount !== null ? { refundAmount: parseFloat(refundAmount) } : {}
-      const response = await adminAPI.processRefund(orderIdToUse, requestData)
-      if (response.data?.success) {
-        const isWalletPayment = order.paymentType === "Wallet" || order.payment?.method === "wallet"
-        toast.success(
-          response.data?.message ||
-            (isWalletPayment
-              ? `Wallet refund of Rs.${refundAmount || order.totalAmount} processed successfully for order ${order.orderId}`
-              : `Refund initiated successfully for order ${order.orderId}`),
-        )
-
-        setOrders((prevOrders) =>
-          prevOrders.map((existingOrder) =>
-            existingOrder.id === order.id || existingOrder.orderId === order.orderId
-              ? { ...existingOrder, refundStatus: "processed" }
-              : existingOrder,
-          ),
-        )
-      } else {
-        toast.error(response.data?.message || "Failed to process refund")
-      }
-    } catch (error) {
-      console.error("Error processing refund:", error)
-
-      let errorMessage = "Failed to process refund"
-      if (error.response) {
-        if (error.response.status === 404) {
-          errorMessage = `Order not found (ID: ${orderIdToUse}). Please check if the order exists.`
-        } else if (error.response.status === 400) {
-          errorMessage = error.response.data?.message || "Invalid request. Please check the refund amount."
-        } else if (error.response.status === 500) {
-          errorMessage = error.response.data?.message || "Server error. Please try again later."
-        } else if (error.response.data?.message) {
-          errorMessage = error.response.data.message
-        } else {
-          errorMessage = `Error ${error.response.status}: ${error.response.statusText || "Unknown error"}`
-        }
-      } else if (error.request) {
-        errorMessage = "Network error. Please check your internet connection and try again."
-      } else {
-        errorMessage = error.message || "Failed to process refund"
-      }
-
-      toast.error(errorMessage)
-    } finally {
-      setProcessingRefund(null)
-      setRefundModalOpen(false)
-      setSelectedOrderForRefund(null)
-    }
-  }
-
-  const handleRefundConfirm = (amount) => {
-    if (selectedOrderForRefund) {
-      processRefund(selectedOrderForRefund, amount)
-    }
-  }
-
   const {
     searchQuery,
     setSearchQuery,
@@ -351,20 +265,11 @@ export default function OrdersPage({ statusKey = "all" }) {
 
       <ViewOrderDialog isOpen={isViewOrderOpen} onOpenChange={setIsViewOrderOpen} order={selectedOrder} />
 
-      <RefundModal
-        isOpen={refundModalOpen}
-        onOpenChange={setRefundModalOpen}
-        order={selectedOrderForRefund}
-        onConfirm={handleRefundConfirm}
-        isProcessing={processingRefund !== null}
-      />
-
       <OrdersTable
         orders={filteredOrders}
         visibleColumns={visibleColumns}
         onViewOrder={handleViewOrder}
         onPrintOrder={handlePrintOrder}
-        onRefund={handleRefund}
         currentPage={currentPage}
         totalPages={totalPages}
         totalItems={totalCount}

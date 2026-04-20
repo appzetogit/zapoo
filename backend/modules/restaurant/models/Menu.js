@@ -79,6 +79,7 @@ const addonSchema = new mongoose.Schema({
   name: { type: String, required: true },
   description: { type: String, default: '' },
   price: { type: Number, required: true },
+  foodType: { type: String, enum: ['Veg', 'Non-Veg', 'Egg'] },
   image: { type: String, default: '' },
   images: { type: [String], default: [] }, // Multiple images support
   isAvailable: { type: Boolean, default: true },
@@ -113,4 +114,3 @@ const menuSchema = new mongoose.Schema({
 menuSchema.index({ restaurant: 1, isActive: 1 });
 
 export default mongoose.model('Menu', menuSchema);
-

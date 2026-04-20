@@ -31,44 +31,47 @@ export const getOrders = asyncHandler(async (req, res) => {
 
     // Status filter
     if (status && status !== 'all') {
-      if (status === 'offline-payments') {
+      const normalizedStatus = String(status).toLowerCase();
+
+      if (normalizedStatus === 'offline-payments') {
         query['payment.method'] = {
           $in: ['cash', 'cod']
         };
       } else {
-      // Map frontend status keys to backend status values
-      const statusMap = {
-        'scheduled': 'scheduled',
-        'pending': 'pending',
-        'accepted': 'confirmed',
-        'processing': 'preparing',
-        'food-on-the-way': 'out_for_delivery',
-        'delivered': 'delivered',
-        'canceled': 'cancelled',
-        'restaurant-cancelled': 'cancelled',
-        // Restaurant cancelled orders
-        'payment-failed': 'pending',
-        // Payment failed orders have pending status
-        'refunded': 'cancelled' // Refunded orders might be cancelled
-      };
-      const mappedStatus = statusMap[status] || status;
-      query.status = mappedStatus;
-
-      // If restaurant-cancelled, filter by cancellation reason
-      if (status === 'restaurant-cancelled') {
-        query.cancellationReason = {
-          $regex: /rejected by restaurant|restaurant rejected|restaurant cancelled/i
+        // Map frontend status keys to backend status values
+        const statusMap = {
+          'scheduled': 'scheduled',
+          'pending': 'pending',
+          'accepted': 'confirmed',
+          'food-on-the-way': 'out_for_delivery',
+          'delivered': 'delivered',
+          'canceled': 'cancelled',
+          'cancelled': 'cancelled',
+          'refunded': 'refunded'
         };
-      }
+
+        if (normalizedStatus === 'processing') {
+          // Keep support for both historical and current processing values.
+          query.status = {
+            $in: ['preparing', 'processing']
+          };
+        } else if (normalizedStatus === 'restaurant-cancelled') {
+          query.status = 'cancelled';
+          query.cancelledBy = 'restaurant';
+        } else if (normalizedStatus === 'payment-failed') {
+          // Payment-failed orders are stored with failed order/payment status.
+          query.status = 'failed';
+        } else {
+          const mappedStatus = statusMap[normalizedStatus] || normalizedStatus;
+          query.status = mappedStatus;
+        }
       }
     }
 
     // Also handle cancelledBy query parameter (if passed separately)
     if (cancelledBy === 'restaurant') {
       query.status = 'cancelled';
-      query.cancellationReason = {
-        $regex: /rejected by restaurant|restaurant rejected|restaurant cancelled/i
-      };
+      query.cancelledBy = 'restaurant';
     }
 
     // Payment status filter

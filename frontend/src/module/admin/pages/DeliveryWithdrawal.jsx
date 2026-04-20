@@ -351,6 +351,12 @@ export default function DeliveryWithdrawal() {
                     <p className="text-sm font-medium text-slate-900 mt-1">{selectedRequest.upiId}</p>
                   </div>
                 )}
+                {selectedRequest.bankDetails?.accountNumber && (
+                  <div>
+                    <label className="text-xs font-semibold text-slate-500 uppercase">Account number</label>
+                    <p className="text-sm font-medium text-slate-900 mt-1">{selectedRequest.bankDetails.accountNumber}</p>
+                  </div>
+                )}
               </div>
             )}
             <DialogFooter className="px-6 pb-6">

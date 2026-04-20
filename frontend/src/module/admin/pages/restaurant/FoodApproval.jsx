@@ -341,14 +341,6 @@ export default function FoodApproval() {
                     <label className="text-xs font-bold text-gray-400 uppercase">Category</label>
                     <p className="text-sm text-gray-900 font-medium">{selectedRequest.category || selectedRequest.item?.category || '-'}</p>
                   </div>
-                  <div>
-                    <label className="text-xs font-bold text-gray-400 uppercase">Section</label>
-                    <p className="text-sm text-gray-900 font-medium">{selectedRequest.sectionName || '-'}</p>
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-gray-400 uppercase">Food Type</label>
-                    <p className="text-sm text-gray-900 font-medium">{selectedRequest.foodType || '-'}</p>
-                  </div>
                 </div>
 
                 {selectedRequest.description && (

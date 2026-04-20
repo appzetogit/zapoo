@@ -30,7 +30,6 @@ export default function OrdersTable({
   visibleColumns,
   onViewOrder,
   onPrintOrder,
-  onRefund,
   currentPage: currentPageProp,
   totalPages: totalPagesProp,
   totalItems: totalItemsProp,
@@ -335,59 +334,6 @@ export default function OrdersTable({
                       >
                         <Printer className="w-4 h-4" />
                       </button>
-                      {/* Show Refund button or Refunded status for cancelled orders with Online/Wallet payment (restaurant or user cancelled) */}
-                      {(() => {
-                        // Check if order is cancelled by restaurant or user
-                        const isCancelled = order.orderStatus === "Cancelled by Restaurant" || 
-                                          order.orderStatus === "Cancelled" || 
-                                          order.orderStatus === "Cancelled by User" ||
-                                          (order.status === "cancelled" && (order.cancelledBy === "user" || order.cancelledBy === "restaurant"));
-                        
-                        // Check if payment type is Online or Wallet (not Cash on Delivery)
-                        const paymentMethod = order.payment?.method || order.paymentMethod;
-                        const isOnlinePayment = order.paymentType === "Online" ||
-                                              (order.paymentType !== "Cash on Delivery" && 
-                                               order.payment?.method !== "cash" && 
-                                               order.payment?.method !== "cod" &&
-                                               (order.paymentMethod === "razorpay" || 
-                                                order.paymentMethod === "online" || 
-                                                order.payment?.paymentMethod === "razorpay" || 
-                                                order.payment?.method === "razorpay" ||
-                                                order.payment?.method === "online"));
-                        
-                        const isWalletPayment = order.paymentType === "Wallet" || paymentMethod === "wallet";
-                        
-                        return isCancelled && (isOnlinePayment || isWalletPayment);
-                      })() && (
-                        <>
-                          {order.refundStatus === 'processed' || order.refundStatus === 'initiated' ? (
-                            <span className={`px-3 py-1.5 rounded-md text-xs font-medium ${
-                              order.paymentType === "Wallet" || order.payment?.method === "wallet"
-                                ? "bg-purple-100 text-purple-700"
-                                : "bg-emerald-100 text-emerald-700"
-                            }`}>
-                              {order.paymentType === "Wallet" || order.payment?.method === "wallet" 
-                                ? "Wallet Refunded" 
-                                : "Refunded"}
-                            </span>
-                          ) : onRefund ? (
-                            <button 
-                              onClick={() => onRefund(order)}
-                              className={`px-3 py-1.5 rounded-md text-white text-xs font-medium hover:opacity-90 transition-colors shadow-sm flex items-center gap-1.5 ${
-                                order.paymentType === "Wallet" || order.payment?.method === "wallet"
-                                  ? "bg-purple-600 hover:bg-purple-700"
-                                  : "bg-blue-600 hover:bg-blue-700"
-                              }`}
-                              title={order.paymentType === "Wallet" || order.payment?.method === "wallet"
-                                ? "Process Wallet Refund (Add to user wallet)"
-                                : "Process Refund via Razorpay"}
-                            >
-                              <span className="text-sm">₹</span>
-                              <span>Refund</span>
-                            </button>
-                          ) : null}
-                        </>
-                      )}
                     </div>
                   </td>
                 )}

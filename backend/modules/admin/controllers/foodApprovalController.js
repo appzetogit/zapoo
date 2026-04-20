@@ -80,6 +80,7 @@ export const getPendingFoodApprovals = asyncHandler(async (req, res) => {
             restaurantName: menu.restaurant.name,
             restaurantMongoId: menu.restaurant._id,
             price: addon.price,
+            foodType: addon.foodType,
             description: addon.description,
             image: addon.image || addon.images && addon.images[0] || '',
             images: Array.isArray(addon.images) && addon.images.length > 0 ? addon.images.filter(img => img && typeof img === 'string' && img.trim() !== '') : [],

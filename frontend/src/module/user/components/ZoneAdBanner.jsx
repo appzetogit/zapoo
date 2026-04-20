@@ -40,6 +40,9 @@ export default function ZoneAdBanner() {
     const [loading, setLoading] = useState(true)
     const [isPaused, setIsPaused] = useState(false)
     const impressionsLogged = useRef(new Set())
+    const touchStartXRef = useRef(0)
+    const touchStartYRef = useRef(0)
+    const didSwipeRef = useRef(false)
     const navigate = useNavigate()
 
     useEffect(() => {
@@ -159,6 +162,36 @@ export default function ZoneAdBanner() {
     }
 
     const currentAd = ads[currentSlide]
+    const SWIPE_THRESHOLD = 40
+
+    const handleTouchStart = (e) => {
+        if (!e.touches || e.touches.length === 0) return
+        const touch = e.touches[0]
+        touchStartXRef.current = touch.clientX
+        touchStartYRef.current = touch.clientY
+        didSwipeRef.current = false
+        setIsPaused(true)
+    }
+
+    const handleTouchEnd = (e) => {
+        if (!e.changedTouches || e.changedTouches.length === 0) {
+            setIsPaused(false)
+            return
+        }
+        const touch = e.changedTouches[0]
+        const deltaX = touch.clientX - touchStartXRef.current
+        const deltaY = touch.clientY - touchStartYRef.current
+
+        // Only treat as swipe when horizontal intent is clear.
+        if (Math.abs(deltaX) > SWIPE_THRESHOLD && Math.abs(deltaX) > Math.abs(deltaY)) {
+            didSwipeRef.current = true
+            setCurrentSlide((prev) => {
+                if (deltaX < 0) return (prev + 1) % ads.length
+                return (prev - 1 + ads.length) % ads.length
+            })
+        }
+        setIsPaused(false)
+    }
 
     return (
         <div className="w-full py-3">
@@ -166,7 +199,15 @@ export default function ZoneAdBanner() {
                 className="relative w-full aspect-[3/1] md:aspect-[4/1] lg:aspect-[5/1] overflow-hidden rounded-2xl cursor-pointer group shadow-sm hover:shadow-md transition-all bg-gray-100"
                 onMouseEnter={() => setIsPaused(true)}
                 onMouseLeave={() => setIsPaused(false)}
-                onClick={() => handleClick(currentAd)}
+                onTouchStart={handleTouchStart}
+                onTouchEnd={handleTouchEnd}
+                onClick={() => {
+                    if (didSwipeRef.current) {
+                        didSwipeRef.current = false
+                        return
+                    }
+                    handleClick(currentAd)
+                }}
             >
                 <AnimatePresence mode="wait">
                     <motion.div

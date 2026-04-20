@@ -21,7 +21,22 @@ const logger = winston.createLogger({
   })]
 });
 
-const isSunday = (date = new Date()) => date.getDay() === 0;
+const toIstYmd = (value = new Date()) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(date);
+};
+
+const isSunday = (date = new Date()) =>
+  new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Kolkata',
+    weekday: 'short'
+  }).format(new Date(date)) === 'Sun';
 
 /**
  * Get Wallet Balance
@@ -454,14 +469,10 @@ export const createWithdrawalRequest = asyncHandler(async (req, res) => {
     const settings = await BusinessSettings.getSettings().catch(() => null);
     const windowCfg = settings?.withdrawalWindows?.delivery;
     const now = new Date();
-    const isSameDay = (a, b) =>
-      a && b &&
-      a.getFullYear() === b.getFullYear() &&
-      a.getMonth() === b.getMonth() &&
-      a.getDate() === b.getDate();
     const openDates = windowCfg?.openDates || [];
     const closedDates = windowCfg?.closedDates || [];
-    const isInList = (list) => list.some((d) => isSameDay(new Date(d), now));
+    const todayIst = toIstYmd(now);
+    const isInList = (list) => list.some((d) => toIstYmd(d) === todayIst);
     if (isInList(closedDates)) {
       return errorResponse(res, 400, 'Withdrawal window is temporarily closed');
     }

@@ -703,6 +703,7 @@ export const addAddon = asyncHandler(async (req, res) => {
     name,
     description,
     price,
+    foodType,
     image,
     images
   } = req.body;
@@ -711,6 +712,9 @@ export const addAddon = asyncHandler(async (req, res) => {
   }
   if (price === undefined || price === null || price < 0) {
     return errorResponse(res, 400, 'Add-on price is required and must be non-negative');
+  }
+  if (!['Veg', 'Non-Veg', 'Egg'].includes(foodType)) {
+    return errorResponse(res, 400, 'Add-on food type is required and must be Veg, Non-Veg, or Egg');
   }
 
   // Find or create menu
@@ -735,6 +739,7 @@ export const addAddon = asyncHandler(async (req, res) => {
     name: name.trim(),
     description: description || '',
     price: Number(price) || 0,
+    foodType,
     image: normalizedImages.length > 0 ? normalizedImages[0] : '',
     images: normalizedImages,
     isAvailable: true,
@@ -839,6 +844,7 @@ export const updateAddon = asyncHandler(async (req, res) => {
     name,
     description,
     price,
+    foodType,
     image,
     images,
     isAvailable
@@ -881,6 +887,9 @@ export const updateAddon = asyncHandler(async (req, res) => {
   if (price === undefined || price === null || price < 0) {
     return errorResponse(res, 400, 'Add-on price is required and must be non-negative');
   }
+  if (!['Veg', 'Non-Veg', 'Egg'].includes(foodType)) {
+    return errorResponse(res, 400, 'Add-on food type is required and must be Veg, Non-Veg, or Egg');
+  }
 
   // Normalize images array
   const normalizedImages = Array.isArray(images) && images.length > 0 ? images.filter(img => img && typeof img === 'string' && img.trim() !== '') : image && image.trim() !== '' ? [image] : [];
@@ -889,6 +898,7 @@ export const updateAddon = asyncHandler(async (req, res) => {
   addon.name = name.trim();
   addon.description = description || '';
   addon.price = Number(price) || 0;
+  addon.foodType = foodType;
   addon.image = normalizedImages.length > 0 ? normalizedImages[0] : '';
   addon.images = normalizedImages;
 

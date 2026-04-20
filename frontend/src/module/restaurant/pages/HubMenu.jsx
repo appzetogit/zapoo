@@ -80,6 +80,7 @@ export default function HubMenu() {
   // Add-on form state
   const [addonName, setAddonName] = useState("");
   const [addonDescription, setAddonDescription] = useState("");
+  const [addonFoodType, setAddonFoodType] = useState("");
   const [addonPrice, setAddonPrice] = useState("");
   const [addonImages, setAddonImages] = useState([]);
   const [addonImageFiles, setAddonImageFiles] = useState(new Map());
@@ -418,9 +419,9 @@ export default function HubMenu() {
       if (showLoading) setLoadingAddons(true);
       const response = await restaurantAPI.getAddons();
       const data = response?.data?.data?.addons || response?.data?.addons || [];
-      // Filter to show only approved add-ons
-      const approvedAddons = data.filter(addon => addon.approvalStatus === 'approved');
-      setAddons(approvedAddons);
+      // Restaurant should see its own add-ons in all approval states
+      // (pending/approved/rejected), similar to item flow.
+      setAddons(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Error fetching add-ons:', error);
       toast.error('Failed to load add-ons');
@@ -537,6 +538,10 @@ export default function HubMenu() {
       toast.error("Please enter a valid price");
       return;
     }
+    if (!["Veg", "Non-Veg", "Egg"].includes(addonFoodType)) {
+      toast.error("Please select add-on food type");
+      return;
+    }
     try {
       setUploadingAddonImages(true);
 
@@ -568,6 +573,7 @@ export default function HubMenu() {
       const addonData = {
         name: addonName.trim(),
         description: addonDescription.trim(),
+        foodType: addonFoodType,
         price: parseFloat(addonPrice) || 0,
         image: allImageUrls.length > 0 ? allImageUrls[0] : '',
         images: allImageUrls
@@ -585,6 +591,7 @@ export default function HubMenu() {
       // Reset form
       setAddonName("");
       setAddonDescription("");
+      setAddonFoodType("");
       setAddonPrice("");
       setAddonImages([]);
       setAddonImageFiles(new Map());
@@ -606,6 +613,11 @@ export default function HubMenu() {
     setEditingAddon(addon);
     setAddonName(addon.name || "");
     setAddonDescription(addon.description || "");
+    setAddonFoodType(
+      addon.foodType === "Veg" || addon.foodType === "Non-Veg" || addon.foodType === "Egg"
+        ? addon.foodType
+        : ""
+    );
     setAddonPrice(addon.price?.toString() || "");
     setAddonImages(addon.images && addon.images.length > 0 ? addon.images : addon.image ? [addon.image] : []);
     setAddonImageFiles(new Map());
@@ -632,6 +644,7 @@ export default function HubMenu() {
     if (!isAddAddonModalOpen) {
       setAddonName("");
       setAddonDescription("");
+      setAddonFoodType("");
       setAddonPrice("");
       setAddonImages([]);
       setAddonImageFiles(new Map());
@@ -718,6 +731,16 @@ export default function HubMenu() {
     }
     return filtered;
   }, [menuData, activeFilter, searchQuery]);
+
+  const filteredAddons = useMemo(() => {
+    const query = searchQuery.toLowerCase().trim();
+    if (!query) return addons;
+    return addons.filter(addon =>
+      addon?.name?.toLowerCase().includes(query) ||
+      addon?.description?.toLowerCase().includes(query) ||
+      addon?.foodType?.toLowerCase().includes(query)
+    );
+  }, [addons, searchQuery]);
 
   // Toggle group expansion
   const toggleGroup = groupId => {
@@ -1802,7 +1825,30 @@ export default function HubMenu() {
             </div>
           </div>
           <div className="flex-1 overflow-y-auto px-4 py-4">
-            {searchQuery.trim() ? filteredMenuGroups.length > 0 ? <div className="space-y-4">
+            {searchQuery.trim() ? activeTab === "add-ons" ? filteredAddons.length > 0 ? <div className="space-y-3">
+              {filteredAddons.map(addon => <div key={addon.id} className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 bg-white">
+                {addon.images && addon.images.length > 0 && addon.images[0] ? <img src={addon.images[0]} alt={addon.name} className="w-14 h-14 rounded-lg object-cover shrink-0" onError={e => {
+                  e.target.style.display = 'none';
+                }} /> : <div className="w-14 h-14 rounded-lg bg-gray-100 shrink-0" />}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h4 className="text-sm font-bold text-gray-900 truncate">{addon.name}</h4>
+                    {addon.approvalStatus === 'pending' && <span className="px-1.5 py-0.5 text-[10px] font-medium bg-yellow-100 text-yellow-800 rounded">Pending</span>}
+                    {addon.approvalStatus === 'approved' && <span className="px-1.5 py-0.5 text-[10px] font-medium bg-green-100 text-green-800 rounded">Approved</span>}
+                    {addon.approvalStatus === 'rejected' && <span className="px-1.5 py-0.5 text-[10px] font-medium bg-red-100 text-red-800 rounded">Rejected</span>}
+                  </div>
+                  {addon.description && <p className="text-xs text-gray-500 line-clamp-1">{addon.description}</p>}
+                  <p className="text-sm font-semibold text-gray-800 mt-1">₹{addon.price}</p>
+                </div>
+              </div>)}
+            </div> : <div className="flex flex-col items-center justify-center py-20 px-4">
+              <div className="text-center">
+                <p className="text-lg font-medium text-gray-500">No add-ons found</p>
+                <p className="text-sm text-gray-400 mt-2">
+                  Try searching with different keywords
+                </p>
+              </div>
+            </div> : filteredMenuGroups.length > 0 ? <div className="space-y-4">
               {filteredMenuGroups.map(group => <div key={group.id} className="space-y-3">
                 <h3 className="text-sm font-bold text-gray-900 uppercase">
                   {group.name} ({group.items.length})
@@ -1845,14 +1891,14 @@ export default function HubMenu() {
                 <Search className="w-12 h-12 text-gray-300 mx-auto mb-3" />
                 <p className="text-lg font-medium text-gray-500">Start searching</p>
                 <p className="text-sm text-gray-400 mt-2">
-                  Type to search for food items by name or category
+                  Type to search by name
                 </p>
               </div>
             </div>}
           </div>
-          {searchQuery.trim() && filteredMenuGroups.length > 0 && <div className="px-4 py-3 border-t border-gray-200">
+          {searchQuery.trim() && (activeTab === "add-ons" ? filteredAddons.length > 0 : filteredMenuGroups.length > 0) && <div className="px-4 py-3 border-t border-gray-200">
             <button onClick={() => setIsSearchOpen(false)} className="w-full py-3 rounded-lg font-semibold text-sm bg-[#3B82F6] text-white hover:bg-blue-700 transition-colors">
-              View Results ({filteredMenuGroups.reduce((acc, group) => acc + group.items.length, 0)} items)
+              View Results ({activeTab === "add-ons" ? filteredAddons.length : filteredMenuGroups.reduce((acc, group) => acc + group.items.length, 0)} items)
             </button>
           </div>}
         </motion.div>
@@ -1904,6 +1950,48 @@ export default function HubMenu() {
                 Description
               </label>
               <textarea value={addonDescription} onChange={e => setAddonDescription(e.target.value)} placeholder="Describe the add-on..." rows={3} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3B82F6] focus:border-transparent resize-none" />
+            </div>
+
+            {/* Food Type Field */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Food Type <span className="text-red-500">*</span>
+              </label>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setAddonFoodType("Veg")}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                    addonFoodType === "Veg"
+                      ? "border-2 border-green-600 text-green-700 bg-green-50"
+                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  }`}
+                >
+                  Veg
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAddonFoodType("Non-Veg")}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                    addonFoodType === "Non-Veg"
+                      ? "border-2 border-red-600 text-red-700 bg-red-50"
+                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  }`}
+                >
+                  Non-Veg
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAddonFoodType("Egg")}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                    addonFoodType === "Egg"
+                      ? "border-2 border-yellow-600 text-yellow-700 bg-yellow-50"
+                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  }`}
+                >
+                  Egg
+                </button>
+              </div>
             </div>
 
             {/* Price Field */}
@@ -1990,7 +2078,7 @@ export default function HubMenu() {
             <button onClick={() => setIsAddAddonModalOpen(false)} className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium">
               Cancel
             </button>
-            <button onClick={handleSaveAddon} disabled={!addonName.trim() || !addonPrice || uploadingAddonImages} className="flex-1 px-4 py-2 bg-[#3B82F6] text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors font-medium flex items-center justify-center gap-2">
+            <button onClick={handleSaveAddon} disabled={!addonName.trim() || !addonPrice || !addonFoodType || uploadingAddonImages} className="flex-1 px-4 py-2 bg-[#3B82F6] text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors font-medium flex items-center justify-center gap-2">
               {uploadingAddonImages ? <>
                 <Loader2 className="h-4 w-4 animate-spin" />
                 <span>Uploading...</span>

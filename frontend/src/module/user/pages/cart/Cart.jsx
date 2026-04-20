@@ -1445,11 +1445,29 @@ export default function Cart() {
                       e.target.onerror = null;
                       e.target.src = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200&h=200&fit=crop";
                     }} />
-                            <div className="absolute top-1 md:top-2 left-1 md:left-2">
-                              <div className="w-3.5 h-3.5 md:w-4 md:h-4 bg-white dark:bg-[#0f0f0f] border border-green-600 dark:border-green-500 flex items-center justify-center rounded">
-                                <div className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-green-600" />
+                            {addon.foodType && (
+                              <div className="absolute top-1 md:top-2 left-1 md:left-2">
+                                <div
+                                  className={`w-3.5 h-3.5 md:w-4 md:h-4 bg-white dark:bg-[#0f0f0f] border flex items-center justify-center rounded ${
+                                    addon.foodType === "Veg"
+                                      ? "border-green-600 dark:border-green-500"
+                                      : addon.foodType === "Egg"
+                                      ? "border-yellow-600 dark:border-yellow-500"
+                                      : "border-red-600 dark:border-red-500"
+                                  }`}
+                                >
+                                  <div
+                                    className={`w-1.5 h-1.5 md:w-2 md:h-2 rounded-full ${
+                                      addon.foodType === "Veg"
+                                        ? "bg-green-600"
+                                        : addon.foodType === "Egg"
+                                        ? "bg-yellow-600"
+                                        : "bg-red-600"
+                                    }`}
+                                  />
+                                </div>
                               </div>
-                            </div>
+                            )}
                             <button onClick={() => {
                       // Use restaurant info from existing cart items to ensure format consistency
                       const cartRestaurantId = cart[0]?.restaurantId || restaurantId;
@@ -1471,7 +1489,8 @@ export default function Cart() {
                         price: addon.price,
                         image: addon.image || addon.images && addon.images[0] || "",
                         description: addon.description || "",
-                        isVeg: true,
+                        isVeg: addon.foodType === "Veg",
+                        foodType: addon.foodType || "",
                         restaurant: cartRestaurantName,
                         restaurantId: cartRestaurantId
                       });
