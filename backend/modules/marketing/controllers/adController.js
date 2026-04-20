@@ -34,6 +34,14 @@ import { uploadToCloudinary } from '../../../shared/utils/cloudinaryService.js';
 
 const FREE_BANNER_MESSAGE = 'You have won a free day banner';
 
+const adPaymentDebug = (step, meta = {}) => {
+  try {
+    console.log('[AD_PAYMENT_DEBUG]', step, meta);
+  } catch (_) {
+    // no-op
+  }
+};
+
 const parseCampaignDate = (input) => {
   if (!input) return null;
 
@@ -104,7 +112,16 @@ const calculateCampaignPricing = async ({ targetZoneIds, days }) => {
  */
 export const createAdRequest = async (req, res) => {
   try {
-    // DEBUG: Log what we receive
+    adPaymentDebug('create_ad_request_incoming', {
+      restaurantId: req.restaurant?._id || req.restaurant?.id || null,
+      hasBody: Boolean(req.body),
+      bodyKeys: req.body ? Object.keys(req.body) : [],
+      startDate: req.body?.startDate || null,
+      endDate: req.body?.endDate || null,
+      userAgent: req.headers['user-agent'] || null,
+      origin: req.headers.origin || null,
+      referer: req.headers.referer || null
+    });
 
     const {
       startDate,
@@ -129,6 +146,9 @@ export const createAdRequest = async (req, res) => {
       }
     }
     if (!Array.isArray(targetZones) || targetZones.length === 0) {
+      adPaymentDebug('create_ad_request_invalid_target_zones', {
+        receivedTargetZones: targetZones
+      });
       return res.status(400).json({
         success: false,
         message: 'At least one target zone must be selected'
@@ -137,6 +157,9 @@ export const createAdRequest = async (req, res) => {
     const restaurantId = req.restaurant?._id || req.restaurant?.id;
     if (!restaurantId) {
       console.error('❌ [createAdRequest] Missing restaurantId');
+      adPaymentDebug('create_ad_request_missing_restaurant', {
+        hasRestaurantObject: Boolean(req.restaurant)
+      });
       return res.status(401).json({
         success: false,
         message: 'Restaurant authentication required'
@@ -148,6 +171,10 @@ export const createAdRequest = async (req, res) => {
     const start = parseCampaignDate(startDate);
     const end = parseCampaignDate(endDate);
     if (!start || !end) {
+      adPaymentDebug('create_ad_request_invalid_dates', {
+        startDateRaw: startDate || null,
+        endDateRaw: endDate || null
+      });
       return res.status(400).json({
         success: false,
         message: 'Invalid start or end date'
@@ -157,6 +184,10 @@ export const createAdRequest = async (req, res) => {
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const normalizedStart = new Date(start.getFullYear(), start.getMonth(), start.getDate());
     if (normalizedStart <= today) {
+      adPaymentDebug('create_ad_request_start_date_too_early', {
+        normalizedStart,
+        today
+      });
       return res.status(400).json({
         success: false,
         message: 'Campaigns must be requested at least one day in advance.'
@@ -164,6 +195,11 @@ export const createAdRequest = async (req, res) => {
     }
     const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
     if (isNaN(days) || days <= 0) {
+      adPaymentDebug('create_ad_request_invalid_day_range', {
+        start,
+        end,
+        days
+      });
       return res.status(400).json({
         success: false,
         message: 'Invalid date range'
@@ -191,6 +227,10 @@ export const createAdRequest = async (req, res) => {
       ]
     });
     if (overlappingOwnAds.length > 0) {
+      adPaymentDebug('create_ad_request_overlap_conflict', {
+        conflictAdId: overlappingOwnAds[0]?._id || null,
+        targetZoneIds: targetZoneIds.map((z) => String(z))
+      });
       return res.status(409).json({
         success: false,
         message: 'You already have a campaign in this zone for these dates.',
@@ -243,6 +283,14 @@ export const createAdRequest = async (req, res) => {
     }
 
     const availableFreeBannerCredits = await countAvailableFreeBannerCredits(restaurantId);
+    adPaymentDebug('create_ad_request_success', {
+      adId: adRequest?._id || null,
+      restaurantId: String(restaurantId),
+      totalCost: adRequest?.totalCost || 0,
+      originalTotalCost: adRequest?.originalTotalCost || 0,
+      hasFreeBannerCreditApplied: Boolean(adRequest?.hasFreeBannerCreditApplied),
+      availableFreeBannerCredits
+    });
     res.status(201).json({
       success: true,
       data: {
@@ -589,7 +637,16 @@ export const createAdPaymentOrder = async (req, res) => {
       adId
     } = req.params;
     const restaurantId = req.restaurant?._id || req.restaurant?.id;
+    adPaymentDebug('create_payment_order_incoming', {
+      adId,
+      restaurantId: restaurantId ? String(restaurantId) : null,
+      userAgent: req.headers['user-agent'] || null,
+      origin: req.headers.origin || null,
+      referer: req.headers.referer || null
+    });
+
     if (!mongoose.Types.ObjectId.isValid(adId)) {
+      adPaymentDebug('create_payment_order_invalid_ad_id', { adId });
       return res.status(400).json({
         success: false,
         message: 'Invalid advertisement ID format'
@@ -600,18 +657,30 @@ export const createAdPaymentOrder = async (req, res) => {
       restaurant: restaurantId
     });
     if (!ad) {
+      adPaymentDebug('create_payment_order_ad_not_found', {
+        adId,
+        restaurantId: restaurantId ? String(restaurantId) : null
+      });
       return res.status(404).json({
         success: false,
         message: 'Ad request not found'
       });
     }
     if (ad.status !== 'Approved') {
+      adPaymentDebug('create_payment_order_ad_not_approved', {
+        adId: String(ad._id),
+        status: ad.status
+      });
       return res.status(400).json({
         success: false,
         message: 'Ad must be Approved before payment'
       });
     }
     if (ad.paymentStatus === 'Paid') {
+      adPaymentDebug('create_payment_order_already_paid', {
+        adId: String(ad._id),
+        paymentStatus: ad.paymentStatus
+      });
       return res.status(400).json({
         success: false,
         message: 'Ad is already paid'
@@ -630,6 +699,12 @@ export const createAdPaymentOrder = async (req, res) => {
         });
       }
 
+      adPaymentDebug('create_payment_order_free_activation', {
+        adId: String(ad._id),
+        totalCost: Number(ad.totalCost || 0),
+        paymentStatus: ad.paymentStatus,
+        status: ad.status
+      });
       return res.status(200).json({
         success: true,
         message: 'Free banner reward applied successfully',
@@ -645,6 +720,13 @@ export const createAdPaymentOrder = async (req, res) => {
 
     // Amount in paise
     const amountInPaise = Math.round(ad.totalCost * 100);
+    adPaymentDebug('create_payment_order_before_razorpay', {
+      adId: String(ad._id),
+      totalCostRupees: Number(ad.totalCost || 0),
+      amountInPaise,
+      previousRazorpayOrderId: ad.razorpayOrderId || null
+    });
+
     const order = await createOrder({
       amount: amountInPaise,
       currency: 'INR',
@@ -657,6 +739,13 @@ export const createAdPaymentOrder = async (req, res) => {
     });
     ad.razorpayOrderId = order.id;
     await ad.save();
+    adPaymentDebug('create_payment_order_success', {
+      adId: String(ad._id),
+      razorpayOrderId: order?.id || null,
+      amount: order?.amount || null,
+      currency: order?.currency || null
+    });
+
     res.status(200).json({
       success: true,
       data: {
@@ -671,6 +760,10 @@ export const createAdPaymentOrder = async (req, res) => {
     });
   } catch (error) {
     console.error('Error creating ad payment order:', error);
+    adPaymentDebug('create_payment_order_error', {
+      message: error?.message || null,
+      stack: error?.stack || null
+    });
     res.status(500).json({
       success: false,
       message: error.message
@@ -688,8 +781,24 @@ export const verifyAdPayment = async (req, res) => {
     const razorpaySignature = req.body.razorpaySignature || req.body.razorpay_signature;
     const incomingOrderId = req.body.razorpayOrderId || req.body.razorpay_order_id;
     const restaurantId = req.restaurant?._id || req.restaurant?.id;
+    adPaymentDebug('verify_payment_incoming', {
+      adId,
+      adIdSnake: req.body.ad_id || null,
+      restaurantId: restaurantId ? String(restaurantId) : null,
+      hasRazorpayPaymentIdCamel: Boolean(req.body.razorpayPaymentId),
+      hasRazorpayPaymentIdSnake: Boolean(req.body.razorpay_payment_id),
+      hasRazorpayOrderIdCamel: Boolean(req.body.razorpayOrderId),
+      hasRazorpayOrderIdSnake: Boolean(req.body.razorpay_order_id),
+      hasSignatureCamel: Boolean(req.body.razorpaySignature),
+      hasSignatureSnake: Boolean(req.body.razorpay_signature),
+      bodyKeys: req.body ? Object.keys(req.body) : [],
+      userAgent: req.headers['user-agent'] || null,
+      origin: req.headers.origin || null,
+      referer: req.headers.referer || null
+    });
 
     if (!adId) {
+      adPaymentDebug('verify_payment_missing_ad_id', {});
       return res.status(400).json({
         success: false,
         message: 'adId is required'
@@ -697,6 +806,7 @@ export const verifyAdPayment = async (req, res) => {
     }
 
     if (!mongoose.Types.ObjectId.isValid(adId)) {
+      adPaymentDebug('verify_payment_invalid_ad_id', { adId });
       return res.status(400).json({
         success: false,
         message: 'Invalid advertisement ID format'
@@ -707,12 +817,21 @@ export const verifyAdPayment = async (req, res) => {
       restaurant: restaurantId
     });
     if (!ad) {
+      adPaymentDebug('verify_payment_ad_not_found', {
+        adId,
+        restaurantId: restaurantId ? String(restaurantId) : null
+      });
       return res.status(404).json({
         success: false,
         message: 'Ad request not found'
       });
     }
     if (!ad.razorpayOrderId) {
+      adPaymentDebug('verify_payment_missing_saved_order_id', {
+        adId: String(ad._id),
+        paymentStatus: ad.paymentStatus,
+        status: ad.status
+      });
       return res.status(400).json({
         success: false,
         message: 'No payment order found for this ad'
@@ -720,6 +839,10 @@ export const verifyAdPayment = async (req, res) => {
     }
 
     if (!razorpayPaymentId || !razorpaySignature) {
+      adPaymentDebug('verify_payment_missing_required_fields', {
+        hasPaymentId: Boolean(razorpayPaymentId),
+        hasSignature: Boolean(razorpaySignature)
+      });
       return res.status(400).json({
         success: false,
         message: 'razorpayPaymentId and razorpaySignature are required'
@@ -727,14 +850,28 @@ export const verifyAdPayment = async (req, res) => {
     }
 
     if (incomingOrderId && incomingOrderId !== ad.razorpayOrderId) {
+      adPaymentDebug('verify_payment_order_mismatch', {
+        incomingOrderId,
+        savedOrderId: ad.razorpayOrderId
+      });
       return res.status(400).json({
         success: false,
         message: 'Razorpay order mismatch for this ad'
       });
     }
 
+    adPaymentDebug('verify_payment_before_signature_check', {
+      adId: String(ad._id),
+      razorpayOrderId: ad.razorpayOrderId,
+      razorpayPaymentId
+    });
     const isValid = await verifyPayment(ad.razorpayOrderId, razorpayPaymentId, razorpaySignature);
     if (!isValid) {
+      adPaymentDebug('verify_payment_signature_invalid', {
+        adId: String(ad._id),
+        razorpayOrderId: ad.razorpayOrderId,
+        razorpayPaymentId
+      });
       return res.status(400).json({
         success: false,
         message: 'Invalid payment signature'
@@ -746,6 +883,13 @@ export const verifyAdPayment = async (req, res) => {
     ad.razorpaySignature = razorpaySignature;
     ad.status = 'Banner Pending';
     await ad.save();
+    adPaymentDebug('verify_payment_success', {
+      adId: String(ad._id),
+      razorpayOrderId: ad.razorpayOrderId,
+      razorpayPaymentId: ad.razorpayPaymentId,
+      paymentStatus: ad.paymentStatus,
+      status: ad.status
+    });
 
     if (ad.appliedFreeBannerCreditId) {
       await markReservedCreditAsConsumed({
@@ -764,6 +908,10 @@ export const verifyAdPayment = async (req, res) => {
     });
   } catch (error) {
     console.error('Error verifying ad payment:', error);
+    adPaymentDebug('verify_payment_error', {
+      message: error?.message || null,
+      stack: error?.stack || null
+    });
     res.status(500).json({
       success: false,
       message: error.message
