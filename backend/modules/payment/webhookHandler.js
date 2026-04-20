@@ -1,6 +1,7 @@
 import Order from '../order/models/Order.js';
 import Payment from './models/Payment.js';
 import OrderSettlement from '../order/models/OrderSettlement.js';
+import AdRequest from '../marketing/models/AdRequest.js';
 import { getRazorpayWebhookSecret } from '../../shared/utils/envService.js';
 import { calculateOrderSettlement } from '../order/services/orderSettlementService.js';
 import { holdEscrow } from '../order/services/escrowWalletService.js';
@@ -53,6 +54,28 @@ const getPaymentEntityOrderId = (paymentEntity = {}) => (
 const getPaymentEntityPaymentId = (paymentEntity = {}) => (
   paymentEntity.id || paymentEntity.paymentId || null
 );
+
+const isAdCampaignPayment = (paymentEntity = {}) => {
+  const type = String(paymentEntity?.notes?.type || '').toUpperCase();
+  return type === 'AD_CAMPAIGN';
+};
+
+const resolveAdForPaymentEvent = async (paymentEntity = {}) => {
+  const notesAdId = paymentEntity?.notes?.adId || paymentEntity?.notes?.ad_id || null;
+  const razorpayOrderId = getPaymentEntityOrderId(paymentEntity);
+
+  let ad = null;
+
+  if (notesAdId && /^[a-f\d]{24}$/i.test(String(notesAdId))) {
+    ad = await AdRequest.findById(notesAdId);
+  }
+
+  if (!ad && razorpayOrderId) {
+    ad = await AdRequest.findOne({ razorpayOrderId });
+  }
+
+  return { ad, razorpayOrderId };
+};
 
 const resolveOrderForPaymentEvent = async (paymentEntity = {}) => {
   const razorpayOrderId = getPaymentEntityOrderId(paymentEntity);
@@ -168,6 +191,43 @@ const upsertPaymentRecord = async ({ order, paymentEntity, status, eventName, pa
   return payment;
 };
 
+const handleAdPaymentCaptured = async ({ paymentEntity }) => {
+  const { ad } = await resolveAdForPaymentEvent(paymentEntity);
+  if (!ad) {
+    throw new Error('Ad request not found for captured payment');
+  }
+
+  if (ad.paymentStatus === 'Paid') {
+    return { ad, alreadyProcessed: true };
+  }
+
+  ad.paymentStatus = 'Paid';
+  ad.status = 'Banner Pending';
+  ad.razorpayPaymentId = getPaymentEntityPaymentId(paymentEntity) || ad.razorpayPaymentId || null;
+  ad.razorpayOrderId = getPaymentEntityOrderId(paymentEntity) || ad.razorpayOrderId || null;
+  await ad.save();
+
+  return { ad, alreadyProcessed: false };
+};
+
+const handleAdPaymentFailed = async ({ paymentEntity }) => {
+  const { ad } = await resolveAdForPaymentEvent(paymentEntity);
+  if (!ad) {
+    throw new Error('Ad request not found for failed payment');
+  }
+
+  if (ad.paymentStatus === 'Paid') {
+    return { ad, alreadyProcessed: true };
+  }
+
+  ad.paymentStatus = 'Failed';
+  ad.razorpayPaymentId = getPaymentEntityPaymentId(paymentEntity) || ad.razorpayPaymentId || null;
+  ad.razorpayOrderId = getPaymentEntityOrderId(paymentEntity) || ad.razorpayOrderId || null;
+  await ad.save();
+
+  return { ad, alreadyProcessed: false };
+};
+
 const handlePaymentCaptured = async ({ paymentEntity, payload }) => {
   webhookDebug('payment_captured_received', {
     paymentId: paymentEntity?.id || null,
@@ -175,6 +235,9 @@ const handlePaymentCaptured = async ({ paymentEntity, payload }) => {
     notesOrderId: paymentEntity?.notes?.orderId || null
   });
   const { order, razorpayOrderId } = await resolveOrderForPaymentEvent(paymentEntity);
+  if (!order && isAdCampaignPayment(paymentEntity)) {
+    return handleAdPaymentCaptured({ paymentEntity, payload });
+  }
   if (!order) {
     throw new Error('Order not found for captured payment');
   }
@@ -319,6 +382,9 @@ const handlePaymentFailed = async ({ paymentEntity, payload }) => {
     orderId: paymentEntity?.order_id || null
   });
   const { order, razorpayOrderId } = await resolveOrderForPaymentEvent(paymentEntity);
+  if (!order && isAdCampaignPayment(paymentEntity)) {
+    return handleAdPaymentFailed({ paymentEntity, payload });
+  }
   if (!order) {
     throw new Error('Order not found for failed payment');
   }
