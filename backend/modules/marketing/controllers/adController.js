@@ -8,6 +8,7 @@ import Tier from '../../admin/models/Tier.js';
 import Restaurant from '../../restaurant/models/Restaurant.js';
 import BusinessSettings from '../../admin/models/BusinessSettings.js';
 import { calculateDistance } from '../../order/services/orderCalculationService.js';
+import { getRazorpayCredentials } from '../../../shared/utils/envService.js';
 import {
   countAvailableFreeBannerCredits,
   reserveOldestAvailableFreeBannerCredit,
@@ -746,6 +747,29 @@ export const createAdPaymentOrder = async (req, res) => {
       currency: order?.currency || null
     });
 
+    let razorpayKeyId = '';
+    try {
+      const credentials = await getRazorpayCredentials();
+      razorpayKeyId = credentials?.keyId || process.env.RAZORPAY_API_KEY || '';
+    } catch (credError) {
+      adPaymentDebug('create_payment_order_key_fetch_error', {
+        message: credError?.message || null
+      });
+      razorpayKeyId = process.env.RAZORPAY_API_KEY || '';
+    }
+
+    adPaymentDebug('create_payment_order_key_resolved', {
+      hasKey: Boolean(razorpayKeyId),
+      keyPrefix: razorpayKeyId ? String(razorpayKeyId).slice(0, 6) : null
+    });
+
+    if (!razorpayKeyId) {
+      return res.status(500).json({
+        success: false,
+        message: 'Razorpay key is missing in server configuration'
+      });
+    }
+
     res.status(200).json({
       success: true,
       data: {
@@ -753,9 +777,9 @@ export const createAdPaymentOrder = async (req, res) => {
         order_id: order.id,
         amount: order.amount,
         currency: order.currency,
-        key: process.env.RAZORPAY_API_KEY,
-        keyId: process.env.RAZORPAY_API_KEY,
-        key_id: process.env.RAZORPAY_API_KEY
+        key: razorpayKeyId,
+        keyId: razorpayKeyId,
+        key_id: razorpayKeyId
       }
     });
   } catch (error) {
