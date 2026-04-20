@@ -3753,11 +3753,13 @@ export default function DeliveryHome() {
           earnedValue = Number(earned.totalEarning) || 0;
         } else if (typeof earned === 'number') {
           earnedValue = earned;
+        } else if (typeof earned === 'object' && earned.basePayout != null) {
+          earnedValue = Number(earned.basePayout) || 0;
         }
       }
 
-      // Use calculated earnings if available, otherwise fallback to deliveryFee
-      const effectiveEarnings = earnedValue > 0 ? earned : deliveryFee > 0 ? deliveryFee : 0;
+      // Prefer backend-provided rider earning; never fall back to customer deliveryFee here
+      const effectiveEarnings = earned || 0;
       // Calculate pickup distance if not provided
       let pickupDistance = newOrder.pickupDistance;
       if (!pickupDistance || pickupDistance === '0 km') {
@@ -3792,7 +3794,7 @@ export default function DeliveryHome() {
         pickupDistance: pickupDistance,
         estimatedEarnings: effectiveEarnings,
         deliveryFee,
-        amount: earnedValue > 0 ? earnedValue : deliveryFee > 0 ? deliveryFee : 0,
+        amount: earnedValue,
         customerName: newOrder.customerName,
         customerPhone: newOrder.customerPhone || null,
         customerAddress: newOrder.customerLocation?.address || 'Customer address',
