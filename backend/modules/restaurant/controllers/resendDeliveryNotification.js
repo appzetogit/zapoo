@@ -48,6 +48,13 @@ export const resendDeliveryNotification = asyncHandler(async (req, res) => {
     const [restaurantLng, restaurantLat] = restaurantDoc.location.coordinates;
 
     const result = await broadcastDeliveryRequest(order._id.toString(), restaurantLat, restaurantLng, { trigger: 'manual_resend' });
+    console.log('📊 [DeliveryAssign] Resend broadcast recipients', {
+      orderId: order.orderId || null,
+      orderMongoId: order._id?.toString?.() || null,
+      restaurantId: restaurantId?.toString?.() || String(restaurantId || ''),
+      notifiedCount: Number(result?.notifiedCount || 0),
+      candidatesCount: Array.isArray(result?.deliveryPartnerIds) ? result.deliveryPartnerIds.length : 0
+    });
     return successResponse(res, 200, `Notification sent to ${result?.notifiedCount || 0} delivery partners`, {
       orderId: order.orderId,
       orderMongoId: order._id?.toString(),
