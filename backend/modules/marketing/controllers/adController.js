@@ -34,6 +34,33 @@ import { uploadToCloudinary } from '../../../shared/utils/cloudinaryService.js';
 
 const FREE_BANNER_MESSAGE = 'You have won a free day banner';
 
+const parseCampaignDate = (input) => {
+  if (!input) return null;
+
+  if (input instanceof Date && !Number.isNaN(input.getTime())) {
+    return input;
+  }
+
+  const raw = String(input).trim();
+
+  // Support yyyy-mm-dd (web) deterministically in local time.
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    const [yyyy, mm, dd] = raw.split('-').map(Number);
+    const date = new Date(yyyy, mm - 1, dd);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+
+  // Support dd-mm-yyyy (common in mobile forms / custom date pickers).
+  if (/^\d{2}-\d{2}-\d{4}$/.test(raw)) {
+    const [dd, mm, yyyy] = raw.split('-').map(Number);
+    const date = new Date(yyyy, mm - 1, dd);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+
+  const parsed = new Date(raw);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
 const buildAdBillingSummary = (ad = {}) => ({
   originalTotalCost: Number(ad.originalTotalCost ?? ad.totalCost ?? 0),
   freeBannerDiscountAmount: Number(ad.freeBannerDiscountAmount || 0),
@@ -118,9 +145,9 @@ export const createAdRequest = async (req, res) => {
 
     // Convert targetZones to ObjectIds for reliable querying
     const targetZoneIds = targetZones.map(id => new mongoose.Types.ObjectId(id));
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+    const start = parseCampaignDate(startDate);
+    const end = parseCampaignDate(endDate);
+    if (!start || !end) {
       return res.status(400).json({
         success: false,
         message: 'Invalid start or end date'
@@ -634,9 +661,12 @@ export const createAdPaymentOrder = async (req, res) => {
       success: true,
       data: {
         orderId: order.id,
+        order_id: order.id,
         amount: order.amount,
         currency: order.currency,
-        key: process.env.RAZORPAY_API_KEY
+        key: process.env.RAZORPAY_API_KEY,
+        keyId: process.env.RAZORPAY_API_KEY,
+        key_id: process.env.RAZORPAY_API_KEY
       }
     });
   } catch (error) {
@@ -653,12 +683,19 @@ export const createAdPaymentOrder = async (req, res) => {
  */
 export const verifyAdPayment = async (req, res) => {
   try {
-    const {
-      adId,
-      razorpayPaymentId,
-      razorpaySignature
-    } = req.body;
+    const adId = req.body.adId || req.body.ad_id;
+    const razorpayPaymentId = req.body.razorpayPaymentId || req.body.razorpay_payment_id;
+    const razorpaySignature = req.body.razorpaySignature || req.body.razorpay_signature;
+    const incomingOrderId = req.body.razorpayOrderId || req.body.razorpay_order_id;
     const restaurantId = req.restaurant?._id || req.restaurant?.id;
+
+    if (!adId) {
+      return res.status(400).json({
+        success: false,
+        message: 'adId is required'
+      });
+    }
+
     if (!mongoose.Types.ObjectId.isValid(adId)) {
       return res.status(400).json({
         success: false,
@@ -681,6 +718,21 @@ export const verifyAdPayment = async (req, res) => {
         message: 'No payment order found for this ad'
       });
     }
+
+    if (!razorpayPaymentId || !razorpaySignature) {
+      return res.status(400).json({
+        success: false,
+        message: 'razorpayPaymentId and razorpaySignature are required'
+      });
+    }
+
+    if (incomingOrderId && incomingOrderId !== ad.razorpayOrderId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Razorpay order mismatch for this ad'
+      });
+    }
+
     const isValid = await verifyPayment(ad.razorpayOrderId, razorpayPaymentId, razorpaySignature);
     if (!isValid) {
       return res.status(400).json({

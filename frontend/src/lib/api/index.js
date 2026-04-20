@@ -795,6 +795,9 @@ export const restaurantAPI = {
   getOffers: (params = {}) => {
     return apiClient.get(API_ENDPOINTS.RESTAURANT.OFFERS, { params });
   },
+  getOfferPerformance: (params = {}) => {
+    return apiClient.get(`${API_ENDPOINTS.RESTAURANT.OFFERS}/performance`, { params });
+  },
   getOfferById: (id) => {
     return apiClient.get(
       API_ENDPOINTS.RESTAURANT.OFFER_BY_ID.replace(":id", id),

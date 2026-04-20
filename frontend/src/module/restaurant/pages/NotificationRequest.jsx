@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from "react-i18next";
-import { Bell, Send, Clock, CheckCircle2, XCircle, AlertCircle, ImagePlus, X, Trash2, ArrowLeft } from 'lucide-react';
+import { Bell, Send, Clock, CheckCircle2, XCircle, AlertCircle, ImagePlus, Camera, X, Trash2, ArrowLeft } from 'lucide-react';
 import apiClient from '@/lib/api';
 
 const STATUS_CONFIG = {
@@ -31,6 +31,7 @@ export default function RestaurantNotificationRequest() {
     const [uploadingImage, setUploadingImage] = useState(false);
     const [imageError, setImageError] = useState('');
     const fileInputRef = useRef(null);
+    const cameraInputRef = useRef(null);
 
     const fetchRequests = async () => {
         try {
@@ -115,6 +116,7 @@ export default function RestaurantNotificationRequest() {
         setImageUrl(null);
         setImageError('');
         if (fileInputRef.current) fileInputRef.current.value = '';
+        if (cameraInputRef.current) cameraInputRef.current.value = '';
     };
 
     // ── Form submit ───────────────────────────────────────────────────────────
@@ -153,7 +155,7 @@ export default function RestaurantNotificationRequest() {
     const formDisabled = isLimitReached || hasPending;
 
     return (
-        <div className="p-4 lg:p-6 bg-slate-50 min-h-screen">
+        <div className="p-4 lg:p-6 bg-slate-50 min-h-screen w-full max-w-full overflow-x-hidden">
             <div className="max-w-3xl mx-auto space-y-6">
 
                 {/* Header */}
@@ -171,26 +173,30 @@ export default function RestaurantNotificationRequest() {
                 </div>
 
                 {/* Quota Bar */}
-                <div className="bg-white rounded-xl border border-slate-200 p-4 flex items-center justify-between">
+                <div className="bg-white rounded-xl border border-slate-200 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div>
                         <p className="text-sm font-medium text-slate-700">{t("restaurant.notificationRequest.quota.title")}</p>
                         <p className="text-xs text-slate-500 mt-0.5">{t("restaurant.notificationRequest.quota.subtitle")}</p>
                     </div>
-                    <div className="flex items-center gap-2">
-                        {[...Array(quota.limit)].map((_, i) => (
-                            <div
-                                key={i}
-                                className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold ${i < quota.used
-                                    ? 'bg-[#FF5200] border-[#FF5200] text-white'
-                                    : 'bg-slate-100 border-slate-300 text-slate-400'
-                                    }`}
-                            >
-                                {i < quota.used ? '✓' : i + 1}
-                            </div>
-                        ))}
-                        <span className="ml-2 text-sm text-slate-600 font-medium">
-                            {t("restaurant.notificationRequest.quota.used", { used: quota.used, limit: quota.limit })}
-                        </span>
+                    <div
+                        className="w-full sm:w-auto overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+                    >
+                        <div className="inline-flex items-center gap-2 min-w-max pr-1">
+                            {[...Array(quota.limit)].map((_, i) => (
+                                <div
+                                    key={i}
+                                    className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full border-2 flex items-center justify-center text-[11px] sm:text-xs font-bold flex-shrink-0 ${i < quota.used
+                                        ? 'bg-[#FF5200] border-[#FF5200] text-white'
+                                        : 'bg-slate-100 border-slate-300 text-slate-400'
+                                        }`}
+                                >
+                                    {i < quota.used ? '\u2713' : i + 1}
+                                </div>
+                            ))}
+                            <span className="ml-1 sm:ml-2 text-sm text-slate-600 font-medium whitespace-nowrap">
+                                {t("restaurant.notificationRequest.quota.used", { used: quota.used, limit: quota.limit })}
+                            </span>
+                        </div>
                     </div>
                 </div>
 
@@ -251,13 +257,8 @@ export default function RestaurantNotificationRequest() {
                             </label>
 
                             {!imagePreview ? (
-                                /* Upload zone */
-                                <label
-                                    className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${formDisabled
-                                        ? 'border-slate-200 bg-slate-50 cursor-not-allowed opacity-50'
-                                        : 'border-slate-300 bg-slate-50 hover:border-[#FF5200] hover:bg-orange-50'
-                                        }`}
-                                >
+                                /* Upload options: gallery + camera */
+                                <div className="space-y-2">
                                     <input
                                         ref={fileInputRef}
                                         type="file"
@@ -266,9 +267,44 @@ export default function RestaurantNotificationRequest() {
                                         onChange={handleImageChange}
                                         className="hidden"
                                     />
-                                    <ImagePlus className="w-7 h-7 text-slate-400 mb-1" />
-                                    <p className="text-xs text-slate-500">{t("restaurant.notificationRequest.upload.helpText")}</p>
-                                </label>
+                                    <input
+                                        ref={cameraInputRef}
+                                        type="file"
+                                        accept="image/jpeg,image/jpg,image/png,image/webp"
+                                        capture="environment"
+                                        disabled={formDisabled}
+                                        onChange={handleImageChange}
+                                        className="hidden"
+                                    />
+
+                                    <button
+                                        type="button"
+                                        onClick={() => fileInputRef.current?.click()}
+                                        disabled={formDisabled}
+                                        className={`flex items-center justify-center gap-2 w-full h-12 border-2 border-dashed rounded-lg transition-colors ${formDisabled
+                                            ? 'border-slate-200 bg-slate-50 cursor-not-allowed opacity-50'
+                                            : 'border-slate-300 bg-slate-50 hover:border-[#FF5200] hover:bg-orange-50'
+                                            }`}
+                                    >
+                                        <ImagePlus className="w-5 h-5 text-slate-400" />
+                                        <span className="text-sm text-slate-600">Choose from gallery</span>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => cameraInputRef.current?.click()}
+                                        disabled={formDisabled}
+                                        className={`flex items-center justify-center gap-2 w-full h-12 border-2 border-dashed rounded-lg transition-colors ${formDisabled
+                                            ? 'border-slate-200 bg-slate-50 cursor-not-allowed opacity-50'
+                                            : 'border-slate-300 bg-slate-50 hover:border-[#FF5200] hover:bg-orange-50'
+                                            }`}
+                                    >
+                                        <Camera className="w-5 h-5 text-slate-400" />
+                                        <span className="text-sm text-slate-600">Take photo</span>
+                                    </button>
+
+                                    <p className="text-xs text-slate-500 text-center">{t("restaurant.notificationRequest.upload.helpText")}</p>
+                                </div>
                             ) : (
                                 /* Preview */
                                 <div className="relative w-full h-40 rounded-lg overflow-hidden border border-slate-200">
@@ -414,3 +450,4 @@ export default function RestaurantNotificationRequest() {
         </div>
     );
 }
+

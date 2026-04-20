@@ -1,9 +1,62 @@
 import Offer from '../models/Offer.js';
 import Restaurant from '../models/Restaurant.js';
+import Order from '../../order/models/Order.js';
 import mongoose from 'mongoose';
 import { successResponse, errorResponse } from '../../../shared/utils/response.js';
 import asyncHandler from '../../../shared/middleware/asyncHandler.js';
 import { calculateDistance } from '../../order/services/orderCalculationService.js';
+
+const MS_IN_DAY = 24 * 60 * 60 * 1000;
+
+const round2 = (value) => Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
+
+const formatPeriodLabel = (start, end, mode) => {
+  const opts = { day: '2-digit', month: 'short' };
+  const startLabel = start.toLocaleDateString('en-IN', opts);
+  const endLabel = end.toLocaleDateString('en-IN', opts);
+  if (mode === 'daily') return `Daily (${endLabel})`;
+  if (mode === 'monthly') return `Monthly (${startLabel} - ${endLabel})`;
+  return `Weekly (${startLabel} - ${endLabel})`;
+};
+
+const getPeriodWindow = (mode = 'weekly', now = new Date()) => {
+  const normalizedMode = ['daily', 'weekly', 'monthly'].includes(mode) ? mode : 'weekly';
+  const end = new Date(now);
+  end.setHours(23, 59, 59, 999);
+
+  let days = 7;
+  if (normalizedMode === 'daily') days = 1;
+  if (normalizedMode === 'monthly') days = 30;
+
+  const start = new Date(end.getTime() - (days - 1) * MS_IN_DAY);
+  start.setHours(0, 0, 0, 0);
+
+  const prevEnd = new Date(start.getTime() - 1);
+  const prevStart = new Date(prevEnd.getTime() - (days - 1) * MS_IN_DAY);
+  prevStart.setHours(0, 0, 0, 0);
+  prevEnd.setHours(23, 59, 59, 999);
+
+  return {
+    mode: normalizedMode,
+    start,
+    end,
+    prevStart,
+    prevEnd
+  };
+};
+
+const normalizeOfferStatusForUI = (offer, now = new Date()) => {
+  const status = String(offer?.status || '').toLowerCase();
+  const startDate = offer?.startDate ? new Date(offer.startDate) : null;
+  const endDate = offer?.endDate ? new Date(offer.endDate) : null;
+
+  if (status === 'active') {
+    if (startDate && startDate > now) return 'scheduled';
+    if (endDate && endDate < now) return 'inactive';
+    return 'active';
+  }
+  return 'inactive';
+};
 
 // Create/Activate offer
 export const createOffer = asyncHandler(async (req, res) => {
@@ -83,8 +136,15 @@ export const getOffers = asyncHandler(async (req, res) => {
   const query = {
     restaurant: restaurantId
   };
-  if (status) {
-    query.status = status;
+  const normalizedStatus = status ? String(status).toLowerCase() : '';
+  const dbStatuses = ['draft', 'active', 'paused', 'expired', 'cancelled'];
+  const uiBucketStatuses = ['active', 'scheduled', 'inactive'];
+  const isUiBucketStatus = uiBucketStatuses.includes(normalizedStatus);
+  const isDbStatus = dbStatuses.includes(normalizedStatus);
+
+  // Keep backward compatibility for real DB statuses and support UI buckets.
+  if (normalizedStatus && isDbStatus && !isUiBucketStatus) {
+    query.status = normalizedStatus;
   }
   if (goalId) {
     query.goalId = goalId;
@@ -92,12 +152,129 @@ export const getOffers = asyncHandler(async (req, res) => {
   if (discountType) {
     query.discountType = discountType;
   }
-  const offers = await Offer.find(query).sort({
+  let offers = await Offer.find(query).sort({
     createdAt: -1
   }).lean();
+
+  // Support UI status buckets without breaking existing raw status filters.
+  if (isUiBucketStatus) {
+    const now = new Date();
+    const wanted = normalizedStatus;
+    offers = offers.filter((offer) => normalizeOfferStatusForUI(offer, now) === wanted);
+  }
+
+  offers = offers.map((offer) => ({
+    ...offer,
+    uiStatus: normalizeOfferStatusForUI(offer, new Date())
+  }));
+
   return successResponse(res, 200, 'Offers retrieved successfully', {
     offers,
     total: offers.length
+  });
+});
+
+// Offer performance analytics for restaurant growth > track offers
+export const getOfferPerformance = asyncHandler(async (req, res) => {
+  const restaurantId = String(req.restaurant._id);
+  const mode = req.query?.dateFormat || 'weekly';
+  const now = new Date();
+  const {
+    mode: normalizedMode,
+    start,
+    end,
+    prevStart,
+    prevEnd
+  } = getPeriodWindow(mode, now);
+
+  const baseOrderQuery = {
+    restaurantId,
+    status: { $nin: ['cancelled', 'failed', 'refunded'] },
+    'pricing.couponSource': 'restaurant',
+    'pricing.couponCode': { $exists: true, $ne: null }
+  };
+
+  const currentOrders = await Order.find({
+    ...baseOrderQuery,
+    createdAt: { $gte: start, $lte: end }
+  }).select('pricing').lean();
+
+  const previousOrders = await Order.find({
+    ...baseOrderQuery,
+    createdAt: { $gte: prevStart, $lte: prevEnd }
+  }).select('pricing').lean();
+
+  const toMetrics = (orders) => {
+    const grossSales = round2(orders.reduce((acc, order) => acc + Number(order?.pricing?.subtotal || 0), 0));
+    const ordersCount = Number(orders.length || 0);
+    const discountGiven = round2(orders.reduce((acc, order) => acc + Number(order?.pricing?.discount || 0), 0));
+    const effectiveDiscount = grossSales > 0 ? round2((discountGiven / grossSales) * 100) : 0;
+    return {
+      grossSales,
+      ordersFromOffers: ordersCount,
+      discountGiven,
+      effectiveDiscount
+    };
+  };
+
+  const current = toMetrics(currentOrders);
+  const previous = toMetrics(previousOrders);
+
+  const getChangePercent = (cur, prev) => {
+    if (!Number.isFinite(cur) || !Number.isFinite(prev)) return 0;
+    if (prev === 0) return cur > 0 ? 100 : 0;
+    return round2(((cur - prev) / prev) * 100);
+  };
+
+  const offerDocs = await Offer.find({ restaurant: restaurantId }).select('status startDate endDate').lean();
+  const groupedOffers = {
+    active: 0,
+    scheduled: 0,
+    inactive: 0
+  };
+  offerDocs.forEach((offer) => {
+    const key = normalizeOfferStatusForUI(offer, now);
+    groupedOffers[key] = Number(groupedOffers[key] || 0) + 1;
+  });
+
+  // Menu-open tracking is not available in current backend data model.
+  const menuToOrder = 0;
+  const previousMenuToOrder = 0;
+
+  return successResponse(res, 200, 'Offer performance retrieved successfully', {
+    period: {
+      dateFormat: normalizedMode,
+      start,
+      end,
+      label: formatPeriodLabel(start, end, normalizedMode),
+      comparisonLabel: normalizedMode === 'daily'
+        ? `previous day (${prevEnd.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })})`
+        : `${normalizedMode === 'monthly' ? 'previous month' : 'previous week'} (${prevStart.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })} - ${prevEnd.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })})`
+    },
+    metrics: {
+      grossSalesFromOffers: {
+        value: current.grossSales,
+        changePercent: getChangePercent(current.grossSales, previous.grossSales)
+      },
+      ordersFromOffers: {
+        value: current.ordersFromOffers,
+        changePercent: getChangePercent(current.ordersFromOffers, previous.ordersFromOffers)
+      },
+      discountGiven: {
+        value: current.discountGiven,
+        changePercent: getChangePercent(current.discountGiven, previous.discountGiven)
+      },
+      effectiveDiscount: {
+        value: current.effectiveDiscount,
+        changePercent: getChangePercent(current.effectiveDiscount, previous.effectiveDiscount)
+      },
+      menuToOrder: {
+        value: menuToOrder,
+        changePercent: getChangePercent(menuToOrder, previousMenuToOrder),
+        unavailable: true
+      }
+    },
+    offers: groupedOffers
   });
 });
 

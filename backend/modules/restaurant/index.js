@@ -15,7 +15,7 @@ import { getMenu, updateMenu, getMenuByRestaurantId, addSection, addItemToSectio
 import { scheduleItemAvailability, cancelScheduledAvailability, getItemSchedule } from './controllers/menuScheduleController.js';
 import { getInventory, updateInventory, getInventoryByRestaurantId } from './controllers/inventoryController.js';
 import { addStaff, getStaff, getStaffById, updateStaff, deleteStaff } from './controllers/staffManagementController.js';
-import { createOffer, getOffers, getOfferById, updateOfferStatus, deleteOffer, getCouponsByItemId, getCouponsByItemIdPublic, getPublicOffers } from './controllers/offerController.js';
+import { createOffer, getOffers, getOfferById, updateOfferStatus, deleteOffer, getCouponsByItemId, getCouponsByItemIdPublic, getPublicOffers, getOfferPerformance } from './controllers/offerController.js';
 import { getRecommendedPreview } from './controllers/recommendedPreviewController.js';
 import categoryRoutes from './routes/categoryRoutes.js';
 import restaurantOrderRoutes from './routes/restaurantOrderRoutes.js';
@@ -107,6 +107,7 @@ router.use('/categories', categoryRoutes);
 // Offer routes (authenticated - for restaurant module)
 router.post('/offers', authenticate, checkFeatureAccess('marketing_tools'), createOffer);
 router.get('/offers', authenticate, checkFeatureAccess('marketing_tools'), getOffers);
+router.get('/offers/performance', authenticate, checkFeatureAccess('marketing_tools'), getOfferPerformance);
 router.get('/offers/item/:itemId/coupons', authenticate, checkFeatureAccess('marketing_tools'), getCouponsByItemId);
 // Public offers route - must come before /offers/:id to avoid route conflict
 router.get('/offers/public', getPublicOffers);
