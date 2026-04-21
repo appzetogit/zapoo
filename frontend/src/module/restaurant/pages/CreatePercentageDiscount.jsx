@@ -714,9 +714,19 @@ export default function CreatePercentageDiscount() {
         }} className="bg-white rounded-lg p-4 border border-gray-200">
           <div className="flex items-start justify-between mb-3">
             <div className="flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${offer.status === 'active' ? 'bg-green-500' : offer.status === 'paused' ? 'bg-orange-500' : 'bg-gray-400'}`}></div>
-              <span className={`text-xs font-medium ${offer.status === 'active' ? 'text-green-600' : offer.status === 'paused' ? 'text-orange-600' : 'text-gray-600'}`}>
-                {offer.status === 'active' ? 'Active' : offer.status === 'paused' ? 'Paused' : offer.status || 'Inactive'}
+              <div
+                className={`w-2 h-2 rounded-full ${(offer.uiStatus || offer.status) === 'active' ? 'bg-green-500' : (offer.uiStatus || offer.status) === 'scheduled' ? 'bg-blue-500' : (offer.uiStatus || offer.status) === 'paused' ? 'bg-orange-500' : 'bg-gray-400'}`}
+              ></div>
+              <span
+                className={`text-xs font-medium ${(offer.uiStatus || offer.status) === 'active' ? 'text-green-600' : (offer.uiStatus || offer.status) === 'scheduled' ? 'text-blue-600' : (offer.uiStatus || offer.status) === 'paused' ? 'text-orange-600' : 'text-gray-600'}`}
+              >
+                {(offer.uiStatus || offer.status) === 'active'
+                  ? 'Active'
+                  : (offer.uiStatus || offer.status) === 'scheduled'
+                    ? 'Scheduled'
+                    : (offer.uiStatus || offer.status) === 'paused'
+                      ? 'Paused'
+                      : (offer.uiStatus || offer.status) || 'Inactive'}
               </span>
             </div>
             <div className="flex items-center gap-3">

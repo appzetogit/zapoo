@@ -786,7 +786,14 @@ export const createAdPaymentOrder = async (req, res) => {
         currency: order.currency,
         key: razorpayKeyId,
         keyId: razorpayKeyId,
-        key_id: razorpayKeyId
+        key_id: razorpayKeyId,
+        // Keep parity with order payment response shape for mobile/web shared parsers.
+        razorpay: {
+          orderId: order.id,
+          amount: order.amount,
+          currency: order.currency,
+          key: razorpayKeyId
+        }
       }
     });
   } catch (error) {

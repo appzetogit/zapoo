@@ -10,6 +10,36 @@ const MS_IN_DAY = 24 * 60 * 60 * 1000;
 
 const round2 = (value) => Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
 
+const normalizeOfferEndForComparison = (endDate) => {
+  if (!endDate) return null;
+  const normalized = new Date(endDate);
+  if (
+    normalized.getHours() === 0 &&
+    normalized.getMinutes() === 0 &&
+    normalized.getSeconds() === 0 &&
+    normalized.getMilliseconds() === 0
+  ) {
+    normalized.setHours(23, 59, 59, 999);
+  }
+  return normalized;
+};
+
+const isOfferActiveForCurrentTime = (offer, now = new Date()) => {
+  const startDate = offer?.startDate ? new Date(offer.startDate) : null;
+  const endDate = normalizeOfferEndForComparison(offer?.endDate);
+  const startValid = !startDate || startDate <= now;
+  const endValid = !endDate || endDate >= now;
+  return startValid && endValid;
+};
+
+const normalizeItemId = (value) => String(value ?? '').trim();
+
+const isSameItemId = (left, right) => {
+  const a = normalizeItemId(left);
+  const b = normalizeItemId(right);
+  return Boolean(a && b && a === b);
+};
+
 const formatPeriodLabel = (start, end, mode) => {
   const opts = { day: '2-digit', month: 'short' };
   const startLabel = start.toLocaleDateString('en-IN', opts);
@@ -362,29 +392,15 @@ export const getCouponsByItemId = asyncHandler(async (req, res) => {
   // Find all active offers that include this item
   const allOffers = await Offer.find({
     restaurant: restaurantId,
-    status: 'active',
-    'items.itemId': itemId
+    status: 'active'
   }).select('items discountType minOrderValue startDate endDate status').lean();
   // Filter by date validity
-  const validOffers = allOffers.filter(offer => {
-    const startDate = offer.startDate ? new Date(offer.startDate) : null;
-    const endDate = offer.endDate ? new Date(offer.endDate) : null;
-
-    // Start date should be <= now (or null)
-    const startValid = !startDate || startDate <= now;
-
-    // End date should be >= now (or null)
-    // Add 1 day buffer to include offers that end today
-    const endOfToday = new Date(now);
-    endOfToday.setHours(23, 59, 59, 999);
-    const endValid = !endDate || endDate >= endOfToday;
-    return startValid && endValid;
-  });
+  const validOffers = allOffers.filter((offer) => isOfferActiveForCurrentTime(offer, now));
   // Extract coupons for this specific item
   const coupons = [];
   validOffers.forEach(offer => {
     offer.items.forEach((item, idx) => {
-      if (item.itemId === itemId) {
+      if (isSameItemId(item.itemId, itemId)) {
         const coupon = {
           couponCode: item.couponCode,
           discountPercentage: item.discountPercentage,
@@ -450,24 +466,15 @@ export const getCouponsByItemIdPublic = asyncHandler(async (req, res) => {
   // Find all active offers that include this item for this restaurant
   const allOffers = await Offer.find({
     restaurant: restaurantObjectId,
-    status: 'active',
-    'items.itemId': itemId
+    status: 'active'
   }).select('items discountType minOrderValue startDate endDate status').lean();
   // Filter by date validity
-  const validOffers = allOffers.filter(offer => {
-    const startDate = offer.startDate ? new Date(offer.startDate) : null;
-    const endDate = offer.endDate ? new Date(offer.endDate) : null;
-    const startValid = !startDate || startDate <= now;
-    const endOfToday = new Date(now);
-    endOfToday.setHours(23, 59, 59, 999);
-    const endValid = !endDate || endDate >= endOfToday;
-    return startValid && endValid;
-  });
+  const validOffers = allOffers.filter((offer) => isOfferActiveForCurrentTime(offer, now));
   // Extract coupons for this specific item
   const coupons = [];
   validOffers.forEach(offer => {
     offer.items.forEach(item => {
-      if (item.itemId === itemId) {
+      if (isSameItemId(item.itemId, itemId)) {
         coupons.push({
           couponCode: item.couponCode,
           discountPercentage: item.discountPercentage,
@@ -508,13 +515,7 @@ export const getPublicOffers = asyncHandler(async (req, res) => {
     const offerDishes = [];
     offers.forEach(offer => {
       // Check if offer is valid (date-wise)
-      const startDate = offer.startDate ? new Date(offer.startDate) : null;
-      const endDate = offer.endDate ? new Date(offer.endDate) : null;
-      const startValid = !startDate || startDate <= now;
-      const endOfToday = new Date(now);
-      endOfToday.setHours(23, 59, 59, 999);
-      const endValid = !endDate || endDate >= endOfToday;
-      if (!startValid || !endValid) {
+      if (!isOfferActiveForCurrentTime(offer, now)) {
         return; // Skip expired or not yet started offers
       }
 

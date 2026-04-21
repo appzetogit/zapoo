@@ -549,8 +549,12 @@ export default function Cart() {
         if (!cartItem.id) {
           continue;
         }
+        const couponRestaurantId = cartItem.restaurantId || restaurantId;
+        if (!couponRestaurantId) {
+          continue;
+        }
         try {
-          const response = await restaurantAPI.getCouponsByItemIdPublic(restaurantId, cartItem.id);
+          const response = await restaurantAPI.getCouponsByItemIdPublic(couponRestaurantId, cartItem.id);
           if (response?.data?.success && response?.data?.data?.coupons) {
             const coupons = response.data.data.coupons;
             // Add coupons, avoiding duplicates
