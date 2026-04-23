@@ -926,11 +926,12 @@ export const getAllTop10Restaurants = async (req, res) => {
  */
 export const getTop10Restaurants = async (req, res) => {
   try {
-    const { latitude, longitude, zoneId } = req.query;
+    const { latitude, longitude, zoneId, pureVeg } = req.query;
     const result = await getTopRestaurantsForUser({
       latitude,
       longitude,
-      zoneId
+      zoneId,
+      pureVeg
     });
 
     return successResponse(res, 200, 'Top restaurants retrieved successfully', {

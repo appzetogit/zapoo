@@ -23,7 +23,8 @@ export default function MenuCategoriesPage() {
   const [formData, setFormData] = useState({
     name: '',
     icon: '',
-    color: '#000000'
+    color: '#000000',
+    foodType: 'Non-Veg'
   })
 
   // Fetch categories
@@ -51,7 +52,8 @@ export default function MenuCategoriesPage() {
     setFormData({
       name: '',
       icon: '',
-      color: '#000000'
+      color: '#000000',
+      foodType: 'Non-Veg'
     })
     setShowAddModal(true)
   }
@@ -61,7 +63,8 @@ export default function MenuCategoriesPage() {
     setFormData({
       name: category.name || '',
       icon: category.icon || '',
-      color: category.color || '#000000'
+      color: category.color || '#000000',
+      foodType: category.foodType || 'Non-Veg'
     })
     setShowAddModal(true)
   }
@@ -75,7 +78,8 @@ export default function MenuCategoriesPage() {
     try {
       // Prepare data to send (only name is required, backend will handle order)
       const categoryData = {
-        name: formData.name.trim()
+        name: formData.name.trim(),
+        foodType: formData.foodType === 'Veg' ? 'Veg' : 'Non-Veg'
       }
 
       if (editingCategory) {
@@ -251,7 +255,7 @@ export default function MenuCategoriesPage() {
                 </button>
               </div>
               <div className="flex-1 overflow-y-auto p-4">
-                <div>
+                <div className="space-y-4">
                   <label className="block text-sm font-medium text-gray-900 mb-2">
                     Category Name *
                   </label>
@@ -263,6 +267,35 @@ export default function MenuCategoriesPage() {
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
                     maxLength={100}
                   />
+                  <div>
+                    <label className="block text-sm font-medium text-gray-900 mb-2">
+                      Food Type *
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setFormData((prev) => ({ ...prev, foodType: 'Veg' }))}
+                        className={`px-4 py-2 rounded-xl text-base font-medium transition-colors ${
+                          formData.foodType === 'Veg'
+                            ? 'border-2 border-green-600 text-green-700 bg-green-50'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        Veg
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFormData((prev) => ({ ...prev, foodType: 'Non-Veg' }))}
+                        className={`px-4 py-2 rounded-xl text-base font-medium transition-colors ${
+                          formData.foodType === 'Non-Veg'
+                            ? 'border-2 border-red-600 text-red-700 bg-red-50'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        Non-Veg
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
               <div className="px-4 py-4 border-t border-gray-200 flex gap-3">
@@ -286,4 +319,3 @@ export default function MenuCategoriesPage() {
     </div>
   )
 }
-

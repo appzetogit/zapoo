@@ -61,90 +61,218 @@ export const updateMenu = asyncHandler(async (req, res) => {
     });
   }
 
+  const normalizeItemImages = (item) => {
+    if (Array.isArray(item?.images)) {
+      return item.images.filter(img => img && typeof img === 'string' && img.trim() !== '');
+    }
+    if (item?.image && typeof item.image === 'string' && item.image.trim() !== '') {
+      return [item.image];
+    }
+    return [];
+  };
+
+  const normalizeVariations = (variations) => (
+    Array.isArray(variations) ? variations.map(v => ({
+      name: String(v?.name || '').trim(),
+      price: Number(v?.price) || 0,
+      stock: v?.stock || 'Unlimited',
+    })) : []
+  );
+
+  const approvalComparableShape = (item) => ({
+    name: String(item?.name || '').trim(),
+    nameArabic: String(item?.nameArabic || '').trim(),
+    image: String(item?.image || '').trim(),
+    images: normalizeItemImages(item),
+    category: String(item?.category || '').trim(),
+    price: Number(item?.price) || 0,
+    stock: item?.stock || 'Unlimited',
+    discount: item?.discount ?? null,
+    originalPrice: item?.originalPrice ?? null,
+    foodType: String(item?.foodType || 'Non-Veg'),
+    availabilityTimeStart: String(item?.availabilityTimeStart || '12:01 AM'),
+    availabilityTimeEnd: String(item?.availabilityTimeEnd || '11:57 PM'),
+    description: String(item?.description || '').trim(),
+    discountType: String(item?.discountType || 'Percent'),
+    discountAmount: Number(item?.discountAmount) || 0,
+    isAvailable: item?.isAvailable !== false,
+    variations: normalizeVariations(item?.variations),
+    tags: Array.isArray(item?.tags) ? item.tags : [],
+    nutrition: Array.isArray(item?.nutrition) ? item.nutrition : [],
+    allergies: Array.isArray(item?.allergies) ? item.allergies : [],
+    photoCount: Number(item?.photoCount ?? 1),
+    subCategory: String(item?.subCategory || ''),
+    servesInfo: String(item?.servesInfo || ''),
+    itemSize: String(item?.itemSize || ''),
+    itemSizeQuantity: String(item?.itemSizeQuantity || ''),
+    itemSizeUnit: String(item?.itemSizeUnit || 'piece'),
+    gst: Number(item?.gst) || 0,
+    preparationTime: String(item?.preparationTime || ''),
+    isRecommendationRequest: item?.isRecommendationRequest === true,
+  });
+
+  const hasMeaningfulItemChanges = (existingItem, nextItem) =>
+    JSON.stringify(approvalComparableShape(existingItem)) !== JSON.stringify(approvalComparableShape(nextItem));
+
+  const buildApprovedSnapshot = (existingItem) => {
+    if (!existingItem) return null;
+    return {
+      ...existingItem,
+      approvalStatus: 'approved',
+      rejectionReason: '',
+      lastApprovedSnapshot: null,
+    };
+  };
+
+  const resolveApprovalFields = (existingItem, nextItem) => {
+    if (!existingItem) {
+      return {
+        approvalStatus: 'pending',
+        rejectionReason: '',
+        requestedAt: new Date(),
+        approvedAt: undefined,
+        approvedBy: undefined,
+        rejectedAt: undefined,
+        lastApprovedSnapshot: null,
+      };
+    }
+
+    const existingStatus = existingItem?.approvalStatus || 'pending';
+    const hasChanges = hasMeaningfulItemChanges(existingItem, nextItem);
+
+    if (existingStatus === 'approved') {
+      if (hasChanges) {
+        return {
+          approvalStatus: 'pending',
+          rejectionReason: '',
+          requestedAt: new Date(),
+          approvedAt: undefined,
+          approvedBy: undefined,
+          rejectedAt: undefined,
+          lastApprovedSnapshot: existingItem?.lastApprovedSnapshot || buildApprovedSnapshot(existingItem),
+        };
+      }
+      return {
+        approvalStatus: 'approved',
+        rejectionReason: '',
+        requestedAt: existingItem?.requestedAt,
+        approvedAt: existingItem?.approvedAt,
+        approvedBy: existingItem?.approvedBy,
+        rejectedAt: existingItem?.rejectedAt,
+        lastApprovedSnapshot: null,
+      };
+    }
+
+    if (existingStatus === 'rejected') {
+      if (hasChanges) {
+        return {
+          approvalStatus: 'pending',
+          rejectionReason: '',
+          requestedAt: new Date(),
+          approvedAt: undefined,
+          approvedBy: undefined,
+          rejectedAt: undefined,
+          lastApprovedSnapshot: existingItem?.lastApprovedSnapshot || null,
+        };
+      }
+      return {
+        approvalStatus: 'rejected',
+        rejectionReason: existingItem?.rejectionReason || '',
+        requestedAt: existingItem?.requestedAt,
+        approvedAt: existingItem?.approvedAt,
+        approvedBy: existingItem?.approvedBy,
+        rejectedAt: existingItem?.rejectedAt,
+        lastApprovedSnapshot: existingItem?.lastApprovedSnapshot || null,
+      };
+    }
+
+    return {
+      approvalStatus: 'pending',
+      rejectionReason: existingItem?.rejectionReason || '',
+      requestedAt: existingItem?.requestedAt || new Date(),
+      approvedAt: existingItem?.approvedAt,
+      approvedBy: existingItem?.approvedBy,
+      rejectedAt: existingItem?.rejectedAt,
+      lastApprovedSnapshot: existingItem?.lastApprovedSnapshot || null,
+    };
+  };
+
+  const buildNormalizedMenuItem = ({ item, existingItem, sectionName, resolvedFoodType }) => {
+    const itemImages = normalizeItemImages(item);
+    const nextItem = {
+      id: String(item.id || Date.now() + Math.random()),
+      name: item.name || "Unnamed Item",
+      nameArabic: item.nameArabic || "",
+      image: itemImages.length > 0 ? itemImages[0] : item.image || "",
+      category: item.category || sectionName,
+      rating: item.rating ?? 0.0,
+      reviews: item.reviews ?? 0,
+      price: item.price || 0,
+      stock: item.stock || "Unlimited",
+      discount: item.discount || null,
+      originalPrice: item.originalPrice || null,
+      foodType: resolvedFoodType,
+      availabilityTimeStart: item.availabilityTimeStart || "12:01 AM",
+      availabilityTimeEnd: item.availabilityTimeEnd || "11:57 PM",
+      description: item.description || "",
+      discountType: item.discountType || "Percent",
+      discountAmount: item.discountAmount ?? 0.0,
+      isAvailable: item.isAvailable !== undefined ? item.isAvailable : true,
+      isRecommended: item.isRecommended || false,
+      variations: Array.isArray(item.variations) ? item.variations.map(v => ({
+        id: String(v.id || Date.now() + Math.random()),
+        name: v.name || "",
+        price: v.price || 0,
+        stock: v.stock || "Unlimited"
+      })) : [],
+      tags: Array.isArray(item.tags) ? item.tags : [],
+      nutrition: Array.isArray(item.nutrition) ? item.nutrition : [],
+      allergies: Array.isArray(item.allergies) ? item.allergies : [],
+      photoCount: item.photoCount ?? 1,
+      subCategory: item.subCategory || "",
+      servesInfo: item.servesInfo || "",
+      itemSize: item.itemSize || "",
+      itemSizeQuantity: item.itemSizeQuantity || "",
+      itemSizeUnit: item.itemSizeUnit || "piece",
+      gst: item.gst ?? 0,
+      preparationTime: item.preparationTime || existingItem?.preparationTime || "",
+      images: itemImages,
+      isRecommendationRequest: typeof item.isRecommendationRequest === 'boolean'
+        ? item.isRecommendationRequest
+        : (existingItem?.isRecommendationRequest ?? false),
+      recommendationStatus: existingItem?.recommendationStatus === 'approved'
+        ? 'approved'
+        : (typeof item.isRecommendationRequest === 'boolean'
+          ? (item.isRecommendationRequest ? 'pending' : 'none')
+          : (existingItem?.recommendationStatus || item.recommendationStatus || 'none')),
+    };
+
+    return {
+      ...nextItem,
+      ...resolveApprovalFields(existingItem, nextItem),
+      // Keep approved special recommendation if already approved by admin.
+      isRecommended: existingItem?.isRecommended || nextItem.isRecommended || false,
+    };
+  };
+
   // Normalize and validate sections
   const normalizedSections = Array.isArray(sections) ? sections.map((section, index) => {
     // Find existing section to preserve approval status
     const existingSection = existingMenu?.sections?.find(s => s.id === section.id);
+    const resolvedSectionFoodType = restaurant.isPureVeg ? "Veg" : (section.foodType || existingSection?.foodType || "Non-Veg");
     return {
       id: section.id || `section-${index}`,
       name: section.name || "Unnamed Section",
+      foodType: resolvedSectionFoodType,
       items: Array.isArray(section.items) ? section.items.map(item => {
-        // If restaurant is marked as pure veg, force all items to Veg
         const resolvedFoodType = restaurant.isPureVeg ? "Veg" : (item.foodType || "Non-Veg");
-        // CRITICAL: Find existing item to preserve approval status fields
-        // Find existing item to preserve approval status fields
         const existingItem = existingSection?.items?.find(i => String(i.id) === String(item.id));
-
-        // Normalize images array - CRITICAL: Sync with singular image field
-        const itemImages = (() => {
-          if (Array.isArray(item.images)) {
-            return item.images.filter(img => img && typeof img === 'string' && img.trim() !== '');
-          } else if (item.image && typeof item.image === 'string' && item.image.trim() !== '') {
-            return [item.image];
-          } else {
-            return [];
-          }
-        })();
-        return {
-          id: String(item.id || Date.now() + Math.random()),
-          name: item.name || "Unnamed Item",
-          nameArabic: item.nameArabic || "",
-          image: itemImages.length > 0 ? itemImages[0] : item.image || "",
-          category: item.category || section.name,
-          rating: item.rating ?? 0.0,
-          reviews: item.reviews ?? 0,
-          price: item.price || 0,
-          stock: item.stock || "Unlimited",
-          discount: item.discount || null,
-          originalPrice: item.originalPrice || null,
-          foodType: resolvedFoodType,
-          availabilityTimeStart: item.availabilityTimeStart || "12:01 AM",
-          availabilityTimeEnd: item.availabilityTimeEnd || "11:57 PM",
-          description: item.description || "",
-          discountType: item.discountType || "Percent",
-          discountAmount: item.discountAmount ?? 0.0,
-          isAvailable: item.isAvailable !== undefined ? item.isAvailable : true,
-          isRecommended: item.isRecommended || false,
-          variations: Array.isArray(item.variations) ? item.variations.map(v => ({
-            id: String(v.id || Date.now() + Math.random()),
-            name: v.name || "",
-            price: v.price || 0,
-            stock: v.stock || "Unlimited"
-          })) : [],
-          tags: Array.isArray(item.tags) ? item.tags : [],
-          nutrition: Array.isArray(item.nutrition) ? item.nutrition : [],
-          allergies: Array.isArray(item.allergies) ? item.allergies : [],
-          photoCount: item.photoCount ?? 1,
-          // Additional fields for complete item details
-          subCategory: item.subCategory || "",
-          servesInfo: item.servesInfo || "",
-          itemSize: item.itemSize || "",
-          itemSizeQuantity: item.itemSizeQuantity || "",
-          itemSizeUnit: item.itemSizeUnit || "piece",
-          gst: item.gst ?? 0,
-          preparationTime: existingItem?.preparationTime || item.preparationTime || "",
-          images: itemImages,
-          // CRITICAL: Preserve approval status fields from existing item
-          // Restaurant should NOT be able to overwrite these fields
-          approvalStatus: existingItem?.approvalStatus || item.approvalStatus || 'pending',
-          rejectionReason: existingItem?.rejectionReason || item.rejectionReason || '',
-          requestedAt: existingItem?.requestedAt || item.requestedAt || (item.approvalStatus === 'pending' ? new Date() : undefined),
-          approvedAt: existingItem?.approvedAt || item.approvedAt,
-          approvedBy: existingItem?.approvedBy || item.approvedBy,
-          rejectedAt: existingItem?.rejectedAt || item.rejectedAt,
-          // Preserve recommendation fields or handle new request
-          // Use boolean-safe logic so restaurant can toggle request ON/OFF.
-          isRecommendationRequest: typeof item.isRecommendationRequest === 'boolean'
-            ? item.isRecommendationRequest
-            : (existingItem?.isRecommendationRequest ?? false),
-          // Keep approved intact; otherwise derive pending/none from request.
-          recommendationStatus: existingItem?.recommendationStatus === 'approved'
-            ? 'approved'
-            : (typeof item.isRecommendationRequest === 'boolean'
-              ? (item.isRecommendationRequest ? 'pending' : 'none')
-              : (existingItem?.recommendationStatus || item.recommendationStatus || 'none')),
-          isRecommended: existingItem?.isRecommended || item.isRecommended || false
-        };
+        return buildNormalizedMenuItem({
+          item,
+          existingItem,
+          sectionName: section.name,
+          resolvedFoodType,
+        });
       }) : [],
       subsections: Array.isArray(section.subsections) ? section.subsections.map(subsection => {
         // Find existing subsection to preserve approval status
@@ -153,82 +281,14 @@ export const updateMenu = asyncHandler(async (req, res) => {
           id: subsection.id || `subsection-${Date.now()}`,
           name: subsection.name || "Unnamed Subsection",
           items: Array.isArray(subsection.items) ? subsection.items.map(item => {
-            // If restaurant is marked as pure veg, force all items to Veg
             const resolvedFoodType = restaurant.isPureVeg ? "Veg" : (item.foodType || "Non-Veg");
-            // CRITICAL: Find existing item to preserve approval status fields
-            // CRITICAL: Find existing item to preserve approval status fields
             const existingItem = existingSubsection?.items?.find(i => String(i.id) === String(item.id));
-
-            // Normalize images array - CRITICAL: Sync with singular image field
-            const itemImages = (() => {
-              if (Array.isArray(item.images) && item.images.length > 0) {
-                return item.images.filter(img => img && typeof img === 'string' && img.trim() !== '');
-              } else if (item.image && item.image.trim() !== '') {
-                return [item.image];
-              } else {
-                return [];
-              }
-            })();
-            return {
-              id: String(item.id || Date.now() + Math.random()),
-              name: item.name || "Unnamed Item",
-              nameArabic: item.nameArabic || "",
-              image: itemImages.length > 0 ? itemImages[0] : item.image || "",
-              category: item.category || section.name,
-              rating: item.rating ?? 0.0,
-              reviews: item.reviews ?? 0,
-              price: item.price || 0,
-              stock: item.stock || "Unlimited",
-              discount: item.discount || null,
-              originalPrice: item.originalPrice || null,
-              foodType: resolvedFoodType,
-              availabilityTimeStart: item.availabilityTimeStart || "12:01 AM",
-              availabilityTimeEnd: item.availabilityTimeEnd || "11:57 PM",
-              description: item.description || "",
-              discountType: item.discountType || "Percent",
-              discountAmount: item.discountAmount ?? 0.0,
-              isAvailable: item.isAvailable !== undefined ? item.isAvailable : true,
-              isRecommended: item.isRecommended || false,
-              variations: Array.isArray(item.variations) ? item.variations.map(v => ({
-                id: String(v.id || Date.now() + Math.random()),
-                name: v.name || "",
-                price: v.price || 0,
-                stock: v.stock || "Unlimited"
-              })) : [],
-              tags: Array.isArray(item.tags) ? item.tags : [],
-              nutrition: Array.isArray(item.nutrition) ? item.nutrition : [],
-              allergies: Array.isArray(item.allergies) ? item.allergies : [],
-              photoCount: item.photoCount ?? 1,
-              // Additional fields for complete item details
-              subCategory: item.subCategory || "",
-              servesInfo: item.servesInfo || "",
-              itemSize: item.itemSize || "",
-              itemSizeQuantity: item.itemSizeQuantity || "",
-              itemSizeUnit: item.itemSizeUnit || "piece",
-              gst: item.gst ?? 0,
-              preparationTime: existingItem?.preparationTime || item.preparationTime || "",
-              images: itemImages,
-              // CRITICAL: Preserve approval status fields from existing item
-              // Restaurant should NOT be able to overwrite these fields
-              approvalStatus: existingItem?.approvalStatus || item.approvalStatus || 'pending',
-              rejectionReason: existingItem?.rejectionReason || item.rejectionReason || '',
-              requestedAt: existingItem?.requestedAt || item.requestedAt || (item.approvalStatus === 'pending' ? new Date() : undefined),
-              approvedAt: existingItem?.approvedAt || item.approvedAt,
-              approvedBy: existingItem?.approvedBy || item.approvedBy,
-              rejectedAt: existingItem?.rejectedAt || item.rejectedAt,
-              // Preserve recommendation fields or handle new request
-              // Use boolean-safe logic so restaurant can toggle request ON/OFF.
-              isRecommendationRequest: typeof item.isRecommendationRequest === 'boolean'
-                ? item.isRecommendationRequest
-                : (existingItem?.isRecommendationRequest ?? false),
-              // Keep approved intact; otherwise derive pending/none from request.
-              recommendationStatus: existingItem?.recommendationStatus === 'approved'
-                ? 'approved'
-                : (typeof item.isRecommendationRequest === 'boolean'
-                  ? (item.isRecommendationRequest ? 'pending' : 'none')
-                  : (existingItem?.recommendationStatus || item.recommendationStatus || 'none')),
-              isRecommended: existingItem?.isRecommended || item.isRecommended || false
-            };
+            return buildNormalizedMenuItem({
+              item,
+              existingItem,
+              sectionName: section.name,
+              resolvedFoodType,
+            });
           }) : []
         };
       }) : [],
@@ -292,10 +352,15 @@ export const updateMenu = asyncHandler(async (req, res) => {
 export const addSection = asyncHandler(async (req, res) => {
   const restaurantId = req.restaurant._id;
   const {
-    name
+    name,
+    foodType
   } = req.body;
   if (!name || !name.trim()) {
     return errorResponse(res, 400, 'Section name is required');
+  }
+  const resolvedFoodType = req.restaurant?.isPureVeg ? "Veg" : (foodType || "Non-Veg");
+  if (!["Veg", "Non-Veg"].includes(resolvedFoodType)) {
+    return errorResponse(res, 400, "Valid food type is required");
   }
 
   // Find or create menu
@@ -320,6 +385,7 @@ export const addSection = asyncHandler(async (req, res) => {
   const newSection = {
     id: `section-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
     name: name.trim(),
+    foodType: resolvedFoodType,
     items: [],
     subsections: [],
     isEnabled: true,
@@ -616,6 +682,82 @@ export const getMenuByRestaurantId = async (req, res) => {
         }
       });
     }
+    const toMs = (value) => {
+      if (!value) return 0;
+      const time = new Date(value).getTime();
+      return Number.isFinite(time) ? time : 0;
+    };
+
+    const itemCompletenessScore = (item) => {
+      let score = 0;
+      if (item?.image && String(item.image).trim()) score += 4;
+      if (Array.isArray(item?.images) && item.images.length > 0) score += 3;
+      if (item?.description && String(item.description).trim()) score += 2;
+      if (item?.preparationTime && String(item.preparationTime).trim()) score += 1;
+      return score;
+    };
+
+    // Resolve duplicate approved versions (same semantic item) and keep the latest/most complete one.
+    const dedupeApprovedItems = (items, sectionName = "") => {
+      const list = Array.isArray(items) ? items : [];
+      const pickMap = new Map();
+
+      for (const item of list) {
+        if (!item) continue;
+        const nameKey = String(item.name || "").trim().toLowerCase();
+        const categoryKey = String(item.category || sectionName || "").trim().toLowerCase();
+        const priceKey = Number(item.price || 0);
+        const foodTypeKey = String(item.foodType || "").trim().toLowerCase();
+        const semanticKey = `${nameKey}||${categoryKey}||${priceKey}||${foodTypeKey}`;
+
+        const current = pickMap.get(semanticKey);
+        if (!current) {
+          pickMap.set(semanticKey, item);
+          continue;
+        }
+
+        const currentApprovedAt = toMs(current.approvedAt);
+        const nextApprovedAt = toMs(item.approvedAt);
+        const currentRequestedAt = toMs(current.requestedAt);
+        const nextRequestedAt = toMs(item.requestedAt);
+        const currentScore = itemCompletenessScore(current);
+        const nextScore = itemCompletenessScore(item);
+
+        // Prefer newest approval; then newest request; then richer content.
+        const shouldReplace =
+          nextApprovedAt > currentApprovedAt ||
+          (nextApprovedAt === currentApprovedAt && nextRequestedAt > currentRequestedAt) ||
+          (nextApprovedAt === currentApprovedAt && nextRequestedAt === currentRequestedAt && nextScore > currentScore);
+
+        if (shouldReplace) {
+          pickMap.set(semanticKey, item);
+        }
+      }
+
+      return Array.from(pickMap.values());
+    };
+
+    const getUserVisibleItem = (item) => {
+      if (!item) return null;
+      const isApproved = item.approvalStatus === 'approved' || !item.approvalStatus;
+      const isAvailable = item.isAvailable !== false;
+      if (isApproved && isAvailable) {
+        return item;
+      }
+      // For edited approved items pending/rejected for re-approval, keep last approved snapshot visible to users.
+      if ((item.approvalStatus === 'pending' || item.approvalStatus === 'rejected') && item.lastApprovedSnapshot) {
+        const snapshot = { ...item.lastApprovedSnapshot };
+        if (snapshot.isAvailable === false) return null;
+        return {
+          ...snapshot,
+          id: item.id, // keep stable id
+          category: item.category || snapshot.category,
+          approvalStatus: 'approved',
+        };
+      }
+      return null;
+    };
+
     // Filter menu for user side: only show enabled sections and available items
     const filteredSections = (menu.sections || []).filter(section => {
       // Only show sections where isEnabled is not explicitly false
@@ -626,33 +768,17 @@ export const getMenuByRestaurantId = async (req, res) => {
     }).map(section => {
       // Filter direct items - only show available AND approved items
       // Items where isAvailable is not explicitly false AND approvalStatus is 'approved' should be shown
-      const availableItems = (section.items || []).filter(item => {
-        const isAvailable = item.isAvailable !== false;
-        const isApproved = item.approvalStatus === 'approved' || !item.approvalStatus; // Include approved or legacy items without approvalStatus
-        const shouldShow = isAvailable && isApproved;
-
-        // Debug logging for filtered items
-        if (!shouldShow) { }
-
-        // Debug logging for preparationTime - log ALL items to see what's in the data
-        if (shouldShow) { }
-        return shouldShow;
-      });
+      const availableItems = dedupeApprovedItems(
+        (section.items || []).map(getUserVisibleItem).filter(Boolean),
+        section.name
+      );
 
       // Filter subsections and their items
       const availableSubsections = (section.subsections || []).map(subsection => {
-        const availableSubsectionItems = (subsection.items || []).filter(item => {
-          const isAvailable = item.isAvailable !== false;
-          const isApproved = item.approvalStatus === 'approved' || !item.approvalStatus; // Include approved or legacy items without approvalStatus
-          const shouldShow = isAvailable && isApproved;
-
-          // Debug logging for filtered items
-          if (!shouldShow) { }
-
-          // Debug logging for preparationTime - log ALL items to see what's in the data
-          if (shouldShow) { }
-          return shouldShow;
-        });
+        const availableSubsectionItems = dedupeApprovedItems(
+          (subsection.items || []).map(getUserVisibleItem).filter(Boolean),
+          section.name
+        );
         // Only include subsection if it has available items
         if (availableSubsectionItems.length > 0) {
           return {

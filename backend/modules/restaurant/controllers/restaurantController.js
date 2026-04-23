@@ -374,11 +374,13 @@ export const getRestaurants = async (req, res) => {
     }
 
     if (pureVegOnly) {
+      const nonVegOrEggPattern = /^(non[-\s]?veg|egg)$/i;
       const nonVegRestaurantIds = await Menu.distinct('restaurant', {
         isActive: true,
         $or: [
-          { 'sections.items.foodType': 'Non-Veg' },
-          { 'sections.subsections.items.foodType': 'Non-Veg' }
+          { 'sections.foodType': { $regex: nonVegOrEggPattern } },
+          { 'sections.items.foodType': { $regex: nonVegOrEggPattern } },
+          { 'sections.subsections.items.foodType': { $regex: nonVegOrEggPattern } }
         ]
       });
 
@@ -604,7 +606,8 @@ export const getRestaurants = async (req, res) => {
 export const getRestaurantById = async (req, res) => {
   try {
     const { id } = req.params;
-    const { latitude, longitude } = req.query;
+    const { latitude, longitude, pureVeg } = req.query;
+    const pureVegOnly = pureVeg === 'true';
     const userLat = latitude != null ? parseFloat(latitude) : null;
     const userLng = longitude != null ? parseFloat(longitude) : null;
 
@@ -647,6 +650,22 @@ export const getRestaurantById = async (req, res) => {
       .lean();
     if (!restaurant) {
       return errorResponse(res, 404, 'Restaurant not found');
+    }
+
+    if (pureVegOnly) {
+      const nonVegOrEggPattern = /^(non[-\s]?veg|egg)$/i;
+      const hasNonVegMenu = await Menu.exists({
+        restaurant: restaurant._id,
+        isActive: true,
+        $or: [
+          { 'sections.foodType': { $regex: nonVegOrEggPattern } },
+          { 'sections.items.foodType': { $regex: nonVegOrEggPattern } },
+          { 'sections.subsections.items.foodType': { $regex: nonVegOrEggPattern } }
+        ]
+      });
+      if (hasNonVegMenu) {
+        return errorResponse(res, 404, 'Restaurant not found');
+      }
     }
 
     let outOfRange = false;
@@ -1432,8 +1451,10 @@ export const getRestaurantsWithDishesUnder250 = async (req, res) => {
     const {
       zoneId,
       latitude,
-      longitude
+      longitude,
+      pureVeg
     } = req.query; // User's zone ID (optional); latitude/longitude for deliveryRange filter
+    const pureVegOnly = pureVeg === 'true';
     const userLat = latitude != null ? parseFloat(latitude) : null;
     const userLng = longitude != null ? parseFloat(longitude) : null;
     const hasGeoFilter = userLat != null && userLng != null && Number.isFinite(userLat) && Number.isFinite(userLng);
@@ -1484,6 +1505,22 @@ export const getRestaurantsWithDishesUnder250 = async (req, res) => {
       .select('-owner -createdAt -updatedAt')
       .lean()
       .limit(100);
+
+    if (pureVegOnly && restaurants.length > 0) {
+      const nonVegOrEggPattern = /^(non[-\s]?veg|egg)$/i;
+      const nonVegRestaurantIds = await Menu.distinct('restaurant', {
+        isActive: true,
+        $or: [
+          { 'sections.foodType': { $regex: nonVegOrEggPattern } },
+          { 'sections.items.foodType': { $regex: nonVegOrEggPattern } },
+          { 'sections.subsections.items.foodType': { $regex: nonVegOrEggPattern } }
+        ]
+      });
+      if (nonVegRestaurantIds.length > 0) {
+        const nonVegIdSet = new Set(nonVegRestaurantIds.map((item) => String(item)));
+        restaurants = restaurants.filter((restaurant) => !nonVegIdSet.has(String(restaurant._id)));
+      }
+    }
 
     // Filter by deliveryRange when user coordinates provided
     if (hasGeoFilter) {

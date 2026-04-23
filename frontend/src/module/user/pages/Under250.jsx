@@ -29,7 +29,7 @@ export default function Under250() {
   const { zoneId, zoneStatus, isInService, isOutOfService } = useZone(location)
   const navigate = useNavigate()
   const { addToCart, updateQuantity, removeFromCart, getCartItem, cart } = useCart()
-  const { addDishFavorite, removeDishFavorite, isDishFavorite } = useProfile()
+  const { vegMode, addDishFavorite, removeDishFavorite, isDishFavorite } = useProfile()
   const [activeCategory, setActiveCategory] = useState(null)
   const [showSortPopup, setShowSortPopup] = useState(false)
   const [selectedSort, setSelectedSort] = useState(null)
@@ -174,6 +174,12 @@ export default function Under250() {
       try {
         setLoadingRestaurants(true)
         const params = {}
+        const pureVegOnlySelected =
+          vegMode === true &&
+          (typeof window !== "undefined" && localStorage.getItem("userVegModeOption") === "pure-veg")
+        if (pureVegOnlySelected) {
+          params.pureVeg = "true"
+        }
         if (zoneId) params.zoneId = zoneId
         if (location?.latitude != null && location?.longitude != null) {
           params.latitude = location.latitude
@@ -274,7 +280,7 @@ export default function Under250() {
     }
 
     fetchRestaurantsUnder250()
-  }, [zoneId, isOutOfService, location?.latitude, location?.longitude])
+  }, [zoneId, isOutOfService, location?.latitude, location?.longitude, vegMode])
 
   // Fetch categories from admin API
   useEffect(() => {

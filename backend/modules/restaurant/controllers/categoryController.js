@@ -80,7 +80,7 @@ export const createCategory = asyncHandler(async (req, res) => {
       return errorResponse(res, 401, 'Restaurant not authenticated');
     }
 
-    const { name, description, order, icon, color } = req.body;
+    const { name, description, order, icon, color, foodType } = req.body;
 
     if (!name || !name.trim()) {
       return errorResponse(res, 400, 'Category name is required');
@@ -102,6 +102,9 @@ export const createCategory = asyncHandler(async (req, res) => {
       .select('order')
       .lean();
 
+    const normalizedFoodType =
+      String(foodType || '').toLowerCase() === 'veg' ? 'Veg' : 'Non-Veg';
+
     const newCategory = await RestaurantCategory.create({
       restaurant: restaurantId,
       name: name.trim(),
@@ -109,6 +112,7 @@ export const createCategory = asyncHandler(async (req, res) => {
       order: order !== undefined ? order : (maxOrder?.order || 0) + 1,
       icon: icon || '',
       color: color || '#000000',
+      foodType: normalizedFoodType,
       isActive: true,
     });
 
@@ -138,7 +142,7 @@ export const updateCategory = asyncHandler(async (req, res) => {
   try {
     const restaurantId = req.restaurant?._id || req.restaurant?.id;
     const { id } = req.params;
-    const { name, description, order, icon, color, isActive } = req.body;
+    const { name, description, order, icon, color, isActive, foodType } = req.body;
 
     if (!restaurantId) {
       return errorResponse(res, 401, 'Restaurant not authenticated');
@@ -172,6 +176,9 @@ export const updateCategory = asyncHandler(async (req, res) => {
     if (order !== undefined) category.order = order;
     if (icon !== undefined) category.icon = icon;
     if (color !== undefined) category.color = color;
+    if (foodType !== undefined) {
+      category.foodType = String(foodType).toLowerCase() === 'veg' ? 'Veg' : 'Non-Veg';
+    }
     if (isActive !== undefined) category.isActive = isActive;
 
     await category.save();
@@ -263,4 +270,3 @@ export const reorderCategories = asyncHandler(async (req, res) => {
     return errorResponse(res, 500, 'Failed to reorder categories');
   }
 });
-

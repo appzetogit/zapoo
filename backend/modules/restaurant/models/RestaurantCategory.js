@@ -35,6 +35,11 @@ const restaurantCategorySchema = new mongoose.Schema(
       type: String,
       default: '#000000',
     },
+    foodType: {
+      type: String,
+      enum: ['Veg', 'Non-Veg'],
+      default: 'Non-Veg',
+    },
     itemCount: {
       type: Number,
       default: 0,
@@ -94,4 +99,3 @@ restaurantCategorySchema.methods.updateItemCount = async function() {
 const RestaurantCategory = mongoose.model('RestaurantCategory', restaurantCategorySchema);
 
 export default RestaurantCategory;
-

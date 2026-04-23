@@ -495,8 +495,8 @@ export const restaurantAPI = {
   updateMenu: (menuData) => {
     return apiClient.put(API_ENDPOINTS.RESTAURANT.MENU, menuData);
   },
-  addSection: (name) => {
-    return apiClient.post(`${API_ENDPOINTS.RESTAURANT.MENU}/section`, { name });
+  addSection: (name, foodType = "Non-Veg") => {
+    return apiClient.post(`${API_ENDPOINTS.RESTAURANT.MENU}/section`, { name, foodType });
   },
   addItemToSection: (sectionId, item) => {
     return apiClient.post(`${API_ENDPOINTS.RESTAURANT.MENU}/section/item`, {
@@ -662,8 +662,8 @@ export const restaurantAPI = {
   updateMenu: (menuData) => {
     return apiClient.put(API_ENDPOINTS.RESTAURANT.MENU, menuData);
   },
-  addSection: (name) => {
-    return apiClient.post(`${API_ENDPOINTS.RESTAURANT.MENU}/section`, { name });
+  addSection: (name, foodType = "Non-Veg") => {
+    return apiClient.post(`${API_ENDPOINTS.RESTAURANT.MENU}/section`, { name, foodType });
   },
   addItemToSection: (sectionId, item) => {
     return apiClient.post(`${API_ENDPOINTS.RESTAURANT.MENU}/section/item`, {

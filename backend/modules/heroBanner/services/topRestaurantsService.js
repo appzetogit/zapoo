@@ -1,4 +1,5 @@
 import Restaurant from '../../restaurant/models/Restaurant.js';
+import Menu from '../../restaurant/models/Menu.js';
 import Order from '../../order/models/Order.js';
 import Zone from '../../admin/models/Zone.js';
 import { calculateDistance } from '../../order/services/orderCalculationService.js';
@@ -42,6 +43,7 @@ export const getTopRestaurantsForUser = async ({
   latitude,
   longitude,
   zoneId,
+  pureVeg,
   limit = TOP_RESTAURANTS_LIMIT
 } = {}) => {
   const userLat = latitude != null ? parseFloat(latitude) : null;
@@ -59,6 +61,22 @@ export const getTopRestaurantsForUser = async ({
   }
 
   const query = buildEligibleRestaurantQuery(activeZoneIds);
+  const pureVegOnly = pureVeg === 'true' || pureVeg === true;
+
+  if (pureVegOnly) {
+    const nonVegOrEggPattern = /^(non[-\s]?veg|egg)$/i;
+    const nonVegRestaurantIds = await Menu.distinct('restaurant', {
+      isActive: true,
+      $or: [
+        { 'sections.foodType': { $regex: nonVegOrEggPattern } },
+        { 'sections.items.foodType': { $regex: nonVegOrEggPattern } },
+        { 'sections.subsections.items.foodType': { $regex: nonVegOrEggPattern } }
+      ]
+    });
+    if (nonVegRestaurantIds.length > 0) {
+      query._id = { $nin: nonVegRestaurantIds };
+    }
+  }
 
   if (zoneId) {
     const normalizedZoneId = String(zoneId);

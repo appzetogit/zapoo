@@ -68,6 +68,9 @@ export default function RestaurantDetails() {
     removeFavorite,
     isFavorite
   } = useProfile();
+  const pureVegOnlySelected =
+    vegMode === true &&
+    (typeof window !== "undefined" && localStorage.getItem("userVegModeOption") === "pure-veg");
   const {
     location: userLocation
   } = useGeoLocation(); // Get user's current location
@@ -174,6 +177,9 @@ export default function RestaurantDetails() {
           coordParams.latitude = userLocation.latitude;
           coordParams.longitude = userLocation.longitude;
         }
+        if (pureVegOnlySelected) {
+          coordParams.pureVeg = "true";
+        }
         // Fetch restaurant directly from restaurantAPI (pass coords for outOfRange check)
         try {
           response = await restaurantAPI.getRestaurantById(slug, coordParams);
@@ -191,6 +197,9 @@ export default function RestaurantDetails() {
               limit: 100,
               zoneId: zoneId
             };
+            if (pureVegOnlySelected) {
+              searchParams.pureVeg = "true";
+            }
             if (userLocation?.latitude != null && userLocation?.longitude != null) {
               searchParams.latitude = userLocation.latitude;
               searchParams.longitude = userLocation.longitude;
@@ -416,6 +425,9 @@ export default function RestaurantDetails() {
                 limit: 100,
                 zoneId: zoneId
               };
+              if (pureVegOnlySelected) {
+                searchParams.pureVeg = "true";
+              }
               const searchResponse = await restaurantAPI.getRestaurants(searchParams);
               const restaurants = searchResponse?.data?.data?.restaurants || searchResponse?.data?.data || [];
 
@@ -490,8 +502,16 @@ export default function RestaurantDetails() {
                   menuSections: finalMenuSections
                 }));
 
-                // Set first 3 sections (Recommended, Starters, Main Course) as expanded by default
-                const defaultExpandedSections = new Set([0, 1, 2]); // Index 0, 1, 2
+                // Keep all sections/subsections expanded by default so all categories and items are visible on open
+                const defaultExpandedSections = new Set();
+                finalMenuSections.forEach((menuSection, sectionIndex) => {
+                  defaultExpandedSections.add(sectionIndex);
+                  if (Array.isArray(menuSection?.subsections)) {
+                    menuSection.subsections.forEach((_, subIndex) => {
+                      defaultExpandedSections.add(`${sectionIndex}-${subIndex}`);
+                    });
+                  }
+                });
                 setExpandedSections(defaultExpandedSections);
               }
             } catch (menuError) {
@@ -577,7 +597,7 @@ export default function RestaurantDetails() {
       return;
     }
     fetchRestaurant();
-  }, [slug, zoneId, loadingZone, restaurant?.slug, isOutOfService]);
+  }, [slug, zoneId, loadingZone, restaurant?.slug, isOutOfService, pureVegOnlySelected]);
 
   // Track previous values to prevent unnecessary recalculations
   const prevCoordsRef = useRef({
@@ -834,15 +854,56 @@ export default function RestaurantDetails() {
     } else if (section?.title && typeof section.title === 'string' && section.title.trim()) {
       sectionTitle = section.title.trim();
     }
-    const itemCount = section?.items?.length || 0;
-    const subsectionCount = section?.subsections?.reduce((sum, sub) => sum + (sub?.items?.length || 0), 0) || 0;
+    const resolveDietType = (item) => {
+      const raw = String(item?.foodType || "").trim().toLowerCase();
+      if (raw) {
+        if (raw.includes("non")) return "non-veg";
+        if (raw === "veg" || raw.includes("vegetarian")) return "veg";
+        if (raw.includes("egg")) return "non-veg";
+      }
+      if (typeof item?.isVeg === "boolean") {
+        return item.isVeg ? "veg" : "non-veg";
+      }
+      return null;
+    };
+    const isVisibleItem = (item) => {
+      const dietType = resolveDietType(item);
+      const finalPrice = item.originalPrice && item.discountAmount && item.discountAmount > 0
+        ? Math.max(
+          0,
+          item.discountType === "Percent"
+            ? item.originalPrice - item.originalPrice * item.discountAmount / 100
+            : item.discountType === "Fixed"
+              ? item.originalPrice - item.discountAmount
+              : item.price || 0
+        )
+        : Math.max(0, item.price || 0);
+      if (showOnlyUnder250) {
+        if (finalPrice > 250) return false;
+      }
+      if (searchQuery.trim()) {
+        const query = searchQuery.toLowerCase().trim();
+        const itemName = item?.name?.toLowerCase() || "";
+        if (!itemName.includes(query)) return false;
+      }
+      if (vegMode === true && dietType !== "veg") return false;
+      if (filters.vegNonVeg === "veg" && dietType !== "veg") return false;
+      if (filters.vegNonVeg === "non-veg" && dietType !== "non-veg") return false;
+      return true;
+    };
+
+    const itemCount = (section?.items || []).filter(isVisibleItem).length || 0;
+    const subsectionCount = (section?.subsections || []).reduce((sum, sub) => {
+      const visibleItems = (sub?.items || []).filter(isVisibleItem).length;
+      return sum + visibleItems;
+    }, 0) || 0;
     const totalCount = itemCount + subsectionCount;
     return {
       name: sectionTitle,
       count: totalCount,
       sectionIndex: index
     };
-  }) : [];
+  }).filter((category) => category.count > 0) : [];
 
   // Count active filters
   const getActiveFilterCount = () => {
@@ -1068,52 +1129,22 @@ export default function RestaurantDetails() {
     return sorted;
   };
 
-  // Helper function to check if a section has any items under ₹250
-  const sectionHasItemsUnder250 = section => {
-    if (!showOnlyUnder250) return true; // If not filtering, show all sections
-
-    // Check direct items
-    if (section.items && section.items.length > 0) {
-      const hasUnder250Items = section.items.some(item => {
-        if (item.isAvailable === false) return false;
-        const finalPrice = getFinalPrice(item);
-        return finalPrice <= 250;
-      });
-      if (hasUnder250Items) return true;
-    }
-
-    // Check subsection items
-    if (section.subsections && section.subsections.length > 0) {
-      for (const subsection of section.subsections) {
-        if (subsection.items && subsection.items.length > 0) {
-          const hasUnder250Items = subsection.items.some(item => {
-            if (item.isAvailable === false) return false;
-            const finalPrice = getFinalPrice(item);
-            return finalPrice <= 250;
-          });
-          if (hasUnder250Items) return true;
-        }
-      }
-    }
-    return false;
-  };
-
   // Filter sections to only show those with items under ₹250
   // Returns array of { section, originalIndex } to preserve original index for expanded sections
   const getFilteredSections = () => {
     if (!restaurant?.menuSections) return [];
-    if (!showOnlyUnder250) {
-      return restaurant.menuSections.map((section, index) => ({
-        section,
-        originalIndex: index
-      }));
-    }
     return restaurant.menuSections.map((section, index) => ({
       section,
       originalIndex: index
-    })).filter(({
-      section
-    }) => sectionHasItemsUnder250(section));
+    })).filter(({ section }) => {
+      const visibleDirectItems = filterMenuItems(section?.items || []);
+      const hasVisibleDirectItems = Array.isArray(visibleDirectItems) && visibleDirectItems.length > 0;
+      const hasVisibleSubsectionItems = Array.isArray(section?.subsections) && section.subsections.some((subsection) => {
+        const visibleSubItems = filterMenuItems(subsection?.items || []);
+        return Array.isArray(visibleSubItems) && visibleSubItems.length > 0;
+      });
+      return hasVisibleDirectItems || hasVisibleSubsectionItems;
+    });
   };
 
   // Highlight offers/texts for the blue offer line
@@ -1348,21 +1379,20 @@ export default function RestaurantDetails() {
 
         {/* Menu Items Section */}
         {restaurant?.menuSections && Array.isArray(restaurant.menuSections) && restaurant.menuSections.length > 0 && <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 lg:px-10 xl:px-12 py-6 sm:py-8 md:py-10 lg:py-12 space-y-6 md:space-y-8 lg:space-y-10">
-            {getFilteredSections().map(({
+        {getFilteredSections().map(({
           section,
           originalIndex
         }, sectionIndex) => {
-          // Handle section name - check for valid non-empty string
-          let sectionTitle = t("user.restaurantDetails.unnamedSection");
-          if (originalIndex === 0) {
-            sectionTitle = t("user.restaurantDetails.recommendedForYou");
-          } else if (section?.name && typeof section.name === 'string' && section.name.trim()) {
-            sectionTitle = section.name.trim();
-          } else if (section?.title && typeof section.title === 'string' && section.title.trim()) {
-            sectionTitle = section.title.trim();
-          }
           const sectionId = `menu-section-${originalIndex}`;
           const isExpanded = expandedSections.has(originalIndex);
+          const visibleSectionItems = sortMenuItems(filterMenuItems(section?.items || []));
+          const visibleSubsections = (section?.subsections || [])
+            .map((subsection, subIndex) => ({
+              subsection,
+              subIndex,
+              visibleItems: sortMenuItems(filterMenuItems(subsection?.items || [])),
+            }))
+            .filter(({ visibleItems }) => Array.isArray(visibleItems) && visibleItems.length > 0);
           return <div key={sectionIndex} id={sectionId} className="space-y-4 scroll-mt-20">
                   {/* Section Header */}
                   {sectionIndex === 0 && <div className="flex items-center justify-between">
@@ -1410,13 +1440,13 @@ export default function RestaurantDetails() {
                     </div>}
 
                   {/* Direct Items */}
-                  {isExpanded && originalIndex === 0 && section.items && section.items.length === 0 && <div className="text-center py-8">
+                  {isExpanded && originalIndex === 0 && visibleSectionItems.length === 0 && visibleSubsections.length === 0 && <div className="text-center py-8">
                       <p className="text-gray-500 dark:text-gray-400 text-sm md:text-base">
                         {t("user.restaurantDetails.noDishRecommended")}
                       </p>
                     </div>}
-                  {isExpanded && section.items && section.items.length > 0 && <div className="space-y-0">
-                      {sortMenuItems(filterMenuItems(section.items)).map(item => {
+                  {isExpanded && visibleSectionItems.length > 0 && <div className="space-y-0">
+                      {visibleSectionItems.map(item => {
                 const quantity = quantities[item.id] || 0;
                 // Determine veg/non-veg based on foodType
                 const isVeg = getDietType(item) !== "non-veg";
@@ -1539,17 +1569,8 @@ export default function RestaurantDetails() {
                     </div>}
 
                   {/* Subsections */}
-                  {isExpanded && section.subsections && section.subsections.length > 0 && <div className="space-y-4">
-                      {section.subsections.filter(subsection => {
-                // Filter subsections to only show those with items under ₹250
-                if (!showOnlyUnder250) return true;
-                if (!subsection.items || subsection.items.length === 0) return false;
-                return subsection.items.some(item => {
-                  if (item.isAvailable === false) return false;
-                  const finalPrice = getFinalPrice(item);
-                  return finalPrice <= 250;
-                });
-              }).map((subsection, subIndex) => {
+                  {isExpanded && visibleSubsections.length > 0 && <div className="space-y-4">
+                      {visibleSubsections.map(({ subsection, subIndex, visibleItems }) => {
                 const subsectionKey = `${originalIndex}-${subIndex}`;
                 const isSubsectionExpanded = expandedSections.has(subsectionKey);
                 return <div key={subIndex} className="space-y-4">
@@ -1575,8 +1596,8 @@ export default function RestaurantDetails() {
                             </div>
 
                             {/* Subsection Items */}
-                            {isSubsectionExpanded && subsection.items && subsection.items.length > 0 && <div className="space-y-0">
-                                {sortMenuItems(filterMenuItems(subsection.items)).map(item => {
+                            {isSubsectionExpanded && visibleItems.length > 0 && <div className="space-y-0">
+                                {visibleItems.map(item => {
                       const quantity = quantities[item.id] || 0;
                       // Determine veg/non-veg based on foodType
                       const isVeg = getDietType(item) !== "non-veg";

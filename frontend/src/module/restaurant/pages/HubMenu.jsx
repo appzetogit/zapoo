@@ -70,6 +70,7 @@ export default function HubMenu() {
   const [selectedGroupForSubCategory, setSelectedGroupForSubCategory] = useState(null); // { id, name }
   const [isAddCategoryPopupOpen, setIsAddCategoryPopupOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
+  const [newCategoryFoodType, setNewCategoryFoodType] = useState("Non-Veg");
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [restaurantData, setRestaurantData] = useState(null);
@@ -286,6 +287,7 @@ export default function HubMenu() {
           const normalizedSections = menuData.map((section, index) => ({
             id: section.id || `section-${index}`,
             name: section.name || "Unnamed Section",
+            foodType: section.foodType || "Non-Veg",
             items: Array.isArray(section.items) ? section.items.map(item => ({
               id: String(item.id || Date.now() + Math.random()),
               name: item.name || "Unnamed Item",
@@ -423,15 +425,22 @@ export default function HubMenu() {
       }
       return true;
     });
-    if (validFiles.length === 0) return;
-    const newImagePreviews = [];
-    const newImageFilesMap = new Map(addonImageFiles);
-    validFiles.forEach(file => {
-      const previewUrl = URL.createObjectURL(file);
-      newImagePreviews.push(previewUrl);
-      newImageFilesMap.set(previewUrl, file);
+    if (validFiles.length === 0) return false;
+    const selectedFile = validFiles[0];
+    if (validFiles.length > 1) {
+      toast.info("Only one image is allowed. Using the first selected image.");
+    }
+
+    // Replace existing image with new image
+    addonImages.forEach(img => {
+      if (typeof img === 'string' && img.startsWith('blob:')) {
+        URL.revokeObjectURL(img);
+      }
     });
-    setAddonImages([...addonImages, ...newImagePreviews]);
+    const previewUrl = URL.createObjectURL(selectedFile);
+    const newImageFilesMap = new Map();
+    newImageFilesMap.set(previewUrl, selectedFile);
+    setAddonImages([previewUrl]);
     setAddonImageFiles(newImageFilesMap);
     return true;
   };
@@ -451,12 +460,12 @@ export default function HubMenu() {
       const result = await window.flutter_inappwebview.callHandler("openGallery", {
         source: "gallery",
         accept: "image/*",
-        multiple: true,
+        multiple: false,
         quality: 0.8
       });
       const files = await flutterImageResultToFiles(result, `addon-image-${Date.now()}`);
       if (!files.length) return false;
-      return processAddonImageFiles(files);
+      return processAddonImageFiles([files[0]]);
     } catch (error) {
       console.error("Failed to pick add-on images from Flutter gallery:", error);
       return false;
@@ -517,38 +526,33 @@ export default function HubMenu() {
     try {
       setUploadingAddonImages(true);
 
-      // Upload new images to Cloudinary
-      const uploadedImageUrls = [];
-      const existingImageUrls = addonImages.filter(img => typeof img === 'string' && (img.startsWith('http://') || img.startsWith('https://')) && !img.startsWith('blob:'));
+      // Upload image to Cloudinary (single image mode)
+      const existingImageUrl = addonImages.find(img => typeof img === 'string' && (img.startsWith('http://') || img.startsWith('https://')) && !img.startsWith('blob:')) || '';
       const filesToUpload = Array.from(addonImageFiles.values());
+      let uploadedImageUrl = '';
       if (filesToUpload.length > 0) {
-        toast.info(`Uploading ${filesToUpload.length} image(s)...`);
-        for (let i = 0; i < filesToUpload.length; i++) {
-          const file = filesToUpload[i];
-          try {
-            const uploadResponse = await uploadAPI.uploadMedia(file, {
-              folder: 'appzeto/restaurant/addons'
-            });
-            const imageUrl = uploadResponse?.data?.data?.url || uploadResponse?.data?.url;
-            if (imageUrl) {
-              uploadedImageUrls.push(imageUrl);
-            }
-          } catch (uploadError) {
-            console.error(`Error uploading image ${i + 1}:`, uploadError);
-            toast.error(`Failed to upload ${file.name}. Please try again.`);
-            setUploadingAddonImages(false);
-            return;
-          }
+        toast.info('Uploading image...');
+        const file = filesToUpload[0];
+        try {
+          const uploadResponse = await uploadAPI.uploadMedia(file, {
+            folder: 'appzeto/restaurant/addons'
+          });
+          uploadedImageUrl = uploadResponse?.data?.data?.url || uploadResponse?.data?.url || '';
+        } catch (uploadError) {
+          console.error('Error uploading image:', uploadError);
+          toast.error(`Failed to upload ${file.name}. Please try again.`);
+          setUploadingAddonImages(false);
+          return;
         }
       }
-      const allImageUrls = [...existingImageUrls, ...uploadedImageUrls].filter((url, index, self) => url && typeof url === 'string' && url.trim() !== '' && self.indexOf(url) === index);
+      const finalImageUrl = uploadedImageUrl || existingImageUrl || '';
       const addonData = {
         name: addonName.trim(),
         description: addonDescription.trim(),
         foodType: addonFoodType,
         price: parseFloat(addonPrice) || 0,
-        image: allImageUrls.length > 0 ? allImageUrls[0] : '',
-        images: allImageUrls
+        image: finalImageUrl,
+        images: finalImageUrl ? [finalImageUrl] : []
       };
       if (editingAddon) {
         // Update existing add-on
@@ -591,7 +595,7 @@ export default function HubMenu() {
         : ""
     );
     setAddonPrice(addon.price?.toString() || "");
-    setAddonImages(addon.images && addon.images.length > 0 ? addon.images : addon.image ? [addon.image] : []);
+    setAddonImages(addon.images && addon.images.length > 0 ? [addon.images[0]] : addon.image ? [addon.image] : []);
     setAddonImageFiles(new Map());
     setIsAddAddonModalOpen(true);
   };
@@ -906,6 +910,7 @@ export default function HubMenu() {
   // Add category handlers
   const handleOpenAddCategory = () => {
     setNewCategoryName("");
+    setNewCategoryFoodType("Non-Veg");
     setIsAddCategoryPopupOpen(true);
     setIsAddPopupOpen(false); // Close the main add popup
   };
@@ -916,7 +921,7 @@ export default function HubMenu() {
     }
     try {
       // Add category to backend
-      const response = await restaurantAPI.addSection(newCategoryName.trim());
+      const response = await restaurantAPI.addSection(newCategoryName.trim(), newCategoryFoodType);
       if (response.data && response.data.success) {
         // Refresh menu data
         const menuResponse = await restaurantAPI.getMenu();
@@ -929,6 +934,7 @@ export default function HubMenu() {
         navigate('/restaurant/hub-menu/item/new', {
           state: {
             category: newCategoryName.trim(),
+            categoryFoodType: newCategoryFoodType,
             isNewCategory: true,
             sectionId: response.data.data.section.id
           }
@@ -944,6 +950,7 @@ export default function HubMenu() {
     // Close popup and reset
     setIsAddCategoryPopupOpen(false);
     setNewCategoryName("");
+    setNewCategoryFoodType("Non-Veg");
   };
   const handleDeleteCategory = async () => {
     if (!selectedCategory) return;
@@ -1712,6 +1719,7 @@ export default function HubMenu() {
         }} onClick={() => {
           setIsAddCategoryPopupOpen(false);
           setNewCategoryName("");
+          setNewCategoryFoodType("Non-Veg");
         }} className="fixed inset-0 bg-black/50 z-[70]" />
         <motion.div initial={{
           y: "100%"
@@ -1729,6 +1737,7 @@ export default function HubMenu() {
             <button onClick={() => {
               setIsAddCategoryPopupOpen(false);
               setNewCategoryName("");
+              setNewCategoryFoodType("Non-Veg");
             }} className="p-1 rounded-full hover:bg-gray-100">
               <X className="w-5 h-5 text-gray-600" />
             </button>
@@ -1744,6 +1753,27 @@ export default function HubMenu() {
                     handleContinueAddCategory();
                   }
                 }} placeholder="Enter category name" className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" autoFocus />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-900 mb-2">
+                  Food type
+                </label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setNewCategoryFoodType("Veg")}
+                    className={`px-4 py-2 rounded-lg text-sm font-semibold border transition-colors ${newCategoryFoodType === "Veg" ? "border-green-600 bg-green-50 text-green-700" : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50"}`}
+                  >
+                    Veg
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setNewCategoryFoodType("Non-Veg")}
+                    className={`px-4 py-2 rounded-lg text-sm font-semibold border transition-colors ${newCategoryFoodType === "Non-Veg" ? "border-red-600 bg-red-50 text-red-700" : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50"}`}
+                  >
+                    Non-Veg
+                  </button>
+                </div>
               </div>
               <button onClick={handleContinueAddCategory} disabled={!newCategoryName.trim()} className={`w-full py-3 px-4 rounded-lg text-sm font-semibold transition-colors ${newCategoryName.trim() ? "bg-[#3B82F6] text-white hover:bg-blue-700" : "bg-gray-300 text-gray-500 cursor-not-allowed"}`}>
                 Continue
@@ -1997,7 +2027,6 @@ export default function HubMenu() {
                 ref={addonFileInputRef}
                 type="file"
                 accept=".png,.jpg,.jpeg,.webp"
-                multiple
                 onChange={handleAddonImageAdd}
                 className="hidden"
                 id="addon-image-upload"
@@ -2041,7 +2070,7 @@ export default function HubMenu() {
                   <span className="text-sm font-medium text-gray-700">Take photo</span>
                 </button>
               </div>
-              <p className="text-xs text-gray-500 mt-1">Add multiple images (PNG, JPG, WEBP - max 5MB each)</p>
+              <p className="text-xs text-gray-500 mt-1">Only one image allowed (PNG, JPG, WEBP - max 5MB). New upload replaces old image.</p>
             </div>
           </div>
 

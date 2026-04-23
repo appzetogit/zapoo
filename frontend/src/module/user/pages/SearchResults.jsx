@@ -38,6 +38,7 @@ const filterOptionsConfig = [{
 
 export default function SearchResults() {
   const { t } = useTranslation();
+  const { vegMode } = useProfile();
   const [searchParams, setSearchParams] = useSearchParams();
   const query = searchParams.get("q") || "";
   const navigate = useNavigate();
@@ -235,6 +236,12 @@ export default function SearchResults() {
         const params = {
           includeBeyondDeliveryRange: "true",
         };
+        const pureVegOnlySelected =
+          vegMode === true &&
+          (typeof window !== "undefined" && localStorage.getItem("userVegModeOption") === "pure-veg");
+        if (pureVegOnlySelected) {
+          params.pureVeg = "true";
+        }
         if (query.trim().length > 0) {
           params.includeInactiveForSearch = "true";
         }
@@ -483,7 +490,7 @@ export default function SearchResults() {
       }
     };
     fetchRestaurants();
-  }, [zoneId, isOutOfService, location?.latitude, location?.longitude, query]);
+  }, [zoneId, isOutOfService, location?.latitude, location?.longitude, query, vegMode]);
 
   // Update search query when URL changes
   useEffect(() => {

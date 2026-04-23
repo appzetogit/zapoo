@@ -40,13 +40,27 @@ function getItemImage(item) {
   return '';
 }
 
+function getDietType(item) {
+  const raw = String(item?.foodType || '').trim().toLowerCase();
+  if (raw) {
+    if (raw.includes('non')) return 'non-veg';
+    if (raw.includes('egg')) return 'non-veg';
+    if (raw === 'veg' || raw.includes('vegetarian')) return 'veg';
+  }
+  if (typeof item?.isVeg === 'boolean') {
+    return item.isVeg ? 'veg' : 'non-veg';
+  }
+  return null;
+}
+
 /**
  * POST /api/restaurant/recommended-preview
- * Body: { restaurantIds: string[] }
+ * Body: { restaurantIds: string[], onlyVeg?: boolean }
  * Returns: { previews: { [restaurantId]: [{ itemId, name, price, originalPrice, image }] } }
  */
 export async function getRecommendedPreview(req, res) {
-  const { restaurantIds } = req.body || {};
+  const { restaurantIds, onlyVeg } = req.body || {};
+  const onlyVegItems = onlyVeg === true || onlyVeg === 'true';
   if (!Array.isArray(restaurantIds) || restaurantIds.length === 0) {
     return errorResponse(res, 400, 'restaurantIds (non-empty array) is required');
   }
@@ -89,17 +103,23 @@ export async function getRecommendedPreview(req, res) {
       })
       .filter((it) => it.isAvailable !== false)
       .filter((it) => (it.approvalStatus === 'approved' || !it.approvalStatus))
+      .filter((it) => {
+        if (!onlyVegItems) return true;
+        return getDietType(it) === 'veg';
+      })
       .slice(0, 50) // safety cap before mapping/slicing to limit
       .map((it) => {
         const originalPrice = Number(it.originalPrice ?? it.price ?? 0) || 0;
         const computed = computeFinalPrice(it);
         const price = Number.isFinite(computed) && computed > 0 ? computed : originalPrice;
+        const dietType = getDietType(it);
         return {
           itemId: String(it.id || ''),
           name: it.name || '',
           price,
           originalPrice,
-          image: getItemImage(it)
+          image: getItemImage(it),
+          foodType: dietType === 'veg' ? 'Veg' : dietType === 'non-veg' ? 'Non-Veg' : undefined
         };
       })
       .filter((it) => it.itemId && it.name)
@@ -110,4 +130,3 @@ export async function getRecommendedPreview(req, res) {
 
   return successResponse(res, 200, 'Recommended preview retrieved successfully', { previews });
 }
-

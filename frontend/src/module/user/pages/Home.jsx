@@ -50,6 +50,7 @@ import { useTranslation } from "react-i18next";
 const RestaurantImageCarousel = React.memo(({
   restaurant,
   recommendedItems = [],
+  vegMode = false,
   priority = false
 }) => {
   const { t } = useTranslation();
@@ -59,8 +60,18 @@ const RestaurantImageCarousel = React.memo(({
   }, [restaurant]);
   const recommendedSlides = useMemo(() => {
     if (!Array.isArray(recommendedItems) || recommendedItems.length === 0) return [];
+    const getDietType = (item) => {
+      const raw = String(item?.foodType || "").trim().toLowerCase();
+      if (raw) {
+        if (raw.includes("non") || raw.includes("egg")) return "non-veg";
+        if (raw === "veg" || raw.includes("vegetarian")) return "veg";
+      }
+      if (typeof item?.isVeg === "boolean") return item.isVeg ? "veg" : "non-veg";
+      return null;
+    };
     return recommendedItems
       .filter(Boolean)
+      .filter((item) => !vegMode || getDietType(item) === "veg")
       .map((item, index) => ({
         id: item.itemId || `${item.name || "recommended"}-${index}`,
         image: item.image || restaurantImages[0] || restaurant.image,
@@ -69,15 +80,16 @@ const RestaurantImageCarousel = React.memo(({
         isRecommended: true,
       }))
       .filter((item) => Boolean(item.image));
-  }, [recommendedItems, restaurant.image, restaurantImages]);
+  }, [recommendedItems, restaurant.image, restaurantImages, vegMode]);
   const gallerySlides = useMemo(() => {
     if (recommendedSlides.length > 0) return recommendedSlides;
+    if (vegMode && Array.isArray(recommendedItems) && recommendedItems.length > 0) return [];
     return restaurantImages.map((image, index) => ({
       id: `${restaurant._id || restaurant.id || restaurant.name}-gallery-${index}`,
       image,
       isRecommended: false,
     }));
-  }, [recommendedSlides, restaurantImages, restaurant]);
+  }, [recommendedSlides, restaurantImages, restaurant, vegMode, recommendedItems]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [direction, setDirection] = useState(1);
   const touchStartX = useRef(0);
@@ -211,7 +223,13 @@ export default function Home() {
   const [prevVegMode, setPrevVegMode] = useState(vegMode);
   const [showVegModePopup, setShowVegModePopup] = useState(false);
   const [showSwitchOffPopup, setShowSwitchOffPopup] = useState(false);
-  const [vegModeOption, setVegModeOption] = useState("all"); // "all" or "pure-veg"
+  const [vegModeOption, setVegModeOption] = useState(() => {
+    try {
+      return localStorage.getItem("userVegModeOption") === "pure-veg" ? "pure-veg" : "all";
+    } catch {
+      return "all";
+    }
+  }); // "all" or "pure-veg"
   const [isApplyingVegMode, setIsApplyingVegMode] = useState(false);
   const [isSwitchingOffVegMode, setIsSwitchingOffVegMode] = useState(false);
   const [popupPosition, setPopupPosition] = useState({
@@ -604,12 +622,15 @@ export default function Home() {
       try {
         setLoadingTop10(true);
         const params = {};
+        if (vegMode && vegModeOption === "pure-veg") {
+          params.pureVeg = "true";
+        }
         if (location?.latitude != null && location?.longitude != null) {
           params.latitude = location.latitude;
           params.longitude = location.longitude;
         }
         const response = await getCachedResource(
-          ["home:top10", params.latitude ?? "na", params.longitude ?? "na"],
+          ["home:top10", params.latitude ?? "na", params.longitude ?? "na", params.pureVeg ?? "false"],
           () => api.get('/hero-banners/top-10/public', { params }),
           { ttl: 60 * 1000 }
         );
@@ -624,7 +645,7 @@ export default function Home() {
       }
     };
     fetchTop10();
-  }, [location?.latitude, location?.longitude]);
+  }, [location?.latitude, location?.longitude, vegMode, vegModeOption]);
 
   // Memoize cartCount to prevent recalculation on every render - use cart directly
   const cartCount = useMemo(() => cart.reduce((total, item) => total + (item.quantity || 0), 0), [cart]);
@@ -1185,6 +1206,7 @@ export default function Home() {
       try {
         const res = await api.post("/restaurant/recommended-preview", {
           restaurantIds: uniqueIds,
+          onlyVeg: vegMode === true,
         });
         const previews = res?.data?.data?.previews || {};
         if (!cancelled) setRecommendedPreviewByRestaurantId(previews);
@@ -1196,7 +1218,7 @@ export default function Home() {
     return () => {
       cancelled = true;
     };
-  }, [filteredRestaurants]);
+  }, [filteredRestaurants, vegMode]);
 
   // Featured foods removed - will be handled by restaurants data from API
   const filteredFeaturedFoods = useMemo(() => {
@@ -2174,6 +2196,7 @@ export default function Home() {
                             <RestaurantImageCarousel
                               restaurant={restaurant}
                               recommendedItems={recommendedPreviewByRestaurantId[String(restaurant?._id || restaurant?.id)]}
+                              vegMode={vegMode}
                               priority={index < 3}
                             />
 
@@ -2552,6 +2575,9 @@ export default function Home() {
             // Confirm veg mode is ON by updating context and prevVegMode
             setVegModeContext(true);
             setPrevVegMode(true);
+            try {
+              localStorage.setItem("userVegModeOption", vegModeOption);
+            } catch {}
             // Simulate applying veg mode settings
             setTimeout(() => {
               setIsApplyingVegMode(false);

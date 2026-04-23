@@ -57,6 +57,9 @@ const menuItemSchema = new mongoose.Schema({
   approvedAt: { type: Date },
   approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' },
   rejectedAt: { type: Date },
+  // When an approved item is edited by restaurant, keep last approved version for user visibility
+  // until admin approves the updated draft.
+  lastApprovedSnapshot: { type: mongoose.Schema.Types.Mixed, default: null },
 }, { _id: false });
 
 const subsectionSchema = new mongoose.Schema({
@@ -68,6 +71,7 @@ const subsectionSchema = new mongoose.Schema({
 const menuSectionSchema = new mongoose.Schema({
   id: { type: String, required: true },
   name: { type: String, required: true },
+  foodType: { type: String, enum: ['Veg', 'Non-Veg'], default: 'Non-Veg' },
   items: { type: [menuItemSchema], default: [] },
   subsections: { type: [subsectionSchema], default: [] },
   isEnabled: { type: Boolean, default: true },

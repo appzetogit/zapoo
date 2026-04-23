@@ -49,6 +49,7 @@ export default function ItemDetailsPage() {
   const [itemData, setItemData] = useState(null); // Store the full item data for saving
   const [itemName, setItemName] = useState("");
   const [category, setCategory] = useState(defaultCategory);
+  const [categoryFoodType, setCategoryFoodType] = useState("Non-Veg");
   const [subCategory, setSubCategory] = useState("");
   const [servesInfo, setServesInfo] = useState("");
   const [itemSizeQuantity, setItemSizeQuantity] = useState("");
@@ -135,7 +136,7 @@ export default function ItemDetailsPage() {
         setRecommendationStatus(item.recommendationStatus || "none");
         setIsInStock(item.isAvailable !== false);
         setSelectedTags(item.tags || []);
-        setImages(item.images && item.images.length > 0 ? item.images : item.image ? [item.image] : []);
+        setImages(item.images && item.images.length > 0 ? [item.images[0]] : item.image ? [item.image] : []);
 
         // Parse nutrition data
         if (item.nutrition && Array.isArray(item.nutrition)) {
@@ -226,7 +227,7 @@ export default function ItemDetailsPage() {
             setRecommendationStatus(foundItem.recommendationStatus || "none");
             setIsInStock(foundItem.isAvailable !== false);
             setSelectedTags(foundItem.tags || []);
-            setImages(foundItem.images && foundItem.images.length > 0 ? foundItem.images : foundItem.image ? [foundItem.image] : []);
+            setImages(foundItem.images && foundItem.images.length > 0 ? [foundItem.images[0]] : foundItem.image ? [foundItem.image] : []);
 
             // Parse nutrition data
             if (foundItem.nutrition && Array.isArray(foundItem.nutrition)) {
@@ -294,7 +295,8 @@ export default function ItemDetailsPage() {
         if (menuResponse.data?.success && menuResponse.data.data?.menu?.sections) {
           const sectionCategories = menuResponse.data.data.menu.sections.map(sec => ({
             id: sec.id || sec._id,
-            name: sec.name
+            name: sec.name,
+            foodType: sec.foodType === "Veg" ? "Veg" : "Non-Veg"
           }));
           allCategories = [...sectionCategories];
         }
@@ -305,7 +307,8 @@ export default function ItemDetailsPage() {
             if (!allCategories.find(existing => existing.name === cat.name)) {
               allCategories.push({
                 id: cat._id || cat.id,
-                name: cat.name
+                name: cat.name,
+                foodType: cat.foodType === "Veg" ? "Veg" : "Non-Veg"
               });
             }
           });
@@ -315,22 +318,29 @@ export default function ItemDetailsPage() {
         if (allCategories.length === 0) {
           allCategories.push({
             id: "default",
-            name: "Varieties"
+            name: "Varieties",
+            foodType: "Non-Veg"
           });
         }
         setCategories(allCategories);
+        const matchedCategory = allCategories.find(c => c.name === category);
+        if (matchedCategory?.foodType) {
+          setCategoryFoodType(matchedCategory.foodType === "Veg" ? "Veg" : "Non-Veg");
+        }
       } catch (error) {
         console.error('Error fetching categories:', error);
         setCategories([{
           id: "default",
-          name: "Varieties"
+          name: "Varieties",
+          foodType: "Non-Veg"
         }]);
+        setCategoryFoodType("Non-Veg");
       } finally {
         setLoadingCategories(false);
       }
     };
     fetchCategories();
-  }, []);
+  }, [category]);
 
   // Serves info options
   const servesOptions = ["Serves eg. 1-2 people", "Serves eg. 2-3 people", "Serves eg. 3-4 people", "Serves eg. 4-5 people", "Serves eg. 5-6 people"];
@@ -372,16 +382,24 @@ export default function ItemDetailsPage() {
       return true;
     });
     if (validFiles.length === 0) return false;
+    const selectedFile = validFiles[0];
+    if (validFiles.length > 1) {
+      toast.info("Only one image is allowed. Using the first selected image.");
+    }
 
-    const newImagePreviews = [];
-    const newImageFilesMap = new Map(imageFiles);
-    validFiles.forEach(file => {
-      const previewUrl = URL.createObjectURL(file);
-      newImagePreviews.push(previewUrl);
-      newImageFilesMap.set(previewUrl, file);
+    // Replace old image with the newly selected one
+    images.forEach((img) => {
+      if (typeof img === "string" && img.startsWith("blob:")) {
+        URL.revokeObjectURL(img);
+      }
     });
-    setImages(prev => [...prev, ...newImagePreviews]);
+
+    const previewUrl = URL.createObjectURL(selectedFile);
+    const newImageFilesMap = new Map();
+    newImageFilesMap.set(previewUrl, selectedFile);
+    setImages([previewUrl]);
     setImageFiles(newImageFilesMap);
+    setCurrentImageIndex(0);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -394,7 +412,7 @@ export default function ItemDetailsPage() {
       const result = await window.flutter_inappwebview.callHandler("openGallery", {
         source: "gallery",
         accept: "image/*",
-        multiple: true,
+        multiple: false,
         quality: 0.8
       });
       const file = await flutterImageResultToFile(result, `item-image-${Date.now()}.jpg`);
@@ -497,7 +515,9 @@ export default function ItemDetailsPage() {
   };
   const handleCategorySelect = (catId, subCat) => {
     const selectedCategory = categories.find(c => c.id === catId);
+    if (!selectedCategory) return;
     setCategory(selectedCategory.name);
+    setCategoryFoodType(selectedCategory.foodType === "Veg" ? "Veg" : "Non-Veg");
     setSubCategory(subCat);
     setShowCategoryError(false);
     setIsCategoryPopupOpen(false);
@@ -548,33 +568,30 @@ export default function ItemDetailsPage() {
       // Upload new File objects to Cloudinary (files that are blob URLs)
       const filesToUpload = Array.from(imageFiles.values());
       if (filesToUpload.length > 0) {
-        toast.info(`Uploading ${filesToUpload.length} image(s)...`);
-        for (let i = 0; i < filesToUpload.length; i++) {
-          const file = filesToUpload[i];
-          try {
-            const uploadResponse = await uploadAPI.uploadMedia(file, {
-              folder: 'appzeto/restaurant/menu-items'
-            });
-            const imageUrl = uploadResponse?.data?.data?.url || uploadResponse?.data?.url;
-            if (imageUrl) {
-              uploadedImageUrls.push(imageUrl);
-            } else {
-              console.error('Upload response:', uploadResponse);
-              throw new Error("Failed to get uploaded image URL");
-            }
-          } catch (uploadError) {
-            console.error(`Error uploading image ${i + 1} (${file.name}):`, uploadError);
-            toast.error(`Failed to upload ${file.name}. Please try again.`);
-            setUploadingImages(false);
-            return;
+        toast.info("Uploading image...");
+        const file = filesToUpload[0];
+        try {
+          const uploadResponse = await uploadAPI.uploadMedia(file, {
+            folder: 'appzeto/restaurant/menu-items'
+          });
+          const imageUrl = uploadResponse?.data?.data?.url || uploadResponse?.data?.url;
+          if (imageUrl) {
+            uploadedImageUrls.push(imageUrl);
+          } else {
+            console.error('Upload response:', uploadResponse);
+            throw new Error("Failed to get uploaded image URL");
           }
+        } catch (uploadError) {
+          console.error(`Error uploading image (${file.name}):`, uploadError);
+          toast.error(`Failed to upload ${file.name}. Please try again.`);
+          setUploadingImages(false);
+          return;
         }
       }
 
-      // Combine existing URLs and newly uploaded URLs
-      // Remove duplicates and filter out any empty strings
-      const allImageUrls = [...existingImageUrls, ...uploadedImageUrls].filter((url, index, self) => url && typeof url === 'string' && url.trim() !== '' && self.indexOf(url) === index // Remove duplicates
-      );
+      // Single image mode: prefer newly uploaded image, else keep existing first image
+      const finalImageUrl = uploadedImageUrls[0] || existingImageUrls[0] || "";
+      const allImageUrls = finalImageUrl ? [finalImageUrl] : [];
 
       // Debug: Log image URLs
 
@@ -642,17 +659,89 @@ export default function ItemDetailsPage() {
           }
         }
         if (!itemRemoved && !isNewItem) {
-          console.warn(`Item with ID ${itemId} (URL: ${id}) not found in menu for removal. It will be added as new.`);
+          // Fallback match for legacy/mismatched IDs: match by original snapshot only when unique.
+          const originalName = String(itemData?.name || "").trim().toLowerCase();
+          const originalCategory = String(itemData?.category || "").trim().toLowerCase();
+          const originalFoodType = String(itemData?.foodType || "").trim().toLowerCase();
+          const originalPrice = Number(itemData?.price);
+          const matches = [];
+
+          for (let sectionIndex = 0; sectionIndex < sections.length; sectionIndex++) {
+            const section = sections[sectionIndex];
+            const sectionItems = Array.isArray(section.items) ? section.items : [];
+            for (let itemIndex = 0; itemIndex < sectionItems.length; itemIndex++) {
+              const candidate = sectionItems[itemIndex];
+              const candidateName = String(candidate?.name || "").trim().toLowerCase();
+              const candidateCategory = String(candidate?.category || section?.name || "").trim().toLowerCase();
+              const candidateFoodType = String(candidate?.foodType || "").trim().toLowerCase();
+              const candidatePrice = Number(candidate?.price);
+              const isMatch =
+                candidateName &&
+                candidateName === originalName &&
+                candidateCategory === originalCategory &&
+                candidateFoodType === originalFoodType &&
+                candidatePrice === originalPrice;
+              if (isMatch) {
+                matches.push({ sectionIndex, itemIndex, inSubsection: false });
+              }
+            }
+
+            const subsections = Array.isArray(section.subsections) ? section.subsections : [];
+            for (let subIndex = 0; subIndex < subsections.length; subIndex++) {
+              const subsection = subsections[subIndex];
+              const subsectionItems = Array.isArray(subsection.items) ? subsection.items : [];
+              for (let subItemIndex = 0; subItemIndex < subsectionItems.length; subItemIndex++) {
+                const candidate = subsectionItems[subItemIndex];
+                const candidateName = String(candidate?.name || "").trim().toLowerCase();
+                const candidateCategory = String(candidate?.category || section?.name || "").trim().toLowerCase();
+                const candidateFoodType = String(candidate?.foodType || "").trim().toLowerCase();
+                const candidatePrice = Number(candidate?.price);
+                const isMatch =
+                  candidateName &&
+                  candidateName === originalName &&
+                  candidateCategory === originalCategory &&
+                  candidateFoodType === originalFoodType &&
+                  candidatePrice === originalPrice;
+                if (isMatch) {
+                  matches.push({ sectionIndex, subIndex, itemIndex: subItemIndex, inSubsection: true });
+                }
+              }
+            }
+          }
+
+          if (matches.length === 1) {
+            const match = matches[0];
+            if (match.inSubsection) {
+              sections[match.sectionIndex].subsections[match.subIndex].items.splice(match.itemIndex, 1);
+            } else {
+              sections[match.sectionIndex].items.splice(match.itemIndex, 1);
+            }
+            itemRemoved = true;
+          }
+        }
+
+        if (!itemRemoved && !isNewItem) {
+          console.error(`Edit blocked: Existing item not found for replacement. itemId=${itemId}, urlId=${id}`);
+          toast.error("Unable to update existing item safely. Please reopen this item and try again.");
+          setUploadingImages(false);
+          return;
         }
       }
 
       // Find or create the category section
       let targetSection = sections.find(s => s.name === category);
       if (!targetSection) {
+        const selectedCategoryMeta = categories.find(c => c.name === category);
+        const resolvedCategoryFoodType = selectedCategoryMeta?.foodType === "Veg"
+          ? "Veg"
+          : categoryFoodType === "Veg"
+            ? "Veg"
+            : "Non-Veg";
         // Create new section for this category
         targetSection = {
           id: `section-${Date.now()}`,
           name: category,
+          foodType: resolvedCategoryFoodType,
           items: [],
           subsections: [],
           isEnabled: true,
@@ -677,7 +766,7 @@ export default function ItemDetailsPage() {
         nameArabic: "",
         image: allImageUrls.length > 0 ? allImageUrls[0] : "",
         images: allImageUrls.length > 0 ? allImageUrls : [],
-        // Multiple images support - all Cloudinary URLs (ensure it's always an array)
+        // Single-image mode (kept as array for backend schema compatibility)
         category: category,
         rating: itemData?.rating || 0.0,
         reviews: itemData?.reviews || 0,
@@ -939,7 +1028,7 @@ export default function ItemDetailsPage() {
               <Camera className="w-10 h-10 text-gray-400" />
             </div>
             <p className="text-sm font-medium text-gray-600">No images added yet</p>
-            <p className="text-xs text-gray-500 mt-1">Tap the button below to add multiple images</p>
+            <p className="text-xs text-gray-500 mt-1">Tap the button below to add an image</p>
           </div>
         </div>}
 
@@ -975,7 +1064,7 @@ export default function ItemDetailsPage() {
               <span>Camera</span>
             </button>
           </div>
-          <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handleImageAdd} className="hidden" id="image-upload" />
+          <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageAdd} className="hidden" id="image-upload" />
         </div>
       </div>
 

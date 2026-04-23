@@ -284,6 +284,12 @@ export default function CategoryPage() {
         }
         setLoadingRestaurants(true)
         const params = {}
+        const pureVegOnlySelected =
+          vegMode === true &&
+          (typeof window !== "undefined" && localStorage.getItem("userVegModeOption") === "pure-veg")
+        if (pureVegOnlySelected) {
+          params.pureVeg = "true"
+        }
         if (zoneId) params.zoneId = zoneId
         if (location?.latitude != null && location?.longitude != null) {
           params.latitude = location.latitude
@@ -522,7 +528,7 @@ export default function CategoryPage() {
     }
 
     fetchRestaurants()
-  }, [zoneId, isOutOfService])
+  }, [zoneId, isOutOfService, vegMode, location?.latitude, location?.longitude])
 
   // Update selected category when URL changes
   useEffect(() => {

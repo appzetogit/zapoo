@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input"
 import { restaurantAPI } from "@/lib/api"
 import { useLocation } from "../hooks/useLocation"
 import { useZone } from "../hooks/useZone"
+import { useProfile } from "../context/ProfileContext"
 import { toast } from "sonner"
 import {
   isOpenForDeliveryNow,
@@ -106,6 +107,7 @@ export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchCh
   const [restaurantMatches, setRestaurantMatches] = useState([])
   const [allRestaurants, setAllRestaurants] = useState([])
   const [restaurantLoading, setRestaurantLoading] = useState(false)
+  const { vegMode } = useProfile()
   const { location } = useLocation()
   const { zoneId, isOutOfService } = useZone(location)
   const isSpeechSupported =
@@ -212,6 +214,12 @@ export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchCh
           includeInactiveForSearch: "true",
           limit: 80,
         }
+        const pureVegOnlySelected =
+          vegMode === true &&
+          (typeof window !== "undefined" && localStorage.getItem("userVegModeOption") === "pure-veg")
+        if (pureVegOnlySelected) {
+          params.pureVeg = "true"
+        }
         if (zoneId) params.zoneId = zoneId
         // If user is currently out of service zone, avoid geo-filter lockout
         // and still allow explicit text search suggestions.
@@ -266,6 +274,7 @@ export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchCh
     isOpen,
     zoneId,
     isOutOfService,
+    vegMode,
     userHasLocation,
     location?.latitude,
     location?.longitude,

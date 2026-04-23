@@ -4,6 +4,7 @@ import { ArrowLeft, MapPin, Phone, Clock, BadgeInfo, CalendarDays, FileText } fr
 import { restaurantAPI } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { useProfile } from "../../context/ProfileContext";
 
 const formatTimeLabel = (value) => {
   if (!value) return "";
@@ -27,6 +28,7 @@ const formatYear = (value) => {
 export default function RestaurantInfo() {
   const navigate = useNavigate();
   const { slug } = useParams();
+  const { vegMode } = useProfile();
   const [restaurant, setRestaurant] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -34,7 +36,14 @@ export default function RestaurantInfo() {
     const fetchRestaurant = async () => {
       try {
         setLoading(true);
-        const response = await restaurantAPI.getRestaurantById(slug);
+        const params = {};
+        const pureVegOnlySelected =
+          vegMode === true &&
+          (typeof window !== "undefined" && localStorage.getItem("userVegModeOption") === "pure-veg");
+        if (pureVegOnlySelected) {
+          params.pureVeg = "true";
+        }
+        const response = await restaurantAPI.getRestaurantById(slug, params);
         const data = response?.data?.data?.restaurant || response?.data?.data || null;
         setRestaurant(data);
       } catch (error) {
@@ -48,7 +57,7 @@ export default function RestaurantInfo() {
     if (slug) {
       fetchRestaurant();
     }
-  }, [slug]);
+  }, [slug, vegMode]);
 
   const phoneNumber = useMemo(() => {
     // Prefer owner-updated contact fields so user side reflects latest restaurant edits

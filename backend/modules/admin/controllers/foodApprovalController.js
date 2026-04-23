@@ -206,8 +206,43 @@ export const approveFoodItem = asyncHandler(async (req, res) => {
       return errorResponse(res, 404, 'Add-on not found in menu');
     }
 
+    const removeOldApprovedItemById = (menuDoc, oldItemId, keepItemId) => {
+      if (!oldItemId) return;
+      for (let sIdx = 0; sIdx < (menuDoc.sections || []).length; sIdx++) {
+        const sec = menuDoc.sections[sIdx];
+
+        if (Array.isArray(sec.items)) {
+          const originalLen = sec.items.length;
+          sec.items = sec.items.filter(it => !(String(it?.id) === String(oldItemId) && String(it?.id) !== String(keepItemId)));
+          if (sec.items.length !== originalLen) {
+            menuDoc.markModified(`sections.${sIdx}.items`);
+            menuDoc.markModified(`sections.${sIdx}`);
+            menuDoc.markModified('sections');
+          }
+        }
+
+        if (Array.isArray(sec.subsections)) {
+          for (let subIdx = 0; subIdx < sec.subsections.length; subIdx++) {
+            const sub = sec.subsections[subIdx];
+            if (!Array.isArray(sub.items)) continue;
+            const originalLen = sub.items.length;
+            sub.items = sub.items.filter(it => !(String(it?.id) === String(oldItemId) && String(it?.id) !== String(keepItemId)));
+            if (sub.items.length !== originalLen) {
+              menuDoc.markModified(`sections.${sIdx}.subsections.${subIdx}.items`);
+              menuDoc.markModified(`sections.${sIdx}.subsections.${subIdx}`);
+              menuDoc.markModified(`sections.${sIdx}.subsections`);
+              menuDoc.markModified(`sections.${sIdx}`);
+              menuDoc.markModified('sections');
+            }
+          }
+        }
+      }
+    };
+
     // Find and update the item directly in the document
     let itemUpdated = false;
+    let previousApprovedItemId = null;
+    let approvedItemId = String(id);
     for (let sectionIndex = 0; sectionIndex < menu.sections.length; sectionIndex++) {
       const section = menu.sections[sectionIndex];
 
@@ -224,10 +259,13 @@ export const approveFoodItem = asyncHandler(async (req, res) => {
           if (itemIndex !== -1) {
             const item = subsection.items[itemIndex];
             // Update the item directly
+            previousApprovedItemId = item?.lastApprovedSnapshot?.id || null;
+            approvedItemId = String(item?.id || id);
             item.approvalStatus = 'approved';
             item.approvedAt = new Date();
             item.approvedBy = adminId;
             item.rejectionReason = '';
+            item.lastApprovedSnapshot = null;
             itemUpdated = true;
             // Mark all nested paths as modified - CRITICAL for Mongoose
             menu.markModified(`sections.${sectionIndex}.subsections.${subsectionIndex}.items.${itemIndex}`);
@@ -245,10 +283,13 @@ export const approveFoodItem = asyncHandler(async (req, res) => {
         if (itemIndex !== -1) {
           const item = section.items[itemIndex];
           // Update the item directly
+          previousApprovedItemId = item?.lastApprovedSnapshot?.id || null;
+          approvedItemId = String(item?.id || id);
           item.approvalStatus = 'approved';
           item.approvedAt = new Date();
           item.approvedBy = adminId;
           item.rejectionReason = '';
+          item.lastApprovedSnapshot = null;
           itemUpdated = true;
           // Mark all nested paths as modified - CRITICAL for Mongoose
           menu.markModified(`sections.${sectionIndex}.items.${itemIndex}`);
@@ -267,6 +308,12 @@ export const approveFoodItem = asyncHandler(async (req, res) => {
         itemsCount: s.items?.length || 0
       })));
       return errorResponse(res, 404, 'Food item not found in menu');
+    }
+
+    // If this approval is for an edited item, remove the previous approved version by its exact id.
+    // This ensures user sees only the latest approved item, never old + new together.
+    if (previousApprovedItemId) {
+      removeOldApprovedItemById(menu, previousApprovedItemId, approvedItemId);
     }
 
     // Save the menu - this is the CRITICAL step
