@@ -59,11 +59,11 @@ export const getOrders = asyncHandler(async (req, res) => {
       limit = 20,
       includeDelivered
     } = req.query;
+    const currentDeliveryId = delivery._id;
+    const currentDeliveryIdStr = delivery._id?.toString?.() || String(delivery._id);
 
     // Build query
-    const query = {
-      deliveryPartnerId: delivery._id
-    };
+    const query = {};
     if (status) {
       query.status = status;
     } else {
@@ -83,6 +83,35 @@ export const getOrders = asyncHandler(async (req, res) => {
           }
         }];
       }
+    }
+
+    const visibilityFilter = {
+      $or: [{
+        deliveryPartnerId: currentDeliveryId
+      }, {
+        deliveryPartnerId: currentDeliveryIdStr
+      }, {
+        'assignmentInfo.priorityDeliveryPartnerIds': {
+          $in: [currentDeliveryId, currentDeliveryIdStr]
+        }
+      }, {
+        'assignmentInfo.expandedDeliveryPartnerIds': {
+          $in: [currentDeliveryId, currentDeliveryIdStr]
+        }
+      }, {
+        'assignmentInfo.broadcastDeliveryPartnerIds': {
+          $in: [currentDeliveryId, currentDeliveryIdStr]
+        }
+      }]
+    };
+
+    if (query.$or) {
+      query.$and = [{
+        $or: query.$or
+      }, visibilityFilter];
+      delete query.$or;
+    } else {
+      query.$and = [visibilityFilter];
     }
 
     // Calculate pagination
@@ -168,11 +197,16 @@ export const getOrderDetails = asyncHandler(async (req, res) => {
         // Legacy fallback: allow access if order is in valid status OR delivery boy was notified
         const validAcceptanceStatuses = ['confirmed', 'preparing', 'ready'];
         const isInValidStatus = validAcceptanceStatuses.includes(order.status);
+        const broadcastIds = assignmentInfo.broadcastDeliveryPartnerIds || [];
         const priorityIds = assignmentInfo.priorityDeliveryPartnerIds || [];
         const expandedIds = assignmentInfo.expandedDeliveryPartnerIds || [];
+        const normalizedBroadcastIds = broadcastIds.map(normalizeId).filter(Boolean);
         const normalizedPriorityIds = priorityIds.map(normalizeId).filter(Boolean);
         const normalizedExpandedIds = expandedIds.map(normalizeId).filter(Boolean);
-        const wasNotified = normalizedPriorityIds.includes(normalizedCurrentId) || normalizedExpandedIds.includes(normalizedCurrentId);
+        const wasNotified =
+          normalizedBroadcastIds.includes(normalizedCurrentId) ||
+          normalizedPriorityIds.includes(normalizedCurrentId) ||
+          normalizedExpandedIds.includes(normalizedCurrentId);
         if (isInValidStatus || wasNotified) {} else {
           console.warn(`⚠️ Delivery partner ${currentDeliveryId} cannot access order ${order.orderId} - Status: ${order.status}, Notified: ${wasNotified}`);
           return errorResponse(res, 403, 'Order not found or not available for you');

@@ -9,6 +9,57 @@ import { notifyUserOrderUpdate } from '../../order/services/userNotificationServ
 import { broadcastDeliveryRequest } from '../../order/services/deliveryAssignmentService.js';
 import mongoose from 'mongoose';
 
+const extractRestaurantCoordinates = (location) => {
+  const coords = location?.coordinates;
+  if (Array.isArray(coords) && coords.length >= 2) {
+    const [lng, lat] = coords;
+    if (Number.isFinite(Number(lat)) && Number.isFinite(Number(lng))) {
+      return {
+        restaurantLat: Number(lat),
+        restaurantLng: Number(lng)
+      };
+    }
+  }
+
+  const lat = location?.latitude;
+  const lng = location?.longitude;
+  if (Number.isFinite(Number(lat)) && Number.isFinite(Number(lng))) {
+    return {
+      restaurantLat: Number(lat),
+      restaurantLng: Number(lng)
+    };
+  }
+
+  return null;
+};
+
+const resolveRestaurantCoordinatesForAssignment = async (order, restaurantId, populatedOrder = null) => {
+  const restaurantLookupId = order?.restaurantId || restaurantId;
+  let restaurantDoc = null;
+
+  if (restaurantLookupId && mongoose.Types.ObjectId.isValid(restaurantLookupId)) {
+    restaurantDoc = await Restaurant.findById(restaurantLookupId)
+      .select('restaurantId location.coordinates location.latitude location.longitude')
+      .lean();
+  }
+
+  if (!restaurantDoc && restaurantLookupId) {
+    restaurantDoc = await Restaurant.findOne({
+      $or: [{ _id: restaurantLookupId }, { restaurantId: restaurantLookupId }]
+    })
+      .select('restaurantId location.coordinates location.latitude location.longitude')
+      .lean();
+  }
+
+  const dbCoords = extractRestaurantCoordinates(restaurantDoc?.location);
+  if (dbCoords) return dbCoords;
+
+  const populatedCoords = extractRestaurantCoordinates(populatedOrder?.restaurantId?.location);
+  if (populatedCoords) return populatedCoords;
+
+  return null;
+};
+
 /**
  * Get all orders for restaurant
  * GET /api/restaurant/orders
@@ -331,7 +382,54 @@ export const acceptOrder = asyncHandler(async (req, res) => {
       console.error('Error sending notification:', notifError);
     }
 
-    // NOTE: Do not notify delivery partners on accept. Assignment happens on "ready".
+    // Broadcast delivery request on ACCEPT stage only once per order.
+    try {
+      const freshOrder = await Order.findById(order._id).select('status deliveryPartnerId assignmentInfo orderId restaurantId').lean();
+      const alreadyBroadcasted = Boolean(freshOrder?.assignmentInfo?.broadcastNotifiedAt);
+
+      if (!freshOrder?.deliveryPartnerId && !alreadyBroadcasted && freshOrder?.status === 'confirmed') {
+        const coords = await resolveRestaurantCoordinatesForAssignment(freshOrder, restaurantId);
+
+        if (coords?.restaurantLat && coords?.restaurantLng) {
+          const result = await broadcastDeliveryRequest(
+            freshOrder._id.toString(),
+            coords.restaurantLat,
+            coords.restaurantLng,
+            { trigger: 'accept' }
+          );
+
+          const notifiedCount = Number(result?.notifiedCount || 0);
+          const candidateCount = Array.isArray(result?.deliveryPartnerIds) ? result.deliveryPartnerIds.length : 0;
+          if (notifiedCount === 0 || candidateCount === 0) {
+            console.warn('⚠️ [DeliveryAssign] Empty recipients on accept-stage broadcast', {
+              orderId: freshOrder.orderId || null,
+              orderMongoId: freshOrder._id?.toString?.() || null,
+              restaurantId: restaurantId?.toString?.() || String(restaurantId || ''),
+              trigger: 'accept',
+              status: freshOrder.status,
+              notifiedCount,
+              candidatesCount: candidateCount
+            });
+          } else {
+            console.log('📊 [DeliveryAssign] Accept broadcast recipients', {
+              orderId: freshOrder.orderId || null,
+              orderMongoId: freshOrder._id?.toString?.() || null,
+              restaurantId: restaurantId?.toString?.() || String(restaurantId || ''),
+              trigger: 'accept',
+              status: freshOrder.status,
+              notifiedCount,
+              candidatesCount: candidateCount
+            });
+          }
+        } else {
+          console.error('❌ [DeliveryAssign] Restaurant location missing on accept for order', freshOrder.orderId || freshOrder._id.toString());
+        }
+      }
+    } catch (assignmentError) {
+      // Keep accept flow successful even if broadcast fails.
+      console.error('❌ Error broadcasting delivery request on accept:', assignmentError);
+    }
+
     return successResponse(res, 200, 'Order accepted successfully', {
       order
     });
@@ -654,59 +752,36 @@ export const markOrderReady = asyncHandler(async (req, res) => {
       console.error('Error sending restaurant notification:', notifError);
     }
 
-    // If no delivery partner assigned yet, broadcast request to all nearby delivery partners (within 5km)
+    const latestOrderForAssignment = await Order.findById(order._id).select('deliveryPartnerId assignmentInfo orderId status restaurantId').lean();
+    const alreadyBroadcasted = Boolean(latestOrderForAssignment?.assignmentInfo?.broadcastNotifiedAt);
+
+    // READY-stage broadcast acts as fallback only when no prior ACCEPT-stage broadcast happened.
     if (!populatedOrder?.deliveryPartnerId) {
-      try {
-        // Always prefer fresh restaurant location from DB (production may have mixed location shapes in populated doc).
-        const restaurantDoc = await Restaurant.findById(order.restaurantId)
-          .select('location.coordinates location.latitude location.longitude')
-          .lean();
-
-        let restaurantLat = null;
-        let restaurantLng = null;
-        const coords = restaurantDoc?.location?.coordinates;
-        if (Array.isArray(coords) && coords.length >= 2) {
-          const [lng, lat] = coords;
-          if (Number.isFinite(Number(lat)) && Number.isFinite(Number(lng))) {
-            restaurantLat = Number(lat);
-            restaurantLng = Number(lng);
+      if (alreadyBroadcasted) {
+        console.log('ℹ️ [DeliveryAssign] skipped_already_broadcasted', {
+          orderId: latestOrderForAssignment?.orderId || order.orderId || null,
+          orderMongoId: latestOrderForAssignment?._id?.toString?.() || order._id?.toString?.() || null,
+          trigger: 'ready',
+          status: latestOrderForAssignment?.status || order.status
+        });
+      } else {
+        try {
+          const coords = await resolveRestaurantCoordinatesForAssignment(latestOrderForAssignment || order, restaurantId, populatedOrder);
+          if (coords?.restaurantLat && coords?.restaurantLng) {
+            console.log('📣 [DeliveryAssign] Broadcast on ready for order', order.orderId || order._id.toString());
+            const result = await broadcastDeliveryRequest(order._id.toString(), coords.restaurantLat, coords.restaurantLng, { trigger: 'ready' });
+            console.log('📊 [DeliveryAssign] Ready broadcast recipients', {
+              orderId: order.orderId || null,
+              orderMongoId: order._id?.toString?.() || null,
+              notifiedCount: Number(result?.notifiedCount || 0),
+              candidatesCount: Array.isArray(result?.deliveryPartnerIds) ? result.deliveryPartnerIds.length : 0
+            });
+          } else {
+            console.error('❌ [DeliveryAssign] Restaurant location missing on ready for order', order.orderId || order._id.toString());
           }
+        } catch (assignmentError) {
+          console.error('❌ Error broadcasting delivery request on ready:', assignmentError);
         }
-        // Fallback to latitude/longitude fields if present
-        if (!restaurantLat || !restaurantLng) {
-          const lat = restaurantDoc?.location?.latitude;
-          const lng = restaurantDoc?.location?.longitude;
-          if (Number.isFinite(Number(lat)) && Number.isFinite(Number(lng))) {
-            restaurantLat = Number(lat);
-            restaurantLng = Number(lng);
-          }
-        }
-        // Final fallback: whatever came in populated payload
-        if (!restaurantLat || !restaurantLng) {
-          const populatedCoords = populatedOrder?.restaurantId?.location?.coordinates;
-          if (Array.isArray(populatedCoords) && populatedCoords.length >= 2) {
-            const [lng, lat] = populatedCoords;
-            if (Number.isFinite(Number(lat)) && Number.isFinite(Number(lng))) {
-              restaurantLat = Number(lat);
-              restaurantLng = Number(lng);
-            }
-          }
-        }
-
-        if (restaurantLat && restaurantLng) {
-          console.log('📣 [DeliveryAssign] Broadcast on ready for order', order.orderId || order._id.toString());
-          const result = await broadcastDeliveryRequest(order._id.toString(), restaurantLat, restaurantLng, { trigger: 'ready' });
-          console.log('📊 [DeliveryAssign] Ready broadcast recipients', {
-            orderId: order.orderId || null,
-            orderMongoId: order._id?.toString?.() || null,
-            notifiedCount: Number(result?.notifiedCount || 0),
-            candidatesCount: Array.isArray(result?.deliveryPartnerIds) ? result.deliveryPartnerIds.length : 0
-          });
-        } else {
-          console.error('❌ [DeliveryAssign] Restaurant location missing on ready for order', order.orderId || order._id.toString());
-        }
-      } catch (assignmentError) {
-        console.error('❌ Error broadcasting delivery request on ready:', assignmentError);
       }
     }
 

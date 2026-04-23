@@ -899,6 +899,14 @@ export async function broadcastDeliveryRequest(orderId, restaurantLat, restauran
   });
 
   if (!eligibleIds || eligibleIds.length === 0) {
+    console.warn('⚠️ [DeliveryAssign] No eligible delivery partners for broadcast', {
+      orderId: order.orderId || null,
+      orderMongoId: order._id?.toString?.() || String(orderId || ''),
+      trigger,
+      status: order.status,
+      candidateCount: Array.isArray(candidateIds) ? candidateIds.length : 0,
+      eligibleCount: 0
+    });
     // No riders nearby/online; notify restaurant immediately.
     await Order.findByIdAndUpdate(orderId, {
       $set: {
