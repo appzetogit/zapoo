@@ -12,6 +12,8 @@ export default function RefundPolicy() {
       saveSuccessMessage="Refund policy updated successfully"
       saveErrorMessage="Failed to save refund policy"
       defaultTitle="Refund Policy"
+      policyKey="refund"
+      allowedModules={["user"]}
     />
   );
 }

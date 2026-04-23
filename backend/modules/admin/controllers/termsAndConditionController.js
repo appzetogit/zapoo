@@ -5,6 +5,7 @@ import { resolveLocaleFromRequest } from '../../../shared/i18n/localeResolver.js
 import { buildLocalizedText } from '../../../shared/i18n/translationService.js';
 import { normalizeLocale } from '../../../shared/i18n/localeConstants.js';
 import { resolveLocalizedText, toLocalizedText } from '../../../shared/i18n/localizedText.js';
+import { buildContentModuleQuery, parseContentModuleFromRequest } from '../utils/contentModule.js';
 
 const DEFAULT_TITLE = 'Terms and Conditions';
 const DEFAULT_CONTENT = '<p>No terms and conditions available at the moment.</p>';
@@ -27,8 +28,16 @@ function mergeLocalizedValue(existingValue, localizedOverride, fallback = '') {
  */
 export const getTermsPublic = asyncHandler(async (req, res) => {
   try {
+    const { module: targetModule, error } = parseContentModuleFromRequest(req);
+    if (error) {
+      return errorResponse(res, 400, error);
+    }
+
     const locale = resolveLocaleFromRequest(req);
-    const terms = await TermsAndCondition.findOne({ isActive: true })
+    const terms = await TermsAndCondition.findOne({
+      isActive: true,
+      ...buildContentModuleQuery(targetModule)
+    })
       .select('-updatedBy -createdAt -updatedAt -__v')
       .lean();
 
@@ -56,7 +65,15 @@ export const getTermsPublic = asyncHandler(async (req, res) => {
  */
 export const getTerms = asyncHandler(async (req, res) => {
   try {
-    let terms = await TermsAndCondition.findOne({ isActive: true }).lean();
+    const { module: targetModule, error } = parseContentModuleFromRequest(req);
+    if (error) {
+      return errorResponse(res, 400, error);
+    }
+
+    let terms = await TermsAndCondition.findOne({
+      isActive: true,
+      ...buildContentModuleQuery(targetModule)
+    }).lean();
 
     if (!terms) {
       terms = await TermsAndCondition.create({
@@ -67,6 +84,7 @@ export const getTerms = asyncHandler(async (req, res) => {
           '<p>This is a test Terms & Conditions</p><p><strong>Terms of Use</strong></p><p>This Terms of Use ("Terms") applies to your access to and use of the website and the mobile application (collectively, the "Platform"). Please read these Terms carefully.</p>',
           ''
         ),
+        targetModule,
         updatedBy: req.admin._id
       });
       terms = terms.toObject();
@@ -91,6 +109,11 @@ export const getTerms = asyncHandler(async (req, res) => {
  */
 export const updateTerms = asyncHandler(async (req, res) => {
   try {
+    const { module: targetModule, error } = parseContentModuleFromRequest(req);
+    if (error) {
+      return errorResponse(res, 400, error);
+    }
+
     const { title, content, localizedTitle, localizedContent, locale, autoTranslate = true } = req.body;
     const sourceLocale = normalizeLocale(locale || 'en');
 
@@ -98,12 +121,16 @@ export const updateTerms = asyncHandler(async (req, res) => {
       return errorResponse(res, 400, 'Content is required');
     }
 
-    let terms = await TermsAndCondition.findOne({ isActive: true });
+    let terms = await TermsAndCondition.findOne({
+      isActive: true,
+      ...buildContentModuleQuery(targetModule)
+    });
 
     if (!terms) {
       terms = new TermsAndCondition({
         title: DEFAULT_TITLE,
         content,
+        targetModule,
         updatedBy: req.admin._id
       });
     }
@@ -146,6 +173,7 @@ export const updateTerms = asyncHandler(async (req, res) => {
     terms.content = nextLocalizedContent.en;
     terms.localizedTitle = nextLocalizedTitle;
     terms.localizedContent = nextLocalizedContent;
+    terms.targetModule = targetModule;
     terms.updatedBy = req.admin._id;
 
     await terms.save();

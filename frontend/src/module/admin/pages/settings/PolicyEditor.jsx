@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { useNavigate, useParams } from "react-router-dom";
 import api from "@/lib/api";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -8,6 +9,31 @@ const LOCALES = [
   { code: "hi", label: "Hindi" },
   { code: "bn", label: "Bengali" },
 ];
+const CONTENT_MODULES = [
+  { key: "user", label: "User" },
+  { key: "restaurant", label: "Restaurant" },
+  { key: "delivery", label: "Delivery" },
+];
+
+function getRememberedModule(policyKey, allowedModules = ["user", "restaurant", "delivery"]) {
+  if (typeof window === "undefined") return "user";
+  const stored = window.localStorage.getItem(`admin_psm_module_${policyKey}`);
+  if (
+    CONTENT_MODULES.some((item) => item.key === stored) &&
+    allowedModules.includes(stored)
+  ) {
+    return stored;
+  }
+  return allowedModules[0] || "user";
+}
+
+function normalizeModule(value) {
+  if (typeof value !== "string") return null;
+  const normalized = value.toLowerCase();
+  return CONTENT_MODULES.some((item) => item.key === normalized)
+    ? normalized
+    : null;
+}
 
 function htmlToText(html) {
   if (!html) return "";
@@ -53,28 +79,57 @@ export default function PolicyEditor({
   saveSuccessMessage,
   saveErrorMessage,
   defaultTitle,
+  policyKey,
+  allowedModules = ["user", "restaurant", "delivery"],
 }) {
+  const navigate = useNavigate();
+  const { module: routeModule } = useParams();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activeLocale, setActiveLocale] = useState("en");
+  const [initialSnapshot, setInitialSnapshot] = useState("");
   const [policyData, setPolicyData] = useState({
     title: defaultTitle,
     localizedTitle: { en: defaultTitle, hi: "", bn: "" },
     localizedContent: { en: "", hi: "", bn: "" },
   });
+  const activeModule = normalizeModule(routeModule);
+  const visibleModules = CONTENT_MODULES.filter((item) =>
+    allowedModules.includes(item.key),
+  );
+  const fallbackModule = visibleModules[0]?.key || "user";
+  const hasUnsavedChanges = useMemo(() => {
+    if (!initialSnapshot) return false;
+    return JSON.stringify(policyData) !== initialSnapshot;
+  }, [initialSnapshot, policyData]);
 
   useEffect(() => {
+    if (!activeModule || !allowedModules.includes(activeModule)) {
+      navigate(
+        `/admin/pages-social-media/${getRememberedModule(policyKey, allowedModules)}/${policyKey}`,
+        { replace: true },
+      );
+      return;
+    }
+    window.localStorage.setItem(`admin_psm_module_${policyKey}`, activeModule);
+  }, [activeModule, allowedModules, navigate, policyKey]);
+
+  useEffect(() => {
+    if (!activeModule) return;
+
     const fetchPolicyData = async () => {
       try {
         setLoading(true);
-        const response = await api.get(endpoint);
+        const response = await api.get(endpoint, {
+          params: { module: activeModule },
+        });
         if (response.data.success) {
           const payload = response.data.data || {};
           const localizedTitle = payload.localizedTitle || {};
           const localizedContent = payload.localizedContent || {};
           const englishContent = htmlToText(payload.content || "");
 
-          setPolicyData({
+          const nextData = {
             ...payload,
             title: payload.title || defaultTitle,
             localizedTitle: {
@@ -88,7 +143,9 @@ export default function PolicyEditor({
               bn: htmlToText(localizedContent.bn || ""),
             },
             content: englishContent,
-          });
+          };
+          setPolicyData(nextData);
+          setInitialSnapshot(JSON.stringify(nextData));
         }
       } catch (error) {
         console.error(`Error fetching ${pageTitle}:`, error);
@@ -99,7 +156,7 @@ export default function PolicyEditor({
     };
 
     fetchPolicyData();
-  }, [defaultTitle, endpoint, loadErrorMessage, pageTitle]);
+  }, [activeModule, defaultTitle, endpoint, loadErrorMessage, pageTitle]);
 
   const handleSave = async () => {
     try {
@@ -126,11 +183,13 @@ export default function PolicyEditor({
         autoTranslate: activeLocale === "en",
       };
 
-      const response = await api.put(endpoint, payload);
+      const response = await api.put(endpoint, payload, {
+        params: { module: activeModule },
+      });
       if (response.data.success) {
         const updated = response.data.data || {};
         toast.success(saveSuccessMessage);
-        setPolicyData({
+        const nextData = {
           ...updated,
           title: updated.title || englishTitle,
           localizedTitle: {
@@ -144,7 +203,9 @@ export default function PolicyEditor({
             bn: htmlToText(updated.localizedContent?.bn || payload.localizedContent.bn),
           },
           content: htmlToText(updated.content || payload.content),
-        });
+        };
+        setPolicyData(nextData);
+        setInitialSnapshot(JSON.stringify(nextData));
       }
     } catch (error) {
       console.error(`Error saving ${pageTitle}:`, error);
@@ -152,6 +213,21 @@ export default function PolicyEditor({
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleModuleChange = (nextModule) => {
+    if (nextModule === activeModule) return;
+    if (!allowedModules.includes(nextModule)) return;
+    if (
+      hasUnsavedChanges &&
+      !window.confirm(
+        "You have unsaved changes. Switch module and discard the current edits?",
+      )
+    ) {
+      return;
+    }
+    window.localStorage.setItem(`admin_psm_module_${policyKey}`, nextModule);
+    navigate(`/admin/pages-social-media/${nextModule}/${policyKey}`);
   };
 
   if (loading) {
@@ -173,6 +249,23 @@ export default function PolicyEditor({
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-slate-900">{pageTitle}</h1>
           <p className="text-sm text-slate-600 mt-1">{pageSubtitle}</p>
+        </div>
+
+        <div className="mb-4 flex items-center gap-2 flex-wrap">
+          {visibleModules.map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              onClick={() => handleModuleChange(item.key)}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                activeModule === item.key
+                  ? "bg-orange-600 text-white"
+                  : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+              }`}
+            >
+              {item.label}
+            </button>
+          ))}
         </div>
 
         <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">

@@ -5,6 +5,7 @@ import { resolveLocaleFromRequest } from '../../../shared/i18n/localeResolver.js
 import { buildLocalizedText } from '../../../shared/i18n/translationService.js';
 import { normalizeLocale } from '../../../shared/i18n/localeConstants.js';
 import { resolveLocalizedText, toLocalizedText } from '../../../shared/i18n/localizedText.js';
+import { buildContentModuleQuery, parseContentModuleFromRequest } from '../utils/contentModule.js';
 
 const DEFAULT_ABOUT = {
   appName: 'Appzeto Food',
@@ -108,8 +109,16 @@ function toPublicAbout(about, locale) {
 
 export const getAboutPublic = asyncHandler(async (req, res) => {
   try {
+    const { module: targetModule, error } = parseContentModuleFromRequest(req);
+    if (error) {
+      return errorResponse(res, 400, error);
+    }
+
     const locale = resolveLocaleFromRequest(req);
-    const about = await About.findOne({ isActive: true })
+    const about = await About.findOne({
+      isActive: true,
+      ...buildContentModuleQuery(targetModule)
+    })
       .select('-updatedBy -createdAt -updatedAt -__v')
       .lean();
 
@@ -131,7 +140,15 @@ export const getAboutPublic = asyncHandler(async (req, res) => {
 
 export const getAbout = asyncHandler(async (req, res) => {
   try {
-    let about = await About.findOne({ isActive: true }).lean();
+    const { module: targetModule, error } = parseContentModuleFromRequest(req);
+    if (error) {
+      return errorResponse(res, 400, error);
+    }
+
+    let about = await About.findOne({
+      isActive: true,
+      ...buildContentModuleQuery(targetModule)
+    }).lean();
 
     if (!about) {
       const defaultDescription = toLocalizedText(DEFAULT_ABOUT.description, DEFAULT_ABOUT.description);
@@ -150,6 +167,7 @@ export const getAbout = asyncHandler(async (req, res) => {
         localizedDescription: defaultDescription,
         features: defaultFeatures,
         stats: defaultStats,
+        targetModule,
         updatedBy: req.admin._id
       });
       about = about.toObject();
@@ -176,6 +194,11 @@ export const getAbout = asyncHandler(async (req, res) => {
 
 export const updateAbout = asyncHandler(async (req, res) => {
   try {
+    const { module: targetModule, error } = parseContentModuleFromRequest(req);
+    if (error) {
+      return errorResponse(res, 400, error);
+    }
+
     const {
       appName,
       version,
@@ -193,11 +216,15 @@ export const updateAbout = asyncHandler(async (req, res) => {
     }
 
     const sourceLocale = normalizeLocale(locale || 'en');
-    let about = await About.findOne({ isActive: true });
+    let about = await About.findOne({
+      isActive: true,
+      ...buildContentModuleQuery(targetModule)
+    });
 
     if (!about) {
       about = new About({
         ...DEFAULT_ABOUT,
+        targetModule,
         updatedBy: req.admin._id
       });
     }
@@ -304,6 +331,7 @@ export const updateAbout = asyncHandler(async (req, res) => {
     about.version = version;
     about.description = nextLocalizedDescription.en;
     about.localizedDescription = nextLocalizedDescription;
+    about.targetModule = targetModule;
     if (logo !== undefined) about.logo = logo;
     if (features !== undefined) about.features = nextFeatures;
     if (stats !== undefined) about.stats = nextStats;

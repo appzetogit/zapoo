@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { useNavigate } from "react-router-dom"
+import { Link, useNavigate } from "react-router-dom"
 import { ArrowLeft, Mail, ChevronDown, Phone } from "lucide-react"
 import { setAuthData } from "@/lib/utils/auth"
 import {
@@ -583,9 +583,13 @@ export default function RestaurantLogin() {
           <p className="text-xs text-center text-blue-500 leading-relaxed">
             By continuing, you agree to our
           </p>
-          <p className="text-xs text-center text-blue-500 underline mt-1">
-            Terms of Service | Privacy Policy | Code of Conduct
-          </p>
+          <div className="text-xs text-center text-blue-500 underline mt-1 flex flex-wrap justify-center gap-x-2 gap-y-1">
+            <Link to="/restaurant/legal/terms">Terms of Service</Link>
+            <span>|</span>
+            <Link to="/restaurant/legal/privacy">Privacy</Link>
+            <span>|</span>
+            <Link to="/restaurant/legal/code-of-conduct">Code of Conduct</Link>
+          </div>
         </div>
       </div>
     </div>

@@ -12,6 +12,8 @@ export default function ShippingPolicy() {
       saveSuccessMessage="Shipping policy updated successfully"
       saveErrorMessage="Failed to save shipping policy"
       defaultTitle="Shipping Policy"
+      policyKey="shipping"
+      allowedModules={["user"]}
     />
   );
 }

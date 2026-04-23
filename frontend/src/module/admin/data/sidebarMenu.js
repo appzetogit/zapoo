@@ -361,12 +361,16 @@ export const sidebarMenuData = [
         icon: "Link",
         subItems: [
           {
-            label: "Terms And Condition",
+            label: "Terms Of Service",
             path: "/admin/pages-social-media/terms",
           },
           {
             label: "Privacy Policy",
             path: "/admin/pages-social-media/privacy",
+          },
+          {
+            label: "Code Of Conduct",
+            path: "/admin/pages-social-media/code-of-conduct",
           },
           { label: "About Us", path: "/admin/pages-social-media/about" },
           { label: "Refund Policy", path: "/admin/pages-social-media/refund" },

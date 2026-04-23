@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { toast } from "sonner"
+import { useNavigate, useParams } from "react-router-dom"
 import api from "@/lib/api"
 import { API_ENDPOINTS } from "@/lib/api/config"
 import { Heart, Users, Shield, Clock, Star, Award, Plus, X } from "lucide-react"
@@ -10,6 +11,23 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useCompanyName } from "@/lib/hooks/useCompanyName"
+
+const CONTENT_MODULES = [
+  { key: "user", label: "User" },
+  { key: "delivery", label: "Delivery" }
+]
+
+const getRememberedModule = (pageKey) => {
+  if (typeof window === "undefined") return "user"
+  const stored = window.localStorage.getItem(`admin_psm_module_${pageKey}`)
+  return CONTENT_MODULES.some((item) => item.key === stored) ? stored : "user"
+}
+
+const normalizeModule = (value) => {
+  if (typeof value !== "string") return null
+  const normalized = value.toLowerCase()
+  return CONTENT_MODULES.some((item) => item.key === normalized) ? normalized : null
+}
 
 // Icon mapping
 const iconMap = {
@@ -46,10 +64,13 @@ const languageTabs = [
 ]
 
 export default function AboutUs() {
-  const { companyName } = useCompanyName()
+  const navigate = useNavigate()
+  const { module: routeModule } = useParams()
+  const companyName = useCompanyName()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [activeLanguage, setActiveLanguage] = useState('en')
+  const [initialSnapshot, setInitialSnapshot] = useState("")
   const [aboutData, setAboutData] = useState({
     appName: 'Appzeto Food',
     version: '1.0.0',
@@ -58,18 +79,36 @@ export default function AboutUs() {
     logo: '',
     features: []
   })
+  const activeModule = normalizeModule(routeModule)
+  const hasUnsavedChanges = useMemo(() => {
+    if (!initialSnapshot) return false
+    return JSON.stringify(aboutData) !== initialSnapshot
+  }, [aboutData, initialSnapshot])
 
   useEffect(() => {
+    if (!activeModule) {
+      navigate(`/admin/pages-social-media/${getRememberedModule("about")}/about`, {
+        replace: true
+      })
+      return
+    }
+    window.localStorage.setItem("admin_psm_module_about", activeModule)
+  }, [activeModule, navigate])
+
+  useEffect(() => {
+    if (!activeModule) return
     fetchAboutData()
-  }, [])
+  }, [activeModule])
 
   const fetchAboutData = async () => {
     try {
       setLoading(true)
-      const response = await api.get(API_ENDPOINTS.ADMIN.ABOUT)
+      const response = await api.get(API_ENDPOINTS.ADMIN.ABOUT, {
+        params: { module: activeModule }
+      })
       if (response.data.success) {
         const payload = response.data.data || {}
-        setAboutData({
+        const nextData = {
           ...payload,
           localizedDescription: {
             en: payload.localizedDescription?.en || payload.description || '',
@@ -90,7 +129,9 @@ export default function AboutUs() {
               bn: feature.localizedDescription?.bn || ''
             }
           }))
-        })
+        }
+        setAboutData(nextData)
+        setInitialSnapshot(JSON.stringify(nextData))
       }
     } catch (error) {
       console.error('Error fetching about data:', error)
@@ -108,10 +149,14 @@ export default function AboutUs() {
         description: aboutData.localizedDescription?.en || aboutData.description || '',
         locale: activeLanguage,
         autoTranslate: activeLanguage === 'en'
+      }, {
+        params: { module: activeModule }
       })
       if (response.data.success) {
         toast.success('About page updated successfully')
-        setAboutData(response.data.data)
+        const nextData = response.data.data
+        setAboutData(nextData)
+        setInitialSnapshot(JSON.stringify(nextData))
       }
     } catch (error) {
       console.error('Error saving about data:', error)
@@ -157,10 +202,14 @@ export default function AboutUs() {
         description: updatedData.localizedDescription?.en || updatedData.description || '',
         locale: activeLanguage,
         autoTranslate: activeLanguage === 'en'
+      }, {
+        params: { module: activeModule }
       })
       if (response.data.success) {
         toast.success('Feature deleted successfully')
-        setAboutData(response.data.data)
+        const nextData = response.data.data
+        setAboutData(nextData)
+        setInitialSnapshot(JSON.stringify(nextData))
       }
     } catch (error) {
       console.error('Error deleting feature:', error)
@@ -170,6 +219,18 @@ export default function AboutUs() {
     } finally {
       setSaving(false)
     }
+  }
+
+  const handleModuleChange = (nextModule) => {
+    if (nextModule === activeModule) return
+    if (
+      hasUnsavedChanges &&
+      !window.confirm("You have unsaved changes. Switch module and discard the current edits?")
+    ) {
+      return
+    }
+    window.localStorage.setItem("admin_psm_module_about", nextModule)
+    navigate(`/admin/pages-social-media/${nextModule}/about`)
   }
 
   const updateFeature = (index, field, value) => {
@@ -227,6 +288,23 @@ export default function AboutUs() {
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-slate-900">About Us</h1>
           <p className="text-sm text-slate-600 mt-1">Manage your About page content</p>
+        </div>
+
+        <div className="mb-4 flex items-center gap-2 flex-wrap">
+          {CONTENT_MODULES.map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              onClick={() => handleModuleChange(item.key)}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                activeModule === item.key
+                  ? "bg-orange-600 text-white"
+                  : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+              }`}
+            >
+              {item.label}
+            </button>
+          ))}
         </div>
 
         <div className="mb-6 flex items-center gap-2 flex-wrap">

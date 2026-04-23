@@ -12,6 +12,8 @@ export default function CancellationPolicy() {
       saveSuccessMessage="Cancellation policy updated successfully"
       saveErrorMessage="Failed to save cancellation policy"
       defaultTitle="Cancellation Policy"
+      policyKey="cancellation"
+      allowedModules={["user"]}
     />
   );
 }

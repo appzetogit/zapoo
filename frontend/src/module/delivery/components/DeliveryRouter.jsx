@@ -20,7 +20,6 @@ const EditProfile = lazy(() => import("../pages/EditProfile"))
 const Settings = lazy(() => import("../pages/Settings"))
 const Conversation = lazy(() => import("../pages/Conversation"))
 const TermsAndConditions = lazy(() => import("../pages/TermsAndConditions"))
-const PrivacyPolicy = lazy(() => import("../pages/PrivacyPolicy"))
 const Payout = lazy(() => import("../pages/Payout"))
 const DeductionStatement = lazy(() => import("../pages/DeductionStatement"))
 const TipsStatement = lazy(() => import("../pages/TipsStatement"))
@@ -349,16 +348,6 @@ export default function DeliveryRouter() {
         <Route
           element={
             <ProtectedRoute>
-              <DeliveryLayout>
-                <PrivacyPolicy />
-              </DeliveryLayout>
-            </ProtectedRoute>
-          }
-          path="/profile/privacy"
-        />
-        <Route
-          element={
-            <ProtectedRoute>
               <DeliveryLayout showGig={true}>
                 <UpdatesPage />
               </DeliveryLayout>
@@ -420,4 +409,3 @@ export default function DeliveryRouter() {
     </Suspense>
   )
 }
-

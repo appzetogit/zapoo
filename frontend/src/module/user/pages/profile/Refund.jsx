@@ -21,7 +21,9 @@ export default function Refund() {
   const fetchRefundData = async () => {
     try {
       setLoading(true)
-      const response = await api.get(API_ENDPOINTS.ADMIN.REFUND_PUBLIC)
+      const response = await api.get(API_ENDPOINTS.ADMIN.REFUND_PUBLIC, {
+        params: { module: "user" }
+      })
       if (response.data.success) {
         setRefundData(response.data.data)
       }

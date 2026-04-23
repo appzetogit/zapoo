@@ -39,7 +39,9 @@ export default function About() {
   const fetchAboutData = async () => {
     try {
       setLoading(true)
-      const response = await api.get(API_ENDPOINTS.ADMIN.ABOUT_PUBLIC)
+      const response = await api.get(API_ENDPOINTS.ADMIN.ABOUT_PUBLIC, {
+        params: { module: "user" }
+      })
       if (response.data.success) {
         setAboutData(response.data.data)
       }

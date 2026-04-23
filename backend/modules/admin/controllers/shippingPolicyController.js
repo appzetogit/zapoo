@@ -5,9 +5,19 @@ import { resolveLocaleFromRequest } from '../../../shared/i18n/localeResolver.js
 import { buildLocalizedText } from '../../../shared/i18n/translationService.js';
 import { normalizeLocale } from '../../../shared/i18n/localeConstants.js';
 import { resolveLocalizedText, toLocalizedText } from '../../../shared/i18n/localizedText.js';
+import { buildContentModuleQuery, parseContentModuleFromRequest } from '../utils/contentModule.js';
 
 const DEFAULT_TITLE = 'Shipping Policy';
 const DEFAULT_CONTENT = '<p>No shipping policy available at the moment.</p>';
+const SHIPPING_MODULE = 'user';
+
+function ensureUserShippingModule(targetModule, res) {
+  if (targetModule !== SHIPPING_MODULE) {
+    errorResponse(res, 400, 'Shipping policy is only available for user module');
+    return false;
+  }
+  return true;
+}
 
 function mergeLocalizedValue(existingValue, localizedOverride, fallback = '') {
   const merged = toLocalizedText(existingValue, fallback);
@@ -23,8 +33,17 @@ function mergeLocalizedValue(existingValue, localizedOverride, fallback = '') {
 
 export const getShippingPublic = asyncHandler(async (req, res) => {
   try {
+    const { module: targetModule, error } = parseContentModuleFromRequest(req);
+    if (error) {
+      return errorResponse(res, 400, error);
+    }
+    if (!ensureUserShippingModule(targetModule, res)) return;
+
     const locale = resolveLocaleFromRequest(req);
-    const shipping = await ShippingPolicy.findOne({ isActive: true })
+    const shipping = await ShippingPolicy.findOne({
+      isActive: true,
+      ...buildContentModuleQuery(targetModule)
+    })
       .select('-updatedBy -createdAt -updatedAt -__v')
       .lean();
 
@@ -48,7 +67,16 @@ export const getShippingPublic = asyncHandler(async (req, res) => {
 
 export const getShipping = asyncHandler(async (req, res) => {
   try {
-    let shipping = await ShippingPolicy.findOne({ isActive: true }).lean();
+    const { module: targetModule, error } = parseContentModuleFromRequest(req);
+    if (error) {
+      return errorResponse(res, 400, error);
+    }
+    if (!ensureUserShippingModule(targetModule, res)) return;
+
+    let shipping = await ShippingPolicy.findOne({
+      isActive: true,
+      ...buildContentModuleQuery(targetModule)
+    }).lean();
 
     if (!shipping) {
       shipping = await ShippingPolicy.create({
@@ -59,6 +87,7 @@ export const getShipping = asyncHandler(async (req, res) => {
           '<p>This is a demo shipping policy. Please update with your actual shipping terms and conditions.</p>',
           ''
         ),
+        targetModule,
         updatedBy: req.admin._id
       });
       shipping = shipping.toObject();
@@ -79,6 +108,12 @@ export const getShipping = asyncHandler(async (req, res) => {
 
 export const updateShipping = asyncHandler(async (req, res) => {
   try {
+    const { module: targetModule, error } = parseContentModuleFromRequest(req);
+    if (error) {
+      return errorResponse(res, 400, error);
+    }
+    if (!ensureUserShippingModule(targetModule, res)) return;
+
     const { title, content, localizedTitle, localizedContent, locale, autoTranslate = true } = req.body;
     const sourceLocale = normalizeLocale(locale || 'en');
 
@@ -86,11 +121,15 @@ export const updateShipping = asyncHandler(async (req, res) => {
       return errorResponse(res, 400, 'Content is required');
     }
 
-    let shipping = await ShippingPolicy.findOne({ isActive: true });
+    let shipping = await ShippingPolicy.findOne({
+      isActive: true,
+      ...buildContentModuleQuery(targetModule)
+    });
     if (!shipping) {
       shipping = new ShippingPolicy({
         title: DEFAULT_TITLE,
         content,
+        targetModule,
         updatedBy: req.admin._id
       });
     }
@@ -125,6 +164,7 @@ export const updateShipping = asyncHandler(async (req, res) => {
     shipping.content = nextLocalizedContent.en;
     shipping.localizedTitle = nextLocalizedTitle;
     shipping.localizedContent = nextLocalizedContent;
+    shipping.targetModule = targetModule;
     shipping.updatedBy = req.admin._id;
 
     await shipping.save();

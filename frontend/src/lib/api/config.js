@@ -309,6 +309,8 @@ export const API_ENDPOINTS = {
     SHIPPING_PUBLIC: "/shipping/public",
     CANCELLATION: "/admin/cancellation",
     CANCELLATION_PUBLIC: "/cancellation/public",
+    CODE_OF_CONDUCT: "/admin/code-of-conduct",
+    CODE_OF_CONDUCT_PUBLIC: "/code-of-conduct/public",
     FEEDBACK: "/admin/feedback",
     FEEDBACK_CREATE: "/feedback",
     REVIEWS: "/admin/reviews",

@@ -106,6 +106,7 @@ const AboutUs = lazy(() => import("../pages/settings/AboutUs"));
 const RefundPolicy = lazy(() => import("../pages/settings/RefundPolicy"));
 const ShippingPolicy = lazy(() => import("../pages/settings/ShippingPolicy"));
 const CancellationPolicy = lazy(() => import("../pages/settings/CancellationPolicy"));
+const CodeOfConduct = lazy(() => import("../pages/settings/CodeOfConduct"));
 const ReactRegistration = lazy(() => import("../pages/settings/ReactRegistration"));
 // System Settings
 const ThirdParty = lazy(() => import("../pages/system/ThirdParty"));
@@ -125,6 +126,28 @@ const AddonActivation = lazy(() => import("../pages/system/AddonActivation"));
 const SystemAddons = lazy(() => import("../pages/system/SystemAddons"));
 const LandingPageManagement = lazy(() => import("../pages/system/LandingPageManagement"));
 const RestaurantBanners = lazy(() => import("../pages/marketing/RestaurantBanners"));
+
+const VALID_CONTENT_MODULES = ["user", "restaurant", "delivery"];
+const PAGE_ALLOWED_MODULES = {
+  terms: ["user", "restaurant", "delivery"],
+  privacy: ["user", "restaurant", "delivery"],
+  "code-of-conduct": ["restaurant"],
+  about: ["user", "delivery"],
+  refund: ["user"],
+  shipping: ["user"],
+  cancellation: ["user"],
+};
+const getRememberedModule = (pageKey) => {
+  if (typeof window === "undefined") return "user";
+  const allowed = PAGE_ALLOWED_MODULES[pageKey] || VALID_CONTENT_MODULES;
+  const stored = window.localStorage.getItem(`admin_psm_module_${pageKey}`);
+  return stored && allowed.includes(stored) ? stored : allowed[0];
+};
+
+function PagesSocialMediaRedirect({ pageKey, slug }) {
+  const module = getRememberedModule(pageKey);
+  return <Navigate to={`/admin/pages-social-media/${module}/${slug}`} replace />;
+}
 
 export default function AdminRouter() {
   return (
@@ -290,12 +313,41 @@ export default function AdminRouter() {
           {/* Business Settings - FCM */}
           <Route path="business-settings/fcm-index" element={<FirebaseNotification />} />
           {/* Pages & Social Media */}
-          <Route path="pages-social-media/terms" element={<TermsAndCondition />} />
-          <Route path="pages-social-media/privacy" element={<PrivacyPolicy />} />
-          <Route path="pages-social-media/about" element={<AboutUs />} />
-          <Route path="pages-social-media/refund" element={<RefundPolicy />} />
-          <Route path="pages-social-media/shipping" element={<ShippingPolicy />} />
-          <Route path="pages-social-media/cancellation" element={<CancellationPolicy />} />
+          <Route path="pages-social-media/:module/terms" element={<TermsAndCondition />} />
+          <Route path="pages-social-media/:module/privacy" element={<PrivacyPolicy />} />
+          <Route path="pages-social-media/:module/about" element={<AboutUs />} />
+          <Route path="pages-social-media/:module/refund" element={<RefundPolicy />} />
+          <Route path="pages-social-media/:module/shipping" element={<ShippingPolicy />} />
+          <Route path="pages-social-media/:module/cancellation" element={<CancellationPolicy />} />
+          <Route path="pages-social-media/:module/code-of-conduct" element={<CodeOfConduct />} />
+          <Route
+            path="pages-social-media/terms"
+            element={<PagesSocialMediaRedirect pageKey="terms" slug="terms" />}
+          />
+          <Route
+            path="pages-social-media/privacy"
+            element={<PagesSocialMediaRedirect pageKey="privacy" slug="privacy" />}
+          />
+          <Route
+            path="pages-social-media/about"
+            element={<PagesSocialMediaRedirect pageKey="about" slug="about" />}
+          />
+          <Route
+            path="pages-social-media/refund"
+            element={<PagesSocialMediaRedirect pageKey="refund" slug="refund" />}
+          />
+          <Route
+            path="pages-social-media/shipping"
+            element={<PagesSocialMediaRedirect pageKey="shipping" slug="shipping" />}
+          />
+          <Route
+            path="pages-social-media/cancellation"
+            element={<PagesSocialMediaRedirect pageKey="cancellation" slug="cancellation" />}
+          />
+          <Route
+            path="pages-social-media/code-of-conduct"
+            element={<PagesSocialMediaRedirect pageKey="code-of-conduct" slug="code-of-conduct" />}
+          />
           <Route path="pages-social-media/react-registration" element={<ReactRegistration />} />
 
           {/* SYSTEM SETTINGS */}

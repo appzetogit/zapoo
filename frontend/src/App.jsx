@@ -28,6 +28,9 @@ const RestaurantForgotPassword = lazy(() => import("@/module/restaurant/pages/au
 const RestaurantOTP = lazy(() => import("@/module/restaurant/pages/auth/OTP"))
 const RestaurantGoogleCallback = lazy(() => import("@/module/restaurant/pages/auth/GoogleCallback"))
 const RestaurantWelcome = lazy(() => import("@/module/restaurant/pages/auth/Welcome"))
+const RestaurantLegalTerms = lazy(() => import("@/module/restaurant/pages/legal/TermsPage"))
+const RestaurantLegalPrivacy = lazy(() => import("@/module/restaurant/pages/legal/PrivacyPage"))
+const RestaurantLegalCodeOfConduct = lazy(() => import("@/module/restaurant/pages/legal/CodeOfConductPage"))
 
 const AdvertisementsPage = lazy(() => import("@/module/restaurant/pages/AdvertisementsPage"))
 const AdDetailsPage = lazy(() => import("@/module/restaurant/pages/AdDetailsPage"))
@@ -96,6 +99,7 @@ const DeliverySignupStep1 = lazy(() => import("@/module/delivery/pages/auth/Sign
 const DeliverySignupStep2 = lazy(() => import("@/module/delivery/pages/auth/SignupStep2"))
 const DeliveryWelcome = lazy(() => import("@/module/delivery/pages/auth/Welcome"))
 const DeliveryChallenges = lazy(() => import("@/module/delivery/pages/Challenges"))
+const DeliveryTermsPublic = lazy(() => import("@/module/delivery/pages/TermsAndConditions"))
 
 function UserPathRedirect() {
   const location = useLocation()
@@ -126,6 +130,9 @@ export default function App() {
         <Route path="/restaurant/forgot-password" element={<AuthRedirect module="restaurant"><RestaurantForgotPassword /></AuthRedirect>} />
         <Route path="/restaurant/otp" element={<AuthRedirect module="restaurant"><RestaurantOTP /></AuthRedirect>} />
         <Route path="/restaurant/auth/google-callback" element={<AuthRedirect module="restaurant"><RestaurantGoogleCallback /></AuthRedirect>} />
+        <Route path="/restaurant/legal/terms" element={<RestaurantLegalTerms />} />
+        <Route path="/restaurant/legal/privacy" element={<RestaurantLegalPrivacy />} />
+        <Route path="/restaurant/legal/code-of-conduct" element={<RestaurantLegalCodeOfConduct />} />
 
         {/* Restaurant Protected Routes */}
         <Route
@@ -642,6 +649,7 @@ export default function App() {
         <Route path="/delivery/signup" element={<DeliverySignup />} />
         <Route path="/delivery/otp" element={<DeliveryOTP />} />
         <Route path="/delivery/welcome" element={<AuthRedirect module="delivery"><DeliveryWelcome /></AuthRedirect>} />
+        <Route path="/delivery/terms" element={<DeliveryTermsPublic />} />
 
         {/* Delivery Signup Routes (Protected - require authentication) */}
         <Route

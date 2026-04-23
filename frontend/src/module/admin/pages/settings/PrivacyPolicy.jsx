@@ -12,6 +12,8 @@ export default function PrivacyPolicy() {
       saveSuccessMessage="Privacy policy updated successfully"
       saveErrorMessage="Failed to save privacy policy"
       defaultTitle="Privacy Policy"
+      policyKey="privacy"
+      allowedModules={["user", "restaurant", "delivery"]}
     />
   );
 }

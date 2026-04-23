@@ -12,6 +12,8 @@ export default function TermsAndCondition() {
       saveSuccessMessage="Terms and conditions updated successfully"
       saveErrorMessage="Failed to save terms and conditions"
       defaultTitle="Terms and Conditions"
+      policyKey="terms"
+      allowedModules={["user", "restaurant", "delivery"]}
     />
   );
 }

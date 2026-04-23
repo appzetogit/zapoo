@@ -5,6 +5,7 @@ import { resolveLocaleFromRequest } from '../../../shared/i18n/localeResolver.js
 import { buildLocalizedText } from '../../../shared/i18n/translationService.js';
 import { normalizeLocale } from '../../../shared/i18n/localeConstants.js';
 import { resolveLocalizedText, toLocalizedText } from '../../../shared/i18n/localizedText.js';
+import { buildContentModuleQuery, parseContentModuleFromRequest } from '../utils/contentModule.js';
 
 const DEFAULT_TITLE = 'Privacy Policy';
 const DEFAULT_CONTENT = '<p>No privacy policy available at the moment.</p>';
@@ -27,8 +28,16 @@ function mergeLocalizedValue(existingValue, localizedOverride, fallback = '') {
  */
 export const getPrivacyPublic = asyncHandler(async (req, res) => {
   try {
+    const { module: targetModule, error } = parseContentModuleFromRequest(req);
+    if (error) {
+      return errorResponse(res, 400, error);
+    }
+
     const locale = resolveLocaleFromRequest(req);
-    const privacy = await PrivacyPolicy.findOne({ isActive: true })
+    const privacy = await PrivacyPolicy.findOne({
+      isActive: true,
+      ...buildContentModuleQuery(targetModule)
+    })
       .select('-updatedBy -createdAt -updatedAt -__v')
       .lean();
 
@@ -56,7 +65,15 @@ export const getPrivacyPublic = asyncHandler(async (req, res) => {
  */
 export const getPrivacy = asyncHandler(async (req, res) => {
   try {
-    let privacy = await PrivacyPolicy.findOne({ isActive: true }).lean();
+    const { module: targetModule, error } = parseContentModuleFromRequest(req);
+    if (error) {
+      return errorResponse(res, 400, error);
+    }
+
+    let privacy = await PrivacyPolicy.findOne({
+      isActive: true,
+      ...buildContentModuleQuery(targetModule)
+    }).lean();
 
     if (!privacy) {
       privacy = await PrivacyPolicy.create({
@@ -67,6 +84,7 @@ export const getPrivacy = asyncHandler(async (req, res) => {
           '<p>StackFood is a complete Multi-vendor Food delivery system developed with powerful admin panel will help you to control your business smartly.</p>',
           ''
         ),
+        targetModule,
         updatedBy: req.admin._id
       });
       privacy = privacy.toObject();
@@ -91,6 +109,11 @@ export const getPrivacy = asyncHandler(async (req, res) => {
  */
 export const updatePrivacy = asyncHandler(async (req, res) => {
   try {
+    const { module: targetModule, error } = parseContentModuleFromRequest(req);
+    if (error) {
+      return errorResponse(res, 400, error);
+    }
+
     const { title, content, localizedTitle, localizedContent, locale, autoTranslate = true } = req.body;
     const sourceLocale = normalizeLocale(locale || 'en');
 
@@ -98,12 +121,16 @@ export const updatePrivacy = asyncHandler(async (req, res) => {
       return errorResponse(res, 400, 'Content is required');
     }
 
-    let privacy = await PrivacyPolicy.findOne({ isActive: true });
+    let privacy = await PrivacyPolicy.findOne({
+      isActive: true,
+      ...buildContentModuleQuery(targetModule)
+    });
 
     if (!privacy) {
       privacy = new PrivacyPolicy({
         title: DEFAULT_TITLE,
         content,
+        targetModule,
         updatedBy: req.admin._id
       });
     }
@@ -146,6 +173,7 @@ export const updatePrivacy = asyncHandler(async (req, res) => {
     privacy.content = nextLocalizedContent.en;
     privacy.localizedTitle = nextLocalizedTitle;
     privacy.localizedContent = nextLocalizedContent;
+    privacy.targetModule = targetModule;
     privacy.updatedBy = req.admin._id;
 
     await privacy.save();

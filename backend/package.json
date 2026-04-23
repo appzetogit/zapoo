@@ -9,6 +9,8 @@
     "dev": "nodemon server.js",
     "verify:telephony": "node verifyTelephonyFlow.js",
     "backfill:i18n-content": "node scripts/backfillLocalizedContent.js",
+    "backfill:content-modules": "node scripts/backfillContentModules.js",
+    "cleanup:restricted-content-modules": "node scripts/cleanupRestrictedModuleContent.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [

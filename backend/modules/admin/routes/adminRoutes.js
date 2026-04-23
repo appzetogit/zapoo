@@ -164,6 +164,10 @@ import {
   updateCancellation,
 } from "../controllers/cancellationPolicyController.js";
 import {
+  getCodeOfConduct,
+  updateCodeOfConduct,
+} from "../controllers/codeOfConductController.js";
+import {
   getAllFeedbacks,
   getFeedbackById,
   updateFeedbackStatus,
@@ -429,6 +433,10 @@ router.put("/shipping", updateShipping);
 // Cancellation Policy Management
 router.get("/cancellation", getCancellation);
 router.put("/cancellation", updateCancellation);
+
+// Code Of Conduct Management
+router.get("/code-of-conduct", getCodeOfConduct);
+router.put("/code-of-conduct", updateCodeOfConduct);
 
 // Feedback Management
 router.get("/feedback", getAllFeedbacks);

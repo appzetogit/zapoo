@@ -5,9 +5,19 @@ import { resolveLocaleFromRequest } from '../../../shared/i18n/localeResolver.js
 import { buildLocalizedText } from '../../../shared/i18n/translationService.js';
 import { normalizeLocale } from '../../../shared/i18n/localeConstants.js';
 import { resolveLocalizedText, toLocalizedText } from '../../../shared/i18n/localizedText.js';
+import { buildContentModuleQuery, parseContentModuleFromRequest } from '../utils/contentModule.js';
 
 const DEFAULT_TITLE = 'Cancellation Policy';
 const DEFAULT_CONTENT = '<p>No cancellation policy available at the moment.</p>';
+const CANCELLATION_MODULE = 'user';
+
+function ensureUserCancellationModule(targetModule, res) {
+  if (targetModule !== CANCELLATION_MODULE) {
+    errorResponse(res, 400, 'Cancellation policy is only available for user module');
+    return false;
+  }
+  return true;
+}
 
 function mergeLocalizedValue(existingValue, localizedOverride, fallback = '') {
   const merged = toLocalizedText(existingValue, fallback);
@@ -23,8 +33,17 @@ function mergeLocalizedValue(existingValue, localizedOverride, fallback = '') {
 
 export const getCancellationPublic = asyncHandler(async (req, res) => {
   try {
+    const { module: targetModule, error } = parseContentModuleFromRequest(req);
+    if (error) {
+      return errorResponse(res, 400, error);
+    }
+    if (!ensureUserCancellationModule(targetModule, res)) return;
+
     const locale = resolveLocaleFromRequest(req);
-    const cancellation = await CancellationPolicy.findOne({ isActive: true })
+    const cancellation = await CancellationPolicy.findOne({
+      isActive: true,
+      ...buildContentModuleQuery(targetModule)
+    })
       .select('-updatedBy -createdAt -updatedAt -__v')
       .lean();
 
@@ -48,7 +67,16 @@ export const getCancellationPublic = asyncHandler(async (req, res) => {
 
 export const getCancellation = asyncHandler(async (req, res) => {
   try {
-    let cancellation = await CancellationPolicy.findOne({ isActive: true }).lean();
+    const { module: targetModule, error } = parseContentModuleFromRequest(req);
+    if (error) {
+      return errorResponse(res, 400, error);
+    }
+    if (!ensureUserCancellationModule(targetModule, res)) return;
+
+    let cancellation = await CancellationPolicy.findOne({
+      isActive: true,
+      ...buildContentModuleQuery(targetModule)
+    }).lean();
 
     if (!cancellation) {
       cancellation = await CancellationPolicy.create({
@@ -59,6 +87,7 @@ export const getCancellation = asyncHandler(async (req, res) => {
           '<p>This is a demo cancellation policy. Please update with your actual cancellation terms and conditions.</p>',
           ''
         ),
+        targetModule,
         updatedBy: req.admin._id
       });
       cancellation = cancellation.toObject();
@@ -79,6 +108,12 @@ export const getCancellation = asyncHandler(async (req, res) => {
 
 export const updateCancellation = asyncHandler(async (req, res) => {
   try {
+    const { module: targetModule, error } = parseContentModuleFromRequest(req);
+    if (error) {
+      return errorResponse(res, 400, error);
+    }
+    if (!ensureUserCancellationModule(targetModule, res)) return;
+
     const { title, content, localizedTitle, localizedContent, locale, autoTranslate = true } = req.body;
     const sourceLocale = normalizeLocale(locale || 'en');
 
@@ -86,11 +121,15 @@ export const updateCancellation = asyncHandler(async (req, res) => {
       return errorResponse(res, 400, 'Content is required');
     }
 
-    let cancellation = await CancellationPolicy.findOne({ isActive: true });
+    let cancellation = await CancellationPolicy.findOne({
+      isActive: true,
+      ...buildContentModuleQuery(targetModule)
+    });
     if (!cancellation) {
       cancellation = new CancellationPolicy({
         title: DEFAULT_TITLE,
         content,
+        targetModule,
         updatedBy: req.admin._id
       });
     }
@@ -125,6 +164,7 @@ export const updateCancellation = asyncHandler(async (req, res) => {
     cancellation.content = nextLocalizedContent.en;
     cancellation.localizedTitle = nextLocalizedTitle;
     cancellation.localizedContent = nextLocalizedContent;
+    cancellation.targetModule = targetModule;
     cancellation.updatedBy = req.admin._id;
 
     await cancellation.save();

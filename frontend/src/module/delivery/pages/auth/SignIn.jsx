@@ -1,6 +1,6 @@
 import { useState } from "react"
 import BackgroundVideo from "@/assets/Food_Delivery_Background_Video_Generation.mp4"
-import { useNavigate } from "react-router-dom"
+import { Link, useNavigate } from "react-router-dom"
 import {
   Select,
   SelectContent,
@@ -225,9 +225,9 @@ export default function DeliverySignIn() {
             {/* Terms and Conditions */}
             <p className="text-xs text-center text-white px-4">
               By continuing, you agree to our{" "}
-              <a href="#" className="text-[#DC2626] hover:underline">
+              <Link to="/delivery/terms" className="text-[#DC2626] hover:underline">
                 Terms and Conditions
-              </a>
+              </Link>
             </p>
           </div>
         </div>

@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { localizedTextSchema } from '../../../shared/i18n/localizedText.js';
+import { CONTENT_MODULES, DEFAULT_CONTENT_MODULE } from '../constants/contentModules.js';
 
 const termsAndConditionSchema = new mongoose.Schema(
   {
@@ -25,6 +26,13 @@ const termsAndConditionSchema = new mongoose.Schema(
       type: Boolean,
       default: true
     },
+    targetModule: {
+      type: String,
+      enum: CONTENT_MODULES,
+      default: DEFAULT_CONTENT_MODULE,
+      required: true,
+      trim: true
+    },
     updatedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Admin',
@@ -38,5 +46,6 @@ const termsAndConditionSchema = new mongoose.Schema(
 
 // Indexes
 termsAndConditionSchema.index({ isActive: 1 });
+termsAndConditionSchema.index({ isActive: 1, targetModule: 1 });
 
 export default mongoose.model('TermsAndCondition', termsAndConditionSchema);

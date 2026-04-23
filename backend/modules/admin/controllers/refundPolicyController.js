@@ -5,9 +5,19 @@ import { resolveLocaleFromRequest } from '../../../shared/i18n/localeResolver.js
 import { buildLocalizedText } from '../../../shared/i18n/translationService.js';
 import { normalizeLocale } from '../../../shared/i18n/localeConstants.js';
 import { resolveLocalizedText, toLocalizedText } from '../../../shared/i18n/localizedText.js';
+import { buildContentModuleQuery, parseContentModuleFromRequest } from '../utils/contentModule.js';
 
 const DEFAULT_TITLE = 'Refund Policy';
 const DEFAULT_CONTENT = '<p>No refund policy available at the moment.</p>';
+const REFUND_MODULE = 'user';
+
+function ensureUserRefundModule(targetModule, res) {
+  if (targetModule !== REFUND_MODULE) {
+    errorResponse(res, 400, 'Refund policy is only available for user module');
+    return false;
+  }
+  return true;
+}
 
 function mergeLocalizedValue(existingValue, localizedOverride, fallback = '') {
   const merged = toLocalizedText(existingValue, fallback);
@@ -23,8 +33,17 @@ function mergeLocalizedValue(existingValue, localizedOverride, fallback = '') {
 
 export const getRefundPublic = asyncHandler(async (req, res) => {
   try {
+    const { module: targetModule, error } = parseContentModuleFromRequest(req);
+    if (error) {
+      return errorResponse(res, 400, error);
+    }
+    if (!ensureUserRefundModule(targetModule, res)) return;
+
     const locale = resolveLocaleFromRequest(req);
-    const refund = await RefundPolicy.findOne({ isActive: true })
+    const refund = await RefundPolicy.findOne({
+      isActive: true,
+      ...buildContentModuleQuery(targetModule)
+    })
       .select('-updatedBy -createdAt -updatedAt -__v')
       .lean();
 
@@ -48,7 +67,16 @@ export const getRefundPublic = asyncHandler(async (req, res) => {
 
 export const getRefund = asyncHandler(async (req, res) => {
   try {
-    let refund = await RefundPolicy.findOne({ isActive: true }).lean();
+    const { module: targetModule, error } = parseContentModuleFromRequest(req);
+    if (error) {
+      return errorResponse(res, 400, error);
+    }
+    if (!ensureUserRefundModule(targetModule, res)) return;
+
+    let refund = await RefundPolicy.findOne({
+      isActive: true,
+      ...buildContentModuleQuery(targetModule)
+    }).lean();
 
     if (!refund) {
       refund = await RefundPolicy.create({
@@ -59,6 +87,7 @@ export const getRefund = asyncHandler(async (req, res) => {
           '<p>Stack Food is a complete Multi-vendor Food products delivery system developed with powerful admin panel will help you to control your business smartly.</p>',
           ''
         ),
+        targetModule,
         updatedBy: req.admin._id
       });
       refund = refund.toObject();
@@ -79,6 +108,12 @@ export const getRefund = asyncHandler(async (req, res) => {
 
 export const updateRefund = asyncHandler(async (req, res) => {
   try {
+    const { module: targetModule, error } = parseContentModuleFromRequest(req);
+    if (error) {
+      return errorResponse(res, 400, error);
+    }
+    if (!ensureUserRefundModule(targetModule, res)) return;
+
     const { title, content, localizedTitle, localizedContent, locale, autoTranslate = true } = req.body;
     const sourceLocale = normalizeLocale(locale || 'en');
 
@@ -86,11 +121,15 @@ export const updateRefund = asyncHandler(async (req, res) => {
       return errorResponse(res, 400, 'Content is required');
     }
 
-    let refund = await RefundPolicy.findOne({ isActive: true });
+    let refund = await RefundPolicy.findOne({
+      isActive: true,
+      ...buildContentModuleQuery(targetModule)
+    });
     if (!refund) {
       refund = new RefundPolicy({
         title: DEFAULT_TITLE,
         content,
+        targetModule,
         updatedBy: req.admin._id
       });
     }
@@ -125,6 +164,7 @@ export const updateRefund = asyncHandler(async (req, res) => {
     refund.content = nextLocalizedContent.en;
     refund.localizedTitle = nextLocalizedTitle;
     refund.localizedContent = nextLocalizedContent;
+    refund.targetModule = targetModule;
     refund.updatedBy = req.admin._id;
 
     await refund.save();
