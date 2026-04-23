@@ -275,14 +275,18 @@ export async function findNearestDeliveryBoys(restaurantLat, restaurantLng, rest
         console.warn(`⚠️ Error finding zone:`, zoneError.message);
       }
     }
-    const {
-      getDb
-    } = await import('../../../config/firebaseConfig.js');
-    const db = getDb();
-
-    // Read from Firebase Realtime DB
-    const boysSnapshot = await db.ref('delivery_boys').once('value');
-    const boysData = boysSnapshot.val() || {};
+    let boysData = {};
+    try {
+      const { getDb } = await import('../../../config/firebaseConfig.js');
+      const db = getDb();
+      // Read from Firebase Realtime DB
+      const boysSnapshot = await db.ref('delivery_boys').once('value');
+      boysData = boysSnapshot.val() || {};
+    } catch (firebaseError) {
+      // Non-fatal: we can still fall back to MongoDB online riders.
+      console.warn('⚠️ [DeliveryAssign] Firebase presence unavailable; falling back to Mongo rider lookup:', firebaseError.message);
+      boysData = {};
+    }
 
     // Convert to array and filter online (be resilient to string coords)
     let deliveryPartners = Object.entries(boysData)
@@ -377,8 +381,6 @@ export async function findNearestDeliveryBoys(restaurantLat, restaurantLng, rest
       if (Array.isArray(preIdleFilterPartners) && preIdleFilterPartners.length > 0) {
         console.warn('⚠️ [DeliveryAssign] All partners filtered as busy. Proceeding without idle filter for this assignment.');
         deliveryPartners = preIdleFilterPartners;
-      } else {
-        return [];
       }
     }
 

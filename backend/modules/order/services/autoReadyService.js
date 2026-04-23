@@ -1,5 +1,7 @@
 import Order from '../models/Order.js';
 import { notifyDeliveryBoyOrderReady } from './deliveryNotificationService.js';
+import Restaurant from '../../restaurant/models/Restaurant.js';
+import { broadcastDeliveryRequest } from './deliveryAssignmentService.js';
 
 /**
  * Automatically mark orders as ready when ETA becomes 0
@@ -68,6 +70,59 @@ export async function processAutoReadyOrders() {
                 await notifyDeliveryBoyOrderReady(updatedOrder, updatedOrder.deliveryPartnerId._id || updatedOrder.deliveryPartnerId);
               } catch (notifError) {
                 console.error(`❌ Error notifying delivery boy about order ${order.orderId}:`, notifError);
+              }
+            }
+            // If order is not assigned yet, broadcast it to nearby delivery partners (same as manual "mark ready")
+            if (!updatedOrder.deliveryPartnerId) {
+              try {
+                let restaurantDoc = null;
+                const restaurantIdRaw = updatedOrder.restaurantId;
+                const looksLikeObjectId = typeof restaurantIdRaw === 'string' && /^[a-f\\d]{24}$/i.test(restaurantIdRaw);
+                if (looksLikeObjectId) {
+                  restaurantDoc = await Restaurant.findById(restaurantIdRaw)
+                    .select('location.coordinates location.latitude location.longitude restaurantId')
+                    .lean();
+                }
+                if (!restaurantDoc && restaurantIdRaw) {
+                  restaurantDoc = await Restaurant.findOne({
+                    $or: [{ restaurantId: restaurantIdRaw }, { _id: restaurantIdRaw }]
+                  }).select('location.coordinates location.latitude location.longitude restaurantId')
+                    .lean();
+                }
+
+                let restaurantLat = null;
+                let restaurantLng = null;
+                const coords = restaurantDoc?.location?.coordinates;
+                if (Array.isArray(coords) && coords.length >= 2) {
+                  const [lng, lat] = coords;
+                  if (Number.isFinite(Number(lat)) && Number.isFinite(Number(lng))) {
+                    restaurantLat = Number(lat);
+                    restaurantLng = Number(lng);
+                  }
+                }
+                if (!restaurantLat || !restaurantLng) {
+                  const lat = restaurantDoc?.location?.latitude;
+                  const lng = restaurantDoc?.location?.longitude;
+                  if (Number.isFinite(Number(lat)) && Number.isFinite(Number(lng))) {
+                    restaurantLat = Number(lat);
+                    restaurantLng = Number(lng);
+                  }
+                }
+
+                if (Number.isFinite(restaurantLat) && Number.isFinite(restaurantLng)) {
+                  console.log('📣 [AutoReady] Broadcast on ready for order', updatedOrder.orderId || updatedOrder._id.toString());
+                  const result = await broadcastDeliveryRequest(updatedOrder._id.toString(), restaurantLat, restaurantLng, { trigger: 'auto_ready' });
+                  console.log('📊 [AutoReady] Ready broadcast recipients', {
+                    orderId: updatedOrder.orderId || null,
+                    orderMongoId: updatedOrder._id?.toString?.() || null,
+                    notifiedCount: Number(result?.notifiedCount || 0),
+                    candidatesCount: Array.isArray(result?.deliveryPartnerIds) ? result.deliveryPartnerIds.length : 0
+                  });
+                } else {
+                  console.warn(`⚠️ [AutoReady] Restaurant location missing; cannot broadcast order ${updatedOrder.orderId || updatedOrder._id}`);
+                }
+              } catch (broadcastErr) {
+                console.error(`❌ [AutoReady] Failed broadcasting order ${updatedOrder.orderId || updatedOrder._id}:`, broadcastErr);
               }
             }
           }
