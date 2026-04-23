@@ -166,7 +166,22 @@ export default function RestaurantWithdraws() {
       maximumFractionDigits: 2
     })}`
   }
-
+  const formatAddress = (address) => {
+    if (!address) return 'N/A'
+    if (typeof address === 'string') return address
+    if (typeof address === 'object') {
+      const addressLine = [
+        address.street,
+        address.area,
+        address.city,
+        address.state,
+        address.pincode,
+        address.country,
+      ].filter(Boolean).join(', ')
+      return addressLine || 'N/A'
+    }
+    return 'N/A'
+  }
   const handleExport = async (format) => {
     if (filteredWithdraws.length === 0) {
       toast.error("No data to export.")
@@ -411,30 +426,69 @@ export default function RestaurantWithdraws() {
 
         {/* View Withdraw Dialog */}
         <Dialog open={isViewOpen} onOpenChange={setIsViewOpen}>
-          <DialogContent className="max-w-md bg-white p-0">
-            <DialogHeader className="px-6 pt-6 pb-4">
+          <DialogContent className="w-[94vw] max-w-4xl bg-white p-0">
+            <DialogHeader className="px-6 pt-6 pb-4 border-b border-slate-200">
               <DialogTitle>Withdraw Request Details</DialogTitle>
             </DialogHeader>
             {selectedWithdraw && (
-              <div className="px-6 pb-6 space-y-4">
-                <div>
-                  <label className="text-xs font-semibold text-slate-500 uppercase">Amount</label>
-                  <p className="text-sm font-medium text-slate-900 mt-1">
-                    {formatCurrency(selectedWithdraw.amount)}
-                  </p>
+              <div className="px-6 py-5 max-h-[72vh] overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 space-y-4">
+                    <div>
+                      <label className="text-xs font-semibold text-slate-500 uppercase">Amount</label>
+                      <p className="text-sm font-medium text-slate-900 mt-1">
+                        {formatCurrency(selectedWithdraw.amount)}
+                      </p>
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-slate-500 uppercase">Restaurant Name</label>
+                      <p className="text-sm font-medium text-slate-900 mt-1">{selectedWithdraw.restaurantName || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-slate-500 uppercase">Restaurant ID</label>
+                      <p className="text-sm font-medium text-slate-900 mt-1">{selectedWithdraw.restaurantIdString || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-slate-500 uppercase">Restaurant Address</label>
+                      <p className="text-sm font-medium text-slate-900 mt-1">{formatAddress(selectedWithdraw.restaurantAddress)}</p>
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 space-y-4">
+                    <div>
+                      <label className="text-xs font-semibold text-slate-500 uppercase">Owner Details</label>
+                      <div className="mt-1 space-y-1">
+                        <p className="text-sm text-slate-900"><span className="font-medium">Name:</span> {selectedWithdraw.ownerName || 'N/A'}</p>
+                        <p className="text-sm text-slate-900"><span className="font-medium">Email:</span> {selectedWithdraw.ownerEmail || 'N/A'}</p>
+                        <p className="text-sm text-slate-900"><span className="font-medium">Phone:</span> {selectedWithdraw.ownerPhone || 'N/A'}</p>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-slate-500 uppercase">Zone & Tier</label>
+                      <div className="mt-1 space-y-1">
+                        <p className="text-sm text-slate-900"><span className="font-medium">Zone:</span> {selectedWithdraw.zoneName || 'N/A'}</p>
+                        <p className="text-sm text-slate-900">
+                          <span className="font-medium">Tier:</span> {selectedWithdraw.tierName || 'N/A'}{selectedWithdraw.tierRank ? ` (Rank ${selectedWithdraw.tierRank})` : ''}
+                        </p>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-slate-500 uppercase">Bank Details</label>
+                      <div className="mt-1 space-y-1">
+                        <p className="text-sm text-slate-900"><span className="font-medium">Account Holder:</span> {selectedWithdraw.bankAccountHolderName || 'N/A'}</p>
+                        <p className="text-sm text-slate-900"><span className="font-medium">Account Number:</span> {selectedWithdraw.bankAccountNumber || 'N/A'}</p>
+                        <p className="text-sm text-slate-900"><span className="font-medium">IFSC:</span> {selectedWithdraw.bankIfscCode || 'N/A'}</p>
+                        <p className="text-sm text-slate-900"><span className="font-medium">Account Type:</span> {selectedWithdraw.bankAccountType || 'N/A'}</p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <label className="text-xs font-semibold text-slate-500 uppercase">Restaurant Name</label>
-                  <p className="text-sm font-medium text-slate-900 mt-1">{selectedWithdraw.restaurantName || 'N/A'}</p>
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-slate-500 uppercase">Restaurant ID</label>
-                  <p className="text-sm font-medium text-slate-900 mt-1">{selectedWithdraw.restaurantIdString || 'N/A'}</p>
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-slate-500 uppercase">Request Time</label>
-                  <p className="text-sm font-medium text-slate-900 mt-1">{formatDate(selectedWithdraw.requestedAt || selectedWithdraw.createdAt)}</p>
-                </div>
+
+                <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-4 space-y-3">
+                  <div>
+                    <label className="text-xs font-semibold text-slate-500 uppercase">Request Time</label>
+                    <p className="text-sm font-medium text-slate-900 mt-1">{formatDate(selectedWithdraw.requestedAt || selectedWithdraw.createdAt)}</p>
+                  </div>
                 {(selectedWithdraw.status === 'Approved' || selectedWithdraw.status === 'Processed') && selectedWithdraw.processedAt && (
                   <div>
                     <label className="text-xs font-semibold text-slate-500 uppercase">Approved Time</label>
@@ -461,9 +515,10 @@ export default function RestaurantWithdraws() {
                     <p className="text-sm font-medium text-slate-900 mt-1">{selectedWithdraw.rejectionReason}</p>
                   </div>
                 )}
+                </div>
               </div>
             )}
-            <DialogFooter className="px-6 pb-6">
+            <DialogFooter className="px-6 py-4 border-t border-slate-200">
               <button
                 onClick={() => setIsViewOpen(false)}
                 className="px-4 py-2 text-sm font-medium rounded-lg bg-[#FF5200] text-white hover:bg-[#E64A00] transition-all shadow-md"

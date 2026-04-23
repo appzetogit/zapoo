@@ -66,6 +66,14 @@ const parseBoolean = (value, fallback = false) => {
   return fallback;
 };
 
+const normalizeFoodType = (value, fallback = 'Veg') => {
+  if (typeof value !== 'string') return fallback;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'veg') return 'Veg';
+  if (normalized === 'non-veg' || normalized === 'non veg' || normalized === 'nonveg') return 'Non-Veg';
+  return fallback;
+};
+
 /**
  * Get All Categories (Public - for user frontend)
  * GET /api/categories/public
@@ -76,7 +84,7 @@ export const getPublicCategories = asyncHandler(async (req, res) => {
     // Only get active categories for public access
     const categories = await AdminCategoryManagement.find({
       status: true
-    }).select('name image _id type').sort({
+    }).select('name image _id type foodType').sort({
       createdAt: -1
     }).lean();
     const formattedCategories = categories.map(category => {
@@ -86,6 +94,7 @@ export const getPublicCategories = asyncHandler(async (req, res) => {
       name: localized.name,
       image: category.image,
       type: category.type || null,
+      foodType: category.foodType || 'Veg',
       slug: (localized.name || category.name || '').toLowerCase().replace(/\s+/g, '-')
     }});
     return successResponse(res, 200, 'Categories retrieved successfully', {
@@ -159,6 +168,11 @@ export const getCategories = asyncHandler(async (req, res) => {
         }
       }, {
         type: {
+          $regex: search,
+          $options: 'i'
+        }
+      }, {
+        foodType: {
           $regex: search,
           $options: 'i'
         }
@@ -237,6 +251,7 @@ export const createCategory = asyncHandler(async (req, res) => {
       image,
       status,
       type,
+      foodType,
       description,
       localizedName,
       localizedDescription,
@@ -314,6 +329,7 @@ export const createCategory = asyncHandler(async (req, res) => {
       localizedName: nextLocalizedName,
       image: imageUrl,
       type: type && type.trim() ? type.trim() : undefined,
+      foodType: normalizeFoodType(foodType, 'Veg'),
       priority: 'Normal',
       // Default priority
       status: status !== undefined ? status : true,
@@ -353,6 +369,7 @@ export const updateCategory = asyncHandler(async (req, res) => {
       image,
       status,
       type,
+      foodType,
       description,
       localizedName,
       localizedDescription,
@@ -445,6 +462,7 @@ export const updateCategory = asyncHandler(async (req, res) => {
     }
     if (imageUrl !== undefined) category.image = imageUrl;
     if (type !== undefined) category.type = type && type.trim() ? type.trim() : undefined;
+    if (foodType !== undefined) category.foodType = normalizeFoodType(foodType, category.foodType || 'Veg');
     if (status !== undefined) category.status = status;
     category.updatedBy = req.user._id;
     await category.save();

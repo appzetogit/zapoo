@@ -132,15 +132,7 @@ export default function HubMenu() {
       "out-of-stock": allItems.filter(item => !item.isAvailable).length,
       "no-photos": allItems.filter(item => !item.image || item.photoCount === 0).length,
       "without-description": allItems.filter(item => !item.description || item.description.trim() === "").length,
-      "without-serving-info": allItems.filter(item => !item.variations || item.variations.length === 0).length,
-      "item-not-live": allItems.filter(item => !item.isAvailable).length,
-      "photos-rejected": 0,
-      // This would need a status field in the item model
-      "under-review": 0,
-      // This would need a status field in the item model
-      goods: 0,
-      // This would need a category type field
-      services: 0 // This would need a category type field
+      "without-serving-info": allItems.filter(item => !item.variations || item.variations.length === 0).length
     };
     return counts;
   }, [menuData]);
@@ -155,29 +147,9 @@ export default function HubMenu() {
     label: "Out of stock",
     count: calculateFilterCounts["out-of-stock"]
   }, {
-    id: "goods",
-    label: "Goods",
-    count: calculateFilterCounts.goods
-  }, {
-    id: "services",
-    label: "Services",
-    count: calculateFilterCounts.services
-  }, {
-    id: "item-not-live",
-    label: "Item not live",
-    count: calculateFilterCounts["item-not-live"]
-  }, {
-    id: "photos-rejected",
-    label: "Photos rejected",
-    count: calculateFilterCounts["photos-rejected"]
-  }, {
     id: "no-photos",
     label: "No photos",
     count: calculateFilterCounts["no-photos"]
-  }, {
-    id: "under-review",
-    label: "Under review",
-    count: calculateFilterCounts["under-review"]
   }, {
     id: "without-description",
     label: "Without description",
@@ -203,13 +175,13 @@ export default function HubMenu() {
       label: "Recommended",
       count: calculateFilterCounts.recommended
     }, {
-      id: "services",
-      label: "Services",
-      count: calculateFilterCounts.services
+      id: "without-description",
+      label: "Without description",
+      count: calculateFilterCounts["without-description"]
     }, {
-      id: "photos-rejected",
-      label: "Photos Rejected",
-      count: calculateFilterCounts["photos-rejected"]
+      id: "without-serving-info",
+      label: "Without serving info",
+      count: calculateFilterCounts["without-serving-info"]
     }];
     // Only return filters with count > 0
     return filters.filter(f => f.count > 0);

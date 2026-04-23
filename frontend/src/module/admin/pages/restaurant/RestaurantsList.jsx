@@ -184,15 +184,12 @@ export default function RestaurantsList() {
     setLoadingDetails(true);
     setRestaurantDetails(null);
     try {
-      // First, use original data if available (has all details)
+      // Use list data as immediate fallback while fetching latest details
       if (restaurant.originalData) {
         setRestaurantDetails(restaurant.originalData);
-        setLoadingDetails(false);
-        return;
       }
 
-      // Try to fetch full restaurant details from API
-      // Use _id if available, otherwise use id or restaurantId
+      // Always fetch full restaurant details from API for accurate subscription info
       const restaurantId = restaurant._id || restaurant.id || restaurant.restaurantId;
       let response = null;
       if (restaurantId) {
@@ -776,6 +773,12 @@ export default function RestaurantsList() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                 {restaurantDetails?.subscription ? <>
                   <div>
+                    <p className="text-xs text-slate-500 mb-1">Plan</p>
+                    <p className="font-medium text-slate-900">
+                      {restaurantDetails.subscription.planName || restaurantDetails.subscription?.planId?.name || "N/A"}
+                    </p>
+                  </div>
+                  <div>
                     <p className="text-xs text-slate-500 mb-1">Current Plan Status</p>
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${restaurantDetails.subscription.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
                       {restaurantDetails.subscription.status || 'Inactive'}
@@ -805,6 +808,22 @@ export default function RestaurantsList() {
                     <p className="text-xs text-slate-500 mb-1">Auto Renew</p>
                     <p className="font-medium text-slate-900">
                       {restaurantDetails.subscription.autoRenew ? 'Yes' : 'No'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500 mb-1">Amount Paid</p>
+                    <p className="font-medium text-slate-900">
+                      ₹{Number(restaurantDetails.subscription.amount || 0).toLocaleString('en-IN')}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500 mb-1">Payment Date</p>
+                    <p className="font-medium text-slate-900">
+                      {restaurantDetails.subscription.paymentDate ? new Date(restaurantDetails.subscription.paymentDate).toLocaleDateString('en-IN', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric'
+                      }) : 'N/A'}
                     </p>
                   </div>
                 </> : <div className="col-span-2 text-slate-500 italic">No active subscription information found. Extension will initialize a new subscription.</div>}

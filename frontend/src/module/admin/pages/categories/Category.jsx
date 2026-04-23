@@ -30,7 +30,8 @@ export default function Category() {
     localizedDescription: { en: "", hi: "", bn: "" },
     image: "https://via.placeholder.com/40",
     status: true,
-    type: ""
+    type: "",
+    foodType: "Veg"
   });
   const [selectedImageFile, setSelectedImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
@@ -225,7 +226,8 @@ export default function Category() {
       },
       image: category.image || "https://via.placeholder.com/40",
       status: category.status !== undefined ? category.status : true,
-      type: category.type || ""
+      type: category.type || "",
+      foodType: category.foodType || "Veg"
     });
     setSelectedImageFile(null);
     setImagePreview(category.image || null);
@@ -241,7 +243,8 @@ export default function Category() {
       localizedDescription: { en: "", hi: "", bn: "" },
       image: "https://via.placeholder.com/40",
       status: true,
-      type: ""
+      type: "",
+      foodType: "Veg"
     });
     setSelectedImageFile(null);
     setImagePreview(null);
@@ -386,7 +389,8 @@ export default function Category() {
       localizedDescription: { en: "", hi: "", bn: "" },
       image: "https://via.placeholder.com/40",
       status: true,
-      type: ""
+      type: "",
+      foodType: "Veg"
     });
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
@@ -406,6 +410,7 @@ export default function Category() {
       formDataToSend.append('locale', activeLanguage);
       formDataToSend.append('autoTranslate', String(activeLanguage === 'en'));
       formDataToSend.append('type', formData.type);
+      formDataToSend.append('foodType', formData.foodType || 'Veg');
       formDataToSend.append('status', formData.status.toString());
 
       // Add image file if selected, otherwise use existing image URL
@@ -824,18 +829,6 @@ export default function Category() {
 
                   {/* Form */}
                   <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      {[{ code: "en", label: t("common.languageNames.en") }, { code: "hi", label: t("common.languageNames.hi") }, { code: "bn", label: t("common.languageNames.bn") }].map((lang) => (
-                        <button
-                          key={lang.code}
-                          type="button"
-                          onClick={() => setActiveLanguage(lang.code)}
-                          className={`px-3 py-1.5 rounded-md text-xs font-semibold ${activeLanguage === lang.code ? "bg-orange-600 text-white" : "bg-slate-100 text-slate-700"}`}
-                        >
-                          {lang.label}
-                        </button>
-                      ))}
-                    </div>
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-2">
                         {t("admin.category.modal.fields.categoryType")}
@@ -873,6 +866,28 @@ export default function Category() {
                   };
                 });
               }} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500" placeholder={t("admin.category.modal.fields.categoryNamePlaceholder")} />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">
+                        Food Type <span className="text-red-500">*</span>
+                      </label>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setFormData(prev => ({ ...prev, foodType: "Veg" }))}
+                          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${formData.foodType === "Veg" ? "border-2 border-green-600 text-green-700 bg-green-50" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
+                        >
+                          Veg
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFormData(prev => ({ ...prev, foodType: "Non-Veg" }))}
+                          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${formData.foodType === "Non-Veg" ? "border-2 border-red-600 text-red-700 bg-red-50" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
+                        >
+                          Non-Veg
+                        </button>
+                      </div>
                     </div>
 
                     <div>

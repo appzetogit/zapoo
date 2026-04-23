@@ -4,17 +4,17 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import Lenis from "lenis";
-import { ArrowLeft, MoreVertical, ChevronRight, Plus, Eye, Edit, Pause, Copy, Trash2 } from "lucide-react";
+import { ArrowLeft, ChevronRight, Plus, Trash2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { initRazorpayPayment } from "@/lib/utils/razorpay";
 import { getCompanyNameAsync } from "@/lib/utils/businessSettings";
 export default function AdvertisementsPage() {
   const navigate = useNavigate();
   const [activeFilter, setActiveFilter] = useState("all");
-  const [openMenuId, setOpenMenuId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [advertisements, setAdvertisements] = useState([]);
   const [processingPayment, setProcessingPayment] = useState(false);
+  const [deletingAdId, setDeletingAdId] = useState(null);
   const adPaymentUiDebug = (step, meta = {}) => {
     try {
       console.log("[AD_PAYMENT_UI_DEBUG]", step, meta);
@@ -190,22 +190,24 @@ export default function AdvertisementsPage() {
     }
   };
 
-  // Close menu when clicking outside
-  useEffect(() => {
-    const handleClickOutside = event => {
-      if (openMenuId && !event.target.closest(`[data-menu-id="${openMenuId}"]`)) {
-        setOpenMenuId(null);
-      }
-    };
-    if (openMenuId) {
-      document.addEventListener("mousedown", handleClickOutside);
-      document.addEventListener("touchstart", handleClickOutside);
+  const handleDeleteAd = async (ad) => {
+    const adId = ad?._id;
+    if (!adId) return;
+
+    const confirmed = window.confirm("Are you sure you want to delete this ad?");
+    if (!confirmed) return;
+
+    try {
+      setDeletingAdId(adId);
+      await marketingAPI.deleteAdRequest(adId);
+      toast.success("Ad deleted successfully");
+      await fetchAds();
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Failed to delete ad");
+    } finally {
+      setDeletingAdId(null);
     }
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("touchstart", handleClickOutside);
-    };
-  }, [openMenuId]);
+  };
 
   // Lenis smooth scrolling
   useEffect(() => {
@@ -347,83 +349,17 @@ export default function AdvertisementsPage() {
                       </div>
 
                       {/* Right Icons */}
-                      <div className="flex items-center gap-2 flex-shrink-0 relative">
+                      <div className="flex items-center gap-2 flex-shrink-0">
                         <motion.button whileHover={{
                     scale: 1.1
                   }} whileTap={{
                     scale: 0.9
                   }} onClick={e => {
                     e.stopPropagation();
-                    setOpenMenuId(openMenuId === ad._id ? null : ad._id);
-                  }} className="p-2 hover:bg-gray-100 rounded-lg transition-colors relative" data-menu-id={ad._id}>
-                          <MoreVertical className="w-5 h-5 text-gray-600" />
+                    handleDeleteAd(ad);
+                  }} disabled={deletingAdId === ad._id} className={`p-2 rounded-lg transition-colors ${deletingAdId === ad._id ? "bg-red-100 opacity-70 cursor-not-allowed" : "bg-red-50 hover:bg-red-100"}`} aria-label="Delete Ad">
+                          <Trash2 className="w-5 h-5 text-red-600" />
                         </motion.button>
-
-                        {/* Context Menu */}
-                        <AnimatePresence>
-                          {openMenuId === ad._id && <motion.div initial={{
-                      opacity: 0,
-                      scale: 0.95,
-                      y: -10
-                    }} animate={{
-                      opacity: 1,
-                      scale: 1,
-                      y: 0
-                    }} exit={{
-                      opacity: 0,
-                      scale: 0.95,
-                      y: -10
-                    }} transition={{
-                      duration: 0.2,
-                      ease: "easeOut"
-                    }} className="absolute top-full right-0 mt-2 bg-white rounded-xl shadow-2xl border border-gray-200 py-2 z-50 min-w-[180px]" data-menu-id={ad._id}>
-                              {[{
-                        icon: Eye,
-                        label: "View Ads",
-                        action: () => navigate(`/restaurant/advertisements/${ad._id}`)
-                      }, {
-                        icon: Edit,
-                        label: "Edit Ads",
-                        action: () => navigate(`/restaurant/advertisements/${ad._id}/edit`)
-                      }, {
-                        icon: Pause,
-                        label: "Pause Ads",
-                        action: () => {}
-                      }, {
-                        icon: Copy,
-                        label: "Copy Ads",
-                        action: () => {}
-                      }, {
-                        icon: Trash2,
-                        label: "Delete Ads",
-                        action: () => {},
-                        isDanger: true
-                      }].map((option, idx) => {
-                        const IconComponent = option.icon;
-                        return <motion.button key={option.label} initial={{
-                          opacity: 0,
-                          x: -10
-                        }} animate={{
-                          opacity: 1,
-                          x: 0
-                        }} transition={{
-                          delay: idx * 0.03,
-                          duration: 0.2
-                        }} whileHover={{
-                          x: 4
-                        }} whileTap={{
-                          scale: 0.95
-                        }} onClick={e => {
-                          e.stopPropagation();
-                          option.action();
-                          setOpenMenuId(null);
-                        }} className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors ${option.isDanger ? "text-red-600 hover:bg-red-50" : "text-gray-700 hover:bg-gray-50"}`}>
-                                    <IconComponent className="w-4 h-4" />
-                                    <span>{option.label}</span>
-                                  </motion.button>;
-                      })}
-                            </motion.div>}
-                        </AnimatePresence>
 
                         <motion.button whileHover={{
                     scale: 1.1

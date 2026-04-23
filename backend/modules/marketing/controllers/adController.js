@@ -70,6 +70,86 @@ const parseCampaignDate = (input) => {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
 
+const IST_OFFSET_MINUTES = 330;
+const IST_OFFSET_MS = IST_OFFSET_MINUTES * 60 * 1000;
+
+const getISTDayBoundsFromDate = (date) => {
+  const shifted = new Date(date.getTime() + IST_OFFSET_MS);
+  const year = shifted.getUTCFullYear();
+  const month = shifted.getUTCMonth();
+  const day = shifted.getUTCDate();
+
+  const startUtcMs = Date.UTC(year, month, day, 0, 0, 0, 0) - IST_OFFSET_MS;
+  const endUtcMs = Date.UTC(year, month, day, 23, 59, 59, 999) - IST_OFFSET_MS;
+
+  return {
+    dayStart: new Date(startUtcMs),
+    dayEnd: new Date(endUtcMs)
+  };
+};
+
+const normalizeToDayStart = (date) => getISTDayBoundsFromDate(date).dayStart;
+const normalizeToDayEnd = (date) => getISTDayBoundsFromDate(date).dayEnd;
+
+const getRestaurantLatLng = (restaurantDoc) => {
+  const lat = restaurantDoc?.location?.latitude ?? restaurantDoc?.location?.coordinates?.[1];
+  const lng = restaurantDoc?.location?.longitude ?? restaurantDoc?.location?.coordinates?.[0];
+
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    return null;
+  }
+
+  return { lat, lng };
+};
+
+const collectInRangeRestaurantIds = async ({ userLat, userLng, maxRangeMeters }) => {
+  const maxRangeKm = maxRangeMeters / 1000;
+  const inRangeIds = new Set();
+
+  const includeIfInRange = (restaurantDoc) => {
+    const coords = getRestaurantLatLng(restaurantDoc);
+    if (!coords) return;
+
+    const distanceKm = calculateDistance([coords.lng, coords.lat], [userLng, userLat]);
+    const deliveryRangeKm = Number(restaurantDoc?.deliveryRange) || 5;
+
+    if (distanceKm <= maxRangeKm && distanceKm <= deliveryRangeKm) {
+      inRangeIds.add(String(restaurantDoc._id));
+    }
+  };
+
+  try {
+    const nearbyRestaurants = await Restaurant.find({
+      isActive: true,
+      'location.coordinates': {
+        $nearSphere: {
+          $geometry: { type: 'Point', coordinates: [userLng, userLat] },
+          $maxDistance: maxRangeMeters
+        }
+      }
+    }).select('_id deliveryRange location').lean();
+
+    nearbyRestaurants.forEach(includeIfInRange);
+  } catch (geoErr) {
+    console.warn('⚠️ Marketing geo query failed, continuing with lat/lng fallback:', geoErr.message);
+  }
+
+  const missingCoordRestaurants = await Restaurant.find({
+    isActive: true,
+    'location.latitude': { $ne: null },
+    'location.longitude': { $ne: null },
+    $or: [
+      { 'location.coordinates': { $exists: false } },
+      { 'location.coordinates': { $size: 0 } },
+      { 'location.coordinates.0': 0, 'location.coordinates.1': 0 }
+    ]
+  }).select('_id deliveryRange location').lean();
+
+  missingCoordRestaurants.forEach(includeIfInRange);
+
+  return [...inRangeIds].map((id) => new mongoose.Types.ObjectId(id));
+};
+
 const buildAdBillingSummary = (ad = {}) => ({
   originalTotalCost: Number(ad.originalTotalCost ?? ad.totalCost ?? 0),
   freeBannerDiscountAmount: Number(ad.freeBannerDiscountAmount || 0),
@@ -78,6 +158,10 @@ const buildAdBillingSummary = (ad = {}) => ({
   appliedFreeBannerCreditId: ad.appliedFreeBannerCreditId || null,
   billingMessage: ad.billingMessage || null
 });
+
+const getCurrentDayBounds = () => {
+  return getISTDayBoundsFromDate(new Date());
+};
 
 const calculateCampaignPricing = async ({ targetZoneIds, days }) => {
   let totalCost = 0;
@@ -169,8 +253,10 @@ export const createAdRequest = async (req, res) => {
 
     // Convert targetZones to ObjectIds for reliable querying
     const targetZoneIds = targetZones.map(id => new mongoose.Types.ObjectId(id));
-    const start = parseCampaignDate(startDate);
-    const end = parseCampaignDate(endDate);
+    const parsedStart = parseCampaignDate(startDate);
+    const parsedEnd = parseCampaignDate(endDate);
+    const start = parsedStart ? normalizeToDayStart(parsedStart) : null;
+    const end = parsedEnd ? normalizeToDayEnd(parsedEnd) : null;
     if (!start || !end) {
       adPaymentDebug('create_ad_request_invalid_dates', {
         startDateRaw: startDate || null,
@@ -411,22 +497,22 @@ export const getActiveAdsByZone = async (req, res) => {
     const { latitude, longitude } = req.query;
     const userLat = latitude != null ? parseFloat(latitude) : null;
     const userLng = longitude != null ? parseFloat(longitude) : null;
-    const now = new Date();
+    const { dayStart, dayEnd } = getCurrentDayBounds();
 
     const [paidAds, challengeBanners] = await Promise.all([
       AdRequest.find({
         targetZones: zoneId,
         status: { $in: ['Active', 'Scheduled'] },
-        startDate: { $lte: now },
-        endDate: { $gte: now }
+        startDate: { $lte: dayEnd },
+        endDate: { $gte: dayStart }
       })
         .populate('restaurant', 'name logo address location deliveryRange')
         .limit(20)
         .lean(),
       ChallengeBanner.find({
         zoneId,
-        startDate: { $lte: now },
-        endDate: { $gte: now }
+        startDate: { $lte: dayEnd },
+        endDate: { $gte: dayStart }
       })
         .populate('restaurant', 'name logo address location deliveryRange')
         .lean()
@@ -479,40 +565,27 @@ export const getActiveAdsByZone = async (req, res) => {
       const settings = await BusinessSettings.getSettings();
       const maxRangeMeters = (settings.maxDeliveryRange || 20) * 1000;
 
-      const nearbyRestaurants = await Restaurant.find({
-        isActive: true,
-        'location.coordinates': {
-          $nearSphere: {
-            $geometry: { type: 'Point', coordinates: [userLng, userLat] },
-            $maxDistance: maxRangeMeters
-          }
-        }
-      }).select('_id deliveryRange location').lean();
-
-      const inRangeRestIds = nearbyRestaurants
-        .filter(r => {
-          const rLat = r.location?.latitude ?? r.location?.coordinates?.[1];
-          const rLng = r.location?.longitude ?? r.location?.coordinates?.[0];
-          if (rLat == null || rLng == null) return false;
-          return calculateDistance([rLng, rLat], [userLng, userLat]) <= (r.deliveryRange ?? 5);
-        })
-        .map(r => r._id);
+      const inRangeRestIds = await collectInRangeRestaurantIds({
+        userLat,
+        userLng,
+        maxRangeMeters
+      });
 
       if (inRangeRestIds.length > 0) {
         const [extraPaidAds, extraChallengeBanners] = await Promise.all([
           AdRequest.find({
             restaurant: { $in: inRangeRestIds },
             status: { $in: ['Active', 'Scheduled'] },
-            startDate: { $lte: now },
-            endDate: { $gte: now }
+            startDate: { $lte: dayEnd },
+            endDate: { $gte: dayStart }
           })
             .populate('restaurant', 'name logo address location deliveryRange')
             .limit(20)
             .lean(),
           ChallengeBanner.find({
             restaurant: { $in: inRangeRestIds },
-            startDate: { $lte: now },
-            endDate: { $gte: now }
+            startDate: { $lte: dayEnd },
+            endDate: { $gte: dayStart }
           })
             .populate('restaurant', 'name logo address location deliveryRange')
             .lean()
@@ -565,29 +638,16 @@ export const getNearbyAds = async (req, res) => {
       return res.status(200).json({ success: true, data: [] });
     }
 
-    const now = new Date();
+    const { dayStart, dayEnd } = getCurrentDayBounds();
 
     const settings = await BusinessSettings.getSettings();
     const maxRangeMeters = (settings.maxDeliveryRange || 20) * 1000;
 
-    const nearbyRestaurants = await Restaurant.find({
-      isActive: true,
-      'location.coordinates': {
-        $nearSphere: {
-          $geometry: { type: 'Point', coordinates: [userLng, userLat] },
-          $maxDistance: maxRangeMeters
-        }
-      }
-    }).select('_id deliveryRange location').lean();
-
-    const inRangeRestIds = nearbyRestaurants
-      .filter(r => {
-        const rLat = r.location?.latitude ?? r.location?.coordinates?.[1];
-        const rLng = r.location?.longitude ?? r.location?.coordinates?.[0];
-        if (rLat == null || rLng == null) return false;
-        return calculateDistance([rLng, rLat], [userLng, userLat]) <= (r.deliveryRange ?? 5);
-      })
-      .map(r => r._id);
+    const inRangeRestIds = await collectInRangeRestaurantIds({
+      userLat,
+      userLng,
+      maxRangeMeters
+    });
 
     if (inRangeRestIds.length === 0) {
       return res.status(200).json({ success: true, data: [] });
@@ -597,16 +657,16 @@ export const getNearbyAds = async (req, res) => {
       AdRequest.find({
         restaurant: { $in: inRangeRestIds },
         status: { $in: ['Active', 'Scheduled'] },
-        startDate: { $lte: now },
-        endDate: { $gte: now }
+        startDate: { $lte: dayEnd },
+        endDate: { $gte: dayStart }
       })
         .populate('restaurant', 'name logo address location deliveryRange')
         .limit(20)
         .lean(),
       ChallengeBanner.find({
         restaurant: { $in: inRangeRestIds },
-        startDate: { $lte: now },
-        endDate: { $gte: now }
+        startDate: { $lte: dayEnd },
+        endDate: { $gte: dayStart }
       })
         .populate('restaurant', 'name logo address location deliveryRange')
         .lean()
@@ -1271,7 +1331,14 @@ export const updateAdRequest = async (req, res) => {
 
     // Validate dates
     if (startDate) {
-      const start = new Date(startDate);
+      const parsedStart = parseCampaignDate(startDate);
+      if (!parsedStart) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid start date format.'
+        });
+      }
+      const start = parsedStart ? normalizeToDayStart(parsedStart) : null;
       if (start < today) {
         return res.status(400).json({
           success: false,
@@ -1280,8 +1347,16 @@ export const updateAdRequest = async (req, res) => {
       }
     }
     if (endDate && startDate) {
-      const start = new Date(startDate);
-      const end = new Date(endDate);
+      const parsedStart = parseCampaignDate(startDate);
+      const parsedEnd = parseCampaignDate(endDate);
+      if (!parsedEnd || !parsedStart) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid campaign date range.'
+        });
+      }
+      const start = parsedStart ? normalizeToDayStart(parsedStart) : null;
+      const end = parsedEnd ? normalizeToDayEnd(parsedEnd) : null;
       if (end < start) {
         return res.status(400).json({
           success: false,
@@ -1293,8 +1368,14 @@ export const updateAdRequest = async (req, res) => {
     // Apply updates
     if (title) ad.title = title;
     if (description !== undefined) ad.description = description;
-    if (startDate) ad.startDate = new Date(startDate);
-    if (endDate) ad.endDate = new Date(endDate);
+    if (startDate) {
+      const parsedStart = parseCampaignDate(startDate);
+      if (parsedStart) ad.startDate = normalizeToDayStart(parsedStart);
+    }
+    if (endDate) {
+      const parsedEnd = parseCampaignDate(endDate);
+      if (parsedEnd) ad.endDate = normalizeToDayEnd(parsedEnd);
+    }
     if (redirectTarget) ad.redirectTarget = redirectTarget;
 
     // Handle new banner upload
@@ -1303,10 +1384,7 @@ export const updateAdRequest = async (req, res) => {
         folder: 'ads/banners',
         resource_type: 'image'
       });
-      ad.bannerImage = {
-        url: uploaded.secure_url,
-        publicId: uploaded.public_id
-      };
+      ad.bannerImage = uploaded.secure_url;
     }
     await ad.save();
     res.status(200).json({
@@ -1398,6 +1476,8 @@ export const deleteAdRequest = async (req, res) => {
     const {
       adId
     } = req.params;
+    const restaurantId = req.restaurant?._id || req.restaurant?.id;
+    const isAdmin = req.admin && (req.admin.role === 'admin' || req.admin.email);
     if (!mongoose.Types.ObjectId.isValid(adId)) {
       return res.status(400).json({
         success: false,
@@ -1409,6 +1489,13 @@ export const deleteAdRequest = async (req, res) => {
       return res.status(404).json({
         success: false,
         message: 'Ad request not found'
+      });
+    }
+
+    if (!isAdmin && restaurantId && String(ad.restaurant) !== String(restaurantId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Unauthorized access'
       });
     }
 

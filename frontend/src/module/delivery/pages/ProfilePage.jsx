@@ -41,6 +41,7 @@ export default function ProfilePage() {
   const profileRef = useRef(null);
   const navButtonsRef = useRef(null);
   const sectionsRef = useRef(null);
+  const previewAudioRef = useRef(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showAlertSoundPopup, setShowAlertSoundPopup] = useState(false);
@@ -167,6 +168,34 @@ export default function ProfilePage() {
       window.removeEventListener("deliveryProfileRefresh", handleProfileRefresh);
     };
   }, []);
+
+  useEffect(() => {
+    return () => {
+      if (previewAudioRef.current) {
+        previewAudioRef.current.pause();
+        previewAudioRef.current.currentTime = 0;
+      }
+    };
+  }, []);
+
+  const stopPreviewTone = () => {
+    if (!previewAudioRef.current) return;
+    previewAudioRef.current.pause();
+    previewAudioRef.current.currentTime = 0;
+    previewAudioRef.current = null;
+  };
+
+  const playPreviewTone = (soundFile) => {
+    stopPreviewTone();
+    try {
+      const audio = new Audio(soundFile);
+      audio.volume = 0.7;
+      previewAudioRef.current = audio;
+      audio.play().catch((err) => console.error("Preview audio error:", err));
+    } catch (err) {
+      console.error("Could not create preview audio:", err);
+    }
+  };
 
   const handleLogout = async () => {
     if (!window.confirm("Are you sure you want to logout?")) {
@@ -461,7 +490,10 @@ export default function ProfilePage() {
             <div className="flex items-center justify-between p-4 border-b border-gray-200">
               <h3 className="text-lg font-semibold">Order alert sound</h3>
               <button
-                onClick={() => setShowAlertSoundPopup(false)}
+                onClick={() => {
+                  stopPreviewTone();
+                  setShowAlertSoundPopup(false);
+                }}
                 className="p-1 hover:bg-gray-100 rounded-full transition-colors"
               >
                 <X className="w-5 h-5 text-gray-500" />
@@ -480,13 +512,7 @@ export default function ProfilePage() {
                     onChange={(e) => {
                       setSelectedAlertSound(e.target.value);
                       localStorage.setItem("delivery_alert_sound", e.target.value);
-                      try {
-                        const audio = new Audio(originalSound);
-                        audio.volume = 0.7;
-                        audio.play().catch((err) => console.error("❌ Preview audio error:", err));
-                      } catch (err) {
-                        console.error("❌ Could not create preview audio:", err);
-                      }
+                      playPreviewTone(originalSound);
                     }}
                     className="w-5 h-5 text-[#DC2626] focus:ring-2 focus:ring-[#DC2626]"
                   />
@@ -502,13 +528,7 @@ export default function ProfilePage() {
                     onChange={(e) => {
                       setSelectedAlertSound(e.target.value);
                       localStorage.setItem("delivery_alert_sound", e.target.value);
-                      try {
-                        const audio = new Audio(alertSound);
-                        audio.volume = 0.7;
-                        audio.play().catch((err) => console.error("❌ Preview audio error:", err));
-                      } catch (err) {
-                        console.error("❌ Could not create preview audio:", err);
-                      }
+                      playPreviewTone(alertSound);
                     }}
                     className="w-5 h-5 text-[#DC2626] focus:ring-2 focus:ring-[#DC2626]"
                   />
@@ -518,7 +538,10 @@ export default function ProfilePage() {
 
             <div className="p-4 border-t border-gray-200">
               <button
-                onClick={() => setShowAlertSoundPopup(false)}
+                onClick={() => {
+                  stopPreviewTone();
+                  setShowAlertSoundPopup(false);
+                }}
                 className="w-full bg-[#DC2626] text-white py-3 rounded-lg font-semibold hover:bg-[#B91C1C] transition-colors"
               >
                 Ok
@@ -530,3 +553,4 @@ export default function ProfilePage() {
     </div>
   );
 }
+

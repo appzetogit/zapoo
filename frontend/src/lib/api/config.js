@@ -196,6 +196,7 @@ export const API_ENDPOINTS = {
     MY_ZONE: "/marketing/ads/my-zone",
     REQUEST: "/marketing/ads/request",
     UPDATE_REQUEST: "/marketing/ads/request/:adId",
+    DELETE_REQUEST: "/marketing/ads/request/:adId",
     MY_ADS: "/marketing/ads/my-ads",
     AD_DETAILS: "/marketing/ads/:adId",
     UPDATE_STATUS: "/marketing/ads/:adId/status",

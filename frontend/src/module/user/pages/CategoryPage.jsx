@@ -74,6 +74,7 @@ export default function CategoryPage() {
               image: cat.image || foodImages[0],
               slug: cat.slug || cat.name.toLowerCase().replace(/\s+/g, '-'),
               type: cat.type,
+              foodType: cat.foodType || "Veg",
             }))
           ]
           
@@ -106,6 +107,24 @@ export default function CategoryPage() {
     
     fetchCategories()
   }, [t])
+
+  const isNonVegCategory = (category) => {
+    const normalizedFoodType = String(category?.foodType || "").trim().toLowerCase()
+    if (normalizedFoodType === "non-veg" || normalizedFoodType === "non veg" || normalizedFoodType === "nonveg") {
+      return true
+    }
+
+    const rawSlug = String(category?.slug || "").toLowerCase()
+    const rawName = String(category?.name || "").toLowerCase()
+    const normalizedText = `${rawSlug} ${rawName}`.replace(/[_-]/g, " ")
+    return /\bnon\s*veg\b/.test(normalizedText) || /\bnonveg\b/.test(normalizedText) || /\bnon vegetarian\b/.test(normalizedText)
+  }
+
+  const visibleCategories = useMemo(() => {
+    if (!Array.isArray(categories)) return []
+    if (!vegMode) return categories
+    return categories.filter((cat) => cat.id === "all" || !isNonVegCategory(cat))
+  }, [categories, vegMode])
 
   // Helper function to check if menu has dishes matching category keywords
   const checkCategoryInMenu = (menu, categoryId) => {
@@ -507,9 +526,9 @@ export default function CategoryPage() {
 
   // Update selected category when URL changes
   useEffect(() => {
-    if (category && categories && categories.length > 0) {
+    if (category && visibleCategories && visibleCategories.length > 0) {
       const categorySlug = category.toLowerCase()
-      const matchedCategory = categories.find(cat => 
+      const matchedCategory = visibleCategories.find(cat => 
         cat.slug === categorySlug || 
         cat.id === categorySlug || 
         cat.name.toLowerCase().replace(/\s+/g, '-') === categorySlug
@@ -517,12 +536,23 @@ export default function CategoryPage() {
       if (matchedCategory) {
         setSelectedCategory(matchedCategory.slug || matchedCategory.id)
       } else {
-        setSelectedCategory(categorySlug)
+        setSelectedCategory('all')
       }
     } else if (category) {
       setSelectedCategory(category.toLowerCase())
     }
-  }, [category, categories])
+  }, [category, visibleCategories])
+
+  useEffect(() => {
+    if (selectedCategory === 'all') return
+    const existsInVisibleCategories = visibleCategories.some((cat) => {
+      const categorySlug = cat.slug || cat.id
+      return selectedCategory === categorySlug || selectedCategory === cat.id
+    })
+    if (!existsInVisibleCategories) {
+      setSelectedCategory('all')
+    }
+  }, [selectedCategory, visibleCategories])
 
   const toggleFilter = (filterId) => {
     setActiveFilters(prev => {
@@ -874,7 +904,7 @@ export default function CategoryPage() {
                 <span className="text-sm text-gray-600 dark:text-gray-400">{t("user.categoryPage.loadingCategories")}</span>
               </div>
             ) : (
-              categories && categories.length > 0 ? categories.map((cat) => {
+              visibleCategories && visibleCategories.length > 0 ? visibleCategories.map((cat) => {
                 const categorySlug = cat.slug || cat.id
                 const isSelected = selectedCategory === categorySlug || selectedCategory === cat.id
                 return (

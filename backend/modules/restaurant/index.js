@@ -8,6 +8,7 @@ import Joi from 'joi';
 import { getOnboarding, upsertOnboarding, createRestaurantFromOnboardingManual } from './controllers/restaurantOnboardingController.js';
 import { getRestaurants, getRestaurantById, getRestaurantByOwner, updateRestaurantProfile, uploadProfileImage, uploadMenuImage, deleteRestaurantAccount, updateDeliveryStatus, getRestaurantsWithDishesUnder250, getDeliveryPricingConfig, updateDeliveryPricingConfig, getRestaurantPreferences, updateRestaurantPreferences } from './controllers/restaurantController.js';
 import { getRestaurantFinance } from './controllers/restaurantFinanceController.js';
+import { getRestaurantAnalytics } from './controllers/analyticsController.js';
 import { getWallet, getWalletTransactions, getWalletStats } from './controllers/restaurantWalletController.js';
 import { createWithdrawalRequest, getRestaurantWithdrawalRequests } from './controllers/withdrawalController.js';
 import { getMyChallenges } from './controllers/restaurantChallengeController.js';
@@ -133,6 +134,7 @@ router.use('/complaints', complaintRoutes);
 // Finance routes (authenticated - for restaurant module)
 // Must come BEFORE /:id route to avoid route conflicts (/:id would match /finance)
 router.get('/finance', authenticate, checkFeatureAccess('basic_reports'), getRestaurantFinance);
+router.get('/analytics', authenticate, checkFeatureAccess('basic_reports'), getRestaurantAnalytics);
 
 // Wallet routes (authenticated - for restaurant module)
 // Must come BEFORE /:id route to avoid route conflicts (/:id would match /wallet)

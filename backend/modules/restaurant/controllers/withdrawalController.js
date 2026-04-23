@@ -2,6 +2,7 @@ import WithdrawalRequest from "../models/WithdrawalRequest.js";
 import RestaurantWallet from "../models/RestaurantWallet.js";
 import Restaurant from "../models/Restaurant.js";
 import BusinessSettings from "../../admin/models/BusinessSettings.js";
+import { sendNotificationToUser } from "../../notification/utils/pushNotificationHelper.js";
 import { successResponse, errorResponse } from "../../../shared/utils/response.js";
 import asyncHandler from "../../../shared/middleware/asyncHandler.js";
 import winston from "winston";
@@ -213,17 +214,79 @@ export const getAllWithdrawalRequests = asyncHandler(async (req, res) => {
       }];
     }
     const skip = (parseInt(page) - 1) * parseInt(limit);
-    const requests = await WithdrawalRequest.find(query).sort({
+    const enrichedRequests = await WithdrawalRequest.find(query).sort({
       createdAt: -1
-    }).skip(skip).limit(parseInt(limit)).populate("restaurantId", "name restaurantId address").populate("processedBy", "name email").lean();
+    }).skip(skip).limit(parseInt(limit)).populate({
+      path: "restaurantId",
+      select: "name restaurantId ownerName ownerEmail ownerPhone email phone primaryContactNumber location onboarding.step1 onboarding.step3 zoneId tierId",
+      populate: [{
+        path: "zoneId",
+        select: "name zoneName serviceLocation"
+      }, {
+        path: "tierId",
+        select: "name rank"
+      }]
+    }).populate("processedBy", "name email").lean();
     const total = await WithdrawalRequest.countDocuments(query);
-    return successResponse(res, 200, "Withdrawal requests retrieved successfully", {
-      requests: requests.map(req => ({
+    const populateRestaurantDetails = {
+      path: "zoneId",
+      select: "name zoneName serviceLocation"
+    };
+    const populateTierDetails = {
+      path: "tierId",
+      select: "name rank"
+    };
+    const requests = await Promise.all(enrichedRequests.map(async (req) => {
+      let restaurant = req.restaurantId || null;
+      const isPopulatedRestaurant = restaurant && typeof restaurant === "object" && restaurant._id;
+
+      if (!isPopulatedRestaurant) {
+        const restaurantIdCandidate = typeof req.restaurantId === "string" ? req.restaurantId : null;
+        if (restaurantIdCandidate) {
+          restaurant = await Restaurant.findById(restaurantIdCandidate)
+            .select("name restaurantId ownerName ownerEmail ownerPhone email phone primaryContactNumber location onboarding.step1 onboarding.step3 zoneId tierId")
+            .populate(populateRestaurantDetails)
+            .populate(populateTierDetails)
+            .lean();
+        }
+      }
+
+      if ((!restaurant || !restaurant._id) && req.restaurantIdString) {
+        restaurant = await Restaurant.findOne({ restaurantId: req.restaurantIdString })
+          .select("name restaurantId ownerName ownerEmail ownerPhone email phone primaryContactNumber location onboarding.step1 onboarding.step3 zoneId tierId")
+          .populate(populateRestaurantDetails)
+          .populate(populateTierDetails)
+          .lean();
+      }
+
+      const location = restaurant?.location || {};
+      const step1Location = restaurant?.onboarding?.step1?.location || {};
+      const gstAddress = restaurant?.onboarding?.step3?.gst?.address;
+      const composedAddress = [
+        location.addressLine1 || step1Location.addressLine1,
+        location.addressLine2 || step1Location.addressLine2,
+        location.area || step1Location.area,
+        location.city || step1Location.city,
+        location.state || step1Location.state,
+        location.zipCode || location.pincode || location.postalCode || step1Location.zipCode || step1Location.pincode || step1Location.postalCode,
+      ].filter(Boolean).join(", ");
+
+      return {
         id: req._id,
-        restaurantId: req.restaurantId?._id || req.restaurantId,
-        restaurantName: req.restaurantName || req.restaurantId?.name || "Unknown",
-        restaurantIdString: req.restaurantIdString || req.restaurantId?.restaurantId || "N/A",
-        restaurantAddress: req.restaurantId?.address || "N/A",
+        restaurantId: restaurant?._id || req.restaurantId,
+        restaurantName: req.restaurantName || restaurant?.name || "Unknown",
+        restaurantIdString: req.restaurantIdString || restaurant?.restaurantId || "N/A",
+        restaurantAddress: location.formattedAddress || location.address || step1Location.formattedAddress || step1Location.address || gstAddress || composedAddress || "N/A",
+        ownerName: restaurant?.ownerName || restaurant?.onboarding?.step1?.ownerName || "N/A",
+        ownerEmail: restaurant?.ownerEmail || restaurant?.onboarding?.step1?.ownerEmail || restaurant?.email || "N/A",
+        ownerPhone: restaurant?.ownerPhone || restaurant?.onboarding?.step1?.ownerPhone || restaurant?.primaryContactNumber || restaurant?.phone || "N/A",
+        bankAccountNumber: restaurant?.onboarding?.step3?.bank?.accountNumber || req.bankDetails?.accountNumber || "N/A",
+        bankIfscCode: restaurant?.onboarding?.step3?.bank?.ifscCode || req.bankDetails?.ifscCode || "N/A",
+        bankAccountHolderName: restaurant?.onboarding?.step3?.bank?.accountHolderName || req.bankDetails?.accountHolderName || "N/A",
+        bankAccountType: restaurant?.onboarding?.step3?.bank?.accountType || "N/A",
+        zoneName: restaurant?.zoneId?.zoneName || restaurant?.zoneId?.name || "N/A",
+        tierName: restaurant?.tierId?.name || "N/A",
+        tierRank: restaurant?.tierId?.rank ?? null,
         amount: req.amount,
         status: req.status,
         requestedAt: req.requestedAt,
@@ -235,7 +298,10 @@ export const getAllWithdrawalRequests = asyncHandler(async (req, res) => {
         rejectionReason: req.rejectionReason,
         createdAt: req.createdAt,
         updatedAt: req.updatedAt
-      })),
+      };
+    }));
+    return successResponse(res, 200, "Withdrawal requests retrieved successfully", {
+      requests,
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
@@ -323,6 +389,28 @@ export const approveWithdrawalRequest = asyncHandler(async (req, res) => {
     } catch (emailError) {
       logger.error(`Error sending withdrawal email: ${emailError.message}`);
     }
+
+    // Send push notification to restaurant
+    try {
+      const restaurantId = withdrawalRequest.restaurantId?._id?.toString() || withdrawalRequest.restaurantId?.toString();
+      if (restaurantId) {
+        await sendNotificationToUser(
+          restaurantId,
+          "restaurant",
+          "Withdrawal Request Approved",
+          "Admin has approved your withdrawal request. Withdrawal will be processed soon.",
+          {
+            type: "withdrawal_approved",
+            withdrawalRequestId: withdrawalRequest._id?.toString(),
+            amount: String(withdrawalRequest.amount || 0),
+            clickUrl: "/restaurant/withdrawal-history"
+          }
+        );
+      }
+    } catch (pushError) {
+      logger.error(`Error sending withdrawal approval push notification: ${pushError.message}`);
+    }
+
     return successResponse(res, 200, "Withdrawal request approved successfully", {
       withdrawalRequest: {
         id: withdrawalRequest._id,

@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { DateRangeCalendar } from "@/components/ui/date-range-calendar";
-import { Bell, HelpCircle, Menu, Search, TrendingUp, BarChart3, Users, CalendarRange, Download, MoreVertical, ChevronLeft, ChevronRight, Wand2, X, MapPin, Megaphone } from "lucide-react";
+import { Bell, HelpCircle, Menu, Search, TrendingUp, BarChart3, Users, CalendarRange, Download, ChevronLeft, ChevronRight, Wand2, X, MapPin, Megaphone } from "lucide-react";
 import { FaExclamationTriangle, FaStar, FaCommentDots, FaLink } from "react-icons/fa";
 import { AreaChart, Area, Line, Bar, ComposedChart, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, LineChart } from "recharts";
 import BottomNavOrders from "../components/BottomNavOrders";
@@ -71,8 +71,6 @@ export default function ToHub() {
   const mouseEndX = useRef(0);
   const isMouseDown = useRef(false);
 
-  // Learn more popup states
-  const [showLearnMoreButton, setShowLearnMoreButton] = useState(null); // cardId
 
   // Card definitions data
   const cardDefinitions = {
@@ -241,11 +239,6 @@ export default function ToHub() {
       }]
     }
   };
-  const handleLearnMoreClick = (cardId, e) => {
-    e.stopPropagation();
-    // Potential for popup logic if added back
-    setShowLearnMoreButton(null);
-  };
   const scrollToTopTab = index => {
     if (topTabBarRef.current) {
       const buttons = topTabBarRef.current.querySelectorAll("button");
@@ -409,7 +402,7 @@ export default function ToHub() {
     orders: 0,
     sales: 0
   }]);
-  const [totalSales, setTotalSales] = useState("₹ 0");
+  const [totalSales, setTotalSales] = useState("INR 0");
   const [totalOrders, setTotalOrders] = useState("0");
   const [lastUpdated, setLastUpdated] = useState(null);
   const [mealtimeMetrics, setMealtimeMetrics] = useState([{
@@ -424,6 +417,25 @@ export default function ToHub() {
     value: "0",
     change: "- 0%",
     color: "#10b981"
+  }]);
+  const [customersMetrics, setCustomersMetrics] = useState([{
+    title: "New customers",
+    sub: "First order in selected period",
+    value: "0",
+    change: "- 0%",
+    color: "#111827"
+  }, {
+    title: "Repeat customers",
+    sub: "Ordered in last 60 days",
+    value: "0",
+    change: "- 0%",
+    color: "#ef4444"
+  }, {
+    title: "Lapsed customers",
+    sub: "Last order 60+ days ago",
+    value: "0",
+    change: "- 0%",
+    color: "#2563eb"
   }]);
   const [recommendedStats, setRecommendedStats] = useState({
     count: 0,
@@ -623,32 +635,32 @@ export default function ToHub() {
   }]);
   const discountTypeBreakup = [{
     title: "Promo discounts",
-    value: "₹0",
+    value: "INR 0",
     change: "- 0%",
     color: "#111827"
   }, {
     title: "Dish discounts",
-    value: "₹0",
+    value: "INR 0",
     change: "- 0%",
     color: "#ef4444"
   }, {
     title: "Buy 1 Get 1, etc.",
-    value: "₹0",
+    value: "INR 0",
     change: "- 0%",
     color: "#2563eb"
   }, {
     title: "Freebie",
-    value: "₹0",
+    value: "INR 0",
     change: "- 0%",
     color: "#f59e0b"
   }, {
     title: "Gold discount",
-    value: "₹0",
+    value: "INR 0",
     change: "- 0%",
     color: "#10b981"
   }, {
     title: "Winback discount",
-    value: "₹0",
+    value: "INR 0",
     change: "- 0%",
     color: "#d1d5db"
   }];
@@ -774,7 +786,7 @@ export default function ToHub() {
   }]);
   const [isDateSelectorOpen, setIsDateSelectorOpen] = useState(false);
   const [isCustomDateOpen, setIsCustomDateOpen] = useState(false);
-  const [selectedDateRange, setSelectedDateRange] = useState("yesterday");
+  const [selectedDateRange, setSelectedDateRange] = useState("today");
   const [customDateRange, setCustomDateRange] = useState({
     start: null,
     end: null
@@ -1186,13 +1198,11 @@ export default function ToHub() {
       color: mealtimeBuckets.lateNight.color
     }];
   };
-
-  // Fetch orders and update chart data
+  // Fetch analytics from backend and update chart/cards
   const fetchOrdersAndUpdateChart = useCallback(async rangeId => {
     try {
       setIsDateLoading(true);
 
-      // Get date range
       const ranges = getDateRanges();
       let startDate, endDate;
       switch (rangeId) {
@@ -1229,8 +1239,8 @@ export default function ToHub() {
             startDate = customDateRange.start;
             endDate = customDateRange.end;
           } else {
-            startDate = ranges.yesterday;
-            endDate = ranges.yesterday;
+            startDate = ranges.today;
+            endDate = ranges.today;
           }
           break;
         case "thisYear":
@@ -1238,187 +1248,56 @@ export default function ToHub() {
           endDate = ranges.thisYearEnd;
           break;
         default:
-          startDate = ranges.yesterday;
-          endDate = ranges.yesterday;
+          startDate = ranges.today;
+          endDate = ranges.today;
       }
 
-      // Format dates for API (ISO format)
       const startDateISO = new Date(startDate);
       startDateISO.setHours(0, 0, 0, 0);
       const endDateISO = new Date(endDate);
       endDateISO.setHours(23, 59, 59, 999);
 
-      // Fetch all orders with pagination to get all orders
-      let allOrders = [];
-      let page = 1;
-      let hasMore = true;
-      const limit = 1000; // Fetch in batches
-      const maxPages = 50; // Safety limit to prevent infinite loops
+      const response = await restaurantAPI.getAnalytics({
+        period: graphFilter,
+        startDate: startDateISO.toISOString(),
+        endDate: endDateISO.toISOString()
+      });
 
-      while (hasMore && page <= maxPages) {
-        try {
-          const response = await restaurantAPI.getOrders({
-            page,
-            limit
-          });
-          if (response.data?.success && response.data.data?.orders) {
-            const orders = response.data.data.orders;
-            allOrders = [...allOrders, ...orders];
+      const analytics = response?.data?.data || {};
+      const summary = analytics.summary || {};
+      const chart = Array.isArray(analytics.chartData) ? analytics.chartData : [];
+      const mealtime = Array.isArray(analytics.mealtime) ? analytics.mealtime : [];
+      const customers = Array.isArray(analytics.customers) ? analytics.customers : [];
 
-            // Check if there are more pages
-            const totalPages = response.data.data.totalPages || response.data.data.pagination?.totalPages || 1;
-            const totalCount = response.data.data.total || response.data.data.pagination?.total || 0;
-
-            // Stop if we got fewer orders than the limit (last page) or if we've reached total pages
-            if (orders.length < limit || totalPages > 0 && page >= totalPages) {
-              hasMore = false;
-            } else {
-              page++;
-            }
-          } else {
-            hasMore = false;
-          }
-        } catch (pageError) {
-          console.error(`Error fetching orders page ${page}:`, pageError);
-          hasMore = false;
-        }
+      if (chart.length) {
+        setChartData(chart);
       }
-      if (allOrders.length > 0) {
-        let result;
-        if (graphFilter === "weekly") {
-          result = calculateWeeklyChartData(allOrders, startDate, endDate);
-        } else if (graphFilter === "monthly") {
-          result = calculateMonthlyChartData(allOrders, startDate, endDate);
-        } else if (graphFilter === "yearly") {
-          result = calculateYearlyChartData(allOrders, startDate, endDate);
-        } else {
-          result = calculateChartDataFromOrders(allOrders, startDate, endDate);
-        }
-        const {
-          chartData: newChartData,
-          totalSales: newTotalSales,
-          totalOrders: newTotalOrders
-        } = result;
 
-        // Calculate mealtime data
-        const mealtimeData = calculateMealtimeData(allOrders, startDate, endDate);
+      const totalSalesValue = Number(summary.totalSales || 0);
+      const totalOrdersValue = Number(summary.totalOrders || 0);
+      setTotalSales(`INR ${totalSalesValue.toLocaleString("en-IN")}`);
+      setTotalOrders(totalOrdersValue.toString());
 
-        // Calculate recommended items data
-        let recCount = 0;
-        let recRevenue = 0;
-        let recFees = 0;
-        const filteredOrdersForRec = allOrders.filter(order => {
-          const orderDate = new Date(order.createdAt);
-          return orderDate >= startDateISO && orderDate <= endDateISO;
-        });
-        filteredOrdersForRec.forEach(order => {
-          let hasRecItem = false;
-          (order.items || []).forEach(item => {
-            if (item.isRecommended) {
-              recCount += item.quantity || 1;
-              recRevenue += (item.price || 0) * (item.quantity || 1);
-              hasRecItem = true;
-            }
-          });
-          if (hasRecItem) {
-            recFees += order.pricing?.internalRecommendedFee || 0;
-          }
-        });
-        const contribution = newTotalSales > 0 ? (recRevenue / newTotalSales * 100).toFixed(1) : 0;
-        setChartData(newChartData);
-        setTotalSales(`₹ ${newTotalSales.toLocaleString("en-IN")}`);
-        setTotalOrders(newTotalOrders.toString());
-        setMealtimeMetrics(mealtimeData);
-        setRecommendedStats({
-          count: recCount,
-          revenue: recRevenue,
-          fees: recFees,
-          contribution
-        });
-        setLastUpdated(new Date());
-      } else {
-        // No orders found
+      if (mealtime.length) setMealtimeMetrics(mealtime);
+      if (customers.length) setCustomersMetrics(customers);
 
-        setChartData([{
-          hour: "12am",
-          orders: 0,
-          sales: 0
-        }, {
-          hour: "4am",
-          orders: 0,
-          sales: 0
-        }, {
-          hour: "8am",
-          orders: 0,
-          sales: 0
-        }, {
-          hour: "12pm",
-          orders: 0,
-          sales: 0
-        }, {
-          hour: "4pm",
-          orders: 0,
-          sales: 0
-        }, {
-          hour: "8pm",
-          orders: 0,
-          sales: 0
-        }, {
-          hour: "12am",
-          orders: 0,
-          sales: 0
-        }]);
-        setTotalSales("₹ 0");
-        setTotalOrders("0");
-        setRecommendedStats({
-          count: 0,
-          revenue: 0,
-          fees: 0,
-          contribution: 0
-        });
-        // Reset mealtime metrics to zero
-        setMealtimeMetrics([{
-          title: "Breakfast",
-          window: "7:00 am - 11:00 am",
-          value: "0",
-          change: "- 0%",
-          color: "#111827"
-        }, {
-          title: "Lunch",
-          window: "11:00 am - 4:00 pm",
-          value: "0",
-          change: "- 0%",
-          color: "#ef4444"
-        }, {
-          title: "Evening snacks",
-          window: "4:00 pm - 7:00 pm",
-          value: "0",
-          change: "- 0%",
-          color: "#2563eb"
-        }, {
-          title: "Dinner",
-          window: "7:00 pm - 11:00 pm",
-          value: "0",
-          change: "- 0%",
-          color: "#f59e0b"
-        }, {
-          title: "Late night",
-          window: "11:00 pm - 7:00 am",
-          value: "0",
-          change: "- 0%",
-          color: "#10b981"
-        }]);
-      }
+      // Kept as-is for now; this card still depends on item-level attribution flow.
+      setRecommendedStats({
+        count: 0,
+        revenue: 0,
+        fees: 0,
+        contribution: 0
+      });
+      setLastUpdated(new Date());
     } catch (error) {
-      // Suppress 401 errors as they're handled by axios interceptor
       if (error.response?.status !== 401) {
-        console.error('Error fetching orders for chart:', error);
+        console.error("Error fetching analytics:", error);
       }
-      // Keep existing data on error
     } finally {
       setIsDateLoading(false);
     }
   }, [customDateRange, graphFilter]);
+
   const handleFilterChange = value => {
     setGraphFilter(value);
     switch (value) {
@@ -1490,26 +1369,26 @@ export default function ToHub() {
     const r = getDateRanges();
     switch (selectedDateRange) {
       case "today":
-        return `Today • ${formatDateLong(r.today)}`;
+        return `Today - ${formatDateLong(r.today)}`;
       case "yesterday":
-        return `Yesterday • ${formatDateLong(r.yesterday)}`;
+        return `Yesterday - ${formatDateLong(r.yesterday)}`;
       case "thisWeek":
-        return `This week • ${formatDateShort(r.thisWeekStart)} - ${formatDateShort(r.thisWeekEnd)}`;
+        return `This week - ${formatDateShort(r.thisWeekStart)} - ${formatDateShort(r.thisWeekEnd)}`;
       case "lastWeek":
-        return `Last week • ${formatDateShort(r.lastWeekStart)} - ${formatDateShort(r.lastWeekEnd)}`;
+        return `Last week - ${formatDateShort(r.lastWeekStart)} - ${formatDateShort(r.lastWeekEnd)}`;
       case "thisMonth":
-        return `This month • ${formatDateShort(r.thisMonthStart)} - ${formatDateShort(r.thisMonthEnd)}`;
+        return `This month - ${formatDateShort(r.thisMonthStart)} - ${formatDateShort(r.thisMonthEnd)}`;
       case "lastMonth":
-        return `Last month • ${formatDateShort(r.lastMonthStart)} - ${formatDateShort(r.lastMonthEnd)}`;
+        return `Last month - ${formatDateShort(r.lastMonthStart)} - ${formatDateShort(r.lastMonthEnd)}`;
       case "last5days":
-        return `Last 5 days • ${formatDateShort(r.last5DaysStart)} - ${formatDateShort(r.last5DaysEnd)}`;
+        return `Last 5 days - ${formatDateShort(r.last5DaysStart)} - ${formatDateShort(r.last5DaysEnd)}`;
       case "custom":
         if (customDateRange.start && customDateRange.end) {
           return `${formatDateShort(customDateRange.start)} - ${formatDateShort(customDateRange.end)}`;
         }
         return "Custom range";
       default:
-        return "Yesterday";
+        return `Today - ${formatDateLong(r.today)}`;
     }
   }, [selectedDateRange, customDateRange]);
   const findSourcesMetrics = [{
@@ -1611,19 +1490,19 @@ export default function ToHub() {
     }],
     spending: [{
       title: "Value seekers",
-      sub: "Orders under ₹300",
+      sub: "Orders under INR 300",
       color: "#111827",
       value: "2",
       change: "- 0%"
     }, {
       title: "Mid spenders",
-      sub: "Orders ₹300 - ₹800",
+      sub: "Orders INR 300 - INR 800",
       color: "#ef4444",
       value: "1",
       change: "- 0%"
     }, {
       title: "High spenders",
-      sub: "Orders above ₹800",
+      sub: "Orders above INR 800",
       color: "#2563eb",
       value: "0",
       change: "- 0%"
@@ -1651,19 +1530,19 @@ export default function ToHub() {
     }],
     spending: [{
       title: "Value seekers",
-      sub: "Orders under ₹300",
+      sub: "Orders under INR 300",
       color: "#111827",
       value: "0",
       change: "- 0%"
     }, {
       title: "Mid spenders",
-      sub: "Orders ₹300 - ₹800",
+      sub: "Orders INR 300 - INR 800",
       color: "#ef4444",
       value: "0",
       change: "- 0%"
     }, {
       title: "High spenders",
-      sub: "Orders above ₹800",
+      sub: "Orders above INR 800",
       color: "#2563eb",
       value: "0",
       change: "- 0%"
@@ -1793,17 +1672,17 @@ export default function ToHub() {
     sub: "Redemptions / clicks"
   }, {
     title: "Cost per redemption",
-    value: "₹0",
+    value: "INR 0",
     change: "- 0%",
     sub: "Est. cost"
   }];
   const offersCardSummary = {
-    grossSales: "₹0",
+    grossSales: "INR 0",
     grossPct: "0%",
     grossShare: "0% of total gross sales",
-    discountGiven: "₹0",
+    discountGiven: "INR 0",
     discountPct: "0%",
-    discountPerOrder: "₹0 discount per order",
+    discountPerOrder: "INR 0 discount per order",
     ordersFromOffers: "0",
     ordersPct: "0%",
     ordersShare: "0% of total orders",
@@ -1828,28 +1707,9 @@ export default function ToHub() {
     sub: "Click-through rate"
   }, {
     title: "Spend",
-    value: "₹0",
+    value: "INR 0",
     change: "- 0%",
     sub: "Total spend"
-  }];
-  const customersMetrics = [{
-    title: "New customers",
-    sub: "No orders in last 365 days",
-    value: "0",
-    change: "- 0%",
-    color: "#111827"
-  }, {
-    title: "Repeat customers",
-    sub: "Ordered in last 60 days",
-    value: "0",
-    change: "- 0%",
-    color: "#ef4444"
-  }, {
-    title: "Lapsed customers",
-    sub: "Last order 60 to 365 days ago",
-    value: "0",
-    change: "- 0%",
-    color: "#2563eb"
   }];
   const customerAffinityBreakup = [{
     title: "New customers",
@@ -1925,7 +1785,7 @@ export default function ToHub() {
   } = useMemo(() => {
     const ranges = getDateRanges();
     let primary = selectedRangeLabel;
-    let baseEnd = ranges.yesterday;
+    let baseEnd = ranges.today;
     switch (selectedDateRange) {
       case "today":
         baseEnd = ranges.today;
@@ -1946,10 +1806,10 @@ export default function ToHub() {
         baseEnd = ranges.last5DaysEnd;
         break;
       case "custom":
-        baseEnd = customDateRange.end || ranges.yesterday;
+        baseEnd = customDateRange.end || ranges.today;
         break;
       default:
-        baseEnd = ranges.yesterday;
+        baseEnd = ranges.today;
     }
     const compare = new Date(baseEnd);
     compare.setDate(compare.getDate() - 7);
@@ -2086,38 +1946,23 @@ export default function ToHub() {
                   <p className="text-base font-bold text-gray-900">Sales</p>
                   <p className="text-xs text-gray-500">Last updated: few seconds ago</p>
                 </div>
-                <div className="relative">
-                  <button onClick={() => setShowLearnMoreButton(showLearnMoreButton === 'sales' ? null : 'sales')} className="p-2 rounded-full hover:bg-gray-100">
-                    <MoreVertical className="w-5 h-5 text-gray-600" />
-                  </button>
-                  {showLearnMoreButton === 'sales' && <motion.div initial={{
-                opacity: 0,
-                scale: 0.95
-              }} animate={{
-                opacity: 1,
-                scale: 1
-              }} className="absolute right-0 top-full mt-1 z-10">
-                      <button onClick={e => handleLearnMoreClick('sales', e)} className="bg-white border border-gray-200 shadow-lg rounded-lg px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 whitespace-nowrap">
-                        Learn more
-                      </button>
-                    </motion.div>}
-                </div>
+                
 
               </div>
 
               {[{
             title: "Net sales",
-            value: "₹0 • 0%",
+            value: `${totalSales} - 0%`,
             dataKey: "sales",
             color: "#f97316"
           }, {
             title: "Orders delivered",
-            value: "0 • 0%",
+            value: `${totalOrders} - 0%`,
             dataKey: "orders",
             color: "#f97316"
           }, {
             title: "Avg. order value",
-            value: "₹0 • 0%",
+            value: `INR ${(parseFloat(totalSales.replace(/[^\d.]/g, "")) / (parseInt(totalOrders, 10) || 1)).toFixed(0)} - 0%`,
             dataKey: "sales",
             color: "#f97316"
           }].map((section, idx) => <div key={section.title} className={idx < 2 ? "pb-3 border-b border-dashed border-gray-200 space-y-2" : "space-y-2"}>
@@ -2125,30 +1970,8 @@ export default function ToHub() {
                     <span>{section.title}</span>
                     <span>{section.value}</span>
                   </div>
-                  <div className="h-16 chart-shell-mini">
-                    <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-                      <AreaChart data={chartData} margin={{
-                  top: 0,
-                  right: 0,
-                  left: 0,
-                  bottom: 0
-                }}>
-                        <defs>
-                          <linearGradient id={`mini-${section.dataKey}`} x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor={section.color} stopOpacity={0.5} />
-                            <stop offset="95%" stopColor={section.color} stopOpacity={0.05} />
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#f5f5f5" />
-                        <XAxis dataKey={xAxisKey} tick={{
-                    fontSize: 10,
-                    fill: "#9ca3af"
-                  }} />
-                        <YAxis hide />
-                        <Tooltip />
-                        <Area type="monotone" dataKey={section.dataKey} stroke={section.color} fill={`url(#mini-${section.dataKey})`} />
-                      </AreaChart>
-                    </ResponsiveContainer>
+                  <div className="chart-shell-mini">
+                    <MiniMetricChart data={chartData} dataKey={section.dataKey} color={section.color} xKey={xAxisKey} gradientId={`mini-${section.dataKey}-${idx}`} />
                   </div>
                 </div>)}
 
@@ -2169,22 +1992,7 @@ export default function ToHub() {
                   <p className="text-base font-bold text-gray-900">Customers</p>
                   <p className="text-xs text-gray-500">Last updated: a day ago</p>
                 </div>
-                <div className="relative">
-                  <button onClick={() => setShowLearnMoreButton(showLearnMoreButton === 'customers-myfeed' ? null : 'customers-myfeed')} className="p-2 rounded-full hover:bg-gray-100">
-                    <MoreVertical className="w-5 h-5 text-gray-600" />
-                  </button>
-                  {showLearnMoreButton === 'customers-myfeed' && <motion.div initial={{
-                opacity: 0,
-                scale: 0.95
-              }} animate={{
-                opacity: 1,
-                scale: 1
-              }} className="absolute right-0 top-full mt-1 z-10">
-                      <button onClick={e => handleLearnMoreClick('customers', e)} className="bg-white border border-gray-200 shadow-lg rounded-lg px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 whitespace-nowrap">
-                        Learn more
-                      </button>
-                    </motion.div>}
-                </div>
+                
               </div>
 
               <div className="space-y-4">
@@ -2218,22 +2026,7 @@ export default function ToHub() {
                     {lastUpdated ? `Last updated: ${formatTimeAgo(lastUpdated)}` : "Last updated: a day ago"}
                   </p>
                 </div>
-                <div className="relative">
-                  <button onClick={() => setShowLearnMoreButton(showLearnMoreButton === 'orders-by-mealtime-myfeed' ? null : 'orders-by-mealtime-myfeed')} className="p-2 rounded-full hover:bg-gray-100">
-                    <MoreVertical className="w-5 h-5 text-gray-600" />
-                  </button>
-                  {showLearnMoreButton === 'orders-by-mealtime-myfeed' && <motion.div initial={{
-                opacity: 0,
-                scale: 0.95
-              }} animate={{
-                opacity: 1,
-                scale: 1
-              }} className="absolute right-0 top-full mt-1 z-10">
-                      <button onClick={e => handleLearnMoreClick('orders-by-mealtime', e)} className="bg-white border border-gray-200 shadow-lg rounded-lg px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 whitespace-nowrap">
-                        Learn more
-                      </button>
-                    </motion.div>}
-                </div>
+                
               </div>
 
               <div className="space-y-3">
@@ -2264,22 +2057,7 @@ export default function ToHub() {
                   <p className="text-base font-bold text-gray-900">Offers</p>
                   <p className="text-xs text-gray-500">Last updated: an hour ago</p>
                 </div>
-                <div className="relative">
-                  <button onClick={() => setShowLearnMoreButton(showLearnMoreButton === 'offers-myfeed' ? null : 'offers-myfeed')} className="p-2 rounded-full hover:bg-gray-100">
-                    <MoreVertical className="w-5 h-5 text-gray-600" />
-                  </button>
-                  {showLearnMoreButton === 'offers-myfeed' && <motion.div initial={{
-                opacity: 0,
-                scale: 0.95
-              }} animate={{
-                opacity: 1,
-                scale: 1
-              }} className="absolute right-0 top-full mt-1 z-10">
-                      <button onClick={e => handleLearnMoreClick('offers', e)} className="bg-white border border-gray-200 shadow-lg rounded-lg px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 whitespace-nowrap">
-                        Learn more
-                      </button>
-                    </motion.div>}
-                </div>
+                
               </div>
 
               <div className="divide-y divide-dashed divide-gray-200">
@@ -2335,22 +2113,7 @@ export default function ToHub() {
                       <SelectItem value="yearly">Yearly</SelectItem>
                     </SelectContent>
                   </Select>
-                  <div className="relative">
-                    <button onClick={() => setShowLearnMoreButton(showLearnMoreButton === 'sales-orders' ? null : 'sales-orders')} className="p-2 rounded-full hover:bg-gray-100">
-                      <MoreVertical className="w-5 h-5 text-gray-600" />
-                    </button>
-                    {showLearnMoreButton === 'sales-orders' && <motion.div initial={{
-                  opacity: 0,
-                  scale: 0.95
-                }} animate={{
-                  opacity: 1,
-                  scale: 1
-                }} className="absolute right-0 top-full mt-1 z-10">
-                        <button onClick={e => handleLearnMoreClick('sales-orders', e)} className="bg-white border border-gray-200 shadow-lg rounded-lg px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 whitespace-nowrap">
-                          Learn more
-                        </button>
-                      </motion.div>}
-                  </div>
+                  
                 </div>
               </div>
 
@@ -2358,7 +2121,7 @@ export default function ToHub() {
               <div className="grid grid-cols-2 gap-4 text-sm font-semibold text-gray-900 text-center items-center">
                 <div className="space-y-1 flex flex-col items-center">
                   <p className="text-xs text-gray-500">Net sales</p>
-                  <p className="text-lg font-bold text-gray-900">{totalSales || "₹0"}</p>
+                  <p className="text-lg font-bold text-gray-900">{totalSales || "INR 0"}</p>
                   <p className="text-xs text-gray-500">- 0%</p>
                 </div>
                 <div className="space-y-1 flex flex-col items-center">
@@ -2386,7 +2149,7 @@ export default function ToHub() {
                     <YAxis yAxisId="left" tick={{
                     fontSize: 10,
                     fill: "#9ca3af"
-                  }} tickFormatter={value => `₹${value.toLocaleString("en-IN")}`} tickLine={false} axisLine={{
+                  }} tickFormatter={value => `INR ${value.toLocaleString("en-IN")}`} tickLine={false} axisLine={{
                     stroke: "#e5e7eb"
                   }} allowDecimals={false} domain={[0, salesMax]} tickCount={5} />
                     <YAxis yAxisId="right" orientation="right" tick={false} axisLine={false} domain={[0, ordersMax]} />
@@ -2449,29 +2212,14 @@ export default function ToHub() {
                       <SelectItem value="yearly">Yearly</SelectItem>
                     </SelectContent>
                   </Select>
-                  <div className="relative">
-                    <button onClick={() => setShowLearnMoreButton(showLearnMoreButton === 'avg-order-value' ? null : 'avg-order-value')} className="p-2 rounded-full hover:bg-gray-100">
-                      <MoreVertical className="w-5 h-5 text-gray-600" />
-                    </button>
-                    {showLearnMoreButton === 'avg-order-value' && <motion.div initial={{
-                  opacity: 0,
-                  scale: 0.95
-                }} animate={{
-                  opacity: 1,
-                  scale: 1
-                }} className="absolute right-0 top-full mt-1 z-10">
-                        <button onClick={e => handleLearnMoreClick('avg-order-value', e)} className="bg-white border border-gray-200 shadow-lg rounded-lg px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 whitespace-nowrap">
-                          Learn more
-                        </button>
-                      </motion.div>}
-                  </div>
+                  
                 </div>
               </div>
 
               <div className="space-y-1 pt-1">
                 <p className="text-xs text-gray-500">AOV</p>
                 <p className="text-lg font-bold text-gray-900">
-                  ₹{(parseFloat(totalSales.replace(/[^\d.]/g, '')) / (parseInt(totalOrders) || 1)).toFixed(0)} <span className="text-xs font-normal text-gray-500">- 0%</span>
+                  INR {(parseFloat(totalSales.replace(/[^\d.]/g, '')) / (parseInt(totalOrders) || 1)).toFixed(0)} <span className="text-xs font-normal text-gray-500">- 0%</span>
                 </p>
               </div>
 
@@ -2493,7 +2241,7 @@ export default function ToHub() {
                     <YAxis tick={{
                     fontSize: 10,
                     fill: "#9ca3af"
-                  }} tickFormatter={value => `₹${value.toLocaleString("en-IN")}`} tickLine={false} axisLine={{
+                  }} tickFormatter={value => `INR ${value.toLocaleString("en-IN")}`} tickLine={false} axisLine={{
                     stroke: "#e5e7eb"
                   }} allowDecimals={false} domain={[0, aovMax]} tickCount={5} />
                     <Tooltip contentStyle={{
@@ -2533,7 +2281,7 @@ export default function ToHub() {
                 </div>
                 <div className="bg-green-50/50 p-3 rounded-lg border border-green-100/50">
                   <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-1">Gross Revenue</p>
-                  <p className="text-xl font-bold text-green-600">₹{recommendedStats.revenue?.toLocaleString('en-IN')}</p>
+                  <p className="text-xl font-bold text-green-600">INR {recommendedStats.revenue?.toLocaleString('en-IN')}</p>
                   <p className="text-[10px] text-green-400 mt-1">Before platform fees</p>
                 </div>
               </div>
@@ -2545,19 +2293,19 @@ export default function ToHub() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="bg-red-50/60 p-3 rounded-lg border border-red-100/60">
                     <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-1">Platform Fee</p>
-                    <p className="text-xl font-bold text-red-500">- ₹{recommendedStats.fees?.toLocaleString('en-IN') ?? 0}</p>
+                    <p className="text-xl font-bold text-red-500">- INR {recommendedStats.fees?.toLocaleString('en-IN') ?? 0}</p>
                     <p className="text-[10px] text-red-400 mt-1">Goes to admin</p>
                   </div>
                   <div className="bg-green-50/60 p-3 rounded-lg border border-green-100/60">
                     <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-1">Your Earnings</p>
-                    <p className="text-xl font-bold text-green-600">₹{(recommendedStats.revenue - recommendedStats.fees).toLocaleString('en-IN')}</p>
+                    <p className="text-xl font-bold text-green-600">INR {(recommendedStats.revenue - recommendedStats.fees).toLocaleString('en-IN')}</p>
                     <p className="text-[10px] text-green-400 mt-1">After platform fee</p>
                   </div>
                 </div>
               </div>
 
               <div className="flex items-start gap-2 text-[10px] text-gray-400 italic bg-gray-50/80 p-2 rounded relative z-10">
-                <span>💡</span>
+                <span>Note:</span>
                 <span>Platform fees are charged for featuring your items to more customers. These are separate from your regular earnings.</span>
               </div>
             </div>
@@ -2571,6 +2319,64 @@ export default function ToHub() {
   }) => <div className="flex-1 flex items-center justify-center text-gray-500 text-sm px-4">
       {label} is empty for now.
     </div>;
+  const MiniMetricChart = ({
+    data,
+    dataKey,
+    color,
+    xKey,
+    gradientId
+  }) => {
+    const containerRef = useRef(null);
+    const [dimensions, setDimensions] = useState({
+      width: 0,
+      height: 0
+    });
+    useEffect(() => {
+      const container = containerRef.current;
+      if (!container) return;
+      const updateDimensions = () => {
+        setDimensions({
+          width: Math.max(0, Math.floor(container.clientWidth)),
+          height: Math.max(0, Math.floor(container.clientHeight))
+        });
+      };
+      updateDimensions();
+      let resizeObserver;
+      if (typeof ResizeObserver !== "undefined") {
+        resizeObserver = new ResizeObserver(() => updateDimensions());
+        resizeObserver.observe(container);
+      } else {
+        window.addEventListener("resize", updateDimensions);
+      }
+      return () => {
+        if (resizeObserver) resizeObserver.disconnect();
+        else window.removeEventListener("resize", updateDimensions);
+      };
+    }, []);
+    return <div ref={containerRef} className="h-16 w-full">
+        {dimensions.width > 0 && dimensions.height > 0 ? <AreaChart width={dimensions.width} height={dimensions.height} data={data} margin={{
+      top: 0,
+      right: 0,
+      left: 0,
+      bottom: 0
+    }}>
+            <defs>
+              <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor={color} stopOpacity={0.5} />
+                <stop offset="95%" stopColor={color} stopOpacity={0.05} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f5f5f5" />
+            <XAxis dataKey={xKey} tick={{
+          fontSize: 10,
+          fill: "#9ca3af"
+        }} />
+            <YAxis hide />
+            <Tooltip />
+            <Area type="monotone" dataKey={dataKey} stroke={color} fill={`url(#${gradientId})`} />
+          </AreaChart> : null}
+      </div>;
+  };
   return <div className="min-h-screen bg-gray-100 flex flex-col">
       <style>{`
         .chart-shell *, .chart-shell, .chart-shell-mini *, .chart-shell-mini,
@@ -2746,3 +2552,6 @@ export default function ToHub() {
       <BottomNavOrders />
     </div>;
 }
+
+
+

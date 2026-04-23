@@ -209,20 +209,6 @@ export default function AdminNavbar({ onMenuClick }) {
             </div>
           </div>
 
-          {/* Center: Search Bar */}
-          <div className="flex-1 flex justify-center max-w-md mx-8">
-            <button
-              onClick={() => setSearchOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 rounded-full bg-white text-gray-500 cursor-pointer hover:bg-gray-50 transition-colors w-full border border-transparent"
-            >
-              <Search className="w-4 h-4 text-gray-400" />
-              <span className="text-sm flex-1 text-left text-gray-400">Search</span>
-              <span className="text-xs px-2 py-0.5 rounded bg-orange-50 text-black border border-[#FF5200]">
-                Ctrl+K
-              </span>
-            </button>
-          </div>
-
           {/* Right: Notifications and User Profile */}
           <div className="flex items-center gap-3">
             {/* User Profile */}

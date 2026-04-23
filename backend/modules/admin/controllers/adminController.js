@@ -1507,9 +1507,62 @@ export const getRestaurantById = asyncHandler(async (req, res) => {
       return errorResponse(res, 400, "Invalid restaurant ID");
     }
 
-    const restaurant = await Restaurant.findById(id).lean();
+    const restaurant = await Restaurant.findById(id)
+      .populate({
+        path: "zoneId",
+        select: "name tierId",
+        populate: {
+          path: "tierId",
+          select: "name rank"
+        }
+      })
+      .populate("subscription.planId", "name durationInDays features pricing")
+      .lean();
     if (!restaurant) {
       return errorResponse(res, 404, "Restaurant not found");
+    }
+
+    const now = new Date();
+    const [activePurchasedSubscription, latestPurchasedSubscription] = await Promise.all([
+      RestaurantSubscription.findOne({
+        restaurantId: restaurant._id,
+        status: "active",
+        paymentStatus: "completed",
+        endDate: { $gte: now }
+      })
+        .populate("planId", "name durationInDays features pricing")
+        .sort({ endDate: -1, paymentDate: -1, createdAt: -1 })
+        .lean(),
+      RestaurantSubscription.findOne({
+        restaurantId: restaurant._id,
+        paymentStatus: "completed"
+      })
+        .populate("planId", "name durationInDays features pricing")
+        .sort({ paymentDate: -1, createdAt: -1 })
+        .lean()
+    ]);
+
+    const purchasedSubscription = activePurchasedSubscription || latestPurchasedSubscription;
+    if (purchasedSubscription) {
+      const existingSubscription = restaurant.subscription || {};
+      const planDoc = purchasedSubscription.planId && typeof purchasedSubscription.planId === "object"
+        ? purchasedSubscription.planId
+        : null;
+
+      restaurant.subscription = {
+        ...existingSubscription,
+        planId: planDoc?._id || existingSubscription.planId || null,
+        planName: planDoc?.name || existingSubscription?.planId?.name || null,
+        startDate: purchasedSubscription.startDate || existingSubscription.startDate || null,
+        endDate: purchasedSubscription.endDate || existingSubscription.endDate || null,
+        status: purchasedSubscription.status || existingSubscription.status || "inactive",
+        autoRenew: existingSubscription.autoRenew ?? true,
+        paymentStatus: purchasedSubscription.paymentStatus || existingSubscription.paymentStatus || "pending",
+        paymentDate: purchasedSubscription.paymentDate || existingSubscription.paymentDate || null,
+        amount: purchasedSubscription.amount ?? existingSubscription.amount ?? 0,
+        features: planDoc?.features || existingSubscription.features || [],
+        durationInDays: planDoc?.durationInDays || existingSubscription.durationInDays || null,
+      };
     }
 
     return successResponse(res, 200, "Restaurant retrieved successfully", {

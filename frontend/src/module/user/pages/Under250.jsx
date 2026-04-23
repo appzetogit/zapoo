@@ -10,6 +10,7 @@ import { useLocationSelector } from "../components/UserLayout"
 import { useLocation } from "../hooks/useLocation"
 import { useZone } from "../hooks/useZone"
 import { useCart } from "../context/CartContext"
+import { useProfile } from "../context/ProfileContext"
 import PageNavbar from "../components/PageNavbar"
 import { foodImages } from "@/constants/images"
 import zapooFoodLogo from "@/assets/zapoo_logo.png"
@@ -28,6 +29,7 @@ export default function Under250() {
   const { zoneId, zoneStatus, isInService, isOutOfService } = useZone(location)
   const navigate = useNavigate()
   const { addToCart, updateQuantity, removeFromCart, getCartItem, cart } = useCart()
+  const { addDishFavorite, removeDishFavorite, isDishFavorite } = useProfile()
   const [activeCategory, setActiveCategory] = useState(null)
   const [showSortPopup, setShowSortPopup] = useState(false)
   const [selectedSort, setSelectedSort] = useState(null)
@@ -35,7 +37,6 @@ export default function Under250() {
   const [showItemDetail, setShowItemDetail] = useState(false)
   const [selectedItem, setSelectedItem] = useState(null)
   const [quantities, setQuantities] = useState({})
-  const [bookmarkedItems, setBookmarkedItems] = useState(new Set())
   const [categories, setCategories] = useState([])
   const [loadingCategories, setLoadingCategories] = useState(true)
   const [bannerImage, setBannerImage] = useState(null)
@@ -420,10 +421,17 @@ export default function Under250() {
   }
 
   const handleItemClick = (item, restaurant) => {
+    const restaurantId = restaurant?.restaurantId || restaurant?._id || restaurant?.id || null
+    const dishId = item?.id || item?._id || null
     // Add restaurant info to item for display
     const itemWithRestaurant = {
       ...item,
+      id: dishId,
       restaurant: restaurant.name,
+      restaurantId,
+      restaurantName: restaurant?.name || "",
+      restaurantSlug: restaurant?.slug || restaurant?.name?.toLowerCase().replace(/\s+/g, "-") || "",
+      foodType: item?.foodType || (item?.isVeg ? "Veg" : "Non-Veg"),
       description: item.description || t("user.under250.itemDescriptionFallback", {
         item: item.name,
         restaurant: restaurant.name
@@ -435,16 +443,36 @@ export default function Under250() {
     setShowItemDetail(true)
   }
 
-  const handleBookmarkClick = (itemId) => {
-    setBookmarkedItems((prev) => {
-      const newSet = new Set(prev)
-      if (newSet.has(itemId)) {
-        newSet.delete(itemId)
-      } else {
-        newSet.add(itemId)
-      }
-      return newSet
+  const handleBookmarkClick = (item) => {
+    const restaurantId = item?.restaurantId
+    const dishId = item?.id || item?._id
+
+    if (!restaurantId || !dishId) {
+      toast.error(t("user.restaurantDetails.toast.dishInfoMissing"))
+      return
+    }
+
+    if (isDishFavorite(dishId, restaurantId)) {
+      removeDishFavorite(dishId, restaurantId)
+      toast.success(t("user.restaurantDetails.toast.dishRemoved"))
+      return
+    }
+
+    addDishFavorite({
+      id: dishId,
+      name: item?.name || "",
+      description: item?.description || "",
+      price: item?.price || 0,
+      originalPrice: item?.originalPrice || item?.price || 0,
+      image: item?.image || "",
+      restaurantId,
+      restaurantName: item?.restaurantName || item?.restaurant || "",
+      restaurantSlug: item?.restaurantSlug || "",
+      foodType: item?.foodType || (item?.isVeg ? "Veg" : "Non-Veg"),
+      isSpicy: item?.isSpicy,
+      customisable: item?.customisable
     })
+    toast.success(t("user.restaurantDetails.toast.dishAdded"))
   }
 
   // Check if should show grayscale (only when user is out of service)
@@ -519,7 +547,7 @@ export default function Under250() {
       </div>
 
       {/* Content Section */}
-      <div className="relative max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 xl:px-12 space-y-0 pt-2 sm:pt-3 md:pt-4 lg:pt-6 pb-6 md:pb-8 lg:pb-10">
+      <div className="relative max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 xl:px-12 space-y-0 pt-2 sm:pt-3 md:pt-4 lg:pt-6 pb-28 md:pb-16 lg:pb-20">
 
         <section className="space-y-1 sm:space-y-1.5">
           <div
@@ -915,15 +943,15 @@ export default function Under250() {
                   <button
                     onClick={(e) => {
                       e.stopPropagation()
-                      handleBookmarkClick(selectedItem.id)
+                      handleBookmarkClick(selectedItem)
                     }}
-                    className={`h-10 w-10 rounded-full border flex items-center justify-center transition-all duration-300 ${bookmarkedItems.has(selectedItem.id)
+                    className={`h-10 w-10 rounded-full border flex items-center justify-center transition-all duration-300 ${isDishFavorite(selectedItem.id, selectedItem.restaurantId)
                       ? "border-red-500 bg-red-50 text-red-500"
                       : "border-white bg-white/90 text-gray-600 hover:bg-white"
                       }`}
                   >
                     <Bookmark
-                      className={`h-5 w-5 transition-all duration-300 ${bookmarkedItems.has(selectedItem.id) ? "fill-red-500" : ""
+                      className={`h-5 w-5 transition-all duration-300 ${isDishFavorite(selectedItem.id, selectedItem.restaurantId) ? "fill-red-500" : ""
                         }`}
                     />
                   </button>
@@ -952,15 +980,15 @@ export default function Under250() {
                     <button
                       onClick={(e) => {
                         e.stopPropagation()
-                        handleBookmarkClick(selectedItem.id)
+                        handleBookmarkClick(selectedItem)
                       }}
-                      className={`h-8 w-8 lg:h-10 lg:w-10 rounded-full border flex items-center justify-center transition-all duration-300 ${bookmarkedItems.has(selectedItem.id)
+                      className={`h-8 w-8 lg:h-10 lg:w-10 rounded-full border flex items-center justify-center transition-all duration-300 ${isDishFavorite(selectedItem.id, selectedItem.restaurantId)
                         ? "border-red-500 bg-red-50 dark:bg-red-900/20 text-red-500 dark:text-red-400"
                         : "border-gray-300 dark:border-gray-600 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
                         }`}
                     >
                       <Bookmark
-                        className={`h-4 w-4 lg:h-5 lg:w-5 transition-all duration-300 ${bookmarkedItems.has(selectedItem.id) ? "fill-red-500 dark:fill-red-400" : ""
+                        className={`h-4 w-4 lg:h-5 lg:w-5 transition-all duration-300 ${isDishFavorite(selectedItem.id, selectedItem.restaurantId) ? "fill-red-500 dark:fill-red-400" : ""
                           }`}
                       />
                     </button>

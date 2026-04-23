@@ -330,7 +330,8 @@ export default function Home() {
             image: cat.image || foodImages[0],
             // Fallback to default image if not provided
             slug: cat.slug || cat.name.toLowerCase().replace(/\s+/g, '-'),
-            label: cat.name // For compatibility with existing code
+            label: cat.name, // For compatibility with existing code
+            foodType: cat.foodType || "Veg",
           }));
           setRealCategories(adminCategories);
         } else {
@@ -345,6 +346,23 @@ export default function Home() {
     };
     fetchRealCategories();
   }, []);
+
+  const isNonVegCategory = (category) => {
+    const normalizedFoodType = String(category?.foodType || "").trim().toLowerCase();
+    if (normalizedFoodType === "non-veg" || normalizedFoodType === "non veg" || normalizedFoodType === "nonveg") {
+      return true;
+    }
+
+    const rawSlug = String(category?.slug || "").toLowerCase();
+    const rawName = String(category?.name || category?.label || "").toLowerCase();
+    const normalizedText = `${rawSlug} ${rawName}`.replace(/[_-]/g, " ");
+    return /\bnon\s*veg\b/.test(normalizedText) || /\bnonveg\b/.test(normalizedText) || /\bnon vegetarian\b/.test(normalizedText);
+  };
+
+  const visibleRealCategories = useMemo(() => {
+    if (!vegMode) return realCategories;
+    return (realCategories || []).filter((cat) => !isNonVegCategory(cat));
+  }, [realCategories, vegMode]);
 
   // Fetch landing page config (categories, explore more, settings)
   useEffect(() => {
@@ -1652,9 +1670,9 @@ export default function Home() {
         }}>
             {loadingRealCategories ? <div className="flex items-center justify-center py-4">
                 <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
-              </div> : realCategories.length > 0 ? <>
+              </div> : visibleRealCategories.length > 0 ? <>
                 {/* Show only first 10 categories */}
-                {realCategories.slice(0, 10).map((category, index) => <motion.div key={category.id || index} className="flex-shrink-0" initial={{
+                {visibleRealCategories.slice(0, 10).map((category, index) => <motion.div key={category.id || index} className="flex-shrink-0" initial={{
               opacity: 0,
               y: 20,
               scale: 0.9
@@ -1685,7 +1703,7 @@ export default function Home() {
                     </Link>
                   </motion.div>)}
                 {/* See All button - show if there are more than 10 categories */}
-                {realCategories.length > 10 && <motion.div className="flex-shrink-0 cursor-pointer" initial={{
+                {visibleRealCategories.length > 10 && <motion.div className="flex-shrink-0 cursor-pointer" initial={{
               opacity: 0,
               scale: 0.8
             }} whileInView={{
@@ -2670,8 +2688,8 @@ export default function Home() {
               {/* Categories Grid - Scrollable */}
               <div className="flex-1 overflow-y-auto px-4 sm:px-5 py-4 sm:py-5">
                 <div className="grid grid-cols-3 gap-4 sm:gap-5 md:gap-6">
-                  {(realCategories.length > 0 ? realCategories : landingCategories).map((category, index) => {
-                const categoryData = realCategories.length > 0 ? {
+                  {(visibleRealCategories.length > 0 ? visibleRealCategories : landingCategories).map((category, index) => {
+                const categoryData = visibleRealCategories.length > 0 ? {
                   name: category.name,
                   image: category.image,
                   slug: category.slug
