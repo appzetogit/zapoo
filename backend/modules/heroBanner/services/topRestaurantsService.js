@@ -3,6 +3,7 @@ import Menu from '../../restaurant/models/Menu.js';
 import Order from '../../order/models/Order.js';
 import Zone from '../../admin/models/Zone.js';
 import { calculateDistance } from '../../order/services/orderCalculationService.js';
+import { filterRestaurantsByOutletTimings } from '../../restaurant/services/outletVisibilityService.js';
 
 const TOP_RESTAURANTS_LIMIT = 10;
 const DEFAULT_OFFER_VALUES = new Set([
@@ -103,6 +104,8 @@ export const getTopRestaurantsForUser = async ({
       return distanceKm <= rangeKm;
     });
   }
+
+  eligibleRestaurants = await filterRestaurantsByOutletTimings(eligibleRestaurants);
 
   if (eligibleRestaurants.length === 0) {
     return {

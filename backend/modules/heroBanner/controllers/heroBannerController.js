@@ -11,6 +11,7 @@ import Zone from '../../admin/models/Zone.js';
 import { successResponse, errorResponse } from '../../../shared/utils/response.js';
 import { calculateDistance } from '../../order/services/orderCalculationService.js';
 import { getTopRestaurantsForUser } from '../services/topRestaurantsService.js';
+import { filterRestaurantsByOutletTimings } from '../../restaurant/services/outletVisibilityService.js';
 
 const attachRealReviewStats = async (restaurants = []) => {
   if (!Array.isArray(restaurants) || restaurants.length === 0) return restaurants;
@@ -1232,6 +1233,8 @@ export const getGourmetRestaurants = async (req, res) => {
         return true;
       });
     }
+
+    filteredRestaurants = await filterRestaurantsByOutletTimings(filteredRestaurants);
 
     const enrichedRestaurants = await attachRealReviewStats(filteredRestaurants);
 
