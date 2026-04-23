@@ -446,6 +446,7 @@ export const API_ENDPOINTS = {
     MY_PLAN: "/subscriptions/my-plan",
     CANCEL: "/subscription/cancel",
     CANCEL_V2: "/subscriptions/cancel",
+    STOP_NOW_V2: "/subscriptions/stop-now",
     RM_REQUEST: "/subscription/request-rm-call",
     HISTORY: "/subscription/history",
     ADMIN_PLANS: "/admin/subscriptions/plans",

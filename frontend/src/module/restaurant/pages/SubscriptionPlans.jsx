@@ -16,6 +16,8 @@ export default function SubscriptionPlans() {
     const [processingId, setProcessingId] = useState(null);
     const [trialUsed, setTrialUsed] = useState(false);
     const [pendingPlanConfirm, setPendingPlanConfirm] = useState(null);
+    const [stopConfirmOpen, setStopConfirmOpen] = useState(false);
+    const [stopProcessing, setStopProcessing] = useState(false);
 
     useEffect(() => {
         fetchData();
@@ -56,6 +58,29 @@ export default function SubscriptionPlans() {
         navigate(`/restaurant/subscription/checkout?planId=${plan._id}`, {
             state: { plan }
         });
+    };
+
+    const handleStopCurrentPlanNow = async () => {
+        try {
+            setStopProcessing(true);
+            const res = await subscriptionAPI.stopSubscriptionNow();
+            if (res?.data?.success) {
+                toast.success(res?.data?.message || "Plan stopped");
+                setStopConfirmOpen(false);
+                await fetchData();
+            } else {
+                throw new Error(res?.data?.message || "Failed to stop plan");
+            }
+        } catch (error) {
+            const message =
+                error?.response?.data?.message ||
+                error?.response?.data?.error ||
+                error?.message ||
+                "Failed to stop plan";
+            toast.error(message);
+        } finally {
+            setStopProcessing(false);
+        }
     };
 
     const handleSubscribe = async (plan) => {
@@ -194,6 +219,19 @@ export default function SubscriptionPlans() {
                                     </p>
                                 </div>
                             </div>
+                            {isSubscribed && (
+                                <div className="flex items-center gap-2 w-full sm:w-auto">
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        className="w-full sm:w-auto border-red-200 text-red-700 hover:bg-red-50"
+                                        onClick={() => setStopConfirmOpen(true)}
+                                        disabled={stopProcessing}
+                                    >
+                                        Stop current plan
+                                    </Button>
+                                </div>
+                            )}
                         </div>
                     </Card>
                 )}
@@ -309,6 +347,38 @@ export default function SubscriptionPlans() {
                     </p>
                 </div>
             </div>
+
+            {stopConfirmOpen && (
+                <div className="fixed inset-0 z-[80] bg-black/40 backdrop-blur-[1px] px-4 flex items-center justify-center">
+                    <div className="w-full max-w-md rounded-2xl bg-white border border-gray-200 shadow-2xl p-4 sm:p-5">
+                        <h3 className="text-base sm:text-lg font-bold text-gray-900">Stop current plan?</h3>
+                        <p className="text-sm text-gray-600 mt-2 leading-relaxed">
+                            This will stop your current plan immediately and your access may be interrupted. <span className="font-semibold text-red-600">No refund will be issued.</span>
+                        </p>
+                        {hasQueuedPlan && (
+                            <p className="text-xs text-gray-500 mt-2">
+                                Your queued plan will be activated immediately after stopping the current plan.
+                            </p>
+                        )}
+                        <div className="mt-4 flex items-center justify-end gap-2">
+                            <Button
+                                variant="outline"
+                                onClick={() => setStopConfirmOpen(false)}
+                                disabled={stopProcessing}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                className="bg-red-600 hover:bg-red-700 text-white"
+                                onClick={handleStopCurrentPlanNow}
+                                disabled={stopProcessing}
+                            >
+                                {stopProcessing ? "Stopping..." : "Stop now"}
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {pendingPlanConfirm && (
                 <div className="fixed inset-0 z-[70] bg-black/40 backdrop-blur-[1px] px-4 flex items-center justify-center">

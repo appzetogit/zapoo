@@ -20,6 +20,7 @@ router.post("/create-order", authenticateRestaurant, subscriptionController.crea
 router.post("/verify-payment", authenticateRestaurant, subscriptionController.verifySubscriptionPayment);
 router.get("/my-subscription", authenticateRestaurant, subscriptionController.getMySubscription);
 router.post("/cancel", authenticateRestaurant, subscriptionController.cancelSubscription);
+router.post("/stop-now", authenticateRestaurant, subscriptionController.stopSubscriptionNow);
 router.post("/request-rm-call", authenticateRestaurant, checkFeatureAccess("relationship_manager"), subscriptionController.requestRMCallViaSubscription);
 router.get("/history", authenticateRestaurant, checkFeatureAccess("relationship_manager"), subscriptionController.getRMCallHistoryViaSubscription);
 

@@ -571,6 +571,111 @@ export const cancelSubscription = async (req, res) => {
 };
 
 /**
+ * Stop current subscription immediately (no refund).
+ * - Ends access right away by setting endDate=now and status=expired
+ * - If a queued pending plan exists, it is activated immediately
+ */
+export const stopSubscriptionNow = async (req, res) => {
+  try {
+    const restaurantId = req.user._id || req.user.id;
+    const restaurant = await Restaurant.findById(restaurantId);
+
+    if (!restaurant) {
+      return res.status(404).json({
+        success: false,
+        message: "Restaurant not found",
+      });
+    }
+
+    const sub = restaurant.subscription;
+    if (!sub || !sub.planId) {
+      return res.status(400).json({
+        success: false,
+        message: "No active subscription to stop",
+      });
+    }
+
+    const now = new Date();
+    const isActiveNow =
+      sub.status === "active" && sub.endDate && new Date(sub.endDate).getTime() > now.getTime();
+
+    if (!isActiveNow) {
+      return res.status(400).json({
+        success: false,
+        message: "Subscription is already inactive or expired",
+      });
+    }
+
+    // Stop current plan immediately
+    restaurant.subscription.endDate = now;
+    restaurant.subscription.status = "expired";
+    restaurant.subscription.autoRenew = false;
+
+    // If a queued plan exists, apply it immediately
+    const queued = restaurant.queuedSubscription;
+    const hasQueuedPlan =
+      queued &&
+      queued.status === "pending" &&
+      queued.planId &&
+      queued.durationInDays;
+
+    if (hasQueuedPlan) {
+      const startDate = now;
+      const endDate = new Date(startDate);
+      endDate.setDate(startDate.getDate() + queued.durationInDays);
+
+      restaurant.subscription = {
+        planId: queued.planId,
+        startDate,
+        endDate,
+        status: "active",
+        autoRenew: true,
+        paymentId: queued.paymentId,
+        razorpayOrderId: queued.razorpayOrderId,
+        razorpayPaymentId: queued.razorpayPaymentId,
+        razorpaySignature: queued.razorpaySignature,
+        paymentStatus: queued.paymentStatus || "completed",
+        paymentDate: queued.paymentDate || startDate,
+        amount: queued.amount || 0,
+        features: queued.features || [],
+      };
+
+      restaurant.queuedSubscription = {
+        planId: null,
+        durationInDays: null,
+        amount: 0,
+        features: [],
+        purchasedAt: null,
+        startAfter: null,
+        paymentId: null,
+        razorpayOrderId: null,
+        razorpayPaymentId: null,
+        razorpaySignature: null,
+        paymentStatus: "pending",
+        paymentDate: null,
+        status: "cancelled",
+      };
+    }
+
+    await restaurant.save();
+
+    return res.status(200).json({
+      success: true,
+      message: hasQueuedPlan
+        ? "Current plan stopped. Queued plan activated immediately."
+        : "Current plan stopped successfully.",
+      data: restaurant.subscription,
+    });
+  } catch (error) {
+    console.error("Error stopping subscription now:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to stop subscription",
+    });
+  }
+};
+
+/**
  * Create a new subscription plan (Admin)
  */
 export const createPlan = async (req, res) => {

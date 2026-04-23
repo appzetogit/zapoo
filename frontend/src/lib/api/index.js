@@ -2134,6 +2134,9 @@ export const subscriptionAPI = {
   cancelSubscription: () => {
     return apiClient.post(API_ENDPOINTS.SUBSCRIPTION.CANCEL_V2);
   },
+  stopSubscriptionNow: () => {
+    return apiClient.post(API_ENDPOINTS.SUBSCRIPTION.STOP_NOW_V2);
+  },
   requestRMCall: (data) => {
     return apiClient.post(API_ENDPOINTS.SUBSCRIPTION.RM_REQUEST, data);
   },
