@@ -99,7 +99,7 @@ export const authenticate = async (req, res, next) => {
     if (restaurant.businessModel === 'Subscription Base' && 
         restaurant.subscription && 
         restaurant.subscription.endDate && 
-        new Date(restaurant.subscription.endDate) < new Date()) {
+        new Date(restaurant.subscription.endDate) <= new Date()) {
       const queued = restaurant.queuedSubscription;
       const hasQueuedPlan =
         queued &&
@@ -153,6 +153,14 @@ export const authenticate = async (req, res, next) => {
           currentStatus: restaurant.subscription.status
         });
         restaurant.subscription.status = 'expired';
+        try {
+          await restaurant.save();
+        } catch (saveErr) {
+          console.error('❌ Failed to persist expired subscription status:', {
+            restaurantId: restaurant._id,
+            error: saveErr?.message || saveErr
+          });
+        }
       }
 
       // Block order management actions for expired subscriptions

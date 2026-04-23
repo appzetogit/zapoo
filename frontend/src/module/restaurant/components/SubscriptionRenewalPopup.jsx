@@ -45,14 +45,22 @@ export default function SubscriptionRenewalPopup() {
 
                 const endDate = new Date(sub.endDate)
                 const now = new Date()
-                const msLeft = endDate - now
-                const days = Math.ceil(msLeft / (1000 * 60 * 60 * 24))
+                if (Number.isNaN(endDate.getTime())) return
+                const isExpiredNow = endDate.getTime() <= now.getTime()
+                const startOfToday = new Date(now)
+                startOfToday.setHours(0, 0, 0, 0)
+                const startOfEndDay = new Date(endDate)
+                startOfEndDay.setHours(0, 0, 0, 0)
+                const days = Math.max(
+                    0,
+                    Math.round((startOfEndDay.getTime() - startOfToday.getTime()) / (1000 * 60 * 60 * 24))
+                )
 
                 const name = sub.planId?.name || "your current plan"
                 setPlanName(name)
 
-                if (days < 0) {
-                    // Already expired
+                if (isExpiredNow) {
+                    // Already expired (time-based)
                     setDaysLeft(0)
                     setPopupState('expired')
                     setVisible(true)

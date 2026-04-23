@@ -519,7 +519,9 @@ export const getMySubscription = async (req, res) => {
       success: true,
       data: restaurant.subscription,
       queuedSubscription:
-        restaurant.queuedSubscription?.status === "pending"
+        restaurant.queuedSubscription?.status === "pending" &&
+        restaurant.queuedSubscription?.planId &&
+        restaurant.queuedSubscription?.durationInDays
           ? restaurant.queuedSubscription
           : null,
     });

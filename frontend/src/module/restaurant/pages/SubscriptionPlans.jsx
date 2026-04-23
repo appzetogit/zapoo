@@ -60,7 +60,10 @@ export default function SubscriptionPlans() {
 
     const handleSubscribe = async (plan) => {
         const activePlanId = currentSubscription?.planId?._id || currentSubscription?.planId;
-        const hasActiveSubscription = !!activePlanId && currentSubscription?.status === "active";
+        const endDateObj = currentSubscription?.endDate ? new Date(currentSubscription.endDate) : null;
+        const hasValidEndDate = !!endDateObj && !Number.isNaN(endDateObj.getTime());
+        const isDateValid = hasValidEndDate ? endDateObj.getTime() > Date.now() : false;
+        const hasActiveSubscription = !!activePlanId && currentSubscription?.status === "active" && isDateValid;
         const isCurrentPlan = activePlanId?.toString() === plan?._id?.toString();
 
         if (plan.needsRMCall) {
@@ -115,7 +118,14 @@ export default function SubscriptionPlans() {
     }
 
     const activePlanId = currentSubscription?.planId?._id || currentSubscription?.planId;
-    const isSubscribed = !!activePlanId && currentSubscription?.status === "active";
+    const endDateObj = currentSubscription?.endDate ? new Date(currentSubscription.endDate) : null;
+    const hasValidEndDate = !!endDateObj && !Number.isNaN(endDateObj.getTime());
+    const isDateValid = hasValidEndDate ? endDateObj.getTime() > Date.now() : false;
+    const isSubscribed = !!activePlanId && currentSubscription?.status === "active" && isDateValid;
+    const expiresLabel = hasValidEndDate
+        ? endDateObj.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })
+        : "N/A";
+    const hasQueuedPlan = !!queuedSubscription?.planId;
 
     return (
         <div className="min-h-screen bg-gray-50/50 flex flex-col">
@@ -128,9 +138,15 @@ export default function SubscriptionPlans() {
                     <ArrowLeft className="w-5 h-5 text-gray-800" />
                 </button>
                 <h1 className="text-lg font-bold text-gray-900">Subscription Plans</h1>
-                {isSubscribed && (
-                    <span className="ml-auto text-[11px] font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700 border border-green-200">
-                        {currentSubscription.planId?.name || "Active"}
+                {!!activePlanId && (
+                    <span
+                        className={`ml-auto text-[11px] font-semibold px-2 py-0.5 rounded-full border ${
+                            isSubscribed
+                                ? "bg-green-100 text-green-700 border-green-200"
+                                : "bg-red-100 text-red-700 border-red-200"
+                        }`}
+                    >
+                        {isSubscribed ? (currentSubscription.planId?.name || "Active") : "Expired"}
                     </span>
                 )}
             </div>
@@ -157,7 +173,7 @@ export default function SubscriptionPlans() {
                     </div>
                 )}
 
-                {isSubscribed && (
+                {!!activePlanId && (
                     <Card className="border-orange-200 bg-orange-50/50 overflow-hidden relative">
                         <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
                             <Zap className="w-32 h-32 animate-pulse text-orange-600" />
@@ -168,11 +184,13 @@ export default function SubscriptionPlans() {
                                     <ShieldCheck className="w-6 h-6 text-orange-500" />
                                 </div>
                                 <div>
-                                    <h3 className="text-base font-bold text-gray-900">Active Subscription</h3>
+                                    <h3 className="text-base font-bold text-gray-900">
+                                        {isSubscribed ? "Active Subscription" : "Subscription Expired"}
+                                    </h3>
                                     <p className="text-gray-600 text-sm mt-0.5">
-                                        You are on <span className="font-semibold text-orange-600">{currentSubscription.planId?.name}</span>.
-                                        {" "}
-                                        {`Expires ${new Date(currentSubscription.endDate).toLocaleDateString()}`}
+                                        You are on{" "}
+                                        <span className="font-semibold text-orange-600">{currentSubscription.planId?.name}</span>.{" "}
+                                        {isSubscribed ? `Expires ${expiresLabel}` : `Expired at ${expiresLabel}`}
                                     </p>
                                 </div>
                             </div>
@@ -180,7 +198,7 @@ export default function SubscriptionPlans() {
                     </Card>
                 )}
 
-                {queuedSubscription && (
+                {hasQueuedPlan && (
                     <Card className="border-blue-200 bg-blue-50/60">
                         <div className="p-4 sm:p-5">
                             <h3 className="text-sm font-bold text-blue-900">Upcoming Plan Purchased</h3>
@@ -193,16 +211,18 @@ export default function SubscriptionPlans() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 items-start">
                     {plans.map((plan) => {
-                        const isCurrent = activePlanId?.toString() === plan._id?.toString();
+                        const matchesStoredPlan = activePlanId?.toString() === plan._id?.toString();
+                        const isActiveCurrent = isSubscribed && matchesStoredPlan;
+                        const isExpiredCurrent = !isSubscribed && matchesStoredPlan;
                         return (
                             <Card
                                 key={plan._id}
-                                className={`relative overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 ${isCurrent
+                                className={`relative overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 ${matchesStoredPlan
                                     ? "border-2 border-orange-500 shadow-lg shadow-orange-100 ring-4 ring-orange-50"
                                     : "border-gray-200 hover:border-orange-200"
                                     }`}
                             >
-                                {plan.price > 1000 && plan.price < 5000 && !isCurrent && (
+                                {plan.price > 1000 && plan.price < 5000 && !matchesStoredPlan && (
                                     <div className="absolute top-4 right-4">
                                         <span className="bg-gradient-to-r from-orange-500 to-amber-500 text-white text-xs font-bold px-2.5 py-1 rounded-full shadow-sm">
                                             MOST POPULAR
@@ -210,15 +230,22 @@ export default function SubscriptionPlans() {
                                     </div>
                                 )}
 
-                                {isCurrent && (
+                                {isActiveCurrent && (
                                     <div className="absolute top-4 left-4">
                                         <span className="bg-green-100 text-green-700 border border-green-200 text-xs font-bold px-2.5 py-1 rounded-full flex items-center gap-1">
                                             <Check className="w-3 h-3" /> ACTIVE PLAN
                                         </span>
                                     </div>
                                 )}
+                                {isExpiredCurrent && (
+                                    <div className="absolute top-4 left-4">
+                                        <span className="bg-red-100 text-red-700 border border-red-200 text-xs font-bold px-2.5 py-1 rounded-full flex items-center gap-1">
+                                            EXPIRED
+                                        </span>
+                                    </div>
+                                )}
 
-                                <CardHeader className={`pb-4 px-6 ${isCurrent ? "pt-12" : "pt-8"}`}>
+                                <CardHeader className={`pb-4 px-6 ${matchesStoredPlan ? "pt-12" : "pt-8"}`}>
                                     <div className="w-11 h-11 rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center mb-4">
                                         <CreditCard className="w-5 h-5" />
                                     </div>
@@ -249,19 +276,21 @@ export default function SubscriptionPlans() {
 
                                 <CardFooter className="px-6 pb-6 pt-0">
                                     <Button
-                                        className={`w-full h-11 text-sm font-semibold rounded-xl transition-all duration-200 flex items-center justify-center gap-2 ${isCurrent
+                                        className={`w-full h-11 text-sm font-semibold rounded-xl transition-all duration-200 flex items-center justify-center gap-2 ${isActiveCurrent
                                             ? "bg-green-100 text-green-700 border border-green-200 hover:bg-green-200 cursor-default"
                                             : plan.needsRMCall
                                                 ? "bg-orange-600 text-white hover:bg-orange-700 hover:shadow-orange-200 hover:shadow-lg"
                                                 : "bg-gray-900 text-white hover:bg-orange-500 hover:shadow-orange-200 hover:shadow-lg"
                                             }`}
-                                        onClick={() => !isCurrent && handleSubscribe(plan)}
-                                        disabled={isCurrent || (processingId === plan._id)}
+                                        onClick={() => !isActiveCurrent && handleSubscribe(plan)}
+                                        disabled={isActiveCurrent || (processingId === plan._id)}
                                     >
                                         {processingId === plan._id ? (
                                             <Loader2 className="w-5 h-5 animate-spin" />
-                                        ) : isCurrent ? (
+                                        ) : isActiveCurrent ? (
                                             <><Check className="w-4 h-4" /> Current Plan</>
+                                        ) : isExpiredCurrent ? (
+                                            <>Renew Plan</>
                                         ) : plan.needsRMCall ? (
                                             <>Request Call <Phone className="w-4 h-4 ml-1.5" /></>
                                         ) : (

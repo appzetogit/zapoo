@@ -1,13 +1,21 @@
 import { useEffect, useState } from "react";
 import { subscriptionAPI } from "@/lib/api";
 
-function getDaysLeft(endDate) {
+function getExpiryInfo(endDate) {
   if (!endDate) return null;
   const now = new Date();
   const end = new Date(endDate);
   if (Number.isNaN(end.getTime())) return null;
-  const diffMs = end - now;
-  return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+  const isExpired = end.getTime() <= now.getTime();
+
+  const startOfToday = new Date(now);
+  startOfToday.setHours(0, 0, 0, 0);
+  const startOfEndDay = new Date(end);
+  startOfEndDay.setHours(0, 0, 0, 0);
+  const daysLeft = Math.round((startOfEndDay.getTime() - startOfToday.getTime()) / (1000 * 60 * 60 * 24));
+
+  return { isExpired, daysLeft: Math.max(0, daysLeft) };
 }
 
 export default function useSubscriptionExpiryNotice() {
@@ -43,8 +51,8 @@ export default function useSubscriptionExpiryNotice() {
           return;
         }
 
-        const daysLeft = getDaysLeft(subscription.endDate);
-        if (daysLeft == null) {
+        const expiryInfo = getExpiryInfo(subscription.endDate);
+        if (!expiryInfo) {
           setState((prev) => ({
             ...prev,
             isVisible: false,
@@ -53,7 +61,7 @@ export default function useSubscriptionExpiryNotice() {
           return;
         }
 
-        const isExpired = daysLeft < 0;
+        const { isExpired, daysLeft } = expiryInfo;
         const shouldShow = isExpired || daysLeft <= 3;
         const paymentId = String(subscription?.paymentId || "").toUpperCase();
         const type = paymentId.startsWith("TRIAL_") ? "trial" : "subscription";
@@ -61,7 +69,7 @@ export default function useSubscriptionExpiryNotice() {
         setState({
           isVisible: shouldShow,
           isExpired,
-          daysLeft: isExpired ? 0 : daysLeft,
+          daysLeft,
           type,
           planName: subscription?.planId?.name || "current plan",
           loading: false,
