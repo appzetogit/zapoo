@@ -877,8 +877,19 @@ export async function broadcastDeliveryRequest(orderId, restaurantLat, restauran
 
   const nearest = await findNearestDeliveryBoys(restaurantLat, restaurantLng, order.restaurantId?._id || order.restaurantId, 5);
   const candidateIds = (nearest || []).map(db => db.deliveryPartnerId?.toString?.() || String(db.deliveryPartnerId || '')).filter(Boolean);
-  // Broadcast mode requirement: notify all riders in range; cash-limit is enforced at accept-time.
-  const eligibleIds = Array.from(new Set(candidateIds));
+
+  const rejectedIds = new Set(
+    (order.assignmentInfo?.broadcastRejectedDeliveryPartnerIds || [])
+      .map(id => id?.toString?.() || String(id || ''))
+      .filter(Boolean)
+  );
+
+  // Broadcast mode requirement: notify all riders in range.
+  // Do not re-notify riders who already rejected this order, unless restaurant triggers manual resend.
+  const uniqueCandidateIds = Array.from(new Set(candidateIds));
+  const eligibleIds = trigger === 'manual_resend'
+    ? uniqueCandidateIds
+    : uniqueCandidateIds.filter(id => !rejectedIds.has(id));
 
   // Reset broadcast tracking + clear sequential fields (if any)
   await Order.findByIdAndUpdate(orderId, {
@@ -886,7 +897,9 @@ export async function broadcastDeliveryRequest(orderId, restaurantLat, restauran
       'assignmentInfo.notificationPhase': 'broadcast',
       'assignmentInfo.broadcastNotifiedAt': now,
       'assignmentInfo.broadcastDeliveryPartnerIds': eligibleIds,
-      'assignmentInfo.broadcastRejectedDeliveryPartnerIds': [],
+      'assignmentInfo.broadcastRejectedDeliveryPartnerIds': trigger === 'manual_resend'
+        ? []
+        : Array.from(rejectedIds),
       'assignmentInfo.lastNotifiedAt': now,
       'assignmentInfo.noPartnerNotifiedAt': null,
       'assignmentInfo.noPartnerReason': null,
