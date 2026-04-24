@@ -189,7 +189,8 @@ export async function notifyDeliveryBoyNewOrder(order, deliveryPartnerId) {
 
     // Calculate distances
     let pickupDistance = null;
-    let deliveryDistance = null;
+    const pricingDistanceKm = Number(orderWithUser?.pricing?.distanceKm);
+    let deliveryDistance = Number.isFinite(pricingDistanceKm) && pricingDistanceKm > 0 ? pricingDistanceKm : null;
     if (deliveryPartner.availability?.currentLocation?.coordinates && restaurant?.location?.coordinates) {
       const [deliveryLng, deliveryLat] = deliveryPartner.availability.currentLocation.coordinates;
       const [restaurantLng, restaurantLat] = restaurant.location.coordinates;
@@ -198,21 +199,25 @@ export async function notifyDeliveryBoyNewOrder(order, deliveryPartnerId) {
       // Calculate pickup distance (delivery boy to restaurant)
       pickupDistance = calculateDistance(deliveryLat, deliveryLng, restaurantLat, restaurantLng);
 
-      // Calculate delivery distance (restaurant to customer)
-      deliveryDistance = calculateDistance(restaurantLat, restaurantLng, customerLat, customerLng);
+      // Calculate delivery distance (restaurant to customer) only when pricing snapshot is unavailable
+      if (!(Number.isFinite(deliveryDistance) && deliveryDistance > 0)) {
+        deliveryDistance = calculateDistance(restaurantLat, restaurantLng, customerLat, customerLng);
+      }
     }
 
     // Resolve tier name from restaurant zone if available
-    let tierName = null;
+    let tierName = orderWithUser?.pricing?.pricingMeta?.tierName || null;
     try {
-      const Zone = (await import('../../admin/models/Zone.js')).default;
-      const Tier = (await import('../../admin/models/Tier.js')).default;
-      const restaurantZoneId = restaurant?.zoneId;
-      if (restaurantZoneId) {
-        const zone = await Zone.findById(restaurantZoneId).select('tierId').lean();
-        if (zone?.tierId) {
-          const tier = await Tier.findById(zone.tierId).select('name').lean();
-          tierName = tier?.name || null;
+      if (!tierName) {
+        const Zone = (await import('../../admin/models/Zone.js')).default;
+        const Tier = (await import('../../admin/models/Tier.js')).default;
+        const restaurantZoneId = restaurant?.zoneId;
+        if (restaurantZoneId) {
+          const zone = await Zone.findById(restaurantZoneId).select('tierId').lean();
+          if (zone?.tierId) {
+            const tier = await Tier.findById(zone.tierId).select('name').lean();
+            tierName = tier?.name || null;
+          }
         }
       }
     } catch (tierError) {
@@ -263,7 +268,7 @@ export async function notifyDeliveryBoyNewOrder(order, deliveryPartnerId) {
       estimatedDeliveryTime: order.estimatedDeliveryTime || 30,
       note: order.note || '',
       pickupDistance: pickupDistance ? `${pickupDistance.toFixed(2)} km` : 'Distance not available',
-      deliveryDistance: deliveryDistance ? `${deliveryDistance.toFixed(2)} km` : 'Calculating...',
+      deliveryDistance: deliveryDistance ? `${Number(deliveryDistance).toFixed(2)} km` : 'Calculating...',
       deliveryDistanceRaw: deliveryDistance || 0,
       // Raw distance number for calculations
       estimatedEarnings
@@ -443,8 +448,10 @@ export async function notifyMultipleDeliveryBoys(order, deliveryPartnerIds, phas
     }
 
     // Calculate delivery distance (restaurant to customer) for earnings calculation
-    let deliveryDistance = 0;
-    if (restaurantLocation?.coordinates && orderWithUser.address?.location?.coordinates) {
+    // Keep it aligned with completion payout by preferring pricing snapshot distance.
+    const pricingDistanceKm = Number(orderWithUser?.pricing?.distanceKm);
+    let deliveryDistance = Number.isFinite(pricingDistanceKm) && pricingDistanceKm > 0 ? pricingDistanceKm : 0;
+    if (!(deliveryDistance > 0) && restaurantLocation?.coordinates && orderWithUser.address?.location?.coordinates) {
       const [restaurantLng, restaurantLat] = restaurantLocation.coordinates;
       const [customerLng, customerLat] = orderWithUser.address.location.coordinates;
 
@@ -461,12 +468,15 @@ export async function notifyMultipleDeliveryBoys(order, deliveryPartnerIds, phas
         console.warn('⚠️ Invalid coordinates for distance calculation');
       }
     } else {
-      console.warn('⚠️ Missing coordinates for distance calculation');
+      if (!(deliveryDistance > 0)) {
+        console.warn('⚠️ Missing coordinates for distance calculation');
+      }
     }
 
     // Calculate estimated earnings based on delivery distance
     let estimatedEarnings = null;
     const deliveryFeeFromOrder = orderWithUser.pricing?.deliveryFee ?? 0;
+    const tierName = orderWithUser?.pricing?.pricingMeta?.tierName || null;
     try {
       estimatedEarnings = await calculateEstimatedEarnings(
         deliveryDistance,
