@@ -306,10 +306,10 @@ export default function ProfilePage() {
               </p>
             </div>
             <div className="relative shrink-0 ml-4">
-              {(profile?.profileImage?.url || profile?.documents?.photo) ? (
+              {profile?.profileImage?.url ? (
                 <>
                   <img
-                    src={profile?.profileImage?.url || profile?.documents?.photo}
+                    src={profile?.profileImage?.url}
                     alt="Profile"
                     className="w-20 h-20 md:w-24 md:h-24 rounded-full object-cover border-2 border-gray-200"
                     onError={(e) => {
@@ -376,7 +376,11 @@ export default function ProfilePage() {
             <div className="space-y-3">
               {/* Today's Earnings entry moved from home screen */}
               <Card
-                onClick={() => navigate("/delivery/earnings")}
+                onClick={() => navigate("/delivery/earnings", {
+                  state: {
+                    initialTab: "day"
+                  }
+                })}
                 className="bg-white py-0 border-0 shadow-none rounded-lg cursor-pointer hover:bg-gray-200 transition-colors"
               >
                 <CardContent className="p-4 flex items-center justify-between">
@@ -553,4 +557,3 @@ export default function ProfilePage() {
     </div>
   );
 }
-

@@ -469,7 +469,7 @@ export default function NewAdvertisementPage() {
         </section>
       </div>
 
-      <div className="fixed bottom-16 md:bottom-0 left-0 right-0 bg-white border-t border-gray-100 p-4 pb-6 z-50">
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 p-4 pb-6 z-50">
         <div className="max-w-2xl mx-auto flex items-center justify-between gap-4">
           <div className="flex flex-col">
             <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">

@@ -14,6 +14,14 @@ const logger = winston.createLogger({
   })]
 });
 
+const VEHICLE_NUMBER_REGEX = /^(?:[A-Z]{2}\d{1,2}[A-Z]{1,3}\d{4}|\d{2}BH\d{4}[A-Z]{1,2})$/;
+const PROFILE_NAME_REGEX = /^[A-Za-z][A-Za-z\s.'-]{1,99}$/;
+const CITY_STATE_REGEX = /^[A-Za-z\s]{2,50}$/;
+const ZIP_CODE_REGEX = /^\d{6}$/;
+const IFSC_REGEX = /^[A-Z]{4}0[A-Z0-9]{6}$/;
+const BANK_ACCOUNT_REGEX = /^\d{9,18}$/;
+const BANK_NAME_REGEX = /^[A-Za-z][A-Za-z\s.'-]{1,99}$/;
+
 /**
  * Get Delivery Partner Profile
  * GET /api/delivery/profile
@@ -41,23 +49,23 @@ export const getProfile = asyncHandler(async (req, res) => {
  * PUT /api/delivery/profile
  */
 const updateProfileSchema = Joi.object({
-  name: Joi.string().trim().min(2).max(100).optional(),
+  name: Joi.string().trim().min(2).max(100).pattern(PROFILE_NAME_REGEX).optional(),
   email: Joi.string().email().lowercase().trim().optional().allow(null, ''),
-  dateOfBirth: Joi.date().optional().allow(null),
+  dateOfBirth: Joi.date().max('now').optional().allow(null),
   gender: Joi.string().valid('male', 'female', 'other', 'prefer-not-to-say').optional(),
   vehicle: Joi.object({
     type: Joi.string().valid('bike', 'scooter', 'bicycle', 'car').optional(),
-    number: Joi.string().trim().optional().allow(null, ''),
+    number: Joi.string().trim().uppercase().pattern(VEHICLE_NUMBER_REGEX).optional().allow(null, ''),
     model: Joi.string().trim().optional().allow(null, ''),
     brand: Joi.string().trim().optional().allow(null, '')
   }).optional(),
   location: Joi.object({
-    addressLine1: Joi.string().trim().optional().allow(null, ''),
-    addressLine2: Joi.string().trim().optional().allow(null, ''),
-    area: Joi.string().trim().optional().allow(null, ''),
-    city: Joi.string().trim().optional().allow(null, ''),
-    state: Joi.string().trim().optional().allow(null, ''),
-    zipCode: Joi.string().trim().optional().allow(null, '')
+    addressLine1: Joi.string().trim().max(120).optional().allow(null, ''),
+    addressLine2: Joi.string().trim().max(120).optional().allow(null, ''),
+    area: Joi.string().trim().max(80).optional().allow(null, ''),
+    city: Joi.string().trim().pattern(CITY_STATE_REGEX).optional().allow(null, ''),
+    state: Joi.string().trim().pattern(CITY_STATE_REGEX).optional().allow(null, ''),
+    zipCode: Joi.string().trim().pattern(ZIP_CODE_REGEX).optional().allow(null, '')
   }).optional(),
   profileImage: Joi.object({
     url: Joi.string().uri().optional().allow(null, ''),
@@ -65,10 +73,10 @@ const updateProfileSchema = Joi.object({
   }).optional(),
   documents: Joi.object({
     bankDetails: Joi.object({
-      accountHolderName: Joi.string().trim().min(2).max(100).optional().allow(null, ''),
-      accountNumber: Joi.string().trim().min(9).max(18).optional().allow(null, ''),
-      ifscCode: Joi.string().trim().length(11).uppercase().optional().allow(null, ''),
-      bankName: Joi.string().trim().min(2).max(100).optional().allow(null, '')
+      accountHolderName: Joi.string().trim().min(2).max(100).pattern(BANK_NAME_REGEX).optional().allow(null, ''),
+      accountNumber: Joi.string().trim().pattern(BANK_ACCOUNT_REGEX).optional().allow(null, ''),
+      ifscCode: Joi.string().trim().uppercase().pattern(IFSC_REGEX).optional().allow(null, ''),
+      bankName: Joi.string().trim().min(2).max(100).pattern(BANK_NAME_REGEX).optional().allow(null, '')
     }).optional()
   }).optional()
 });

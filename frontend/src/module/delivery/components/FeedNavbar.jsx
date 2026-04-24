@@ -309,8 +309,7 @@ export default function FeedNavbar({
         const response = await deliveryAPI.getProfile();
         if (response?.data?.success && response?.data?.data?.profile) {
           const profile = response.data.data.profile;
-          // Use profileImage.url first, fallback to documents.photo
-          const imageUrl = profile.profileImage?.url || profile.documents?.photo;
+          const imageUrl = profile.profileImage?.url;
           if (imageUrl) {
             setProfileImage(imageUrl);
             setImageError(false);

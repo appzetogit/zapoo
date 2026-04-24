@@ -217,11 +217,30 @@ export const getOfferPerformance = asyncHandler(async (req, res) => {
     prevEnd
   } = getPeriodWindow(mode, now);
 
+  const offerDocs = await Offer.find({ restaurant: restaurantId }).select('status startDate endDate items.couponCode').lean();
+  const couponCodes = Array.from(new Set(
+    offerDocs.flatMap((offer) => (offer?.items || [])
+      .map((item) => String(item?.couponCode || '').trim())
+      .filter(Boolean))
+  ));
+
   const baseOrderQuery = {
     restaurantId,
     status: { $nin: ['cancelled', 'failed', 'refunded'] },
-    'pricing.couponSource': 'restaurant',
-    'pricing.couponCode': { $exists: true, $ne: null }
+    $or: [
+      {
+        'pricing.couponSource': 'restaurant',
+        'pricing.couponCode': { $exists: true, $ne: null }
+      },
+      {
+        'pricing.appliedCoupon.source': 'restaurant',
+        'pricing.appliedCoupon.code': { $exists: true, $ne: null }
+      },
+      ...(couponCodes.length > 0 ? [
+        { 'pricing.couponCode': { $in: couponCodes } },
+        { 'pricing.appliedCoupon.code': { $in: couponCodes } }
+      ] : [])
+    ]
   };
 
   const currentOrders = await Order.find({
@@ -256,7 +275,6 @@ export const getOfferPerformance = asyncHandler(async (req, res) => {
     return round2(((cur - prev) / prev) * 100);
   };
 
-  const offerDocs = await Offer.find({ restaurant: restaurantId }).select('status startDate endDate').lean();
   const groupedOffers = {
     active: 0,
     scheduled: 0,

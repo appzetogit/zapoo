@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { useNavigate } from "react-router-dom"
+import { useLocation, useNavigate } from "react-router-dom"
 import { ArrowLeft, Share2, ChevronLeft, ChevronRight, ChevronDown, Loader2 } from "lucide-react"
 import { formatCurrency } from "../../restaurant/utils/currency"
 import { useProgressStore } from "../store/progressStore"
@@ -9,7 +9,9 @@ import { handleShare as shareWithFallback } from "@/lib/utils/share"
 
 export default function Earnings() {
   const navigate = useNavigate()
-  const [activeTab, setActiveTab] = useState("week")
+  const location = useLocation()
+  const initialTab = location.state?.initialTab
+  const [activeTab, setActiveTab] = useState(initialTab === "day" ? "day" : "week")
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [showDatePicker, setShowDatePicker] = useState(false)
   const [showWeekPicker, setShowWeekPicker] = useState(false)
@@ -892,4 +894,3 @@ export default function Earnings() {
     </div>
   )
 }
-

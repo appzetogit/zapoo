@@ -202,17 +202,17 @@ const SectionItem = ({
   showArrow = true,
   rightContent,
   subtitleClassName = "truncate"
-}) => <motion.button onClick={onClick} className="w-full flex items-center gap-3 p-4 hover:bg-gray-50 transition-colors text-left border-b border-dashed border-gray-200 last:border-0" whileTap={{
+}) => <motion.button onClick={onClick} className="w-full flex items-center gap-3 p-4 hover:bg-gray-50 dark:hover:bg-[#222222] transition-colors text-left border-b border-dashed border-gray-200 dark:border-gray-700 last:border-0" whileTap={{
   scale: 0.99
 }}>
-    <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
-      <Icon className="w-5 h-5 text-gray-600" />
+    <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center flex-shrink-0">
+      <Icon className="w-5 h-5 text-gray-600 dark:text-gray-300" />
     </div>
     <div className="flex-1 min-w-0">
-      <p className="font-medium text-gray-900 truncate">{title}</p>
-      {subtitle && <p className={`text-sm text-gray-500 ${subtitleClassName}`}>{subtitle}</p>}
+      <p className="font-medium text-gray-900 dark:text-white truncate">{title}</p>
+      {subtitle && <p className={`text-sm text-gray-500 dark:text-gray-400 ${subtitleClassName}`}>{subtitle}</p>}
     </div>
-    {rightContent || showArrow && <ChevronRight className="w-5 h-5 text-gray-400" />}
+    {rightContent || showArrow && <ChevronRight className="w-5 h-5 text-gray-400 dark:text-gray-500" />}
   </motion.button>;
 export default function OrderTracking() {
   const { t } = useTranslation();
@@ -725,20 +725,20 @@ export default function OrderTracking() {
 
   // Loading state
   if (loading) {
-    return <AnimatedPage className="min-h-screen bg-gray-50 p-4">
+    return <AnimatedPage className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a] p-4">
         <div className="max-w-lg mx-auto text-center py-20">
-          <Loader2 className="w-8 h-8 animate-spin text-gray-600 mx-auto mb-4" />
-          <p className="text-gray-600">{t("user.orderTracking.loadingOrderDetails")}</p>
+          <Loader2 className="w-8 h-8 animate-spin text-gray-600 dark:text-gray-300 mx-auto mb-4" />
+          <p className="text-gray-600 dark:text-gray-300">{t("user.orderTracking.loadingOrderDetails")}</p>
         </div>
       </AnimatedPage>;
   }
 
   // Error state
   if (error || !order) {
-    return <AnimatedPage className="min-h-screen bg-gray-50 p-4">
+    return <AnimatedPage className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a] p-4">
         <div className="max-w-lg mx-auto text-center py-20">
-          <h1 className="text-lg sm:text-xl md:text-2xl font-bold mb-4">{t("user.orderTracking.orderNotFound")}</h1>
-          <p className="text-gray-600 mb-6">{error || t("user.orderTracking.orderNotFoundDescription")}</p>
+          <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 dark:text-white mb-4">{t("user.orderTracking.orderNotFound")}</h1>
+          <p className="text-gray-600 dark:text-gray-300 mb-6">{error || t("user.orderTracking.orderNotFoundDescription")}</p>
           <Link to="/user/orders">
             <Button>{t("user.orderTracking.backToOrders")}</Button>
           </Link>
@@ -807,7 +807,7 @@ export default function OrderTracking() {
             y: 0
           }} transition={{
             delay: 0.9
-          }} className="text-2xl font-bold text-gray-900 mt-6">
+          }} className="text-2xl font-bold text-gray-900 dark:text-white mt-6">
                 {t("user.orderTracking.orderConfirmed")}
               </motion.h1>
               <motion.p initial={{
@@ -818,7 +818,7 @@ export default function OrderTracking() {
             y: 0
           }} transition={{
             delay: 1.1
-          }} className="text-gray-600 mt-2">
+          }} className="text-gray-600 dark:text-gray-300 mt-2">
                 {t("user.orderTracking.orderPlacedSuccessfully")}
               </motion.p>
               <motion.div initial={{
@@ -829,7 +829,7 @@ export default function OrderTracking() {
             delay: 1.5
           }} className="mt-8">
                 <div className="w-8 h-8 border-2 border-green-500 border-t-transparent rounded-full animate-spin mx-auto" />
-                <p className="text-sm text-gray-500 mt-3">{t("user.orderTracking.loadingOrderDetails")}</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-3">{t("user.orderTracking.loadingOrderDetails")}</p>
               </motion.div>
             </motion.div>
           </motion.div>}
@@ -907,7 +907,7 @@ export default function OrderTracking() {
         const isReadyForPickup = order?.status === 'ready' && !hasAcceptedPickup;
 
         if (isReadyForPickup) {
-          return <motion.div className="bg-white rounded-xl p-4 shadow-sm" initial={{
+          return <motion.div className="bg-white dark:bg-[#1a1a1a] rounded-xl p-4 shadow-sm border border-transparent dark:border-gray-800" initial={{
             opacity: 0,
             y: 20
           }} animate={{
@@ -920,14 +920,14 @@ export default function OrderTracking() {
                   <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center overflow-hidden">
                     <img src={circleIcon} alt={t("user.orderTracking.orderReadyAlt")} className="w-full h-full object-cover" />
                   </div>
-                  <p className="font-semibold text-gray-900">{t("user.orderTracking.orderReadyForPickup")}</p>
+                  <p className="font-semibold text-gray-900 dark:text-white">{t("user.orderTracking.orderReadyForPickup")}</p>
                 </div>
               </motion.div>;
         }
 
         // Show "Food is Cooking" until the delivery partner actually picks up the order
         if (!hasAcceptedPickup) {
-          return <motion.div className="bg-white rounded-xl p-4 shadow-sm" initial={{
+          return <motion.div className="bg-white dark:bg-[#1a1a1a] rounded-xl p-4 shadow-sm border border-transparent dark:border-gray-800" initial={{
             opacity: 0,
             y: 20
           }} animate={{
@@ -940,7 +940,7 @@ export default function OrderTracking() {
                   <div className="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center overflow-hidden">
                     <img src={circleIcon} alt={t("user.orderTracking.foodCookingAlt")} className="w-full h-full object-cover" />
                   </div>
-                  <p className="font-semibold text-gray-900">{t("user.orderTracking.foodIsCooking")}</p>
+                  <p className="font-semibold text-gray-900 dark:text-white">{t("user.orderTracking.foodIsCooking")}</p>
                 </div>
               </motion.div>;
         }
@@ -950,7 +950,7 @@ export default function OrderTracking() {
       })()}
 
         {/* Delivery Details Banner */}
-        <motion.div className="bg-yellow-50 rounded-xl p-4 text-center" initial={{
+        <motion.div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-xl p-4 text-center border border-transparent dark:border-yellow-800/40" initial={{
         opacity: 0,
         y: 20
       }} animate={{
@@ -959,13 +959,13 @@ export default function OrderTracking() {
       }} transition={{
         delay: 0.65
       }}>
-          <p className="text-yellow-800 font-medium">
+          <p className="text-yellow-800 dark:text-yellow-300 font-medium">
             {t("user.orderTracking.deliveryDetailsBanner")}
           </p>
         </motion.div>
 
         {/* Contact & Address Section */}
-        <motion.div className="bg-white rounded-xl shadow-sm overflow-hidden" initial={{
+        <motion.div className="bg-white dark:bg-[#1a1a1a] rounded-xl shadow-sm overflow-hidden border border-transparent dark:border-gray-800" initial={{
         opacity: 0,
         y: 20
       }} animate={{
@@ -1017,7 +1017,7 @@ export default function OrderTracking() {
         </motion.div>
 
         {/* Restaurant Section */}
-        <motion.div className="bg-white rounded-xl shadow-sm overflow-hidden" initial={{
+        <motion.div className="bg-white dark:bg-[#1a1a1a] rounded-xl shadow-sm overflow-hidden border border-transparent dark:border-gray-800" initial={{
         opacity: 0,
         y: 20
       }} animate={{
@@ -1026,39 +1026,39 @@ export default function OrderTracking() {
       }} transition={{
         delay: 0.75
       }}>
-          <div className="flex items-center gap-3 p-4 border-b border-dashed border-gray-200">
-            <div className="w-12 h-12 rounded-full bg-orange-100 overflow-hidden flex items-center justify-center">
+          <div className="flex items-center gap-3 p-4 border-b border-dashed border-gray-200 dark:border-gray-700">
+            <div className="w-12 h-12 rounded-full bg-orange-100 dark:bg-orange-900/30 overflow-hidden flex items-center justify-center">
               <span className="text-2xl">🍔</span>
             </div>
             <div className="flex-1">
-              <p className="font-semibold text-gray-900">{order.restaurant}</p>
-              <p className="text-sm text-gray-500">{order.address?.city || t("user.orderTracking.localArea")}</p>
+              <p className="font-semibold text-gray-900 dark:text-white">{order.restaurant}</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">{order.address?.city || t("user.orderTracking.localArea")}</p>
             </div>
             <motion.button
               type="button"
               onClick={handleCallRestaurantMasked}
               disabled={isCallingRestaurant || order.status === "cancelled" || order.status === "delivered"}
-              className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-10 h-10 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
               whileTap={{
                 scale: 0.9
               }}
             >
               {isCallingRestaurant ? (
-                <Loader2 className="w-5 h-5 text-green-700 animate-spin" />
+                <Loader2 className="w-5 h-5 text-green-700 dark:text-green-300 animate-spin" />
               ) : (
-                <Phone className="w-5 h-5 text-green-700" />
+                <Phone className="w-5 h-5 text-green-700 dark:text-green-300" />
               )}
             </motion.button>
           </div>
 
           {/* Order Items */}
-          <div className="p-4 border-b border-dashed border-gray-200">
+          <div className="p-4 border-b border-dashed border-gray-200 dark:border-gray-700">
             <div className="flex items-start gap-3">
-              <Receipt className="w-5 h-5 text-gray-500 mt-0.5" />
+              <Receipt className="w-5 h-5 text-gray-500 dark:text-gray-400 mt-0.5" />
               <div className="flex-1">
-                <p className="font-medium text-gray-900">{t("user.orderTracking.orderNumber", { id: order?.id || order?.orderId || t("user.orderTracking.na") })}</p>
+                <p className="font-medium text-gray-900 dark:text-white">{t("user.orderTracking.orderNumber", { id: order?.id || order?.orderId || t("user.orderTracking.na") })}</p>
                 <div className="mt-2 space-y-1">
-                  {order?.items?.map((item, index) => <div key={index} className="flex items-center gap-2 text-sm text-gray-600">
+                  {order?.items?.map((item, index) => <div key={index} className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
                       <span className="w-4 h-4 rounded border border-green-600 flex items-center justify-center">
                         <span className="w-2 h-2 rounded-full bg-green-600" />
                       </span>
@@ -1071,7 +1071,7 @@ export default function OrderTracking() {
         </motion.div>
 
         {/* Help Section */}
-        {isOrderCancelable(order) && <motion.div className="bg-white rounded-xl shadow-sm overflow-hidden" initial={{
+        {isOrderCancelable(order) && <motion.div className="bg-white dark:bg-[#1a1a1a] rounded-xl shadow-sm overflow-hidden border border-transparent dark:border-gray-800" initial={{
         opacity: 0,
         y: 20
       }} animate={{
@@ -1087,34 +1087,34 @@ export default function OrderTracking() {
 
       {/* Cancel Order Dialog */}
       <Dialog open={showPhoneDialog} onOpenChange={setShowPhoneDialog}>
-        <DialogContent className="w-[92%] max-w-[360px] overflow-hidden rounded-[24px] border-0 p-0 shadow-2xl [&>button]:right-4 [&>button]:top-4 [&>button]:h-8 [&>button]:w-8 [&>button]:rounded-full [&>button]:border [&>button]:border-green-100 [&>button]:bg-white [&>button]:text-gray-500 [&>button]:opacity-100">
+        <DialogContent className="w-[92%] max-w-[360px] overflow-hidden rounded-[24px] border-0 p-0 shadow-2xl bg-white dark:bg-[#1a1a1a] [&>button]:right-4 [&>button]:top-4 [&>button]:h-8 [&>button]:w-8 [&>button]:rounded-full [&>button]:border [&>button]:border-green-100 dark:[&>button]:border-gray-700 [&>button]:bg-white dark:[&>button]:bg-[#111111] [&>button]:text-gray-500 dark:[&>button]:text-gray-300 [&>button]:opacity-100">
           <div className="h-1.5 w-full bg-green-600" />
           <div className="px-5 pb-5 pt-4">
-            <DialogHeader className="space-y-1 border-b border-green-50 pb-4 text-left">
-              <DialogTitle className="text-lg font-semibold text-gray-900">
+            <DialogHeader className="space-y-1 border-b border-green-50 dark:border-gray-700 pb-4 text-left">
+              <DialogTitle className="text-lg font-semibold text-gray-900 dark:text-white">
               {t("user.orderTracking.editCustomerNumber")}
               </DialogTitle>
-              <p className="pr-8 text-sm leading-5 text-gray-500">
+              <p className="pr-8 text-sm leading-5 text-gray-500 dark:text-gray-400">
                 {t("user.orderTracking.editCustomerNumberDesc")}
               </p>
             </DialogHeader>
             <div className="space-y-2 pt-4">
-              <label className="block text-sm font-medium text-gray-700">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
                 {t("user.orderTracking.phoneNumber")}
               </label>
-              <div className="rounded-2xl border border-green-100 bg-green-50/50 p-2">
+              <div className="rounded-2xl border border-green-100 dark:border-gray-700 bg-green-50/50 dark:bg-gray-900/40 p-2">
                 <input
                   type="tel"
                   value={editablePhone}
                   onChange={e => setEditablePhone(e.target.value)}
                   placeholder={t("user.orderTracking.enterPhoneNumber")}
-                  className="w-full rounded-xl border border-green-200 bg-white px-4 py-3 text-base text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-green-500 focus:ring-2 focus:ring-green-100"
+                  className="w-full rounded-xl border border-green-200 dark:border-gray-700 bg-white dark:bg-[#0f0f0f] px-4 py-3 text-base text-gray-900 dark:text-gray-100 outline-none transition placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:border-green-500 focus:ring-2 focus:ring-green-100"
                   disabled={isSavingPhone}
                 />
               </div>
             </div>
             <div className="mt-5 flex gap-3">
-              <Button type="button" variant="outline" className="h-11 flex-1 rounded-xl border-gray-200 text-gray-700" onClick={() => setShowPhoneDialog(false)} disabled={isSavingPhone}>
+              <Button type="button" variant="outline" className="h-11 flex-1 rounded-xl border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 dark:bg-transparent" onClick={() => setShowPhoneDialog(false)} disabled={isSavingPhone}>
                 {t("common.cancel")}
               </Button>
               <Button type="button" className="h-11 flex-1 rounded-xl bg-green-600 text-white shadow-sm hover:bg-green-700" onClick={handleSavePhone} disabled={isSavingPhone}>
@@ -1126,33 +1126,33 @@ export default function OrderTracking() {
       </Dialog>
 
       <Dialog open={showInstructionsDialog} onOpenChange={setShowInstructionsDialog}>
-        <DialogContent className="w-[92%] max-w-[380px] overflow-hidden rounded-[24px] border-0 p-0 shadow-2xl [&>button]:right-4 [&>button]:top-4 [&>button]:h-8 [&>button]:w-8 [&>button]:rounded-full [&>button]:border [&>button]:border-green-100 [&>button]:bg-white [&>button]:text-gray-500 [&>button]:opacity-100">
+        <DialogContent className="w-[92%] max-w-[380px] overflow-hidden rounded-[24px] border-0 p-0 shadow-2xl bg-white dark:bg-[#1a1a1a] [&>button]:right-4 [&>button]:top-4 [&>button]:h-8 [&>button]:w-8 [&>button]:rounded-full [&>button]:border [&>button]:border-green-100 dark:[&>button]:border-gray-700 [&>button]:bg-white dark:[&>button]:bg-[#111111] [&>button]:text-gray-500 dark:[&>button]:text-gray-300 [&>button]:opacity-100">
           <div className="h-1.5 w-full bg-green-600" />
           <div className="px-5 pb-5 pt-4">
-            <DialogHeader className="space-y-1 border-b border-green-50 pb-4 text-left">
-              <DialogTitle className="text-lg font-semibold text-gray-900">
+            <DialogHeader className="space-y-1 border-b border-green-50 dark:border-gray-700 pb-4 text-left">
+              <DialogTitle className="text-lg font-semibold text-gray-900 dark:text-white">
                 {t("user.orderTracking.deliveryInstructions")}
               </DialogTitle>
-              <p className="pr-8 text-sm leading-5 text-gray-500">
+              <p className="pr-8 text-sm leading-5 text-gray-500 dark:text-gray-400">
                 {t("user.orderTracking.deliveryInstructionsDesc")}
               </p>
             </DialogHeader>
             <div className="space-y-2 pt-4">
-              <label className="block text-sm font-medium text-gray-700">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
                 {t("user.orderTracking.instructions")}
               </label>
-              <div className="rounded-2xl border border-green-100 bg-green-50/50 p-2">
+              <div className="rounded-2xl border border-green-100 dark:border-gray-700 bg-green-50/50 dark:bg-gray-900/40 p-2">
                 <Textarea
                   value={deliveryInstructions}
                   onChange={e => setDeliveryInstructions(e.target.value)}
                   placeholder={t("user.orderTracking.instructionsPlaceholder")}
-                  className="min-h-[120px] w-full resize-none rounded-xl border border-green-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-green-500 focus:ring-2 focus:ring-green-100"
+                  className="min-h-[120px] w-full resize-none rounded-xl border border-green-200 dark:border-gray-700 bg-white dark:bg-[#0f0f0f] px-4 py-3 text-sm text-gray-900 dark:text-gray-100 outline-none transition placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:border-green-500 focus:ring-2 focus:ring-green-100"
                   disabled={isSavingInstructions}
                 />
               </div>
             </div>
             <div className="mt-5 flex gap-3">
-              <Button type="button" variant="outline" className="h-11 flex-1 rounded-xl border-gray-200 text-gray-700" onClick={() => setShowInstructionsDialog(false)} disabled={isSavingInstructions}>
+              <Button type="button" variant="outline" className="h-11 flex-1 rounded-xl border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 dark:bg-transparent" onClick={() => setShowInstructionsDialog(false)} disabled={isSavingInstructions}>
                 {t("common.cancel")}
               </Button>
               <Button type="button" className="h-11 flex-1 rounded-xl bg-green-600 text-white shadow-sm hover:bg-green-700" onClick={handleSaveDeliveryInstructions} disabled={isSavingInstructions}>
@@ -1164,21 +1164,21 @@ export default function OrderTracking() {
       </Dialog>
 
       <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
-        <DialogContent className="sm:max-w-xl w-[95%] max-w-[600px]">
+        <DialogContent className="sm:max-w-xl w-[95%] max-w-[600px] bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-800 [&>button]:text-gray-500 dark:[&>button]:text-gray-300">
           <DialogHeader>
-            <DialogTitle className="text-xl font-bold text-gray-900">
+            <DialogTitle className="text-xl font-bold text-gray-900 dark:text-white">
               {t("user.orderTracking.cancelOrder")}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-5 py-6 px-2">
             <div className="space-y-2 w-full">
-              <Textarea value={cancellationReason} onChange={e => setCancellationReason(e.target.value)} placeholder={t("user.orderTracking.cancellationReasonPlaceholder")} className="w-full min-h-[100px] resize-none border-2 border-gray-300 rounded-lg px-4 py-3 text-sm focus:border-red-500 focus:ring-2 focus:ring-red-200 focus:outline-none transition-colors disabled:bg-gray-100 disabled:cursor-not-allowed disabled:border-gray-200" disabled={isCancelling} />
+              <Textarea value={cancellationReason} onChange={e => setCancellationReason(e.target.value)} placeholder={t("user.orderTracking.cancellationReasonPlaceholder")} className="w-full min-h-[100px] resize-none border-2 border-gray-300 dark:border-gray-700 rounded-lg px-4 py-3 text-sm bg-white dark:bg-[#0f0f0f] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:border-red-500 focus:ring-2 focus:ring-red-200 focus:outline-none transition-colors disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:cursor-not-allowed disabled:border-gray-200 dark:disabled:border-gray-700" disabled={isCancelling} />
             </div>
             <div className="flex gap-3 pt-2">
               <Button variant="outline" onClick={() => {
               setShowCancelDialog(false);
               setCancellationReason("");
-            }} disabled={isCancelling} className="flex-1">
+            }} disabled={isCancelling} className="flex-1 border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 dark:bg-transparent">
                 {t("common.cancel")}
               </Button>
               <Button onClick={handleConfirmCancel} disabled={isCancelling || !cancellationReason.trim()} className="flex-1 bg-red-600 hover:bg-red-700 text-white">
