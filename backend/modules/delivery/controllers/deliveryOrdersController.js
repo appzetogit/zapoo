@@ -99,9 +99,15 @@ export const getOrders = asyncHandler(async (req, res) => {
           $in: [currentDeliveryId, currentDeliveryIdStr]
         }
       }, {
-        'assignmentInfo.broadcastDeliveryPartnerIds': {
-          $in: [currentDeliveryId, currentDeliveryIdStr]
-        }
+        $and: [{
+          'assignmentInfo.broadcastDeliveryPartnerIds': {
+            $in: [currentDeliveryId, currentDeliveryIdStr]
+          }
+        }, {
+          'assignmentInfo.broadcastRejectedDeliveryPartnerIds': {
+            $nin: [currentDeliveryId, currentDeliveryIdStr]
+          }
+        }]
       }]
     };
 
@@ -198,15 +204,21 @@ export const getOrderDetails = asyncHandler(async (req, res) => {
         const validAcceptanceStatuses = ['confirmed', 'preparing', 'ready'];
         const isInValidStatus = validAcceptanceStatuses.includes(order.status);
         const broadcastIds = assignmentInfo.broadcastDeliveryPartnerIds || [];
+        const broadcastRejectedIds = assignmentInfo.broadcastRejectedDeliveryPartnerIds || [];
         const priorityIds = assignmentInfo.priorityDeliveryPartnerIds || [];
         const expandedIds = assignmentInfo.expandedDeliveryPartnerIds || [];
         const normalizedBroadcastIds = broadcastIds.map(normalizeId).filter(Boolean);
+        const normalizedBroadcastRejectedIds = broadcastRejectedIds.map(normalizeId).filter(Boolean);
         const normalizedPriorityIds = priorityIds.map(normalizeId).filter(Boolean);
         const normalizedExpandedIds = expandedIds.map(normalizeId).filter(Boolean);
+        const isBroadcastRejected = normalizedBroadcastRejectedIds.includes(normalizedCurrentId);
         const wasNotified =
           normalizedBroadcastIds.includes(normalizedCurrentId) ||
           normalizedPriorityIds.includes(normalizedCurrentId) ||
           normalizedExpandedIds.includes(normalizedCurrentId);
+        if (isBroadcastRejected) {
+          return errorResponse(res, 403, 'Order not found or not available for you');
+        }
         if (isInValidStatus || wasNotified) {} else {
           console.warn(`⚠️ Delivery partner ${currentDeliveryId} cannot access order ${order.orderId} - Status: ${order.status}, Notified: ${wasNotified}`);
           return errorResponse(res, 403, 'Order not found or not available for you');
