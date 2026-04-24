@@ -541,10 +541,10 @@ export default function Profile() {
       </Dialog>
 
       <Dialog open={deleteConfirmOpen} onOpenChange={handleDeleteDialogOpenChange}>
-        <DialogContent className="w-[calc(100vw-1.5rem)] max-w-sm rounded-2xl p-4 sm:p-5 [&>button]:hidden">
+        <DialogContent className="w-[calc(100vw-1.5rem)] max-w-sm rounded-2xl p-4 sm:p-5 bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-800 [&>button]:hidden">
           <DialogHeader className="space-y-2 text-center">
             <DialogTitle className="text-base sm:text-lg font-bold text-red-600">Delete Your Account?</DialogTitle>
-            <DialogDescription className="text-sm leading-5 text-gray-600">
+            <DialogDescription className="text-sm leading-5 text-gray-600 dark:text-gray-300">
               Are you sure you want to delete your account? All your data will be permanently lost. This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
@@ -553,7 +553,7 @@ export default function Profile() {
             value={deleteConfirmationText}
             onChange={handleDeleteConfirmationChange}
             disabled={isDeletingAccount}
-            className="h-11 mt-2"
+            className="h-11 mt-2 bg-white dark:bg-[#232323] border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400 focus-visible:ring-red-500"
           />
           <DialogFooter className="mt-4 flex-col gap-2">
             <Button
@@ -561,7 +561,7 @@ export default function Profile() {
               variant="outline"
               onClick={() => handleDeleteDialogOpenChange(false)}
               disabled={isDeletingAccount}
-              className="h-11 w-full"
+              className="h-11 w-full border-gray-300 text-gray-800 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-[#2a2a2a]"
             >
               Cancel
             </Button>
