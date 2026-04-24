@@ -73,14 +73,14 @@ export default function UserOrderDetails() {
     }
   };
   if (loading) {
-    return <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <p className="text-gray-600 text-sm">{t("user.orderDetailsPage.loadingOrderDetails")}</p>
+    return <div className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a] flex items-center justify-center">
+        <p className="text-gray-600 dark:text-gray-300 text-sm">{t("user.orderDetailsPage.loadingOrderDetails")}</p>
       </div>;
   }
   if (!order) {
-    return <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+    return <div className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a] flex items-center justify-center">
         <div className="text-center space-y-3">
-          <p className="text-gray-700 text-sm font-medium">{t("user.orderDetailsPage.orderNotFound")}</p>
+          <p className="text-gray-700 dark:text-gray-200 text-sm font-medium">{t("user.orderDetailsPage.orderNotFound")}</p>
           <button onClick={() => navigate("/user/orders")} className="px-4 py-2 rounded-lg bg-[#E23744] text-white text-sm font-semibold">
             {t("user.orderDetailsPage.backToOrders")}
           </button>
@@ -432,26 +432,26 @@ export default function UserOrderDetails() {
       toast.error(t("user.orderDetailsPage.toast.failedToDownloadSummary"));
     }
   };
-  return <div className="min-h-screen bg-gray-50 pb-24 font-sans relative">
+  return <div className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a] pb-24 font-sans relative">
       {/* Header */}
-      <div className="bg-white p-4 flex items-center sticky top-0 z-20 shadow-sm">
+      <div className="bg-white dark:bg-[#1a1a1a] p-4 flex items-center sticky top-0 z-20 shadow-sm border-b border-gray-100 dark:border-gray-800">
         <div className="flex items-center gap-3">
-          <button type="button" onClick={() => navigate(-1)} className="p-1 rounded-full hover:bg-gray-100">
-            <ArrowLeft className="w-6 h-6 text-gray-700 cursor-pointer" />
+          <button type="button" onClick={() => navigate(-1)} className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800">
+            <ArrowLeft className="w-6 h-6 text-gray-700 dark:text-gray-200 cursor-pointer" />
           </button>
-          <h1 className="text-lg font-semibold text-gray-800">{t("user.orderDetailsPage.title")}</h1>
+          <h1 className="text-lg font-semibold text-gray-800 dark:text-white">{t("user.orderDetailsPage.title")}</h1>
         </div>
       </div>
 
       {/* Scrollable Content */}
       <div className="p-4 space-y-4">
         {/* Status Card */}
-        <div className="bg-white p-4 rounded-xl flex items-center gap-3 shadow-sm">
-          <div className="bg-gray-100 p-2 rounded-lg">
-            <ShoppingBag className="w-6 h-6 text-gray-600" />
+        <div className="bg-white dark:bg-[#1a1a1a] p-4 rounded-xl flex items-center gap-3 shadow-sm border border-transparent dark:border-gray-800">
+          <div className="bg-gray-100 dark:bg-gray-800 p-2 rounded-lg">
+            <ShoppingBag className="w-6 h-6 text-gray-600 dark:text-gray-300" />
           </div>
           <div>
-            <h2 className="font-semibold text-gray-800">
+            <h2 className="font-semibold text-gray-800 dark:text-white">
               {order.status === "delivered" ? t("user.orderDetailsPage.orderWasDelivered") : t("user.orderDetailsPage.orderStatusWithValue", {
               status: order.status || t("user.orderDetailsPage.processing")
             })}
@@ -460,15 +460,15 @@ export default function UserOrderDetails() {
         </div>
 
         {/* Restaurant Info Card */}
-        <div className="bg-white p-4 rounded-xl shadow-sm">
+        <div className="bg-white dark:bg-[#1a1a1a] p-4 rounded-xl shadow-sm border border-transparent dark:border-gray-800">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <img src={
             // Prefer the food image from the first ordered item
             Array.isArray(items) && items[0]?.image || restaurantObj.profileImage?.url || restaurantObj.profileImage || order.restaurantImage || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=100&q=80"} alt={restaurantName} className="w-10 h-10 rounded-lg object-cover" />
               <div>
-                <h3 className="font-semibold text-gray-800">{restaurantName}</h3>
-                <p className="text-xs text-gray-500">{restaurantLocation}</p>
+                <h3 className="font-semibold text-gray-800 dark:text-white">{restaurantName}</h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{restaurantLocation}</p>
               </div>
             </div>
 
@@ -478,7 +478,7 @@ export default function UserOrderDetails() {
                 onClick={handleCallRestaurant}
                 disabled={callingRestaurant}
                 title={t("user.orderDetailsPage.callRestaurantMasked")}
-                className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center text-[#E23744] hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-8 h-8 rounded-full border border-gray-200 dark:border-gray-700 flex items-center justify-center text-[#E23744] hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Phone className="w-4 h-4" />
               </button>
@@ -488,7 +488,7 @@ export default function UserOrderDetails() {
                   onClick={handleCallDeliveryPartner}
                   disabled={callingDeliveryPartner}
                   title={t("user.orderDetailsPage.callDeliveryPartnerMasked")}
-                  className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center text-green-600 hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-8 h-8 rounded-full border border-gray-200 dark:border-gray-700 flex items-center justify-center text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Phone className="w-4 h-4" />
                 </button>
@@ -497,17 +497,17 @@ export default function UserOrderDetails() {
           </div>
 
           <div className="flex items-center gap-2 mb-4">
-            <span className="text-xs text-gray-500 uppercase tracking-wide font-medium">
+            <span className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide font-medium">
               {t("user.orderDetailsPage.orderIdLabel", {
               id: orderIdDisplay
             })}
             </span>
             <button type="button" onClick={handleCopyOrderId}>
-              <Copy className="w-3 h-3 text-gray-400 cursor-pointer" />
+              <Copy className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-pointer" />
             </button>
           </div>
 
-          <div className="border-t border-dashed border-gray-200 my-3" />
+          <div className="border-t border-dashed border-gray-200 dark:border-gray-700 my-3" />
 
           {/* Items */}
           {items.map((item, idx) => <div key={idx} className="flex justify-between items-start mt-2">
@@ -515,36 +515,36 @@ export default function UserOrderDetails() {
                 <div className={`w-3 h-3 border ${item.isVeg ? "border-green-600" : "border-red-600"} flex items-center justify-center p-[1px]`}>
                   <div className={`w-full h-full rounded-full ${item.isVeg ? "bg-green-600" : "bg-red-600"}`} />
                 </div>
-                <span className="text-sm text-gray-700 font-medium">
+                <span className="text-sm text-gray-700 dark:text-gray-200 font-medium">
                   {item.quantity || item.qty || 1} x {item.name}
                 </span>
               </div>
-              <span className="text-sm text-gray-800 font-medium">
+              <span className="text-sm text-gray-800 dark:text-gray-100 font-medium">
                 ₹{(item.price || 0).toFixed(2)}
               </span>
             </div>)}
         </div>
 
         {/* Bill Summary Card */}
-        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-          <div className="p-4 flex justify-between items-center border-b border-gray-100">
+        <div className="bg-white dark:bg-[#1a1a1a] rounded-xl shadow-sm overflow-hidden border border-transparent dark:border-gray-800">
+          <div className="p-4 flex justify-between items-center border-b border-gray-100 dark:border-gray-800">
             <div className="flex items-center gap-2">
-              <FileText className="w-5 h-5 text-gray-600" />
-              <h3 className="font-semibold text-gray-800">{t("user.orderDetailsPage.billSummary")}</h3>
+              <FileText className="w-5 h-5 text-gray-600 dark:text-gray-300" />
+              <h3 className="font-semibold text-gray-800 dark:text-white">{t("user.orderDetailsPage.billSummary")}</h3>
             </div>
-            <button type="button" onClick={handleDownloadSummary} className="w-7 h-7 rounded-full bg-red-50 flex items-center justify-center text-[#E23744] hover:bg-red-100">
+            <button type="button" onClick={handleDownloadSummary} className="w-7 h-7 rounded-full bg-red-50 dark:bg-red-900/20 flex items-center justify-center text-[#E23744] hover:bg-red-100 dark:hover:bg-red-900/30">
               <Download className="w-4 h-4" />
             </button>
           </div>
 
           <div className="p-4 space-y-2 text-sm">
             <div className="flex justify-between">
-              <span className="text-gray-500">{t("user.orderDetailsPage.itemTotal")}</span>
+              <span className="text-gray-500 dark:text-gray-400">{t("user.orderDetailsPage.itemTotal")}</span>
               <div>
-                {pricing.originalItemTotal && <span className="text-gray-400 line-through mr-1">
+                {pricing.originalItemTotal && <span className="text-gray-400 dark:text-gray-500 line-through mr-1">
                     ₹{Number(pricing.originalItemTotal).toFixed(2)}
                   </span>}
-                <span className="text-gray-800">
+                <span className="text-gray-800 dark:text-gray-100">
                   ₹{Number(pricing.subtotal || pricing.total || 0).toFixed(2)}
                 </span>
               </div>
@@ -554,15 +554,15 @@ export default function UserOrderDetails() {
               onClick={() => setShowGstBreakdown(true)}
               className="flex w-full justify-between text-left"
             >
-              <span className="text-gray-500 underline underline-offset-4 decoration-dotted">{t("user.orderDetailsPage.gstGovTaxes")}</span>
-              <span className="text-gray-800">
+              <span className="text-gray-500 dark:text-gray-400 underline underline-offset-4 decoration-dotted">{t("user.orderDetailsPage.gstGovTaxes")}</span>
+              <span className="text-gray-800 dark:text-gray-100">
                 ₹{Number(pricing.tax || 0).toFixed(2)}
               </span>
             </button>
             <div className="flex justify-between">
-              <span className="text-gray-500">{t("user.orderDetailsPage.deliveryPartnerFee")}</span>
+              <span className="text-gray-500 dark:text-gray-400">{t("user.orderDetailsPage.deliveryPartnerFee")}</span>
               <div>
-                {pricing.originalDeliveryFee && <span className="text-gray-400 line-through mr-1">
+                {pricing.originalDeliveryFee && <span className="text-gray-400 dark:text-gray-500 line-through mr-1">
                     ₹{Number(pricing.originalDeliveryFee).toFixed(2)}
                   </span>}
                 <span className="text-blue-500 font-medium uppercase">
@@ -571,21 +571,21 @@ export default function UserOrderDetails() {
               </div>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-500">{t("user.orderDetailsPage.platformFee")}</span>
-              <span className="text-gray-800">
+              <span className="text-gray-500 dark:text-gray-400">{t("user.orderDetailsPage.platformFee")}</span>
+              <span className="text-gray-800 dark:text-gray-100">
                 ₹{Number(pricing.platformFee || 0).toFixed(2)}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-500">{t("user.orderDetailsPage.subscriptionOtherFees")}</span>
-              <span className="text-gray-800">
+              <span className="text-gray-500 dark:text-gray-400">{t("user.orderDetailsPage.subscriptionOtherFees")}</span>
+              <span className="text-gray-800 dark:text-gray-100">
                 ₹{Number(pricing.subscriptionFee || 0).toFixed(2)}
               </span>
             </div>
 
-            <div className="border-t border-gray-100 my-2 pt-2 flex justify-between items-center">
-              <span className="font-bold text-gray-800">{t("user.orderDetailsPage.paid")}</span>
-              <span className="font-bold text-gray-800">
+            <div className="border-t border-gray-100 dark:border-gray-800 my-2 pt-2 flex justify-between items-center">
+              <span className="font-bold text-gray-800 dark:text-white">{t("user.orderDetailsPage.paid")}</span>
+              <span className="font-bold text-gray-800 dark:text-white">
                 ₹{Number(pricing.total || 0).toFixed(2)}
               </span>
             </div>
@@ -595,7 +595,7 @@ export default function UserOrderDetails() {
           {savings > 0 && <div className="relative bg-blue-50 p-3 pb-4 mt-2">
               <div className="absolute -top-1.5 left-0 w-full overflow-hidden leading-none">
                 <svg className="relative block w-[calc(100%+1.3px)] h-[8px]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none">
-                  <path d="M0,0V46.29c47,0,47,69.5,94,69.5s47-69.5,94-69.5,47,69.5,94,69.5,47-69.5,94-69.5,47,69.5,94,69.5,47-69.5,94-69.5,47,69.5,94,69.5,47-69.5,94-69.5,47,69.5,94,69.5,47-69.5,94-69.5,47,69.5,94,69.5V0Z" fill="#ffffff" className="fill-white" />
+                  <path d="M0,0V46.29c47,0,47,69.5,94,69.5s47-69.5,94-69.5,47,69.5,94,69.5,47-69.5,94-69.5,47,69.5,94,69.5,47-69.5,94-69.5,47,69.5,94,69.5,47-69.5,94-69.5,47,69.5,94,69.5,47-69.5,94-69.5,47,69.5,94,69.5V0Z" fill="#ffffff" className="fill-white dark:fill-[#1a1a1a]" />
                 </svg>
               </div>
 
@@ -622,30 +622,30 @@ export default function UserOrderDetails() {
         />
 
         {/* User & Delivery Details */}
-        <div className="bg-white p-4 rounded-xl shadow-sm space-y-5">
+        <div className="bg-white dark:bg-[#1a1a1a] p-4 rounded-xl shadow-sm space-y-5 border border-transparent dark:border-gray-800">
           {/* User */}
           <div className="flex gap-3">
-            <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
-              <User className="w-5 h-5 text-gray-500" />
+            <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-800 flex items-center justify-center">
+              <User className="w-5 h-5 text-gray-500 dark:text-gray-400" />
             </div>
             <div>
-              <h4 className="font-semibold text-gray-800 text-sm">
+              <h4 className="font-semibold text-gray-800 dark:text-white text-sm">
                 {userName || t("user.orderDetailsPage.customer")}
               </h4>
-              <p className="text-gray-500 text-xs">{userPhone}</p>
+              <p className="text-gray-500 dark:text-gray-400 text-xs">{userPhone}</p>
             </div>
           </div>
 
           {/* Payment */}
           <div className="flex gap-3">
             <div className="mt-0.5">
-              <CreditCard className="w-5 h-5 text-gray-500" />
+              <CreditCard className="w-5 h-5 text-gray-500 dark:text-gray-400" />
             </div>
             <div>
-              <h4 className="font-semibold text-gray-800 text-sm">
+              <h4 className="font-semibold text-gray-800 dark:text-white text-sm">
                 {t("user.orderDetailsPage.paymentMethod")}
               </h4>
-              <p className="text-gray-500 text-xs mt-0.5">
+              <p className="text-gray-500 dark:text-gray-400 text-xs mt-0.5">
                 {t("user.orderDetailsPage.paidViaWithValue", {
                 method: paymentMethod
               })}
@@ -656,26 +656,26 @@ export default function UserOrderDetails() {
           {/* Date */}
           <div className="flex gap-3">
             <div className="mt-0.5">
-              <Calendar className="w-5 h-5 text-gray-500" />
+              <Calendar className="w-5 h-5 text-gray-500 dark:text-gray-400" />
             </div>
             <div>
-              <h4 className="font-semibold text-gray-800 text-sm">
+              <h4 className="font-semibold text-gray-800 dark:text-white text-sm">
                 {t("user.orderDetailsPage.paymentDate")}
               </h4>
-              <p className="text-gray-500 text-xs mt-0.5">{paymentDate}</p>
+              <p className="text-gray-500 dark:text-gray-400 text-xs mt-0.5">{paymentDate}</p>
             </div>
           </div>
 
           {/* Address */}
           <div className="flex gap-3">
             <div className="mt-0.5">
-              <MapPin className="w-5 h-5 text-gray-500" />
+              <MapPin className="w-5 h-5 text-gray-500 dark:text-gray-400" />
             </div>
             <div>
-              <h4 className="font-semibold text-gray-800 text-sm">
+              <h4 className="font-semibold text-gray-800 dark:text-white text-sm">
                 {t("user.orderDetailsPage.deliveryAddress")}
               </h4>
-              <p className="text-gray-500 text-xs mt-0.5 leading-relaxed">
+              <p className="text-gray-500 dark:text-gray-400 text-xs mt-0.5 leading-relaxed">
                 {addressText || t("user.orderDetailsPage.addressNotAvailable")}
               </p>
             </div>
@@ -684,12 +684,12 @@ export default function UserOrderDetails() {
       </div>
 
       {/* Fixed Bottom Buttons */}
-      <div className="fixed bottom-0 w-full bg-white border-t border-gray-200 p-4 flex gap-3 z-20">
+      <div className="fixed bottom-0 w-full bg-white dark:bg-[#1a1a1a] border-t border-gray-200 dark:border-gray-800 p-4 flex gap-3 z-20">
         <button type="button" onClick={() => navigate(`/user/restaurants/${order.restaurantId || ""}`)} className="flex-1 bg-[#E23744] text-white py-3 rounded-lg font-semibold flex items-center justify-center gap-2 hover:bg-red-600 transition-colors">
           <RotateCcw className="w-4 h-4" />
           {t("user.orderDetailsPage.reorder")}
         </button>
-        <button type="button" onClick={handleDownloadSummary} className="flex-1 bg-white border border-[#E23744] text-[#E23744] py-3 rounded-lg font-semibold flex items-center justify-center gap-2 hover:bg-red-50 transition-colors">
+        <button type="button" onClick={handleDownloadSummary} className="flex-1 bg-white dark:bg-[#0f0f0f] border border-[#E23744] text-[#E23744] py-3 rounded-lg font-semibold flex items-center justify-center gap-2 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
           <Download className="w-4 h-4" />
           {t("user.orderDetailsPage.invoice")}
         </button>
@@ -716,11 +716,10 @@ export default function UserOrderDetails() {
         // Convert to string if it's an ObjectId object
         const orderIdString = typeof orderMongoId === 'object' && orderMongoId.toString ? orderMongoId.toString() : String(orderMongoId);
         navigate(`/user/complaints/submit/${encodeURIComponent(orderIdString)}`);
-      }} className="w-full bg-orange-50 border border-orange-200 text-orange-700 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 hover:bg-orange-100 transition-colors">
+      }} className="w-full bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 text-orange-700 dark:text-orange-300 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 hover:bg-orange-100 dark:hover:bg-orange-900/30 transition-colors">
             <FileText className="w-4 h-4" />
             {t("user.orderDetailsPage.restaurantComplaint")}
           </button>
         </div>}
     </div>;
 }
-

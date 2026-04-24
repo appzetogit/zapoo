@@ -23,6 +23,29 @@ import {
 } from "@/components/ui/dialog"
 import { restaurantAPI } from "@/lib/api"
 
+const isFlutterInAppWebViewAvailable = () =>
+  typeof window !== "undefined" &&
+  typeof window.flutter_inappwebview?.callHandler === "function"
+
+const flutterBase64ToFile = (result, fallbackName) => {
+  if (!result || result.success === false || !result.base64) return null
+
+  let base64Data = String(result.base64)
+  if (base64Data.includes(",")) {
+    base64Data = base64Data.split(",")[1]
+  }
+
+  const byteCharacters = atob(base64Data)
+  const byteNumbers = new Array(byteCharacters.length)
+  for (let i = 0; i < byteCharacters.length; i++) {
+    byteNumbers[i] = byteCharacters.charCodeAt(i)
+  }
+  const byteArray = new Uint8Array(byteNumbers)
+  const mimeType = result.mimeType || "image/jpeg"
+  const blob = new Blob([byteArray], { type: mimeType })
+  return new File([blob], result.fileName || fallbackName, { type: mimeType })
+}
+
 export default function InviteUser() {
   const { t } = useTranslation()
   const navigate = useNavigate()
@@ -153,6 +176,46 @@ export default function InviteUser() {
         setPhotoPreview(event.target?.result)
       }
       reader.readAsDataURL(file)
+    }
+  }
+
+  const capturePhotoFromFlutter = async (source) => {
+    if (!isFlutterInAppWebViewAvailable()) return false
+
+    try {
+      const result = await window.flutter_inappwebview.callHandler(
+        source === "camera" ? "openCamera" : "openGallery",
+        {
+          source,
+          accept: "image/*",
+          multiple: false,
+          quality: 0.8,
+        }
+      )
+
+      if (!result || result.success === false) return false
+
+      let file = null
+      if (result.file) {
+        file = result.file
+      } else if (result.base64) {
+        file = flutterBase64ToFile(result, `invite-user-${Date.now()}.jpg`)
+      }
+
+      if (file) {
+        setPhoto(file)
+        const reader = new FileReader()
+        reader.onload = (event) => {
+          setPhotoPreview(event.target?.result)
+        }
+        reader.readAsDataURL(file)
+        return true
+      }
+
+      return false
+    } catch (error) {
+      console.error(`Error capturing invite user photo from Flutter ${source}:`, error)
+      return false
     }
   }
 
@@ -353,13 +416,35 @@ export default function InviteUser() {
                   </button>
                 </div>
               ) : (
-                <label
-                  htmlFor="photoInput"
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white border border-gray-300 text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-50 transition-colors"
-                >
-                  <Upload className="w-4 h-4" />
-                  <span>{t("restaurant.inviteUser.actions.uploadPhoto")}</span>
-                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (isFlutterInAppWebViewAvailable()) {
+                        const picked = await capturePhotoFromFlutter("gallery")
+                        if (picked) return
+                      }
+                      document.getElementById("photoInput")?.click()
+                    }}
+                    className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-white border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    <Upload className="w-4 h-4" />
+                    <span>{t("restaurant.inviteUser.actions.uploadPhoto")}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (isFlutterInAppWebViewAvailable()) {
+                        const picked = await capturePhotoFromFlutter("camera")
+                        if (picked) return
+                      }
+                      document.getElementById("photoInput")?.click()
+                    }}
+                    className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-black text-white text-sm font-medium hover:bg-gray-900 transition-colors"
+                  >
+                    <span>{t("restaurant.inviteUser.actions.takePhoto", { defaultValue: "Take photo" })}</span>
+                  </button>
+                </div>
               )}
               <input
                 id="photoInput"
@@ -453,4 +538,3 @@ export default function InviteUser() {
     </div>
   )
 }
-

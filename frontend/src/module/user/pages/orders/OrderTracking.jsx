@@ -2,7 +2,7 @@ import { useParams, Link, useSearchParams } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
-import { ArrowLeft, Share2, RefreshCw, Phone, ChevronRight, MapPin, Home as HomeIcon, MessageSquare, X, Check, Shield, Receipt, CircleSlash, Loader2 } from "lucide-react";
+import { ArrowLeft, Share2, RefreshCw, Phone, ChevronRight, MapPin, Home as HomeIcon, MessageSquare, X, Check, Receipt, CircleSlash, Loader2 } from "lucide-react";
 import AnimatedPage from "../../components/AnimatedPage";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -949,25 +949,6 @@ export default function OrderTracking() {
         return null;
       })()}
 
-        {/* Delivery Partner Safety */}
-        <motion.button className="w-full bg-white rounded-xl p-4 shadow-sm flex items-center gap-3" initial={{
-        opacity: 0,
-        y: 20
-      }} animate={{
-        opacity: 1,
-        y: 0
-      }} transition={{
-        delay: 0.6
-      }} whileTap={{
-        scale: 0.99
-      }}>
-          <Shield className="w-6 h-6 text-gray-600" />
-          <span className="flex-1 text-left font-medium text-gray-900">
-            {t("user.orderTracking.learnSafety")}
-          </span>
-          <ChevronRight className="w-5 h-5 text-gray-400" />
-        </motion.button>
-
         {/* Delivery Details Banner */}
         <motion.div className="bg-yellow-50 rounded-xl p-4 text-center" initial={{
         opacity: 0,
@@ -1085,7 +1066,6 @@ export default function OrderTracking() {
                     </div>)}
                 </div>
               </div>
-              <ChevronRight className="w-5 h-5 text-gray-400" />
             </div>
           </div>
         </motion.div>

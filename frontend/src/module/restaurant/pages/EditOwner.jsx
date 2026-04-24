@@ -7,6 +7,7 @@ import {
   User,
   Edit,
   Trash2,
+  Upload,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -25,6 +26,29 @@ import { firebaseAuth } from "@/lib/firebase"
 import { revokeFcmTokenOnLogout } from "@/lib/utils/fcmTokenLifecycle"
 
 const STORAGE_KEY = "restaurant_owner_contact"
+
+const isFlutterInAppWebViewAvailable = () =>
+  typeof window !== "undefined" &&
+  typeof window.flutter_inappwebview?.callHandler === "function"
+
+const flutterBase64ToFile = (result, fallbackName) => {
+  if (!result || result.success === false || !result.base64) return null
+
+  let base64Data = String(result.base64)
+  if (base64Data.includes(",")) {
+    base64Data = base64Data.split(",")[1]
+  }
+
+  const byteCharacters = atob(base64Data)
+  const byteNumbers = new Array(byteCharacters.length)
+  for (let i = 0; i < byteCharacters.length; i++) {
+    byteNumbers[i] = byteCharacters.charCodeAt(i)
+  }
+  const byteArray = new Uint8Array(byteNumbers)
+  const mimeType = result.mimeType || "image/jpeg"
+  const blob = new Blob([byteArray], { type: mimeType })
+  return new File([blob], result.fileName || fallbackName, { type: mimeType })
+}
 
 export default function EditOwner() {
   const { t } = useTranslation()
@@ -189,6 +213,50 @@ export default function EditOwner() {
         }))
       }
       reader.readAsDataURL(file)
+    }
+  }
+
+  const capturePhotoFromFlutter = async (source) => {
+    if (!isFlutterInAppWebViewAvailable()) return false
+
+    try {
+      const result = await window.flutter_inappwebview.callHandler(
+        source === "camera" ? "openCamera" : "openGallery",
+        {
+          source,
+          accept: "image/*",
+          multiple: false,
+          quality: 0.8,
+        }
+      )
+
+      if (!result || result.success === false) return false
+
+      let file = null
+      if (result.file) {
+        file = result.file
+      } else if (result.base64) {
+        file = flutterBase64ToFile(result, `owner-photo-${Date.now()}.jpg`)
+      }
+
+      if (file) {
+        setProfileImageFile(file)
+        const reader = new FileReader()
+        reader.onload = (e) => {
+          const photoData = e.target?.result
+          setFormData(prev => ({
+            ...prev,
+            photo: photoData
+          }))
+        }
+        reader.readAsDataURL(file)
+        return true
+      }
+
+      return false
+    } catch (error) {
+      console.error(`Error capturing owner photo from Flutter ${source}:`, error)
+      return false
     }
   }
 
@@ -362,13 +430,35 @@ export default function EditOwner() {
               )}
             </div>
           </div>
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={loading || saving}
-            className="text-blue-600 text-sm font-normal hover:text-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {t("restaurant.editOwner.actions.editPhoto")}
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={async () => {
+                if (isFlutterInAppWebViewAvailable()) {
+                  const picked = await capturePhotoFromFlutter("gallery")
+                  if (picked) return
+                }
+                fileInputRef.current?.click()
+              }}
+              disabled={loading || saving}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 text-blue-600 text-sm font-normal hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Upload className="w-4 h-4" />
+              <span>{t("restaurant.editOwner.actions.editPhoto")}</span>
+            </button>
+            <button
+              onClick={async () => {
+                if (isFlutterInAppWebViewAvailable()) {
+                  const picked = await capturePhotoFromFlutter("camera")
+                  if (picked) return
+                }
+                fileInputRef.current?.click()
+              }}
+              disabled={loading || saving}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-black text-white text-sm font-normal hover:bg-gray-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <span>{t("restaurant.editOwner.actions.takePhoto", { defaultValue: "Take photo" })}</span>
+            </button>
+          </div>
           <input
             ref={fileInputRef}
             type="file"

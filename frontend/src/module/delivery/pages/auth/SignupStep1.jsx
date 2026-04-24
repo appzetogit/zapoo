@@ -7,6 +7,7 @@ import { toast } from "sonner"
 const SIGNUP_STEP1_DRAFT_KEY = "delivery_signup_step1_draft";
 const INDIAN_VEHICLE_NUMBER_REGEX = /^[A-Z]{2}\d{1,2}[A-Z]{1,3}\d{4}$/;
 const BH_SERIES_VEHICLE_NUMBER_REGEX = /^\d{2}BH\d{4}[A-Z]{1,2}$/;
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const DEFAULT_FORM_DATA = {
   name: "",
@@ -91,8 +92,8 @@ export default function SignupStep1() {
       newErrors.name = "Name is required"
     }
 
-    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      newErrors.email = "Invalid email format"
+    if (formData.email && !EMAIL_REGEX.test(formData.email)) {
+      newErrors.email = "Enter a valid email"
     }
 
     if (!formData.address.trim()) {
@@ -146,7 +147,11 @@ export default function SignupStep1() {
     e.preventDefault()
 
     if (!validate()) {
-      toast.error("Please fill all required fields correctly")
+      if (formData.email && !EMAIL_REGEX.test(formData.email)) {
+        toast.error("Enter a valid email")
+      } else {
+        toast.error("Please fill all required fields correctly")
+      }
       return
     }
 
