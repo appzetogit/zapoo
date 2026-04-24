@@ -20,12 +20,13 @@ import {
 export default function BottomNavigation() {
   const navigate = useNavigate()
   const location = useLocation()
+  const normalizedPath = (location.pathname || "/").replace(/\/+$/, "") || "/"
   const [profileImage, setProfileImage] = useState(null)
   const [imageError, setImageError] = useState(false)
 
   const isActive = (path) => {
-    if (path === "/delivery") return location.pathname === "/delivery"
-    return location.pathname.startsWith(path)
+    if (path === "/delivery") return normalizedPath === "/delivery"
+    return normalizedPath.startsWith(path)
   }
 
   const iconClass = "w-6 h-6"
@@ -107,7 +108,7 @@ export default function BottomNavigation() {
           className="flex flex-col items-center gap-1 p-2"
         >
           {TabIcon(isActive("/delivery/trip-history"), ClockOutline, ClockSolid)}
-          {TabLabel(isActive("/delivery/trip-history "), "Trip History")}
+          {TabLabel(isActive("/delivery/trip-history"), "Trip History")}
         </button>
 
         {/* Profile */}

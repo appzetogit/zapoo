@@ -12,6 +12,7 @@ export default function DeliveryLayout({
   onGigClick
 }) {
   const location = useLocation()
+  const normalizedPath = (location.pathname || "/").replace(/\/+$/, "") || "/"
   const [requestBadgeCount, setRequestBadgeCount] = useState(() =>
     getUnreadDeliveryNotificationCount()
   )
@@ -43,7 +44,7 @@ export default function DeliveryLayout({
     '/delivery/requests',
     '/delivery/trip-history',
     '/delivery/profile'
-  ].includes(location.pathname)
+  ].includes(normalizedPath)
 
   return (
     <>
@@ -62,4 +63,3 @@ export default function DeliveryLayout({
     </>
   )
 }
-
