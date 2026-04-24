@@ -161,7 +161,7 @@ export const ordersDummy = [
     totalAmount: 900.0,
     paymentStatus: "Unpaid",
     orderStatus: "Pending",
-    deliveryType: "Take Away",
+    deliveryType: "Home Delivery",
   },
   {
     sl: 13,
@@ -401,4 +401,3 @@ export const ordersDummy = [
     deliveryType: "Home Delivery",
   },
 ]
-

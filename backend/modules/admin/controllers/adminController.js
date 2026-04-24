@@ -1163,6 +1163,9 @@ export const getUsers = asyncHandler(async (req, res) => {
         },
         totalAmount: {
           $sum: "$pricing.total"
+        },
+        lastOrderDate: {
+          $max: "$createdAt"
         }
       }
     }]);
@@ -1172,7 +1175,8 @@ export const getUsers = asyncHandler(async (req, res) => {
     orderStats.forEach(stat => {
       statsMap[stat._id.toString()] = {
         totalOrder: stat.totalOrders || 0,
-        totalOrderAmount: stat.totalAmount || 0
+        totalOrderAmount: stat.totalAmount || 0,
+        lastOrderDate: stat.lastOrderDate || null
       };
     });
 
@@ -1180,7 +1184,8 @@ export const getUsers = asyncHandler(async (req, res) => {
     const formattedUsers = users.map((user, index) => {
       const stats = statsMap[user._id.toString()] || {
         totalOrder: 0,
-        totalOrderAmount: 0
+        totalOrderAmount: 0,
+        lastOrderDate: null
       };
 
       // Format joining date
@@ -1201,7 +1206,8 @@ export const getUsers = asyncHandler(async (req, res) => {
         joiningDate: formattedDate,
         status: user.isActive !== false,
         // Default to true if not set
-        createdAt: user.createdAt
+        createdAt: user.createdAt,
+        lastOrderDate: stats.lastOrderDate
       };
     });
 
@@ -1221,8 +1227,21 @@ export const getUsers = asyncHandler(async (req, res) => {
     // Order date filter (filter by order date after aggregation)
     let filteredUsers = formattedUsers;
     if (orderDate) {
-      // This would require additional query to filter by order date
-      // For now, we'll skip this as it's complex and may require different approach
+      const startDate = new Date(orderDate);
+      startDate.setHours(0, 0, 0, 0);
+      const endDate = new Date(orderDate);
+      endDate.setHours(23, 59, 59, 999);
+
+      const usersWithOrdersOnDate = await Order.distinct("userId", {
+        userId: { $in: userIds },
+        createdAt: {
+          $gte: startDate,
+          $lte: endDate
+        }
+      });
+
+      const usersWithOrdersSet = new Set(usersWithOrdersOnDate.map(id => id.toString()));
+      filteredUsers = formattedUsers.filter(user => usersWithOrdersSet.has(user.id));
     }
     const total = await User.countDocuments(query);
     return successResponse(res, 200, "Users retrieved successfully", {

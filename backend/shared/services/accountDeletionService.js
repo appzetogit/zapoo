@@ -20,7 +20,6 @@ import Offer from '../../modules/restaurant/models/Offer.js';
 import Inventory from '../../modules/restaurant/models/Inventory.js';
 import RestaurantCategory from '../../modules/restaurant/models/RestaurantCategory.js';
 import MenuItemSchedule from '../../modules/restaurant/models/MenuItemSchedule.js';
-import OutletTimings from '../../modules/restaurant/models/OutletTimings.js';
 import WithdrawalRequest from '../../modules/restaurant/models/WithdrawalRequest.js';
 import StaffManagement from '../../modules/restaurant/models/StaffManagement.js';
 import RelationshipRequest from '../../modules/restaurant/models/RelationshipRequest.js';
@@ -137,7 +136,6 @@ export const deleteRestaurantAccountCascade = async ({ restaurantId }) => {
     Inventory.deleteMany({ restaurant: restaurantObjectId }),
     RestaurantCategory.deleteMany({ restaurant: restaurantObjectId }),
     MenuItemSchedule.deleteMany({ restaurant: restaurantObjectId }),
-    OutletTimings.deleteMany({ restaurantId: restaurantObjectId }),
     WithdrawalRequest.deleteMany({ restaurantId: restaurantObjectId }),
     StaffManagement.deleteMany({
       $or: [{ restaurantId: restaurantObjectId }, { addedBy: restaurantObjectId }],

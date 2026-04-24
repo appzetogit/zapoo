@@ -11,6 +11,7 @@ import autoTable from "jspdf-autotable";
 import { useTranslation } from "react-i18next";
 export default function Category() {
   const { t } = useTranslation();
+  const DEFAULT_CATEGORY_TYPE = "Starters";
   const [activeLanguage, setActiveLanguage] = useState("en");
   const [searchQuery, setSearchQuery] = useState("");
   const [categories, setCategories] = useState([]);
@@ -30,7 +31,7 @@ export default function Category() {
     localizedDescription: { en: "", hi: "", bn: "" },
     image: "https://via.placeholder.com/40",
     status: true,
-    type: "",
+    type: DEFAULT_CATEGORY_TYPE,
     foodType: "Veg"
   });
   const [selectedImageFile, setSelectedImageFile] = useState(null);
@@ -243,7 +244,7 @@ export default function Category() {
       localizedDescription: { en: "", hi: "", bn: "" },
       image: "https://via.placeholder.com/40",
       status: true,
-      type: "",
+      type: DEFAULT_CATEGORY_TYPE,
       foodType: "Veg"
     });
     setSelectedImageFile(null);
@@ -389,7 +390,7 @@ export default function Category() {
       localizedDescription: { en: "", hi: "", bn: "" },
       image: "https://via.placeholder.com/40",
       status: true,
-      type: "",
+      type: DEFAULT_CATEGORY_TYPE,
       foodType: "Veg"
     });
     if (fileInputRef.current) {
@@ -837,7 +838,6 @@ export default function Category() {
                 ...formData,
                 type: e.target.value
               })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white">
-                        <option value="">{t("admin.category.modal.fields.selectCategoryType")}</option>
                         <option value="Starters">{t("admin.category.modal.types.starters")}</option>
                         <option value="Main course">{t("admin.category.modal.types.mainCourse")}</option>
                         <option value="Desserts">{t("admin.category.modal.types.desserts")}</option>

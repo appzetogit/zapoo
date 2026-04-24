@@ -84,12 +84,36 @@ export const getHeroBanners = async (req, res) => {
 
     const banners = await HeroBanner.find({ isActive: true })
       .sort({ order: 1, createdAt: -1 })
-      .populate('linkedRestaurants', 'name slug restaurantId profileImage rating estimatedDeliveryTime distance location deliveryRange')
+      .populate('linkedRestaurants', 'name slug restaurantId profileImage rating estimatedDeliveryTime distance location deliveryRange openDays deliveryTimings weeklyTimings outletTimingsActive')
       .lean();
 
-    let filteredBanners = banners;
+    const linkedRestaurants = banners.flatMap((banner) => banner.linkedRestaurants || []);
+    const openLinkedRestaurants = await filterRestaurantsByOutletTimings(linkedRestaurants);
+    const openRestaurantIdSet = new Set(openLinkedRestaurants.map((r) => String(r._id)));
+
+    let filteredBanners = banners.map((banner) => {
+      const linked = banner.linkedRestaurants || [];
+      if (linked.length === 0) {
+        return { ...banner, __hadLinkedRestaurants: false };
+      }
+      return {
+        ...banner,
+        __hadLinkedRestaurants: true,
+        linkedRestaurants: linked.filter((restaurant) =>
+          openRestaurantIdSet.has(String(restaurant?._id)),
+        ),
+      };
+    });
+
+    filteredBanners = filteredBanners
+      .filter((banner) => {
+        if (!banner.__hadLinkedRestaurants) return true;
+        return (banner.linkedRestaurants || []).length > 0;
+      })
+      .map(({ __hadLinkedRestaurants, ...banner }) => banner);
+
     if (userLat != null && userLng != null && Number.isFinite(userLat) && Number.isFinite(userLng)) {
-      filteredBanners = banners.filter(banner => {
+      filteredBanners = filteredBanners.filter(banner => {
         const restaurants = banner.linkedRestaurants || [];
         if (restaurants.length === 0) return true;
         return restaurants.some(rest => {
@@ -1195,7 +1219,7 @@ export const getGourmetRestaurants = async (req, res) => {
     }
 
     const restaurants = await GourmetRestaurant.find({ isActive: true })
-      .populate('restaurant', 'name restaurantId slug profileImage coverImages menuImages rating estimatedDeliveryTime distance offer featuredDish featuredPrice location deliveryRange zoneId')
+      .populate('restaurant', 'name restaurantId slug profileImage coverImages menuImages rating estimatedDeliveryTime distance offer featuredDish featuredPrice location deliveryRange zoneId openDays deliveryTimings weeklyTimings outletTimingsActive')
       .sort({ order: 1, createdAt: -1 })
       .lean();
 

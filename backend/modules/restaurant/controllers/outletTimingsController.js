@@ -1,36 +1,111 @@
-import OutletTimings from '../models/OutletTimings.js';
 import Restaurant from '../models/Restaurant.js';
 import { successResponse, errorResponse } from '../../../shared/utils/response.js';
 import asyncHandler from '../../../shared/middleware/asyncHandler.js';
+
+const DAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const DAY_TO_ABBR = {
+  Monday: 'Mon',
+  Tuesday: 'Tue',
+  Wednesday: 'Wed',
+  Thursday: 'Thu',
+  Friday: 'Fri',
+  Saturday: 'Sat',
+  Sunday: 'Sun'
+};
+
+const sanitizeTime = (value, fallback) => {
+  if (typeof value !== 'string') return fallback;
+  const trimmed = value.trim();
+  return trimmed || fallback;
+};
+
+const createDefaultWeeklyTimings = (restaurant) => {
+  const openDays = Array.isArray(restaurant?.openDays) ? restaurant.openDays : [];
+  const hasOpenDays = openDays.length > 0;
+  const openingTime = sanitizeTime(restaurant?.deliveryTimings?.openingTime, '09:00 AM');
+  const closingTime = sanitizeTime(restaurant?.deliveryTimings?.closingTime, '10:00 PM');
+
+  return DAY_ORDER.map((day) => ({
+    day,
+    isOpen: hasOpenDays ? openDays.includes(DAY_TO_ABBR[day]) : true,
+    openingTime,
+    closingTime
+  }));
+};
+
+const normalizeWeeklyTimings = (rawTimings, restaurant) => {
+  const fallback = createDefaultWeeklyTimings(restaurant);
+  const existingByDay = new Map(
+    (Array.isArray(rawTimings) ? rawTimings : [])
+      .filter((entry) => entry?.day && DAY_ORDER.includes(entry.day))
+      .map((entry) => [entry.day, entry])
+  );
+
+  return DAY_ORDER.map((day) => {
+    const current = existingByDay.get(day);
+    const fb = fallback.find((item) => item.day === day);
+    return {
+      day,
+      isOpen: typeof current?.isOpen === 'boolean' ? current.isOpen : fb.isOpen,
+      openingTime: sanitizeTime(current?.openingTime, fb.openingTime),
+      closingTime: sanitizeTime(current?.closingTime, fb.closingTime)
+    };
+  });
+};
+
+const syncOpenDaysAbbr = (weeklyTimings = []) =>
+  weeklyTimings
+    .filter((entry) => entry?.isOpen === true && DAY_TO_ABBR[entry.day])
+    .map((entry) => DAY_TO_ABBR[entry.day]);
+
+const buildResponseShape = (restaurantId, weeklyTimings, isActive) => ({
+  restaurantId,
+  outletType: 'Appzeto delivery',
+  timings: weeklyTimings,
+  isActive: isActive !== false
+});
+
+async function ensureRestaurantWeeklyTimings(restaurantDoc) {
+  const normalized = normalizeWeeklyTimings(restaurantDoc.weeklyTimings, restaurantDoc);
+  const nextOpenDays = syncOpenDaysAbbr(normalized);
+  const changed =
+    JSON.stringify(normalized) !== JSON.stringify(restaurantDoc.weeklyTimings || []) ||
+    JSON.stringify(nextOpenDays) !== JSON.stringify(restaurantDoc.openDays || []) ||
+    restaurantDoc.outletTimingsActive === undefined;
+
+  if (changed) {
+    restaurantDoc.weeklyTimings = normalized;
+    if (typeof restaurantDoc.outletTimingsActive !== 'boolean') {
+      restaurantDoc.outletTimingsActive = true;
+    }
+    restaurantDoc.openDays = nextOpenDays;
+    if (!restaurantDoc.onboarding) restaurantDoc.onboarding = {};
+    if (!restaurantDoc.onboarding.step2) restaurantDoc.onboarding.step2 = {};
+    restaurantDoc.onboarding.step2.openDays = nextOpenDays;
+    await restaurantDoc.save();
+  }
+
+  return normalized;
+}
 
 /**
  * Get outlet timings for the authenticated restaurant
  * @route GET /api/restaurant/outlet-timings
  */
 export const getOutletTimings = asyncHandler(async (req, res) => {
-  const restaurantId = req.restaurant._id;
-
-  let outletTimings = await OutletTimings.findOne({ restaurantId });
-
-  // If no timings exist, create default timings
-  if (!outletTimings) {
-    outletTimings = await OutletTimings.create({
-      restaurantId,
-      outletType: 'Appzeto delivery',
-      timings: [
-        { day: 'Monday', isOpen: true, openingTime: '09:00 AM', closingTime: '10:00 PM' },
-        { day: 'Tuesday', isOpen: true, openingTime: '09:00 AM', closingTime: '10:00 PM' },
-        { day: 'Wednesday', isOpen: true, openingTime: '09:00 AM', closingTime: '10:00 PM' },
-        { day: 'Thursday', isOpen: true, openingTime: '09:00 AM', closingTime: '10:00 PM' },
-        { day: 'Friday', isOpen: true, openingTime: '09:00 AM', closingTime: '10:00 PM' },
-        { day: 'Saturday', isOpen: true, openingTime: '09:00 AM', closingTime: '10:00 PM' },
-        { day: 'Sunday', isOpen: true, openingTime: '09:00 AM', closingTime: '10:00 PM' }
-      ]
-    });
+  const restaurant = await Restaurant.findById(req.restaurant._id);
+  if (!restaurant) {
+    return errorResponse(res, 404, 'Restaurant not found');
   }
 
+  const weekly = await ensureRestaurantWeeklyTimings(restaurant);
+
   return successResponse(res, 200, 'Outlet timings retrieved successfully', {
-    outletTimings
+    outletTimings: buildResponseShape(
+      restaurant._id,
+      weekly,
+      restaurant.outletTimingsActive
+    )
   });
 });
 
@@ -40,40 +115,20 @@ export const getOutletTimings = asyncHandler(async (req, res) => {
  */
 export const getOutletTimingsByRestaurantId = asyncHandler(async (req, res) => {
   const { restaurantId } = req.params;
-
-  // Verify restaurant exists and is active
   const restaurant = await Restaurant.findById(restaurantId);
+
   if (!restaurant || !restaurant.isActive) {
     return errorResponse(res, 404, 'Restaurant not found');
   }
 
-  const outletTimings = await OutletTimings.findOne({ 
-    restaurantId,
-    isActive: true 
-  });
-
-  if (!outletTimings) {
-    // Return default timings if not set
-    return successResponse(res, 200, 'Outlet timings retrieved successfully', {
-      outletTimings: {
-        restaurantId,
-        outletType: 'Appzeto delivery',
-        timings: [
-          { day: 'Monday', isOpen: true, openingTime: '09:00 AM', closingTime: '10:00 PM' },
-          { day: 'Tuesday', isOpen: true, openingTime: '09:00 AM', closingTime: '10:00 PM' },
-          { day: 'Wednesday', isOpen: true, openingTime: '09:00 AM', closingTime: '10:00 PM' },
-          { day: 'Thursday', isOpen: true, openingTime: '09:00 AM', closingTime: '10:00 PM' },
-          { day: 'Friday', isOpen: true, openingTime: '09:00 AM', closingTime: '10:00 PM' },
-          { day: 'Saturday', isOpen: true, openingTime: '09:00 AM', closingTime: '10:00 PM' },
-          { day: 'Sunday', isOpen: true, openingTime: '09:00 AM', closingTime: '10:00 PM' }
-        ],
-        isActive: true
-      }
-    });
-  }
+  const weekly = await ensureRestaurantWeeklyTimings(restaurant);
 
   return successResponse(res, 200, 'Outlet timings retrieved successfully', {
-    outletTimings
+    outletTimings: buildResponseShape(
+      restaurant._id,
+      weekly,
+      restaurant.outletTimingsActive
+    )
   });
 });
 
@@ -82,94 +137,57 @@ export const getOutletTimingsByRestaurantId = asyncHandler(async (req, res) => {
  * @route PUT /api/restaurant/outlet-timings
  */
 export const upsertOutletTimings = asyncHandler(async (req, res) => {
-  const restaurantId = req.restaurant._id;
-  const { timings } = req.body;
+  const restaurant = await Restaurant.findById(req.restaurant._id);
+  if (!restaurant) {
+    return errorResponse(res, 404, 'Restaurant not found');
+  }
 
-  // Validate timings array
+  const timings = req.body?.timings;
   if (timings && !Array.isArray(timings)) {
     return errorResponse(res, 400, 'Timings must be an array');
   }
-
-  // Validate all 7 days are present
   if (timings && timings.length !== 7) {
     return errorResponse(res, 400, 'All 7 days must be provided');
   }
 
-  const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
   if (timings) {
-    const presentDays = timings.map(t => t.day);
-    const allDaysPresent = dayOrder.every(day => presentDays.includes(day));
+    const presentDays = timings.map((item) => item.day);
+    const allDaysPresent = DAY_ORDER.every((day) => presentDays.includes(day));
     if (!allDaysPresent) {
       return errorResponse(res, 400, 'All 7 days (Monday-Sunday) must be present');
     }
 
-    // Validate each day's timing format
     for (const timing of timings) {
-      if (!dayOrder.includes(timing.day)) {
+      if (!DAY_ORDER.includes(timing.day)) {
         return errorResponse(res, 400, `Invalid day: ${timing.day}`);
       }
-
-      // If day is open, validate times
-      if (timing.isOpen) {
-        if (!timing.openingTime || !timing.closingTime) {
-          return errorResponse(res, 400, `Opening and closing times are required for ${timing.day} when open`);
-        }
+      if (timing.isOpen && (!timing.openingTime || !timing.closingTime)) {
+        return errorResponse(
+          res,
+          400,
+          `Opening and closing times are required for ${timing.day} when open`
+        );
       }
     }
   }
 
-  // Find existing outlet timings
-  let outletTimings = await OutletTimings.findOne({ restaurantId });
-
-  if (outletTimings) {
-    // Update existing
-    if (timings) {
-      // Sort timings by day order
-      timings.sort((a, b) => dayOrder.indexOf(a.day) - dayOrder.indexOf(b.day));
-      outletTimings.timings = timings;
-    }
-    await outletTimings.save();
-  } else {
-    // Create new
-    const defaultTimings = timings || [
-      { day: 'Monday', isOpen: true, openingTime: '09:00 AM', closingTime: '10:00 PM' },
-      { day: 'Tuesday', isOpen: true, openingTime: '09:00 AM', closingTime: '10:00 PM' },
-      { day: 'Wednesday', isOpen: true, openingTime: '09:00 AM', closingTime: '10:00 PM' },
-      { day: 'Thursday', isOpen: true, openingTime: '09:00 AM', closingTime: '10:00 PM' },
-      { day: 'Friday', isOpen: true, openingTime: '09:00 AM', closingTime: '10:00 PM' },
-      { day: 'Saturday', isOpen: true, openingTime: '09:00 AM', closingTime: '10:00 PM' },
-      { day: 'Sunday', isOpen: true, openingTime: '09:00 AM', closingTime: '10:00 PM' }
-    ];
-
-    outletTimings = await OutletTimings.create({
-      restaurantId,
-      timings: defaultTimings
-    });
-  }
-
-  // Sync Restaurant.openDays based on OutletTimings.isOpen
-  // Restaurant.openDays stores 3-letter abbreviations: Mon, Tue, Wed, ...
-  try {
-    const openDayAbbr = (outletTimings?.timings || [])
-      .filter(t => t?.isOpen === true && typeof t.day === "string")
-      .map(t => t.day.substring(0, 3));
-
-    await Restaurant.findByIdAndUpdate(
-      restaurantId,
-      {
-        $set: {
-          openDays: openDayAbbr,
-          'onboarding.step2.openDays': openDayAbbr
-        }
-      },
-      { new: true },
-    );
-  } catch (e) {
-    // Don't block outlet timing update if restaurant sync fails
-  }
+  const normalized = normalizeWeeklyTimings(timings || restaurant.weeklyTimings, restaurant);
+  const nextOpenDays = syncOpenDaysAbbr(normalized);
+  restaurant.weeklyTimings = normalized;
+  restaurant.outletTimingsActive =
+    typeof restaurant.outletTimingsActive === 'boolean' ? restaurant.outletTimingsActive : true;
+  restaurant.openDays = nextOpenDays;
+  restaurant.onboarding = restaurant.onboarding || {};
+  restaurant.onboarding.step2 = restaurant.onboarding.step2 || {};
+  restaurant.onboarding.step2.openDays = nextOpenDays;
+  await restaurant.save();
 
   return successResponse(res, 200, 'Outlet timings updated successfully', {
-    outletTimings
+    outletTimings: buildResponseShape(
+      restaurant._id,
+      restaurant.weeklyTimings,
+      restaurant.outletTimingsActive
+    )
   });
 });
 
@@ -178,82 +196,58 @@ export const upsertOutletTimings = asyncHandler(async (req, res) => {
  * @route PATCH /api/restaurant/outlet-timings/day/:day
  */
 export const updateDayTiming = asyncHandler(async (req, res) => {
-  const restaurantId = req.restaurant._id;
   const { day } = req.params;
   const { isOpen, openingTime, closingTime } = req.body;
 
-  const validDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-  if (!validDays.includes(day)) {
-    return errorResponse(res, 400, 'Invalid day. Must be one of: Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday');
+  if (!DAY_ORDER.includes(day)) {
+    return errorResponse(
+      res,
+      400,
+      'Invalid day. Must be one of: Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday'
+    );
   }
 
-  let outletTimings = await OutletTimings.findOne({ restaurantId });
-
-  if (!outletTimings) {
-    // Create default timings if not exists
-    outletTimings = await OutletTimings.create({
-      restaurantId,
-      outletType: 'Appzeto delivery',
-      timings: [
-        { day: 'Monday', isOpen: true, openingTime: '09:00 AM', closingTime: '10:00 PM' },
-        { day: 'Tuesday', isOpen: true, openingTime: '09:00 AM', closingTime: '10:00 PM' },
-        { day: 'Wednesday', isOpen: true, openingTime: '09:00 AM', closingTime: '10:00 PM' },
-        { day: 'Thursday', isOpen: true, openingTime: '09:00 AM', closingTime: '10:00 PM' },
-        { day: 'Friday', isOpen: true, openingTime: '09:00 AM', closingTime: '10:00 PM' },
-        { day: 'Saturday', isOpen: true, openingTime: '09:00 AM', closingTime: '10:00 PM' },
-        { day: 'Sunday', isOpen: true, openingTime: '09:00 AM', closingTime: '10:00 PM' }
-      ]
-    });
+  const restaurant = await Restaurant.findById(req.restaurant._id);
+  if (!restaurant) {
+    return errorResponse(res, 404, 'Restaurant not found');
   }
 
-  // Find and update the specific day
-  const dayIndex = outletTimings.timings.findIndex(t => t.day === day);
+  const normalized = normalizeWeeklyTimings(restaurant.weeklyTimings, restaurant);
+  const dayIndex = normalized.findIndex((item) => item.day === day);
   if (dayIndex === -1) {
     return errorResponse(res, 404, `Timing for ${day} not found`);
   }
 
-  // Update the day's timing
-  if (isOpen !== undefined) {
-    outletTimings.timings[dayIndex].isOpen = isOpen;
-  }
+  if (isOpen !== undefined) normalized[dayIndex].isOpen = Boolean(isOpen);
   if (openingTime !== undefined) {
-    outletTimings.timings[dayIndex].openingTime = openingTime;
+    normalized[dayIndex].openingTime = sanitizeTime(openingTime, normalized[dayIndex].openingTime);
   }
   if (closingTime !== undefined) {
-    outletTimings.timings[dayIndex].closingTime = closingTime;
+    normalized[dayIndex].closingTime = sanitizeTime(closingTime, normalized[dayIndex].closingTime);
   }
 
-  // Validate: if opening, times must be provided
-  if (outletTimings.timings[dayIndex].isOpen) {
-    if (!outletTimings.timings[dayIndex].openingTime || !outletTimings.timings[dayIndex].closingTime) {
+  if (normalized[dayIndex].isOpen) {
+    if (!normalized[dayIndex].openingTime || !normalized[dayIndex].closingTime) {
       return errorResponse(res, 400, 'Opening and closing times are required when day is open');
     }
   }
 
-  await outletTimings.save();
-
-  // Sync Restaurant.openDays based on OutletTimings.isOpen
-  try {
-    const openDayAbbr = (outletTimings?.timings || [])
-      .filter(t => t?.isOpen === true && typeof t.day === "string")
-      .map(t => t.day.substring(0, 3));
-
-    await Restaurant.findByIdAndUpdate(
-      restaurantId,
-      {
-        $set: {
-          openDays: openDayAbbr,
-          'onboarding.step2.openDays': openDayAbbr
-        }
-      },
-      { new: true },
-    );
-  } catch (e) {
-    // non-blocking sync
-  }
+  const nextOpenDays = syncOpenDaysAbbr(normalized);
+  restaurant.weeklyTimings = normalized;
+  restaurant.openDays = nextOpenDays;
+  restaurant.onboarding = restaurant.onboarding || {};
+  restaurant.onboarding.step2 = restaurant.onboarding.step2 || {};
+  restaurant.onboarding.step2.openDays = nextOpenDays;
+  restaurant.outletTimingsActive =
+    typeof restaurant.outletTimingsActive === 'boolean' ? restaurant.outletTimingsActive : true;
+  await restaurant.save();
 
   return successResponse(res, 200, `${day} timing updated successfully`, {
-    outletTimings
+    outletTimings: buildResponseShape(
+      restaurant._id,
+      restaurant.weeklyTimings,
+      restaurant.outletTimingsActive
+    )
   });
 });
 
@@ -262,21 +256,33 @@ export const updateDayTiming = asyncHandler(async (req, res) => {
  * @route PATCH /api/restaurant/outlet-timings/status
  */
 export const toggleOutletTimingsStatus = asyncHandler(async (req, res) => {
-  const restaurantId = req.restaurant._id;
   const { isActive } = req.body;
-
-  const outletTimings = await OutletTimings.findOne({ restaurantId });
-
-  if (!outletTimings) {
-    return errorResponse(res, 404, 'Outlet timings not found');
+  const restaurant = await Restaurant.findById(req.restaurant._id);
+  if (!restaurant) {
+    return errorResponse(res, 404, 'Restaurant not found');
   }
 
-  outletTimings.isActive = isActive !== undefined ? isActive : !outletTimings.isActive;
-  await outletTimings.save();
+  restaurant.outletTimingsActive =
+    isActive !== undefined
+      ? Boolean(isActive)
+      : !(typeof restaurant.outletTimingsActive === 'boolean'
+        ? restaurant.outletTimingsActive
+        : true);
+  await restaurant.save();
 
-  return successResponse(res, 200, `Outlet timings ${outletTimings.isActive ? 'activated' : 'deactivated'} successfully`, {
-    outletTimings
-  });
+  const weekly = normalizeWeeklyTimings(restaurant.weeklyTimings, restaurant);
+  return successResponse(
+    res,
+    200,
+    `Outlet timings ${restaurant.outletTimingsActive ? 'activated' : 'deactivated'} successfully`,
+    {
+      outletTimings: buildResponseShape(
+        restaurant._id,
+        weekly,
+        restaurant.outletTimingsActive
+      )
+    }
+  );
 });
 
 /**
@@ -284,16 +290,14 @@ export const toggleOutletTimingsStatus = asyncHandler(async (req, res) => {
  * @route DELETE /api/restaurant/outlet-timings
  */
 export const deleteOutletTimings = asyncHandler(async (req, res) => {
-  const restaurantId = req.restaurant._id;
-
-  const outletTimings = await OutletTimings.findOne({ restaurantId });
-
-  if (!outletTimings) {
-    return errorResponse(res, 404, 'Outlet timings not found');
+  const restaurant = await Restaurant.findById(req.restaurant._id);
+  if (!restaurant) {
+    return errorResponse(res, 404, 'Restaurant not found');
   }
 
-  outletTimings.isActive = false;
-  await outletTimings.save();
+  restaurant.outletTimingsActive = false;
+  await restaurant.save();
 
   return successResponse(res, 200, 'Outlet timings deleted successfully');
 });
+

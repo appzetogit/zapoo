@@ -1,6 +1,13 @@
-import OutletTimings from '../models/OutletTimings.js';
-
 const INDIA_TIME_ZONE = 'Asia/Kolkata';
+const DAY_ABBR = {
+  Monday: 'Mon',
+  Tuesday: 'Tue',
+  Wednesday: 'Wed',
+  Thursday: 'Thu',
+  Friday: 'Fri',
+  Saturday: 'Sat',
+  Sunday: 'Sun'
+};
 
 const parseTimeToMinutes = (timeValue) => {
   if (!timeValue || typeof timeValue !== 'string') return null;
@@ -50,18 +57,36 @@ const getCurrentIndiaDayAndMinutes = (now = new Date()) => {
   };
 };
 
-const isRestaurantOpenNowFromOutletTiming = (timingDoc, currentDay, currentMinutes) => {
-  // Backward compatible default: if no doc, do not hide.
-  if (!timingDoc) return true;
-  if (timingDoc.isActive === false) return false;
+const isRestaurantOpenNowFromWeeklyTimings = (restaurant, currentDay, currentMinutes) => {
+  const weekly = Array.isArray(restaurant?.weeklyTimings) ? restaurant.weeklyTimings : [];
 
-  const todayTiming = (timingDoc.timings || []).find((entry) => entry?.day === currentDay);
-  if (!todayTiming) return false;
-  if (todayTiming.isOpen !== true) return false;
+  if (weekly.length > 0) {
+    if (restaurant?.outletTimingsActive === false) return false;
+    const todayTiming = weekly.find((entry) => entry?.day === currentDay);
+    if (!todayTiming) return false;
+    if (todayTiming.isOpen !== true) return false;
 
-  const openingMinutes = parseTimeToMinutes(todayTiming.openingTime);
-  const closingMinutes = parseTimeToMinutes(todayTiming.closingTime);
-  if (openingMinutes == null || closingMinutes == null) return false;
+    const openingMinutes = parseTimeToMinutes(todayTiming.openingTime);
+    const closingMinutes = parseTimeToMinutes(todayTiming.closingTime);
+    if (openingMinutes == null || closingMinutes == null) return false;
+
+    if (openingMinutes === closingMinutes) return true;
+    if (closingMinutes > openingMinutes) {
+      return currentMinutes >= openingMinutes && currentMinutes < closingMinutes;
+    }
+    return currentMinutes >= openingMinutes || currentMinutes < closingMinutes;
+  }
+
+  // Fallback for legacy docs that only have openDays + deliveryTimings.
+  const openDays = Array.isArray(restaurant?.openDays) ? restaurant.openDays : [];
+  if (openDays.length > 0) {
+    const dayAbbr = DAY_ABBR[currentDay];
+    if (!dayAbbr || !openDays.includes(dayAbbr)) return false;
+  }
+
+  const openingMinutes = parseTimeToMinutes(restaurant?.deliveryTimings?.openingTime);
+  const closingMinutes = parseTimeToMinutes(restaurant?.deliveryTimings?.closingTime);
+  if (openingMinutes == null || closingMinutes == null) return true;
 
   if (openingMinutes === closingMinutes) return true;
   if (closingMinutes > openingMinutes) {
@@ -72,25 +97,12 @@ const isRestaurantOpenNowFromOutletTiming = (timingDoc, currentDay, currentMinut
 
 export const filterRestaurantsByOutletTimings = async (restaurants = []) => {
   if (!Array.isArray(restaurants) || restaurants.length === 0) return restaurants;
-
-  const restaurantIds = restaurants.map((restaurant) => restaurant?._id).filter(Boolean);
-  if (restaurantIds.length === 0) return restaurants;
-
-  const timingDocs = await OutletTimings.find({
-    restaurantId: { $in: restaurantIds }
-  }).select('restaurantId timings isActive').lean();
-
-  const timingByRestaurantId = new Map(
-    timingDocs.map((doc) => [String(doc.restaurantId), doc])
-  );
-
   const { dayName, minutesOfDay } = getCurrentIndiaDayAndMinutes();
   return restaurants.filter((restaurant) =>
-    isRestaurantOpenNowFromOutletTiming(
-      timingByRestaurantId.get(String(restaurant._id)),
+    isRestaurantOpenNowFromWeeklyTimings(
+      restaurant,
       dayName,
       minutesOfDay
     )
   );
 };
-

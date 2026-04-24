@@ -16,6 +16,7 @@ import SubscriptionRenewalPopup from "../components/SubscriptionRenewalPopup";
 import SubscriptionExpiryBanner from "../components/SubscriptionExpiryBanner";
 import useSubscriptionExpiryNotice from "../hooks/useSubscriptionExpiryNotice";
 const STORAGE_KEY = "restaurant_online_status";
+const ORDERS_FILTER_STORAGE_KEY = "restaurant_orders_active_filter";
 
 // Top filter tabs
 const filterTabs = [{
@@ -394,7 +395,12 @@ function CancelledOrders({
 export default function OrdersMain() {
   const navigate = useNavigate();
   const expiryNotice = useSubscriptionExpiryNotice();
-  const [activeFilter, setActiveFilter] = useState("preparing");
+  const [activeFilter, setActiveFilter] = useState(() => {
+    if (typeof window === "undefined") return "preparing";
+    const savedFilter = window.sessionStorage.getItem(ORDERS_FILTER_STORAGE_KEY);
+    const isValidFilter = filterTabs.some(tab => tab.id === savedFilter);
+    return isValidFilter ? savedFilter : "preparing";
+  });
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
@@ -434,6 +440,11 @@ export default function OrdersMain() {
     restaurantId: null,
   });
   const [isReverifying, setIsReverifying] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.sessionStorage.setItem(ORDERS_FILTER_STORAGE_KEY, activeFilter);
+  }, [activeFilter]);
 
   // Restaurant notifications hook for real-time orders
   const {

@@ -32,6 +32,29 @@ const deliveryTimingsSchema = new mongoose.Schema({
   closingTime: String,
 });
 
+const weeklyDayTimingSchema = new mongoose.Schema(
+  {
+    day: {
+      type: String,
+      enum: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
+      required: true
+    },
+    isOpen: {
+      type: Boolean,
+      default: true
+    },
+    openingTime: {
+      type: String,
+      default: '09:00 AM'
+    },
+    closingTime: {
+      type: String,
+      default: '10:00 PM'
+    }
+  },
+  { _id: false }
+);
+
 const orderValueSlabSchema = new mongoose.Schema({
   label: {
     type: String,
@@ -178,6 +201,14 @@ const restaurantSchema = new mongoose.Schema(
     cuisines: [String],
     deliveryTimings: deliveryTimingsSchema,
     openDays: [String],
+    weeklyTimings: {
+      type: [weeklyDayTimingSchema],
+      default: []
+    },
+    outletTimingsActive: {
+      type: Boolean,
+      default: true
+    },
     // Whether the restaurant is purely vegetarian
     isPureVeg: {
       type: Boolean,

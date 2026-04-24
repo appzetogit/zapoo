@@ -1,6 +1,5 @@
 import Restaurant from '../models/Restaurant.js';
 import Menu from '../models/Menu.js';
-import OutletTimings from '../models/OutletTimings.js';
 import Zone from '../../admin/models/Zone.js';
 import Order from '../../order/models/Order.js';
 import Tier from '../../admin/models/Tier.js';
@@ -13,105 +12,7 @@ import mongoose from 'mongoose';
 import { calculateDistance } from '../../order/services/orderCalculationService.js';
 import { normalizeLocale } from '../../../shared/i18n/localeConstants.js';
 import { deleteRestaurantAccountCascade } from '../../../shared/services/accountDeletionService.js';
-
-const INDIA_TIME_ZONE = 'Asia/Kolkata';
-
-const parseTimeToMinutes = (timeValue) => {
-  if (!timeValue || typeof timeValue !== 'string') return null;
-  const normalized = timeValue.trim().toUpperCase();
-  const amPmMatch = normalized.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/);
-  if (amPmMatch) {
-    let hours = Number(amPmMatch[1]);
-    const minutes = Number(amPmMatch[2]);
-    const meridiem = amPmMatch[3];
-    if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return null;
-    if (hours < 1 || hours > 12 || minutes < 0 || minutes > 59) return null;
-    if (hours === 12) hours = 0;
-    if (meridiem === 'PM') hours += 12;
-    return hours * 60 + minutes;
-  }
-
-  const twentyFourMatch = normalized.match(/^(\d{1,2}):(\d{2})$/);
-  if (twentyFourMatch) {
-    const hours = Number(twentyFourMatch[1]);
-    const minutes = Number(twentyFourMatch[2]);
-    if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return null;
-    if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
-    return hours * 60 + minutes;
-  }
-  return null;
-};
-
-const getCurrentIndiaDayAndMinutes = (now = new Date()) => {
-  const dayName = new Intl.DateTimeFormat('en-US', {
-    weekday: 'long',
-    timeZone: INDIA_TIME_ZONE
-  }).format(now);
-
-  const time24 = new Intl.DateTimeFormat('en-GB', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-    timeZone: INDIA_TIME_ZONE
-  }).format(now);
-
-  const [hourPart, minutePart] = time24.split(':');
-  const hours = Number(hourPart);
-  const minutes = Number(minutePart);
-  return {
-    dayName,
-    minutesOfDay: (Number.isFinite(hours) ? hours : 0) * 60 + (Number.isFinite(minutes) ? minutes : 0)
-  };
-};
-
-const isRestaurantOpenNowFromOutletTiming = (timingDoc, currentDay, currentMinutes) => {
-  // If outlet timing doc is missing, keep backward compatibility (don't hide restaurant).
-  if (!timingDoc) return true;
-  if (timingDoc.isActive === false) return false;
-  const todayTiming = (timingDoc.timings || []).find((entry) => entry?.day === currentDay);
-  if (!todayTiming) return false;
-  if (todayTiming.isOpen !== true) return false;
-
-  const openingMinutes = parseTimeToMinutes(todayTiming.openingTime);
-  const closingMinutes = parseTimeToMinutes(todayTiming.closingTime);
-  if (openingMinutes == null || closingMinutes == null) return false;
-
-  // Same open/close minute means full-day open in practical config.
-  if (openingMinutes === closingMinutes) return true;
-
-  // Normal window in same day: e.g. 09:00 -> 22:00
-  if (closingMinutes > openingMinutes) {
-    return currentMinutes >= openingMinutes && currentMinutes < closingMinutes;
-  }
-
-  // Overnight window: e.g. 22:00 -> 02:00
-  return currentMinutes >= openingMinutes || currentMinutes < closingMinutes;
-};
-
-const filterRestaurantsByOutletTimings = async (restaurants = []) => {
-  if (!Array.isArray(restaurants) || restaurants.length === 0) return restaurants;
-  const restaurantIds = restaurants
-    .map((restaurant) => restaurant?._id)
-    .filter(Boolean);
-  if (restaurantIds.length === 0) return restaurants;
-
-  const timingDocs = await OutletTimings.find({
-    restaurantId: { $in: restaurantIds }
-  }).select('restaurantId timings isActive').lean();
-
-  const timingByRestaurantId = new Map(
-    timingDocs.map((doc) => [String(doc.restaurantId), doc])
-  );
-
-  const { dayName, minutesOfDay } = getCurrentIndiaDayAndMinutes();
-  return restaurants.filter((restaurant) =>
-    isRestaurantOpenNowFromOutletTiming(
-      timingByRestaurantId.get(String(restaurant._id)),
-      dayName,
-      minutesOfDay
-    )
-  );
-};
+import { filterRestaurantsByOutletTimings } from '../services/outletVisibilityService.js';
 
 const attachRealReviewStats = async (restaurants = []) => {
   if (!Array.isArray(restaurants) || restaurants.length === 0) {
@@ -460,7 +361,7 @@ export const getRestaurants = async (req, res) => {
       profileImage: 1, location: 1, avgDeliveryTime: 1, avgPriceValue: 1,
       isActive: 1, isAcceptingOrders: 1, featuredDish: 1, featuredPrice: 1,
       offer: 1, estimatedDeliveryTime: 1, distance: 1, deliveryRange: 1,
-      deliveryTimings: 1, openDays: 1,
+      deliveryTimings: 1, openDays: 1, weeklyTimings: 1, outletTimingsActive: 1,
       // Cart needs this for correct free-delivery fallback vs custom slab pricing
       deliveryPricingConfig: 1
     };
@@ -568,7 +469,7 @@ export const getRestaurants = async (req, res) => {
         console.warn("⚠️ Geo fallback for missing coordinates failed:", fallbackErr.message);
       }
     } else {
-      const projection = 'name slug cuisines rating totalRatings promo profileImage location avgDeliveryTime avgPriceValue isActive isAcceptingOrders featuredDish featuredPrice offer estimatedDeliveryTime distance deliveryRange deliveryTimings openDays deliveryPricingConfig';
+      const projection = 'name slug cuisines rating totalRatings promo profileImage location avgDeliveryTime avgPriceValue isActive isAcceptingOrders featuredDish featuredPrice offer estimatedDeliveryTime distance deliveryRange deliveryTimings openDays weeklyTimings outletTimingsActive deliveryPricingConfig';
       restaurants = await Restaurant.find(query)
         .select(projection)
         .sort(sortObj)
@@ -643,7 +544,7 @@ export const getRestaurantById = async (req, res) => {
     };
 
     // Strict field projection for public restaurant profile (deliveryPricingConfig for cart pricing fallback)
-    const projection = 'name slug cuisines rating totalRatings promo profileImage location avgDeliveryTime avgPriceValue isActive isAcceptingOrders featuredDish featuredPrice offer distance deliveryRange estimatedDeliveryTime cuisines deliveryTimings openDays deliveryPricingConfig ownerName ownerEmail ownerPhone email phone primaryContactNumber createdAt onboarding.step3.gst.isRegistered onboarding.step3.gst.gstNumber onboarding.step3.gst.legalName onboarding.step3.gst.address onboarding.step3.fssai.registrationNumber onboarding.step3.fssai.expiryDate';
+    const projection = 'name slug cuisines rating totalRatings promo profileImage location avgDeliveryTime avgPriceValue isActive isAcceptingOrders featuredDish featuredPrice offer distance deliveryRange estimatedDeliveryTime cuisines deliveryTimings openDays weeklyTimings outletTimingsActive deliveryPricingConfig ownerName ownerEmail ownerPhone email phone primaryContactNumber createdAt onboarding.step3.gst.isRegistered onboarding.step3.gst.gstNumber onboarding.step3.gst.legalName onboarding.step3.gst.address onboarding.step3.fssai.registrationNumber onboarding.step3.fssai.expiryDate';
 
     const restaurant = await Restaurant.findOne(queryConditions)
       .select(projection)
@@ -1616,6 +1517,8 @@ export const getRestaurantsWithDishesUnder250 = async (req, res) => {
           isAcceptingOrders: restaurant.isAcceptingOrders,
           openDays: restaurant.openDays,
           deliveryTimings: restaurant.deliveryTimings,
+          weeklyTimings: restaurant.weeklyTimings,
+          outletTimingsActive: restaurant.outletTimingsActive,
           rating: effectiveRating,
           totalRatings: effectiveTotalRatings,
           deliveryTime: restaurant.estimatedDeliveryTime || "25-30 mins",

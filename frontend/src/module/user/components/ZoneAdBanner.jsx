@@ -96,10 +96,20 @@ export default function ZoneAdBanner() {
         return () => clearInterval(timer)
     }, [ads.length, isPaused])
 
+    // Keep slide index valid when ads length changes (prevents undefined currentAd).
+    useEffect(() => {
+        if (ads.length === 0) {
+            setCurrentSlide(0)
+            return
+        }
+        setCurrentSlide((prev) => (prev >= ads.length ? 0 : prev))
+    }, [ads.length])
+
     // Track Impression for current slide
     useEffect(() => {
         const currentAd = ads[currentSlide]
-        const isTrackableAd = currentAd && !currentAd._id.startsWith('fallback-') && currentAd.source !== 'challenge'
+        const currentAdId = typeof currentAd?._id === "string" ? currentAd._id : ""
+        const isTrackableAd = currentAd && currentAdId && !currentAdId.startsWith('fallback-') && currentAd.source !== 'challenge'
         if (isTrackableAd && !impressionsLogged.current.has(currentAd._id)) {
             const trackImpression = async () => {
                 try {
@@ -117,9 +127,10 @@ export default function ZoneAdBanner() {
         if (!ad) return
 
         // Track Click for paid ads
-        if (!ad._id.startsWith('fallback-') && ad.source !== 'challenge') {
+        const adId = typeof ad?._id === "string" ? ad._id : ""
+        if (adId && !adId.startsWith('fallback-') && ad.source !== 'challenge') {
             try {
-                await api.post(`/marketing/ads/${ad._id}/track`, { type: 'click' })
+                await api.post(`/marketing/ads/${adId}/track`, { type: 'click' })
             } catch (err) {
                 console.error("Failed to track click:", err)
             }
@@ -161,7 +172,8 @@ export default function ZoneAdBanner() {
         setCurrentSlide((prev) => (prev - 1 + ads.length) % ads.length)
     }
 
-    const currentAd = ads[currentSlide]
+    const currentAd = ads[currentSlide] || ads[0]
+    if (!currentAd) return null
     const SWIPE_THRESHOLD = 40
 
     const handleTouchStart = (e) => {
@@ -219,7 +231,7 @@ export default function ZoneAdBanner() {
                         className="absolute inset-0"
                     >
                         <img
-                            src={currentAd.bannerImage}
+                            src={typeof currentAd?.bannerImage === "string" ? currentAd.bannerImage : currentAd?.bannerImage?.url}
                             alt={currentAd.title}
                             className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                         />
@@ -272,7 +284,7 @@ export default function ZoneAdBanner() {
 
                 {/* Status Badge */}
                 <div className="absolute top-4 left-4 bg-black/40 backdrop-blur-md text-white text-[10px] md:text-xs font-bold px-2.5 py-1 rounded-full border border-white/20 z-10">
-                    {currentAd._id.startsWith('fallback-') ? 'SUGGESTED' : currentAd.source === 'challenge' ? 'FREE REWARD' : 'AD'}
+                    {currentAd?._id?.startsWith('fallback-') ? 'SUGGESTED' : currentAd?.source === 'challenge' ? 'FREE REWARD' : 'AD'}
                 </div>
             </div>
         </div>

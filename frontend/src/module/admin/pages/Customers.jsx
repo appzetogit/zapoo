@@ -7,6 +7,7 @@ import { toast } from "sonner"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 
 export default function Customers() {
+  const todayIsoDate = new Date().toISOString().split("T")[0]
   const [searchQuery, setSearchQuery] = useState("")
   const [customers, setCustomers] = useState([])
   const [loading, setLoading] = useState(true)
@@ -37,7 +38,15 @@ export default function Customers() {
     }
 
     // Filter by order date (if customer has order date field, otherwise skip)
-    // Note: customersDummy doesn't have orderDate, so this is a placeholder for future implementation
+    if (filters.orderDate) {
+      result = result.filter((customer) => {
+        if (!customer.lastOrderDate) return false
+        const orderDate = new Date(customer.lastOrderDate)
+        const selectedDate = new Date(filters.orderDate)
+        if (Number.isNaN(orderDate.getTime()) || Number.isNaN(selectedDate.getTime())) return false
+        return orderDate.toDateString() === selectedDate.toDateString()
+      })
+    }
 
     // Filter by joining date
     if (filters.joiningDate) {
@@ -80,6 +89,22 @@ export default function Customers() {
   }, [customers, searchQuery, filters])
 
   const handleFilterChange = (field, value) => {
+    if (field === "orderDate" || field === "joiningDate") {
+      const nextValue = value > todayIsoDate ? todayIsoDate : value
+      setFilters(prev => ({ ...prev, [field]: nextValue }))
+      return
+    }
+
+    if (field === "chooseFirst") {
+      if (value === "") {
+        setFilters(prev => ({ ...prev, chooseFirst: "" }))
+        return
+      }
+      const numericValue = Number(value)
+      setFilters(prev => ({ ...prev, chooseFirst: Number.isFinite(numericValue) && numericValue >= 0 ? value : "0" }))
+      return
+    }
+
     setFilters(prev => ({ ...prev, [field]: value }))
   }
 
@@ -93,6 +118,7 @@ export default function Customers() {
           offset: 0,
           ...(searchQuery && { search: searchQuery }),
           ...(filters.status && { status: filters.status }),
+          ...(filters.orderDate && { orderDate: filters.orderDate }),
           ...(filters.joiningDate && { joiningDate: filters.joiningDate }),
           ...(filters.sortBy && { sortBy: filters.sortBy }),
         }
@@ -118,7 +144,7 @@ export default function Customers() {
     }
 
     fetchCustomers()
-  }, [searchQuery, filters.status, filters.joiningDate, filters.sortBy])
+  }, [searchQuery, filters.status, filters.orderDate, filters.joiningDate, filters.sortBy])
 
   const handleToggleStatus = async (customerId) => {
     try {
@@ -216,6 +242,7 @@ export default function Customers() {
                   type="date"
                   value={filters.orderDate}
                   onChange={(e) => handleFilterChange("orderDate", e.target.value)}
+                  max={todayIsoDate}
                   className="w-full px-4 py-2.5 pr-10 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#FF5200] focus:border-[#FF5200] text-sm"
                 />
                 <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
@@ -231,9 +258,9 @@ export default function Customers() {
                   type="date"
                   value={filters.joiningDate}
                   onChange={(e) => handleFilterChange("joiningDate", e.target.value)}
+                  max={todayIsoDate}
                   className="w-full px-4 py-2.5 pr-10 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#FF5200] focus:border-[#FF5200] text-sm"
                 />
-                <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
               </div>
             </div>
 
@@ -277,6 +304,7 @@ export default function Customers() {
                 type="number"
                 value={filters.chooseFirst}
                 onChange={(e) => handleFilterChange("chooseFirst", e.target.value)}
+                min={0}
                 placeholder="Ex: 100"
                 className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#FF5200] focus:border-[#FF5200] text-sm"
               />
@@ -285,14 +313,6 @@ export default function Customers() {
 
           <div className="mt-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <button
-                onClick={() => {
-                  // Filters are applied automatically via useMemo
-                }}
-                className="px-6 py-2.5 text-sm font-medium rounded-lg bg-[#FF5200] text-white hover:bg-[#E64A00] transition-all"
-              >
-                Apply Filters
-              </button>
               <button
                 onClick={() => {
                   setFilters({
@@ -416,7 +436,7 @@ export default function Customers() {
                         <span className="text-sm text-slate-700">{customer.totalOrder || 0}</span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-sm font-medium text-slate-900">$ {(customer.totalOrderAmount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        <span className="text-sm font-medium text-slate-900">₹ {(customer.totalOrderAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="text-sm text-slate-700">{customer.joiningDate}</span>
@@ -579,7 +599,7 @@ export default function Customers() {
                     </div>
                     <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Wallet Spent</p>
                     <h4 className="text-3xl font-black text-slate-900">
-                      <span className="text-xl text-green-500 mr-0.5">$</span>
+                      <span className="text-xl text-green-500 mr-0.5">₹</span>
                       {Math.floor(userDetails.totalOrderAmount || 0)}
                       <span className="text-lg text-slate-400">.{(userDetails.totalOrderAmount || 0).toFixed(2).split('.')[1]}</span>
                     </h4>
@@ -665,7 +685,7 @@ export default function Customers() {
                               </div>
                             </div>
                             <div className="text-right">
-                              <p className="text-sm font-black text-slate-900">${(order.total || 0).toLocaleString()}</p>
+                              <p className="text-sm font-black text-slate-900">₹{(order.total || 0).toLocaleString('en-IN')}</p>
                               <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full tracking-[1px] ${order.status === 'delivered' ? 'bg-green-100 text-green-600' :
                                 order.status === 'cancelled' ? 'bg-red-100 text-red-600' :
                                   'bg-orange-100 text-orange-600'
