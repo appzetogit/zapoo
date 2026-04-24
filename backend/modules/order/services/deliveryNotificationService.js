@@ -545,6 +545,7 @@ export async function notifyMultipleDeliveryBoys(order, deliveryPartnerIds, phas
         for (const room of roomVariations) {
           const sockets = await deliveryNamespace.in(room).fetchSockets();
           if (sockets.length > 0) {
+            deliveryNamespace.to(room).emit('new_order', orderNotification);
             deliveryNamespace.to(room).emit('new_order_available', orderNotification);
             deliveryNamespace.to(room).emit('play_notification_sound', {
               type: 'new_order_available',
@@ -561,6 +562,7 @@ export async function notifyMultipleDeliveryBoys(order, deliveryPartnerIds, phas
           console.warn(`⚠️ Delivery partner ${normalizedId} not connected, but will receive notification when they connect`);
           // Still emit to room for when they connect
           roomVariations.forEach(room => {
+            deliveryNamespace.to(room).emit('new_order', orderNotification);
             deliveryNamespace.to(room).emit('new_order_available', orderNotification);
           });
           notifiedCount++;

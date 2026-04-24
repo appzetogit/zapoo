@@ -12,7 +12,8 @@ const ASSIGNMENT_TIMEOUT_MS = 300000; // 5 minutes to accept
 const assignmentTimeouts = new Map();
 const FIREBASE_ONLINE_TTL_MS = Number(process.env.DELIVERY_ONLINE_TTL_MS || 120000); // 2 minutes
 const STRICT_SOCKET_ONLINE = String(process.env.DELIVERY_STRICT_SOCKET_ONLINE || 'true') !== 'false';
-const ALLOW_MONGO_ONLINE_FALLBACK = String(process.env.DELIVERY_ALLOW_MONGO_ONLINE_FALLBACK || 'false') === 'true';
+// Default true so broadcast can include riders who are online in DB but missing/stale in Firebase presence.
+const ALLOW_MONGO_ONLINE_FALLBACK = String(process.env.DELIVERY_ALLOW_MONGO_ONLINE_FALLBACK || 'true') === 'true';
 const PRESENCE_DEBUG = String(process.env.DELIVERY_PRESENCE_DEBUG || 'true') === 'true';
 
 function clearAssignmentTimeout(orderId) {
@@ -875,8 +876,9 @@ export async function broadcastDeliveryRequest(orderId, restaurantLat, restauran
   }
 
   const nearest = await findNearestDeliveryBoys(restaurantLat, restaurantLng, order.restaurantId?._id || order.restaurantId, 5);
-  const candidateIds = (nearest || []).map(db => db.deliveryPartnerId).filter(Boolean);
-  const eligibleIds = await filterByCodCashLimit(candidateIds, order);
+  const candidateIds = (nearest || []).map(db => db.deliveryPartnerId?.toString?.() || String(db.deliveryPartnerId || '')).filter(Boolean);
+  // Broadcast mode requirement: notify all riders in range; cash-limit is enforced at accept-time.
+  const eligibleIds = Array.from(new Set(candidateIds));
 
   // Reset broadcast tracking + clear sequential fields (if any)
   await Order.findByIdAndUpdate(orderId, {

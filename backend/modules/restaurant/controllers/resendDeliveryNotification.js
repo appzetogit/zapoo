@@ -35,9 +35,9 @@ export const resendDeliveryNotification = asyncHandler(async (req, res) => {
       return errorResponse(res, 404, 'Order not found');
     }
 
-    // Check if order is in valid status (preparing or ready)
-    if (!['preparing', 'ready'].includes(order.status)) {
-      return errorResponse(res, 400, `Cannot resend notification. Order status must be 'preparing' or 'ready'. Current status: ${order.status}`);
+    // Allow resend from accepted-stage too (`confirmed`) so dispatch recovery works before READY.
+    if (!['confirmed', 'preparing', 'ready'].includes(order.status)) {
+      return errorResponse(res, 400, `Cannot resend notification. Order status must be 'confirmed', 'preparing' or 'ready'. Current status: ${order.status}`);
     }
 
     // Get restaurant location

@@ -754,17 +754,32 @@ export const markOrderReady = asyncHandler(async (req, res) => {
 
     const latestOrderForAssignment = await Order.findById(order._id).select('deliveryPartnerId assignmentInfo orderId status restaurantId').lean();
     const alreadyBroadcasted = Boolean(latestOrderForAssignment?.assignmentInfo?.broadcastNotifiedAt);
+    const priorBroadcastIds = Array.isArray(latestOrderForAssignment?.assignmentInfo?.broadcastDeliveryPartnerIds)
+      ? latestOrderForAssignment.assignmentInfo.broadcastDeliveryPartnerIds
+      : [];
+    const hasPriorRecipients = priorBroadcastIds.length > 0;
 
     // READY-stage broadcast acts as fallback only when no prior ACCEPT-stage broadcast happened.
-    if (!populatedOrder?.deliveryPartnerId) {
-      if (alreadyBroadcasted) {
+    if (!latestOrderForAssignment?.deliveryPartnerId) {
+      // Skip READY fallback only when ACCEPT-stage broadcast already reached at least one rider.
+      // If ACCEPT-stage broadcast had zero recipients, retry on READY.
+      if (alreadyBroadcasted && hasPriorRecipients) {
         console.log('ℹ️ [DeliveryAssign] skipped_already_broadcasted', {
           orderId: latestOrderForAssignment?.orderId || order.orderId || null,
           orderMongoId: latestOrderForAssignment?._id?.toString?.() || order._id?.toString?.() || null,
           trigger: 'ready',
-          status: latestOrderForAssignment?.status || order.status
+          status: latestOrderForAssignment?.status || order.status,
+          priorRecipients: priorBroadcastIds.length
         });
       } else {
+        if (alreadyBroadcasted && !hasPriorRecipients) {
+          console.log('ℹ️ [DeliveryAssign] ready_fallback_retry_due_to_empty_accept_recipients', {
+            orderId: latestOrderForAssignment?.orderId || order.orderId || null,
+            orderMongoId: latestOrderForAssignment?._id?.toString?.() || order._id?.toString?.() || null,
+            trigger: 'ready',
+            status: latestOrderForAssignment?.status || order.status
+          });
+        }
         try {
           const coords = await resolveRestaurantCoordinatesForAssignment(latestOrderForAssignment || order, restaurantId, populatedOrder);
           if (coords?.restaurantLat && coords?.restaurantLng) {
