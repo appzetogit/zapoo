@@ -976,6 +976,49 @@ export default function HubMenu() {
     setSelectedCategory(null);
   };
 
+  const handleDeleteItem = async (itemId, groupId, itemName) => {
+    if (!itemId || !groupId) return;
+
+    if (!window.confirm(`Are you sure you want to delete "${itemName || "this item"}"?`)) {
+      return;
+    }
+
+    try {
+      const updatedSections = menuData.map(section => {
+        if (section.id !== groupId) return section;
+
+        const updatedItems = Array.isArray(section.items)
+          ? section.items.filter(item => item.id !== itemId)
+          : [];
+
+        const updatedSubsections = Array.isArray(section.subsections)
+          ? section.subsections.map(subsection => ({
+            ...subsection,
+            items: Array.isArray(subsection.items)
+              ? subsection.items.filter(item => item.id !== itemId)
+              : []
+          }))
+          : section.subsections;
+
+        return {
+          ...section,
+          items: updatedItems,
+          subsections: updatedSubsections
+        };
+      });
+
+      await restaurantAPI.updateMenu({
+        sections: updatedSections
+      });
+
+      setMenuData(updatedSections);
+      toast.success("Item deleted successfully");
+    } catch (error) {
+      console.error("Error deleting item:", error);
+      toast.error(error.response?.data?.message || "Failed to delete item");
+    }
+  };
+
   // Scroll to category
   const scrollToCategory = categoryId => {
     const element = document.getElementById(`group-${categoryId}`);
@@ -1240,6 +1283,14 @@ export default function HubMenu() {
                     })} className="flex items-center gap-1.5 bg-transparent text-gray-700 text-sm font-medium">
                       <Edit className="w-3.5 h-3.5" />
                       <span>Edit</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteItem(item.id, group.id, item.name)}
+                      className="flex items-center gap-1.5 bg-transparent text-red-600 text-sm font-medium"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Delete</span>
                     </button>
                   </div>
                 </div>)}

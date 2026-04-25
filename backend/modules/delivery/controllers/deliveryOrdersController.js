@@ -1615,6 +1615,13 @@ export const completeDelivery = asyncHandler(async (req, res) => {
     // Check if order is already delivered/completed (idempotent - allow if already completed)
     const isAlreadyDelivered = order.status === 'delivered' || order.deliveryState?.currentPhase === 'completed' || order.deliveryState?.status === 'delivered';
     if (isAlreadyDelivered) {
+      try {
+        await evaluateChallengesOnOrderCompleted(order);
+        await evaluateChallengesOnDeliveryCompleted(order);
+      } catch {
+        // Challenge reconciliation is non-blocking for idempotent complete flow.
+      }
+
       // Return success with existing order data (idempotent operation)
       // Still calculate earnings if not already calculated
       let earnings = null;
@@ -1737,10 +1744,10 @@ export const completeDelivery = asyncHandler(async (req, res) => {
     }
 
     try {
-      const { updateSettlementOnStatusChange } = await import('../../order/services/orderSettlementService.js');
-      await updateSettlementOnStatusChange(orderMongoId, 'delivered');
+      const { calculateOrderSettlement } = await import('../../order/services/orderSettlementService.js');
+      await calculateOrderSettlement(orderMongoId);
     } catch (settlementPreReleaseErr) {
-      console.error('⚠️ Settlement update on delivered failed:', settlementPreReleaseErr.message);
+      console.error('⚠️ Settlement recompute on delivered failed:', settlementPreReleaseErr.message);
     }
 
     // Release escrow and distribute funds
@@ -1762,6 +1769,29 @@ export const completeDelivery = asyncHandler(async (req, res) => {
       const settlement = await OrderSettlement.findOne({
         orderId: orderMongoId
       }).lean();
+      // Ensure restaurant wallet is credited in idempotent escrow-release scenarios.
+      try {
+        const settlementRestaurantEarning = Number(settlement?.restaurantEarning?.netEarning) || 0;
+        if (settlement?.restaurantId && settlementRestaurantEarning > 0) {
+          const restaurantWallet = await RestaurantWallet.findOrCreateByRestaurantId(settlement.restaurantId);
+          const orderIdForTransaction = orderMongoId?.toString ? orderMongoId.toString() : orderMongoId;
+          const existingRestaurantTransaction = restaurantWallet.transactions?.find(
+            t => t.orderId && t.orderId.toString() === orderIdForTransaction && t.type === 'payment'
+          );
+          if (!existingRestaurantTransaction) {
+            restaurantWallet.addTransaction({
+              amount: settlementRestaurantEarning,
+              type: 'payment',
+              status: 'Completed',
+              description: `Settlement credit for order ${settlement.orderNumber || orderIdForLog}`,
+              orderId: orderMongoId || order._id
+            });
+            await restaurantWallet.save();
+          }
+        }
+      } catch (restaurantWalletEscrowError) {
+        logger.error('❌ Error adding restaurant earning to wallet (escrow flow):', restaurantWalletEscrowError);
+      }
       // Ensure delivery wallet is updated even when escrow flow handles payouts
       try {
         const earningsAmount = Number(settlement?.deliveryPartnerEarning?.totalEarning) || 0;
@@ -1934,6 +1964,7 @@ export const completeDelivery = asyncHandler(async (req, res) => {
     try {
       // Get order total amount (subtotal, excluding delivery fee and tax for commission calculation)
       const orderTotal = order.pricing?.subtotal || order.pricing?.total || 0;
+      const orderIdForTransaction = orderMongoId?.toString ? orderMongoId.toString() : orderMongoId;
 
       // Find restaurant by restaurantId (can be string or ObjectId)
       let restaurant = null;

@@ -29,6 +29,17 @@ export default function HubFinance() {
   const [withdrawalWindows, setWithdrawalWindows] = useState(null);
   const [walletBalance, setWalletBalance] = useState(0);
   const [walletLoading, setWalletLoading] = useState(false);
+  const [challengeEarnings, setChallengeEarnings] = useState(0);
+
+  const calculateChallengeEarnings = (transactions = []) => {
+    if (!Array.isArray(transactions)) return 0;
+
+    return transactions.reduce((sum, tx) => {
+      const isChallengeReward = tx?.type === "bonus" && typeof tx?.description === "string" && tx.description.toLowerCase().includes("challenge reward");
+      if (!isChallengeReward) return sum;
+      return sum + (Number(tx?.amount) || 0);
+    }, 0);
+  };
 
   // Fetch finance data on mount
   useEffect(() => {
@@ -58,8 +69,10 @@ export default function HubFinance() {
         const response = await restaurantAPI.getWallet();
         const data = response?.data?.data || response?.data;
         setWalletBalance(Number(data?.wallet?.totalBalance) || 0);
+        setChallengeEarnings(calculateChallengeEarnings(data?.transactions || []));
       } catch (_) {
         setWalletBalance(0);
+        setChallengeEarnings(0);
       } finally {
         setWalletLoading(false);
       }
@@ -744,6 +757,15 @@ export default function HubFinance() {
                 })}
                     </p>
                     <p className="text-sm text-gray-600 mb-4">Updated after each delivered order.</p>
+                    <div className="mb-4 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2">
+                      <p className="text-xs text-blue-700">Challenge Earning</p>
+                      <p className="text-base font-semibold text-blue-900">
+                        ₹{(challengeEarnings || 0).toLocaleString('en-IN', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2
+                      })}
+                      </p>
+                    </div>
 
                     {/* Recommended Item Performance */}
                     {financeData?.currentCycle?.recommendedItems && <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-100">
@@ -1096,6 +1118,12 @@ export default function HubFinance() {
                     maximumFractionDigits: 2
                   })}</span>
                   </p>
+                  <p className="text-sm text-gray-600 mb-3">
+                    Challenge Earning: <span className="font-semibold text-gray-900">₹{(challengeEarnings || 0).toLocaleString('en-IN', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                  })}</span>
+                  </p>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Enter Amount to Withdraw
                   </label>
@@ -1136,6 +1164,7 @@ export default function HubFinance() {
                       const walletResponse = await restaurantAPI.getWallet();
                       const data = walletResponse?.data?.data || walletResponse?.data;
                       setWalletBalance(Number(data?.wallet?.totalBalance) || 0);
+                      setChallengeEarnings(calculateChallengeEarnings(data?.transactions || []));
                     } catch (_) {}
                   } else {
                     alert(response.data?.message || 'Failed to submit withdrawal request');

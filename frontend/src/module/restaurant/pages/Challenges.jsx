@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useTranslation } from "react-i18next"
 import {
@@ -27,13 +27,9 @@ export default function RestaurantChallenges() {
     const [selectedChallenge, setSelectedChallenge] = useState(null)
     const [showDetails, setShowDetails] = useState(false)
 
-    useEffect(() => {
-        fetchChallenges()
-    }, [])
-
-    const fetchChallenges = async () => {
+    const fetchChallenges = useCallback(async ({ showLoader = false } = {}) => {
         try {
-            setLoading(true)
+            if (showLoader) setLoading(true)
             const res = await restaurantAPI.getMyChallenges()
             if (res.data?.success) {
                 // Backend returns { challenges: [...] }
@@ -45,9 +41,35 @@ export default function RestaurantChallenges() {
             console.error(err)
             setError(t("restaurant.challenges.errors.unexpected"))
         } finally {
-            setLoading(false)
+            if (showLoader) setLoading(false)
         }
-    }
+    }, [t])
+
+    useEffect(() => {
+        fetchChallenges({ showLoader: true })
+    }, [fetchChallenges])
+
+    useEffect(() => {
+        const refreshOnFocus = () => fetchChallenges()
+        const refreshOnVisible = () => {
+            if (document.visibilityState === "visible") {
+                fetchChallenges()
+            }
+        }
+
+        const intervalId = window.setInterval(() => {
+            fetchChallenges()
+        }, 20000)
+
+        window.addEventListener("focus", refreshOnFocus)
+        document.addEventListener("visibilitychange", refreshOnVisible)
+
+        return () => {
+            window.clearInterval(intervalId)
+            window.removeEventListener("focus", refreshOnFocus)
+            document.removeEventListener("visibilitychange", refreshOnVisible)
+        }
+    }, [fetchChallenges])
 
     const filteredChallenges = challenges.filter(challenge => {
         if (filter === "all") return true
@@ -55,6 +77,17 @@ export default function RestaurantChallenges() {
         if (filter === "completed") return challenge.progress?.status === "completed"
         return true
     })
+
+    const totalRewards = useMemo(() => {
+        return challenges.reduce((sum, challenge) => {
+            if (challenge?.rewardType === "free_banner") return sum
+            const isIssued = challenge?.progress?.rewardStatus === "issued" || Boolean(challenge?.progress?.rewardGranted)
+            if (!isIssued) return sum
+
+            const rewardAmount = Number(challenge?.progress?.rewardAmount ?? challenge?.rewardValue ?? 0)
+            return sum + (Number.isFinite(rewardAmount) ? rewardAmount : 0)
+        }, 0)
+    }, [challenges])
 
     const getFrequencyLabel = (freq) => {
         switch (freq) {
@@ -127,7 +160,10 @@ export default function RestaurantChallenges() {
                         <div className="flex gap-4">
                             <div className="bg-white/15 backdrop-blur-sm rounded-2xl px-4 py-3 border border-white/20">
                                 <div className="text-xs opacity-80 mb-1">{t("restaurant.challenges.hero.totalRewards")}</div>
-                                <div className="text-lg font-bold">₹0.00</div>
+                                <div className="text-lg font-bold">₹{totalRewards.toLocaleString("en-IN", {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2
+                                })}</div>
                             </div>
                             <div className="bg-white/15 backdrop-blur-sm rounded-2xl px-4 py-3 border border-white/20">
                                 <div className="text-xs opacity-80 mb-1">{t("restaurant.challenges.hero.rank")}</div>

@@ -112,6 +112,19 @@ const getMetricKeysForEvent = (eventType, userType) => {
   return [];
 };
 
+const isOrderCompletionStatus = (order) => {
+  const normalizedStatus = String(order?.status || '').toLowerCase();
+  const normalizedDeliveryStatus = String(order?.deliveryState?.status || '').toLowerCase();
+  const normalizedPhase = String(order?.deliveryState?.currentPhase || '').toLowerCase();
+
+  return (
+    normalizedStatus === 'delivered' ||
+    normalizedStatus === 'completed' ||
+    normalizedDeliveryStatus === 'delivered' ||
+    normalizedPhase === 'completed'
+  );
+};
+
 const ensureProgress = async ({ challenge, userId, userType, eventDate }) => {
   const { cycleStart, cycleEnd, cycleKey } = getCycleBounds(challenge.frequency, eventDate);
   return ChallengeProgress.findOneAndUpdate(
@@ -409,7 +422,7 @@ const evaluateChallengesForUserEvent = async ({
 };
 
 export const evaluateChallengesOnOrderCompleted = async (order) => {
-  if (!order || order.status !== 'delivered') return;
+  if (!order || !isOrderCompletionStatus(order)) return;
 
   const eventDate = order.deliveredAt || new Date();
   const revenue = Math.max(0, Number(order?.pricing?.subtotal || 0) - Number(order?.pricing?.discount || 0));
@@ -423,7 +436,7 @@ export const evaluateChallengesOnOrderCompleted = async (order) => {
   const customerOrderCount = await Order.countDocuments({
     userId: order.userId,
     restaurantId: order.restaurantId,
-    status: 'delivered'
+    status: { $in: ['delivered', 'completed'] }
   });
   const isNewCustomer = customerOrderCount <= 1;
 
@@ -443,7 +456,7 @@ export const evaluateChallengesOnOrderCompleted = async (order) => {
 };
 
 export const evaluateChallengesOnDeliveryCompleted = async (order) => {
-  if (!order || order.status !== 'delivered' || !order.deliveryPartnerId) return;
+  if (!order || !isOrderCompletionStatus(order) || !order.deliveryPartnerId) return;
   const eventDate = order.deliveredAt || new Date();
   const orderObjectId = order._id?.toString?.() || order.id || order.orderId;
   const eventKey = `delivery_completed:${orderObjectId}`;
