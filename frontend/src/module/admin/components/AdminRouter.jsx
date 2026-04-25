@@ -235,6 +235,7 @@ export default function AdminRouter() {
           <Route path="promotional-banner" element={<PromotionalBanner />} />
           {/* Advertisement */}
           <Route path="advertisement/new" element={<NewAdvertisement />} />
+          <Route path="new-advertisement" element={<NewAdvertisement />} />
           <Route path="advertisement/requests" element={<AdRequests />} />
           <Route path="advertisement" element={<AdsList />} />
           <Route path="marketing/ad-requests" element={<AdRequests />} />

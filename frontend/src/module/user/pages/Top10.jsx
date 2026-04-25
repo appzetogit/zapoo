@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom"
 import { ArrowLeft, Star, Clock, Bookmark, BadgePercent, Trophy, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { heroBannerAPI } from "@/lib/api"
+import api, { heroBannerAPI } from "@/lib/api"
 import { useLocation } from "../hooks/useLocation"
 import { useZone } from "../hooks/useZone"
 import { toast } from "sonner"
@@ -25,14 +25,39 @@ export default function Top10() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const getRestaurantImageUrl = (restaurant) => {
-    if (!restaurant) return "";
-    if (typeof restaurant.image === "string" && restaurant.image.trim()) return restaurant.image;
-    if (restaurant.image?.url) return restaurant.image.url;
-    if (typeof restaurant.profileImage === "string" && restaurant.profileImage.trim()) return restaurant.profileImage;
-    if (restaurant.profileImage?.url) return restaurant.profileImage.url;
+  const getImageUrl = (value) => {
+    if (!value) return "";
+    if (typeof value === "string" && value.trim()) return value;
+    if (typeof value === "object") {
+      if (typeof value.url === "string" && value.url.trim()) return value.url;
+      if (typeof value.secure_url === "string" && value.secure_url.trim()) return value.secure_url;
+      if (typeof value.image === "string" && value.image.trim()) return value.image;
+    }
     return "";
   };
+
+  const getRestaurantImages = (restaurant) => {
+    if (!restaurant) return [];
+    const candidates = [
+      ...(Array.isArray(restaurant.coverImages) ? restaurant.coverImages : []),
+      ...(Array.isArray(restaurant.images) ? restaurant.images : []),
+      ...(Array.isArray(restaurant.menuImages) ? restaurant.menuImages : []),
+      restaurant.coverImage,
+      restaurant.profileImage,
+      restaurant.image,
+      restaurant.logo,
+      restaurant.onboarding?.step2?.coverImage,
+      restaurant.onboarding?.step2?.profileImage,
+      restaurant.onboarding?.step3?.images,
+    ];
+
+    return candidates
+      .flatMap((item) => (Array.isArray(item) ? item : [item]))
+      .map(getImageUrl)
+      .filter(Boolean);
+  };
+
+  const getRestaurantImageUrl = (restaurant) => getRestaurantImages(restaurant)[0] || "";
 
   useEffect(() => {
     const fetchTop10Restaurants = async () => {
@@ -178,12 +203,27 @@ export default function Top10() {
                   const restaurantId = restaurant._id || restaurant.restaurantId || restaurant.id;
                   const restaurantSlug = restaurant.slug || restaurant.name?.toLowerCase().replace(/\s+/g, "-") || "";
                   const favorite = isFavorite(restaurantSlug);
+                  const restaurantImages = getRestaurantImages(restaurant);
+                  const normalizedRecommendedItems = (recommendedPreviewByRestaurantId[String(restaurantId)] || [])
+                    .map((item) => ({
+                      ...item,
+                      image: getImageUrl(item?.image) || "",
+                    }))
+                    .filter((item) => Boolean(item?.image));
+                  const restaurantForCard = {
+                    ...restaurant,
+                    // Top-10 should render slider from recommended items (Home featured style).
+                    // Keep restaurant image only as final fallback when recommended data is unavailable.
+                    images: normalizedRecommendedItems.length > 0 ? [] : restaurantImages,
+                    image: normalizedRecommendedItems.length > 0 ? "" : restaurantImages[0] || restaurant.image || "",
+                    profileImage: getImageUrl(restaurant.profileImage) || restaurant.profileImage,
+                  };
 
                   return (
                     <FeaturedStyleRestaurantCard
                       key={restaurantId}
-                      restaurant={restaurant}
-                      recommendedItems={recommendedPreviewByRestaurantId[String(restaurantId)]}
+                      restaurant={restaurantForCard}
+                      recommendedItems={normalizedRecommendedItems}
                       priority={index < 3}
                       favorite={favorite}
                       onToggleFavorite={toggleFavorite}

@@ -43,6 +43,11 @@ const adRequestSchema = new mongoose.Schema(
             enum: ['Pending', 'Approved', 'Scheduled', 'Active', 'Completed', 'Rejected', 'Banner Pending'],
             default: 'Pending'
         },
+        priority: {
+            type: Number,
+            enum: [1, 2, 3],
+            default: null
+        },
         paymentStatus: {
             type: String,
             enum: ['Pending', 'Paid', 'Failed'],

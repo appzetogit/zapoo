@@ -9,6 +9,8 @@ import Order from '../../order/models/Order.js';
 import AdminCategoryManagement from '../../admin/models/AdminCategoryManagement.js';
 import Zone from '../../admin/models/Zone.js';
 import { successResponse, errorResponse } from '../../../shared/utils/response.js';
+import { uploadToCloudinary } from '../../../shared/utils/cloudinaryService.js';
+import { cloudinary } from '../../../config/cloudinary.js';
 import { calculateDistance } from '../../order/services/orderCalculationService.js';
 import { getTopRestaurantsForUser } from '../services/topRestaurantsService.js';
 import { filterRestaurantsByOutletTimings } from '../../restaurant/services/outletVisibilityService.js';
@@ -139,6 +141,153 @@ export const getHeroBanners = async (req, res) => {
   } catch (error) {
     console.error('Error fetching hero banners:', error);
     return errorResponse(res, 500, 'Failed to fetch hero banners');
+  }
+};
+
+/**
+ * Get all hero banners (admin endpoint)
+ */
+export const getAllHeroBanners = async (req, res) => {
+  try {
+    const banners = await HeroBanner.find()
+      .sort({ order: 1, createdAt: -1 })
+      .populate('linkedRestaurants', 'name slug restaurantId profileImage')
+      .lean();
+
+    return successResponse(res, 200, 'Hero banners retrieved successfully', { banners });
+  } catch (error) {
+    console.error('Error fetching hero banners:', error);
+    return errorResponse(res, 500, 'Failed to fetch hero banners');
+  }
+};
+
+/**
+ * Create a hero banner (admin endpoint)
+ */
+export const createHeroBanner = async (req, res) => {
+  try {
+    if (!req.file) {
+      return errorResponse(res, 400, 'No image file provided');
+    }
+
+    const uploadResult = await uploadToCloudinary(req.file.buffer, {
+      folder: 'appzeto/hero-banners',
+      resource_type: 'image'
+    });
+
+    const lastBanner = await HeroBanner.findOne()
+      .sort({ order: -1 })
+      .select('order')
+      .lean();
+    const nextOrder = lastBanner ? Number(lastBanner.order || 0) + 1 : 0;
+
+    const banner = await HeroBanner.create({
+      imageUrl: uploadResult.secure_url,
+      cloudinaryPublicId: uploadResult.public_id,
+      title: (req.body?.title || '').trim(),
+      subtitle: (req.body?.subtitle || '').trim(),
+      description: (req.body?.description || '').trim(),
+      ctaText: (req.body?.ctaText || 'Order Now').trim() || 'Order Now',
+      ctaLink: (req.body?.ctaLink || '/user').trim() || '/user',
+      order: nextOrder,
+      isActive: true
+    });
+
+    return successResponse(res, 201, 'Hero banner uploaded successfully', { banner });
+  } catch (error) {
+    console.error('Error creating hero banner:', error);
+    return errorResponse(res, 500, 'Failed to upload hero banner');
+  }
+};
+
+/**
+ * Create multiple hero banners (admin endpoint)
+ */
+export const createMultipleHeroBanners = async (req, res) => {
+  try {
+    const files = req.files || [];
+    if (!Array.isArray(files) || files.length === 0) {
+      return errorResponse(res, 400, 'No image files provided');
+    }
+    if (files.length > 5) {
+      return errorResponse(res, 400, 'Maximum 5 images can be uploaded at once');
+    }
+
+    const lastBanner = await HeroBanner.findOne()
+      .sort({ order: -1 })
+      .select('order')
+      .lean();
+    let currentOrder = lastBanner ? Number(lastBanner.order || 0) + 1 : 0;
+
+    const uploadedBanners = [];
+    const errors = [];
+
+    for (let i = 0; i < files.length; i += 1) {
+      try {
+        const file = files[i];
+        const result = await uploadToCloudinary(file.buffer, {
+          folder: 'appzeto/hero-banners',
+          resource_type: 'image'
+        });
+
+        const banner = await HeroBanner.create({
+          imageUrl: result.secure_url,
+          cloudinaryPublicId: result.public_id,
+          order: currentOrder++,
+          isActive: true
+        });
+
+        uploadedBanners.push(banner);
+      } catch (uploadError) {
+        console.error(`Error uploading hero banner ${i + 1}:`, uploadError);
+        errors.push(`Failed to upload file ${i + 1}: ${uploadError.message}`);
+      }
+    }
+
+    if (uploadedBanners.length === 0) {
+      return errorResponse(res, 500, `Failed to upload hero banners. ${errors.join(', ')}`);
+    }
+
+    if (errors.length > 0) {
+      return successResponse(res, 201, `Uploaded ${uploadedBanners.length} banner(s) with some errors`, {
+        banners: uploadedBanners,
+        errors
+      });
+    }
+
+    return successResponse(res, 201, `${uploadedBanners.length} hero banner(s) uploaded successfully`, {
+      banners: uploadedBanners
+    });
+  } catch (error) {
+    console.error('Error creating multiple hero banners:', error);
+    return errorResponse(res, 500, 'Failed to upload hero banners');
+  }
+};
+
+/**
+ * Delete a hero banner (admin endpoint)
+ */
+export const deleteHeroBanner = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const banner = await HeroBanner.findById(id);
+    if (!banner) {
+      return errorResponse(res, 404, 'Hero banner not found');
+    }
+
+    if (banner.cloudinaryPublicId) {
+      try {
+        await cloudinary.uploader.destroy(banner.cloudinaryPublicId);
+      } catch (cloudinaryError) {
+        console.error('Error deleting hero banner from Cloudinary:', cloudinaryError);
+      }
+    }
+
+    await HeroBanner.findByIdAndDelete(id);
+    return successResponse(res, 200, 'Hero banner deleted successfully');
+  } catch (error) {
+    console.error('Error deleting hero banner:', error);
+    return errorResponse(res, 500, 'Failed to delete hero banner');
   }
 };
 

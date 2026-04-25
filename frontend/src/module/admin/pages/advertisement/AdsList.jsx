@@ -11,6 +11,11 @@ import { toast } from "sonner"
 
 export default function AdsList() {
   const navigate = useNavigate()
+  const defaultFilters = {
+    status: "Active",
+    restaurant: "",
+    priority: "",
+  }
   const [searchQuery, setSearchQuery] = useState("")
   const [adsType, setAdsType] = useState("all")
   const [ads, setAds] = useState([])
@@ -25,11 +30,7 @@ export default function AdsList() {
   const [editFilePreview, setEditFilePreview] = useState(null)
   const [editStatus, setEditStatus] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [filters, setFilters] = useState({
-    status: "Active", // Default to Active for "Active Campaigns" page
-    restaurant: "",
-    priority: "",
-  })
+  const [filters, setFilters] = useState(defaultFilters)
   const [visibleColumns, setVisibleColumns] = useState({
     si: true,
     adsId: true,
@@ -53,7 +54,7 @@ export default function AdsList() {
     adsType: ad.targetZones?.map(z => z.name || z).join(", ") || "Banner",
     duration: `${new Date(ad.startDate).toLocaleDateString("en-IN")} – ${new Date(ad.endDate).toLocaleDateString("en-IN")}`,
     status: ad.status,
-    priority: ad.priority || null,
+    priority: ad.priority !== undefined && ad.priority !== null ? String(ad.priority) : "",
     raw: ad,
   })
 
@@ -125,7 +126,7 @@ export default function AdsList() {
     return result
   }, [ads, searchQuery, adsType, filters])
 
-  const activeFiltersCount = Object.values(filters).filter(v => v).length
+  const activeFiltersCount = Object.keys(filters).filter((key) => filters[key] !== defaultFilters[key]).length
 
   const handleExport = (format) => {
     const filename = "ads_list"
@@ -251,11 +252,7 @@ export default function AdsList() {
   }
 
   const handleResetFilters = () => {
-    setFilters({
-      status: "Active",
-      restaurant: "",
-      priority: "",
-    })
+    setFilters(defaultFilters)
   }
 
   const restaurants = [...new Set(ads.map(ad => ad.restaurantName))].filter(Boolean)
@@ -279,7 +276,7 @@ export default function AdsList() {
           </div>
 
           <button
-            onClick={() => navigate("/admin/new-advertisement")}
+            onClick={() => navigate("/admin/advertisement/new")}
             className="px-4 py-2.5 text-sm font-medium rounded-lg bg-[#FF5200] text-white hover:bg-[#E64A00] flex items-center gap-2 transition-all shadow-md"
           >
             <Plus className="w-4 h-4" />

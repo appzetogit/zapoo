@@ -407,8 +407,31 @@ export const updateAdStatus = async (req, res) => {
     } = req.params;
     const {
       status,
-      rejectionReason
+      rejectionReason,
+      priority
     } = req.body;
+    const normalizedStatus = typeof status === 'string' ? status.trim() : '';
+    const hasStatusUpdate = Boolean(normalizedStatus);
+    const hasPriorityUpdate = priority !== undefined && priority !== null && String(priority).trim() !== '';
+
+    if (!hasStatusUpdate && !hasPriorityUpdate) {
+      return res.status(400).json({
+        success: false,
+        message: 'Either status or priority is required'
+      });
+    }
+
+    let normalizedPriority = null;
+    if (hasPriorityUpdate) {
+      normalizedPriority = Number(priority);
+      if (!Number.isInteger(normalizedPriority) || normalizedPriority < 1 || normalizedPriority > 3) {
+        return res.status(400).json({
+          success: false,
+          message: 'Priority must be 1, 2, or 3'
+        });
+      }
+    }
+
     if (!mongoose.Types.ObjectId.isValid(adId)) {
       return res.status(400).json({
         success: false,
@@ -422,7 +445,7 @@ export const updateAdStatus = async (req, res) => {
         message: 'Ad request not found'
       });
     }
-    if (status === 'Approved') {
+    if (hasStatusUpdate && normalizedStatus === 'Approved') {
       // Check if approval window is still open (must be approved BEFORE start date)
       const now = new Date();
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -451,9 +474,9 @@ export const updateAdStatus = async (req, res) => {
       ad.status = 'Approved';
       // Payment remains Pending until restaurant pays via Razorpay
       // ad.paymentStatus = 'Paid'; // REMOVED: Auto-pay logic
-      ad.approvedBy = req.user?._id;
+      ad.approvedBy = req.admin?._id || req.user?._id;
       ad.approvalDate = new Date();
-    } else if (status === 'Rejected') {
+    } else if (hasStatusUpdate && normalizedStatus === 'Rejected') {
       if (ad.appliedFreeBannerCreditId && ad.paymentStatus !== 'Paid') {
         await releaseReservedFreeBannerCredit({
           creditId: ad.appliedFreeBannerCreditId,
@@ -467,17 +490,27 @@ export const updateAdStatus = async (req, res) => {
       }
       ad.status = 'Rejected';
       ad.rejectionReason = rejectionReason;
-    } else {
-      ad.status = status;
+    } else if (hasStatusUpdate) {
+      ad.status = normalizedStatus;
     }
+
+    if (hasPriorityUpdate) {
+      ad.priority = normalizedPriority;
+    }
+
     await ad.save();
+
+    const messageParts = [];
+    if (hasStatusUpdate) messageParts.push(`status updated to ${ad.status}`);
+    if (hasPriorityUpdate) messageParts.push(`priority updated to ${ad.priority}`);
+
     res.status(200).json({
       success: true,
       data: {
         ...ad.toObject(),
         ...buildAdBillingSummary(ad)
       },
-      message: `Ad status updated to ${status}`
+      message: messageParts.length ? `Ad ${messageParts.join(' and ')}` : 'Ad updated successfully'
     });
   } catch (error) {
     res.status(500).json({

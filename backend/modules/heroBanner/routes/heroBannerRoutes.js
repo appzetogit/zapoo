@@ -3,6 +3,10 @@ import { uploadMiddleware } from '../../../shared/utils/cloudinaryService.js';
 import { authenticateAdmin } from '../../../modules/admin/middleware/adminAuth.js';
 import {
   getHeroBanners,
+  getAllHeroBanners,
+  createHeroBanner,
+  createMultipleHeroBanners,
+  deleteHeroBanner,
   updateBannerOrder,
   toggleBannerStatus,
   linkRestaurantsToBanner,
@@ -51,6 +55,20 @@ router.get('/top-10/public', getTop10Restaurants);
 router.get('/gourmet/public', getGourmetRestaurants);
 
 // Admin routes - Hero Banners
+router.get('/', authenticateAdmin, getAllHeroBanners);
+router.post(
+  '/',
+  authenticateAdmin,
+  uploadMiddleware.single('image'),
+  createHeroBanner
+);
+router.post(
+  '/multiple',
+  authenticateAdmin,
+  uploadMiddleware.array('images', 5),
+  createMultipleHeroBanners
+);
+router.delete('/:id', authenticateAdmin, deleteHeroBanner);
 router.patch('/:id/order', authenticateAdmin, updateBannerOrder);
 router.patch('/:id/status', authenticateAdmin, toggleBannerStatus);
 router.patch('/:id/link-restaurants', authenticateAdmin, linkRestaurantsToBanner);
