@@ -126,7 +126,7 @@ export default function PocketPage() {
   const weeklyEarnings =
     walletState?.transactions
       ?.filter((t) => {
-        if ((t.type !== "payment" && t.type !== "earning_addon") || t.status !== "Completed") return false;
+        if (t.type !== "payment" || t.status !== "Completed") return false;
         const now = new Date();
         const startOfWeek = new Date(now);
         startOfWeek.setDate(now.getDate() - now.getDay());
@@ -153,18 +153,14 @@ export default function PocketPage() {
   };
   const weeklyOrders = calculateWeeklyOrders();
 
-  const totalBonus =
-    walletState?.transactions
-      ?.filter((t) => t.type === "bonus" && t.status === "Completed")
-      .reduce((sum, t) => sum + (t.amount || 0), 0) || 0;
-
-  let pocketBalance = walletState?.pocketBalance ?? walletState?.totalBalance ?? balances.totalBalance ?? 0;
-  if (pocketBalance === 0 && totalBonus > 0) {
-    pocketBalance = totalBonus;
-  } else if (pocketBalance > 0 && totalBonus > 0) {
-    const expectedBalance = weeklyEarnings + totalBonus - (balances.totalWithdrawn || 0);
-    if (expectedBalance > pocketBalance) pocketBalance = expectedBalance;
-  }
+  // IMPORTANT: Always trust backend-computed pocket/total balance.
+  // Do not override with client-side weekly/bonus formulas (can show stale/incorrect balance after withdrawals).
+  const pocketBalance = Math.max(
+    0,
+    Number.isFinite(Number(walletState?.pocketBalance))
+      ? Number(walletState.pocketBalance)
+      : Number(walletState?.totalBalance ?? balances.totalBalance ?? 0)
+  );
 
   const totalCashLimit = Number.isFinite(Number(walletState?.totalCashLimit)) ? Number(walletState.totalCashLimit) : 0;
   const availableCashLimit =

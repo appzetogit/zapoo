@@ -831,11 +831,10 @@ export default function DeliveryHome() {
   // Calculate today's gigs count
   const todayGigsCount = bookedGigs.filter(gig => gig.date === todayDateKey).length;
 
-  // Calculate weekly earnings from wallet transactions (payment + earning_addon bonus)
-  // Include both payment and earning_addon transactions in weekly earnings
+  // Calculate weekly earnings from wallet transactions (orders only)
+  // IMPORTANT: earning_addon is disabled; keep only payment earnings.
   const weeklyEarnings = walletState?.transactions?.filter(t => {
-    // Include both payment and earning_addon transactions
-    if (t.type !== 'payment' && t.type !== 'earning_addon' || t.status !== 'Completed') return false;
+    if (t.type !== 'payment' || t.status !== 'Completed') return false;
     const now = new Date();
     const startOfWeek = new Date(now);
     startOfWeek.setDate(now.getDate() - now.getDay());
@@ -863,130 +862,7 @@ export default function DeliveryHome() {
     }).length;
   };
   const weeklyOrders = calculateWeeklyOrders();
-  // State for active earning addon
-  const [activeEarningAddon, setActiveEarningAddon] = useState(null);
 
-  // Fetch active earning addon offers
-  useEffect(() => {
-    const fetchActiveEarningAddons = async () => {
-      try {
-        const response = await deliveryAPI.getActiveEarningAddons();
-        if (response?.data?.success && response?.data?.data?.activeOffers) {
-          const offers = response.data.data.activeOffers;
-          // Get the first valid active offer (prioritize isValid, then isUpcoming, then any active status)
-          const activeOffer = offers.find(offer => offer.isValid) || offers.find(offer => offer.isUpcoming) || offers.find(offer => offer.status === 'active') || offers[0] || null;
-          setActiveEarningAddon(activeOffer);
-        } else {
-          setActiveEarningAddon(null);
-        }
-      } catch (error) {
-        // Suppress network errors - backend might be down or endpoint not available
-        if (error.code === 'ERR_NETWORK') {
-          // Silently handle network errors - backend might not be running
-          setActiveEarningAddon(null);
-          return;
-        }
-
-        // Skip logging timeout errors (handled by axios interceptor)
-        if (error.code !== 'ECONNABORTED' && !error.message?.includes('timeout')) {
-          // Only log non-network errors
-          if (error.response) {
-            console.error('Error fetching active earning addons:', error.response?.data || error.message);
-          }
-        }
-        setActiveEarningAddon(null);
-      }
-    };
-
-    // Fetch immediately on mount
-    fetchActiveEarningAddons();
-
-    // Refresh every 5 seconds to get latest offers
-    const refreshInterval = setInterval(() => {
-      fetchActiveEarningAddons();
-    }, 5000);
-
-    // Refresh when page becomes visible
-    const handleVisibilityChange = () => {
-      if (!document.hidden) {
-        fetchActiveEarningAddons();
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    // Also listen for focus events for instant refresh
-    const handleFocus = () => {
-      fetchActiveEarningAddons();
-    };
-    window.addEventListener('focus', handleFocus);
-    return () => {
-      clearInterval(refreshInterval);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('focus', handleFocus);
-    };
-  }, []);
-
-  // Calculate bonus earnings from earning_addon transactions (only for active offer)
-  const calculateBonusEarnings = () => {
-    if (!activeEarningAddon || !walletState?.transactions) return 0;
-    const now = new Date();
-    const startDate = activeEarningAddon.startDate ? new Date(activeEarningAddon.startDate) : null;
-    const endDate = activeEarningAddon.endDate ? new Date(activeEarningAddon.endDate) : null;
-    return walletState.transactions.filter(t => {
-      // Only count earning_addon type transactions
-      if (t.type !== 'earning_addon' || t.status !== 'Completed') return false;
-
-      // Filter by date range if offer has dates
-      if (startDate || endDate) {
-        const transactionDate = t.date ? new Date(t.date) : t.createdAt ? new Date(t.createdAt) : null;
-        if (!transactionDate) return false;
-        if (startDate && transactionDate < startDate) return false;
-        if (endDate && transactionDate > endDate) return false;
-      }
-
-      // Check if transaction is related to current offer
-      if (t.metadata?.earningAddonId) {
-        return t.metadata.earningAddonId === activeEarningAddon._id?.toString() || t.metadata.earningAddonId === activeEarningAddon.id?.toString();
-      }
-
-      // If no metadata, include all earning_addon transactions in date range
-      return true;
-    }).reduce((sum, t) => sum + (t.amount || 0), 0);
-  };
-
-  // Earnings Guarantee - Use active earning addon if available, otherwise show 0
-  // When no offer is active, show 0 of 0 and ₹0
-  const earningsGuaranteeTarget = activeEarningAddon?.earningAmount || 0;
-  const earningsGuaranteeOrdersTarget = activeEarningAddon?.requiredOrders || 0;
-  // Only show current orders/earnings if there's an active offer
-  const earningsGuaranteeCurrentOrders = activeEarningAddon ? activeEarningAddon.currentOrders ?? weeklyOrders : 0;
-  // Show only bonus earnings from the offer, not total weekly earnings
-  const earningsGuaranteeCurrentEarnings = activeEarningAddon ? calculateBonusEarnings() : 0;
-  const ordersProgress = earningsGuaranteeOrdersTarget > 0 ? Math.min(earningsGuaranteeCurrentOrders / earningsGuaranteeOrdersTarget, 1) : 0;
-  const earningsProgress = earningsGuaranteeTarget > 0 ? Math.min(earningsGuaranteeCurrentEarnings / earningsGuaranteeTarget, 1) : 0;
-
-  // Get week end date for valid till - use offer end date if available
-  const getWeekEndDate = () => {
-    if (activeEarningAddon?.endDate) {
-      const endDate = new Date(activeEarningAddon.endDate);
-      const day = endDate.getDate();
-      const month = endDate.toLocaleString('en-US', {
-        month: 'short'
-      });
-      return `${day} ${month}`;
-    }
-    const now = new Date();
-    const endOfWeek = new Date(now);
-    endOfWeek.setDate(now.getDate() - now.getDay() + 6); // End of week (Saturday)
-    const day = endOfWeek.getDate();
-    const month = endOfWeek.toLocaleString('en-US', {
-      month: 'short'
-    });
-    return `${day} ${month}`;
-  };
-  const weekEndDate = getWeekEndDate();
-  // Offer is live if it's valid (started) or upcoming (not started yet but active)
-  const isOfferLive = activeEarningAddon?.isValid || activeEarningAddon?.isUpcoming || false;
   // Calculate total hours worked today (prefer store, then calculated; default to 0)
   const calculatedHours = bookedGigs.filter(gig => gig.date === todayDateKey).reduce((total, gig) => total + (gig.totalHours || 0), 0);
   const todayHoursWorked = hasStoreDataForToday && todayData ? todayData.timeOnOrders ?? calculatedHours : calculatedHours;
