@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, ChevronDown } from "lucide-react";
+import { X } from "lucide-react";
 
 /**
  * BottomPopup Component
@@ -282,7 +282,6 @@ export default function BottomPopup({
           userSelect: 'none',
           background: 'transparent'
         }}>
-                <ChevronDown className="w-6 h-6 text-gray-400 mb-1 pointer-events-none" />
                 <div className="w-12 h-1.5 bg-gray-300 rounded-full pointer-events-none" />
               </button>}
 

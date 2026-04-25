@@ -3,6 +3,7 @@ import { successResponse, errorResponse } from '../../../shared/utils/response.j
 import Order from '../../order/models/Order.js';
 import Payment from '../../payment/models/Payment.js';
 import Restaurant from '../../restaurant/models/Restaurant.js';
+import OrderSettlement from '../../order/models/OrderSettlement.js';
 import mongoose from 'mongoose';
 import winston from 'winston';
 
@@ -118,6 +119,22 @@ export const getTripHistory = asyncHandler(async (req, res) => {
       logger.warn('Could not fetch payment records for COD check:', e.message);
     }
 
+    // Fetch delivery partner earnings from settlement table (source of truth for rider amount)
+    const settlementEarningMap = new Map();
+    try {
+      const settlements = await OrderSettlement.find({
+        orderId: { $in: orderIds }
+      }).select('orderId deliveryPartnerEarning.totalEarning').lean();
+
+      settlements.forEach((settlement) => {
+        const orderIdStr = settlement?.orderId?.toString();
+        if (!orderIdStr) return;
+        settlementEarningMap.set(orderIdStr, Number(settlement?.deliveryPartnerEarning?.totalEarning) || 0);
+      });
+    } catch (e) {
+      logger.warn('Could not fetch settlement earnings for trip history:', e.message);
+    }
+
     // Get unique restaurant IDs that need name lookup (where restaurantName is missing/empty)
     const restaurantIdsToLookup = [...new Set(
       orders
@@ -194,8 +211,17 @@ export const getTripHistory = asyncHandler(async (req, res) => {
                         'Unknown Restaurant';
       }
 
-      // Get order amount (delivery fee or total)
-      const amount = order.pricing?.deliveryFee || order.pricing?.total || 0;
+      // Get rider amount from settlement (source of truth), fallback to delivery fee
+      // NOTE: pricing.total is customer bill, not delivery partner earning.
+      const settlementAmount = settlementEarningMap.get(order._id?.toString()) || 0;
+      const fallbackDeliveryFee = Number(order.pricing?.deliveryFee) || 0;
+      const fallbackTotal = Number(order.pricing?.total) || 0;
+      let amount = settlementAmount > 0 ? settlementAmount : (fallbackDeliveryFee > 0 ? fallbackDeliveryFee : fallbackTotal);
+
+      // Cancelled trips should not show payout amount in trip history
+      if (order.status === 'cancelled') {
+        amount = 0;
+      }
 
       // Get payment method - check Payment collection as fallback (for COD orders)
       let paymentMethod = order.payment?.method || 'razorpay';
@@ -243,4 +269,3 @@ export const getTripHistory = asyncHandler(async (req, res) => {
     return errorResponse(res, 500, 'Failed to fetch trip history');
   }
 });
-
