@@ -245,10 +245,14 @@ export async function notifyRestaurantOrderUpdate(orderId, status) {
       updatedAt: new Date()
     });
 
-    // Send FCM notification to restaurant for status update (always send)
+    // Send FCM notification to restaurant for status update.
+    // IMPORTANT: Keep notifications enabled, but for accept/ready transitions
+    // send a "safe" payload without order action metadata to avoid
+    // Accept/Reject action buttons on some Android clients.
     try {
       let title = 'Order Update';
       let body = `Order #${order.orderId} status is now ${normalizedStatus}`;
+      const shouldUseSafePayload = ['confirmed', 'preparing', 'ready'].includes(normalizedStatus);
       if (normalizedStatus === 'delivered') {
         title = '✅ Order Delivered!';
         body = `Order #${order.orderId} has been delivered.`;
@@ -271,12 +275,20 @@ export async function notifyRestaurantOrderUpdate(orderId, status) {
         title = '🚴 Out for Delivery';
         body = `Order #${order.orderId} is out for delivery.`;
       }
-      await sendNotificationToUser(order.restaurantId?.toString() || order.restaurantId, 'restaurant', title, body, {
-        orderId: order.orderId,
-        orderMongoId: order._id?.toString(),
-        status: normalizedStatus,
-        type: 'order_update'
-      });
+      const payloadData = shouldUseSafePayload
+        ? {
+            status: normalizedStatus,
+            type: 'restaurant_status_update',
+            clickUrl: '/restaurant/orders/all'
+          }
+        : {
+            orderId: order.orderId,
+            orderMongoId: order._id?.toString(),
+            status: normalizedStatus,
+            type: 'order_update'
+          };
+
+      await sendNotificationToUser(order.restaurantId?.toString() || order.restaurantId, 'restaurant', title, body, payloadData);
     } catch (pushError) {
       console.error('❌ [FCM] Error sending restaurant status notification:', pushError);
     }
