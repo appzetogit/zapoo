@@ -1,7 +1,7 @@
 import { ArrowLeft, AlertTriangle, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { fetchDeliveryWallet, calculateDeliveryBalances, calculatePeriodEarnings } from "../utils/deliveryWalletState";
+import { fetchDeliveryWallet, calculateDeliveryBalances } from "../utils/deliveryWalletState";
 import { formatCurrency } from "../../restaurant/utils/currency";
 import { deliveryAPI } from "@/lib/api";
 import { toast } from "sonner";
@@ -84,35 +84,14 @@ export default function PocketBalancePage() {
   }, []);
   const balances = calculateDeliveryBalances(walletState);
 
-  // Calculate weekly earnings for the current week (excludes bonus)
-  const weeklyEarnings = calculatePeriodEarnings(walletState, 'week');
-
-  // Calculate total bonus amount from all bonus transactions
-  const totalBonus = walletState?.transactions?.filter(t => t.type === 'bonus' && t.status === 'Completed').reduce((sum, t) => sum + (t.amount || 0), 0) || 0;
-
-  // Calculate total withdrawn (needed for pocket balance calculation)
-  const totalWithdrawn = balances.totalWithdrawn || 0;
-
-  // Pocket balance = total balance (includes bonus + earnings)
-  // Formula: Pocket Balance = Earnings + Bonus - Withdrawals
-  // Use walletState.pocketBalance if available, otherwise calculate from totalBalance
-  let pocketBalance = walletState?.pocketBalance !== undefined ? walletState.pocketBalance : walletState?.totalBalance || balances.totalBalance || 0;
-
-  // IMPORTANT: Ensure pocket balance includes bonus
-  // If backend totalBalance is 0 but we have bonus, calculate it manually
-  // This ensures bonus is always reflected in pocket balance and withdrawable amount
-  if (pocketBalance === 0 && totalBonus > 0) {
-    // If totalBalance is 0 but we have bonus, pocket balance = bonus
-    pocketBalance = totalBonus;
-  } else if (pocketBalance > 0 && totalBonus > 0) {
-    // Verify pocket balance includes bonus
-    // Calculate expected: Earnings + Bonus - Withdrawals
-    const expectedBalance = weeklyEarnings + totalBonus - totalWithdrawn;
-    // Use the higher value to ensure bonus is included
-    if (expectedBalance > pocketBalance) {
-      pocketBalance = expectedBalance;
-    }
-  }
+  // Always trust backend-computed pocket balance.
+  // Avoid client-side recalculation to prevent stale/non-zero UI after withdrawals.
+  const pocketBalance = Math.max(
+    0,
+    Number.isFinite(Number(walletState?.pocketBalance))
+      ? Number(walletState.pocketBalance)
+      : Number(walletState?.totalBalance ?? balances.totalBalance ?? 0)
+  );
 
   // Calculate cash collected (cash in hand)
   const cashCollected = balances.cashInHand || 0;
