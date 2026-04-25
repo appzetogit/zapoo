@@ -2199,9 +2199,23 @@ export default function DeliveryHome() {
             lng: restaurantInfo.lng
           });
           if (directionsResult) {
+            // Store pickup route metrics so total trip stats are available on delivery complete popup
+            const pickupDistance = directionsResult.routes?.[0]?.legs?.[0]?.distance?.value || 0; // meters
+            const pickupDuration = directionsResult.routes?.[0]?.legs?.[0]?.duration?.value || 0; // seconds
+            pickupRouteDistanceRef.current = pickupDistance;
+            pickupRouteTimeRef.current = pickupDuration;
+
             setDirectionsResponse(directionsResult);
             directionsResponseRef.current = directionsResult;
             updateLiveTrackingPolyline(directionsResult, currentLocation);
+
+            if (pickupDistance > 0 || pickupDuration > 0) {
+              setSelectedRestaurant(prev => (prev ? {
+                ...prev,
+                pickupRouteDistanceMeters: pickupDistance,
+                pickupRouteTimeSeconds: pickupDuration
+              } : prev));
+            }
           }
         }
         
@@ -3110,6 +3124,13 @@ export default function DeliveryHome() {
                     const totalTime = pickupRouteTimeRef.current + deliveryDuration;
                     setTripDistance(totalDistance);
                     setTripTime(totalTime);
+                    setSelectedRestaurant(prev => (prev ? {
+                      ...prev,
+                      deliveryRouteDistanceMeters: deliveryDistance,
+                      deliveryRouteTimeSeconds: deliveryDuration,
+                      tripDistanceMeters: totalDistance,
+                      tripTimeSeconds: totalTime
+                    } : prev));
                     setDirectionsResponse(directionsResult);
                     directionsResponseRef.current = directionsResult;
 
@@ -3162,6 +3183,25 @@ export default function DeliveryHome() {
                     }
                     setShowRoutePath(true);
                   } else if (routeData?.coordinates?.length > 0) {
+                    // Fallback path when Google Directions is unavailable:
+                    // backend route.distance is in km and route.duration is in minutes
+                    const fallbackDeliveryDistance = Number(routeData?.distance || 0) * 1000;
+                    const fallbackDeliveryDuration = Number(routeData?.duration || 0) * 60;
+                    if (fallbackDeliveryDistance > 0 || fallbackDeliveryDuration > 0) {
+                      deliveryRouteDistanceRef.current = fallbackDeliveryDistance;
+                      deliveryRouteTimeRef.current = fallbackDeliveryDuration;
+                      const totalDistance = pickupRouteDistanceRef.current + fallbackDeliveryDistance;
+                      const totalTime = pickupRouteTimeRef.current + fallbackDeliveryDuration;
+                      setTripDistance(totalDistance);
+                      setTripTime(totalTime);
+                      setSelectedRestaurant(prev => (prev ? {
+                        ...prev,
+                        deliveryRouteDistanceMeters: fallbackDeliveryDistance,
+                        deliveryRouteTimeSeconds: fallbackDeliveryDuration,
+                        tripDistanceMeters: totalDistance,
+                        tripTimeSeconds: totalTime
+                      } : prev));
+                    }
                     setRoutePolyline(routeData.coordinates);
                     updateRoutePolyline(routeData.coordinates);
                     setShowRoutePath(true);
@@ -3171,6 +3211,23 @@ export default function DeliveryHome() {
                     console.error('❌ Error calculating route to customer:', routeError);
                   }
                   if (routeData?.coordinates?.length > 0) {
+                    const fallbackDeliveryDistance = Number(routeData?.distance || 0) * 1000;
+                    const fallbackDeliveryDuration = Number(routeData?.duration || 0) * 60;
+                    if (fallbackDeliveryDistance > 0 || fallbackDeliveryDuration > 0) {
+                      deliveryRouteDistanceRef.current = fallbackDeliveryDistance;
+                      deliveryRouteTimeRef.current = fallbackDeliveryDuration;
+                      const totalDistance = pickupRouteDistanceRef.current + fallbackDeliveryDistance;
+                      const totalTime = pickupRouteTimeRef.current + fallbackDeliveryDuration;
+                      setTripDistance(totalDistance);
+                      setTripTime(totalTime);
+                      setSelectedRestaurant(prev => (prev ? {
+                        ...prev,
+                        deliveryRouteDistanceMeters: fallbackDeliveryDistance,
+                        deliveryRouteTimeSeconds: fallbackDeliveryDuration,
+                        tripDistanceMeters: totalDistance,
+                        tripTimeSeconds: totalTime
+                      } : prev));
+                    }
                     setRoutePolyline(routeData.coordinates);
                     updateRoutePolyline(routeData.coordinates);
                     setShowRoutePath(true);
@@ -3363,6 +3420,29 @@ export default function DeliveryHome() {
     orderDeliveredSwipeStartY.current = 0;
     orderDeliveredIsSwiping.current = false;
   };
+
+  // Ensure trip stats are available in "Delivery complete" popup even after refresh/rejoin flows
+  useEffect(() => {
+    if (!showOrderDeliveredAnimation) return;
+
+    if (tripDistance == null) {
+      const storedDistance =
+        Number(selectedRestaurant?.tripDistanceMeters || 0) ||
+        Number(pickupRouteDistanceRef.current || 0) + Number(deliveryRouteDistanceRef.current || 0);
+      if (storedDistance > 0) {
+        setTripDistance(storedDistance);
+      }
+    }
+
+    if (tripTime == null) {
+      const storedTime =
+        Number(selectedRestaurant?.tripTimeSeconds || 0) ||
+        Number(pickupRouteTimeRef.current || 0) + Number(deliveryRouteTimeRef.current || 0);
+      if (storedTime > 0) {
+        setTripTime(storedTime);
+      }
+    }
+  }, [showOrderDeliveredAnimation, selectedRestaurant?.tripDistanceMeters, selectedRestaurant?.tripTimeSeconds, tripDistance, tripTime]);
 
   // Handle accept orders button swipe
   const handleAcceptOrdersTouchStart = e => {
