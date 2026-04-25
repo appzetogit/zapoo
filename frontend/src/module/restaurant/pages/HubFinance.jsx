@@ -1,7 +1,7 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Bell, Menu, ChevronDown, Calendar, Download, ArrowRight, FileText, Wallet, X, AlertTriangle } from "lucide-react";
+import { Menu, ChevronDown, Calendar, Download, ArrowRight, FileText, Wallet, X, AlertTriangle } from "lucide-react";
 import BottomNavOrders from "../components/BottomNavOrders";
 import { restaurantAPI } from "@/lib/api";
 import { loadBusinessSettings } from "@/lib/utils/businessSettings";
@@ -712,9 +712,6 @@ export default function HubFinance() {
           <div className="flex items-center gap-1 ml-2">
             <button className="p-2 hover:bg-gray-100 rounded-full transition-colors" onClick={() => navigate("/restaurant/withdrawal-history")} title="Withdrawal History">
               <Wallet className="w-5 h-5 text-gray-700" />
-            </button>
-            <button className="p-2 hover:bg-gray-100 rounded-full transition-colors" onClick={() => navigate("/restaurant/notifications")}>
-              <Bell className="w-5 h-5 text-gray-700" />
             </button>
             <button className="p-2 hover:bg-gray-100 rounded-full transition-colors" onClick={() => navigate("/restaurant/explore")}>
               <Menu className="w-5 h-5 text-gray-700" />

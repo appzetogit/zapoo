@@ -142,7 +142,7 @@ export const getRestaurantOrders = asyncHandler(async (req, res) => {
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
     // Strict field projection for order listing
-    const projection = 'orderId userId items pricing payment status address createdAt deliveredAt eta preparationTime note sendCutlery';
+    const projection = 'orderId userId items pricing payment status address createdAt deliveredAt eta preparationTime note sendCutlery review';
 
     const orders = await Order.find(query)
       .populate('userId', 'name email phone')

@@ -1013,7 +1013,7 @@ export const getUserOrders = async (req, res) => {
       .sort({ createdAt: -1 })
       .limit(parseInt(limit))
       .skip(skip)
-      .select('orderId status pricing items address createdAt restaurantName restaurantId estimatedDeliveryTime eta')
+      .select('orderId status pricing items address createdAt deliveredAt restaurantName restaurantId estimatedDeliveryTime eta review cancelledBy cancellationReason tracking')
       .populate('restaurantId', 'name slug profileImage address location')
       .lean();
     const total = await Order.countDocuments(query);
@@ -1096,6 +1096,90 @@ export const getOrderDetails = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch order details'
+    });
+  }
+};
+
+/**
+ * Submit user rating/review for a delivered order
+ * PATCH /api/order/:id/review
+ */
+export const submitOrderReview = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    const { id } = req.params;
+    const ratingValue = Number(req.body?.rating);
+    const reviewTextRaw = req.body?.review ?? req.body?.comment ?? '';
+    const reviewText = typeof reviewTextRaw === 'string' ? reviewTextRaw.trim() : '';
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'User not authenticated'
+      });
+    }
+
+    if (!Number.isInteger(ratingValue) || ratingValue < 1 || ratingValue > 5) {
+      return res.status(400).json({
+        success: false,
+        message: 'Rating must be an integer between 1 and 5'
+      });
+    }
+
+    let order = null;
+    if (mongoose.Types.ObjectId.isValid(id) && id.length === 24) {
+      order = await Order.findOne({ _id: id, userId }).lean();
+    }
+    if (!order) {
+      order = await Order.findOne({ orderId: id, userId }).lean();
+    }
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found'
+      });
+    }
+
+    const normalizedStatus = String(order.status || '').toLowerCase();
+    const deliveryStateStatus = String(order.deliveryState?.status || '').toLowerCase();
+    const isDelivered = normalizedStatus === 'delivered' || normalizedStatus === 'completed' || deliveryStateStatus === 'delivered';
+    if (!isDelivered) {
+      return res.status(400).json({
+        success: false,
+        message: 'You can review only delivered orders'
+      });
+    }
+
+    const updateData = {
+      'review.rating': ratingValue,
+      'review.submittedAt': new Date(),
+      'review.reviewedBy': userId
+    };
+    if (reviewText) {
+      updateData['review.comment'] = reviewText;
+    }
+
+    const updatedOrder = await Order.findByIdAndUpdate(order._id, {
+      $set: updateData
+    }, {
+      new: true,
+      runValidators: true
+    })
+      .select('orderId status review deliveredAt')
+      .lean();
+
+    return res.json({
+      success: true,
+      message: 'Review submitted successfully',
+      data: {
+        order: updatedOrder
+      }
+    });
+  } catch (error) {
+    logger.error(`Error submitting order review: ${error.message}`);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to submit review'
     });
   }
 };

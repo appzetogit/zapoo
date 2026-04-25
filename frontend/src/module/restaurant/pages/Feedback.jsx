@@ -1,86 +1,14 @@
 import { useState, useEffect, useRef } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { motion, AnimatePresence } from "framer-motion"
-import { Bell, HelpCircle, Menu, Search, SlidersHorizontal, Calendar, Reply, ChevronLeft, Send, X, Loader2, ChevronRight } from "lucide-react"
+import { Bell, HelpCircle, Menu, Search, SlidersHorizontal, Calendar, ChevronLeft, X, Loader2, ChevronRight } from "lucide-react"
 import { DateRangeCalendar } from "@/components/ui/date-range-calendar"
 import BottomNavOrders from "../components/BottomNavOrders"
 import { restaurantAPI } from "@/lib/api"
 
-const REVIEWS_STORAGE_KEY = "restaurant_reviews_data"
-
 const tabs = [
   { id: "complaints", label: "Complaints" },
   { id: "reviews", label: "Reviews" },
-]
-
-// Dummy review data
-const dummyReviews = [
-  {
-    id: 1,
-    orderNumber: "0",
-    outlet: "Kadhai Chammach Restaur.. By Pass Road (South)",
-    userName: "Pradeep Rajput",
-    userImage: "https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=80",
-    ordersCount: 0,
-    rating: 5,
-    date: "30 Dec, 2023 2:05 PM",
-    reviewText: "very good nice food"
-  },
-  {
-    id: 2,
-    orderNumber: "1234",
-    outlet: "Kadhai Chammach Restaur.. By Pass Road (North)",
-    userName: "Rahul Sharma",
-    userImage: "https://images.pexels.com/photos/1043471/pexels-photo-1043471.jpeg?auto=compress&cs=tinysrgb&w=80",
-    ordersCount: 3,
-    rating: 4,
-    date: "29 Dec, 2023 8:30 AM",
-    reviewText: "Great food quality and fast delivery. Will order again!"
-  },
-  {
-    id: 3,
-    orderNumber: "1235",
-    outlet: "Kadhai Chammach Restaur.. By Pass Road (South)",
-    userName: "Priya Patel",
-    userImage: "https://images.pexels.com/photos/774909/pexels-photo-774909.jpeg?auto=compress&cs=tinysrgb&w=80",
-    ordersCount: 1,
-    rating: 5,
-    date: "28 Dec, 2023 6:15 PM",
-    reviewText: "Amazing taste! The biryani was perfect."
-  },
-  {
-    id: 4,
-    orderNumber: "1236",
-    outlet: "Kadhai Chammach Restaur.. By Pass Road (Central)",
-    userName: "Amit Kumar",
-    userImage: "https://images.pexels.com/photos/1222271/pexels-photo-1222271.jpeg?auto=compress&cs=tinysrgb&w=80",
-    ordersCount: 5,
-    rating: 3,
-    date: "27 Dec, 2023 1:20 PM",
-    reviewText: "Food was okay, but delivery took longer than expected."
-  },
-  {
-    id: 5,
-    orderNumber: "1237",
-    outlet: "Kadhai Chammach Restaur.. By Pass Road (South)",
-    userName: "Sneha Reddy",
-    userImage: "https://images.pexels.com/photos/415829/pexels-photo-415829.jpeg?auto=compress&cs=tinysrgb&w=80",
-    ordersCount: 2,
-    rating: 5,
-    date: "26 Dec, 2023 9:45 AM",
-    reviewText: "Excellent service and delicious food. Highly recommended!"
-  },
-  {
-    id: 6,
-    orderNumber: "1238",
-    outlet: "Kadhai Chammach Restaur.. By Pass Road (North)",
-    userName: "Vikram Singh",
-    userImage: "https://images.pexels.com/photos/91227/pexels-photo-91227.jpeg?auto=compress&cs=tinysrgb&w=80",
-    ordersCount: 7,
-    rating: 4,
-    date: "25 Dec, 2023 4:10 PM",
-    reviewText: "Good quality food. Packaging was neat and clean."
-  }
 ]
 
 export default function Feedback() {
@@ -108,18 +36,15 @@ export default function Feedback() {
 
   const feedbackTabs = ["complaints", "reviews"]
   const [reviews, setReviews] = useState([])
-  const [selectedReview, setSelectedReview] = useState(null)
-  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false)
-  const [replyText, setReplyText] = useState("")
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [selectedFilterCategory, setSelectedFilterCategory] = useState("duration")
   const [filterValues, setFilterValues] = useState({
     duration: null,
-    sortBy: null,
-    reviewType: []
+    sortBy: null
   })
   const [isFilterLoading, setIsFilterLoading] = useState(false)
   const [displayedReviews, setDisplayedReviews] = useState([])
+  const [reviewsSearchQuery, setReviewsSearchQuery] = useState("")
 
   // Complaints filter state
   const [isComplaintsFilterOpen, setIsComplaintsFilterOpen] = useState(false)
@@ -240,16 +165,17 @@ export default function Feedback() {
     fetchComplaints()
   }, [activeTab, selectedDateRange, customDateRange, complaintsFilterValues, complaintsSearchQuery])
 
-  // Fetch reviews from orders
+  // Fetch reviews from delivered orders (dynamic)
   useEffect(() => {
     const fetchReviews = async () => {
+      if (activeTab !== "reviews") return
+
       try {
         setIsLoadingReviews(true)
-        // Fetch all delivered orders
         let allOrders = []
         let page = 1
         let hasMore = true
-        const limit = 1000
+        const limit = 100
         const maxPages = 50
 
         while (hasMore && page <= maxPages) {
@@ -260,117 +186,88 @@ export default function Feedback() {
               status: 'delivered'
             })
 
-            if (response.data?.success && response.data.data?.orders) {
-              const orders = response.data.data.orders
-              allOrders = [...allOrders, ...orders]
+            const fetchedOrders = response?.data?.data?.orders || []
+            if (fetchedOrders.length > 0) {
+              allOrders = [...allOrders, ...fetchedOrders]
+            }
 
-              const totalPages = response.data.data.pagination?.totalPages || response.data.data.totalPages || 1
-              if (orders.length < limit || (totalPages > 0 && page >= totalPages)) {
-                hasMore = false
-              } else {
-                page++
-              }
-            } else {
+            const totalPages = response?.data?.data?.pagination?.totalPages || 1
+            if (fetchedOrders.length < limit || (totalPages > 0 && page >= totalPages)) {
               hasMore = false
+            } else {
+              page += 1
             }
           } catch (pageError) {
-            console.error(`Error fetching orders page ${page}:`, pageError)
+            console.error(`Error fetching delivered orders page ${page}:`, pageError)
             hasMore = false
           }
         }
 
-        // Transform orders to reviews format
-        // Note: If orders have review/rating fields, use them. Otherwise, we'll show delivered orders as reviews
+        const customerOrderCountMap = allOrders.reduce((acc, order) => {
+          const customerId = (order?.userId?._id || order?.userId)?.toString?.() || ''
+          if (!customerId) return acc
+          acc[customerId] = (acc[customerId] || 0) + 1
+          return acc
+        }, {})
+
         const transformedReviews = allOrders
-          .filter(order => order.status === 'delivered')
+          .filter(order => order?.status === 'delivered')
           .map((order, index) => {
-            const orderDate = new Date(order.createdAt || order.deliveredAt || Date.now())
-            // Format date as "30 Dec, 2023 2:05 PM"
-            const day = orderDate.getDate()
-            const month = orderDate.toLocaleDateString('en-GB', { month: 'short' })
-            const year = orderDate.getFullYear()
-            const hours = orderDate.getHours()
-            const minutes = orderDate.getMinutes()
+            const reviewDate = new Date(order.review?.submittedAt || order.deliveredAt || order.createdAt || Date.now())
+            const day = reviewDate.getDate()
+            const month = reviewDate.toLocaleDateString('en-GB', { month: 'short' })
+            const year = reviewDate.getFullYear()
+            const hours = reviewDate.getHours()
+            const minutes = reviewDate.getMinutes()
             const ampm = hours >= 12 ? 'PM' : 'AM'
             const displayHours = hours % 12 || 12
             const displayMinutes = minutes.toString().padStart(2, '0')
             const formattedDate = `${day} ${month}, ${year} ${displayHours}:${displayMinutes} ${ampm}`
 
-            // Extract user info
-            const userName = order.userId?.name ||
-              (typeof order.userId === 'object' && order.userId?.name) ||
-              'Customer'
-            const userImage = order.userId?.profileImage ||
-              (typeof order.userId === 'object' && order.userId?.profileImage) ||
+            const userName = order?.userId?.name || 'Customer'
+            const customerId = (order?.userId?._id || order?.userId)?.toString?.() || ''
+            const userImage =
               `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=random`
-
-            // Get outlet/restaurant name
-            const outlet = order.restaurantName ||
-              (restaurantData?.name) ||
-              'Restaurant'
-
-            // Get rating if available (from order.review or order.rating)
-            const rating = order.review?.rating ||
-              order.rating ||
-              order.feedback?.rating ||
-              null
-            const reviewText = order.review?.comment ||
-              order.review?.text ||
-              order.feedback?.comment ||
-              order.feedback?.text ||
-              (rating ? `${rating}★ rating` : 'No review text')
-
-            // Count user's orders with this restaurant
-            const userOrdersCount = allOrders.filter(o =>
-              (o.userId?._id || o.userId) === (order.userId?._id || order.userId)
-            ).length
+            const rawRating = Number(order?.review?.rating ?? order?.feedback?.rating ?? order?.rating)
+            const rating = Number.isFinite(rawRating) && rawRating > 0 ? rawRating : null
+            const reviewText = (order?.review?.comment || order?.review?.text || order?.feedback?.comment || order?.feedback?.text || '').trim() || 'No review text'
 
             return {
-              id: order._id || order.orderId || `review-${index}`,
-              orderNumber: order.orderId || order.orderNumber || String(index),
-              outlet: outlet,
-              userName: userName,
-              userImage: userImage,
-              ordersCount: userOrdersCount,
-              rating: rating || 5, // Default to 5 if no rating
+              id: order?._id || order?.orderId || `review-${index}`,
+              orderNumber: order?.orderId || String(index),
+              outlet: restaurantData?.name || 'Restaurant',
+              userName,
+              userImage,
+              ordersCount: customerOrderCountMap[customerId] || 1,
+              rating,
               date: formattedDate,
-              reviewText: reviewText,
-              reply: order.review?.reply || order.feedback?.reply || null,
-              orderData: order // Keep original order data
+              submittedAt: reviewDate.toISOString(),
+              reviewText,
             }
           })
-          .filter(review => {
-            // Include reviews that have a rating or have review text (not the default "No review text")
-            return review.rating !== null || (review.reviewText && review.reviewText !== 'No review text')
-          })
 
-        // Calculate rating summary
         const ratings = transformedReviews.map(r => r.rating).filter(r => r !== null)
         const averageRating = ratings.length > 0
-          ? (ratings.reduce((sum, r) => sum + r, 0) / ratings.length).toFixed(1)
+          ? Number((ratings.reduce((sum, r) => sum + r, 0) / ratings.length).toFixed(1))
           : 0
         const totalRatings = ratings.length
         const totalReviews = transformedReviews.length
 
         setRatingSummary({
-          averageRating: parseFloat(averageRating),
+          averageRating,
           totalRatings,
           totalReviews
         })
 
         setReviews(transformedReviews)
-
-        // Save to localStorage for offline access
-        try {
-          if (typeof window !== "undefined") {
-            localStorage.setItem(REVIEWS_STORAGE_KEY, JSON.stringify(transformedReviews))
-          }
-        } catch (error) {
-          console.error("Error saving reviews to storage:", error)
-        }
       } catch (error) {
         console.error("Error fetching reviews:", error)
-        // Keep existing reviews on error
+        setReviews([])
+        setRatingSummary({
+          averageRating: 0,
+          totalRatings: 0,
+          totalReviews: 0
+        })
       } finally {
         setIsLoadingReviews(false)
       }
@@ -379,9 +276,7 @@ export default function Feedback() {
     if (!isLoadingRestaurant) {
       fetchReviews()
     }
-  }, [isLoadingRestaurant, restaurantData])
-
-  // Persist reviews to localStorage whenever they change (removed - now done in fetchReviews)
+  }, [activeTab, isLoadingRestaurant, restaurantData])
 
   // Update displayed reviews when reviews or filter values change
   useEffect(() => {
@@ -394,23 +289,25 @@ export default function Feedback() {
       const cutoffDate = new Date(now.getTime() - daysAgo * 24 * 60 * 60 * 1000)
 
       filtered = filtered.filter(review => {
-        // Parse date from review.date string (format: "30 Dec, 2023 2:05 PM")
-        const reviewDate = new Date(review.date)
+        const reviewDate = new Date(review.submittedAt || review.date)
         return reviewDate >= cutoffDate
       })
     }
 
-    // Filter by review type (if selected)
-    if (filterValues.reviewType && filterValues.reviewType.length > 0) {
-      // For now, we'll keep all reviews as we don't have review type in the data
-      // This can be extended when review type is added to the review data structure
+    if (reviewsSearchQuery.trim()) {
+      const query = reviewsSearchQuery.trim().toLowerCase()
+      filtered = filtered.filter((review) =>
+        String(review.userName || "").toLowerCase().includes(query) ||
+        String(review.orderNumber || "").toLowerCase().includes(query) ||
+        String(review.reviewText || "").toLowerCase().includes(query)
+      )
     }
 
     // Sort reviews
     if (filterValues.sortBy) {
       filtered.sort((a, b) => {
-        const dateA = new Date(a.date)
-        const dateB = new Date(b.date)
+        const dateA = new Date(a.submittedAt || a.date)
+        const dateB = new Date(b.submittedAt || b.date)
 
         switch (filterValues.sortBy) {
           case "newest":
@@ -418,9 +315,9 @@ export default function Feedback() {
           case "oldest":
             return dateA - dateB
           case "bestRated":
-            return b.rating - a.rating
+            return (b.rating ?? -1) - (a.rating ?? -1)
           case "worstRated":
-            return a.rating - b.rating
+            return (a.rating ?? 999) - (b.rating ?? 999)
           default:
             return 0
         }
@@ -428,65 +325,13 @@ export default function Feedback() {
     }
 
     setDisplayedReviews(filtered)
-  }, [reviews, filterValues])
-
-  // Handle review card click
-  const handleReviewClick = (review) => {
-    setSelectedReview(review)
-    setReplyText(review.reply || "")
-    setIsReviewModalOpen(true)
-  }
-
-  // Handle reply send
-  const handleSendReply = async () => {
-    if (!selectedReview || !replyText.trim()) return
-
-    try {
-      // TODO: Implement API call to save reply to backend
-      // For now, update local state
-      setReviews(prev =>
-        prev.map(review =>
-          review.id === selectedReview.id
-            ? { ...review, reply: replyText.trim() }
-            : review
-        )
-      )
-
-      setSelectedReview(prev => prev ? { ...prev, reply: replyText.trim() } : null)
-      setReplyText("")
-      setIsReviewModalOpen(false)
-
-      // Save to localStorage
-      try {
-        if (typeof window !== "undefined") {
-          const updatedReviews = reviews.map(review =>
-            review.id === selectedReview.id
-              ? { ...review, reply: replyText.trim() }
-              : review
-          )
-          localStorage.setItem(REVIEWS_STORAGE_KEY, JSON.stringify(updatedReviews))
-        }
-      } catch (error) {
-        console.error("Error saving reply to storage:", error)
-      }
-    } catch (error) {
-      console.error("Error sending reply:", error)
-    }
-  }
-
-  // Handle modal close
-  const handleCloseModal = () => {
-    setIsReviewModalOpen(false)
-    setSelectedReview(null)
-    setReplyText("")
-  }
+  }, [reviews, filterValues, reviewsSearchQuery])
 
   // Handle filter reset
   const handleFilterReset = () => {
     setFilterValues({
       duration: null,
-      sortBy: null,
-      reviewType: []
+      sortBy: null
     })
     setIsFilterLoading(true)
     setTimeout(() => {
@@ -865,6 +710,8 @@ export default function Feedback() {
                     <input
                       type="text"
                       placeholder="Search reviews"
+                      value={reviewsSearchQuery}
+                      onChange={(e) => setReviewsSearchQuery(e.target.value)}
                       className="flex-1 text-sm text-gray-900 placeholder-gray-400 bg-transparent focus:outline-none"
                     />
                   </div>
@@ -905,8 +752,7 @@ export default function Feedback() {
                     displayedReviews.map((review) => (
                       <div
                         key={review.id}
-                        className="rounded-2xl bg-white p-3 space-y-3  cursor-pointer"
-                        onClick={() => handleReviewClick(review)}
+                        className="rounded-2xl bg-white p-3 space-y-3"
                       >
                         {/* Order & outlet */}
                         <div className="text-[11px] text-gray-500 flex items-center justify-between gap-2">
@@ -938,7 +784,7 @@ export default function Feedback() {
                           <div className="absolute -top-2 left-4 w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-b-[8px] border-b-gray-100"></div>
                           <div className="flex items-center justify-between mb-1">
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-700 text-white text-[11px] font-semibold">
-                              {review.rating}★
+                              {review.rating ? `${review.rating}★` : "N/A"}
                             </span>
                             <span className="text-[11px] text-gray-500">
                               {review.date}
@@ -949,35 +795,6 @@ export default function Feedback() {
                           </p>
                         </div>
 
-                        {/* Reply section - show if reply exists */}
-                        {review.reply && (
-                          <div className="mt-2 rounded-xl bg-blue-50 px-3 py-2 relative">
-                            {/* Speech bubble tail for reply */}
-                            <div className="absolute -top-2 right-4 w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-b-[8px] border-b-blue-50"></div>
-                            <div className="flex items-center justify-between mb-1">
-                              <span className="text-[11px] text-gray-600 font-medium">
-                                Your reply
-                              </span>
-                            </div>
-                            <p className="text-sm text-gray-800">
-                              {review.reply}
-                            </p>
-                          </div>
-                        )}
-
-                        {/* Reply link */}
-                        <div className="flex justify-end">
-                          <button
-                            className="text-xs font-medium text-blue-700 flex items-center gap-1"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleReviewClick(review)
-                            }}
-                          >
-                            <Reply className="w-3.5 h-3.5" />
-                            <span>{review.reply ? "Edit Reply" : "Reply"}</span>
-                          </button>
-                        </div>
                       </div>
                     ))
                   )}
@@ -987,113 +804,6 @@ export default function Feedback() {
           </motion.div>
         </AnimatePresence>
       </div>
-
-      {/* Review Detail Modal */}
-      <AnimatePresence>
-        {isReviewModalOpen && selectedReview && (
-          <>
-            {/* Backdrop */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/50 z-[9999]"
-              onClick={handleCloseModal}
-            />
-
-            {/* Modal */}
-            <motion.div
-              initial={{ y: "100%" }}
-              animate={{ y: 0 }}
-              exit={{ y: "100%" }}
-              transition={{ type: "spring", damping: 30, stiffness: 300 }}
-              className="fixed bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-2xl z-[9999] max-h-[90vh] flex flex-col"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* Header */}
-              <div className="sticky top-0 bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3 z-10">
-                <button
-                  onClick={handleCloseModal}
-                  className="p-1 hover:bg-gray-100 rounded-full transition-colors"
-                >
-                  <ChevronLeft className="w-6 h-6 text-gray-900" />
-                </button>
-                <h2 className="text-lg font-bold text-gray-900">Review</h2>
-              </div>
-
-              {/* Content */}
-              <div className="flex-1 overflow-y-auto px-4 py-4">
-                {/* Restaurant name */}
-                <p className="text-sm text-gray-600 mb-4">
-                  {selectedReview.outlet}
-                </p>
-
-                {/* User row */}
-                <div className="flex items-center gap-3 mb-4">
-                  <img
-                    src={selectedReview.userImage}
-                    alt={selectedReview.userName}
-                    className="h-10 w-10 rounded-full object-cover"
-                  />
-                  <div>
-                    <p className="text-base font-semibold text-gray-900">
-                      {selectedReview.userName}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {selectedReview.ordersCount} order{selectedReview.ordersCount !== 1 ? 's' : ''} with you
-                    </p>
-                  </div>
-                </div>
-
-                {/* Rating + text card */}
-                <div className="mt-1 rounded-xl bg-gray-50 px-3 py-2 relative mb-6">
-                  {/* Speech bubble tail */}
-                  <div className="absolute -top-2 left-4 w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-b-[8px] border-b-gray-50"></div>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-700 text-white text-[11px] font-semibold">
-                      {selectedReview.rating}★
-                    </span>
-                    <span className="text-[11px] text-gray-500">
-                      {selectedReview.date}
-                    </span>
-                  </div>
-                  <p className="text-sm text-gray-800">
-                    {selectedReview.reviewText}
-                  </p>
-                </div>
-              </div>
-
-              {/* Reply Input Area */}
-              <div className="sticky bottom-0 bg-white border-t border-gray-200 px-4 py-3">
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={replyText}
-                    onChange={(e) => setReplyText(e.target.value)}
-                    placeholder="Type your reply"
-                    className="flex-1 px-4 py-2.5 rounded-lg border border-gray-300 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                    onKeyPress={(e) => {
-                      if (e.key === "Enter" && replyText.trim()) {
-                        handleSendReply()
-                      }
-                    }}
-                  />
-                  <button
-                    onClick={handleSendReply}
-                    disabled={!replyText.trim()}
-                    className={`w-11 h-11 rounded-lg flex items-center justify-center transition-colors ${replyText.trim()
-                      ? "bg-[#3B82F6] text-white hover:bg-blue-700"
-                      : "bg-gray-200 text-gray-400 cursor-not-allowed"
-                      }`}
-                  >
-                    <Send className="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
 
       {/* Filter Modal */}
       <AnimatePresence>
@@ -1150,15 +860,6 @@ export default function Feedback() {
                       }`}
                   >
                     Sort by
-                  </button>
-                  <button
-                    onClick={() => setSelectedFilterCategory("reviewType")}
-                    className={`p-4 text-left text-sm font-medium transition-colors ${selectedFilterCategory === "reviewType"
-                      ? "bg-white text-gray-900 border-l-2 border-[#3B82F6]"
-                      : "text-gray-700 hover:bg-gray-100"
-                      }`}
-                  >
-                    Review type
                   </button>
                 </div>
 
@@ -1244,52 +945,6 @@ export default function Feedback() {
                     </div>
                   )}
 
-                  {selectedFilterCategory === "reviewType" && (
-                    <div className="space-y-6">
-                      <label className="flex items-center gap-3 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={filterValues.reviewType.includes("detailed")}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setFilterValues(prev => ({
-                                ...prev,
-                                reviewType: [...prev.reviewType, "detailed"]
-                              }))
-                            } else {
-                              setFilterValues(prev => ({
-                                ...prev,
-                                reviewType: prev.reviewType.filter(t => t !== "detailed")
-                              }))
-                            }
-                          }}
-                          className="w-5 h-5 text-black border-gray-300 focus:ring-black rounded"
-                        />
-                        <span className="text-sm text-gray-900 font-medium">Detailed reviews</span>
-                      </label>
-                      <label className="flex items-center gap-3 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={filterValues.reviewType.includes("delivery")}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setFilterValues(prev => ({
-                                ...prev,
-                                reviewType: [...prev.reviewType, "delivery"]
-                              }))
-                            } else {
-                              setFilterValues(prev => ({
-                                ...prev,
-                                reviewType: prev.reviewType.filter(t => t !== "delivery")
-                              }))
-                            }
-                          }}
-                          className="w-5 h-5 text-black border-gray-300 focus:ring-black rounded"
-                        />
-                        <span className="text-sm text-gray-900 font-medium">Delivery</span>
-                      </label>
-                    </div>
-                  )}
                 </div>
               </div>
 

@@ -4,6 +4,7 @@ import {
   verifyOrderPayment,
   getUserOrders,
   getOrderDetails,
+  submitOrderReview,
   calculateOrder,
   cancelOrder,
   updateDeliveryInstructions
@@ -30,6 +31,9 @@ router.get('/', getUserOrders);
 
 // Get order details
 router.get('/:id', getOrderDetails);
+
+// Submit order rating/review
+router.patch('/:id/review', submitOrderReview);
 
 // Update delivery instructions
 router.patch('/:id/delivery-instructions', updateDeliveryInstructions);

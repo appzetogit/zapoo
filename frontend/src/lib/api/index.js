@@ -2234,6 +2234,11 @@ export const orderAPI = {
     return apiClient.get(API_ENDPOINTS.ORDER.DETAILS.replace(":id", orderId));
   },
 
+  // Submit order review/rating
+  submitOrderReview: (orderId, data) => {
+    return apiClient.patch(API_ENDPOINTS.ORDER.REVIEW.replace(":id", orderId), data);
+  },
+
   // Update delivery instructions
   updateDeliveryInstructions: (orderId, deliveryInstructions) => {
     return apiClient.patch(

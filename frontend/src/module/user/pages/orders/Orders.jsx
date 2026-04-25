@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, Search, MoreVertical, Star, RotateCcw, AlertCircle, Loader2, Clock } from "lucide-react";
-import { orderAPI, api, API_ENDPOINTS } from "@/lib/api";
+import { orderAPI } from "@/lib/api";
 import { toast } from "sonner";
 import { getCompanyNameAsync } from "@/lib/utils/businessSettings";
 import { useTranslation } from "react-i18next";
@@ -364,17 +364,9 @@ export default function Orders() {
     try {
       setSubmittingRating(true);
       const order = ratingModal.order;
-      await api.post(API_ENDPOINTS.ADMIN.FEEDBACK_EXPERIENCE_CREATE, {
+      await orderAPI.submitOrderReview(order.mongoId || order.id, {
         rating: selectedRating,
-        module: "user",
-        restaurantId: order.restaurantId || null,
-        metadata: {
-          orderId: order.id,
-          orderMongoId: order.mongoId,
-          orderTotal: order.total,
-          restaurantName: order.restaurant,
-          comment: feedbackText || undefined
-        }
+        review: feedbackText || undefined
       });
 
       // Update local state so UI shows "You rated"

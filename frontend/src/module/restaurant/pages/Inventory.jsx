@@ -1429,7 +1429,7 @@ export default function Inventory() {
           opacity: 1
         }} exit={{
           opacity: 0
-        }} className="fixed inset-0 bg-black/50 z-50" onClick={() => setFilterOpen(false)} />
+        }} className="fixed inset-0 bg-black/50 z-[70]" onClick={() => setFilterOpen(false)} />
             <motion.div initial={{
           y: "100%"
         }} animate={{
@@ -1440,8 +1440,8 @@ export default function Inventory() {
           type: "spring",
           damping: 30,
           stiffness: 300
-        }} className="fixed bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-2xl z-50" onClick={e => e.stopPropagation()}>
-              <div className="p-6">
+        }} className="fixed bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-2xl z-[70]" onClick={e => e.stopPropagation()}>
+              <div className="p-6 pb-[calc(6.5rem+env(safe-area-inset-bottom))]">
                 <h2 className="text-lg font-bold text-gray-900 mb-6">Filters</h2>
 
                 <div className="space-y-4 mb-6">
@@ -1478,7 +1478,7 @@ export default function Inventory() {
           opacity: 1
         }} exit={{
           opacity: 0
-        }} className="fixed inset-0 bg-black/50 z-50" onClick={() => setTogglePopupOpen(false)} />
+        }} className="fixed inset-0 bg-black/50 z-[70]" onClick={() => setTogglePopupOpen(false)} />
             <motion.div initial={{
           y: "100%"
         }} animate={{
@@ -1489,8 +1489,8 @@ export default function Inventory() {
           type: "spring",
           damping: 30,
           stiffness: 300
-        }} className="fixed bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-2xl z-50 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-              <div className="p-6">
+        }} className="fixed bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-2xl z-[70] max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+              <div className="p-6 pb-[calc(6.5rem+env(safe-area-inset-bottom))]">
                 {/* Header */}
                 <h2 className="text-lg font-bold text-gray-900 text-center mb-6">
                   {toggleTarget.type === "category" ? "Mark sub category out of stock" : "Mark item out of stock"}

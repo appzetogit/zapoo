@@ -854,6 +854,7 @@ export const logout = asyncHandler(async (req, res) => {
  */
 export const getCurrentRestaurant = asyncHandler(async (req, res) => {
   const r = req.restaurant;
+  const rmFallbackPhone = String(process.env.RM_NUMBER || '').trim();
   let zoneName = null;
   let tierName = null;
   let zoneIdOut = r.zoneId ? String(r.zoneId) : null;
@@ -912,6 +913,7 @@ export const getCurrentRestaurant = asyncHandler(async (req, res) => {
       businessModel: r.businessModel,
       subscription: r.subscription,
       relationshipManager: r.relationshipManager,
+      rmFallbackPhone,
       preferences: r.preferences || { language: 'en' },
       // Zone / tier (for outlet info & delivery pricing context)
       zoneId: zoneIdOut,

@@ -337,13 +337,14 @@ export default function ToHub() {
     const planFeatures = restaurantData?.subscription?.features || restaurantData?.subscription?.planId?.features || [];
     const hasRM = planFeatures.includes("relationship_manager") || planFeatures.some(f => String(f).toLowerCase().includes('relationship manager'));
     const rmDetails = restaurantData?.relationshipManager;
+    const resolvedRMPhone = String(rmDetails?.phone || restaurantData?.rmFallbackPhone || "").trim();
 
     if (hasRM || isPremium || rmDetails) {
       links.push({
         id: "relationship-manager",
         label: "Your RM",
         icon: Users,
-        route: rmDetails?.phone ? `tel:${rmDetails.phone}` : "tel:+911111111111", // Default if not assigned
+        route: resolvedRMPhone ? `tel:${resolvedRMPhone}` : "",
         isPhone: true,
         subLabel: rmDetails?.name || "Premium assigned"
       });
@@ -1898,7 +1899,9 @@ export default function ToHub() {
             const Icon = link.icon;
             return <button key={link.id} onClick={() => {
               if (link.isPhone) {
-                window.location.href = link.route;
+                if (link.route && link.route.startsWith("tel:")) {
+                  window.location.href = link.route;
+                }
               } else {
                 navigate(link.route);
               }
@@ -2552,6 +2555,4 @@ export default function ToHub() {
       <BottomNavOrders />
     </div>;
 }
-
-
 
