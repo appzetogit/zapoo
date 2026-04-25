@@ -114,6 +114,8 @@ export function useFCMNotification({
             new Notification(title, {
               body,
               icon: '/zapoo-icon.png',
+              // Explicitly disable notification action buttons.
+              actions: [],
               ...(image ? {
                 image
               } : {})

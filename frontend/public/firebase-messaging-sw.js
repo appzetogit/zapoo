@@ -37,6 +37,8 @@ messaging.onBackgroundMessage((payload) => {
         icon,
         badge: icon, // same icon for badge
         image: image || data.imageUrl || undefined,
+        // Explicitly disable notification action buttons (Accept/Reject, etc.)
+        actions: [],
         tag: `zapoo-${data.target || 'user'}`, // separate tag per role
         renotify: true,
         data: {
