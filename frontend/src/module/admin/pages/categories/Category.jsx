@@ -256,7 +256,17 @@ export default function Category() {
   };
   const handleExportPDF = () => {
     try {
-      const doc = new jsPDF();
+      const doc = new jsPDF({
+        orientation: "landscape",
+        unit: "mm",
+        format: "a4"
+      });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+
+      // Add subtle page background
+      doc.setFillColor(248, 250, 252);
+      doc.rect(0, 0, pageWidth, pageHeight, "F");
 
       // Add title
       doc.setFontSize(18);
@@ -293,35 +303,38 @@ export default function Category() {
           fontSize: 9,
           textColor: [30, 30, 30]
         },
+        styles: {
+          cellPadding: 4,
+          lineColor: [200, 200, 200],
+          lineWidth: 0.5,
+          overflow: "linebreak",
+          valign: "middle"
+        },
         alternateRowStyles: {
           fillColor: [245, 247, 250]
         },
-        styles: {
-          cellPadding: 5,
-          lineColor: [200, 200, 200],
-          lineWidth: 0.5
-        },
         columnStyles: {
           0: {
-            cellWidth: 20
+            cellWidth: 16
           },
           // SL
           1: {
-            cellWidth: 70
+            cellWidth: 72
           },
           // Category Name
           2: {
-            cellWidth: 50
+            cellWidth: 45
           },
           // Type
           3: {
-            cellWidth: 40
+            cellWidth: 32
           },
           // Status
           4: {
-            cellWidth: 50
+            cellWidth: 78
           } // ID
-        }
+        },
+        margin: { left: 10, right: 10 }
       });
 
       // Add footer

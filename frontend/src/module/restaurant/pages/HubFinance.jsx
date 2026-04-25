@@ -613,20 +613,46 @@ export default function HubFinance() {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [showDownloadMenu]);
-  const isSameDay = (a, b) =>
-    a && b &&
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate();
-
-  const isRestaurantWithdrawalDay = (date = new Date()) => date.getDate() % 3 === 0;
+  const BUSINESS_TIMEZONE = "Asia/Kolkata";
+  const getDatePartsInTimezone = (date = new Date(), timeZone = BUSINESS_TIMEZONE) => {
+    const formatter = new Intl.DateTimeFormat("en-CA", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit"
+    });
+    const parts = formatter.formatToParts(new Date(date));
+    const getPart = type => parts.find(p => p.type === type)?.value;
+    return {
+      year: Number(getPart("year")),
+      month: Number(getPart("month")),
+      day: Number(getPart("day"))
+    };
+  };
+  const toDateKeyInTimezone = (date = new Date(), timeZone = BUSINESS_TIMEZONE) => {
+    if (!date) return "";
+    const {
+      year,
+      month,
+      day
+    } = getDatePartsInTimezone(date, timeZone);
+    if (!year || !month || !day) return "";
+    return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  };
+  const isRestaurantWithdrawalDay = (date = new Date(), timeZone = BUSINESS_TIMEZONE) => {
+    const {
+      day
+    } = getDatePartsInTimezone(date, timeZone);
+    return day % 3 === 0;
+  };
 
   const restaurantWindow = withdrawalWindows?.restaurant;
   const today = new Date();
   const defaultAllowed = isRestaurantWithdrawalDay(today);
   const openDates = restaurantWindow?.openDates || [];
   const closedDates = restaurantWindow?.closedDates || [];
-  const isInList = (list) => list.some((d) => isSameDay(new Date(d), today));
+  const todayKey = toDateKeyInTimezone(today);
+  const isInList = list => list.some(d => toDateKeyInTimezone(d) === todayKey);
   let isAllowedToday = defaultAllowed;
   if (isInList(closedDates)) {
     isAllowedToday = false;

@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Search, Download, ChevronDown, DollarSign, Calendar, Filter, Loader2, FileText, FileSpreadsheet, Code } from "lucide-react"
 import { adminAPI } from "@/lib/api"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
@@ -21,6 +21,7 @@ const formatDate = (dateString) => {
 }
 
 export default function DeliveryEarnings() {
+  const todayDate = new Date().toISOString().split("T")[0]
   const [searchQuery, setSearchQuery] = useState("")
   const [earnings, setEarnings] = useState([])
   const [loading, setLoading] = useState(true)
@@ -140,7 +141,7 @@ export default function DeliveryEarnings() {
     }))
 
     switch (format) {
-      case "csv":
+      case "csv": {
         const csvContent = [
           headers.map(h => h.label).join(","),
           ...data.map(row => headers.map(h => `"${row[h.key] || ''}"`).join(","))
@@ -152,13 +153,14 @@ export default function DeliveryEarnings() {
         csvLink.click()
         toast.success("CSV exported successfully")
         break
+      }
       case "excel":
         toast.info("Excel export coming soon")
         break
       case "pdf":
         toast.info("PDF export coming soon")
         break
-      case "json":
+      case "json": {
         const jsonContent = JSON.stringify(data, null, 2)
         const jsonBlob = new Blob([jsonContent], { type: "application/json" })
         const jsonLink = document.createElement("a")
@@ -167,6 +169,7 @@ export default function DeliveryEarnings() {
         jsonLink.click()
         toast.success("JSON exported successfully")
         break
+      }
       default:
         toast.error("Invalid export format")
     }
@@ -353,6 +356,7 @@ export default function DeliveryEarnings() {
                 type="date"
                 value={filters.fromDate}
                 onChange={(e) => handleFilterChange('fromDate', e.target.value)}
+                max={todayDate}
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF5200]"
               />
             </div>
@@ -362,6 +366,7 @@ export default function DeliveryEarnings() {
                 type="date"
                 value={filters.toDate}
                 onChange={(e) => handleFilterChange('toDate', e.target.value)}
+                max={todayDate}
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF5200]"
               />
             </div>
@@ -375,7 +380,7 @@ export default function DeliveryEarnings() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input
                 type="text"
-                placeholder="Search by name, phone, order ID..."
+                placeholder="Search by delivery boy name, phone, or order ID"
                 value={searchQuery}
                 onChange={(e) => {
                   setSearchQuery(e.target.value)
@@ -392,7 +397,7 @@ export default function DeliveryEarnings() {
                   <ChevronDown className="w-4 h-4" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
+              <DropdownMenuContent align="end" className="bg-white border border-slate-200 shadow-xl rounded-lg">
                 <DropdownMenuLabel>Export Format</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => handleExport("csv")}>
@@ -536,4 +541,3 @@ export default function DeliveryEarnings() {
     </div>
   )
 }
-

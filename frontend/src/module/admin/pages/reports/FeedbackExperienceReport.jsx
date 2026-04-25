@@ -1,5 +1,5 @@
-import { useState, useMemo, useEffect } from "react"
-import { Search, Download, ChevronDown, Filter, Star, RefreshCw, Calendar, Trash2, Eye, User, Mail, Phone, MessageSquare } from "lucide-react"
+import { useState, useMemo, useEffect, useCallback } from "react"
+import { Search, Download, ChevronDown, Filter, Star, RefreshCw, Calendar, Trash2, Eye, MessageSquare } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { adminAPI } from "@/lib/api"
@@ -34,12 +34,7 @@ export default function FeedbackExperienceReport() {
     return `${roundedRating}/5`
   }
 
-  // Fetch feedback experiences
-  useEffect(() => {
-    fetchFeedbackExperiences()
-  }, [filters])
-
-  const fetchFeedbackExperiences = async () => {
+  const fetchFeedbackExperiences = useCallback(async () => {
     try {
       setLoading(true)
       const params = {
@@ -63,7 +58,12 @@ export default function FeedbackExperienceReport() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [filters.fromDate, filters.toDate, filters.experience, filters.module])
+
+  // Fetch feedback experiences
+  useEffect(() => {
+    fetchFeedbackExperiences()
+  }, [fetchFeedbackExperiences])
 
   const filteredFeedback = useMemo(() => {
     let result = [...feedbackExperiences]

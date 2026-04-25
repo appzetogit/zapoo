@@ -32,7 +32,6 @@ export const exportToCSV = (orders, filename = "orders") => {
   // Detect order structure
   const firstOrder = orders[0]
   const isSubscription = firstOrder?.subscriptionId
-  const isDispatch = firstOrder?.id && !firstOrder?.orderId
   
   let headers, rows
   
