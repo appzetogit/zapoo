@@ -1,7 +1,6 @@
 import { useState, useMemo, useEffect } from "react"
-import { BarChart3, ChevronDown, Info, Settings, FileText, FileSpreadsheet, Code, Loader2 } from "lucide-react"
+import { BarChart3, ChevronDown, Info, FileText, FileSpreadsheet, Code, Loader2 } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { exportTransactionReportToCSV, exportTransactionReportToExcel, exportTransactionReportToPDF, exportTransactionReportToJSON } from "../../components/reports/reportsExportUtils"
 import { adminAPI } from "@/lib/api"
 import { toast } from "sonner"
@@ -34,9 +33,10 @@ export default function TransactionReport() {
     restaurant: "All restaurants",
     time: "All Time",
   })
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [zones, setZones] = useState([])
   const [restaurants, setRestaurants] = useState([])
+  const [currentPage, setCurrentPage] = useState(1)
+  const rowsPerPage = 10
 
   // Fetch zones and restaurants for filters
   useEffect(() => {
@@ -85,7 +85,6 @@ export default function TransactionReport() {
         }
 
         const params = {
-          search: searchQuery || undefined,
           zone: filters.zone !== "All Zones" ? filters.zone : undefined,
           restaurant: filters.restaurant !== "All restaurants" ? filters.restaurant : undefined,
           fromDate: fromDate ? fromDate.toISOString() : undefined,
@@ -121,11 +120,30 @@ export default function TransactionReport() {
     }
 
     fetchTransactionReport()
-  }, [searchQuery, filters])
+  }, [filters])
 
   const filteredTransactions = useMemo(() => {
-    return transactions // Backend already filters, so just return transactions
-  }, [transactions])
+    const query = searchQuery.trim().toLowerCase()
+    if (!query) return transactions
+
+    return transactions.filter((transaction) =>
+      Object.values(transaction).some((value) => {
+        if (value === null || value === undefined) return false
+        if (typeof value === "object") return false
+        return String(value).toLowerCase().includes(query)
+      })
+    )
+  }, [transactions, searchQuery])
+  const totalPages = Math.max(1, Math.ceil(filteredTransactions.length / rowsPerPage))
+
+  const paginatedTransactions = useMemo(() => {
+    const startIndex = (currentPage - 1) * rowsPerPage
+    return filteredTransactions.slice(startIndex, startIndex + rowsPerPage)
+  }, [filteredTransactions, currentPage])
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchQuery, filters, transactions])
 
   const handleExport = (format) => {
     if (filteredTransactions.length === 0) {
@@ -158,11 +176,10 @@ export default function TransactionReport() {
     { key: "restaurant", label: "Restaurant", minWidth: "190px", align: "left" },
     { key: "customerName", label: "Customer Name", minWidth: "170px", align: "left" },
     { key: "totalItemAmount", label: "Total Item Amount", minWidth: "140px", align: "right" },
-    { key: "itemDiscount", label: "Item Discount", minWidth: "130px", align: "right" },
-    { key: "couponDiscount", label: "Coupon Discount", minWidth: "140px", align: "right" },
-    { key: "referralDiscount", label: "Referral Discount", minWidth: "140px", align: "right" },
+    { key: "adminCouponDiscount", label: "Admin Coupon Discount", minWidth: "170px", align: "right" },
+    { key: "restaurantCouponDiscount", label: "Restaurant Coupon Discount", minWidth: "190px", align: "right" },
     { key: "discountedAmount", label: "Discounted Amount", minWidth: "145px", align: "right" },
-    { key: "vatTax", label: "Vat/Tax", minWidth: "120px", align: "right" },
+    { key: "gst", label: "GST", minWidth: "120px", align: "right" },
     { key: "deliveryCharge", label: "Delivery Charge", minWidth: "140px", align: "right" },
     { key: "recommendedItemFee", label: "Recommended Fee", minWidth: "145px", align: "right" },
     { key: "orderAmount", label: "Order Amount", minWidth: "145px", align: "right" },
@@ -393,7 +410,7 @@ export default function TransactionReport() {
               <div className="relative min-w-[180px] flex-1 sm:flex-none sm:w-[240px]">
                 <input
                   type="text"
-                  placeholder="Search by Order ID"
+                  placeholder="Search by order/customer/restaurant or any field"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-7 pr-2 py-1.5 w-full text-[11px] rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-[#FF5200] focus:border-[#FF5200]"
@@ -430,18 +447,12 @@ export default function TransactionReport() {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-              <button
-                onClick={() => setIsSettingsOpen(true)}
-                className="p-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 transition-all"
-              >
-                <Settings className="w-3 h-3" />
-              </button>
             </div>
           </div>
 
           {/* Table */}
           <div className="overflow-x-auto scrollbar-hide">
-            <table className="min-w-[1720px] w-max border-separate border-spacing-0">
+            <table className="min-w-[1580px] w-max border-separate border-spacing-0">
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
                   {tableColumns.map((column) => (
@@ -466,13 +477,15 @@ export default function TransactionReport() {
                     </td>
                   </tr>
                 ) : (
-                  filteredTransactions.map((transaction, index) => (
+                  paginatedTransactions.map((transaction, index) => (
                     <tr
                       key={transaction.id}
                       className="hover:bg-slate-50 transition-colors"
                     >
                       <td className="px-3 py-3 align-top" style={{ minWidth: tableColumns[0].minWidth }}>
-                        <span className="text-xs font-medium text-slate-700 whitespace-nowrap">{index + 1}</span>
+                        <span className="text-xs font-medium text-slate-700 whitespace-nowrap">
+                          {(currentPage - 1) * rowsPerPage + index + 1}
+                        </span>
                       </td>
                       <td className="px-3 py-3 align-top" style={{ minWidth: tableColumns[1].minWidth }}>
                         <span className="text-xs text-slate-700 break-words leading-5 block">{transaction.orderId}</span>
@@ -492,15 +505,12 @@ export default function TransactionReport() {
                         <span className="text-xs text-slate-700 whitespace-nowrap">{formatFullCurrency(transaction.totalItemAmount)}</span>
                       </td>
                       <td className="px-3 py-3 align-top text-right" style={{ minWidth: tableColumns[5].minWidth }}>
-                        <span className="text-xs text-slate-700 whitespace-nowrap">{formatFullCurrency(transaction.itemDiscount)}</span>
+                        <span className="text-xs text-slate-700 whitespace-nowrap">{formatFullCurrency(transaction.adminCouponDiscount || 0)}</span>
                       </td>
                       <td className="px-3 py-3 align-top text-right" style={{ minWidth: tableColumns[6].minWidth }}>
-                        <span className="text-xs text-slate-700 whitespace-nowrap">{formatFullCurrency(transaction.couponDiscount)}</span>
+                        <span className="text-xs text-slate-700 whitespace-nowrap">{formatFullCurrency(transaction.restaurantCouponDiscount || 0)}</span>
                       </td>
                       <td className="px-3 py-3 align-top text-right" style={{ minWidth: tableColumns[7].minWidth }}>
-                        <span className="text-xs text-slate-700 whitespace-nowrap">{formatFullCurrency(transaction.referralDiscount)}</span>
-                      </td>
-                      <td className="px-3 py-3 align-top text-right" style={{ minWidth: tableColumns[8].minWidth }}>
                         <span className="text-xs text-slate-700 whitespace-nowrap">
                           {transaction.discountedAmount >= 1000
                             ? formatCurrency(transaction.discountedAmount)
@@ -508,16 +518,16 @@ export default function TransactionReport() {
                           }
                         </span>
                       </td>
-                      <td className="px-3 py-3 align-top text-right" style={{ minWidth: tableColumns[9].minWidth }}>
-                        <span className="text-xs text-slate-700 whitespace-nowrap">{formatFullCurrency(transaction.vatTax)}</span>
+                      <td className="px-3 py-3 align-top text-right" style={{ minWidth: tableColumns[8].minWidth }}>
+                        <span className="text-xs text-slate-700 whitespace-nowrap">{formatFullCurrency(transaction.gst ?? transaction.vatTax ?? 0)}</span>
                       </td>
-                      <td className="px-3 py-3 align-top text-right" style={{ minWidth: tableColumns[10].minWidth }}>
+                      <td className="px-3 py-3 align-top text-right" style={{ minWidth: tableColumns[9].minWidth }}>
                         <span className="text-xs text-slate-700 whitespace-nowrap">{formatFullCurrency(transaction.deliveryCharge)}</span>
                       </td>
-                      <td className="px-3 py-3 align-top text-right" style={{ minWidth: tableColumns[11].minWidth }}>
+                      <td className="px-3 py-3 align-top text-right" style={{ minWidth: tableColumns[10].minWidth }}>
                         <span className="text-xs text-slate-700 whitespace-nowrap">{formatFullCurrency(transaction.recommendedItemFee || 0)}</span>
                       </td>
-                      <td className="px-3 py-3 align-top text-right" style={{ minWidth: tableColumns[12].minWidth }}>
+                      <td className="px-3 py-3 align-top text-right" style={{ minWidth: tableColumns[11].minWidth }}>
                         <span className="text-xs font-medium text-slate-900 whitespace-nowrap">{formatFullCurrency(transaction.orderAmount)}</span>
                       </td>
                     </tr>
@@ -526,33 +536,35 @@ export default function TransactionReport() {
               </tbody>
             </table>
           </div>
+
+          {filteredTransactions.length > 0 && (
+            <div className="mt-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <p className="text-xs text-slate-600">
+                Showing {(currentPage - 1) * rowsPerPage + 1} to {Math.min(currentPage * rowsPerPage, filteredTransactions.length)} of {filteredTransactions.length}
+              </p>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Prev
+                </button>
+                <span className="px-3 py-1.5 text-xs font-semibold text-slate-700">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
-
-      {/* Settings Dialog */}
-      <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
-        <DialogContent className="max-w-md bg-white p-0 opacity-0 data-[state=open]:opacity-100 data-[state=closed]:opacity-0 transition-opacity duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=open]:scale-100 data-[state=closed]:scale-100">
-          <DialogHeader className="px-6 pt-6 pb-4">
-            <DialogTitle className="flex items-center gap-2">
-              <Settings className="w-5 h-5" />
-              Report Settings
-            </DialogTitle>
-          </DialogHeader>
-          <div className="px-6 pb-6">
-            <p className="text-sm text-slate-700">
-              Transaction report settings and preferences will be available here.
-            </p>
-          </div>
-          <div className="px-6 pb-6 flex items-center justify-end">
-            <button
-              onClick={() => setIsSettingsOpen(false)}
-              className="px-4 py-2 text-sm font-medium rounded-lg bg-emerald-500 text-white hover:bg-emerald-600 transition-all shadow-md"
-            >
-              Close
-            </button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

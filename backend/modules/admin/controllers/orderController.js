@@ -25,6 +25,7 @@ export const getOrders = asyncHandler(async (req, res) => {
       cancelledBy,
       paymentType
     } = req.query;
+    const escapeRegex = (value = '') => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
     // Build query
     const query = {};
@@ -132,16 +133,56 @@ export const getOrders = asyncHandler(async (req, res) => {
 
     // Zone filter
     if (zone && zone !== 'All Zones') {
-      // Find zone by name
       const Zone = (await import('../models/Zone.js')).default;
+      const Restaurant = (await import('../../restaurant/models/Restaurant.js')).default;
+      const safeZonePattern = escapeRegex(zone);
       const zoneDoc = await Zone.findOne({
-        name: {
-          $regex: zone,
+        $or: [{
+          name: {
+            $regex: safeZonePattern,
+            $options: 'i'
+          }
+        }, {
+          zoneName: {
+            $regex: safeZonePattern,
+            $options: 'i'
+          }
+        }]
+      }).select('_id name zoneName').lean();
+
+      const zoneFilters = [];
+      if (zoneDoc?._id) {
+        const zoneIdString = zoneDoc._id?.toString();
+        zoneFilters.push({ 'assignmentInfo.zoneId': zoneIdString });
+        zoneFilters.push({ 'assignmentInfo.zoneId': zoneDoc._id });
+
+        const zoneRestaurants = await Restaurant.find({
+          zoneId: zoneDoc._id
+        }).select('_id restaurantId').lean();
+
+        const restaurantIdentifiers = [
+          ...new Set(
+            zoneRestaurants.flatMap((restaurant) => [
+              restaurant?._id ? restaurant._id.toString() : null,
+              restaurant?.restaurantId || null
+            ]).filter(Boolean)
+          )
+        ];
+
+        if (restaurantIdentifiers.length > 0) {
+          zoneFilters.push({ restaurantId: { $in: restaurantIdentifiers } });
+        }
+      }
+      zoneFilters.push({
+        'assignmentInfo.zoneName': {
+          $regex: safeZonePattern,
           $options: 'i'
         }
-      }).select('_id name').lean();
-      if (zoneDoc) {
-        query['assignmentInfo.zoneId'] = zoneDoc._id?.toString();
+      });
+
+      if (zoneFilters.length > 0) {
+        query.$and = query.$and || [];
+        query.$and.push({ $or: zoneFilters });
       }
     }
 
@@ -231,6 +272,7 @@ export const getOrders = asyncHandler(async (req, res) => {
     // Batch fetch settlements for platform fee and refund status (more efficient than individual queries)
     let settlementMap = new Map();
     let refundStatusMap = new Map();
+    let settlementCouponMap = new Map();
     try {
       const OrderSettlement = (await import('../../order/models/OrderSettlement.js')).default;
       const orderIds = orders.map(o => o._id);
@@ -238,7 +280,7 @@ export const getOrders = asyncHandler(async (req, res) => {
         orderId: {
           $in: orderIds
         }
-      }).select('orderId userPayment.platformFee cancellationDetails.refundStatus').lean();
+      }).select('orderId userPayment.platformFee cancellationDetails.refundStatus adminCouponDiscount restaurantCouponDiscount couponDiscount').lean();
 
       // Create maps for quick lookup
       settlements.forEach(s => {
@@ -249,10 +291,59 @@ export const getOrders = asyncHandler(async (req, res) => {
           if (s.cancellationDetails?.refundStatus) {
             refundStatusMap.set(s.orderId.toString(), s.cancellationDetails.refundStatus);
           }
+          settlementCouponMap.set(s.orderId.toString(), s);
         }
       });
     } catch (err) {
       console.warn('Could not batch fetch settlements:', err.message);
+    }
+
+    // Fallback lookup: infer coupon source by coupon code when source is missing.
+    const unresolvedCouponCodes = [
+      ...new Set(
+        orders
+          .map((order) => {
+            const hasDiscount = Number(order.pricing?.discount || 0) > 0;
+            const rawCode = String(order.pricing?.couponCode || '').trim();
+            const hasSource = order.pricing?.couponSource === 'admin' || order.pricing?.couponSource === 'restaurant';
+            const settlementCoupon = settlementCouponMap.get(order._id.toString());
+            const hasSettlementSplit =
+              Number(settlementCoupon?.adminCouponDiscount || 0) > 0 ||
+              Number(settlementCoupon?.restaurantCouponDiscount || 0) > 0;
+
+            if (!hasDiscount || !rawCode || hasSource || hasSettlementSplit) return null;
+            return rawCode.toUpperCase();
+          })
+          .filter(Boolean)
+      )
+    ];
+
+    let restaurantCouponCodeSet = new Set();
+    let adminCouponCodeSet = new Set();
+    if (unresolvedCouponCodes.length > 0) {
+      const Offer = (await import('../../restaurant/models/Offer.js')).default;
+      const AdminCoupon = (await import('../models/AdminCoupon.js')).default;
+
+      const [offers, adminCoupons] = await Promise.all([
+        Offer.find({
+          'items.couponCode': { $in: unresolvedCouponCodes }
+        }).select('items.couponCode').lean(),
+        AdminCoupon.find({
+          code: { $in: unresolvedCouponCodes }
+        }).select('code').lean()
+      ]);
+
+      restaurantCouponCodeSet = new Set(
+        offers
+          .flatMap((offer) => offer.items || [])
+          .map((item) => String(item?.couponCode || '').trim().toUpperCase())
+          .filter(Boolean)
+      );
+      adminCouponCodeSet = new Set(
+        adminCoupons
+          .map((coupon) => String(coupon?.code || '').trim().toUpperCase())
+          .filter(Boolean)
+      );
     }
 
     // Transform orders to match frontend format
@@ -318,7 +409,21 @@ export const getOrders = asyncHandler(async (req, res) => {
       const discount = order.pricing?.discount || 0;
       const deliveryFee = order.pricing?.deliveryFee || 0;
       const tax = order.pricing?.tax || 0;
-      const couponCode = order.pricing?.couponCode || null;
+      const settlementCoupon = settlementCouponMap.get(order._id.toString());
+
+      let couponSource = order.pricing?.couponSource === 'admin' ?
+        'admin' :
+        order.pricing?.couponSource === 'restaurant' ?
+          'restaurant' :
+          null;
+      const normalizedCouponCode = String(order.pricing?.couponCode || '').trim().toUpperCase();
+      if (!couponSource && normalizedCouponCode) {
+        if (restaurantCouponCodeSet.has(normalizedCouponCode)) {
+          couponSource = 'restaurant';
+        } else if (adminCouponCodeSet.has(normalizedCouponCode)) {
+          couponSource = 'admin';
+        }
+      }
 
       // Get platform fee - check if it exists in pricing, otherwise get from settlement map
       let platformFee = order.pricing?.platformFee;
@@ -340,12 +445,14 @@ export const getOrders = asyncHandler(async (req, res) => {
       const itemDiscount = discount;
       // Discounted amount is subtotal after discount
       const discountedAmount = Math.max(0, subtotal - discount);
-      // Coupon discount (if coupon was applied, it's part of discount)
-      const couponDiscount = couponCode ? discount : 0;
+      // Coupon discounts split by source
+      const adminCouponDiscount = settlementCoupon?.adminCouponDiscount ?? (couponSource === 'admin' ? discount : 0);
+      const restaurantCouponDiscount = settlementCoupon?.restaurantCouponDiscount ?? (couponSource === 'restaurant' ? discount : 0);
+      const couponDiscount = adminCouponDiscount + restaurantCouponDiscount;
       // Referral discount (not currently in model, default to 0)
       const referralDiscount = 0;
-      // VAT/Tax
-      const vatTax = tax;
+      // GST
+      const gst = tax;
       // Delivery charge
       const deliveryCharge = deliveryFee;
       // Total item amount (subtotal before discounts)
@@ -366,10 +473,14 @@ export const getOrders = asyncHandler(async (req, res) => {
         // Report-specific fields
         totalItemAmount: totalItemAmount,
         itemDiscount: itemDiscount,
+        adminCouponDiscount: adminCouponDiscount,
+        restaurantCouponDiscount: restaurantCouponDiscount,
         discountedAmount: discountedAmount,
         couponDiscount: couponDiscount,
+        couponSource: couponSource,
         referralDiscount: referralDiscount,
-        vatTax: vatTax,
+        gst: gst,
+        vatTax: gst,
         deliveryCharge: deliveryCharge,
         platformFee: platformFee,
         totalAmount: orderAmount,
@@ -909,6 +1020,8 @@ export const getTransactionReport = asyncHandler(async (req, res) => {
       fromDate,
       toDate
     } = req.query;
+
+    const escapeRegex = (value = '') => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     // Build query for orders
     const query = {};
 
@@ -950,14 +1063,53 @@ export const getTransactionReport = asyncHandler(async (req, res) => {
     // Zone filter
     if (zone && zone !== 'All Zones') {
       const Zone = (await import('../models/Zone.js')).default;
+      const Restaurant = (await import('../../restaurant/models/Restaurant.js')).default;
+      const safeZonePattern = escapeRegex(zone);
       const zoneDoc = await Zone.findOne({
         name: {
-          $regex: zone,
+          $regex: safeZonePattern,
           $options: 'i'
         }
       }).select('_id name').lean();
-      if (zoneDoc) {
-        query['assignmentInfo.zoneId'] = zoneDoc._id?.toString();
+
+      // Support both old and new order snapshots:
+      // - assignmentInfo.zoneId (preferred)
+      // - assignmentInfo.zoneName (legacy/fallback)
+      // - restaurantId belonging to selected zone (for historical orders without assignmentInfo)
+      const zoneFilters = [];
+      if (zoneDoc?._id) {
+        const zoneIdString = zoneDoc._id?.toString();
+
+        zoneFilters.push({ 'assignmentInfo.zoneId': zoneIdString });
+        zoneFilters.push({ 'assignmentInfo.zoneId': zoneDoc._id });
+
+        const zoneRestaurants = await Restaurant.find({
+          zoneId: zoneDoc._id
+        }).select('_id restaurantId').lean();
+
+        const restaurantIdentifiers = [
+          ...new Set(
+            zoneRestaurants.flatMap((restaurant) => [
+              restaurant?._id ? restaurant._id.toString() : null,
+              restaurant?.restaurantId || null
+            ]).filter(Boolean)
+          )
+        ];
+
+        if (restaurantIdentifiers.length > 0) {
+          zoneFilters.push({ restaurantId: { $in: restaurantIdentifiers } });
+        }
+      }
+      zoneFilters.push({
+        'assignmentInfo.zoneName': {
+          $regex: safeZonePattern,
+          $options: 'i'
+        }
+      });
+
+      if (zoneFilters.length > 0) {
+        query.$and = query.$and || [];
+        query.$and.push({ $or: zoneFilters });
       }
     }
 
@@ -976,6 +1128,64 @@ export const getTransactionReport = asyncHandler(async (req, res) => {
     const orders = await Order.find(query).populate('userId', 'name email phone').populate('restaurantId', 'name slug').sort({
       createdAt: -1
     }).limit(parseInt(limit)).skip(skip).lean();
+
+    // Fetch settlement coupon split for better discount source accuracy
+    const orderIds = orders.map(order => order._id);
+    const OrderSettlement = (await import('../../order/models/OrderSettlement.js')).default;
+    const settlements = await OrderSettlement.find({
+      orderId: { $in: orderIds }
+    }).select('orderId adminCouponDiscount restaurantCouponDiscount couponDiscount').lean();
+    const settlementCouponMap = new Map(
+      settlements.map((settlement) => [settlement.orderId?.toString(), settlement])
+    );
+
+    // Fallback lookup: infer coupon source by coupon code when source is missing in order/settlement
+    const unresolvedCouponCodes = [
+      ...new Set(
+        orders
+          .map((order) => {
+            const hasDiscount = Number(order.pricing?.discount || 0) > 0;
+            const rawCode = String(order.pricing?.couponCode || '').trim();
+            const hasSource = order.pricing?.couponSource === 'admin' || order.pricing?.couponSource === 'restaurant';
+            const settlementCoupon = settlementCouponMap.get(order._id.toString());
+            const hasSettlementSplit =
+              Number(settlementCoupon?.adminCouponDiscount || 0) > 0 ||
+              Number(settlementCoupon?.restaurantCouponDiscount || 0) > 0;
+
+            if (!hasDiscount || !rawCode || hasSource || hasSettlementSplit) return null;
+            return rawCode.toUpperCase();
+          })
+          .filter(Boolean)
+      )
+    ];
+
+    let restaurantCouponCodeSet = new Set();
+    let adminCouponCodeSet = new Set();
+    if (unresolvedCouponCodes.length > 0) {
+      const Offer = (await import('../../restaurant/models/Offer.js')).default;
+      const AdminCoupon = (await import('../models/AdminCoupon.js')).default;
+
+      const [offers, adminCoupons] = await Promise.all([
+        Offer.find({
+          'items.couponCode': { $in: unresolvedCouponCodes }
+        }).select('items.couponCode').lean(),
+        AdminCoupon.find({
+          code: { $in: unresolvedCouponCodes }
+        }).select('code').lean()
+      ]);
+
+      restaurantCouponCodeSet = new Set(
+        offers
+          .flatMap((offer) => offer.items || [])
+          .map((item) => String(item?.couponCode || '').trim().toUpperCase())
+          .filter(Boolean)
+      );
+      adminCouponCodeSet = new Set(
+        adminCoupons
+          .map((coupon) => String(coupon?.code || '').trim().toUpperCase())
+          .filter(Boolean)
+      );
+    }
 
     // Get total count
     const total = await Order.countDocuments(query);
@@ -1065,18 +1275,33 @@ export const getTransactionReport = asyncHandler(async (req, res) => {
       const discount = order.pricing?.discount || 0;
       const deliveryFee = order.pricing?.deliveryFee || 0;
       const tax = order.pricing?.tax || 0;
-      const couponCode = order.pricing?.couponCode || null;
+      let couponSource = order.pricing?.couponSource === 'admin'
+        ? 'admin'
+        : order.pricing?.couponSource === 'restaurant'
+          ? 'restaurant'
+          : null;
+      const settlementCoupon = settlementCouponMap.get(order._id.toString());
+      const normalizedCouponCode = String(order.pricing?.couponCode || '').trim().toUpperCase();
+      if (!couponSource && normalizedCouponCode) {
+        if (restaurantCouponCodeSet.has(normalizedCouponCode)) {
+          couponSource = 'restaurant';
+        } else if (adminCouponCodeSet.has(normalizedCouponCode)) {
+          couponSource = 'admin';
+        }
+      }
 
       // For report: itemDiscount is the discount applied to items
       const itemDiscount = discount;
       // Discounted amount is subtotal after discount
       const discountedAmount = Math.max(0, subtotal - discount);
-      // Coupon discount (if coupon was applied, it's part of discount)
-      const couponDiscount = couponCode ? discount : 0;
+      // Coupon discounts split by source
+      const adminCouponDiscount = settlementCoupon?.adminCouponDiscount ?? (couponSource === 'admin' ? discount : 0);
+      const restaurantCouponDiscount = settlementCoupon?.restaurantCouponDiscount ?? (couponSource === 'restaurant' ? discount : 0);
+      const couponDiscount = adminCouponDiscount + restaurantCouponDiscount;
       // Referral discount (not currently in model, default to 0)
       const referralDiscount = 0;
-      // VAT/Tax
-      const vatTax = tax;
+      // GST
+      const gst = tax;
       // Delivery charge
       const deliveryCharge = deliveryFee;
       // Total item amount (subtotal before discounts)
@@ -1090,10 +1315,14 @@ export const getTransactionReport = asyncHandler(async (req, res) => {
         customerName: order.userId?.name || 'Invalid Customer Data',
         totalItemAmount: totalItemAmount,
         itemDiscount: itemDiscount,
+        adminCouponDiscount: adminCouponDiscount,
+        restaurantCouponDiscount: restaurantCouponDiscount,
         couponDiscount: couponDiscount,
+        couponSource: couponSource,
         referralDiscount: referralDiscount,
         discountedAmount: discountedAmount,
-        vatTax: vatTax,
+        gst: gst,
+        vatTax: gst,
         deliveryCharge: deliveryCharge,
         orderAmount: orderAmount,
         recommendedItemFee: order.pricing?.internalRecommendedFee || 0
@@ -1133,53 +1362,98 @@ export const getRestaurantReport = asyncHandler(async (req, res) => {
     const {
       zone,
       all,
-      type,
       time,
       search
     } = req.query;
+    const escapeRegex = (value = '') => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const Restaurant = (await import('../../restaurant/models/Restaurant.js')).default;
     const AdminCommission = (await import('../models/AdminCommission.js')).default;
     const FeedbackExperience = (await import('../models/FeedbackExperience.js')).default;
 
     // Build restaurant query
     const restaurantQuery = {};
+    const restaurantAndFilters = [];
 
     // Zone filter
     if (zone && zone !== 'All Zones') {
       const Zone = (await import('../models/Zone.js')).default;
+      const safeZonePattern = escapeRegex(zone);
       const zoneDoc = await Zone.findOne({
-        name: {
-          $regex: zone,
-          $options: 'i'
-        }
-      }).select('_id name').lean();
+        $or: [{
+          name: {
+            $regex: safeZonePattern,
+            $options: 'i'
+          }
+        }, {
+          zoneName: {
+            $regex: safeZonePattern,
+            $options: 'i'
+          }
+        }]
+      }).select('_id name zoneName').lean();
       if (zoneDoc) {
-        // Find restaurants in this zone by checking orders with this zoneId
+        const zoneIdString = zoneDoc._id.toString();
+
         const ordersInZone = await Order.find({
-          'assignmentInfo.zoneId': zoneDoc._id?.toString()
-        }).distinct('restaurantId').lean();
-        if (ordersInZone.length > 0) {
-          restaurantQuery.$or = [{
-            _id: {
-              $in: ordersInZone
-            }
+          $or: [{
+            'assignmentInfo.zoneId': zoneIdString
           }, {
-            restaurantId: {
-              $in: ordersInZone
+            'assignmentInfo.zoneId': zoneDoc._id
+          }, {
+            'assignmentInfo.zoneName': {
+              $regex: safeZonePattern,
+              $options: 'i'
             }
-          }];
-        } else {
-          // No restaurants found in this zone
-          return successResponse(res, 200, 'Restaurant report retrieved successfully', {
-            restaurants: [],
-            pagination: {
-              page: 1,
-              limit: 1000,
-              total: 0,
-              pages: 0
+          }]
+        }).distinct('restaurantId').lean();
+
+        const normalizedRestaurantIdsFromOrders = [
+          ...new Set(
+            (ordersInZone || [])
+              .map((id) => id?.toString?.() || String(id))
+              .filter(Boolean)
+          )
+        ];
+
+        const zoneRestaurantOrFilters = [{
+          zoneId: zoneDoc._id
+        }, {
+          zoneId: zoneIdString
+        }];
+
+        if (normalizedRestaurantIdsFromOrders.length > 0) {
+          const objectIdsFromOrders = normalizedRestaurantIdsFromOrders
+            .filter((id) => mongoose.Types.ObjectId.isValid(id))
+            .map((id) => new mongoose.Types.ObjectId(id));
+
+          if (objectIdsFromOrders.length > 0) {
+            zoneRestaurantOrFilters.push({
+              _id: {
+                $in: objectIdsFromOrders
+              }
+            });
+          }
+
+          zoneRestaurantOrFilters.push({
+            restaurantId: {
+              $in: normalizedRestaurantIdsFromOrders
             }
           });
         }
+
+        restaurantAndFilters.push({
+          $or: zoneRestaurantOrFilters
+        });
+      } else {
+        return successResponse(res, 200, 'Restaurant report retrieved successfully', {
+          restaurants: [],
+          pagination: {
+            page: 1,
+            limit: 1000,
+            total: 0,
+            pages: 0
+          }
+        });
       }
     }
 
@@ -1190,21 +1464,28 @@ export const getRestaurantReport = asyncHandler(async (req, res) => {
 
     // Search filter
     if (search) {
-      restaurantQuery.$or = [{
+      const safeSearchPattern = escapeRegex(search);
+      restaurantAndFilters.push({
+        $or: [{
         name: {
-          $regex: search,
+          $regex: safeSearchPattern,
           $options: 'i'
         }
       }, {
         restaurantId: {
-          $regex: search,
+          $regex: safeSearchPattern,
           $options: 'i'
         }
-      }];
+      }]
+      });
+    }
+
+    if (restaurantAndFilters.length > 0) {
+      restaurantQuery.$and = restaurantAndFilters;
     }
 
     // Get all restaurants matching the query
-    const restaurants = await Restaurant.find(restaurantQuery).select('_id restaurantId name profileImage rating totalRatings isActive').lean();
+    const restaurants = await Restaurant.find(restaurantQuery).select('_id restaurantId name profileImage rating totalRatings isActive createdAt zoneId').lean();
     // Date range filter for orders
     let dateQuery = {};
     if (time && time !== 'All Time') {
@@ -1251,7 +1532,11 @@ export const getRestaurantReport = asyncHandler(async (req, res) => {
       }
     });
 
-    const orderIdentifiers = [...restaurantKeyByIdentifier.keys()];
+    const orderIdentifiers = [
+      ...restaurantObjectIds,
+      ...restaurantObjectIds.map((id) => id.toString()),
+      ...restaurants.map((restaurant) => restaurant.restaurantId).filter(Boolean)
+    ];
     const [orders, commissionAgg, ratingAgg] = await Promise.all([
       Order.find({
         ...dateQuery,
@@ -1297,7 +1582,8 @@ export const getRestaurantReport = asyncHandler(async (req, res) => {
 
     const orderStatsByRestaurant = new Map();
     for (const order of orders) {
-      const canonicalId = restaurantKeyByIdentifier.get(order.restaurantId);
+      const orderRestaurantId = order.restaurantId?.toString?.() || String(order.restaurantId || '');
+      const canonicalId = restaurantKeyByIdentifier.get(orderRestaurantId);
       if (!canonicalId) continue;
 
       const stats = orderStatsByRestaurant.get(canonicalId) || {
@@ -1358,6 +1644,7 @@ export const getRestaurantReport = asyncHandler(async (req, res) => {
       return {
         sl: 0,
         id: restaurantId,
+        createdAt: restaurant.createdAt || null,
         restaurantName: restaurant.name,
         icon: restaurant.profileImage?.url || restaurant.profileImage || null,
         totalFood: orderStats.uniqueItemIds.size,
@@ -1371,22 +1658,19 @@ export const getRestaurantReport = asyncHandler(async (req, res) => {
       };
     });
 
-    // Filter by type (Commission/Subscription) if needed
     let filteredReports = restaurantReports;
-    if (type && type !== 'All types') {
-      // This would require checking restaurant subscription status
-      // For now, we'll return all restaurants
-      // You can add subscription filtering logic here if needed
-    }
 
-    // Sort by restaurant name
-    filteredReports.sort((a, b) => (a.restaurantName || '').localeCompare(b.restaurantName || ''));
+    // Show newest restaurants first
+    filteredReports.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
 
     // Add serial numbers
-    filteredReports = filteredReports.map((report, index) => ({
-      ...report,
-      sl: index + 1
-    }));
+    filteredReports = filteredReports.map((report, index) => {
+      const { createdAt, ...rest } = report;
+      return {
+        ...rest,
+        sl: index + 1
+      };
+    });
     return successResponse(res, 200, 'Restaurant report retrieved successfully', {
       restaurants: filteredReports,
       pagination: {
