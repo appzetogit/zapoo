@@ -56,6 +56,21 @@ export default function HubFinance() {
     maximumFractionDigits: 2
   })}`;
 
+  const formatOrderReceivedAt = order => {
+    const receivedAtValue = order?.receivedAt || order?.createdAt;
+    if (!receivedAtValue) return "N/A";
+    const parsedDate = new Date(receivedAtValue);
+    if (Number.isNaN(parsedDate.getTime())) return "N/A";
+    return parsedDate.toLocaleString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    });
+  };
+
   const getRowTaxCollected = order => {
     return Number(order?.taxCollected)
       || ((Number(order?.customerGst) || Number(order?.gstCollected) || Number(order?.tax) || 0) + (Number(order?.adminDeliveryGst) || 0));
@@ -1226,6 +1241,9 @@ export default function HubFinance() {
                                 <p className="text-xs text-gray-600">
                                   {order.foodNames || order.items && order.items.map(item => item.name).join(', ') || 'N/A'}
                                 </p>
+                                <p className="text-[11px] text-gray-500 mt-1">
+                                  Received: {formatOrderReceivedAt(order)}
+                                </p>
                               </div>
                               <div className="text-right ml-4">
                                 <p className="text-sm font-bold text-gray-900">
@@ -1251,6 +1269,9 @@ export default function HubFinance() {
                                 </p>
                                 <p className="text-xs text-gray-600">
                                   {order.foodNames || order.items && order.items.map(item => item.name).join(', ') || 'N/A'}
+                                </p>
+                                <p className="text-[11px] text-gray-500 mt-1">
+                                  Received: {formatOrderReceivedAt(order)}
                                 </p>
                               </div>
                               <div className="text-right ml-4">
@@ -1296,7 +1317,6 @@ export default function HubFinance() {
                 <label className="block text-xs text-gray-500 mb-1">Select date</label>
                 <div className="relative">
                   <input type="date" value={invoiceSelectedDate} onChange={e => setInvoiceSelectedDate(e.target.value)} className="w-full h-10 rounded-lg border border-gray-200 px-3 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/30" />
-                  <Calendar className="w-4 h-4 text-gray-400 absolute right-3 top-3 pointer-events-none" />
                 </div>
               </div>
             </div>
@@ -1322,32 +1342,6 @@ export default function HubFinance() {
               </div>
             </div>
 
-            <div className="pt-2 border-t border-gray-100">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-lg font-bold text-gray-900">Invoice rows</p>
-                <p className="text-sm text-gray-500">{invoiceSummary.rows.length} orders</p>
-              </div>
-
-              {invoiceRangeLoading ? <p className="text-sm text-gray-500 text-center py-6">Loading invoice data...</p> : invoiceSummary.rows.length === 0 ? <p className="text-sm text-gray-400 text-center py-6">No invoice data available</p> : <div className="space-y-2">
-                  {invoiceSummary.rows.map((order, index) => {
-                const orderDate = normalizeOrderDate(order);
-                return <div key={`${order?.orderId || "order"}-${index}`} className="rounded-lg border border-gray-100 p-3">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="text-sm font-semibold text-gray-900 truncate">{order?.orderId || "N/A"}</p>
-                            <p className="text-xs text-gray-500">{orderDate ? orderDate.toLocaleString('en-IN') : "N/A"}</p>
-                          </div>
-                          <p className="text-sm font-bold text-gray-900">{formatCurrency(order?.payout || order?.restaurantEarning || 0)}</p>
-                        </div>
-                        <div className="grid grid-cols-3 gap-2 mt-2 text-xs text-gray-600">
-                          <p>Tax: {formatCurrency(getRowTaxCollected(order))}</p>
-                          <p>Platform: {formatCurrency(getRowPlatformFeeExclGst(order))}</p>
-                          <p>Delivery: {formatCurrency(getRowCustomerDeliveryFeeExclGst(order))}</p>
-                        </div>
-                      </div>;
-              })}
-                </div>}
-            </div>
           </div>}
       </div>
 

@@ -119,7 +119,7 @@ export const getRestaurantFinance = asyncHandler(async (req, res) => {
           { 'tracking.delivered.timestamp': { $gte: start, $lte: end } }
         ]
       })
-        .select('orderId userId items pricing payment status address createdAt deliveredAt')
+        .select('orderId userId items pricing payment status address createdAt deliveredAt tracking.confirmed.timestamp')
         .populate('userId', 'name phone email')
         .sort({ deliveredAt: -1 })
         .lean();
@@ -207,6 +207,7 @@ export const getRestaurantFinance = asyncHandler(async (req, res) => {
           totalAmount: order.pricing?.total || 0,
           commission,
           payout: foodPrice - commission,
+          receivedAt: order?.tracking?.confirmed?.timestamp || order?.createdAt,
           deliveredAt: order.deliveredAt || order.createdAt,
           customerName: order.userId?.name || 'N/A',
           customerPhone: order.userId?.phone || 'N/A',
