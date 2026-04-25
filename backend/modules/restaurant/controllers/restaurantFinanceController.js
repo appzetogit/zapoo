@@ -1,10 +1,13 @@
 import Order from '../../order/models/Order.js';
+import OrderSettlement from '../../order/models/OrderSettlement.js';
 import RestaurantCommission from '../../admin/models/RestaurantCommission.js';
 import WithdrawalRequest from '../models/WithdrawalRequest.js';
 import RestaurantWallet from '../models/RestaurantWallet.js';
 import { successResponse, errorResponse } from '../../../shared/utils/response.js';
 import asyncHandler from '../../../shared/middleware/asyncHandler.js';
 import mongoose from 'mongoose';
+
+const roundCurrency = (value) => Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
 
 /**
  * Get restaurant finance/payout data
@@ -93,6 +96,20 @@ export const getRestaurantFinance = asyncHandler(async (req, res) => {
     };
 
     // Use aggregation to get data for current and past cycles efficiently
+    const normalizeStartOfDay = (dateValue) => {
+      const d = new Date(dateValue);
+      if (Number.isNaN(d.getTime())) return null;
+      d.setHours(0, 0, 0, 0);
+      return d;
+    };
+
+    const normalizeEndOfDay = (dateValue) => {
+      const d = new Date(dateValue);
+      if (Number.isNaN(d.getTime())) return null;
+      d.setHours(23, 59, 59, 999);
+      return d;
+    };
+
     const getCycleStats = async (start, end) => {
       const orders = await Order.find({
         restaurantId: { $in: uniqueRestaurantIdVariations },
@@ -107,20 +124,72 @@ export const getRestaurantFinance = asyncHandler(async (req, res) => {
         .sort({ deliveredAt: -1 })
         .lean();
 
+      const orderIds = orders.map(order => order._id).filter(Boolean);
+      const settlements = orderIds.length > 0
+        ? await OrderSettlement.find({ orderId: { $in: orderIds } })
+          .select('orderId userPayment.deliveryFee userPayment.platformFee restaurantEarning.adminDeliveryCost restaurantEarning.adminDeliveryGst restaurantEarning.platformFee restaurantEarning.gstCollected')
+          .lean()
+        : [];
+      const settlementByOrderId = new Map(
+        settlements.map(s => [String(s.orderId), s])
+      );
+
       let totalValue = 0;
       let totalCommission = 0;
       let recCount = 0;
       let recRev = 0;
       let recFees = 0;
+      let totalTaxCollected = 0; // food GST + platform GST + customer delivery GST + admin delivery GST
+      let totalPlatformFeeExclGst = 0; // platform fee only
+      let totalCustomerDeliveryFeeExclGst = 0; // user charged delivery fee only
+      let totalRestaurantToAdminDeliveryFeeExclGst = 0; // admin delivery cost
+      let totalRestaurantToAdminDeliveryFeeInclGst = 0; // admin delivery cost + admin delivery gst
 
       const formattedOrders = orders.map(order => {
+        const settlement = settlementByOrderId.get(String(order._id));
         const subtotal = order.pricing?.subtotal || 0;
         const discount = order.pricing?.discount || 0;
         const foodPrice = subtotal - discount;
         const commission = calculateCommissionForOrder(foodPrice, restaurantCommission);
+        const settlementPlatformFee = Number(settlement?.restaurantEarning?.platformFee);
+        const settlementUserPlatformFee = Number(settlement?.userPayment?.platformFee);
+        const platformFeeExclGst = Number.isFinite(settlementPlatformFee) && settlementPlatformFee > 0
+          ? settlementPlatformFee
+          : (Number.isFinite(settlementUserPlatformFee) && settlementUserPlatformFee > 0
+            ? settlementUserPlatformFee
+            : (Number(order.pricing?.platformFee) || 0));
+
+        const settlementCustomerDeliveryFee = Number(settlement?.userPayment?.deliveryFee);
+        const customerDeliveryFeeExclGst = Number.isFinite(settlementCustomerDeliveryFee)
+          ? settlementCustomerDeliveryFee
+          : (Number(order.pricing?.deliveryFee) || 0);
+
+        const settlementAdminDeliveryCost = Number(settlement?.restaurantEarning?.adminDeliveryCost);
+        const restaurantToAdminDeliveryFeeExclGst = Number.isFinite(settlementAdminDeliveryCost)
+          ? settlementAdminDeliveryCost
+          : (Number(order.pricing?.adminDeliveryCost ?? order.pricing?.internalAdminDeliveryCost) || 0);
+
+        const settlementAdminDeliveryGst = Number(settlement?.restaurantEarning?.adminDeliveryGst);
+        const adminDeliveryGstRaw = Number(order.pricing?.adminDeliveryGst);
+        const adminDeliveryGst = Number.isFinite(settlementAdminDeliveryGst)
+          ? settlementAdminDeliveryGst
+          : (Number.isFinite(adminDeliveryGstRaw)
+            ? adminDeliveryGstRaw
+            : roundCurrency(restaurantToAdminDeliveryFeeExclGst * 0.18));
+        const restaurantToAdminDeliveryFeeInclGst = restaurantToAdminDeliveryFeeExclGst + adminDeliveryGst;
+        const settlementTaxCollected = Number(settlement?.restaurantEarning?.gstCollected);
+        const customerGst = Number(order.pricing?.gstCollected ?? order.pricing?.tax) || 0;
+        const taxCollected = Number.isFinite(settlementTaxCollected) && settlementTaxCollected > 0
+          ? settlementTaxCollected
+          : (customerGst + adminDeliveryGst);
 
         totalValue += foodPrice;
         totalCommission += commission;
+        totalTaxCollected += taxCollected;
+        totalPlatformFeeExclGst += platformFeeExclGst;
+        totalCustomerDeliveryFeeExclGst += customerDeliveryFeeExclGst;
+        totalRestaurantToAdminDeliveryFeeExclGst += restaurantToAdminDeliveryFeeExclGst;
+        totalRestaurantToAdminDeliveryFeeInclGst += restaurantToAdminDeliveryFeeInclGst;
 
         const internalFee = order.pricing?.internalRecommendedFee || 0;
         recFees += internalFee;
@@ -141,7 +210,14 @@ export const getRestaurantFinance = asyncHandler(async (req, res) => {
           deliveredAt: order.deliveredAt || order.createdAt,
           customerName: order.userId?.name || 'N/A',
           customerPhone: order.userId?.phone || 'N/A',
-          foodNames: (order.items || []).map(i => i.name).join(', ')
+          foodNames: (order.items || []).map(i => i.name).join(', '),
+          taxCollected: roundCurrency(taxCollected),
+          platformFeeExclGst: roundCurrency(platformFeeExclGst),
+          customerDeliveryFeeExclGst: roundCurrency(customerDeliveryFeeExclGst),
+          restaurantToAdminDeliveryFeeExclGst: roundCurrency(restaurantToAdminDeliveryFeeExclGst),
+          restaurantToAdminDeliveryFeeInclGst: roundCurrency(restaurantToAdminDeliveryFeeInclGst),
+          customerGst: roundCurrency(customerGst),
+          adminDeliveryGst: roundCurrency(adminDeliveryGst)
         };
       });
 
@@ -150,6 +226,14 @@ export const getRestaurantFinance = asyncHandler(async (req, res) => {
         totalOrderValue: Math.round(totalValue * 100) / 100,
         totalCommission: Math.round(totalCommission * 100) / 100,
         orders: formattedOrders,
+        invoiceSummary: {
+          taxCollected: roundCurrency(totalTaxCollected),
+          platformFeeExclGst: roundCurrency(totalPlatformFeeExclGst),
+          customerDeliveryFeeExclGst: roundCurrency(totalCustomerDeliveryFeeExclGst),
+          restaurantToAdminDeliveryFeeExclGst: roundCurrency(totalRestaurantToAdminDeliveryFeeExclGst),
+          restaurantToAdminDeliveryFeeInclGst: roundCurrency(totalRestaurantToAdminDeliveryFeeInclGst),
+          orderCount: orders.length
+        },
         recommendedItems: {
           count: recCount,
           revenue: Math.round(recRev * 100) / 100,
@@ -160,7 +244,11 @@ export const getRestaurantFinance = asyncHandler(async (req, res) => {
 
     // Execute fetches in parallel
     const currentStatsPromise = getCycleStats(currentCycleStart, currentCycleEnd);
-    const pastStatsPromise = (startDate && endDate) ? getCycleStats(new Date(startDate), new Date(endDate)) : Promise.resolve(null);
+    const parsedStartDate = startDate ? normalizeStartOfDay(startDate) : null;
+    const parsedEndDate = endDate ? normalizeEndOfDay(endDate) : null;
+    const pastStatsPromise = (parsedStartDate && parsedEndDate)
+      ? getCycleStats(parsedStartDate, parsedEndDate)
+      : Promise.resolve(null);
 
     const [currentStats, pastStats] = await Promise.all([currentStatsPromise, pastStatsPromise]);
 
@@ -185,7 +273,7 @@ export const getRestaurantFinance = asyncHandler(async (req, res) => {
         orders: currentStats.orders.slice(0, 20)
       },
       pastCycles: pastStats ? {
-        dateRange: { start: formatCycleDate(new Date(startDate)), end: formatCycleDate(new Date(endDate)) },
+        dateRange: { start: formatCycleDate(parsedStartDate), end: formatCycleDate(parsedEndDate) },
         ...pastStats
       } : null,
       restaurant: {

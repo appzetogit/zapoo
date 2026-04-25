@@ -30,6 +30,16 @@ export default function HubFinance() {
   const [walletBalance, setWalletBalance] = useState(0);
   const [walletLoading, setWalletLoading] = useState(false);
   const [challengeEarnings, setChallengeEarnings] = useState(0);
+  const [invoicePeriodFilter, setInvoicePeriodFilter] = useState("monthly");
+  const [invoiceSelectedDate, setInvoiceSelectedDate] = useState(() => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, "0");
+    const d = String(now.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  });
+  const [invoiceRangeData, setInvoiceRangeData] = useState(null);
+  const [invoiceRangeLoading, setInvoiceRangeLoading] = useState(false);
 
   const calculateChallengeEarnings = (transactions = []) => {
     if (!Array.isArray(transactions)) return 0;
@@ -39,6 +49,114 @@ export default function HubFinance() {
       if (!isChallengeReward) return sum;
       return sum + (Number(tx?.amount) || 0);
     }, 0);
+  };
+
+  const formatCurrency = amount => `₹${(Number(amount) || 0).toLocaleString('en-IN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  })}`;
+
+  const getRowTaxCollected = order => {
+    return Number(order?.taxCollected)
+      || ((Number(order?.customerGst) || Number(order?.gstCollected) || Number(order?.tax) || 0) + (Number(order?.adminDeliveryGst) || 0));
+  };
+
+  const getRowPlatformFeeExclGst = order => {
+    return Number(order?.platformFeeExclGst)
+      || Number(order?.platformFee)
+      || Number(order?.userPayment?.platformFee)
+      || Number(order?.pricing?.platformFee)
+      || Number(order?.breakdown?.platformFee)
+      || 0;
+  };
+
+  const getRowCustomerDeliveryFeeExclGst = order => {
+    return Number(order?.customerDeliveryFeeExclGst)
+      || Number(order?.deliveryFee)
+      || Number(order?.pricing?.deliveryFee)
+      || Number(order?.userPayment?.deliveryFee)
+      || 0;
+  };
+
+  const getRowRestaurantToAdminDeliveryFeeExclGst = order => {
+    return Number(order?.restaurantToAdminDeliveryFeeExclGst)
+      || Number(order?.adminDeliveryCost)
+      || Number(order?.pricing?.adminDeliveryCost)
+      || Number(order?.restaurantEarning?.adminDeliveryCost)
+      || 0;
+  };
+
+  const getRowRestaurantToAdminDeliveryFeeInclGst = order => {
+    const explicitIncl = Number(order?.restaurantToAdminDeliveryFeeInclGst);
+    if (explicitIncl) return explicitIncl;
+    return getRowRestaurantToAdminDeliveryFeeExclGst(order) + (Number(order?.adminDeliveryGst) || 0);
+  };
+
+  const normalizeOrderDate = order => {
+    const dateValue = order?.deliveredAt || order?.createdAt || order?.updatedAt || order?.date;
+    const d = new Date(dateValue);
+    return Number.isNaN(d.getTime()) ? null : d;
+  };
+
+  const formatDateAsLocalIso = dateValue => {
+    const d = dateValue instanceof Date ? dateValue : new Date(dateValue);
+    if (Number.isNaN(d.getTime())) return null;
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  };
+
+  const getInvoiceDateRange = (period, selectedDateValue) => {
+    const selectedDate = new Date(selectedDateValue);
+    if (Number.isNaN(selectedDate.getTime())) {
+      return null;
+    }
+
+    const start = new Date(selectedDate);
+    const end = new Date(selectedDate);
+
+    if (period === "daily") {
+      start.setHours(0, 0, 0, 0);
+      end.setHours(23, 59, 59, 999);
+      return {
+        start,
+        end
+      };
+    }
+
+    if (period === "weekly") {
+      const day = selectedDate.getDay();
+      const daysFromMonday = day === 0 ? 6 : day - 1;
+      start.setDate(selectedDate.getDate() - daysFromMonday);
+      end.setDate(start.getDate() + 6);
+      start.setHours(0, 0, 0, 0);
+      end.setHours(23, 59, 59, 999);
+      return {
+        start,
+        end
+      };
+    }
+
+    if (period === "monthly") {
+      start.setDate(1);
+      end.setMonth(selectedDate.getMonth() + 1, 0);
+      start.setHours(0, 0, 0, 0);
+      end.setHours(23, 59, 59, 999);
+      return {
+        start,
+        end
+      };
+    }
+
+    start.setMonth(0, 1);
+    end.setMonth(11, 31);
+    start.setHours(0, 0, 0, 0);
+    end.setHours(23, 59, 59, 999);
+    return {
+      start,
+      end
+    };
   };
 
   // Fetch finance data on mount
@@ -252,8 +370,12 @@ export default function HubFinance() {
         setPastCyclesData(null);
         return;
       }
-      const startDateISO = startDateObj.toISOString().split('T')[0];
-      const endDateISO = endDateObj.toISOString().split('T')[0];
+      const startDateISO = formatDateAsLocalIso(startDateObj);
+      const endDateISO = formatDateAsLocalIso(endDateObj);
+      if (!startDateISO || !endDateISO) {
+        setPastCyclesData(null);
+        return;
+      }
       const response = await restaurantAPI.getFinance({
         startDate: startDateISO,
         endDate: endDateISO
@@ -284,6 +406,89 @@ export default function HubFinance() {
       setPastCyclesData(null);
     }
   }, [selectedDateRange]);
+
+  const invoiceOrders = useMemo(() => {
+    if (Array.isArray(invoiceRangeData?.orders)) {
+      return invoiceRangeData.orders;
+    }
+    const currentOrders = Array.isArray(financeData?.currentCycle?.orders) ? financeData.currentCycle.orders : [];
+    const historicOrders = Array.isArray(pastCyclesData?.orders) ? pastCyclesData.orders : [];
+    return [...currentOrders, ...historicOrders];
+  }, [financeData, pastCyclesData, invoiceRangeData]);
+
+  useEffect(() => {
+    const loadInvoiceRangeData = async () => {
+      const range = getInvoiceDateRange(invoicePeriodFilter, invoiceSelectedDate);
+      if (!range) {
+        setInvoiceRangeData(null);
+        return;
+      }
+      try {
+        setInvoiceRangeLoading(true);
+        const startDate = formatDateAsLocalIso(range.start);
+        const endDate = formatDateAsLocalIso(range.end);
+        if (!startDate || !endDate) {
+          setInvoiceRangeData({
+            orders: []
+          });
+          return;
+        }
+        const response = await restaurantAPI.getFinance({
+          startDate,
+          endDate
+        });
+        const payload = response?.data?.data;
+        setInvoiceRangeData(payload?.pastCycles || {
+          orders: []
+        });
+      } catch (_) {
+        setInvoiceRangeData({
+          orders: []
+        });
+      } finally {
+        setInvoiceRangeLoading(false);
+      }
+    };
+    loadInvoiceRangeData();
+  }, [invoicePeriodFilter, invoiceSelectedDate]);
+
+  const invoiceSummary = useMemo(() => {
+    const range = getInvoiceDateRange(invoicePeriodFilter, invoiceSelectedDate);
+    if (!range) {
+      return {
+        rows: [],
+        taxCollected: 0,
+        platformFeeExclGst: 0,
+        customerDeliveryFeeExclGst: 0,
+        restaurantToAdminDeliveryFeeExclGst: 0,
+        restaurantToAdminDeliveryFeeInclGst: 0,
+        rangeLabel: "Invalid date"
+      };
+    }
+
+    const rows = invoiceOrders.filter(order => {
+      const d = normalizeOrderDate(order);
+      if (!d) return false;
+      return d >= range.start && d <= range.end;
+    });
+
+    const rangeLabel = `${range.start.toLocaleDateString('en-IN')} - ${range.end.toLocaleDateString('en-IN')}`;
+    const taxCollected = rows.reduce((sum, order) => sum + getRowTaxCollected(order), 0);
+    const platformFeeExclGst = rows.reduce((sum, order) => sum + getRowPlatformFeeExclGst(order), 0);
+    const customerDeliveryFeeExclGst = rows.reduce((sum, order) => sum + getRowCustomerDeliveryFeeExclGst(order), 0);
+    const restaurantToAdminDeliveryFeeExclGst = rows.reduce((sum, order) => sum + getRowRestaurantToAdminDeliveryFeeExclGst(order), 0);
+    const restaurantToAdminDeliveryFeeInclGst = rows.reduce((sum, order) => sum + getRowRestaurantToAdminDeliveryFeeInclGst(order), 0);
+
+    return {
+      rows,
+      taxCollected,
+      platformFeeExclGst,
+      customerDeliveryFeeExclGst,
+      restaurantToAdminDeliveryFeeExclGst,
+      restaurantToAdminDeliveryFeeInclGst,
+      rangeLabel
+    };
+  }, [invoiceOrders, invoicePeriodFilter, invoiceSelectedDate, invoiceRangeData]);
 
   // Prepare report data from real finance data
   const getReportData = () => {
@@ -1067,10 +1272,82 @@ export default function HubFinance() {
             </div>
           </div>}
 
-        {activeTab === "invoices" && <div className=" rounded-lg p-4">
-            <p className="text-sm text-gray-600 text-center py-8">
-              Invoices & Taxes content will be displayed here
-            </p>
+        {activeTab === "invoices" && <div className="space-y-4 rounded-lg p-4 bg-white border border-gray-100">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <p className="text-xs text-gray-500">Invoice period</p>
+                <p className="text-base font-semibold text-gray-900 capitalize">{invoicePeriodFilter}</p>
+                <p className="text-xs text-gray-500">{invoiceSummary.rangeLabel}</p>
+              </div>
+              <FileText className="w-5 h-5 text-[#3B82F6]" />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Duration</label>
+                <select value={invoicePeriodFilter} onChange={e => setInvoicePeriodFilter(e.target.value)} className="w-full h-10 rounded-lg border border-gray-200 px-3 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/30">
+                  <option value="daily">Daily</option>
+                  <option value="weekly">Weekly</option>
+                  <option value="monthly">Monthly</option>
+                  <option value="yearly">Yearly</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Select date</label>
+                <div className="relative">
+                  <input type="date" value={invoiceSelectedDate} onChange={e => setInvoiceSelectedDate(e.target.value)} className="w-full h-10 rounded-lg border border-gray-200 px-3 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/30" />
+                  <Calendar className="w-4 h-4 text-gray-400 absolute right-3 top-3 pointer-events-none" />
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <p className="text-xs text-gray-400">Tax Collected</p>
+                <p className="text-3xl font-bold text-gray-900">{formatCurrency(invoiceSummary.taxCollected)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-400">Platform Fee (Excl GST)</p>
+                <p className="text-2xl font-semibold text-gray-900">{formatCurrency(invoiceSummary.platformFeeExclGst)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-400">Delivery Fee Collected (Excl GST)</p>
+                <p className="text-2xl font-semibold text-gray-900">{formatCurrency(invoiceSummary.customerDeliveryFeeExclGst)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-400">Restaurant → Admin Delivery Fee (Excl GST / Incl GST)</p>
+                <p className="text-lg font-semibold text-gray-900">
+                  {formatCurrency(invoiceSummary.restaurantToAdminDeliveryFeeExclGst)} / {formatCurrency(invoiceSummary.restaurantToAdminDeliveryFeeInclGst)}
+                </p>
+              </div>
+            </div>
+
+            <div className="pt-2 border-t border-gray-100">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-lg font-bold text-gray-900">Invoice rows</p>
+                <p className="text-sm text-gray-500">{invoiceSummary.rows.length} orders</p>
+              </div>
+
+              {invoiceRangeLoading ? <p className="text-sm text-gray-500 text-center py-6">Loading invoice data...</p> : invoiceSummary.rows.length === 0 ? <p className="text-sm text-gray-400 text-center py-6">No invoice data available</p> : <div className="space-y-2">
+                  {invoiceSummary.rows.map((order, index) => {
+                const orderDate = normalizeOrderDate(order);
+                return <div key={`${order?.orderId || "order"}-${index}`} className="rounded-lg border border-gray-100 p-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold text-gray-900 truncate">{order?.orderId || "N/A"}</p>
+                            <p className="text-xs text-gray-500">{orderDate ? orderDate.toLocaleString('en-IN') : "N/A"}</p>
+                          </div>
+                          <p className="text-sm font-bold text-gray-900">{formatCurrency(order?.payout || order?.restaurantEarning || 0)}</p>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2 mt-2 text-xs text-gray-600">
+                          <p>Tax: {formatCurrency(getRowTaxCollected(order))}</p>
+                          <p>Platform: {formatCurrency(getRowPlatformFeeExclGst(order))}</p>
+                          <p>Delivery: {formatCurrency(getRowCustomerDeliveryFeeExclGst(order))}</p>
+                        </div>
+                      </div>;
+              })}
+                </div>}
+            </div>
           </div>}
       </div>
 

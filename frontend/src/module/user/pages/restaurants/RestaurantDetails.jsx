@@ -1393,6 +1393,10 @@ export default function RestaurantDetails() {
               visibleItems: sortMenuItems(filterMenuItems(subsection?.items || [])),
             }))
             .filter(({ visibleItems }) => Array.isArray(visibleItems) && visibleItems.length > 0);
+          // Safety guard: never render empty categories (especially in pure veg mode).
+          if (visibleSectionItems.length === 0 && visibleSubsections.length === 0) {
+            return null;
+          }
           return <div key={sectionIndex} id={sectionId} className="space-y-4 scroll-mt-20">
                   {/* Section Header */}
                   {sectionIndex === 0 && <div className="flex items-center justify-between">
