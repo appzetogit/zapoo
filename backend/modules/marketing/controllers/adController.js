@@ -15,6 +15,7 @@ import {
   markReservedCreditAsConsumed,
   releaseReservedFreeBannerCredit
 } from '../services/freeBannerCreditService.js';
+import { notifyAdminsAdPaymentCompleted } from '../services/adAdminNotificationService.js';
 
 // Pricing configuration based on Tier Rank
 const AD_PRICING = {
@@ -1009,6 +1010,7 @@ export const verifyAdPayment = async (req, res) => {
       });
     }
 
+    const wasAlreadyPaid = ad.paymentStatus === 'Paid';
     ad.paymentStatus = 'Paid';
     ad.razorpayPaymentId = razorpayPaymentId;
     ad.razorpaySignature = razorpaySignature;
@@ -1027,6 +1029,10 @@ export const verifyAdPayment = async (req, res) => {
         creditId: ad.appliedFreeBannerCreditId,
         adRequestId: ad._id
       });
+    }
+
+    if (!wasAlreadyPaid) {
+      await notifyAdminsAdPaymentCompleted(ad);
     }
 
     res.status(200).json({

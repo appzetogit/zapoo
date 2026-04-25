@@ -1190,7 +1190,7 @@ export default function Inventory() {
       </div>
 
       {/* Main Content */}
-      <div ref={contentContainerRef} className="flex-1 overflow-y-auto px-4" onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd} onMouseDown={e => {
+      <div ref={contentContainerRef} className="flex-1 overflow-y-auto px-4 pb-[calc(8.5rem+env(safe-area-inset-bottom))]" onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd} onMouseDown={e => {
       const target = e.target;
       // Don't handle swipe if starting on topbar
       if (tabBarRef.current?.contains(target)) return;

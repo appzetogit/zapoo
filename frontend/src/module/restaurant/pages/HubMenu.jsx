@@ -1146,7 +1146,7 @@ export default function HubMenu() {
       </button>
     </div>
     {/* Content */}
-    <div className="flex-1 space-y-4 pt-8 pb-24 overflow-y-auto">
+    <div className="flex-1 space-y-4 pt-8 pb-[calc(10rem+env(safe-area-inset-bottom))] overflow-y-auto">
       {activeTab === "add-ons" ? <div className="px-4">
         {/* Add Add-on Button */}
         <div className="mb-6">

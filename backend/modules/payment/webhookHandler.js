@@ -9,6 +9,7 @@ import { notifyRestaurantNewOrder } from '../order/services/restaurantNotificati
 import { findOrderByIdentifier } from '../order/utils/findOrderByIdentifier.js';
 import { upsertRefundFromWebhook } from '../refund/services/refundService.js';
 import { initiateRazorpayRefundForOrder } from '../order/services/cancellationRefundService.js';
+import { notifyAdminsAdPaymentCompleted } from '../marketing/services/adAdminNotificationService.js';
 
 const ALLOWED_EVENTS = new Set([
   'payment.captured',
@@ -236,7 +237,11 @@ const handlePaymentCaptured = async ({ paymentEntity, payload }) => {
   });
   const { order, razorpayOrderId } = await resolveOrderForPaymentEvent(paymentEntity);
   if (!order && isAdCampaignPayment(paymentEntity)) {
-    return handleAdPaymentCaptured({ paymentEntity, payload });
+    const adCaptureResult = await handleAdPaymentCaptured({ paymentEntity, payload });
+    if (!adCaptureResult?.alreadyProcessed && adCaptureResult?.ad) {
+      await notifyAdminsAdPaymentCompleted(adCaptureResult.ad);
+    }
+    return adCaptureResult;
   }
   if (!order) {
     throw new Error('Order not found for captured payment');
