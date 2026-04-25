@@ -7,6 +7,7 @@ import { toast } from "sonner"
 import { exportReportsToCSV, exportReportsToExcel, exportReportsToPDF, exportReportsToJSON } from "../../components/reports/reportsExportUtils"
 
 export default function FeedbackExperienceReport() {
+  const todayDate = useMemo(() => new Date().toISOString().split("T")[0], [])
   const [searchQuery, setSearchQuery] = useState("")
   const [feedbackExperiences, setFeedbackExperiences] = useState([])
   const [loading, setLoading] = useState(true)
@@ -22,6 +23,17 @@ export default function FeedbackExperienceReport() {
   })
   const [isFilterOpen, setIsFilterOpen] = useState(true)
 
+  const normalizeToFivePointScale = (rating) => {
+    const numericRating = Number(rating) || 0
+    return numericRating > 5 ? numericRating / 2 : numericRating
+  }
+
+  const formatRatingOutOfFive = (rating) => {
+    const normalizedRating = normalizeToFivePointScale(rating)
+    const roundedRating = Number.isInteger(normalizedRating) ? normalizedRating : normalizedRating.toFixed(1)
+    return `${roundedRating}/5`
+  }
+
   // Fetch feedback experiences
   useEffect(() => {
     fetchFeedbackExperiences()
@@ -35,7 +47,6 @@ export default function FeedbackExperienceReport() {
         limit: 1000,
         ...(filters.fromDate && { startDate: filters.fromDate }),
         ...(filters.toDate && { endDate: filters.toDate }),
-        ...(filters.rating && { rating: filters.rating }),
         ...(filters.experience && { experience: filters.experience }),
         ...(filters.module && { module: filters.module }),
       }
@@ -63,12 +74,22 @@ export default function FeedbackExperienceReport() {
         feedback.userName?.toLowerCase().includes(query) ||
         feedback.userEmail?.toLowerCase().includes(query) ||
         feedback.userPhone?.includes(query) ||
+        feedback.restaurantId?.name?.toLowerCase().includes(query) ||
+        feedback.metadata?.restaurantName?.toLowerCase().includes(query) ||
         feedback._id?.toString().includes(query)
       )
     }
 
+    if (filters.rating) {
+      const selectedRating = Number(filters.rating)
+      result = result.filter((feedback) => {
+        const normalizedRating = normalizeToFivePointScale(feedback.rating)
+        return Math.abs(normalizedRating - selectedRating) < 0.001
+      })
+    }
+
     return result
-  }, [feedbackExperiences, searchQuery])
+  }, [feedbackExperiences, searchQuery, filters.rating])
 
   const handleReset = () => {
     setFilters({
@@ -94,6 +115,7 @@ export default function FeedbackExperienceReport() {
       { key: "rating", label: "Rating" },
       { key: "experience", label: "Experience" },
       { key: "module", label: "Module" },
+      { key: "restaurant", label: "Restaurant" },
       { key: "createdAt", label: "Date" },
     ]
     const exportData = filteredFeedback.map((fb, idx) => ({
@@ -101,9 +123,10 @@ export default function FeedbackExperienceReport() {
       userName: fb.userName || 'N/A',
       userEmail: fb.userEmail || 'N/A',
       userPhone: fb.userPhone || 'N/A',
-      rating: fb.rating,
+      rating: formatRatingOutOfFive(fb.rating),
       experience: fb.experience || 'N/A',
       module: fb.module || 'N/A',
+      restaurant: fb.restaurantId?.name || fb.metadata?.restaurantName || 'N/A',
       createdAt: new Date(fb.createdAt).toLocaleString(),
     }))
     switch (format) {
@@ -134,10 +157,11 @@ export default function FeedbackExperienceReport() {
   }
 
   const getRatingColor = (rating) => {
-    if (rating <= 2) return 'bg-red-100 text-red-700'
-    if (rating <= 4) return 'bg-orange-100 text-orange-700'
-    if (rating <= 6) return 'bg-yellow-100 text-yellow-700'
-    if (rating <= 8) return 'bg-orange-100 text-[#FF5200]'
+    const normalizedRating = normalizeToFivePointScale(rating)
+    if (normalizedRating <= 1) return 'bg-red-100 text-red-700'
+    if (normalizedRating <= 2) return 'bg-orange-100 text-orange-700'
+    if (normalizedRating <= 3) return 'bg-yellow-100 text-yellow-700'
+    if (normalizedRating <= 4) return 'bg-orange-100 text-[#FF5200]'
     return 'bg-green-100 text-green-700'
   }
 
@@ -195,6 +219,7 @@ export default function FeedbackExperienceReport() {
                       type="date"
                       value={filters.fromDate}
                       onChange={(e) => setFilters(prev => ({ ...prev, fromDate: e.target.value }))}
+                      max={todayDate}
                       className="w-full pl-10 pr-4 py-2.5 text-sm rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-[#FF5200] focus:border-[#FF5200]"
                     />
                   </div>
@@ -210,6 +235,7 @@ export default function FeedbackExperienceReport() {
                       type="date"
                       value={filters.toDate}
                       onChange={(e) => setFilters(prev => ({ ...prev, toDate: e.target.value }))}
+                      max={todayDate}
                       className="w-full pl-10 pr-4 py-2.5 text-sm rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-[#FF5200] focus:border-[#FF5200]"
                     />
                   </div>
@@ -227,8 +253,8 @@ export default function FeedbackExperienceReport() {
                     className="w-full px-4 py-2.5 pr-8 text-sm rounded-lg border border-slate-300 bg-white text-slate-700 appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#FF5200]"
                   >
                     <option value="">All Ratings</option>
-                    {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(r => (
-                      <option key={r} value={r}>{r}/10</option>
+                    {Array.from({ length: 11 }, (_, index) => index / 2).map(r => (
+                      <option key={r} value={r}>{r}/5</option>
                     ))}
                   </select>
                   <ChevronDown className="absolute right-2 bottom-2.5 w-4 h-4 text-slate-500 pointer-events-none" />
@@ -319,7 +345,7 @@ export default function FeedbackExperienceReport() {
                 <div>
                   <p className="text-sm font-medium text-slate-600 mb-1">Average Rating</p>
                   <p className="text-2xl font-bold text-slate-900">
-                    {statistics.averageRating ? statistics.averageRating.toFixed(1) : '0.0'}/10
+                    {formatRatingOutOfFive(statistics.averageRating || 0)}
                   </p>
                 </div>
                 <div className="w-12 h-12 rounded-lg bg-yellow-100 flex items-center justify-center">
@@ -332,7 +358,7 @@ export default function FeedbackExperienceReport() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-slate-600 mb-1">Min Rating</p>
-                  <p className="text-2xl font-bold text-slate-900">{statistics.minRating || 0}/10</p>
+                  <p className="text-2xl font-bold text-slate-900">{formatRatingOutOfFive(statistics.minRating || 0)}</p>
                 </div>
                 <div className="w-12 h-12 rounded-lg bg-red-100 flex items-center justify-center">
                   <Star className="w-6 h-6 text-red-600" />
@@ -344,7 +370,7 @@ export default function FeedbackExperienceReport() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-slate-600 mb-1">Max Rating</p>
-                  <p className="text-2xl font-bold text-slate-900">{statistics.maxRating || 0}/10</p>
+                  <p className="text-2xl font-bold text-slate-900">{formatRatingOutOfFive(statistics.maxRating || 0)}</p>
                 </div>
                 <div className="w-12 h-12 rounded-lg bg-green-100 flex items-center justify-center">
                   <Star className="w-6 h-6 text-green-600" />
@@ -407,6 +433,7 @@ export default function FeedbackExperienceReport() {
                     <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">Rating</th>
                     <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">Experience</th>
                     <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">Module</th>
+                    <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">Restaurant</th>
                     <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">Date</th>
                     <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">Actions</th>
                   </tr>
@@ -414,7 +441,7 @@ export default function FeedbackExperienceReport() {
                 <tbody className="bg-white divide-y divide-slate-100">
                   {filteredFeedback.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="px-6 py-20 text-center">
+                      <td colSpan={8} className="px-6 py-20 text-center">
                         <div className="flex flex-col items-center justify-center">
                           <p className="text-lg font-semibold text-slate-700 mb-1">No Data Found</p>
                           <p className="text-sm text-slate-500">No feedback experiences match your search</p>
@@ -440,7 +467,7 @@ export default function FeedbackExperienceReport() {
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
                           <span className={`px-3 py-1 rounded-full text-xs font-medium ${getRatingColor(feedback.rating)}`}>
-                            {feedback.rating}/10
+                            {formatRatingOutOfFive(feedback.rating)}
                           </span>
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
@@ -450,6 +477,9 @@ export default function FeedbackExperienceReport() {
                           <span className="px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-[#FF5200] capitalize">
                             {feedback.module || 'N/A'}
                           </span>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <span className="text-sm text-slate-700">{feedback.restaurantId?.name || feedback.metadata?.restaurantName || 'N/A'}</span>
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
                           <span className="text-xs text-slate-700">
@@ -521,7 +551,7 @@ export default function FeedbackExperienceReport() {
                     <label className="text-sm font-semibold text-slate-700 mb-1 block">Rating</label>
                     <p className="text-sm text-slate-900 mt-1">
                       <span className={`inline-block px-3 py-1.5 rounded-full text-sm font-medium ${getRatingColor(selectedFeedback.rating)}`}>
-                        {selectedFeedback.rating}/10
+                        {formatRatingOutOfFive(selectedFeedback.rating)}
                       </span>
                     </p>
                   </div>
@@ -536,6 +566,10 @@ export default function FeedbackExperienceReport() {
                         {selectedFeedback.module || 'N/A'}
                       </span>
                     </p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-semibold text-slate-700 mb-1 block">Restaurant</label>
+                    <p className="text-sm text-slate-900 mt-1">{selectedFeedback.restaurantId?.name || selectedFeedback.metadata?.restaurantName || 'N/A'}</p>
                   </div>
                 </div>
               </div>

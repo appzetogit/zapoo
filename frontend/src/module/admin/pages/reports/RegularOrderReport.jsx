@@ -118,7 +118,6 @@ export default function RegularOrderReport() {
         const params = {
           page: 1,
           limit: 10000, // Fetch all orders for report (can be optimized later)
-          search: searchQuery || undefined,
           zone: filters.zone !== "All Zones" ? filters.zone : undefined,
           restaurant: filters.restaurant !== "All restaurants" ? filters.restaurant : undefined,
           customer: filters.customer !== "All customers" ? filters.customer : undefined,
@@ -131,15 +130,16 @@ export default function RegularOrderReport() {
         if (response.data?.success) {
           // Transform backend orders to match frontend format
           const transformedOrders = (response.data.data.orders || []).map(order => ({
+            ...order,
             orderId: order.orderId,
             restaurant: order.restaurant,
             customerName: order.customerName,
             totalItemAmount: order.totalItemAmount || 0,
-            itemDiscount: order.itemDiscount || 0,
             discountedAmount: order.discountedAmount || 0,
-            couponDiscount: order.couponDiscount || 0,
-            referralDiscount: order.referralDiscount || 0,
-            vatTax: order.vatTax || 0,
+            adminCouponDiscount: order.adminCouponDiscount || 0,
+            restaurantCouponDiscount: order.restaurantCouponDiscount || 0,
+            couponDiscount: (order.adminCouponDiscount || 0) + (order.restaurantCouponDiscount || 0),
+            gst: order.gst ?? order.vatTax ?? 0,
             deliveryCharge: order.deliveryCharge || 0,
             totalAmount: order.totalAmount || 0,
             orderStatus: order.orderStatus,
@@ -159,11 +159,20 @@ export default function RegularOrderReport() {
     }
 
     fetchOrders()
-  }, [filters, searchQuery])
+  }, [filters])
 
   const filteredOrders = useMemo(() => {
-    return orders // Orders are already filtered by backend
-  }, [orders])
+    const query = searchQuery.trim().toLowerCase()
+    if (!query) return orders
+
+    return orders.filter((order) =>
+      Object.values(order).some((value) => {
+        if (value === null || value === undefined) return false
+        if (typeof value === "object") return false
+        return String(value).toLowerCase().includes(query)
+      })
+    )
+  }, [orders, searchQuery])
 
   const handleExport = (format) => {
     if (filteredOrders.length === 0) {
@@ -175,11 +184,10 @@ export default function RegularOrderReport() {
       { key: "restaurant", label: "Restaurant" },
       { key: "customerName", label: "Customer Name" },
       { key: "totalItemAmount", label: "Total Item Amount" },
-      { key: "itemDiscount", label: "Item Discount" },
+      { key: "adminCouponDiscount", label: "Admin Coupon Discount" },
+      { key: "restaurantCouponDiscount", label: "Restaurant Coupon Discount" },
       { key: "discountedAmount", label: "Discounted Amount" },
-      { key: "couponDiscount", label: "Coupon Discount" },
-      { key: "referralDiscount", label: "Referral Discount" },
-      { key: "vatTax", label: "VAT/Tax" },
+      { key: "gst", label: "GST" },
       { key: "deliveryCharge", label: "Delivery Charge" },
       { key: "totalAmount", label: "Order Amount" },
       { key: "orderStatus", label: "Status" },
@@ -240,7 +248,7 @@ export default function RegularOrderReport() {
   )
 
   const formatAmount = (amount) =>
-    `$ ${Number(amount || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    `\u20B9 ${Number(amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
   const handleFilterChange = (key, value) => {
     setFilters((prev) => ({ ...prev, [key]: value }))
@@ -322,8 +330,8 @@ export default function RegularOrderReport() {
               >
                 <option value="All Zones">All Zones</option>
                 {zones.map((zone) => (
-                  <option key={zone._id} value={zone.name}>
-                    {zone.name}
+                  <option key={zone._id} value={zone.zoneName || zone.name}>
+                    {zone.zoneName || zone.name}
                   </option>
                 ))}
               </select>
@@ -421,7 +429,7 @@ export default function RegularOrderReport() {
               <div className="relative flex-1 sm:flex-initial min-w-[180px]">
                 <input
                   type="text"
-                  placeholder="Search by Order ID"
+                  placeholder="Search by Order ID, customer, restaurant or any field"
                   value={searchQuery}
                   onChange={(e) => {
                     setSearchQuery(e.target.value)
@@ -491,19 +499,16 @@ export default function RegularOrderReport() {
                     Total Item Amount
                   </th>
                   <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: "7%" }}>
-                    Item Discount
+                    Admin Coupon Discount
+                  </th>
+                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: "7%" }}>
+                    Restaurant Coupon Discount
                   </th>
                   <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: "7%" }}>
                     Discounted Amount
                   </th>
-                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: "7%" }}>
-                    Coupon Discount
-                  </th>
-                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: "7%" }}>
-                    Referral Discount
-                  </th>
                   <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: "6%" }}>
-                    Vat/Tax
+                    GST
                   </th>
                   <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: "7%" }}>
                     Delivery Charge
@@ -519,7 +524,7 @@ export default function RegularOrderReport() {
               <tbody className="bg-white divide-y divide-slate-100">
                 {paginatedOrders.length === 0 ? (
                   <tr>
-                    <td colSpan={13} className="px-6 py-20 text-center">
+                    <td colSpan={12} className="px-6 py-20 text-center">
                       <div className="flex flex-col items-center justify-center">
                         <p className="text-lg font-semibold text-slate-700 mb-1">No Data Found</p>
                         <p className="text-sm text-slate-500">No orders match your filters</p>
@@ -544,22 +549,19 @@ export default function RegularOrderReport() {
                         <span className="text-[10px] text-slate-700 truncate block">{order.customerName}</span>
                       </td>
                       <td className="px-1.5 py-1">
-                        <span className="text-[10px] text-slate-700">{formatAmount(order.totalAmount)}</span>
+                        <span className="text-[10px] text-slate-700">{formatAmount(order.totalItemAmount)}</span>
                       </td>
                       <td className="px-1.5 py-1">
-                        <span className="text-[10px] text-slate-700">{formatAmount(order.itemDiscount)}</span>
+                        <span className="text-[10px] text-slate-700">{formatAmount(order.adminCouponDiscount)}</span>
+                      </td>
+                      <td className="px-1.5 py-1">
+                        <span className="text-[10px] text-slate-700">{formatAmount(order.restaurantCouponDiscount)}</span>
                       </td>
                       <td className="px-1.5 py-1">
                         <span className="text-[10px] text-slate-700">{formatAmount(order.discountedAmount)}</span>
                       </td>
                       <td className="px-1.5 py-1">
-                        <span className="text-[10px] text-slate-700">{formatAmount(order.couponDiscount)}</span>
-                      </td>
-                      <td className="px-1.5 py-1">
-                        <span className="text-[10px] text-slate-700">{formatAmount(order.referralDiscount)}</span>
-                      </td>
-                      <td className="px-1.5 py-1">
-                        <span className="text-[10px] text-slate-700">{formatAmount(order.vatTax)}</span>
+                        <span className="text-[10px] text-slate-700">{formatAmount(order.gst)}</span>
                       </td>
                       <td className="px-1.5 py-1">
                         <span className="text-[10px] text-slate-700">{formatAmount(order.deliveryCharge)}</span>

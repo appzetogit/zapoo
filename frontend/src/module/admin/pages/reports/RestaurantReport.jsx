@@ -13,7 +13,6 @@ export default function RestaurantReport() {
   const [filters, setFilters] = useState({
     zone: "All Zones",
     all: "All",
-    type: "All types",
     time: "All Time",
   })
   const [zones, setZones] = useState([])
@@ -43,9 +42,7 @@ export default function RestaurantReport() {
         const params = {
           zone: filters.zone !== "All Zones" ? filters.zone : undefined,
           all: filters.all !== "All" ? filters.all : undefined,
-          type: filters.type !== "All types" ? filters.type : undefined,
           time: filters.time !== "All Time" ? filters.time : undefined,
-          search: searchQuery || undefined
         }
 
         const response = await adminAPI.getRestaurantReport(params)
@@ -68,11 +65,20 @@ export default function RestaurantReport() {
     }
 
     fetchRestaurantReport()
-  }, [filters, searchQuery])
+  }, [filters])
 
   const filteredRestaurants = useMemo(() => {
-    return restaurants // Backend already filters, so just return restaurants
-  }, [restaurants])
+    const query = searchQuery.trim().toLowerCase()
+    if (!query) return restaurants
+
+    return restaurants.filter((restaurant) =>
+      Object.values(restaurant).some((value) => {
+        if (value === null || value === undefined) return false
+        if (typeof value === "object") return false
+        return String(value).toLowerCase().includes(query)
+      })
+    )
+  }, [restaurants, searchQuery])
 
   const totalRestaurants = filteredRestaurants.length
 
@@ -80,7 +86,6 @@ export default function RestaurantReport() {
     setFilters({
       zone: "All Zones",
       all: "All",
-      type: "All types",
       time: "All Time",
     })
     setSearchQuery("")
@@ -102,11 +107,25 @@ export default function RestaurantReport() {
       { key: "totalVATTAX", label: "Total VAT/TAX" },
       { key: "averageRatings", label: "Average Ratings" },
     ]
+
+    const parseAmountForExport = (value) => {
+      const numeric = Number(String(value ?? 0).replace(/[^0-9.-]/g, ""))
+      return Number.isFinite(numeric) ? numeric.toFixed(2) : "0.00"
+    }
+
+    const exportRows = filteredRestaurants.map((restaurant) => ({
+      ...restaurant,
+      totalOrderAmount: parseAmountForExport(restaurant.totalOrderAmount),
+      totalDiscountGiven: parseAmountForExport(restaurant.totalDiscountGiven),
+      totalAdminCommission: parseAmountForExport(restaurant.totalAdminCommission),
+      totalVATTAX: parseAmountForExport(restaurant.totalVATTAX),
+    }))
+
     switch (format) {
-      case "csv": exportReportsToCSV(filteredRestaurants, headers, "restaurant_report"); break
-      case "excel": exportReportsToExcel(filteredRestaurants, headers, "restaurant_report"); break
-      case "pdf": exportReportsToPDF(filteredRestaurants, headers, "restaurant_report", "Restaurant Report"); break
-      case "json": exportReportsToJSON(filteredRestaurants, "restaurant_report"); break
+      case "csv": exportReportsToCSV(exportRows, headers, "restaurant_report"); break
+      case "excel": exportReportsToExcel(exportRows, headers, "restaurant_report"); break
+      case "pdf": exportReportsToPDF(exportRows, headers, "restaurant_report", "Restaurant Report"); break
+      case "json": exportReportsToJSON(exportRows, "restaurant_report"); break
     }
   }
 
@@ -114,7 +133,7 @@ export default function RestaurantReport() {
     // Filters are already applied via useMemo
   }
 
-  const activeFiltersCount = (filters.zone !== "All Zones" ? 1 : 0) + (filters.all !== "All" ? 1 : 0) + (filters.type !== "All types" ? 1 : 0) + (filters.time !== "All Time" ? 1 : 0)
+  const activeFiltersCount = (filters.zone !== "All Zones" ? 1 : 0) + (filters.all !== "All" ? 1 : 0) + (filters.time !== "All Time" ? 1 : 0)
 
   const renderStars = (rating, reviews) => {
     if (!rating || rating === 0) {
@@ -156,7 +175,7 @@ export default function RestaurantReport() {
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
           <h3 className="text-sm font-semibold text-slate-700 mb-4">Search Data</h3>
           <div className="flex flex-col lg:flex-row lg:items-end gap-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 flex-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 flex-1">
               <div className="relative">
                 <label className="block text-sm font-semibold text-slate-700 mb-2">
                   Zone
@@ -168,7 +187,7 @@ export default function RestaurantReport() {
                 >
                   <option value="All Zones">All Zones</option>
                   {zones.map(zone => (
-                    <option key={zone._id} value={zone.name}>{zone.name}</option>
+                    <option key={zone._id} value={zone.zoneName || zone.name}>{zone.zoneName || zone.name}</option>
                   ))}
                 </select>
                 <ChevronDown className="absolute right-2 bottom-2.5 w-4 h-4 text-slate-500 pointer-events-none" />
@@ -186,22 +205,6 @@ export default function RestaurantReport() {
                   <option value="All">All</option>
                   <option value="Active">Active</option>
                   <option value="Inactive">Inactive</option>
-                </select>
-                <ChevronDown className="absolute right-2 bottom-2.5 w-4 h-4 text-slate-500 pointer-events-none" />
-              </div>
-
-              <div className="relative">
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
-                  Type
-                </label>
-                <select
-                  value={filters.type}
-                  onChange={(e) => setFilters(prev => ({ ...prev, type: e.target.value }))}
-                  className="w-full px-4 py-2.5 pr-8 text-sm rounded-lg border border-slate-300 bg-white text-slate-700 appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#FF5200]"
-                >
-                  <option value="All types">All types</option>
-                  <option value="Commission">Commission</option>
-                  <option value="Subscription">Subscription</option>
                 </select>
                 <ChevronDown className="absolute right-2 bottom-2.5 w-4 h-4 text-slate-500 pointer-events-none" />
               </div>
@@ -259,7 +262,7 @@ export default function RestaurantReport() {
               <div className="relative flex-1 sm:flex-initial min-w-[250px]">
                 <input
                   type="text"
-                  placeholder="Ex: search restaurant nam"
+                  placeholder="Ex: Search by restaurant name, ID, amount, rating"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-4 pr-10 py-2.5 w-full text-sm rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-[#FF5200] focus:border-[#FF5200]"

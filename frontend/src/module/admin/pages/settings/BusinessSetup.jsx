@@ -4,6 +4,19 @@ import { toast } from "sonner";
 import { adminAPI } from "@/lib/api";
 import { clearCache, updateTitle } from "@/lib/utils/businessSettings";
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i;
+const STATE_REGEX = /^[A-Za-z]+(?:[ ]+[A-Za-z]+)*$/;
+const PINCODE_REGEX = /^[1-9][0-9]{5}$/;
+const INDIAN_PHONE_REGEX = /^[6-9][0-9]{9}$/;
+
+const toTitleCase = (value) =>
+  value
+    .toLowerCase()
+    .split(" ")
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+
 export default function BusinessSetup() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -23,7 +36,6 @@ export default function BusinessSetup() {
     maxDeliveryRange: 20,
   });
 
-  // Fetch business settings on mount
   useEffect(() => {
     fetchBusinessSettings();
   }, []);
@@ -38,16 +50,15 @@ export default function BusinessSetup() {
         setFormData({
           companyName: settings.companyName || "",
           email: settings.email || "",
-          phoneCountryCode: settings.phone?.countryCode || "+91",
-          phoneNumber: settings.phone?.number || "",
+          phoneCountryCode: "+91",
+          phoneNumber: String(settings.phone?.number || "").replace(/\D/g, "").slice(0, 10),
           address: settings.address || "",
           state: settings.state || "",
-          pincode: settings.pincode || "",
+          pincode: String(settings.pincode || "").replace(/\D/g, "").slice(0, 6),
           region: settings.region || "India",
           maxDeliveryRange: settings.maxDeliveryRange ?? 20,
         });
 
-        // Set logo and favicon previews if they exist
         if (settings.logo?.url) {
           setLogoPreview(settings.logo.url);
         }
@@ -61,6 +72,39 @@ export default function BusinessSetup() {
   };
 
   const handleInputChange = (field, value) => {
+    if (field === "phoneCountryCode") {
+      setFormData((prev) => ({ ...prev, phoneCountryCode: "+91" }));
+      return;
+    }
+
+    if (field === "phoneNumber") {
+      const digitsOnly = value.replace(/\D/g, "").slice(0, 10);
+      const normalizedPhone = digitsOnly.replace(/^[0-5]+/, "").slice(0, 10);
+      setFormData((prev) => ({ ...prev, phoneNumber: normalizedPhone }));
+      return;
+    }
+
+    if (field === "pincode") {
+      const digitsOnly = value.replace(/\D/g, "").slice(0, 6);
+      setFormData((prev) => ({ ...prev, pincode: digitsOnly }));
+      return;
+    }
+
+    if (field === "state") {
+      const normalizedState = value
+        .replace(/[^A-Za-z\s]/g, "")
+        .replace(/\s{2,}/g, " ")
+        .replace(/^\s+/, "");
+
+      setFormData((prev) => ({ ...prev, state: normalizedState }));
+      return;
+    }
+
+    if (field === "email") {
+      setFormData((prev) => ({ ...prev, email: value.trim().toLowerCase() }));
+      return;
+    }
+
     setFormData((prev) => ({
       ...prev,
       [field]: value,
@@ -69,7 +113,6 @@ export default function BusinessSetup() {
 
   const handleSave = async () => {
     try {
-      // Validate required fields
       if (!formData.companyName.trim()) {
         toast.error("Company name is required");
         return;
@@ -78,27 +121,41 @@ export default function BusinessSetup() {
         toast.error("Email is required");
         return;
       }
+      if (!EMAIL_REGEX.test(formData.email.trim())) {
+        toast.error("Please enter a valid email address");
+        return;
+      }
       if (!formData.phoneNumber.trim()) {
         toast.error("Phone number is required");
+        return;
+      }
+      if (!INDIAN_PHONE_REGEX.test(formData.phoneNumber.trim())) {
+        toast.error("Please enter a valid 10-digit Indian mobile number");
+        return;
+      }
+      if (formData.state.trim() && !STATE_REGEX.test(formData.state.trim())) {
+        toast.error("State should contain only letters and spaces");
+        return;
+      }
+      if (formData.pincode.trim() && !PINCODE_REGEX.test(formData.pincode.trim())) {
+        toast.error("Pincode must be a valid 6-digit Indian pincode");
         return;
       }
 
       setSaving(true);
 
-      // Prepare form data
       const dataToSend = {
         companyName: formData.companyName.trim(),
         email: formData.email.trim(),
-        phoneCountryCode: formData.phoneCountryCode,
+        phoneCountryCode: "+91",
         phoneNumber: formData.phoneNumber.trim(),
         address: formData.address.trim(),
-        state: formData.state.trim(),
+        state: toTitleCase(formData.state.trim()),
         pincode: formData.pincode.trim(),
         region: formData.region,
         maxDeliveryRange: Number(formData.maxDeliveryRange) || 20,
       };
 
-      // Prepare files
       const files = {};
       if (logoFile) {
         files.logo = logoFile;
@@ -108,24 +165,19 @@ export default function BusinessSetup() {
       const updatedSettings = response?.data?.data || response?.data;
 
       if (updatedSettings) {
-        // Clear cache to force reload
         clearCache();
 
-        // Update previews with new URLs if files were uploaded
         if (updatedSettings.logo?.url) {
           setLogoPreview(updatedSettings.logo.url);
           setLogoFile(null);
         }
-        // Update page title
         if (updatedSettings.companyName) {
           updateTitle(updatedSettings.companyName);
         }
       }
 
       toast.success("Business settings saved successfully");
-
-      // Dispatch event to notify other components (like AdminNavbar)
-      window.dispatchEvent(new Event('businessSettingsUpdated'));
+      window.dispatchEvent(new Event("businessSettingsUpdated"));
     } catch (error) {
       console.error("Error saving business settings:", error);
       toast.error(error?.response?.data?.message || "Failed to save business settings");
@@ -143,7 +195,6 @@ export default function BusinessSetup() {
     toast.info("Form reset to saved values");
   };
 
-
   if (loading) {
     return (
       <div className="p-4 lg:p-6 bg-slate-50 min-h-screen flex items-center justify-center">
@@ -154,7 +205,6 @@ export default function BusinessSetup() {
 
   return (
     <div className="p-4 lg:p-6 bg-slate-50 min-h-screen">
-      {/* Page header */}
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-4">
         <div>
           <h1 className="text-xl lg:text-2xl font-bold text-slate-900">Business setup</h1>
@@ -163,7 +213,6 @@ export default function BusinessSetup() {
           </p>
         </div>
 
-        {/* Note card (top-right) */}
         <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 flex items-start gap-3 max-w-md">
           <div className="mt-0.5">
             <Info className="w-4 h-4 text-amber-500" />
@@ -176,9 +225,7 @@ export default function BusinessSetup() {
       </div>
 
       <div className="space-y-4">
-        {/* Company info */}
         <div className="bg-white rounded-lg shadow-sm border border-slate-200">
-          {/* Company information */}
           <div className="px-4 py-4 border-b border-slate-100">
             <h3 className="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">
               <span>Company Information</span>
@@ -204,6 +251,9 @@ export default function BusinessSetup() {
                 </label>
                 <input
                   type="email"
+                  autoComplete="email"
+                  inputMode="email"
+                  pattern="^[^\s@]+@[^\s@]+\.[^\s@]{2,}$"
                   placeholder="Enter Your Email"
                   value={formData.email}
                   onChange={(e) => handleInputChange("email", e.target.value)}
@@ -231,222 +281,20 @@ export default function BusinessSetup() {
                   Phone <span className="text-red-500">*</span>
                 </label>
                 <div className="flex gap-2">
-                  <div className="relative w-32">
-                    <select
-                      value={formData.phoneCountryCode}
-                      onChange={(e) => handleInputChange("phoneCountryCode", e.target.value)}
-                      className="w-full pl-8 pr-6 py-2 text-xs border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#FF5200] focus:border-[#FF5200] appearance-none"
-                    >
-                      <option value="+1">+1 (US/CA)</option>
-                      <option value="+7">+7 (RU/KZ)</option>
-                      <option value="+20">+20 (EG)</option>
-                      <option value="+27">+27 (ZA)</option>
-                      <option value="+30">+30 (GR)</option>
-                      <option value="+31">+31 (NL)</option>
-                      <option value="+32">+32 (BE)</option>
-                      <option value="+33">+33 (FR)</option>
-                      <option value="+34">+34 (ES)</option>
-                      <option value="+36">+36 (HU)</option>
-                      <option value="+39">+39 (IT)</option>
-                      <option value="+40">+40 (RO)</option>
-                      <option value="+41">+41 (CH)</option>
-                      <option value="+43">+43 (AT)</option>
-                      <option value="+44">+44 (GB)</option>
-                      <option value="+45">+45 (DK)</option>
-                      <option value="+46">+46 (SE)</option>
-                      <option value="+47">+47 (NO)</option>
-                      <option value="+48">+48 (PL)</option>
-                      <option value="+49">+49 (DE)</option>
-                      <option value="+51">+51 (PE)</option>
-                      <option value="+52">+52 (MX)</option>
-                      <option value="+53">+53 (CU)</option>
-                      <option value="+54">+54 (AR)</option>
-                      <option value="+55">+55 (BR)</option>
-                      <option value="+56">+56 (CL)</option>
-                      <option value="+57">+57 (CO)</option>
-                      <option value="+58">+58 (VE)</option>
-                      <option value="+60">+60 (MY)</option>
-                      <option value="+61">+61 (AU)</option>
-                      <option value="+62">+62 (ID)</option>
-                      <option value="+63">+63 (PH)</option>
-                      <option value="+64">+64 (NZ)</option>
-                      <option value="+65">+65 (SG)</option>
-                      <option value="+66">+66 (TH)</option>
-                      <option value="+81">+81 (JP)</option>
-                      <option value="+82">+82 (KR)</option>
-                      <option value="+84">+84 (VN)</option>
-                      <option value="+86">+86 (CN)</option>
-                      <option value="+90">+90 (TR)</option>
-                      <option value="+91">+91 (IN)</option>
-                      <option value="+92">+92 (PK)</option>
-                      <option value="+93">+93 (AF)</option>
-                      <option value="+94">+94 (LK)</option>
-                      <option value="+95">+95 (MM)</option>
-                      <option value="+98">+98 (IR)</option>
-                      <option value="+212">+212 (MA)</option>
-                      <option value="+213">+213 (DZ)</option>
-                      <option value="+216">+216 (TN)</option>
-                      <option value="+218">+218 (LY)</option>
-                      <option value="+220">+220 (GM)</option>
-                      <option value="+221">+221 (SN)</option>
-                      <option value="+222">+222 (MR)</option>
-                      <option value="+223">+223 (ML)</option>
-                      <option value="+224">+224 (GN)</option>
-                      <option value="+225">+225 (CI)</option>
-                      <option value="+226">+226 (BF)</option>
-                      <option value="+227">+227 (NE)</option>
-                      <option value="+228">+228 (TG)</option>
-                      <option value="+229">+229 (BJ)</option>
-                      <option value="+230">+230 (MU)</option>
-                      <option value="+231">+231 (LR)</option>
-                      <option value="+232">+232 (SL)</option>
-                      <option value="+233">+233 (GH)</option>
-                      <option value="+234">+234 (NG)</option>
-                      <option value="+235">+235 (TD)</option>
-                      <option value="+236">+236 (CF)</option>
-                      <option value="+237">+237 (CM)</option>
-                      <option value="+238">+238 (CV)</option>
-                      <option value="+239">+239 (ST)</option>
-                      <option value="+240">+240 (GQ)</option>
-                      <option value="+241">+241 (GA)</option>
-                      <option value="+242">+242 (CG)</option>
-                      <option value="+243">+243 (CD)</option>
-                      <option value="+244">+244 (AO)</option>
-                      <option value="+245">+245 (GW)</option>
-                      <option value="+246">+246 (IO)</option>
-                      <option value="+248">+248 (SC)</option>
-                      <option value="+249">+249 (SD)</option>
-                      <option value="+250">+250 (RW)</option>
-                      <option value="+251">+251 (ET)</option>
-                      <option value="+252">+252 (SO)</option>
-                      <option value="+253">+253 (DJ)</option>
-                      <option value="+254">+254 (KE)</option>
-                      <option value="+255">+255 (TZ)</option>
-                      <option value="+256">+256 (UG)</option>
-                      <option value="+257">+257 (BI)</option>
-                      <option value="+258">+258 (MZ)</option>
-                      <option value="+260">+260 (ZM)</option>
-                      <option value="+261">+261 (MG)</option>
-                      <option value="+262">+262 (RE)</option>
-                      <option value="+263">+263 (ZW)</option>
-                      <option value="+264">+264 (NA)</option>
-                      <option value="+265">+265 (MW)</option>
-                      <option value="+266">+266 (LS)</option>
-                      <option value="+267">+267 (BW)</option>
-                      <option value="+268">+268 (SZ)</option>
-                      <option value="+269">+269 (KM)</option>
-                      <option value="+290">+290 (SH)</option>
-                      <option value="+291">+291 (ER)</option>
-                      <option value="+297">+297 (AW)</option>
-                      <option value="+298">+298 (FO)</option>
-                      <option value="+299">+299 (GL)</option>
-                      <option value="+350">+350 (GI)</option>
-                      <option value="+351">+351 (PT)</option>
-                      <option value="+352">+352 (LU)</option>
-                      <option value="+353">+353 (IE)</option>
-                      <option value="+354">+354 (IS)</option>
-                      <option value="+355">+355 (AL)</option>
-                      <option value="+356">+356 (MT)</option>
-                      <option value="+357">+357 (CY)</option>
-                      <option value="+358">+358 (FI)</option>
-                      <option value="+359">+359 (BG)</option>
-                      <option value="+370">+370 (LT)</option>
-                      <option value="+371">+371 (LV)</option>
-                      <option value="+372">+372 (EE)</option>
-                      <option value="+373">+373 (MD)</option>
-                      <option value="+374">+374 (AM)</option>
-                      <option value="+375">+375 (BY)</option>
-                      <option value="+376">+376 (AD)</option>
-                      <option value="+377">+377 (MC)</option>
-                      <option value="+378">+378 (SM)</option>
-                      <option value="+380">+380 (UA)</option>
-                      <option value="+381">+381 (RS)</option>
-                      <option value="+382">+382 (ME)</option>
-                      <option value="+383">+383 (XK)</option>
-                      <option value="+385">+385 (HR)</option>
-                      <option value="+386">+386 (SI)</option>
-                      <option value="+387">+387 (BA)</option>
-                      <option value="+389">+389 (MK)</option>
-                      <option value="+420">+420 (CZ)</option>
-                      <option value="+421">+421 (SK)</option>
-                      <option value="+423">+423 (LI)</option>
-                      <option value="+500">+500 (FK)</option>
-                      <option value="+501">+501 (BZ)</option>
-                      <option value="+502">+502 (GT)</option>
-                      <option value="+503">+503 (SV)</option>
-                      <option value="+504">+504 (HN)</option>
-                      <option value="+505">+505 (NI)</option>
-                      <option value="+506">+506 (CR)</option>
-                      <option value="+507">+507 (PA)</option>
-                      <option value="+508">+508 (PM)</option>
-                      <option value="+509">+509 (HT)</option>
-                      <option value="+590">+590 (GP)</option>
-                      <option value="+591">+591 (BO)</option>
-                      <option value="+592">+592 (GY)</option>
-                      <option value="+593">+593 (EC)</option>
-                      <option value="+594">+594 (GF)</option>
-                      <option value="+595">+595 (PY)</option>
-                      <option value="+596">+596 (MQ)</option>
-                      <option value="+597">+597 (SR)</option>
-                      <option value="+598">+598 (UY)</option>
-                      <option value="+599">+599 (CW)</option>
-                      <option value="+670">+670 (TL)</option>
-                      <option value="+672">+672 (AQ)</option>
-                      <option value="+673">+673 (BN)</option>
-                      <option value="+674">+674 (NR)</option>
-                      <option value="+675">+675 (PG)</option>
-                      <option value="+676">+676 (TO)</option>
-                      <option value="+677">+677 (SB)</option>
-                      <option value="+678">+678 (VU)</option>
-                      <option value="+679">+679 (FJ)</option>
-                      <option value="+680">+680 (PW)</option>
-                      <option value="+681">+681 (WF)</option>
-                      <option value="+682">+682 (CK)</option>
-                      <option value="+683">+683 (NU)</option>
-                      <option value="+685">+685 (WS)</option>
-                      <option value="+686">+686 (KI)</option>
-                      <option value="+687">+687 (NC)</option>
-                      <option value="+688">+688 (TV)</option>
-                      <option value="+689">+689 (PF)</option>
-                      <option value="+850">+850 (KP)</option>
-                      <option value="+852">+852 (HK)</option>
-                      <option value="+853">+853 (MO)</option>
-                      <option value="+855">+855 (KH)</option>
-                      <option value="+856">+856 (LA)</option>
-                      <option value="+880">+880 (BD)</option>
-                      <option value="+886">+886 (TW)</option>
-                      <option value="+960">+960 (MV)</option>
-                      <option value="+961">+961 (LB)</option>
-                      <option value="+962">+962 (JO)</option>
-                      <option value="+963">+963 (SY)</option>
-                      <option value="+964">+964 (IQ)</option>
-                      <option value="+965">+965 (KW)</option>
-                      <option value="+966">+966 (SA)</option>
-                      <option value="+967">+967 (YE)</option>
-                      <option value="+968">+968 (OM)</option>
-                      <option value="+970">+970 (PS)</option>
-                      <option value="+971">+971 (AE)</option>
-                      <option value="+972">+972 (IL)</option>
-                      <option value="+973">+973 (BH)</option>
-                      <option value="+974">+974 (QA)</option>
-                      <option value="+975">+975 (BT)</option>
-                      <option value="+976">+976 (MN)</option>
-                      <option value="+977">+977 (NP)</option>
-                      <option value="+992">+992 (TJ)</option>
-                      <option value="+993">+993 (TM)</option>
-                      <option value="+994">+994 (AZ)</option>
-                      <option value="+995">+995 (GE)</option>
-                      <option value="+996">+996 (KG)</option>
-                      <option value="+998">+998 (UZ)</option>
-                    </select>
+                  <div className="relative w-24">
+                    <div className="w-full pl-8 pr-3 py-2 text-xs border border-slate-300 rounded-lg bg-slate-50 text-slate-700">
+                      +91
+                    </div>
                     <Phone className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
-                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 pointer-events-none">
-                      ▾
-                    </span>
                   </div>
                   <input
-                    type="text"
-                    placeholder="Enter Your Phone Number"
+                    type="tel"
+                    inputMode="numeric"
+                    pattern="[0-9]{10}"
+                    minLength={10}
+                    maxLength={10}
+                    placeholder="Ex: 9876543210"
+                    title="Enter a valid 10-digit Indian mobile number starting with 6-9"
                     value={formData.phoneNumber}
                     onChange={(e) => handleInputChange("phoneNumber", e.target.value)}
                     className="flex-1 px-3 py-2 text-xs border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#FF5200] focus:border-[#FF5200]"
@@ -455,12 +303,10 @@ export default function BusinessSetup() {
               </div>
 
               <div className="md:col-span-2">
-                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                  Address
-                </label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">Address</label>
                 <textarea
                   rows={2}
-                  placeholder="Enter Your Addresss"
+                  placeholder="Enter Your Address"
                   value={formData.address}
                   onChange={(e) => handleInputChange("address", e.target.value)}
                   className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#FF5200] focus:border-[#FF5200] resize-none"
@@ -468,25 +314,26 @@ export default function BusinessSetup() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                  State
-                </label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">State</label>
                 <input
                   type="text"
-                  placeholder="Enter Your State"
+                  maxLength={50}
+                  placeholder="Ex: Rajasthan"
                   value={formData.state}
                   onChange={(e) => handleInputChange("state", e.target.value)}
+                  onBlur={(e) => handleInputChange("state", toTitleCase(e.target.value))}
                   className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#FF5200] focus:border-[#FF5200]"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                  Pincode
-                </label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">Pincode</label>
                 <input
                   type="text"
-                  placeholder="Enter Your Pincode"
+                  inputMode="numeric"
+                  pattern="[0-9]{6}"
+                  maxLength={6}
+                  placeholder="Enter 6-digit pincode"
                   value={formData.pincode}
                   onChange={(e) => handleInputChange("pincode", e.target.value)}
                   className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#FF5200] focus:border-[#FF5200]"
@@ -494,12 +341,9 @@ export default function BusinessSetup() {
               </div>
             </div>
 
-            {/* Max Delivery Range */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                  Max Delivery Range (km)
-                </label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">Max Delivery Range (km)</label>
                 <input
                   type="number"
                   min="1"
@@ -515,7 +359,6 @@ export default function BusinessSetup() {
               </div>
             </div>
 
-            {/* Logo upload */}
             <div className="grid grid-cols-1 gap-4 mb-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1.5">Logo</label>
@@ -527,15 +370,13 @@ export default function BusinessSetup() {
                     const file = e.target.files?.[0];
                     if (!file) return;
 
-                    // Validate file type
                     const allowedTypes = ["image/png", "image/jpeg", "image/jpg", "image/webp"];
                     if (!allowedTypes.includes(file.type)) {
                       toast.error("Invalid file type. Please upload PNG, JPG, JPEG, or WEBP.");
                       return;
                     }
 
-                    // Validate file size (max 5MB)
-                    const maxSize = 5 * 1024 * 1024; // 5MB
+                    const maxSize = 5 * 1024 * 1024;
                     if (file.size > maxSize) {
                       toast.error("File size exceeds 5MB limit.");
                       return;
@@ -556,11 +397,7 @@ export default function BusinessSetup() {
                 >
                   {logoPreview ? (
                     <>
-                      <img
-                        src={logoPreview}
-                        alt="Logo preview"
-                        className="w-full h-full object-contain"
-                      />
+                      <img src={logoPreview} alt="Logo preview" className="w-full h-full object-contain" />
                       <button
                         type="button"
                         onClick={(e) => {
@@ -587,7 +424,6 @@ export default function BusinessSetup() {
             </div>
           </div>
 
-          {/* Save Button Section */}
           <div className="px-4 py-4 border-t border-slate-100">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <p className="text-[11px] text-slate-500">
@@ -623,20 +459,5 @@ export default function BusinessSetup() {
         </div>
       </div>
     </div>
-  );
-}
-
-function ToggleSwitch({ initial = false }) {
-  const [enabled, setEnabled] = useState(initial);
-
-  return (
-    <button
-      type="button"
-      onClick={() => setEnabled((prev) => !prev)}
-      className={`inline-flex items-center w-10 h-5 rounded-full border transition-all ${enabled ? "bg-[#FF5200] border-[#FF5200] justify-end" : "bg-slate-200 border-slate-300 justify-start"
-        }`}
-    >
-      <span className="h-4 w-4 rounded-full bg-white shadow-sm" />
-    </button>
   );
 }

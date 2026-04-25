@@ -472,7 +472,7 @@ export default function Customers() {
 
       {/* User Details Modal - Enhanced UI */}
       <Dialog open={showUserDetails} onOpenChange={setShowUserDetails}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-0 border-none shadow-2xl rounded-2xl overflow-hidden bg-white">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto overflow-x-hidden p-0 border-none shadow-2xl rounded-2xl bg-white">
           <DialogHeader className="sr-only">
             <DialogTitle>User Detail Insights</DialogTitle>
             <DialogDescription>

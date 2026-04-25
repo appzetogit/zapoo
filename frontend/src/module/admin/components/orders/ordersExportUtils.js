@@ -1,4 +1,33 @@
 // Export utility functions for orders
+const getNumericOrderAmount = (order = {}) => {
+  const amountCandidates = [
+    order.totalAmount,
+    order.originalOrder?.pricing?.total,
+    order.originalOrder?.totalAmount,
+    order.originalOrder?.total,
+    order.total,
+  ]
+
+  for (const candidate of amountCandidates) {
+    if (typeof candidate === "number" && Number.isFinite(candidate)) {
+      return candidate
+    }
+
+    if (typeof candidate === "string") {
+      const parsedAmount = parseFloat(candidate.replace(/[^0-9.-]/g, ""))
+      if (Number.isFinite(parsedAmount)) {
+        return parsedAmount
+      }
+    }
+  }
+
+  return null
+}
+
+const formatOrderAmount = (order = {}) => {
+  const numericAmount = getNumericOrderAmount(order)
+  return numericAmount === null ? "N/A" : `Rs. ${numericAmount.toFixed(2)}`
+}
 export const exportToCSV = (orders, filename = "orders") => {
   // Detect order structure
   const firstOrder = orders[0]
@@ -30,7 +59,7 @@ export const exportToCSV = (orders, filename = "orders") => {
       order.customerName,
       order.customerPhone,
       order.restaurant,
-      order.total || `₹${(order.totalAmount || 0).toFixed(2)}`,
+      formatOrderAmount(order),
       order.paymentStatus || "",
       order.orderStatus || "",
       order.deliveryType || ""
@@ -99,7 +128,7 @@ export const exportToExcel = (orders, filename = "orders") => {
         order.deliveryBoyName || 'N/A',
         order.deliveryBoyNumber || 'N/A',
         order.status || 'N/A',
-        totalAmount > 0 ? `₹${totalAmount.toFixed(2)}` : 'N/A',
+        totalAmount > 0 ? `Rs. ${totalAmount.toFixed(2)}` : 'N/A',
         paymentStatus
       ]
     })
@@ -112,7 +141,7 @@ export const exportToExcel = (orders, filename = "orders") => {
       order.customerName || 'N/A',
       order.customerPhone || 'N/A',
       order.restaurant || 'N/A',
-      order.total || `₹${(order.totalAmount || 0).toFixed(2)}`,
+      formatOrderAmount(order),
       order.paymentStatus || 'N/A',
       order.orderStatus || 'N/A',
       order.deliveryType || 'N/A'
@@ -212,6 +241,12 @@ export const exportToPDF = async (orders, filename = "orders") => {
       unit: 'mm',
       format: 'a4'
     })
+    const pageWidth = doc.internal.pageSize.getWidth()
+    const pageHeight = doc.internal.pageSize.getHeight()
+
+    // Add subtle page background for better exported readability
+    doc.setFillColor(248, 250, 252)
+    doc.rect(0, 0, pageWidth, pageHeight, "F")
 
     // Add title
     doc.setFontSize(16)
@@ -266,7 +301,7 @@ export const exportToPDF = async (orders, filename = "orders") => {
           order.deliveryBoyName || 'N/A',
           order.deliveryBoyNumber || 'N/A',
           order.status || 'N/A',
-          totalAmount > 0 ? `₹${totalAmount.toFixed(2)}` : 'N/A',
+          totalAmount > 0 ? `Rs. ${totalAmount.toFixed(2)}` : 'N/A',
           paymentStatus
         ]
       })
@@ -279,7 +314,7 @@ export const exportToPDF = async (orders, filename = "orders") => {
         order.customerName || 'N/A',
         order.customerPhone || 'N/A',
         order.restaurant || 'N/A',
-        order.total || `₹${(order.totalAmount || 0).toFixed(2)}` || 'N/A',
+        formatOrderAmount(order),
         order.paymentStatus || 'N/A',
         order.orderStatus || 'N/A',
         order.deliveryType || 'N/A'
@@ -335,4 +370,5 @@ export const exportToJSON = (orders, filename = "orders") => {
   link.click()
   document.body.removeChild(link)
 }
+
 
