@@ -1,7 +1,7 @@
 import { ArrowLeft, AlertTriangle, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { fetchDeliveryWallet, calculateDeliveryBalances } from "../utils/deliveryWalletState";
+import { fetchDeliveryWallet, calculateDeliveryBalances, calculatePeriodEarnings } from "../utils/deliveryWalletState";
 import { formatCurrency } from "../../restaurant/utils/currency";
 import { deliveryAPI } from "@/lib/api";
 import { toast } from "sonner";
@@ -92,6 +92,9 @@ export default function PocketBalancePage() {
       ? Number(walletState.pocketBalance)
       : Number(walletState?.totalBalance ?? balances.totalBalance ?? 0)
   );
+  const weeklyEarnings = calculatePeriodEarnings(walletState, 'week');
+  const totalBonus = walletState?.transactions?.filter(t => t.type === 'bonus' && t.status === 'Completed').reduce((sum, t) => sum + (t.amount || 0), 0) || 0;
+  const totalWithdrawn = balances.totalWithdrawn || 0;
 
   // Calculate cash collected (cash in hand)
   const cashCollected = balances.cashInHand || 0;
