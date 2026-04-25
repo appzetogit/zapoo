@@ -430,6 +430,7 @@ export default function DeliveryHome() {
   const lastRiderPositionRef = useRef(null); // Last rider position for smooth animation
   const markerAnimationCancelRef = useRef(null); // Cancel function for marker animation
   const directionsResponseRef = useRef(null); // Store directions response for use in callbacks
+  const isRouteRestoreInProgressRef = useRef(false); // Guard route restore calls on app resume
   const fetchedOrderDetailsForDropRef = useRef(null); // Prevent re-fetching order details for Reached Drop customer coords
   const [zones, setZones] = useState([]); // Store nearby zones
   const [mapLoading, setMapLoading] = useState(false);
@@ -3258,31 +3259,31 @@ export default function DeliveryHome() {
     if (isAndroid) {
       // Android: Use google.navigation: scheme (opens directly in navigation mode)
       // Fallback to web URL if app not installed
-      mapsUrl = `google.navigation:q=${customerLat},${customerLng}&mode=b`;
+      mapsUrl = `google.navigation:q=${customerLat},${customerLng}&mode=d`;
 
       // Try to open Google Maps app first
       window.location.href = mapsUrl;
 
       // Fallback to web URL after a short delay (in case app is not installed)
       setTimeout(() => {
-        const webUrl = `https://www.google.com/maps/dir/?api=1&destination=${customerLat},${customerLng}&travelmode=bicycling`;
+        const webUrl = `https://www.google.com/maps/dir/?api=1&destination=${customerLat},${customerLng}&travelmode=driving`;
         window.open(webUrl, '_blank');
       }, 500);
     } else if (isIOS) {
       // iOS: Use comgooglemaps:// scheme (opens Google Maps app)
-      mapsUrl = `comgooglemaps://?daddr=${customerLat},${customerLng}&directionsmode=bicycling`;
+      mapsUrl = `comgooglemaps://?daddr=${customerLat},${customerLng}&directionsmode=driving`;
 
       // Try to open Google Maps app first
       window.location.href = mapsUrl;
 
       // Fallback to web URL after a short delay (in case app is not installed)
       setTimeout(() => {
-        const webUrl = `https://maps.google.com/?daddr=${customerLat},${customerLng}&directionsmode=bicycling`;
+        const webUrl = `https://maps.google.com/?daddr=${customerLat},${customerLng}&directionsmode=driving`;
         window.open(webUrl, '_blank');
       }, 500);
     } else {
       // Web/Desktop: Use web URL
-      mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${customerLat},${customerLng}&travelmode=bicycling`;
+      mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${customerLat},${customerLng}&travelmode=driving`;
       window.open(mapsUrl, '_blank');
     }
 
@@ -4415,6 +4416,8 @@ export default function DeliveryHome() {
       const existingMap = window.deliveryMapInstance;
       const existingBikeMarker = bikeMarkerRef.current;
       const existingPolyline = routePolylineRef.current;
+      const existingLiveTrackingPolyline = liveTrackingPolylineRef.current;
+      const existingLiveTrackingShadow = liveTrackingPolylineShadowRef.current;
       // Check if map is already attached to current container
       try {
         const mapDiv = existingMap.getDiv();
@@ -4430,7 +4433,9 @@ export default function DeliveryHome() {
           zoom: existingMap.getZoom(),
           bikeMarkerPosition: null,
           bikeMarkerHeading: null,
-          hasPolyline: !!existingPolyline
+          hasPolyline: !!existingPolyline,
+          hasLiveTrackingPolyline: !!existingLiveTrackingPolyline,
+          hasLiveTrackingShadow: !!existingLiveTrackingShadow
         };
 
         // Store bike marker state
@@ -4460,6 +4465,12 @@ export default function DeliveryHome() {
         }
         if (existingPolyline && typeof existingPolyline.setMap === 'function') {
           existingPolyline.setMap(null);
+        }
+        if (existingLiveTrackingPolyline && typeof existingLiveTrackingPolyline.setMap === 'function') {
+          existingLiveTrackingPolyline.setMap(null);
+        }
+        if (existingLiveTrackingShadow && typeof existingLiveTrackingShadow.setMap === 'function') {
+          existingLiveTrackingShadow.setMap(null);
         }
       } catch (error) {
         console.warn('⚠️ Error removing markers from old map:', error);
@@ -4787,6 +4798,14 @@ export default function DeliveryHome() {
             // Clear polyline if no active order
             routePolylineRef.current.setMap(null);
             routePolylineRef.current = null;
+          }
+
+          // Re-attach live tracking polylines for active order on new map instance
+          if (selectedRestaurant && preservedState.hasLiveTrackingPolyline && liveTrackingPolylineRef.current) {
+            liveTrackingPolylineRef.current.setMap(map);
+          }
+          if (selectedRestaurant && preservedState.hasLiveTrackingShadow && liveTrackingPolylineShadowRef.current) {
+            liveTrackingPolylineShadowRef.current.setMap(map);
           }
 
           // Clear live tracking polyline if no active order
@@ -6065,20 +6084,50 @@ export default function DeliveryHome() {
     }
     const currentDirectionsResponse = directionsResponseRef.current;
     const currentRiderLocation = riderLocation || lastLocationRef.current;
+    const currentPolylineMap = liveTrackingPolylineRef.current?.getMap?.();
 
     // If we have a directions response and rider location, but no polyline, create it
     if (currentDirectionsResponse && currentDirectionsResponse.routes && currentDirectionsResponse.routes.length > 0 && currentRiderLocation && currentRiderLocation.length === 2 && !liveTrackingPolylineRef.current) {
       updateLiveTrackingPolyline(currentDirectionsResponse, currentRiderLocation);
-    } else if (currentDirectionsResponse && currentRiderLocation && liveTrackingPolylineRef.current && liveTrackingPolylineRef.current.getMap() === null) {
-      // Polyline exists but not on map - reattach it
-
+    } else if (currentDirectionsResponse && currentRiderLocation && liveTrackingPolylineRef.current && currentPolylineMap !== window.deliveryMapInstance) {
+      // Polyline exists but points to old/null map - reattach it
       liveTrackingPolylineRef.current.setMap(window.deliveryMapInstance);
       // Also reattach shadow polyline if it exists
       if (liveTrackingPolylineShadowRef.current) {
         liveTrackingPolylineShadowRef.current.setMap(window.deliveryMapInstance);
       }
+    } else if (!currentDirectionsResponse && !liveTrackingPolylineRef.current && currentRiderLocation && currentRiderLocation.length === 2 && !isRouteRestoreInProgressRef.current) {
+      // App resumed/reloaded with active order but missing route; recover route once.
+      const orderStatus = selectedRestaurant?.orderStatus || selectedRestaurant?.status || '';
+      const deliveryPhase = selectedRestaurant?.deliveryPhase || selectedRestaurant?.deliveryState?.currentPhase || '';
+      const deliveryStateStatus = selectedRestaurant?.deliveryState?.status || '';
+      const shouldRouteToCustomer = Boolean(selectedRestaurant?.customerLat && selectedRestaurant?.customerLng) && (
+        orderStatus === 'out_for_delivery' ||
+        deliveryPhase === 'en_route_to_delivery' ||
+        deliveryPhase === 'at_delivery' ||
+        deliveryPhase === 'completed' ||
+        deliveryStateStatus === 'order_confirmed'
+      );
+      const destinationLat = shouldRouteToCustomer ? selectedRestaurant?.customerLat : selectedRestaurant?.lat;
+      const destinationLng = shouldRouteToCustomer ? selectedRestaurant?.customerLng : selectedRestaurant?.lng;
+
+      if (destinationLat && destinationLng) {
+        isRouteRestoreInProgressRef.current = true;
+        calculateRouteWithDirectionsAPI(currentRiderLocation, {
+          lat: destinationLat,
+          lng: destinationLng
+        }).then(result => {
+          if (result && result.routes && result.routes.length > 0) {
+            setDirectionsResponse(result);
+            directionsResponseRef.current = result;
+            updateLiveTrackingPolyline(result, currentRiderLocation);
+          }
+        }).finally(() => {
+          isRouteRestoreInProgressRef.current = false;
+        });
+      }
     }
-  }, [selectedRestaurant, riderLocation, updateLiveTrackingPolyline]);
+  }, [selectedRestaurant, riderLocation, updateLiveTrackingPolyline, calculateRouteWithDirectionsAPI]);
 
   // Clear any default/mock routes on mount if there's no active order
   useEffect(() => {
@@ -7897,31 +7946,31 @@ export default function DeliveryHome() {
         let mapsUrl = '';
         if (isAndroid) {
           // Android: Use google.navigation: scheme (opens directly in navigation mode)
-          mapsUrl = `google.navigation:q=${restaurantLat},${restaurantLng}&mode=b`;
+          mapsUrl = `google.navigation:q=${restaurantLat},${restaurantLng}&mode=d`;
 
           // Try to open Google Maps app first
           window.location.href = mapsUrl;
 
           // Fallback to web URL after a short delay (in case app is not installed)
           setTimeout(() => {
-            const webUrl = `https://www.google.com/maps/dir/?api=1&destination=${restaurantLat},${restaurantLng}&travelmode=bicycling`;
+            const webUrl = `https://www.google.com/maps/dir/?api=1&destination=${restaurantLat},${restaurantLng}&travelmode=driving`;
             window.open(webUrl, '_blank');
           }, 500);
         } else if (isIOS) {
           // iOS: Use comgooglemaps:// scheme (opens Google Maps app)
-          mapsUrl = `comgooglemaps://?daddr=${restaurantLat},${restaurantLng}&directionsmode=bicycling`;
+          mapsUrl = `comgooglemaps://?daddr=${restaurantLat},${restaurantLng}&directionsmode=driving`;
 
           // Try to open Google Maps app first
           window.location.href = mapsUrl;
 
           // Fallback to web URL after a short delay (in case app is not installed)
           setTimeout(() => {
-            const webUrl = `https://maps.google.com/?daddr=${restaurantLat},${restaurantLng}&directionsmode=bicycling`;
+            const webUrl = `https://maps.google.com/?daddr=${restaurantLat},${restaurantLng}&directionsmode=driving`;
             window.open(webUrl, '_blank');
           }, 500);
         } else {
           // Web/Desktop: Use web URL with navigation
-          mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${restaurantLat},${restaurantLng}&travelmode=bicycling`;
+          mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${restaurantLat},${restaurantLng}&travelmode=driving`;
           window.open(mapsUrl, '_blank');
         }
 
@@ -8182,7 +8231,7 @@ export default function DeliveryHome() {
       </button>
 
       <p className="text-center text-xs text-gray-500 mt-3">
-        Opens Google Maps in Bike Mode 🏍️
+        Opens Google Maps in Driving Mode
       </p>
     </motion.div>
   </div>
