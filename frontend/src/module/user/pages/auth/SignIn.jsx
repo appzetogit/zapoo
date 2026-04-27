@@ -5,19 +5,12 @@ import AnimatedPage from "../../components/AnimatedPage";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { authAPI } from "@/lib/api";
 import { firebaseAuth, googleProvider, ensureFirebaseInitialized } from "@/lib/firebase";
 import { setAuthData } from "@/lib/utils/auth";
 import loginBanner from "@/assets/loginbanner.png";
 import { useTranslation } from "react-i18next";
 
-// Common country codes
-const countryCodes = [{
-  code: "+91",
-  country: "IN",
-  flag: "🇮🇳"
-}];
 export default function SignIn() {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -301,9 +294,6 @@ export default function SignIn() {
     };
   }, [navigate, searchParams]);
 
-  // Get selected country details dynamically
-  const selectedCountry = countryCodes.find(c => c.code === formData.countryCode) || countryCodes[0]; // Default to India (+91)
-
   const validateEmail = email => {
     if (!email.trim()) {
       return t("user.auth.signIn.validation.emailRequired");
@@ -319,14 +309,8 @@ export default function SignIn() {
       return t("user.auth.signIn.validation.phoneRequired");
     }
     const cleanPhone = phone.replace(/\D/g, "");
-    const isIndia = formData.countryCode === "+91";
-
-    if (isIndia && cleanPhone.length !== 10) {
+    if (cleanPhone.length !== 10) {
       return t("user.auth.signIn.validation.phone10Digits");
-    }
-
-    if (!isIndia && (cleanPhone.length < 7 || cleanPhone.length > 15)) {
-      return t("user.auth.signIn.validation.phoneRange");
     }
     return "";
   };
@@ -356,8 +340,8 @@ const sanitizeNameInput = (value) => value.replace(/[^a-zA-Z\s]/g, "")
     if (name === "phone") {
       // Allow only digits
       const cleaned = value.replace(/\D/g, "");
-      // Limit based on country code (91 for India is 10 digits)
-      const maxLength = formData.countryCode === "+91" ? 10 : 15;
+      // India-only flow: 10 digits max
+      const maxLength = 10;
       const restrictedValue = cleaned.slice(0, maxLength);
 
       setFormData({
@@ -392,12 +376,6 @@ const sanitizeNameInput = (value) => value.replace(/[^a-zA-Z\s]/g, "")
 
   // Backwards-compatible alias for existing JSX handlers
   const handleChange = handleInputChange;
-  const handleCountryCodeChange = value => {
-    setFormData({
-      ...formData,
-      countryCode: value
-    });
-  };
   const handleSubmit = async e => {
     e.preventDefault();
     setIsLoading(true);
@@ -654,24 +632,9 @@ const sanitizeNameInput = (value) => value.replace(/[^a-zA-Z\s]/g, "")
           {/* Phone Number Input */}
           {authMethod === "phone" && <div className="space-y-2">
             <div className="flex gap-2 items-stretch">
-              <Select value={formData.countryCode} onValueChange={handleCountryCodeChange}>
-                <SelectTrigger className="w-[100px] md:w-[120px] !h-12 md:!h-14 border-gray-300 dark:border-gray-700 bg-white dark:bg-[#1a1a1a] text-black dark:text-white rounded-lg flex items-center transition-colors" size="default" aria-label={t("user.auth.signIn.selectCountryCode")}>
-                  <SelectValue>
-                    <span className="flex items-center gap-2 text-sm md:text-base">
-                      <span>{selectedCountry.flag}</span>
-                      <span>{selectedCountry.code}</span>
-                    </span>
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent className="max-h-[300px] overflow-y-auto">
-                  {countryCodes.map(country => <SelectItem key={country.code} value={country.code}>
-                    <span className="flex items-center gap-2">
-                      <span>{country.flag}</span>
-                      <span>{country.code}</span>
-                    </span>
-                  </SelectItem>)}
-                </SelectContent>
-              </Select>
+              <div className="w-[100px] md:w-[120px] !h-12 md:!h-14 border border-gray-300 dark:border-gray-700 bg-white dark:bg-[#1a1a1a] text-black dark:text-white rounded-lg flex items-center justify-center text-sm md:text-base font-medium">
+                +91
+              </div>
               <Input id="phone" name="phone" type="tel" placeholder={t("user.auth.signIn.placeholders.phoneNumber")} value={formData.phone} onChange={handleChange} className={`flex-1 h-12 md:h-14 text-base md:text-lg bg-white dark:bg-[#1a1a1a] text-black dark:text-white border-gray-300 dark:border-gray-700 rounded-lg ${errors.phone ? "border-red-500" : ""} transition-colors`} aria-invalid={errors.phone ? "true" : "false"} />
             </div>
             {errors.phone && <div className="flex items-center gap-1 text-xs text-red-600">
@@ -770,3 +733,4 @@ const sanitizeNameInput = (value) => value.replace(/[^a-zA-Z\s]/g, "")
     </div>
   </AnimatedPage>;
 }
+

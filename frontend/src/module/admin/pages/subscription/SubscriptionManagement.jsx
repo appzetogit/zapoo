@@ -214,7 +214,13 @@ export default function SubscriptionManagement() {
                     {/* Action Bar */}
                     <div className="flex items-center justify-between">
                         <h2 className="text-lg font-semibold text-neutral-900">Available Plans</h2>
-
+                        <Button
+                            onClick={openNewDialog}
+                            className="bg-orange-600 hover:bg-orange-700 text-white"
+                        >
+                            <Plus className="w-4 h-4 mr-2" />
+                            Create Plan
+                        </Button>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

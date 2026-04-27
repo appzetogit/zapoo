@@ -431,7 +431,11 @@ export const claimTrial = async (req, res) => {
       });
     }
 
-    const growthPlan = await SubscriptionPlan.findOne({ name: "GROWTH", isActive: true });
+    // Keep trial logic stable even if admin creates plan name as "Growth"/"growth"/"GROWTH"
+    const growthPlan = await SubscriptionPlan.findOne({
+      isActive: true,
+      name: { $regex: /^growth$/i },
+    });
     if (!growthPlan) {
       return res.status(404).json({
         success: false,
