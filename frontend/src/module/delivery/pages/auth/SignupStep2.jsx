@@ -4,6 +4,7 @@ import { ArrowLeft, Upload, X, Check, Camera } from "lucide-react"
 import { deliveryAPI } from "@/lib/api"
 import apiClient from "@/lib/api/axios"
 import { toast } from "sonner"
+import { setDeliverySignupPendingStep } from "@/lib/utils/auth"
 
 const SIGNUP_STEP1_DRAFT_KEY = "delivery_signup_step1_draft";
 const SIGNUP_STEP2_DRAFT_KEY = "delivery_signup_step2_uploaded_docs_draft";
@@ -196,6 +197,7 @@ export default function SignupStep2() {
       })
 
       if (response?.data?.success) {
+        setDeliverySignupPendingStep(null);
         try {
           localStorage.removeItem(SIGNUP_STEP1_DRAFT_KEY);
           localStorage.removeItem(SIGNUP_STEP2_DRAFT_KEY);

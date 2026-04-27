@@ -5,7 +5,7 @@ import AnimatedPage from "../../../user/components/AnimatedPage";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { deliveryAPI } from "@/lib/api";
-import { setAuthData as storeAuthData } from "@/lib/utils/auth";
+import { setAuthData as storeAuthData, setDeliverySignupPendingStep } from "@/lib/utils/auth";
 export default function DeliveryOTP() {
   const navigate = useNavigate();
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
@@ -191,6 +191,8 @@ export default function DeliveryOTP() {
 
       // Check if user needs to complete signup
       if (data.needsSignup) {
+        const signupStep = data.signupStep === "documents" ? "documents" : "details";
+
         // Store tokens for authenticated signup flow
         const accessToken = data.accessToken;
         const user = data.user;
@@ -201,6 +203,8 @@ export default function DeliveryOTP() {
         // Store auth data using utility function
         try {
           storeAuthData("delivery", accessToken, user);
+          localStorage.setItem("delivery_authenticated", "false");
+          setDeliverySignupPendingStep(signupStep);
         } catch (storageError) {
           console.error("Failed to store authentication data:", storageError);
           setError("Failed to save authentication. Please try again or clear your browser storage.");
@@ -213,9 +217,12 @@ export default function DeliveryOTP() {
 
         // Redirect to signup step 1 after token is stored
         setTimeout(() => {
-          navigate("/delivery/signup/details", {
-            replace: true
-          });
+          navigate(
+            signupStep === "documents" ? "/delivery/signup/documents" : "/delivery/signup/details",
+            {
+              replace: true
+            }
+          );
         }, 200);
         setIsLoading(false);
         return;
@@ -227,6 +234,8 @@ export default function DeliveryOTP() {
       if (!accessToken || !user) {
         throw new Error("Invalid response from server");
       }
+
+      setDeliverySignupPendingStep(null);
 
       // Clear auth data from sessionStorage
       sessionStorage.removeItem("deliveryAuthData");
@@ -309,6 +318,8 @@ export default function DeliveryOTP() {
       if (!accessToken || !user) {
         throw new Error("Invalid response from server");
       }
+
+      setDeliverySignupPendingStep(null);
 
       // Clear auth data from sessionStorage
       sessionStorage.removeItem("deliveryAuthData");

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom"
 import { ArrowLeft } from "lucide-react"
 import { deliveryAPI } from "@/lib/api"
 import { toast } from "sonner"
+import { setDeliverySignupPendingStep } from "@/lib/utils/auth"
 
 const SIGNUP_STEP1_DRAFT_KEY = "delivery_signup_step1_draft";
 const INDIAN_VEHICLE_NUMBER_REGEX = /^[A-Z]{2}\d{1,2}[A-Z]{1,3}\d{4}$/;
@@ -172,6 +173,7 @@ export default function SignupStep1() {
       })
 
       if (response?.data?.success) {
+        setDeliverySignupPendingStep("documents");
         toast.success("Details saved successfully")
         navigate("/delivery/signup/documents")
       }

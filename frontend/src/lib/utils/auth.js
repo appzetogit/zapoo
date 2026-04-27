@@ -1,5 +1,7 @@
 import { invalidateCachedResource } from "../api/requestCache.js";
 
+const DELIVERY_SIGNUP_PENDING_STEP_KEY = "delivery_signup_pending_step";
+
 /**
  * JWT Token Utilities
  * Decode and extract information from JWT tokens
@@ -138,12 +140,54 @@ export function clearModuleAuth(module) {
   localStorage.removeItem(`${module}_accessToken`);
   localStorage.removeItem(`${module}_authenticated`);
   localStorage.removeItem(`${module}_user`);
+  if (module === "delivery") {
+    localStorage.removeItem(DELIVERY_SIGNUP_PENDING_STEP_KEY);
+  }
   // Also clear any sessionStorage data
   sessionStorage.removeItem(`${module}AuthData`);
   if (module === "user") {
     invalidateCachedResource("auth:current-user");
     invalidateCachedResource("user:addresses");
   }
+}
+
+export function getDeliverySignupStepFromUser(user) {
+  if (!user || typeof user !== "object") return null;
+
+  const hasBasicDetails = Boolean(
+    user?.name?.trim?.() &&
+    user?.location?.addressLine1?.trim?.() &&
+    user?.location?.city?.trim?.() &&
+    user?.location?.state?.trim?.() &&
+    user?.vehicle?.type &&
+    user?.vehicle?.number?.trim?.() &&
+    user?.documents?.pan?.number?.trim?.() &&
+    user?.documents?.aadhar?.number?.trim?.()
+  );
+
+  if (!hasBasicDetails) return "details";
+
+  const hasAllDocuments = Boolean(
+    user?.profileImage?.url &&
+    user?.documents?.aadhar?.document &&
+    user?.documents?.pan?.document &&
+    user?.documents?.drivingLicense?.document
+  );
+
+  return hasAllDocuments ? null : "documents";
+}
+
+export function setDeliverySignupPendingStep(step) {
+  if (step === "details" || step === "documents") {
+    localStorage.setItem(DELIVERY_SIGNUP_PENDING_STEP_KEY, step);
+    return;
+  }
+  localStorage.removeItem(DELIVERY_SIGNUP_PENDING_STEP_KEY);
+}
+
+export function getDeliverySignupPendingStep() {
+  const step = localStorage.getItem(DELIVERY_SIGNUP_PENDING_STEP_KEY);
+  return step === "details" || step === "documents" ? step : null;
 }
 
 /**

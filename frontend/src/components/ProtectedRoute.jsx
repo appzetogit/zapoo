@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { Loader2 } from "lucide-react";
-import { isModuleAuthenticated } from "@/lib/utils/auth";
+import {
+  isModuleAuthenticated,
+  getDeliverySignupPendingStep,
+  setDeliverySignupPendingStep,
+  getDeliverySignupStepFromUser,
+} from "@/lib/utils/auth";
 import { restaurantAPI } from "@/lib/api";
 import FeatureLockedScreen from "@/module/restaurant/components/FeatureLockedScreen";
 import NoPlanPopup from "@/module/restaurant/components/NoPlanPopup";
@@ -142,6 +147,31 @@ export default function ProtectedRoute({ children, requiredRole, loginPath }) {
 
     const redirectPath = roleLoginPaths[requiredRole] || "/";
     return <Navigate to={redirectPath} replace />;
+  }
+
+  if (requiredRole === "delivery") {
+    let pendingStep = getDeliverySignupPendingStep();
+    if (!pendingStep) {
+      try {
+        const rawDeliveryUser = localStorage.getItem("delivery_user");
+        const parsedDeliveryUser = rawDeliveryUser ? JSON.parse(rawDeliveryUser) : null;
+        const derivedStep = getDeliverySignupStepFromUser(parsedDeliveryUser);
+        if (derivedStep) {
+          setDeliverySignupPendingStep(derivedStep);
+          pendingStep = derivedStep;
+        }
+      } catch {
+        pendingStep = null;
+      }
+    }
+
+    if (pendingStep) {
+      const targetPath =
+        pendingStep === "documents" ? "/delivery/signup/documents" : "/delivery/signup/details";
+      if (location.pathname !== targetPath) {
+        return <Navigate to={targetPath} replace />;
+      }
+    }
   }
 
   if (requiredRole === "restaurant" && subscriptionLoading) {

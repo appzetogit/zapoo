@@ -13,6 +13,36 @@ const logger = winston.createLogger({
   })]
 });
 
+const getSignupStatus = delivery => {
+  const hasBasicDetails = Boolean(
+    delivery?.name?.trim() &&
+    delivery?.location?.addressLine1?.trim() &&
+    delivery?.location?.city?.trim() &&
+    delivery?.location?.state?.trim() &&
+    delivery?.vehicle?.type &&
+    delivery?.vehicle?.number?.trim() &&
+    delivery?.documents?.pan?.number?.trim() &&
+    delivery?.documents?.aadhar?.number?.trim()
+  );
+
+  if (!hasBasicDetails) {
+    return { needsSignup: true, signupStep: 'details' };
+  }
+
+  const hasAllDocuments = Boolean(
+    delivery?.profileImage?.url &&
+    delivery?.documents?.aadhar?.document &&
+    delivery?.documents?.pan?.document &&
+    delivery?.documents?.drivingLicense?.document
+  );
+
+  if (!hasAllDocuments) {
+    return { needsSignup: true, signupStep: 'documents' };
+  }
+
+  return { needsSignup: false, signupStep: null };
+};
+
 /**
  * Send OTP for delivery boy phone number
  * POST /api/delivery/auth/send-otp
@@ -152,42 +182,43 @@ export const verifyOTP = asyncHandler(async (req, res) => {
         }
       }
 
-      // Check if signup needs to be completed (missing required fields)
-      const needsSignup = !delivery.location?.city || !delivery.vehicle?.number || !delivery.documents?.pan?.number || !delivery.documents?.aadhar?.number || !delivery.documents?.aadhar?.document || !delivery.documents?.pan?.document || !delivery.documents?.drivingLicense?.document;
-      if (needsSignup) {
-        // Generate tokens for signup flow
-        const tokens = jwtService.generateTokens({
-          userId: delivery._id.toString(),
-          role: 'delivery',
-          email: delivery.email || delivery.phone || delivery.deliveryId
-        });
+    }
 
-        // Store refresh token
-        delivery.refreshToken = tokens.refreshToken;
-        await delivery.save();
+    const signupStatus = getSignupStatus(delivery);
+    if (signupStatus.needsSignup) {
+      // Generate tokens for signup flow
+      const tokens = jwtService.generateTokens({
+        userId: delivery._id.toString(),
+        role: 'delivery',
+        email: delivery.email || delivery.phone || delivery.deliveryId
+      });
 
-        // Set refresh token in httpOnly cookie
-        res.cookie('refreshToken', tokens.refreshToken, {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'strict',
-          maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
-        });
-        return successResponse(res, 200, 'OTP verified. Please complete your profile.', {
-          accessToken: tokens.accessToken,
-          refreshToken: tokens.refreshToken,
-          user: {
-            id: delivery._id,
-            name: delivery.name,
-            phone: delivery.phone,
-            email: delivery.email,
-            deliveryId: delivery.deliveryId,
-            status: delivery.status,
-            rejectionReason: delivery.rejectionReason || null // Include rejection reason for blocked accounts
-          },
-          needsSignup: true // Signal that signup needs to be completed
-        });
-      }
+      // Store refresh token
+      delivery.refreshToken = tokens.refreshToken;
+      await delivery.save();
+
+      // Set refresh token in httpOnly cookie
+      res.cookie('refreshToken', tokens.refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+      });
+      return successResponse(res, 200, 'OTP verified. Please complete your profile.', {
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+        user: {
+          id: delivery._id,
+          name: delivery.name,
+          phone: delivery.phone,
+          email: delivery.email,
+          deliveryId: delivery.deliveryId,
+          status: delivery.status,
+          rejectionReason: delivery.rejectionReason || null // Include rejection reason for blocked accounts
+        },
+        needsSignup: true,
+        signupStep: signupStatus.signupStep
+      });
     }
 
     // Check if delivery boy is active (blocked/pending status partners can still login to see rejection reason or verification message)
