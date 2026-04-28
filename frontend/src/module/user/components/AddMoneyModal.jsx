@@ -165,8 +165,8 @@ export default function AddMoneyModal({
     }
   };
   return <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
+      <DialogContent className="w-[calc(100%-1rem)] max-w-md rounded-xl p-4 sm:p-6">
+        <DialogHeader className="space-y-1.5 pr-8">
           <DialogTitle className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">
             Add Money to Wallet
           </DialogTitle>
@@ -175,7 +175,7 @@ export default function AddMoneyModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6 py-4">
+        <div className="space-y-4 sm:space-y-6 pt-3 sm:pt-4">
           {/* Amount Input */}
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -185,7 +185,7 @@ export default function AddMoneyModal({
               <div className="absolute left-3 top-1/2 -translate-y-1/2">
                 <IndianRupee className="h-5 w-5 text-gray-400" />
               </div>
-              <Input type="text" value={amount} onChange={handleAmountChange} placeholder="Enter amount" className="pl-10 h-12 text-lg" disabled={loading || processing} />
+              <Input type="text" value={amount} onChange={handleAmountChange} placeholder="Enter amount" className="h-11 pl-10 text-base sm:h-12 sm:text-lg" disabled={loading || processing} />
             </div>
             <p className="text-xs text-gray-500 dark:text-gray-400">
               Minimum: ₹1 | Maximum: ₹50,000
@@ -198,14 +198,14 @@ export default function AddMoneyModal({
               Quick Select
             </label>
             <div className="grid grid-cols-3 gap-2">
-              {quickAmounts.map(quickAmount => <Button key={quickAmount} type="button" variant={amount === quickAmount.toString() ? "default" : "outline"} className="h-10" onClick={() => handleAmountSelect(quickAmount)} disabled={loading || processing}>
+              {quickAmounts.map(quickAmount => <Button key={quickAmount} type="button" variant={amount === quickAmount.toString() ? "default" : "outline"} className="h-10 px-2 text-sm" onClick={() => handleAmountSelect(quickAmount)} disabled={loading || processing}>
                   ₹{quickAmount}
                 </Button>)}
             </div>
           </div>
 
           {/* Add Money Button */}
-          <Button onClick={handleAddMoney} disabled={!amount || loading || processing || parseFloat(amount) < 1} className="w-full h-12 bg-green-600 hover:bg-green-700 text-white font-semibold text-base">
+          <Button onClick={handleAddMoney} disabled={!amount || loading || processing || parseFloat(amount) < 1} className="w-full h-11 sm:h-12 bg-green-600 hover:bg-green-700 text-white font-semibold text-base">
             {loading || processing ? <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 {loading ? "Processing..." : "Opening Payment Gateway..."}

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -87,6 +87,20 @@ const clearOnboardingFromLocalStorage = () => {
   } catch (error) {
     console.error("Failed to clear onboarding data from localStorage:", error);
   }
+};
+
+const hasMeaningfulOnboardingDraft = data => {
+  if (!data) return false;
+  const serialized = JSON.stringify({
+    step1: data.step1 || {},
+    step2: data.step2 || {},
+    step3: data.step3 || {}
+  });
+  return serialized !== JSON.stringify({
+    step1: {},
+    step2: {},
+    step3: {}
+  });
 };
 
 // Helper function to convert "HH:mm" string to Date object
@@ -307,6 +321,7 @@ export default function RestaurantOnboarding() {
     accountHolderName: "",
     accountType: ""
   });
+  const hasLocalDraftRef = useRef(false);
 
   const normalizeStep = (value) => {
     const n = Number(value);
@@ -533,6 +548,7 @@ export default function RestaurantOnboarding() {
     }
     const localData = loadOnboardingFromLocalStorage();
     if (localData) {
+      hasLocalDraftRef.current = hasMeaningfulOnboardingDraft(localData);
       if (localData.step1) {
         setStep1({
           restaurantName: localData.step1.restaurantName || "",
@@ -618,6 +634,11 @@ export default function RestaurantOnboarding() {
         const payload = res?.data?.data || {};
         const data = payload?.onboarding;
         const baseRestaurantName = payload?.restaurantName || "";
+
+        // If user has a local draft (typed but not submitted yet), don't overwrite it from API on refresh.
+        if (hasLocalDraftRef.current) {
+          return;
+        }
 
         if (data) {
           if (data.step1) {

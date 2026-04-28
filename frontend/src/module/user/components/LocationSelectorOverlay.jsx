@@ -93,7 +93,8 @@ export default function LocationSelectorOverlay({
     zipCode: "",
     additionalDetails: "",
     label: "Home",
-    phone: ""
+    phone: "",
+    receiverName: ""
   });
   const [loadingAddress, setLoadingAddress] = useState(false);
   const [mapLoading, setMapLoading] = useState(false);
@@ -238,7 +239,8 @@ export default function LocationSelectorOverlay({
         setAddressFormData(prev => ({
           ...prev,
           label: initialLabel,
-          phone: userProfile?.phone || ""
+          phone: userProfile?.phone || "",
+          receiverName: userProfile?.name || ""
         }));
       }
     }
@@ -1013,7 +1015,8 @@ export default function LocationSelectorOverlay({
         city: location.city || "",
         state: location.state || "",
         street: location.address || location.area || "",
-        phone: userProfile?.phone || ""
+        phone: userProfile?.phone || "",
+        receiverName: userProfile?.name || ""
       }));
     }
   };
@@ -2036,6 +2039,8 @@ export default function LocationSelectorOverlay({
         city: trimmedCity,
         state: trimmedState,
         zipCode: (addressFormData.zipCode || "").trim(),
+        receiverName: (addressFormData.receiverName || "").trim() || userProfile?.name || "",
+        phone: (addressFormData.phone || "").trim() || userProfile?.phone || "",
         latitude: mapPosition[0],
         // latitude from mapPosition[0]
         longitude: mapPosition[1] // longitude from mapPosition[1]
@@ -2090,7 +2095,8 @@ export default function LocationSelectorOverlay({
         zipCode: "",
         additionalDetails: "",
         label: "Home",
-        phone: ""
+        phone: "",
+        receiverName: ""
       });
       setShowAddressForm(false);
       setLoadingAddress(false);
@@ -2136,7 +2142,8 @@ export default function LocationSelectorOverlay({
       zipCode: "",
       additionalDetails: "",
       label: "Home",
-      phone: ""
+      phone: "",
+      receiverName: ""
     });
     navigate("/");
   };
@@ -2190,7 +2197,8 @@ export default function LocationSelectorOverlay({
         zipCode: address.zipCode || "",
         additionalDetails: address.additionalDetails || "",
         label: address.label || "Home",
-        phone: address.phone || ""
+        phone: address.phone || "",
+        receiverName: address.receiverName || userProfile?.name || ""
       });
 
       // Update Google Maps to show selected address
@@ -2256,7 +2264,8 @@ export default function LocationSelectorOverlay({
       city: address.city || "",
       state: address.state || "",
       zipCode: address.zipCode || "",
-      phone: address.phone || userProfile?.phone || ""
+      phone: address.phone || userProfile?.phone || "",
+      receiverName: address.receiverName || userProfile?.name || ""
     });
     setShowAddressForm(true);
 
@@ -2409,13 +2418,16 @@ export default function LocationSelectorOverlay({
               <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 block">
                 Receiver details for this address
               </Label>
-              <div className="bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-700 rounded-lg p-3 flex items-center gap-3">
+              <div className="bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-700 rounded-lg p-3 space-y-3">
                 <Phone className="h-5 w-5 text-gray-600 dark:text-gray-400 shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 dark:text-white">
-                    {userProfile?.name || "User"}, {addressFormData.phone || userProfile?.phone || "Add phone"}
-                  </p>
-                </div>
+                <Input name="receiverName" placeholder="Receiver name" value={addressFormData.receiverName || ""} onChange={handleAddressFormChange} className="bg-white dark:bg-[#1a1a1a] border-gray-200 dark:border-gray-700" />
+                <Input name="phone" type="tel" inputMode="numeric" maxLength={15} placeholder="Receiver phone number" value={addressFormData.phone || ""} onChange={e => {
+                const onlyDigits = e.target.value.replace(/\D/g, "");
+                setAddressFormData({
+                  ...addressFormData,
+                  phone: onlyDigits
+                });
+              }} className="bg-white dark:bg-[#1a1a1a] border-gray-200 dark:border-gray-700" />
               </div>
             </div>
 
@@ -2563,6 +2575,9 @@ export default function LocationSelectorOverlay({
                               </div>
                               <p className="text-sm text-gray-500 dark:text-gray-400">
                                 {[address.additionalDetails, address.street, address.city, address.state, address.zipCode].filter(Boolean).join(", ")}
+                              </p>
+                              <p className="text-sm text-gray-500 dark:text-gray-400">
+                                Receiver: {address.receiverName || userProfile?.name || "Not provided"}
                               </p>
                               <p className="text-sm text-gray-500 dark:text-gray-400">
                                 Phone number: {address.phone || userProfile?.phone || "Not provided"}

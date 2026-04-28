@@ -493,6 +493,8 @@ export const addUserAddress = asyncHandler(async (req, res) => {
   try {
     const {
       label,
+      receiverName,
+      phone,
       street,
       additionalDetails,
       city,
@@ -513,6 +515,8 @@ export const addUserAddress = asyncHandler(async (req, res) => {
     // Prepare address object
     const newAddress = {
       label: label || 'Other',
+      receiverName: receiverName || '',
+      phone: phone || '',
       street,
       additionalDetails: additionalDetails || '',
       city,
@@ -593,6 +597,8 @@ export const updateUserAddress = asyncHandler(async (req, res) => {
     } = req.params;
     const {
       label,
+      receiverName,
+      phone,
       street,
       additionalDetails,
       city,
@@ -613,6 +619,8 @@ export const updateUserAddress = asyncHandler(async (req, res) => {
 
     // Update address fields
     if (label !== undefined) address.label = label;
+    if (receiverName !== undefined) address.receiverName = receiverName;
+    if (phone !== undefined) address.phone = phone;
     if (street !== undefined) address.street = street;
     if (additionalDetails !== undefined) address.additionalDetails = additionalDetails;
     if (city !== undefined) address.city = city;
