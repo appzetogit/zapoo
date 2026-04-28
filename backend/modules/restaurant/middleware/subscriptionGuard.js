@@ -1,4 +1,5 @@
 import { errorResponse } from '../../../shared/utils/response.js';
+import { splitFeatureKeysByValidity, normalizeFeatureKey } from '../../subscription/constants/featureCatalog.js';
 
 /**
  * Middleware to check if restaurant has access to a specific feature
@@ -25,15 +26,30 @@ export const checkFeatureAccess = (feature) => {
       return errorResponse(res, 403, 'An active subscription is required to access this feature.');
     }
 
-    // If subscription is active, check features
-    // In our model, features are stored as an array of strings
-    // Some flows (e.g., admin extend) may not persist a snapshot to subscription.features.
-    // Fall back to the populated plan's features when snapshot is missing/empty.
-    const snapshotFeatures = Array.isArray(subscription.features) ? subscription.features : [];
-    const planFeatures = Array.isArray(subscription.planId?.features) ? subscription.planId.features : [];
-    const effectiveFeatures = snapshotFeatures.length > 0 ? snapshotFeatures : planFeatures;
+    // If subscription is active, check features.
+    // Use a merged set from both subscription snapshot + current plan features.
+    // This handles stale/incomplete snapshots while preserving valid legacy values.
+    const readFeatureKeys = (source) => {
+      if (!Array.isArray(source)) return [];
+      return source.map((item) => {
+        if (typeof item === "string") return item;
+        if (item && typeof item === "object") {
+          return item.key || item.feature || item.name || "";
+        }
+        return "";
+      }).filter(Boolean);
+    };
 
-    if (Array.isArray(effectiveFeatures) && effectiveFeatures.includes(feature)) {
+    const snapshotFeatures = splitFeatureKeysByValidity(
+      readFeatureKeys(subscription.features)
+    ).valid;
+    const planFeatures = splitFeatureKeysByValidity(
+      readFeatureKeys(subscription.planId?.features)
+    ).valid;
+    const effectiveFeatures = [...new Set([...snapshotFeatures, ...planFeatures])];
+    const requiredFeature = normalizeFeatureKey(feature);
+
+    if (effectiveFeatures.includes(requiredFeature)) {
       return next();
     }
 

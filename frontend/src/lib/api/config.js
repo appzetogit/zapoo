@@ -456,6 +456,7 @@ export const API_ENDPOINTS = {
     ADMIN_CREATE_PLAN: "/admin/subscriptions/create-plan",
     ADMIN_UPDATE_PRICE: "/admin/subscriptions/update-price",
     ADMIN_TOGGLE_PLAN: "/admin/subscriptions/toggle-plan",
+    ADMIN_FEATURE_CATALOG: "/admin/subscriptions/features/catalog",
     ADMIN_RESTAURANTS: "/admin/subscriptions/restaurants",
     ADMIN_HISTORY: "/admin/subscriptions/history"
   },

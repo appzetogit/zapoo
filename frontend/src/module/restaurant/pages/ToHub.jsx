@@ -21,9 +21,23 @@ export default function ToHub() {
   const [loadingRestaurant, setLoadingRestaurant] = useState(true);
   const [graphFilter, setGraphFilter] = useState("daily"); // daily, weekly, monthly, yearly
   const subscription = restaurantData?.subscription;
-  const planName = String(subscription?.planId?.name || "").toUpperCase();
-  const featureList = subscription?.features || subscription?.planId?.features || [];
-  const hasAdvancedAnalytics = planName === "GROWTH" || featureList.includes("advanced_analytics");
+  const readFeatureKeys = useCallback((source) => {
+    if (!Array.isArray(source)) return [];
+    return source.map((item) => {
+      if (typeof item === "string") return item;
+      if (item && typeof item === "object") {
+        return item.key || item.feature || item.name || "";
+      }
+      return "";
+    }).filter(Boolean);
+  }, []);
+  const featureList = useMemo(() => {
+    const snapshot = readFeatureKeys(subscription?.features);
+    const plan = readFeatureKeys(subscription?.planId?.features);
+    return [...new Set([...snapshot, ...plan].map((f) => String(f).trim().toLowerCase()))];
+  }, [readFeatureKeys, subscription?.features, subscription?.planId?.features]);
+  const hasAdvancedAnalytics = featureList.includes("advanced_analytics");
+  const hasAdvancedMarketingTools = featureList.includes("advanced_marketing_tools");
   const topTabs = useMemo(() => {
     return [{
       id: "my-feed",
@@ -325,28 +339,30 @@ export default function ToHub() {
     isSwiping.current = false;
   };
   const quickLinks = useMemo(() => {
-    const links = [{
-      id: "promoted-banners",
-      label: "Promoted Banners",
-      icon: Megaphone,
-      route: "/restaurant/advertisements"
-    }];
+    const links = [];
 
-    // Add Relationship Manager if restaurant has subscription with RM access
-    const isPremium = restaurantData?.subscription?.planId?.isPremium;
-    const planFeatures = restaurantData?.subscription?.features || restaurantData?.subscription?.planId?.features || [];
-    const hasRM = planFeatures.includes("relationship_manager") || planFeatures.some(f => String(f).toLowerCase().includes('relationship manager'));
+    if (hasAdvancedMarketingTools) {
+      links.push({
+        id: "promoted-banners",
+        label: "Promoted Banners",
+        icon: Megaphone,
+        route: "/restaurant/advertisements"
+      });
+    }
+
+    // Add Relationship Manager only if effective enabled features include RM access
+    const hasRM = featureList.includes("relationship_manager");
     const rmDetails = restaurantData?.relationshipManager;
     const resolvedRMPhone = String(rmDetails?.phone || restaurantData?.rmFallbackPhone || "").trim();
 
-    if (hasRM || isPremium || rmDetails) {
+    if (hasRM) {
       links.push({
         id: "relationship-manager",
         label: "Your RM",
         icon: Users,
         route: resolvedRMPhone ? `tel:${resolvedRMPhone}` : "",
         isPhone: true,
-        subLabel: rmDetails?.name || "Premium assigned"
+        subLabel: rmDetails?.name || "RM assigned"
       });
     }
 
@@ -373,7 +389,7 @@ export default function ToHub() {
     }]);
 
     return links;
-  }, [restaurantData]);
+  }, [hasAdvancedMarketingTools, restaurantData, featureList]);
   const [chartData, setChartData] = useState([{
     hour: "12am",
     orders: 0,
@@ -2518,20 +2534,22 @@ export default function ToHub() {
                 </SubscriptionFeatureOverlay>
               </div> : activeTopTab === "growth" ? <div className="p-4 bg-gray-100 min-h-screen">
               <div className="space-y-4">
+              {hasAdvancedMarketingTools && (
                 <motion.div whileTap={{
-            scale: 0.98
-          }} onClick={() => navigate("/restaurant/advertisements")} className="bg-white rounded-lg p-4 flex items-center gap-4 border border-gray-200 cursor-pointer">
-                <div className="shrink-0">
-                  <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
-                    <Megaphone className="w-6 h-6 text-orange-600" />
+              scale: 0.98
+            }} onClick={() => navigate("/restaurant/advertisements")} className="bg-white rounded-lg p-4 flex items-center gap-4 border border-gray-200 cursor-pointer">
+                  <div className="shrink-0">
+                    <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
+                      <Megaphone className="w-6 h-6 text-orange-600" />
+                    </div>
                   </div>
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-base font-bold text-gray-900 mb-1">Promoted Banners</h3>
-                  <p className="text-sm text-gray-600">Get better visibility on homepage & search</p>
-                </div>
-                <ChevronRight className="w-5 h-5 text-blue-600 shrink-0" />
-              </motion.div>
+                  <div className="flex-1">
+                    <h3 className="text-base font-bold text-gray-900 mb-1">Promoted Banners</h3>
+                    <p className="text-sm text-gray-600">Get better visibility on homepage & search</p>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-blue-600 shrink-0" />
+                </motion.div>
+              )}
 
               <motion.div whileTap={{
             scale: 0.98

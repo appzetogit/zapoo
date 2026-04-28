@@ -5,6 +5,11 @@ import RelationshipRequest from "../../restaurant/models/RelationshipRequest.js"
 import * as razorpayService from "../../payment/services/razorpayService.js";
 import { getRazorpayCredentials } from "../../../shared/utils/envService.js";
 import mongoose from "mongoose";
+import {
+  FEATURE_CATALOG,
+  normalizeFeatureKeys,
+  splitFeatureKeysByValidity,
+} from "../constants/featureCatalog.js";
 
 const getRestaurantTierKey = (restaurant) => {
   if (restaurant?.zoneId?.tierId?.rank) {
@@ -291,7 +296,7 @@ export const subscribe = async (req, res) => {
           planId: plan._id,
           durationInDays: plan.durationInDays || 30,
           amount,
-          features: plan.features,
+          features: normalizeFeatureKeys(plan.features),
           purchasedAt: new Date(),
           startAfter: restaurant.subscription.endDate,
           paymentId: `FREE_${Date.now()}`,
@@ -328,7 +333,7 @@ export const subscribe = async (req, res) => {
         paymentStatus: "completed",
         paymentDate: startDate,
         amount,
-        features: plan.features,
+        features: normalizeFeatureKeys(plan.features),
       };
       restaurant.businessModel = "Subscription Base";
       await restaurant.save();
@@ -457,7 +462,7 @@ export const claimTrial = async (req, res) => {
       paymentStatus: "completed",
       paymentDate: startDate,
       amount: 0,
-      features: growthPlan.features,
+      features: normalizeFeatureKeys(growthPlan.features),
     };
     restaurant.businessModel = "Subscription Base";
     restaurant.trialUsed = true;
@@ -641,7 +646,7 @@ export const stopSubscriptionNow = async (req, res) => {
         paymentStatus: queued.paymentStatus || "completed",
         paymentDate: queued.paymentDate || startDate,
         amount: queued.amount || 0,
-        features: queued.features || [],
+        features: normalizeFeatureKeys(queued.features || []),
       };
 
       restaurant.queuedSubscription = {
@@ -679,18 +684,33 @@ export const stopSubscriptionNow = async (req, res) => {
   }
 };
 
+export const getFeatureCatalog = async (req, res) => {
+  return res.status(200).json({
+    success: true,
+    data: FEATURE_CATALOG.filter((item) => item.isActive !== false),
+  });
+};
+
 /**
  * Create a new subscription plan (Admin)
  */
 export const createPlan = async (req, res) => {
   try {
     const { name, pricing, durationInDays, features, isActive } = req.body;
+    const { valid, invalid } = splitFeatureKeysByValidity(features);
+
+    if (invalid.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid feature key(s): ${invalid.join(", ")}`,
+      });
+    }
 
     const plan = await SubscriptionPlan.create({
       name,
       pricing,
       durationInDays,
-      features,
+      features: valid,
       isActive,
     });
 
@@ -715,7 +735,18 @@ export const createPlan = async (req, res) => {
 export const updatePlan = async (req, res) => {
   try {
     const { id } = req.params;
-    const updates = req.body;
+    const updates = { ...req.body };
+
+    if (Object.prototype.hasOwnProperty.call(updates, "features")) {
+      const { valid, invalid } = splitFeatureKeysByValidity(updates.features);
+      if (invalid.length > 0) {
+        return res.status(400).json({
+          success: false,
+          message: `Invalid feature key(s): ${invalid.join(", ")}`,
+        });
+      }
+      updates.features = valid;
+    }
 
     const plan = await SubscriptionPlan.findByIdAndUpdate(id, updates, {
       new: true,
@@ -1077,7 +1108,7 @@ export const verifySubscriptionPayment = async (req, res) => {
         planId: plan._id,
         durationInDays: plan.durationInDays || 30,
         amount,
-        features: plan.features,
+        features: normalizeFeatureKeys(plan.features),
         purchasedAt: new Date(),
         startAfter: restaurant.subscription.endDate,
         paymentId: razorpay_payment_id,
@@ -1120,7 +1151,7 @@ export const verifySubscriptionPayment = async (req, res) => {
       paymentStatus: "completed",
       paymentDate: startDate,
       amount,
-      features: plan.features,
+      features: normalizeFeatureKeys(plan.features),
     };
     restaurant.businessModel = "Subscription Base";
     await restaurant.save();

@@ -20,11 +20,15 @@ export default function SubscriptionManagement() {
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [editingPlan, setEditingPlan] = useState(null);
     const [activeTab, setActiveTab] = useState("overview");
+    const [featureCatalog, setFeatureCatalog] = useState([]);
+    const [selectedFeatures, setSelectedFeatures] = useState([]);
+    const [isPlanActive, setIsPlanActive] = useState(true);
 
     const { register, handleSubmit, reset, setValue, formState: { errors, isSubmitting } } = useForm();
 
     useEffect(() => {
         fetchPlans();
+        fetchFeatureCatalog();
     }, []);
 
     useEffect(() => {
@@ -32,6 +36,11 @@ export default function SubscriptionManagement() {
             fetchRestaurantSubscriptions();
         }
     }, [activeTab]);
+
+    useEffect(() => {
+        if (featureCatalog.length === 0) return;
+        setSelectedFeatures((prev) => normalizeFeatureKeys(prev));
+    }, [featureCatalog]);
 
     const fetchPlans = async () => {
         try {
@@ -45,6 +54,18 @@ export default function SubscriptionManagement() {
             toast.error("Failed to load subscription plans");
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchFeatureCatalog = async () => {
+        try {
+            const res = await subscriptionAPI.getFeatureCatalog();
+            if (res.data?.success) {
+                setFeatureCatalog(res.data.data || []);
+            }
+        } catch (error) {
+            console.error("Error fetching feature catalog:", error);
+            toast.error("Failed to load feature catalog");
         }
     };
 
@@ -63,14 +84,25 @@ export default function SubscriptionManagement() {
         }
     };
 
+    const normalizeFeatureKeys = (keys = []) => {
+        if (!Array.isArray(keys) || featureCatalog.length === 0) return [];
+        const allowed = new Set(featureCatalog.map((item) => item.key));
+        return [...new Set(keys)].filter((key) => allowed.has(key));
+    };
+
     const onSubmit = async (data) => {
         try {
+            const sanitizedFeatures = normalizeFeatureKeys(selectedFeatures);
+            if (sanitizedFeatures.length === 0) {
+                toast.error("Please enable at least one feature");
+                return;
+            }
             // Format data
             const formattedData = {
                 name: data.name,
                 durationInDays: parseInt(data.durationInDays),
-                features: data.features.split('\n').filter(f => f.trim() !== ''),
-                isActive: data.isActive,
+                features: sanitizedFeatures,
+                isActive: isPlanActive,
                 pricing: {
                     tier1: parseFloat(data.priceTier1),
                     tier2: parseFloat(data.priceTier2),
@@ -101,8 +133,8 @@ export default function SubscriptionManagement() {
         setEditingPlan(plan);
         setValue("name", plan.name);
         setValue("durationInDays", plan.durationInDays);
-        setValue("features", plan.features.join('\n'));
-        setValue("isActive", plan.isActive);
+        setSelectedFeatures(normalizeFeatureKeys(plan.features));
+        setIsPlanActive(Boolean(plan.isActive));
 
         // Handle old pricing structure fallback
         const pricing = plan.pricing || {};
@@ -164,10 +196,25 @@ export default function SubscriptionManagement() {
     const openNewDialog = () => {
         setEditingPlan(null);
         reset({
-            isActive: true,
             durationInDays: 30
         });
+        setSelectedFeatures([]);
+        setIsPlanActive(true);
         setIsDialogOpen(true);
+    };
+
+    const toggleFeature = (featureKey, nextChecked) => {
+        setSelectedFeatures((prev) => {
+            const set = new Set(prev);
+            if (nextChecked) set.add(featureKey);
+            else set.delete(featureKey);
+            return [...set];
+        });
+    };
+
+    const getFeatureLabel = (featureKey) => {
+        const match = featureCatalog.find((item) => item.key === featureKey);
+        return match?.label || featureKey;
     };
 
     if (loading) {
@@ -257,7 +304,7 @@ export default function SubscriptionManagement() {
                                         {plan.features.map((feature, idx) => (
                                             <div key={idx} className={`flex items-start gap-2 text-sm ${!plan.isActive ? 'text-neutral-400' : 'text-neutral-600'}`}>
                                                 <Check className={`w-4 h-4 mt-0.5 shrink-0 ${!plan.isActive ? 'text-neutral-300' : 'text-green-500'}`} />
-                                                <span>{feature}</span>
+                                                <span>{getFeatureLabel(feature)}</span>
                                             </div>
                                         ))}
                                     </div>
@@ -379,7 +426,7 @@ export default function SubscriptionManagement() {
             </Dialog>
 
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                <DialogContent className="sm:max-w-[550px] border-none shadow-2xl p-0 overflow-hidden">
+                <DialogContent className="sm:max-w-[550px] max-h-[90vh] border-none shadow-2xl p-0 overflow-y-auto overflow-x-hidden [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
                     <DialogHeader className="px-6 py-4 bg-orange-50/50 border-b border-orange-100">
                         <DialogTitle className="text-xl font-bold text-orange-600 flex items-center gap-2">
                             {editingPlan ? <Edit className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
@@ -441,17 +488,50 @@ export default function SubscriptionManagement() {
                             </div>
                         </div>
 
-                        <div className="space-y-2">
-                            <Label htmlFor="features" className="text-neutral-700 font-medium">
-                                Features
-                                <span className="text-xs font-normal text-neutral-500 ml-2">(One feature per line)</span>
-                            </Label>
-                            <textarea
-                                id="features"
-                                className="flex min-h-[120px] w-full rounded-md border border-neutral-200 bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-neutral-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/30 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
-                                placeholder="Basic Listing&#10;Standard Delivery&#10;Email Support"
-                                {...register("features")}
-                            />
+                        <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                                <Label className="text-neutral-700 font-medium">Plan Features</Label>
+                                <div className="flex items-center gap-2">
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setSelectedFeatures(featureCatalog.map((item) => item.key))}
+                                    >
+                                        Enable all
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setSelectedFeatures([])}
+                                    >
+                                        Disable all
+                                    </Button>
+                                </div>
+                            </div>
+                            <div className="max-h-64 overflow-y-auto rounded-md border border-neutral-200 divide-y [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                                {featureCatalog.map((feature) => {
+                                    const checked = selectedFeatures.includes(feature.key);
+                                    return (
+                                        <div key={feature.key} className="flex items-start justify-between gap-3 p-3">
+                                            <div>
+                                                <p className="text-sm font-medium text-neutral-900">{feature.label}</p>
+                                                <p className="text-xs text-neutral-500">{feature.description}</p>
+                                                <p className="text-[11px] text-neutral-400 mt-1">{feature.key}</p>
+                                            </div>
+                                            <Switch
+                                                checked={checked}
+                                                onCheckedChange={(next) => toggleFeature(feature.key, next)}
+                                                className="data-[state=checked]:bg-orange-600"
+                                            />
+                                        </div>
+                                    );
+                                })}
+                                {featureCatalog.length === 0 && (
+                                    <p className="text-sm text-neutral-500 p-3">No features available</p>
+                                )}
+                            </div>
                         </div>
 
                         <div className="flex items-center justify-between p-4 bg-neutral-50 rounded-lg border border-neutral-100">
@@ -461,8 +541,8 @@ export default function SubscriptionManagement() {
                             </div>
                             <Switch
                                 id="isActive"
-                                onCheckedChange={(checked) => setValue("isActive", checked)}
-                                checked={editingPlan ? editingPlan.isActive : true}
+                                onCheckedChange={setIsPlanActive}
+                                checked={isPlanActive}
                                 className="data-[state=checked]:bg-orange-600"
                             />
                         </div>

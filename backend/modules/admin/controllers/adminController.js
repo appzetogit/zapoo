@@ -20,6 +20,7 @@ import { uploadToCloudinary } from "../../../shared/utils/cloudinaryService.js";
 import { initializeCloudinary } from "../../../config/cloudinary.js";
 import { applyZoneTierToRestaurantById } from "../services/restaurantZoneAssignmentService.js";
 import { normalizeLocale } from "../../../shared/i18n/localeConstants.js";
+import { normalizeFeatureKeys } from "../../subscription/constants/featureCatalog.js";
 const logger = winston.createLogger({
   level: "info",
   format: winston.format.json(),
@@ -3076,6 +3077,12 @@ export const extendRestaurantSubscription = asyncHandler(async (req, res) => {
         endDate: new Date(),
         features: []
       };
+    }
+    if ((!Array.isArray(restaurant.subscription.features) || restaurant.subscription.features.length === 0) && restaurant.subscription.planId) {
+      const planDoc = await SubscriptionPlan.findById(restaurant.subscription.planId).select("features").lean();
+      restaurant.subscription.features = normalizeFeatureKeys(planDoc?.features || []);
+    } else {
+      restaurant.subscription.features = normalizeFeatureKeys(restaurant.subscription.features || []);
     }
     const currentEndDate = restaurant.subscription.endDate ? new Date(restaurant.subscription.endDate) : new Date();
 

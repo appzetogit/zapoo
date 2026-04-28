@@ -1,6 +1,6 @@
 import { motion } from "framer-motion"
 import { Lock, Crown } from "lucide-react"
-import { useNavigate } from "react-router-dom"
+import { useLocation, useNavigate } from "react-router-dom"
 import { useTranslation } from "react-i18next"
 
 /**
@@ -17,6 +17,7 @@ export default function SubscriptionFeatureOverlay({
 }) {
     const { t } = useTranslation()
     const navigate = useNavigate()
+    const location = useLocation()
     const resolvedTitle = title || t("restaurant.subscriptionFeatureOverlay.title")
     const resolvedMessage = message || t("restaurant.subscriptionFeatureOverlay.message")
 
@@ -32,7 +33,18 @@ export default function SubscriptionFeatureOverlay({
             onGoBack()
             return
         }
-        navigate(-1)
+        if (window.history.length > 1) {
+            navigate(-1)
+            return
+        }
+        navigate("/restaurant", { replace: true })
+    }
+
+    const handleViewPlans = (e) => {
+        e.stopPropagation()
+        navigate("/restaurant/subscription", {
+            state: { from: location.pathname }
+        })
     }
 
     return (
@@ -62,10 +74,7 @@ export default function SubscriptionFeatureOverlay({
                     <motion.button
                         whileHover={{ scale: 1.05, boxShadow: "0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)" }}
                         whileTap={{ scale: 0.95 }}
-                        onClick={(e) => {
-                            e.stopPropagation()
-                            navigate("/restaurant/subscription")
-                        }}
+                        onClick={handleViewPlans}
                         className="px-8 py-3 bg-gray-900 text-white text-sm font-bold rounded-2xl border border-gray-800 hover:bg-black transition-all flex items-center gap-2 cursor-pointer relative overflow-hidden"
                     >
                         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full hover:translate-x-full transition-transform duration-1000" />

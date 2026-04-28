@@ -17,31 +17,20 @@ import NoPlanPopup from "@/module/restaurant/components/NoPlanPopup";
  */
 export default function ProtectedRoute({ children, requiredRole, loginPath }) {
   const location = useLocation();
-  const [subscriptionLoading, setSubscriptionLoading] = useState(false);
+  const [subscriptionLoading, setSubscriptionLoading] = useState(requiredRole === "restaurant");
   const [hasActiveSubscription, setHasActiveSubscription] = useState(true);
   const [featureLock, setFeatureLock] = useState(null);
-  const planFeatureDefaults = useMemo(
-    () => ({
-      BASIC: ["order_management", "menu_control", "basic_reports", "marketing_tools"],
-      EXECUTIVE: ["order_management", "menu_control", "basic_reports", "relationship_manager"],
-      GROWTH: [
-        "order_management",
-        "menu_control",
-        "basic_reports",
-        "marketing_tools",
-        "advanced_analytics",
-        "advanced_marketing_tools",
-        "relationship_manager",
-      ],
-    }),
-    []
-  );
 
   const gatedRestaurantPaths = useMemo(
     () => [
       "/restaurant/orders",
       "/restaurant/hub-menu",
       "/restaurant/hub-growth",
+      "/restaurant/hub-finance",
+      "/restaurant/finance-details",
+      "/restaurant/withdrawal-history",
+      "/restaurant/delivery-pricing",
+      "/restaurant/challenges",
       "/restaurant/download-report",
       "/restaurant/to-hub",
       "/restaurant/advertisements",
@@ -66,6 +55,8 @@ export default function ProtectedRoute({ children, requiredRole, loginPath }) {
 
     if (!needsSubscription || isAllowedPath) {
       setHasActiveSubscription(true);
+      setFeatureLock(null);
+      setSubscriptionLoading(false);
       return;
     }
 
@@ -87,8 +78,13 @@ export default function ProtectedRoute({ children, requiredRole, loginPath }) {
           { prefix: "/restaurant/orders", feature: "order_management" },
           { prefix: "/restaurant/hub-menu", feature: "menu_control" },
           { prefix: "/restaurant/download-report", feature: "basic_reports" },
+          { prefix: "/restaurant/hub-finance", feature: "basic_reports" },
+          { prefix: "/restaurant/finance-details", feature: "basic_reports" },
+          { prefix: "/restaurant/withdrawal-history", feature: "basic_reports" },
+          { prefix: "/restaurant/delivery-pricing", feature: "basic_reports" },
+          { prefix: "/restaurant/challenges", feature: "basic_reports" },
           { prefix: "/restaurant/hub-growth", feature: "marketing_tools" },
-          { prefix: "/restaurant/advertisements", feature: "marketing_tools" },
+          { prefix: "/restaurant/advertisements", feature: "advanced_marketing_tools" },
           { prefix: "/restaurant/notify-customers", feature: "marketing_tools" },
           { prefix: "/restaurant/rm", feature: "relationship_manager" },
         ];
@@ -96,11 +92,9 @@ export default function ProtectedRoute({ children, requiredRole, loginPath }) {
           if (item.exact) return path === item.prefix;
           return path.startsWith(item.prefix);
         });
-        const planName = String(subscription?.planId?.name || "").toUpperCase();
         const mergedFeatures = new Set([
           ...(subscription?.features || []),
           ...(subscription?.planId?.features || []),
-          ...(planFeatureDefaults[planName] || []),
         ]);
 
         if (isSubActive && match && !mergedFeatures.has(match.feature)) {
@@ -124,7 +118,7 @@ export default function ProtectedRoute({ children, requiredRole, loginPath }) {
     return () => {
       isMounted = false;
     };
-  }, [allowedWithoutSubscription, gatedRestaurantPaths, location.pathname, planFeatureDefaults, requiredRole]);
+  }, [allowedWithoutSubscription, gatedRestaurantPaths, location.pathname, requiredRole]);
 
   // Check if user is authenticated for the required module using module-specific token
   if (!requiredRole) {

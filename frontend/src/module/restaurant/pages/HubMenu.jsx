@@ -62,6 +62,9 @@ export default function HubMenu() {
   const [customDateTime, setCustomDateTime] = useState('');
   const [isScheduling, setIsScheduling] = useState(false);
   const [menuData, setMenuData] = useState([]); // Store menu groups with state
+  const [menuAccessBlocked, setMenuAccessBlocked] = useState(false);
+  const isHydratingMenuRef = useRef(false);
+  const hasFetchedMenuRef = useRef(false);
   const scrollContainerRef = useRef(null);
   const [isScrolled, setIsScrolled] = useState(false);
   const mainScrollRef = useRef(null);
@@ -211,22 +214,40 @@ export default function HubMenu() {
   }, []);
 
   // Fetch menu from API - reusable function
+  const hydrateMenuData = (sections) => {
+    isHydratingMenuRef.current = true;
+    setMenuData(sections);
+    hasFetchedMenuRef.current = true;
+    setTimeout(() => {
+      isHydratingMenuRef.current = false;
+    }, 0);
+  };
+
   const fetchMenu = async (showLoading = true) => {
     try {
       if (showLoading) {
         setLoadingMenu(true);
       }
       const response = await restaurantAPI.getMenu();
+      if (response?.data?.subscriptionBlocked || response?.status === 403) {
+        setMenuAccessBlocked(true);
+        hydrateMenuData([]);
+        return;
+      }
+      setMenuAccessBlocked(false);
       if (response.data && response.data.success && response.data.data && response.data.data.menu) {
         const menuSections = response.data.data.menu.sections || [];
-        setMenuData(menuSections);
+        hydrateMenuData(menuSections);
 
         // Menu data is now directly from backend, no need to transform
       } else {
         // Empty menu - start fresh
-        setMenuData([]);
+        hydrateMenuData([]);
       }
     } catch (error) {
+      if (error?.response?.status === 403) {
+        setMenuAccessBlocked(true);
+      }
       // Only log and show toast if it's not a network/timeout error
       if (error.code !== 'ERR_NETWORK' && error.code !== 'ECONNABORTED' && !error.message?.includes('timeout')) {
         console.error('Error fetching menu:', error);
@@ -235,7 +256,7 @@ export default function HubMenu() {
         // Silently handle network errors - backend is not running
         // The axios interceptor already handles these with proper error messages
       }
-      setMenuData([]);
+      hydrateMenuData([]);
     } finally {
       if (showLoading) {
         setLoadingMenu(false);
@@ -280,7 +301,16 @@ export default function HubMenu() {
 
   // Save menu to API whenever menuData changes (debounced)
   useEffect(() => {
-    if (!loadingMenu && menuData.length >= 0) {
+    if (
+      loadingMenu ||
+      menuAccessBlocked ||
+      !hasFetchedMenuRef.current ||
+      isHydratingMenuRef.current
+    ) {
+      return;
+    }
+
+    if (menuData.length >= 0) {
       const timeoutId = setTimeout(async () => {
         try {
           // Normalize menuData before saving to ensure proper structure matching backend schema
@@ -371,6 +401,9 @@ export default function HubMenu() {
             sections: normalizedSections
           });
         } catch (error) {
+          if (error?.response?.status === 403) {
+            setMenuAccessBlocked(true);
+          }
           console.error('Error saving menu:', error);
           // Check if it's a network error (backend not running)
           if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
@@ -385,7 +418,7 @@ export default function HubMenu() {
 
       return () => clearTimeout(timeoutId);
     }
-  }, [menuData, loadingMenu]);
+  }, [menuData, loadingMenu, menuAccessBlocked]);
 
   // Fetch add-ons when add-ons tab is active
   const fetchAddons = async (showLoading = true) => {

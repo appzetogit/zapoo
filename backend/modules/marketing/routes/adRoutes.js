@@ -53,13 +53,13 @@ const authenticateAny = async (req, res, next) => {
 };
 
 // Restaurant routes
-router.post('/request', restaurantAuth, checkFeatureAccess('marketing_tools'), createAdRequest);
-router.put('/request/:adId', restaurantAuth, checkFeatureAccess('marketing_tools'), uploadMiddleware.single('bannerImage'), updateAdRequest);
-router.delete('/request/:adId', restaurantAuth, checkFeatureAccess('marketing_tools'), deleteAdRequest);
-router.get('/my-zone', restaurantAuth, checkFeatureAccess('marketing_tools'), getMyZone);
-router.get('/my-ads', restaurantAuth, checkFeatureAccess('marketing_tools'), getMyAdRequests);
-router.post('/payment/create-order/:adId', restaurantAuth, checkFeatureAccess('marketing_tools'), createAdPaymentOrder);
-router.post('/payment/verify', restaurantAuth, checkFeatureAccess('marketing_tools'), verifyAdPayment);
+router.post('/request', restaurantAuth, checkFeatureAccess('advanced_marketing_tools'), createAdRequest);
+router.put('/request/:adId', restaurantAuth, checkFeatureAccess('advanced_marketing_tools'), uploadMiddleware.single('bannerImage'), updateAdRequest);
+router.delete('/request/:adId', restaurantAuth, checkFeatureAccess('advanced_marketing_tools'), deleteAdRequest);
+router.get('/my-zone', restaurantAuth, checkFeatureAccess('advanced_marketing_tools'), getMyZone);
+router.get('/my-ads', restaurantAuth, checkFeatureAccess('advanced_marketing_tools'), getMyAdRequests);
+router.post('/payment/create-order/:adId', restaurantAuth, checkFeatureAccess('advanced_marketing_tools'), createAdPaymentOrder);
+router.post('/payment/verify', restaurantAuth, checkFeatureAccess('advanced_marketing_tools'), verifyAdPayment);
 
 // Admin routes
 router.get('/all', authenticateAdmin, getAllAdRequests);

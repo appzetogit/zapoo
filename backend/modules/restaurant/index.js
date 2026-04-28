@@ -134,7 +134,7 @@ router.use('/complaints', complaintRoutes);
 // Finance routes (authenticated - for restaurant module)
 // Must come BEFORE /:id route to avoid route conflicts (/:id would match /finance)
 router.get('/finance', authenticate, checkFeatureAccess('basic_reports'), getRestaurantFinance);
-router.get('/analytics', authenticate, checkFeatureAccess('basic_reports'), getRestaurantAnalytics);
+router.get('/analytics', authenticate, checkFeatureAccess('advanced_analytics'), getRestaurantAnalytics);
 
 // Wallet routes (authenticated - for restaurant module)
 // Must come BEFORE /:id route to avoid route conflicts (/:id would match /wallet)

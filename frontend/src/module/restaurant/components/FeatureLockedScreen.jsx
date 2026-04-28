@@ -1,5 +1,5 @@
 import { Lock, Crown, Sparkles, ArrowRight } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import RestaurantNavbar from "./RestaurantNavbar";
 import BottomNavOrders from "./BottomNavOrders";
@@ -7,9 +7,24 @@ import BottomNavOrders from "./BottomNavOrders";
 export default function FeatureLockedScreen({ requiredFeature }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
   const label = t(`restaurant.featureLockedScreen.features.${requiredFeature}`, {
     defaultValue: t("restaurant.featureLockedScreen.features.thisFeature"),
   });
+
+  const handleViewPlans = () => {
+    navigate("/restaurant/subscription", {
+      state: { from: location.pathname },
+    });
+  };
+
+  const handleGoBack = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+    navigate("/restaurant", { replace: true });
+  };
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
@@ -58,14 +73,14 @@ export default function FeatureLockedScreen({ requiredFeature }) {
 
             <div className="mt-5 space-y-2">
               <button
-                onClick={() => navigate("/restaurant/subscription")}
+                onClick={handleViewPlans}
                 className="w-full rounded-2xl bg-slate-900 text-white py-3 text-sm font-semibold hover:bg-black transition-colors inline-flex items-center justify-center gap-2"
               >
                 {t("restaurant.featureLockedScreen.actions.viewPlans")}
                 <ArrowRight className="w-4 h-4" />
               </button>
               <button
-                onClick={() => navigate(-1)}
+                onClick={handleGoBack}
                 className="w-full rounded-2xl border border-slate-200 bg-white text-slate-700 py-3 text-sm font-medium hover:bg-slate-50 transition-colors"
               >
                 {t("restaurant.featureLockedScreen.actions.goBack")}

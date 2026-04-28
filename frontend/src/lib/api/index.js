@@ -2151,6 +2151,9 @@ export const subscriptionAPI = {
   getAdminPlans: () => {
     return apiClient.get(API_ENDPOINTS.SUBSCRIPTION.ADMIN_PLANS);
   },
+  getFeatureCatalog: () => {
+    return apiClient.get(API_ENDPOINTS.SUBSCRIPTION.ADMIN_FEATURE_CATALOG);
+  },
   createPlan: (data) => {
     return apiClient.post(API_ENDPOINTS.SUBSCRIPTION.ADMIN_CREATE_PLAN, data);
   },

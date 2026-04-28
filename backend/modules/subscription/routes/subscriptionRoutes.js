@@ -25,6 +25,7 @@ router.post("/request-rm-call", authenticateRestaurant, checkFeatureAccess("rela
 router.get("/history", authenticateRestaurant, checkFeatureAccess("relationship_manager"), subscriptionController.getRMCallHistoryViaSubscription);
 
 // Admin routes
+router.get("/features/catalog", authenticateAdmin, subscriptionController.getFeatureCatalog);
 router.post("/plans", authenticateAdmin, subscriptionController.createPlan);
 router.put("/plans/:id", authenticateAdmin, subscriptionController.updatePlan);
 router.delete("/plans/:id", authenticateAdmin, subscriptionController.deletePlan);
