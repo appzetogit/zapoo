@@ -8290,7 +8290,7 @@ export default function DeliveryHome() {
 }
 
 {/* Reached Drop Popup - shown instantly after Order Picked Up confirmation */ }
-<BottomPopup isOpen={showReachedDropPopup} onClose={() => setShowReachedDropPopup(false)} showCloseButton={false} closeOnBackdropClick={false} maxHeight="70vh" showHandle={true} showBackdrop={false} backdropBlocksInteraction={false}>
+<BottomPopup isOpen={showReachedDropPopup} onClose={() => setShowReachedDropPopup(false)} showCloseButton={false} closeOnBackdropClick={false} disableSwipeToClose={true} maxHeight="70vh" showHandle={true} showBackdrop={false} backdropBlocksInteraction={false}>
   <div className="">
     {/* Drop Label */}
     <div className="mb-4">
