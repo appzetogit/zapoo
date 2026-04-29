@@ -19,6 +19,7 @@ import {
   evaluateChallengesOnDeliveryCompleted,
   evaluateChallengesOnDeliveryAccepted
 } from '../../order/services/challengeEngineService.js';
+import { calculateRiderEarning } from '../services/riderEarningsService.js';
 import mongoose from 'mongoose';
 import winston from 'winston';
 const logger = winston.createLogger({
@@ -1808,7 +1809,12 @@ export const completeDelivery = asyncHandler(async (req, res) => {
               status: 'Completed',
               description: `Delivery earnings for Order #${orderIdForLog}`,
               orderId: orderMongoId || order._id,
-              paymentCollected: false
+              paymentCollected: false,
+              metadata: {
+                source: 'settlement',
+                fallbackReason: null,
+                reconciliationRequired: false,
+              }
             });
             await wallet.save();
           }
@@ -1860,6 +1866,9 @@ export const completeDelivery = asyncHandler(async (req, res) => {
         earnings: {
           amount: settlement?.deliveryPartnerEarning?.totalEarning || 0,
           currency: 'INR',
+          source: 'settlement',
+          fallbackReason: null,
+          reconciliationRequired: false,
           distance: settlement?.deliveryPartnerEarning?.distance || 0,
           breakdown: settlement?.deliveryPartnerEarning || null
         },
@@ -1893,16 +1902,33 @@ export const completeDelivery = asyncHandler(async (req, res) => {
     // Calculate earnings using admin's commission rules
     let totalEarning = 0;
     let commissionBreakdown = null;
+    let earningSource = 'commission';
+    let fallbackReason = null;
+    let reconciliationRequired = false;
     try {
       const tierName = order.pricing?.pricingMeta?.tierName || null;
-      const commissionResult = await DeliveryBoyCommission.calculateCommission(deliveryDistance, tierName);
-      totalEarning = commissionResult.commission;
-      commissionBreakdown = commissionResult.breakdown;
+      const earningResult = await calculateRiderEarning({
+        distanceKm: deliveryDistance,
+        tierName,
+        context: 'delivery_completion_legacy_fallback',
+      });
+      totalEarning = earningResult.amount;
+      commissionBreakdown = earningResult.breakdown;
+      earningSource = earningResult.source;
+      fallbackReason = earningResult.fallbackReason;
+      reconciliationRequired = earningResult.reconciliationRequired;
     } catch (commissionError) {
       console.error('⚠️ Error calculating commission using rules:', commissionError.message);
-      // Fallback: Use delivery fee as earnings if commission calculation fails
-      totalEarning = order.pricing?.deliveryFee || 0;
-      console.warn(`⚠️ Using fallback earnings (delivery fee): ₹${totalEarning.toFixed(2)}`);
+      const earningResult = await calculateRiderEarning({
+        distanceKm: deliveryDistance,
+        tierName: order.pricing?.pricingMeta?.tierName || null,
+        context: 'delivery_completion_legacy_fallback_catch',
+      });
+      totalEarning = earningResult.amount;
+      commissionBreakdown = earningResult.breakdown;
+      earningSource = earningResult.source;
+      fallbackReason = earningResult.fallbackReason;
+      reconciliationRequired = earningResult.reconciliationRequired;
     }
 
     // Add earning to delivery boy's wallet
@@ -1925,7 +1951,12 @@ export const completeDelivery = asyncHandler(async (req, res) => {
           status: 'Completed',
           description: `Delivery earnings for Order #${orderIdForLog} (Distance: ${deliveryDistance.toFixed(2)} km)`,
           orderId: orderMongoId || order._id,
-          paymentCollected: false
+          paymentCollected: false,
+          metadata: {
+            source: earningSource,
+            fallbackReason: fallbackReason || null,
+            reconciliationRequired: reconciliationRequired === true,
+          }
         });
         await wallet.save();
 
@@ -2045,6 +2076,9 @@ export const completeDelivery = asyncHandler(async (req, res) => {
         amount: totalEarning,
         currency: 'INR',
         distance: deliveryDistance,
+        source: earningSource,
+        fallbackReason: fallbackReason || null,
+        reconciliationRequired: reconciliationRequired === true,
         breakdown: commissionBreakdown || {
           basePayout: 0,
           distance: deliveryDistance,
