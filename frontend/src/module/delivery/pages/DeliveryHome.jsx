@@ -2526,8 +2526,8 @@ export default function DeliveryHome() {
       // Close reached drop popup
       setShowReachedDropPopup(false);
 
-      // Show delivery complete popup (this triggers review -> completeDelivery flow)
-      setShowOrderDeliveredAnimation(true);
+      // Avoid intermediate delivered animation popup here to prevent flicker/reopen loops.
+      setShowOrderDeliveredAnimation(false);
       // Mark that this order has reached drop to avoid showing earlier popups on refresh
       try {
         const orderIdForApi = selectedRestaurant?.id || newOrder?.orderMongoId || newOrder?._id || selectedRestaurant?.orderId || newOrder?.orderId;
@@ -2549,7 +2549,9 @@ export default function DeliveryHome() {
             // Use MongoDB _id for API call to avoid ObjectId casting errors
 
             const response = await deliveryAPI.confirmReachedDrop(orderIdForApi);
-            if (response.data?.success) { } else {
+            if (response.data?.success) {
+              setShowCustomerReviewPopup(true);
+            } else {
               console.error('❌ Failed to confirm reached drop:', response.data);
               toast.error(response.data?.message || 'Failed to confirm reached drop. Please try again.');
             }
