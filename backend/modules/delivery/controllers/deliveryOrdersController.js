@@ -11,9 +11,10 @@ import RestaurantCommission from '../../admin/models/RestaurantCommission.js';
 import AdminCommission from '../../admin/models/AdminCommission.js';
 import BusinessSettings from '../../admin/models/BusinessSettings.js';
 import { calculateRoute } from '../../order/services/routeCalculationService.js';
-import { notifyNextDeliveryPartner, clearAssignmentTimer } from '../../order/services/deliveryAssignmentService.js';
+import { notifyNextDeliveryPartner, clearAssignmentTimer, clearSmartDispatchTimer } from '../../order/services/deliveryAssignmentService.js';
 import { notifyDeliveryPartnersOrderTaken } from '../../order/services/deliveryNotificationService.js';
 import { notifyRestaurantOrderMessage } from '../../order/services/restaurantNotificationService.js';
+import { sendNotificationToUser } from '../../notification/utils/pushNotificationHelper.js';
 import {
   evaluateChallengesOnOrderCompleted,
   evaluateChallengesOnDeliveryCompleted,
@@ -29,6 +30,53 @@ const logger = winston.createLogger({
     format: winston.format.simple()
   })]
 });
+
+const HANDOFF_OTP_EXPIRY_MINUTES = Number(process.env.DELIVERY_HANDOFF_OTP_EXPIRY_MINUTES || 10);
+const HANDOFF_OTP_RESEND_COOLDOWN_SECONDS = Number(process.env.DELIVERY_HANDOFF_OTP_RESEND_COOLDOWN_SECONDS || 30);
+const DELIVERY_SIMULATION_MODE = String(process.env.DELIVERY_SIMULATION_MODE || 'false') === 'true';
+const simulationIntervals = new Map();
+
+const generateHandoffOtp = () => String(Math.floor(1000 + Math.random() * 9000));
+
+const startDevDeliverySimulation = async ({ orderMongoId, orderIdentifier, routeCoordinates }) => {
+  if (!DELIVERY_SIMULATION_MODE || process.env.NODE_ENV === 'production') return;
+  if (!Array.isArray(routeCoordinates) || routeCoordinates.length < 2) return;
+  const key = String(orderMongoId);
+
+  const existing = simulationIntervals.get(key);
+  if (existing) {
+    clearInterval(existing);
+    simulationIntervals.delete(key);
+  }
+
+  let index = 0;
+  const interval = setInterval(async () => {
+    try {
+      const point = routeCoordinates[Math.min(index, routeCoordinates.length - 1)];
+      if (!Array.isArray(point) || point.length < 2) return;
+      const [lat, lng] = point;
+      const serverModule = await import('../../../server.js');
+      const io = serverModule.getIO ? serverModule.getIO() : null;
+      if (io) {
+        io.to(`order:${String(orderIdentifier || orderMongoId)}`).emit(
+          `location-receive-${String(orderIdentifier || orderMongoId)}`,
+          { orderId: String(orderIdentifier || orderMongoId), lat: Number(lat), lng: Number(lng), heading: 0, timestamp: Date.now(), simulated: true }
+        );
+      }
+      index += 1;
+      if (index >= routeCoordinates.length) {
+        clearInterval(interval);
+        simulationIntervals.delete(key);
+      }
+    } catch (error) {
+      clearInterval(interval);
+      simulationIntervals.delete(key);
+      console.error('⚠️ Dev delivery simulation stopped:', error.message);
+    }
+  }, 4000);
+
+  simulationIntervals.set(key, interval);
+};
 
 const applyCustomerSnapshot = (order) => {
   if (!order || typeof order !== 'object') return order;
@@ -424,6 +472,7 @@ export const acceptOrder = asyncHandler(async (req, res) => {
         }
         orderDoc = updated;
         clearAssignmentTimer(orderDoc._id.toString());
+        clearSmartDispatchTimer(orderDoc._id.toString());
 
         // Tell other notified delivery partners to remove the offer.
         try {
@@ -880,6 +929,7 @@ export const rejectOrder = asyncHandler(async (req, res) => {
       };
       await orderDoc.save();
       clearAssignmentTimer(orderDoc._id.toString());
+      clearSmartDispatchTimer(orderDoc._id.toString());
 
       // Notify next candidate in sequence (legacy)
       try {
@@ -939,6 +989,7 @@ export const rejectOrder = asyncHandler(async (req, res) => {
       };
       await orderDoc.save();
       clearAssignmentTimer(orderDoc._id.toString());
+      clearSmartDispatchTimer(orderDoc._id.toString());
 
       // If everyone rejected, notify restaurant immediately (no auto-cancel).
       if (rejectedSet.size >= notifiedIds.length) {
@@ -1366,6 +1417,13 @@ export const confirmOrderId = asyncHandler(async (req, res) => {
     };
     const response = successResponse(res, 200, 'Order ID confirmed', responseData);
 
+    // Dev-only simulation playback (non-production).
+    void startDevDeliverySimulation({
+      orderMongoId: updatedOrder._id?.toString?.() || updatedOrder._id,
+      orderIdentifier: updatedOrder.orderId,
+      routeCoordinates: routeData.coordinates
+    });
+
     // Emit socket event + FCM push to customer asynchronously (don't block response)
     (async () => {
       try {
@@ -1537,9 +1595,45 @@ export const confirmReachedDrop = asyncHandler(async (req, res) => {
     if (!finalOrder) {
       return errorResponse(res, 500, 'Failed to process order');
     }
+    const hasVerifiedHandoffOtp = Boolean(finalOrder?.deliveryVerification?.handoffOtp?.verifiedAt);
+    if (!hasVerifiedHandoffOtp) {
+      const otpCode = generateHandoffOtp();
+      const generatedAt = new Date();
+      const expiresAt = new Date(generatedAt.getTime() + HANDOFF_OTP_EXPIRY_MINUTES * 60 * 1000);
+
+      await Order.findByIdAndUpdate(order._id, {
+        $set: {
+          'deliveryVerification.handoffOtp.code': otpCode,
+          'deliveryVerification.handoffOtp.generatedAt': generatedAt,
+          'deliveryVerification.handoffOtp.expiresAt': expiresAt,
+          'deliveryVerification.handoffOtp.verifiedAt': null,
+          'deliveryVerification.handoffOtp.verifiedBy': null
+        }
+      });
+
+      try {
+        const userId = finalOrder?.userId?._id || finalOrder?.userId;
+        if (userId) {
+          await sendNotificationToUser(
+            userId.toString(),
+            'user',
+            'Delivery OTP Generated',
+            `Share OTP ${otpCode} with your delivery partner to complete delivery.`,
+            {
+              type: 'delivery_handoff_otp_generated',
+              orderId: finalOrder?.orderId || finalOrder?._id?.toString?.() || orderId,
+              orderMongoId: finalOrder?._id?.toString?.() || '',
+              otp: otpCode
+            }
+          );
+        }
+      } catch (otpNotifError) {
+        console.error('⚠️ Failed to send delivery handoff OTP notification:', otpNotifError.message);
+      }
+    }
     const orderIdForLog = finalOrder.orderId || finalOrder._id?.toString() || orderId;
     return successResponse(res, 200, 'Reached drop confirmed', {
-      order: finalOrder,
+      order: await Order.findById(finalOrder._id).populate('restaurantId', 'name location address phone ownerPhone').populate('userId', 'name phone').lean(),
       message: 'Reached drop location confirmed'
     });
   } catch (error) {
@@ -1553,6 +1647,167 @@ export const confirmReachedDrop = asyncHandler(async (req, res) => {
     });
     return errorResponse(res, 500, `Failed to confirm reached drop: ${error.message}`);
   }
+});
+
+/**
+ * Verify delivery handoff OTP
+ * PATCH /api/delivery/orders/:orderId/verify-handoff-otp
+ */
+export const verifyHandoffOtp = asyncHandler(async (req, res) => {
+  const delivery = req.delivery;
+  const { orderId } = req.params;
+  const submittedOtp = String(req.body?.otp || '').trim();
+
+  if (!delivery?._id) {
+    return errorResponse(res, 401, 'Delivery partner authentication required');
+  }
+  if (!submittedOtp) {
+    return errorResponse(res, 400, 'OTP is required');
+  }
+
+  const order = await Order.findOne({
+    $and: [
+      { $or: [{ _id: orderId }, { orderId }] },
+      { deliveryPartnerId: delivery._id }
+    ]
+  }).select('+deliveryVerification.handoffOtp.code');
+
+  if (!order) {
+    return errorResponse(res, 404, 'Order not found or not assigned to you');
+  }
+
+  const otp = order?.deliveryVerification?.handoffOtp;
+  if (!otp?.code) {
+    return errorResponse(res, 400, 'Handoff OTP is not generated yet');
+  }
+  if (otp?.verifiedAt) {
+    return successResponse(res, 200, 'Handoff OTP already verified', { verified: true });
+  }
+  if (otp?.expiresAt && new Date(otp.expiresAt).getTime() < Date.now()) {
+    return errorResponse(res, 400, 'OTP expired. Please request a new OTP.');
+  }
+
+  if (String(otp.code) !== submittedOtp) {
+    return errorResponse(res, 400, 'Invalid OTP');
+  }
+
+  order.deliveryVerification = order.deliveryVerification || {};
+  order.deliveryVerification.handoffOtp = {
+    ...(order.deliveryVerification.handoffOtp || {}),
+    verifiedAt: new Date(),
+    verifiedBy: delivery._id
+  };
+  await order.save();
+
+  return successResponse(res, 200, 'Handoff OTP verified successfully', { verified: true });
+});
+
+/**
+ * Resend delivery handoff OTP
+ * PATCH /api/delivery/orders/:orderId/resend-handoff-otp
+ */
+export const resendHandoffOtp = asyncHandler(async (req, res) => {
+  const delivery = req.delivery;
+  const { orderId } = req.params;
+
+  if (!delivery?._id) {
+    return errorResponse(res, 401, 'Delivery partner authentication required');
+  }
+
+  const order = await Order.findOne({
+    $and: [
+      { $or: [{ _id: orderId }, { orderId }] },
+      { deliveryPartnerId: delivery._id }
+    ]
+  }).populate('userId', 'name phone');
+
+  if (!order) {
+    return errorResponse(res, 404, 'Order not found or not assigned to you');
+  }
+
+  const now = Date.now();
+  const lastResentAt = order?.deliveryVerification?.handoffOtp?.lastResentAt
+    ? new Date(order.deliveryVerification.handoffOtp.lastResentAt).getTime()
+    : 0;
+  if (lastResentAt && now - lastResentAt < HANDOFF_OTP_RESEND_COOLDOWN_SECONDS * 1000) {
+    return errorResponse(res, 429, `Please wait ${HANDOFF_OTP_RESEND_COOLDOWN_SECONDS} seconds before resending OTP`);
+  }
+
+  const otpCode = generateHandoffOtp();
+  const generatedAt = new Date();
+  const expiresAt = new Date(generatedAt.getTime() + HANDOFF_OTP_EXPIRY_MINUTES * 60 * 1000);
+
+  order.deliveryVerification = order.deliveryVerification || {};
+  order.deliveryVerification.handoffOtp = {
+    ...(order.deliveryVerification.handoffOtp || {}),
+    code: otpCode,
+    generatedAt,
+    expiresAt,
+    lastResentAt: generatedAt,
+    resendCount: Number(order?.deliveryVerification?.handoffOtp?.resendCount || 0) + 1,
+    verifiedAt: null,
+    verifiedBy: null
+  };
+  await order.save();
+
+  try {
+    const userId = order?.userId?._id || order?.userId;
+    if (userId) {
+      await sendNotificationToUser(
+        userId.toString(),
+        'user',
+        'Delivery OTP Resent',
+        `Share OTP ${otpCode} with your delivery partner to complete delivery.`,
+        {
+          type: 'delivery_handoff_otp_resent',
+          orderId: order?.orderId || order?._id?.toString?.() || orderId,
+          orderMongoId: order?._id?.toString?.() || '',
+          otp: otpCode
+        }
+      );
+    }
+  } catch (otpNotifError) {
+    console.error('⚠️ Failed to send resent delivery OTP notification:', otpNotifError.message);
+  }
+
+  return successResponse(res, 200, 'Handoff OTP resent successfully', { sent: true });
+});
+
+/**
+ * Start dev route simulation manually (delivery app button)
+ * PATCH /api/delivery/orders/:orderId/simulate-route
+ */
+export const simulateDeliveryRoute = asyncHandler(async (req, res) => {
+  if (!DELIVERY_SIMULATION_MODE || process.env.NODE_ENV === 'production') {
+    return errorResponse(res, 400, 'Delivery simulation mode is disabled');
+  }
+  const delivery = req.delivery;
+  const { orderId } = req.params;
+  if (!delivery?._id) {
+    return errorResponse(res, 401, 'Delivery partner authentication required');
+  }
+  const order = await Order.findOne({
+    $and: [
+      { $or: [{ _id: orderId }, { orderId }] },
+      { deliveryPartnerId: delivery._id }
+    ]
+  }).select('orderId deliveryState.routeToDelivery');
+
+  if (!order) {
+    return errorResponse(res, 404, 'Order not found or not assigned to you');
+  }
+  const routeCoordinates = order?.deliveryState?.routeToDelivery?.coordinates || [];
+  if (!Array.isArray(routeCoordinates) || routeCoordinates.length < 2) {
+    return errorResponse(res, 400, 'Route polyline is not available yet');
+  }
+
+  await startDevDeliverySimulation({
+    orderMongoId: order._id?.toString?.() || order._id,
+    orderIdentifier: order.orderId,
+    routeCoordinates
+  });
+
+  return successResponse(res, 200, 'Delivery simulation started', { started: true });
 });
 
 /**
@@ -1672,6 +1927,11 @@ export const completeDelivery = asyncHandler(async (req, res) => {
     const isValidState = order.status === 'out_for_delivery' || order.deliveryState?.currentPhase === 'at_delivery' || order.deliveryState?.currentPhase === 'en_route_to_delivery';
     if (!isValidState) {
       return errorResponse(res, 400, `Order cannot be completed. Current status: ${order.status}, Phase: ${order.deliveryState?.currentPhase || 'unknown'}`);
+    }
+
+    const handoffOtpVerified = Boolean(order?.deliveryVerification?.handoffOtp?.verifiedAt);
+    if (!handoffOtpVerified) {
+      return errorResponse(res, 400, 'Delivery handoff OTP verification is required before completing delivery.');
     }
 
     // Ensure we have order._id - from .lean() it's a plain object with _id

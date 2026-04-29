@@ -1143,6 +1143,22 @@ export const deliveryAPI = {
       API_ENDPOINTS.DELIVERY.ORDER_REACHED_DROP.replace(":orderId", orderId),
     );
   },
+  verifyHandoffOtp: (orderId, otp) => {
+    return apiClient.patch(
+      API_ENDPOINTS.DELIVERY.ORDER_VERIFY_HANDOFF_OTP.replace(":orderId", orderId),
+      { otp },
+    );
+  },
+  resendHandoffOtp: (orderId) => {
+    return apiClient.patch(
+      API_ENDPOINTS.DELIVERY.ORDER_RESEND_HANDOFF_OTP.replace(":orderId", orderId),
+    );
+  },
+  simulateRoute: (orderId) => {
+    return apiClient.patch(
+      API_ENDPOINTS.DELIVERY.ORDER_SIMULATE_ROUTE.replace(":orderId", orderId),
+    );
+  },
   completeDelivery: (orderId, rating = null, review = "") => {
     return apiClient.patch(
       API_ENDPOINTS.DELIVERY.ORDER_COMPLETE_DELIVERY.replace(

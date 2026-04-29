@@ -252,6 +252,11 @@ export default function OrderTracking() {
   const customerName = order?.userName || order?.userId?.fullName || order?.userId?.name || userProfile?.fullName || userProfile?.name || t("user.orderTracking.customer");
   const customerPhone = order?.userPhone || order?.userId?.phone || userProfile?.phone || defaultAddress?.phone || "";
   const currentDeliveryInstructions = order?.address?.deliveryInstructions || "";
+  const deliveryHandoffOtp = order?.deliveryVerification?.handoffOtp?.code || "";
+  const deliveryPhase = order?.deliveryState?.currentPhase || "";
+  const shouldShowHandoffOtp =
+    Boolean(deliveryHandoffOtp) &&
+    (deliveryPhase === "at_delivery" || order?.status === "out_for_delivery");
   useEffect(() => {
     if (!showPhoneDialog) return;
     setEditablePhone(customerPhone || "");
@@ -318,7 +323,8 @@ export default function OrderTracking() {
               } : order.restaurantLocation,
               deliveryPartnerId: apiOrder.deliveryPartnerId?._id || apiOrder.deliveryPartnerId || apiOrder.assignmentInfo?.deliveryPartnerId || null,
               assignmentInfo: apiOrder.assignmentInfo || null,
-              deliveryState: apiOrder.deliveryState || null
+              deliveryState: apiOrder.deliveryState || null,
+              deliveryVerification: apiOrder.deliveryVerification || null
             };
             setOrder(transformedOrder);
             setOrderStatus(deriveTrackingUiStatus(apiOrder));
@@ -346,11 +352,9 @@ export default function OrderTracking() {
         // Also ensure restaurantId is present
         if (!contextOrder.restaurantId && contextOrder.restaurant) {}
         setOrder(contextOrder);
-        setLoading(false);
-        return;
       }
 
-      // If not in context, fetch from API
+      // Always fetch latest order from API so delivery OTP/status is fresh
       try {
         setLoading(true);
         setError(null);
@@ -425,7 +429,8 @@ export default function OrderTracking() {
             deliveryPartnerId: apiOrder.deliveryPartnerId?._id || apiOrder.deliveryPartnerId || apiOrder.assignmentInfo?.deliveryPartnerId || null,
             assignmentInfo: apiOrder.assignmentInfo || null,
             tracking: apiOrder.tracking || {},
-            deliveryState: apiOrder.deliveryState || null
+            deliveryState: apiOrder.deliveryState || null,
+            deliveryVerification: apiOrder.deliveryVerification || null
           };
           setOrder(transformedOrder);
           setOrderStatus(deriveTrackingUiStatus(apiOrder));
@@ -948,6 +953,35 @@ export default function OrderTracking() {
         // Don't show card if delivery partner has accepted pickup
         return null;
       })()}
+
+        {shouldShowHandoffOtp && <motion.div className="bg-green-50 dark:bg-green-900/20 rounded-xl p-4 border border-green-200 dark:border-green-800/40" initial={{
+        opacity: 0,
+        y: 20
+      }} animate={{
+        opacity: 1,
+        y: 0
+      }}>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm text-green-800 dark:text-green-300 font-medium">Share OTP with delivery partner</p>
+                <p className="text-2xl tracking-widest font-bold text-green-900 dark:text-green-200 mt-1">{deliveryHandoffOtp}</p>
+              </div>
+              <Button
+                type="button"
+                className="bg-green-600 hover:bg-green-700 text-white"
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(String(deliveryHandoffOtp));
+                    toast.success("OTP copied");
+                  } catch {
+                    toast.error("Unable to copy OTP");
+                  }
+                }}
+              >
+                Copy OTP
+              </Button>
+            </div>
+          </motion.div>}
 
         {/* Delivery Details Banner */}
         <motion.div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-xl p-4 text-center border border-transparent dark:border-yellow-800/40" initial={{

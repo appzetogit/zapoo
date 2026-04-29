@@ -382,7 +382,33 @@ const orderSchema = new mongoose.Schema({
     currentCandidateIndex: Number,
     currentCandidateId: String,
     rejectedDeliveryPartnerIds: [String],
-    lastNotifiedAt: Date
+    lastNotifiedAt: Date,
+    smartDispatchAttempt: {
+      type: Number,
+      default: 0
+    },
+    smartDispatchRadiusKm: Number,
+    smartDispatchNextRetryAt: Date
+  },
+  deliveryVerification: {
+    handoffOtp: {
+      code: {
+        type: String,
+        select: false
+      },
+      generatedAt: Date,
+      expiresAt: Date,
+      resendCount: {
+        type: Number,
+        default: 0
+      },
+      lastResentAt: Date,
+      verifiedAt: Date,
+      verifiedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Delivery'
+      }
+    }
   },
   deliveryState: {
     status: {

@@ -6,7 +6,7 @@ import { successResponse, errorResponse } from '../../../shared/utils/response.j
 import asyncHandler from '../../../shared/middleware/asyncHandler.js';
 import { notifyRestaurantOrderUpdate } from '../../order/services/restaurantNotificationService.js';
 import { notifyUserOrderUpdate } from '../../order/services/userNotificationService.js';
-import { broadcastDeliveryRequest } from '../../order/services/deliveryAssignmentService.js';
+import { dispatchDeliveryRequestWithStrategy } from '../../order/services/deliveryAssignmentService.js';
 import mongoose from 'mongoose';
 
 const extractRestaurantCoordinates = (location) => {
@@ -391,7 +391,7 @@ export const acceptOrder = asyncHandler(async (req, res) => {
         const coords = await resolveRestaurantCoordinatesForAssignment(freshOrder, restaurantId);
 
         if (coords?.restaurantLat && coords?.restaurantLng) {
-          const result = await broadcastDeliveryRequest(
+          const result = await dispatchDeliveryRequestWithStrategy(
             freshOrder._id.toString(),
             coords.restaurantLat,
             coords.restaurantLng,
@@ -784,7 +784,7 @@ export const markOrderReady = asyncHandler(async (req, res) => {
           const coords = await resolveRestaurantCoordinatesForAssignment(latestOrderForAssignment || order, restaurantId, populatedOrder);
           if (coords?.restaurantLat && coords?.restaurantLng) {
             console.log('📣 [DeliveryAssign] Broadcast on ready for order', order.orderId || order._id.toString());
-            const result = await broadcastDeliveryRequest(order._id.toString(), coords.restaurantLat, coords.restaurantLng, { trigger: 'ready' });
+            const result = await dispatchDeliveryRequestWithStrategy(order._id.toString(), coords.restaurantLat, coords.restaurantLng, { trigger: 'ready' });
             console.log('📊 [DeliveryAssign] Ready broadcast recipients', {
               orderId: order.orderId || null,
               orderMongoId: order._id?.toString?.() || null,
