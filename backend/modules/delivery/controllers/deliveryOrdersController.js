@@ -760,35 +760,34 @@ export const acceptOrder = asyncHandler(async (req, res) => {
         minDistance: 4
       };
       estimatedEarnings = {
-        basePayout: Math.round((breakdown.basePayout || 10) * 100) / 100,
+        basePayout: Math.round((Number(breakdown.basePayout ?? 0)) * 100) / 100,
         distance: Math.round(deliveryDistance * 100) / 100,
-        commissionPerKm: Math.round((breakdown.commissionPerKm || 5) * 100) / 100,
-        distanceCommission: Math.round((breakdown.distanceCommission || 0) * 100) / 100,
-        totalEarning: Math.round(commissionResult.commission * 100) / 100,
+        commissionPerKm: Math.round((Number(breakdown.commissionPerKm ?? 0)) * 100) / 100,
+        distanceCommission: Math.round((Number(breakdown.distanceCommission ?? 0)) * 100) / 100,
+        totalEarning: Math.round(Number(commissionResult.commission ?? 0) * 100) / 100,
         breakdown: {
-          basePayout: breakdown.basePayout || 10,
+          basePayout: Number(breakdown.basePayout ?? 0),
           distance: deliveryDistance,
-          commissionPerKm: breakdown.commissionPerKm || 5,
-          distanceCommission: breakdown.distanceCommission || 0,
-          minDistance: rule.minDistance || 4
+          commissionPerKm: Number(breakdown.commissionPerKm ?? 0),
+          distanceCommission: Number(breakdown.distanceCommission ?? 0),
+          minDistance: Number(rule.minDistance ?? 0)
         }
       };
     } catch (earningsError) {
       console.error('❌ Error calculating estimated earnings:', earningsError);
       console.error('❌ Earnings error stack:', earningsError.stack);
-      // Fallback to default
       estimatedEarnings = {
-        basePayout: 10,
+        basePayout: 0,
         distance: Math.round(deliveryDistance * 100) / 100,
-        commissionPerKm: 5,
-        distanceCommission: deliveryDistance > 4 ? Math.round(deliveryDistance * 5 * 100) / 100 : 0,
-        totalEarning: 10 + (deliveryDistance > 4 ? Math.round(deliveryDistance * 5 * 100) / 100 : 0),
+        commissionPerKm: 0,
+        distanceCommission: 0,
+        totalEarning: 0,
         breakdown: {
-          basePayout: 10,
+          basePayout: 0,
           distance: deliveryDistance,
-          commissionPerKm: 5,
-          distanceCommission: deliveryDistance > 4 ? deliveryDistance * 5 : 0,
-          minDistance: 4
+          commissionPerKm: 0,
+          distanceCommission: 0,
+          minDistance: 0
         }
       };
     }
@@ -1896,13 +1895,12 @@ export const completeDelivery = asyncHandler(async (req, res) => {
     try {
       const tierName = order.pricing?.pricingMeta?.tierName || null;
       const commissionResult = await DeliveryBoyCommission.calculateCommission(deliveryDistance, tierName);
-      totalEarning = commissionResult.commission;
+      totalEarning = Number(commissionResult.commission || 0);
       commissionBreakdown = commissionResult.breakdown;
     } catch (commissionError) {
       console.error('⚠️ Error calculating commission using rules:', commissionError.message);
-      // Fallback: Use delivery fee as earnings if commission calculation fails
-      totalEarning = order.pricing?.deliveryFee || 0;
-      console.warn(`⚠️ Using fallback earnings (delivery fee): ₹${totalEarning.toFixed(2)}`);
+      totalEarning = 0;
+      console.warn('⚠️ Commission calculation failed; keeping delivery earning as ₹0 to avoid incorrect payout.');
     }
 
     // Add earning to delivery boy's wallet
