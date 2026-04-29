@@ -4,9 +4,9 @@ import DeliveryWallet from '../models/DeliveryWallet.js';
 import DeliveryWithdrawalRequest from '../models/DeliveryWithdrawalRequest.js';
 import Order from '../../order/models/Order.js';
 import BusinessSettings from '../../admin/models/BusinessSettings.js';
+import DeliveryBoyCommission from '../../admin/models/DeliveryBoyCommission.js';
 import OrderSettlement from '../../order/models/OrderSettlement.js';
 import AdminWallet from '../../admin/models/AdminWallet.js';
-import { calculateRiderEarning } from '../services/riderEarningsService.js';
 import { validate } from '../../../shared/middleware/validate.js';
 import Joi from 'joi';
 import winston from 'winston';
@@ -147,11 +147,6 @@ export const getWallet = asyncHandler(async (req, res) => {
             if (existing) continue;
 
             let amount = settlementMap.get(orderIdStr) || 0;
-            let payoutMeta = {
-              source: 'settlement',
-              fallbackReason: null,
-              reconciliationRequired: false,
-            };
             if (!amount || amount <= 0) {
               let distance = 0;
               if (order?.pricing?.distanceKm != null && Number(order.pricing.distanceKm) > 0) {
@@ -162,18 +157,16 @@ export const getWallet = asyncHandler(async (req, res) => {
                 distance = Number(order.assignmentInfo.distance) || 0;
               }
               if (distance > 0) {
-                const tierName = order?.pricing?.pricingMeta?.tierName || null;
-                const earningResult = await calculateRiderEarning({
-                  distanceKm: distance,
-                  tierName,
-                  context: 'delivery_wallet_backfill',
-                });
-                amount = Number(earningResult?.amount) || 0;
-                payoutMeta = {
-                  source: earningResult.source,
-                  fallbackReason: earningResult.fallbackReason || null,
-                  reconciliationRequired: earningResult.reconciliationRequired === true,
-                };
+                try {
+                  const tierName = order?.pricing?.pricingMeta?.tierName || null;
+                  const commissionResult = await DeliveryBoyCommission.calculateCommission(distance, tierName);
+                  amount = Number(commissionResult?.commission) || 0;
+                } catch {
+                  amount = 0;
+                }
+              }
+              if (!amount || amount <= 0) {
+                amount = Number(order?.pricing?.deliveryFee) || 0;
               }
             }
 
@@ -185,12 +178,7 @@ export const getWallet = asyncHandler(async (req, res) => {
                 description: `Backfill delivery earnings for Order #${order.orderId || orderIdStr}`,
                 orderId: order._id,
                 paymentCollected: false,
-                metadata: {
-                  source: payoutMeta.source,
-                  fallbackReason: payoutMeta.fallbackReason || null,
-                  reconciliationRequired: payoutMeta.reconciliationRequired === true,
-                  backfill: true,
-                }
+                metadata: { source: 'wallet_backfill' }
               });
               backfillCount += 1;
             }

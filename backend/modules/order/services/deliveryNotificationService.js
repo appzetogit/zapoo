@@ -3,7 +3,6 @@ import Delivery from '../../delivery/models/Delivery.js';
 import Restaurant from '../../restaurant/models/Restaurant.js';
 import mongoose from 'mongoose';
 import { sendNotificationToUser } from '../../notification/utils/pushNotificationHelper.js';
-import { calculateRiderEarning } from '../../delivery/services/riderEarningsService.js';
 
 // Dynamic import to avoid circular dependency
 let getIO = null;
@@ -225,12 +224,19 @@ export async function notifyDeliveryBoyNewOrder(order, deliveryPartnerId) {
       console.error('Error resolving tier for notification earnings:', tierError.message);
     }
 
-    // Calculate estimated earnings from tier commission rules only.
+    // Calculate estimated earnings; use order's delivery fee as fallback when 0 or distance missing
     const deliveryFeeFromOrder = order.pricing?.deliveryFee ?? 0;
     let estimatedEarnings = await calculateEstimatedEarnings(
       deliveryDistance || 0,
       tierName
     );
+    const earnedValue = typeof estimatedEarnings === 'object' ? estimatedEarnings.totalEarning ?? 0 : Number(estimatedEarnings) || 0;
+    if (earnedValue <= 0 && deliveryFeeFromOrder > 0) {
+      estimatedEarnings = typeof estimatedEarnings === 'object' ? {
+        ...estimatedEarnings,
+        totalEarning: deliveryFeeFromOrder
+      } : deliveryFeeFromOrder;
+    }
 
     // Prepare order notification data
     const orderNotification = {
@@ -476,11 +482,26 @@ export async function notifyMultipleDeliveryBoys(order, deliveryPartnerIds, phas
         deliveryDistance,
         tierName
       );
+      const earnedValue = typeof estimatedEarnings === 'object' ? estimatedEarnings.totalEarning ?? 0 : Number(estimatedEarnings) || 0;
+      // Use deliveryFee as fallback if earnings is 0 or invalid
+      if (earnedValue <= 0 && deliveryFeeFromOrder > 0) {
+        estimatedEarnings = typeof estimatedEarnings === 'object' ? {
+          ...estimatedEarnings,
+          totalEarning: deliveryFeeFromOrder
+        } : deliveryFeeFromOrder;
+      }
     } catch (earningsError) {
       console.error('❌ Error calculating estimated earnings in notification:', earningsError);
       console.error('❌ Error stack:', earningsError.stack);
-      // Emergency base fallback is handled inside calculateEstimatedEarnings.
-      estimatedEarnings = await calculateEstimatedEarnings(deliveryDistance, tierName);
+      // Fallback to deliveryFee or default
+      estimatedEarnings = deliveryFeeFromOrder > 0 ? deliveryFeeFromOrder : {
+        basePayout: 10,
+        distance: deliveryDistance,
+        commissionPerKm: 5,
+        distanceCommission: 0,
+        totalEarning: 10,
+        breakdown: 'Default calculation'
+      };
     }
 
     // Prepare notification payload
@@ -722,25 +743,67 @@ function calculateDistance(lat1, lng1, lat2, lng2) {
  * Uses DeliveryBoyCommission model to calculate: Base Payout + (Distance × Per Km) if distance > minDistance
  */
 async function calculateEstimatedEarnings(deliveryDistance, tierName = null) {
-  const earning = await calculateRiderEarning({
-    distanceKm: deliveryDistance || 0,
-    tierName,
-    context: 'delivery_notification',
-  });
+  try {
+    const DeliveryBoyCommission = (await import('../../admin/models/DeliveryBoyCommission.js')).default;
 
-  return {
-    basePayout: earning.breakdown.basePayout,
-    distance: earning.breakdown.distance,
-    commissionPerKm: earning.breakdown.commissionPerKm,
-    distanceCommission: earning.breakdown.distanceCommission,
-    totalEarning: earning.amount,
-    minDistance: earning.breakdown.minDistance,
-    maxDistance: earning.breakdown.maxDistance,
-    source: earning.source,
-    fallbackReason: earning.fallbackReason,
-    reconciliationRequired: earning.reconciliationRequired,
-    breakdown: earning.source === 'commission'
-      ? `Tier commission applied`
-      : `Emergency base fallback applied`,
-  };
+    // Always use calculateCommission method which handles all cases including distance = 0
+    // It will return base payout even if distance is 0
+    const deliveryDistanceForCalc = deliveryDistance || 0;
+    const commissionResult = await DeliveryBoyCommission.calculateCommission(
+      deliveryDistanceForCalc,
+      tierName
+    );
+
+    // If distance is 0 or not provided, payout remains 0 (0 km excluded from payout range)
+    if (!deliveryDistance || deliveryDistance <= 0) {
+      return {
+        basePayout: 0,
+        distance: 0,
+        commissionPerKm: 0,
+        distanceCommission: 0,
+        totalEarning: 0,
+        breakdown: 'No payout for 0 km distance',
+        minDistance: commissionResult.breakdown?.minDistance ?? 0,
+        maxDistance: commissionResult.breakdown?.maxDistance ?? 0
+      };
+    }
+
+    // Use the already calculated commissionResult for distance > 0
+
+    const basePayout = commissionResult.breakdown.basePayout;
+    const distance = deliveryDistance;
+    const commissionPerKm = commissionResult.breakdown.commissionPerKm;
+    const distanceCommission = commissionResult.breakdown.distanceCommission;
+    const totalEarning = commissionResult.commission;
+
+    // Create breakdown text
+    let breakdown = `Base payout: ₹${basePayout}`;
+    if (commissionResult.breakdown?.perKmApplied) {
+      breakdown += ` + Distance (${distance.toFixed(1)} km × ₹${commissionPerKm}/km) = ₹${distanceCommission.toFixed(0)}`;
+    } else {
+      breakdown += ` (Distance ${distance.toFixed(1)} km within base slab up to ${commissionResult.breakdown.maxDistance} km, per km not applicable)`;
+    }
+    breakdown += ` = ₹${totalEarning.toFixed(0)}`;
+    return {
+      basePayout: Math.round(basePayout * 100) / 100,
+      distance: Math.round(distance * 100) / 100,
+      commissionPerKm: Math.round(commissionPerKm * 100) / 100,
+      distanceCommission: Math.round(distanceCommission * 100) / 100,
+      totalEarning: Math.round(totalEarning * 100) / 100,
+      breakdown: breakdown,
+      minDistance: commissionResult.rule.minDistance,
+      maxDistance: commissionResult.rule.maxDistance
+    };
+  } catch (error) {
+    console.error('Error calculating estimated earnings:', error);
+    // Fallback to default calculation
+    return {
+      basePayout: 10,
+      distance: deliveryDistance || 0,
+      commissionPerKm: 5,
+      distanceCommission: deliveryDistance && deliveryDistance > 4 ? deliveryDistance * 5 : 0,
+      totalEarning: 10 + (deliveryDistance && deliveryDistance > 4 ? deliveryDistance * 5 : 0),
+      breakdown: 'Default calculation'
+    };
+  }
 }
