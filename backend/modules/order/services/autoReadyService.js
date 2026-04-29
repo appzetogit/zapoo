@@ -1,7 +1,7 @@
 import Order from '../models/Order.js';
 import { notifyDeliveryBoyOrderReady } from './deliveryNotificationService.js';
 import Restaurant from '../../restaurant/models/Restaurant.js';
-import { dispatchDeliveryRequestWithStrategy } from './deliveryAssignmentService.js';
+import { broadcastDeliveryRequest } from './deliveryAssignmentService.js';
 
 /**
  * Automatically mark orders as ready when ETA becomes 0
@@ -111,7 +111,7 @@ export async function processAutoReadyOrders() {
 
                 if (Number.isFinite(restaurantLat) && Number.isFinite(restaurantLng)) {
                   console.log('📣 [AutoReady] Broadcast on ready for order', updatedOrder.orderId || updatedOrder._id.toString());
-                  const result = await dispatchDeliveryRequestWithStrategy(updatedOrder._id.toString(), restaurantLat, restaurantLng, { trigger: 'auto_ready' });
+                  const result = await broadcastDeliveryRequest(updatedOrder._id.toString(), restaurantLat, restaurantLng, { trigger: 'auto_ready' });
                   console.log('📊 [AutoReady] Ready broadcast recipients', {
                     orderId: updatedOrder.orderId || null,
                     orderMongoId: updatedOrder._id?.toString?.() || null,

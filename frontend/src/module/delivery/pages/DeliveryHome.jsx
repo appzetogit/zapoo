@@ -614,13 +614,9 @@ export default function DeliveryHome() {
   const [showReachedDropPopup, setShowReachedDropPopup] = useState(false);
   const [showOrderDeliveredAnimation, setShowOrderDeliveredAnimation] = useState(false);
   const [showCustomerReviewPopup, setShowCustomerReviewPopup] = useState(false);
-  const [isSimulationStarting, setIsSimulationStarting] = useState(false);
   const [showPaymentPage, setShowPaymentPage] = useState(false);
   const [customerRating, setCustomerRating] = useState(0);
   const [customerReviewText, setCustomerReviewText] = useState("");
-  const [handoffOtpInput, setHandoffOtpInput] = useState("");
-  const [isResendingHandoffOtp, setIsResendingHandoffOtp] = useState(false);
-  const isSimulationModeEnabled = String(import.meta.env.VITE_DELIVERY_SIMULATION_MODE || "false") === "true";
   const [orderEarnings, setOrderEarnings] = useState(0); // Store earnings from completed order
   const [routePolyline, setRoutePolyline] = useState([]);
   const [showRoutePath, setShowRoutePath] = useState(false); // Toggle to show/hide route path - disabled by default
@@ -2529,7 +2525,9 @@ export default function DeliveryHome() {
       // Close popup, confirm reached drop, and show order delivered animation instantly (no delay)
       // Close reached drop popup
       setShowReachedDropPopup(false);
-      setShowOrderDeliveredAnimation(false);
+
+      // Show delivery complete popup (this triggers review -> completeDelivery flow)
+      setShowOrderDeliveredAnimation(true);
       // Mark that this order has reached drop to avoid showing earlier popups on refresh
       try {
         const orderIdForApi = selectedRestaurant?.id || newOrder?.orderMongoId || newOrder?._id || selectedRestaurant?.orderId || newOrder?.orderId;
@@ -2551,9 +2549,7 @@ export default function DeliveryHome() {
             // Use MongoDB _id for API call to avoid ObjectId casting errors
 
             const response = await deliveryAPI.confirmReachedDrop(orderIdForApi);
-            if (response.data?.success) {
-              setShowCustomerReviewPopup(true);
-            } else {
+            if (response.data?.success) { } else {
               console.error('❌ Failed to confirm reached drop:', response.data);
               toast.error(response.data?.message || 'Failed to confirm reached drop. Please try again.');
             }
@@ -3228,23 +3224,6 @@ export default function DeliveryHome() {
     toast.success('Opening Google Maps navigation 🗺️', {
       duration: 2000
     });
-  };
-
-  const handleStartSimulation = async () => {
-    const orderIdForApi = selectedRestaurant?.id || newOrder?.orderMongoId || newOrder?._id || selectedRestaurant?.orderId || newOrder?.orderId;
-    if (!orderIdForApi) {
-      toast.error('Route is not ready for simulation');
-      return;
-    }
-    try {
-      setIsSimulationStarting(true);
-      await deliveryAPI.simulateRoute(orderIdForApi);
-      toast.success('Simulation started');
-    } catch (error) {
-      toast.error(error?.response?.data?.message || 'Failed to start simulation');
-    } finally {
-      setIsSimulationStarting(false);
-    }
   };
 
   // Handle Order Delivered button swipe
@@ -4687,12 +4666,8 @@ export default function DeliveryHome() {
             heading: 0,
             disableDefaultUI: false,
             zoomControl: true,
-            zoomControlOptions: {
-              position: window.google.maps.ControlPosition.RIGHT_CENTER
-            },
             mapTypeControl: false,
             streetViewControl: false,
-            rotateControl: false,
             fullscreenControl: false
           });
         } catch (mapError) {
@@ -4921,12 +4896,8 @@ export default function DeliveryHome() {
           heading: 0,
           disableDefaultUI: false,
           zoomControl: true,
-          zoomControlOptions: {
-            position: window.google.maps.ControlPosition.RIGHT_CENTER
-          },
           mapTypeControl: false,
           streetViewControl: false,
-          rotateControl: false,
           fullscreenControl: false
         });
         window.deliveryMapInstance = map;
@@ -5457,12 +5428,8 @@ export default function DeliveryHome() {
           mapTypeId: window.google.maps.MapTypeId.ROADMAP || 'roadmap',
           disableDefaultUI: false,
           zoomControl: true,
-          zoomControlOptions: {
-            position: window.google.maps.ControlPosition.RIGHT_CENTER
-          },
           mapTypeControl: false,
           streetViewControl: false,
-          rotateControl: false,
           fullscreenControl: false
         });
         directionsMapInstanceRef.current = map;
@@ -8211,11 +8178,6 @@ export default function DeliveryHome() {
         </div>}
       </div>
 
-      {isSimulationModeEnabled && (Array.isArray(selectedRestaurant?.routeCoordinates) && selectedRestaurant.routeCoordinates.length > 1 || Array.isArray(selectedRestaurant?.deliveryState?.routeToDelivery?.coordinates) && selectedRestaurant.deliveryState.routeToDelivery.coordinates.length > 1) && <button onClick={handleStartSimulation} disabled={isSimulationStarting} className="w-full mb-3 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 px-4 rounded-xl shadow-md transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-60">
-          <TargetIcon className="w-4 h-4" />
-          <span>{isSimulationStarting ? 'Starting Simulation...' : 'Start Simulation'}</span>
-        </button>}
-
       {/* Start Navigation Button */}
       <button onClick={handleStartNavigation} className="w-full bg-[#4285F4] hover:bg-[#357ae8] text-white font-bold py-4 px-6 rounded-xl shadow-lg transition-all duration-200 flex items-center justify-center gap-2 active:scale-95">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -8485,41 +8447,6 @@ export default function DeliveryHome() {
       {/* Optional Review Text */}
       <div className="mb-6">
         <label className="block text-left text-sm font-medium text-gray-700 mb-2">
-          Delivery Handoff OTP
-        </label>
-        <div className="flex gap-2">
-          <input
-            value={handoffOtpInput}
-            onChange={e => setHandoffOtpInput(e.target.value.replace(/\D/g, '').slice(0, 6))}
-            placeholder="Enter OTP from customer"
-            className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-          />
-          <button
-            type="button"
-            onClick={async () => {
-              const orderIdForApi = selectedRestaurant?.id || newOrder?.orderMongoId || newOrder?._id || selectedRestaurant?.orderId || newOrder?.orderId;
-              if (!orderIdForApi) return;
-              try {
-                setIsResendingHandoffOtp(true);
-                await deliveryAPI.resendHandoffOtp(orderIdForApi);
-                toast.success('OTP resent to customer');
-              } catch (error) {
-                toast.error(error?.response?.data?.message || 'Failed to resend OTP');
-              } finally {
-                setIsResendingHandoffOtp(false);
-              }
-            }}
-            disabled={isResendingHandoffOtp}
-            className="px-3 py-2 text-sm rounded-lg border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-50"
-          >
-            {isResendingHandoffOtp ? 'Sending...' : 'Resend OTP'}
-          </button>
-        </div>
-      </div>
-
-      {/* Optional Review Text */}
-      <div className="mb-6">
-        <label className="block text-left text-sm font-medium text-gray-700 mb-2">
           Review (Optional)
         </label>
         <textarea value={customerReviewText} onChange={e => setCustomerReviewText(e.target.value)} placeholder="Share your experience..." className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none" rows={4} />
@@ -8533,11 +8460,6 @@ export default function DeliveryHome() {
         // Save review by calling completeDelivery API with rating and review
         if (orderIdForApi) {
           try {
-            if (!handoffOtpInput.trim()) {
-              toast.error('Please enter customer OTP before completing delivery.');
-              return;
-            }
-            await deliveryAPI.verifyHandoffOtp(orderIdForApi, handoffOtpInput.trim());
             // Call completeDelivery API with rating and review
             const response = await deliveryAPI.completeDelivery(orderIdForApi, customerRating > 0 ? customerRating : null, customerReviewText.trim() || '');
             if (response.data?.success) {
@@ -8556,7 +8478,6 @@ export default function DeliveryHome() {
               // Close review popup and show payment page
               setShowCustomerReviewPopup(false);
               setShowPaymentPage(true);
-              setHandoffOtpInput("");
               localStorage.removeItem('deliveryAtDropOrderId');
               localStorage.removeItem('deliveryPendingOrder');
             } else {
@@ -8565,7 +8486,11 @@ export default function DeliveryHome() {
             }
           } catch (error) {
             console.error('❌ Error submitting review:', error);
-            toast.error(error?.response?.data?.message || 'Failed to complete delivery. Please try again.');
+            toast.error('Failed to submit review. Please try again.');
+            // Still show payment page even if review fails
+            setShowCustomerReviewPopup(false);
+            setShowPaymentPage(true);
+            localStorage.removeItem('deliveryPendingOrder');
           }
         } else {
           // If no order ID, just show payment page

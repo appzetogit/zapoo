@@ -1055,14 +1055,12 @@ export const getOrderDetails = async (req, res) => {
         let foundOrder = null;
         if (mongoose.Types.ObjectId.isValid(id) && id.length === 24) {
           foundOrder = await Order.findOne({ _id: id, userId })
-            .select('+deliveryVerification.handoffOtp.code')
             .populate('deliveryPartnerId', 'name email phone')
             .populate('restaurantId', 'name slug address location profileImage')
             .lean();
         }
         if (!foundOrder) {
           foundOrder = await Order.findOne({ orderId: id, userId })
-            .select('+deliveryVerification.handoffOtp.code')
             .populate('deliveryPartnerId', 'name email phone')
             .populate('restaurantId', 'name slug address location profileImage')
             .lean();

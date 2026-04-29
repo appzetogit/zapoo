@@ -93,9 +93,7 @@ const DeliveryMap = React.memo(({ mapContainerRef, mapLoading, isRefreshingLocat
       </AnimatePresence>
 
       {/* Floating Action Button - My Location */}
-      <motion.button onClick={onRefreshLocation} className="absolute right-3 w-12 h-12 bg-white rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 transition-colors z-20 overflow-visible" style={{
-        top: "calc(50% + 88px)"
-      }} whileTap={{
+      <motion.button onClick={onRefreshLocation} className="absolute bottom-44 right-3 w-12 h-12 bg-white rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 transition-colors z-20 overflow-visible" whileTap={{
         scale: 0.92
       }} transition={{
         type: "spring",

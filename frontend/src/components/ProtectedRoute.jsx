@@ -4,6 +4,8 @@ import { Loader2 } from "lucide-react";
 import {
   isModuleAuthenticated,
   getDeliverySignupPendingStep,
+  setDeliverySignupPendingStep,
+  getDeliverySignupStepFromUser,
 } from "@/lib/utils/auth";
 import { restaurantAPI } from "@/lib/api";
 import FeatureLockedScreen from "@/module/restaurant/components/FeatureLockedScreen";
@@ -142,7 +144,21 @@ export default function ProtectedRoute({ children, requiredRole, loginPath }) {
   }
 
   if (requiredRole === "delivery") {
-    const pendingStep = getDeliverySignupPendingStep();
+    let pendingStep = getDeliverySignupPendingStep();
+    if (!pendingStep) {
+      try {
+        const rawDeliveryUser = localStorage.getItem("delivery_user");
+        const parsedDeliveryUser = rawDeliveryUser ? JSON.parse(rawDeliveryUser) : null;
+        const derivedStep = getDeliverySignupStepFromUser(parsedDeliveryUser);
+        if (derivedStep) {
+          setDeliverySignupPendingStep(derivedStep);
+          pendingStep = derivedStep;
+        }
+      } catch {
+        pendingStep = null;
+      }
+    }
+
     if (pendingStep) {
       const targetPath =
         pendingStep === "documents" ? "/delivery/signup/documents" : "/delivery/signup/details";

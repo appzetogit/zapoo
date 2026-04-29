@@ -2,7 +2,7 @@ import Order from '../../order/models/Order.js';
 import Restaurant from '../models/Restaurant.js';
 import { successResponse, errorResponse } from '../../../shared/utils/response.js';
 import asyncHandler from '../../../shared/middleware/asyncHandler.js';
-import { dispatchDeliveryRequestWithStrategy } from '../../order/services/deliveryAssignmentService.js';
+import { broadcastDeliveryRequest } from '../../order/services/deliveryAssignmentService.js';
 import mongoose from 'mongoose';
 
 /**
@@ -47,7 +47,7 @@ export const resendDeliveryNotification = asyncHandler(async (req, res) => {
     }
     const [restaurantLng, restaurantLat] = restaurantDoc.location.coordinates;
 
-    const result = await dispatchDeliveryRequestWithStrategy(order._id.toString(), restaurantLat, restaurantLng, { trigger: 'manual_resend' });
+    const result = await broadcastDeliveryRequest(order._id.toString(), restaurantLat, restaurantLng, { trigger: 'manual_resend' });
     console.log('📊 [DeliveryAssign] Resend broadcast recipients', {
       orderId: order.orderId || null,
       orderMongoId: order._id?.toString?.() || null,

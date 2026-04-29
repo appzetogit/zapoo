@@ -10,12 +10,8 @@ import { notifyRestaurantOrderMessage } from './restaurantNotificationService.js
 
 const ASSIGNMENT_TIMEOUT_MS = 300000; // 5 minutes to accept
 const assignmentTimeouts = new Map();
-const smartDispatchRetryTimeouts = new Map();
 const FIREBASE_ONLINE_TTL_MS = Number(process.env.DELIVERY_ONLINE_TTL_MS || 120000); // 2 minutes
 const STRICT_SOCKET_ONLINE = String(process.env.DELIVERY_STRICT_SOCKET_ONLINE || 'true') !== 'false';
-const SMART_DISPATCH_V2_ENABLED = String(process.env.DELIVERY_SMART_DISPATCH_V2 || 'false') === 'true';
-const SMART_DISPATCH_RETRY_MS = Number(process.env.DELIVERY_SMART_DISPATCH_RETRY_MS || 60000);
-const SMART_DISPATCH_PHASE_RADII = [15, 25, 40, 60];
 // Default true so broadcast can include riders who are online in DB but missing/stale in Firebase presence.
 const ALLOW_MONGO_ONLINE_FALLBACK = String(process.env.DELIVERY_ALLOW_MONGO_ONLINE_FALLBACK || 'true') === 'true';
 const PRESENCE_DEBUG = String(process.env.DELIVERY_PRESENCE_DEBUG || 'true') === 'true';
@@ -77,22 +73,6 @@ function scheduleAssignmentTimeout(orderId) {
   clearAssignmentTimeout(orderId);
   const timeoutId = setTimeout(() => autoCancelIfUnassigned(orderId), ASSIGNMENT_TIMEOUT_MS);
   assignmentTimeouts.set(String(orderId), timeoutId);
-}
-
-function clearSmartDispatchRetry(orderId) {
-  const key = String(orderId);
-  const timeout = smartDispatchRetryTimeouts.get(key);
-  if (timeout) {
-    clearTimeout(timeout);
-    smartDispatchRetryTimeouts.delete(key);
-  }
-}
-
-function getSmartDispatchRadiusKm(attempt = 1) {
-  if (attempt <= 1) return SMART_DISPATCH_PHASE_RADII[0];
-  if (attempt === 2) return SMART_DISPATCH_PHASE_RADII[1];
-  if (attempt === 3) return SMART_DISPATCH_PHASE_RADII[2];
-  return SMART_DISPATCH_PHASE_RADII[3];
 }
 
 function isFirebaseOnlineEntry(data) {
@@ -960,96 +940,6 @@ export async function broadcastDeliveryRequest(orderId, restaurantLat, restauran
   await notifyMultipleDeliveryBoys(order, eligibleIds, 'broadcast');
   scheduleAssignmentTimeout(orderId);
   return { success: true, notifiedCount: eligibleIds.length, deliveryPartnerIds: eligibleIds };
-}
-
-export function clearSmartDispatchTimer(orderId) {
-  clearSmartDispatchRetry(orderId);
-}
-
-async function scheduleSmartDispatchRetry(orderId, restaurantLat, restaurantLng, nextAttempt, trigger) {
-  clearSmartDispatchRetry(orderId);
-  const timeoutId = setTimeout(async () => {
-    try {
-      const latestOrder = await Order.findById(orderId).select('status deliveryPartnerId');
-      if (!latestOrder || latestOrder.deliveryPartnerId) {
-        clearSmartDispatchRetry(orderId);
-        return;
-      }
-      if (!['confirmed', 'preparing', 'ready'].includes(latestOrder.status)) {
-        clearSmartDispatchRetry(orderId);
-        return;
-      }
-      await runSmartDispatchCycle(orderId, restaurantLat, restaurantLng, { attempt: nextAttempt, trigger });
-    } catch (error) {
-      console.error('❌ [SmartDispatch] Retry cycle failed:', error);
-    }
-  }, SMART_DISPATCH_RETRY_MS);
-  smartDispatchRetryTimeouts.set(String(orderId), timeoutId);
-}
-
-async function runSmartDispatchCycle(orderId, restaurantLat, restaurantLng, { attempt = 1, trigger = 'accept' } = {}) {
-  const radiusKm = getSmartDispatchRadiusKm(attempt);
-  const now = new Date();
-  const order = await Order.findById(orderId)
-    .populate('userId', 'name phone')
-    .populate('restaurantId', 'name location address phone ownerPhone')
-    .lean();
-
-  if (!order || order.deliveryPartnerId || !['confirmed', 'preparing', 'ready'].includes(order.status)) {
-    clearSmartDispatchRetry(orderId);
-    return { success: false, skipped: true, reason: 'not_dispatchable' };
-  }
-
-  const nearest = await findNearestDeliveryBoys(restaurantLat, restaurantLng, order.restaurantId?._id || order.restaurantId, radiusKm);
-  const candidateIds = (nearest || []).map(db => db.deliveryPartnerId?.toString?.() || String(db.deliveryPartnerId || '')).filter(Boolean);
-  const uniqueCandidateIds = Array.from(new Set(candidateIds));
-  const alreadyOffered = new Set((order.assignmentInfo?.broadcastDeliveryPartnerIds || []).map(id => String(id)));
-  const rejected = new Set((order.assignmentInfo?.broadcastRejectedDeliveryPartnerIds || []).map(id => String(id)));
-  const eligibleIds = uniqueCandidateIds.filter(id => !alreadyOffered.has(id) && !rejected.has(id));
-
-  await Order.findByIdAndUpdate(orderId, {
-    $set: {
-      'assignmentInfo.notificationPhase': 'broadcast',
-      'assignmentInfo.broadcastNotifiedAt': now,
-      'assignmentInfo.lastNotifiedAt': now,
-      'assignmentInfo.smartDispatchAttempt': attempt,
-      'assignmentInfo.smartDispatchRadiusKm': radiusKm,
-      'assignmentInfo.smartDispatchNextRetryAt': new Date(Date.now() + SMART_DISPATCH_RETRY_MS),
-      'assignmentInfo.assignedBy': 'manual'
-    }
-  });
-
-  if (eligibleIds.length > 0) {
-    await notifyMultipleDeliveryBoys(order, eligibleIds, 'broadcast');
-    await Order.findByIdAndUpdate(orderId, {
-      $addToSet: {
-        'assignmentInfo.broadcastDeliveryPartnerIds': { $each: eligibleIds }
-      }
-    });
-  }
-
-  const shouldRetry = !order.deliveryPartnerId && ['confirmed', 'preparing', 'ready'].includes(order.status);
-  if (shouldRetry) {
-    await scheduleSmartDispatchRetry(orderId, restaurantLat, restaurantLng, attempt + 1, trigger);
-  } else {
-    clearSmartDispatchRetry(orderId);
-  }
-
-  scheduleAssignmentTimeout(orderId);
-  return {
-    success: true,
-    attempt,
-    radiusKm,
-    notifiedCount: eligibleIds.length,
-    deliveryPartnerIds: eligibleIds
-  };
-}
-
-export async function dispatchDeliveryRequestWithStrategy(orderId, restaurantLat, restaurantLng, { trigger = 'accept' } = {}) {
-  if (!SMART_DISPATCH_V2_ENABLED) {
-    return broadcastDeliveryRequest(orderId, restaurantLat, restaurantLng, { trigger });
-  }
-  return runSmartDispatchCycle(orderId, restaurantLat, restaurantLng, { attempt: 1, trigger });
 }
 
 async function refreshSequentialCandidateQueue(orderDoc, restaurantLat, restaurantLng) {
