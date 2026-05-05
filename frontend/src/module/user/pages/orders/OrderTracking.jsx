@@ -425,7 +425,8 @@ export default function OrderTracking() {
             deliveryPartnerId: apiOrder.deliveryPartnerId?._id || apiOrder.deliveryPartnerId || apiOrder.assignmentInfo?.deliveryPartnerId || null,
             assignmentInfo: apiOrder.assignmentInfo || null,
             tracking: apiOrder.tracking || {},
-            deliveryState: apiOrder.deliveryState || null
+            deliveryState: apiOrder.deliveryState || null,
+            deliveryVerification: apiOrder.deliveryVerification || null
           };
           setOrder(transformedOrder);
           setOrderStatus(deriveTrackingUiStatus(apiOrder));
@@ -711,7 +712,8 @@ export default function OrderTracking() {
           deliveryPartnerId: apiOrder.deliveryPartnerId?._id || apiOrder.deliveryPartnerId || apiOrder.assignmentInfo?.deliveryPartnerId || null,
           assignmentInfo: apiOrder.assignmentInfo || null,
           tracking: apiOrder.tracking || {},
-          deliveryState: apiOrder.deliveryState || null
+          deliveryState: apiOrder.deliveryState || null,
+          deliveryVerification: apiOrder.deliveryVerification || null
         };
         setOrder(transformedOrder);
         setOrderStatus(deriveTrackingUiStatus(apiOrder));
@@ -963,6 +965,31 @@ export default function OrderTracking() {
             {t("user.orderTracking.deliveryDetailsBanner")}
           </p>
         </motion.div>
+
+        {!!order?.deliveryVerification?.dropOtp?.code && orderStatus !== 'delivered' && (
+          <motion.div
+            className="bg-emerald-50 dark:bg-emerald-900/20 rounded-xl p-4 border border-emerald-200 dark:border-emerald-800/40"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.68 }}
+          >
+            <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300 mb-2">
+              Delivery Verification Code
+            </p>
+            <div className="flex items-center justify-between">
+              <p className="text-3xl font-black tracking-[0.28em] text-emerald-900 dark:text-emerald-100">
+                {String(order.deliveryVerification.dropOtp.code)}
+              </p>
+              <span className={`text-xs font-bold px-3 py-1 rounded-full ${
+                order?.deliveryVerification?.dropOtp?.verified
+                  ? 'bg-emerald-200 text-emerald-900 dark:bg-emerald-800 dark:text-emerald-100'
+                  : 'bg-amber-100 text-amber-800 dark:bg-amber-800/50 dark:text-amber-200'
+              }`}>
+                {order?.deliveryVerification?.dropOtp?.verified ? 'Verified' : 'Share with rider'}
+              </span>
+            </div>
+          </motion.div>
+        )}
 
         {/* Contact & Address Section */}
         <motion.div className="bg-white dark:bg-[#1a1a1a] rounded-xl shadow-sm overflow-hidden border border-transparent dark:border-gray-800" initial={{

@@ -412,6 +412,17 @@ const orderSchema = new mongoose.Schema({
       calculatedAt: Date,
       method: String // 'osrm', 'dijkstra', 'haversine'
     }
+  },
+  deliveryVerification: {
+    dropOtp: {
+      code: String,
+      generatedAt: Date,
+      verified: {
+        type: Boolean,
+        default: false
+      },
+      verifiedAt: Date
+    }
   }
 }, {
   timestamps: true

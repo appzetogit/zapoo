@@ -72,6 +72,9 @@ const updateProfileSchema = Joi.object({
     publicId: Joi.string().trim().optional().allow(null, '')
   }).optional(),
   documents: Joi.object({
+    pan: Joi.object({
+      number: Joi.string().trim().uppercase().optional().allow(null, '')
+    }).optional(),
     bankDetails: Joi.object({
       accountHolderName: Joi.string().trim().min(2).max(100).pattern(BANK_NAME_REGEX).optional().allow(null, ''),
       accountNumber: Joi.string().trim().pattern(BANK_ACCOUNT_REGEX).optional().allow(null, ''),

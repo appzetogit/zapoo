@@ -3,7 +3,7 @@
  * Helper functions for date generation, slot creation, and validation
  */
 
-import { USER_LEVELS } from '../store/gigStore'
+import { USER_LEVELS } from '@food/store/gigStore'
 
 /**
  * Generate available dates based on user level

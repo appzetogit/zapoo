@@ -875,8 +875,79 @@ export async function broadcastDeliveryRequest(orderId, restaurantLat, restauran
     return { success: false, notifiedCount: 0, deliveryPartnerIds: [] };
   }
 
-  const nearest = await findNearestDeliveryBoys(restaurantLat, restaurantLng, order.restaurantId?._id || order.restaurantId, 5);
-  const candidateIds = (nearest || []).map(db => db.deliveryPartnerId?.toString?.() || String(db.deliveryPartnerId || '')).filter(Boolean);
+  const distanceTiers = [5, 8, 12];
+  let nearest = [];
+  let selectedTierKm = distanceTiers[0];
+  for (const tierKm of distanceTiers) {
+    const tierCandidates = await findNearestDeliveryBoys(
+      restaurantLat,
+      restaurantLng,
+      order.restaurantId?._id || order.restaurantId,
+      tierKm
+    );
+    if (Array.isArray(tierCandidates) && tierCandidates.length > 0) {
+      nearest = tierCandidates;
+      selectedTierKm = tierKm;
+      break;
+    }
+  }
+
+  let candidateIds = (nearest || [])
+    .map(db => db.deliveryPartnerId?.toString?.() || String(db.deliveryPartnerId || ''))
+    .filter(Boolean);
+
+  // Emergency fallback: if geo shortlist is empty, use currently online approved riders from MongoDB.
+  if (!candidateIds.length) {
+    const mongoOnlineFallback = await Delivery.find({
+      isActive: true,
+      status: { $in: ['approved', 'active'] },
+      'availability.isOnline': true
+    })
+      .select('_id availability.lastLocationUpdate')
+      .sort({ 'availability.lastLocationUpdate': -1, updatedAt: -1 })
+      .limit(40)
+      .lean();
+
+    candidateIds = (mongoOnlineFallback || [])
+      .map(p => p?._id?.toString?.() || String(p?._id || ''))
+      .filter(Boolean);
+
+    console.warn('⚠️ [DeliveryAssign] Geo shortlist empty. Using mongo online fallback for broadcast.', {
+      orderId: order.orderId || null,
+      orderMongoId: order._id?.toString?.() || String(orderId || ''),
+      trigger,
+      fallbackCount: candidateIds.length
+    });
+  } else {
+    console.log('🧭 [DeliveryAssign] Broadcast shortlist selected', {
+      orderId: order.orderId || null,
+      orderMongoId: order._id?.toString?.() || String(orderId || ''),
+      trigger,
+      selectedTierKm,
+      candidateCount: candidateIds.length
+    });
+  }
+
+  // Safety fallback for manual resend:
+  // if geo shortlist + online fallback both are empty, retry with previously known candidates.
+  if ((!candidateIds || candidateIds.length === 0) && trigger === 'manual_resend') {
+    const previousKnownIds = [
+      ...(order.assignmentInfo?.broadcastDeliveryPartnerIds || []),
+      ...(order.assignmentInfo?.priorityDeliveryPartnerIds || []),
+      ...(order.assignmentInfo?.expandedDeliveryPartnerIds || []),
+      ...(order.assignmentInfo?.candidateDeliveryPartnerIds || []),
+      order.assignmentInfo?.currentCandidateId
+    ]
+      .map(id => id?.toString?.() || String(id || ''))
+      .filter(Boolean);
+
+    candidateIds = Array.from(new Set(previousKnownIds));
+    console.warn('⚠️ [DeliveryAssign] Manual resend using previous known candidates fallback', {
+      orderId: order.orderId || null,
+      orderMongoId: order._id?.toString?.() || String(orderId || ''),
+      fallbackCount: candidateIds.length
+    });
+  }
 
   const rejectedIds = new Set(
     (order.assignmentInfo?.broadcastRejectedDeliveryPartnerIds || [])

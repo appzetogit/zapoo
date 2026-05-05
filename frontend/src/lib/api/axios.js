@@ -49,6 +49,7 @@ const apiClient = axios.create({
 function getTokenForContext(requestUrl = "") {
   const path = window.location.pathname;
   const url = requestUrl.toLowerCase();
+  const isDeliveryPath = path.startsWith("/delivery") || path.startsWith("/food/delivery");
 
   // 1. Check Request URL first (priority) - this ensures background tasks like 
   // FCM registration use the correct token regardless of active page
@@ -68,7 +69,7 @@ function getTokenForContext(requestUrl = "") {
     return localStorage.getItem("admin_accessToken");
   } else if (path.startsWith("/restaurant") && !path.startsWith("/restaurants") && !path.startsWith("/restaurant/list") && !path.startsWith("/restaurant/under-250")) {
     return localStorage.getItem("restaurant_accessToken");
-  } else if (path.startsWith("/delivery")) {
+  } else if (isDeliveryPath) {
     return localStorage.getItem("delivery_accessToken");
   } else if (path.startsWith("/user/") || path === "/") {
     return localStorage.getItem("user_accessToken");
@@ -144,7 +145,8 @@ apiClient.interceptors.request.use(config => {
         requestUrl.match(/\/restaurant\/[^/]+\/inventory/) ||
         requestUrl.match(/\/restaurant\/[^/]+\/offers/)));
 
-  const isAuthenticatedRoute = !isAuthPage && (path.startsWith("/admin") || path.startsWith("/restaurant") && !path.startsWith("/restaurants") && !isPublicRestaurantRoute || path.startsWith("/delivery")) && !isPublicRestaurantRoute;
+  const isDeliveryPath = path.startsWith("/delivery") || path.startsWith("/food/delivery");
+  const isAuthenticatedRoute = !isAuthPage && (path.startsWith("/admin") || path.startsWith("/restaurant") && !path.startsWith("/restaurants") && !isPublicRestaurantRoute || isDeliveryPath) && !isPublicRestaurantRoute;
 
   // For authenticated routes, ALWAYS ensure Authorization header is set if we have a token
   // This ensures FormData requests and other requests always have the token
@@ -221,6 +223,7 @@ apiClient.interceptors.response.use(response => {
   // If response contains new access token, store it for the current module
   if (response.data?.accessToken) {
     const currentPath = window.location.pathname;
+    const isDeliveryPath = currentPath.startsWith("/delivery") || currentPath.startsWith("/food/delivery");
     let tokenKey = "accessToken"; // fallback
     let expectedRole = "user";
     if (currentPath.startsWith("/admin")) {
@@ -230,7 +233,7 @@ apiClient.interceptors.response.use(response => {
       // /restaurant/* is for restaurant module, /restaurants/* is for user module viewing restaurants
       tokenKey = "restaurant_accessToken";
       expectedRole = "restaurant";
-    } else if (currentPath.startsWith("/delivery")) {
+    } else if (isDeliveryPath) {
       tokenKey = "delivery_accessToken";
       expectedRole = "delivery";
     } else if (currentPath.startsWith("/user") || currentPath === "/" || currentPath.startsWith("/restaurants")) {
@@ -281,6 +284,7 @@ apiClient.interceptors.response.use(response => {
     try {
       // Determine which module's refresh endpoint to use based on current route
       const currentPath = window.location.pathname;
+      const isDeliveryPath = currentPath.startsWith("/delivery") || currentPath.startsWith("/food/delivery");
       let refreshEndpoint = "/auth/refresh-token"; // default to user auth
 
       if (currentPath.startsWith("/admin")) {
@@ -288,7 +292,7 @@ apiClient.interceptors.response.use(response => {
       } else if (currentPath.startsWith("/restaurant") && !currentPath.startsWith("/restaurants")) {
         // /restaurant/* is for restaurant module, /restaurants/* is for user module viewing restaurants
         refreshEndpoint = "/restaurant/auth/refresh-token";
-      } else if (currentPath.startsWith("/delivery")) {
+      } else if (isDeliveryPath) {
         refreshEndpoint = "/delivery/auth/refresh-token";
       }
 
@@ -303,6 +307,7 @@ apiClient.interceptors.response.use(response => {
       if (accessToken) {
         // Determine which module's token to update based on current route
         const currentPath = window.location.pathname;
+        const isDeliveryPath = currentPath.startsWith("/delivery") || currentPath.startsWith("/food/delivery");
         let tokenKey = "accessToken"; // fallback
         let expectedRole = "user";
         if (currentPath.startsWith("/admin")) {
@@ -312,7 +317,7 @@ apiClient.interceptors.response.use(response => {
           // /restaurant/* is for restaurant module, /restaurants/* is for user module viewing restaurants
           tokenKey = "restaurant_accessToken";
           expectedRole = "restaurant";
-        } else if (currentPath.startsWith("/delivery")) {
+        } else if (isDeliveryPath) {
           tokenKey = "delivery_accessToken";
           expectedRole = "delivery";
         } else if (currentPath.startsWith("/user") || currentPath === "/" || currentPath.startsWith("/restaurants")) {
@@ -358,6 +363,7 @@ apiClient.interceptors.response.use(response => {
       // Refresh failed, clear module-specific token and redirect to login
       // BUT: Don't auto-redirect on certain pages - let them handle errors gracefully
       const currentPath = window.location.pathname;
+      const isDeliveryPath = currentPath.startsWith("/delivery") || currentPath.startsWith("/food/delivery");
       const isOnboardingPage = currentPath.includes("/onboarding");
       const isLandingPageManagement = currentPath.includes("/hero-banner-management") || currentPath.includes("/landing-page");
 
@@ -375,7 +381,7 @@ apiClient.interceptors.response.use(response => {
           localStorage.removeItem("restaurant_authenticated");
           localStorage.removeItem("restaurant_user");
           window.location.href = "/restaurant/login";
-        } else if (currentPath.startsWith("/delivery")) {
+        } else if (isDeliveryPath) {
           localStorage.removeItem("delivery_accessToken");
           localStorage.removeItem("delivery_authenticated");
           localStorage.removeItem("delivery_user");

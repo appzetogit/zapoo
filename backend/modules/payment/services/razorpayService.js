@@ -240,4 +240,72 @@ const createRefund = async (paymentId, amount = null, notes = {}) => {
     throw error;
   }
 };
-export { initializeRazorpay, getRazorpayInstance, createOrder, verifyPayment, fetchPayment, createRefund };
+
+/**
+ * Create a Razorpay payment link (for dynamic COD collect QR).
+ */
+const createPaymentLink = async (options = {}) => {
+  const razorpay = await getRazorpayInstance();
+  if (!razorpay) {
+    throw new Error('Razorpay is not initialized');
+  }
+
+  const payload = {
+    amount: Number(options.amount || 0),
+    currency: options.currency || 'INR',
+    description: options.description || 'Order payment',
+    reference_id: options.reference_id,
+    customer: options.customer || undefined,
+    notify: options.notify || undefined,
+    notes: options.notes || {},
+    reminder_enable: Boolean(options.reminder_enable)
+  };
+
+  if (!Number.isFinite(payload.amount) || payload.amount <= 0) {
+    throw new Error('Invalid amount for payment link');
+  }
+
+  try {
+    return await razorpay.paymentLink.create(payload);
+  } catch (error) {
+    logger.error(`Error creating Razorpay payment link: ${error.message}`, {
+      message: error.message,
+      description: error?.error?.description || error?.description || null,
+      code: error?.error?.code || null,
+      reason: error?.error?.reason || null,
+      source: error?.error?.source || null,
+      step: error?.error?.step || null,
+      statusCode: error?.statusCode || null,
+      payload: {
+        amount: payload.amount,
+        currency: payload.currency,
+        reference_id: payload.reference_id
+      }
+    });
+    throw error;
+  }
+};
+
+const fetchPaymentLink = async paymentLinkId => {
+  const razorpay = await getRazorpayInstance();
+  if (!razorpay) {
+    throw new Error('Razorpay is not initialized');
+  }
+  if (!paymentLinkId) {
+    throw new Error('Payment link ID is required');
+  }
+  try {
+    return await razorpay.paymentLink.fetch(paymentLinkId);
+  } catch (error) {
+    logger.error(`Error fetching Razorpay payment link: ${error.message}`, {
+      message: error.message,
+      paymentLinkId,
+      description: error?.error?.description || error?.description || null,
+      code: error?.error?.code || null,
+      statusCode: error?.statusCode || null
+    });
+    throw error;
+  }
+};
+
+export { initializeRazorpay, getRazorpayInstance, createOrder, verifyPayment, fetchPayment, createRefund, createPaymentLink, fetchPaymentLink };

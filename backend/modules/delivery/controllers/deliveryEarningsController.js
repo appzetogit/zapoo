@@ -3,6 +3,7 @@ import { successResponse, errorResponse } from '../../../shared/utils/response.j
 import Delivery from '../models/Delivery.js';
 import Order from '../../order/models/Order.js';
 import DeliveryWallet from '../models/DeliveryWallet.js';
+import BusinessSettings from '../../admin/models/BusinessSettings.js';
 import winston from 'winston';
 
 const logger = winston.createLogger({
@@ -177,5 +178,176 @@ export const getEarnings = asyncHandler(async (req, res) => {
   } catch (error) {
     logger.error(`Error fetching delivery earnings: ${error.message}`, { stack: error.stack });
     return errorResponse(res, 500, 'Failed to fetch earnings');
+  }
+});
+
+/**
+ * Get delivery cash limit breakdown
+ * GET /api/delivery/cash-limit
+ */
+export const getCashLimit = asyncHandler(async (req, res) => {
+  try {
+    const delivery = req.delivery;
+    const wallet = await DeliveryWallet.findOrCreateByDeliveryId(delivery._id);
+    const settings = await BusinessSettings.getSettings().catch(() => null);
+
+    const totalCashLimit = Math.max(0, Number(settings?.deliveryCashLimit) || 0);
+    const cashInHand = Math.max(0, Number(wallet?.cashInHand) || 0);
+    const deductions = Math.max(
+      0,
+      (wallet.transactions || [])
+        .filter((t) => t?.status === 'Completed' && t?.type === 'deduction')
+        .reduce((sum, t) => sum + (Number(t.amount) || 0), 0)
+    );
+    const pocketWithdrawals = Math.max(0, Number(wallet?.totalWithdrawn) || 0);
+
+    return successResponse(res, 200, 'Cash limit retrieved successfully', {
+      totalCashLimit,
+      cashInHand,
+      deductions,
+      pocketWithdrawals,
+      availableCashLimit: Math.max(0, totalCashLimit - cashInHand)
+    });
+  } catch (error) {
+    logger.error(`Error fetching cash limit: ${error.message}`, { stack: error.stack });
+    return errorResponse(res, 500, 'Failed to fetch cash limit');
+  }
+});
+
+/**
+ * Get pocket details for selected week/date window
+ * GET /api/delivery/pocket-details?date=<iso>&limit=<n>
+ */
+export const getPocketDetails = asyncHandler(async (req, res) => {
+  try {
+    const delivery = req.delivery;
+    const { date, limit = 500 } = req.query;
+
+    const baseDate = date ? new Date(date) : new Date();
+    if (Number.isNaN(baseDate.getTime())) {
+      return errorResponse(res, 400, 'Invalid date parameter');
+    }
+
+    // Sunday -> Saturday range (aligned with deliveryV2 UI week selector)
+    const startDate = new Date(baseDate);
+    startDate.setHours(0, 0, 0, 0);
+    const day = startDate.getDay();
+    startDate.setDate(startDate.getDate() - day);
+
+    const endDate = new Date(startDate);
+    endDate.setDate(startDate.getDate() + 6);
+    endDate.setHours(23, 59, 59, 999);
+
+    const wallet = await DeliveryWallet.findOrCreateByDeliveryId(delivery._id);
+    const allTransactions = Array.isArray(wallet.transactions) ? wallet.transactions : [];
+    const completedInRange = allTransactions.filter((t) => {
+      if (t?.status !== 'Completed') return false;
+      const txDate = new Date(t.createdAt || t.processedAt || t.date || 0);
+      if (Number.isNaN(txDate.getTime())) return false;
+      return txDate >= startDate && txDate <= endDate;
+    });
+
+    const paymentTransactions = completedInRange
+      .filter((t) => t.type === 'payment')
+      .map((t) => ({
+        id: t._id?.toString?.() || String(t._id || ''),
+        amount: Number(t.amount) || 0,
+        orderId: t.orderId?.toString?.() || String(t.orderId || ''),
+        type: t.type,
+        status: t.status,
+        createdAt: t.createdAt || t.processedAt || t.date
+      }));
+
+    const bonusTransactions = completedInRange
+      .filter((t) => t.type === 'bonus')
+      .map((t) => ({
+        id: t._id?.toString?.() || String(t._id || ''),
+        amount: Number(t.amount) || 0,
+        orderId: t.orderId?.toString?.() || String(t.orderId || ''),
+        type: t.type,
+        status: t.status,
+        createdAt: t.createdAt || t.processedAt || t.date
+      }));
+
+    const deliveredOrders = await Order.find({
+      deliveryPartnerId: delivery._id,
+      $or: [
+        { status: 'delivered' },
+        { 'deliveryState.status': 'delivered' },
+        { 'deliveryState.currentPhase': 'completed' }
+      ],
+      deliveredAt: { $gte: startDate, $lte: endDate }
+    })
+      .select('orderId _id restaurantName deliveredAt createdAt payment')
+      .sort({ deliveredAt: -1 })
+      .limit(Math.max(1, Number(limit) || 500))
+      .lean();
+
+    const paymentByOrderObjectId = new Map(paymentTransactions.map((t) => [String(t.orderId || ''), t]));
+    const paymentByOrderCode = new Map();
+    for (const t of paymentTransactions) {
+      if (!t.orderId) continue;
+      paymentByOrderCode.set(String(t.orderId), t);
+    }
+
+    const trips = deliveredOrders.map((order) => {
+      const byObjectId = paymentByOrderObjectId.get(String(order._id));
+      const byOrderCode = paymentByOrderCode.get(String(order.orderId || ''));
+      const paymentTx = byObjectId || byOrderCode || null;
+      return {
+        _id: order._id?.toString?.() || String(order._id || ''),
+        orderId: order.orderId || order._id?.toString?.() || '',
+        restaurantName: order.restaurantName || 'Restaurant',
+        deliveredAt: order.deliveredAt || order.createdAt,
+        createdAt: order.createdAt,
+        paymentMethod: order?.payment?.method || 'online',
+        deliveryEarning: Number(paymentTx?.amount) || 0
+      };
+    });
+
+    const totalEarning = paymentTransactions.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+    const totalBonus = bonusTransactions.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+
+    return successResponse(res, 200, 'Pocket details retrieved successfully', {
+      range: {
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString()
+      },
+      summary: {
+        totalEarning,
+        totalBonus,
+        grandTotal: totalEarning + totalBonus
+      },
+      trips,
+      transactions: {
+        payment: paymentTransactions,
+        bonus: bonusTransactions
+      }
+    });
+  } catch (error) {
+    logger.error(`Error fetching pocket details: ${error.message}`, { stack: error.stack });
+    return errorResponse(res, 500, 'Failed to fetch pocket details');
+  }
+});
+
+/**
+ * Get referral stats (compat API for deliveryV2 profile page)
+ * GET /api/delivery/referrals/stats
+ */
+export const getReferralStats = asyncHandler(async (req, res) => {
+  try {
+    const delivery = await Delivery.findById(req.delivery._id)
+      .select('_id deliveryId name createdAt')
+      .lean();
+    if (!delivery) return errorResponse(res, 404, 'Delivery partner not found');
+
+    return successResponse(res, 200, 'Referral stats retrieved successfully', {
+      referralCode: delivery.deliveryId || delivery._id?.toString?.() || '',
+      referralCount: 0,
+      rewardAmount: 0
+    });
+  } catch (error) {
+    logger.error(`Error fetching referral stats: ${error.message}`, { stack: error.stack });
+    return errorResponse(res, 500, 'Failed to fetch referral stats');
   }
 });

@@ -92,6 +92,7 @@ const AdminForgotPassword = lazy(() => import("@/module/admin/pages/auth/AdminFo
 
 // Delivery Module
 const DeliveryRouter = lazy(() => import("@/module/delivery/components/DeliveryRouter"))
+const DeliveryV2Router = lazy(() => import("@/module/deliveryV2"))
 const DeliverySignIn = lazy(() => import("@/module/delivery/pages/auth/SignIn"))
 const DeliverySignup = lazy(() => import("@/module/delivery/pages/auth/Signup"))
 const DeliveryOTP = lazy(() => import("@/module/delivery/pages/auth/OTP"))
@@ -645,6 +646,7 @@ export default function App() {
           }
         />
         {/* Delivery Public Routes */}
+        <Route path="/food/delivery/*" element={<DeliveryV2Router />} />
         <Route path="/delivery/sign-in" element={<DeliverySignIn />} />
         <Route path="/delivery/signup" element={<DeliverySignup />} />
         <Route path="/delivery/otp" element={<DeliveryOTP />} />

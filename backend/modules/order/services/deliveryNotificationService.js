@@ -14,6 +14,35 @@ async function getIOInstance() {
   return getIO ? getIO() : null;
 }
 
+function getDeliverySocketEmitters(io) {
+  if (!io) return [];
+  const emitters = [io.of('/delivery'), io].filter(Boolean);
+  return emitters;
+}
+
+async function fetchSocketsInAnyDeliveryEmitter(io, room) {
+  const emitters = getDeliverySocketEmitters(io);
+  for (const emitter of emitters) {
+    const sockets = await emitter.in(room).fetchSockets();
+    if (sockets.length > 0) {
+      return { sockets, emitter };
+    }
+  }
+  return { sockets: [], emitter: null };
+}
+
+function emitToDeliveryRoomAll(io, room, eventName, payload) {
+  const emitters = getDeliverySocketEmitters(io);
+  emitters.forEach((emitter) => {
+    emitter.to(room).emit(eventName, payload);
+  });
+}
+
+function emitToAllDeliverySockets(io, eventName, payload) {
+  const emitters = getDeliverySocketEmitters(io);
+  emitters.forEach((emitter) => emitter.emit(eventName, payload));
+}
+
 function buildDeliveryRoomVariations(deliveryPartnerId, deliveryId) {
   const rooms = new Set();
   const normalizedId = deliveryPartnerId?.toString ? deliveryPartnerId.toString() : (deliveryPartnerId || '');
@@ -47,7 +76,6 @@ export async function checkDeliveryPartnerConnection(deliveryPartnerId) {
         socketCount: 0
       };
     }
-    const deliveryNamespace = io.of('/delivery');
     const normalizedId = deliveryPartnerId?.toString() || deliveryPartnerId;
     let roomVariations = buildDeliveryRoomVariations(normalizedId, null);
     console.log('🔎 [DeliverySocketCheck] Checking connection', {
@@ -55,11 +83,12 @@ export async function checkDeliveryPartnerConnection(deliveryPartnerId) {
       roomVariations
     });
     for (const room of roomVariations) {
-      const sockets = await deliveryNamespace.in(room).fetchSockets();
+      const { sockets, emitter } = await fetchSocketsInAnyDeliveryEmitter(io, room);
       if (sockets.length > 0) {
         console.log('✅ [DeliverySocketCheck] Connected', {
           deliveryPartnerId: normalizedId,
           room,
+          emitter: emitter?.name || '/',
           socketCount: sockets.length,
           socketIds: sockets.map(s => s.id)
         });
@@ -81,11 +110,12 @@ export async function checkDeliveryPartnerConnection(deliveryPartnerId) {
           roomVariations
         });
         for (const room of roomVariations) {
-          const sockets = await deliveryNamespace.in(room).fetchSockets();
+          const { sockets, emitter } = await fetchSocketsInAnyDeliveryEmitter(io, room);
           if (sockets.length > 0) {
             console.log('✅ [DeliverySocketCheck] Connected (deliveryId room)', {
               deliveryPartnerId: normalizedId,
               room,
+              emitter: emitter?.name || '/',
               socketCount: sockets.length,
               socketIds: sockets.map(s => s.id)
             });
@@ -268,8 +298,6 @@ export async function notifyDeliveryBoyNewOrder(order, deliveryPartnerId) {
     };
 
     // Get delivery namespace
-    const deliveryNamespace = io.of('/delivery');
-
     // Normalize deliveryPartnerId to string
     const normalizedDeliveryPartnerId = deliveryPartnerId?.toString() || deliveryPartnerId;
 
@@ -287,26 +315,34 @@ export async function notifyDeliveryBoyNewOrder(order, deliveryPartnerId) {
     let foundRoom = null;
 
     // First, get all connected sockets in delivery namespace for debugging
-    const allSockets = await deliveryNamespace.fetchSockets();
+    const allSocketsByEmitter = await Promise.all(
+      getDeliverySocketEmitters(io).map(async (emitter) => {
+        const sockets = await emitter.fetchSockets();
+        return { emitter: emitter?.name || '/', sockets };
+      })
+    );
     // Check each room variation
     for (const room of roomVariations) {
-      const sockets = await deliveryNamespace.in(room).fetchSockets();
+      const { sockets, emitter } = await fetchSocketsInAnyDeliveryEmitter(io, room);
       if (sockets.length > 0) {
         socketsInRoom = sockets;
         foundRoom = room;
+        console.log('📣 [DeliveryNotify] Active room found', {
+          room,
+          emitter: emitter?.name || '/',
+          socketCount: sockets.length
+        });
         break;
       } else {
-        // Check room size using adapter (alternative method)
-        const roomSize = deliveryNamespace.adapter.rooms.get(room)?.size || 0;
-        if (roomSize > 0) {}
+        // noop
       }
     }
     const primaryRoom = roomVariations[0];
     // Emit new order notification to all room variations (even if no sockets found, in case they connect)
     let notificationSent = false;
     roomVariations.forEach(room => {
-      deliveryNamespace.to(room).emit('new_order', orderNotification);
-      deliveryNamespace.to(room).emit('play_notification_sound', {
+      emitToDeliveryRoomAll(io, room, 'new_order', orderNotification);
+      emitToDeliveryRoomAll(io, room, 'play_notification_sound', {
         type: 'new_order',
         orderId: order.orderId,
         message: `New order assigned: ${order.orderId}`
@@ -331,18 +367,16 @@ export async function notifyDeliveryBoyNewOrder(order, deliveryPartnerId) {
       console.warn(`  3. Socket connection failed`);
       console.warn(`  4. Delivery partner needs to refresh their app`);
       console.warn(`  5. Delivery partner ID mismatch (check if ID used to join room matches ${normalizedDeliveryPartnerId})`);
-      if (allSockets.length > 0) {
-        // List all rooms in delivery namespace
-        const allRooms = deliveryNamespace.adapter.rooms;
-      } else {
+      const totalSockets = allSocketsByEmitter.reduce((acc, item) => acc + (item.sockets?.length || 0), 0);
+      if (totalSockets === 0) {
         console.warn(`⚠️ No delivery partners are currently connected to the app!`);
       }
 
       // Optional fallback broadcast (disabled by default to avoid showing orders to wrong partners)
       if (process.env.DELIVERY_BROADCAST_FALLBACK === 'true') {
         console.warn(`⚠️ Broadcasting to all delivery sockets as fallback (in case they connect later)`);
-        deliveryNamespace.emit('new_order', orderNotification);
-        deliveryNamespace.emit('play_notification_sound', {
+        emitToAllDeliverySockets(io, 'new_order', orderNotification);
+        emitToAllDeliverySockets(io, 'play_notification_sound', {
           type: 'new_order',
           orderId: order.orderId,
           message: `New order assigned: ${order.orderId}`
@@ -405,7 +439,6 @@ export async function notifyMultipleDeliveryBoys(order, deliveryPartnerIds, phas
         notified: 0
       };
     }
-    const deliveryNamespace = io.of('/delivery');
     let notifiedCount = 0;
 
     // Populate userId if needed
@@ -547,11 +580,11 @@ export async function notifyMultipleDeliveryBoys(order, deliveryPartnerIds, phas
         const roomVariations = [`delivery:${normalizedId}`, `delivery:${deliveryPartnerId}`, ...(mongoose.Types.ObjectId.isValid(normalizedId) ? [`delivery:${new mongoose.Types.ObjectId(normalizedId).toString()}`] : [])];
         let notificationSent = false;
         for (const room of roomVariations) {
-          const sockets = await deliveryNamespace.in(room).fetchSockets();
+          const { sockets } = await fetchSocketsInAnyDeliveryEmitter(io, room);
           if (sockets.length > 0) {
-            deliveryNamespace.to(room).emit('new_order', orderNotification);
-            deliveryNamespace.to(room).emit('new_order_available', orderNotification);
-            deliveryNamespace.to(room).emit('play_notification_sound', {
+            emitToDeliveryRoomAll(io, room, 'new_order', orderNotification);
+            emitToDeliveryRoomAll(io, room, 'new_order_available', orderNotification);
+            emitToDeliveryRoomAll(io, room, 'play_notification_sound', {
               type: 'new_order_available',
               orderId: order.orderId,
               message: `New order available: ${order.orderId}`,
@@ -566,8 +599,8 @@ export async function notifyMultipleDeliveryBoys(order, deliveryPartnerIds, phas
           console.warn(`⚠️ Delivery partner ${normalizedId} not connected, but will receive notification when they connect`);
           // Still emit to room for when they connect
           roomVariations.forEach(room => {
-            deliveryNamespace.to(room).emit('new_order', orderNotification);
-            deliveryNamespace.to(room).emit('new_order_available', orderNotification);
+            emitToDeliveryRoomAll(io, room, 'new_order', orderNotification);
+            emitToDeliveryRoomAll(io, room, 'new_order_available', orderNotification);
           });
           notifiedCount++;
         }
@@ -620,7 +653,6 @@ export async function notifyDeliveryPartnersOrderTaken(data, deliveryPartnerIds 
     const io = await getIOInstance();
     if (!io) return;
 
-    const deliveryNamespace = io.of('/delivery');
     const payload = {
       orderMongoId: data?.orderMongoId || null,
       orderId: data?.orderId || null,
@@ -632,7 +664,7 @@ export async function notifyDeliveryPartnersOrderTaken(data, deliveryPartnerIds 
     for (const deliveryPartnerId of uniqueIds) {
       const rooms = buildDeliveryRoomVariations(deliveryPartnerId, null);
       rooms.forEach(room => {
-        deliveryNamespace.to(room).emit('order_taken', payload);
+        emitToDeliveryRoomAll(io, room, 'order_taken', payload);
       });
     }
   } catch (error) {
@@ -652,7 +684,6 @@ export async function notifyDeliveryBoyOrderReady(order, deliveryPartnerId) {
       console.warn('Socket.IO not initialized, skipping delivery boy notification');
       return;
     }
-    const deliveryNamespace = io.of('/delivery');
     const normalizedDeliveryPartnerId = deliveryPartnerId?.toString() || deliveryPartnerId;
 
     // Prepare order ready notification
@@ -676,7 +707,7 @@ export async function notifyDeliveryBoyOrderReady(order, deliveryPartnerId) {
     let foundRoom = null;
     let socketsInRoom = [];
     for (const room of roomVariations) {
-      const sockets = await deliveryNamespace.in(room).fetchSockets();
+      const { sockets } = await fetchSocketsInAnyDeliveryEmitter(io, room);
       if (sockets.length > 0) {
         foundRoom = room;
         socketsInRoom = sockets;
@@ -685,12 +716,12 @@ export async function notifyDeliveryBoyOrderReady(order, deliveryPartnerId) {
     }
     if (foundRoom && socketsInRoom.length > 0) {
       // Send to specific delivery partner room
-      deliveryNamespace.to(foundRoom).emit('order_ready', orderReadyNotification);
+      emitToDeliveryRoomAll(io, foundRoom, 'order_ready', orderReadyNotification);
       notificationSent = true;
     } else {
       // Fallback: broadcast to all delivery sockets
       console.warn(`⚠️ Delivery partner ${normalizedDeliveryPartnerId} not found in any room, broadcasting to all`);
-      deliveryNamespace.emit('order_ready', orderReadyNotification);
+      emitToAllDeliverySockets(io, 'order_ready', orderReadyNotification);
       notificationSent = true;
     }
 

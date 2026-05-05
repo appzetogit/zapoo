@@ -1,3 +1,7 @@
+const debugLog = (...args) => {}
+const debugWarn = (...args) => {}
+const debugError = (...args) => {}
+
 /**
  * Delivery Order Status Utility Functions
  * Centralized management for delivery order status across the delivery module
@@ -13,39 +17,21 @@ export const DELIVERY_ORDER_STATUS = {
 }
 
 /**
- * Get delivery order status from localStorage
+ * Get delivery order status (Legacy function, no longer uses localStorage)
  * @param {string|number} orderId - The order ID
  * @returns {string} - The order status, defaults to "Order is Accepted"
  */
 export const getDeliveryOrderStatus = (orderId) => {
-  if (!orderId) return DELIVERY_ORDER_STATUS.ACCEPTED
-  
-  try {
-    const savedStatus = localStorage.getItem(`delivery_order_status_${orderId}`)
-    return savedStatus || DELIVERY_ORDER_STATUS.ACCEPTED
-  } catch (error) {
-    console.error('Error reading delivery order status from localStorage:', error)
-    return DELIVERY_ORDER_STATUS.ACCEPTED
-  }
+  return DELIVERY_ORDER_STATUS.ACCEPTED
 }
 
 /**
- * Save delivery order status to localStorage
+ * Save delivery order status (Legacy function, handled via Socket.IO)
  * @param {string|number} orderId - The order ID
  * @param {string} status - The order status to save
  */
 export const saveDeliveryOrderStatus = (orderId, status) => {
-  if (!orderId || !status) return
-  
-  try {
-    localStorage.setItem(`delivery_order_status_${orderId}`, status)
-    // Dispatch custom event for other components
-    window.dispatchEvent(new CustomEvent('deliveryOrderStatusUpdated', { 
-      detail: { orderId, status } 
-    }))
-  } catch (error) {
-    console.error('Error saving delivery order status to localStorage:', error)
-  }
+  // No-op: we rely on backend for order statuses
 }
 
 /**
@@ -66,7 +52,6 @@ export const normalizeDeliveryStatus = (status) => {
     'picked up': DELIVERY_ORDER_STATUS.PICKED_UP,
     'pickedup': DELIVERY_ORDER_STATUS.PICKED_UP,
     'on the way': DELIVERY_ORDER_STATUS.ON_THE_WAY,
-    'onway': DELIVERY_ORDER_STATUS.ON_THE_WAY,
     'onway': DELIVERY_ORDER_STATUS.ON_THE_WAY,
     'delivered': DELIVERY_ORDER_STATUS.DELIVERED,
     'cancelled': DELIVERY_ORDER_STATUS.CANCELLED,
@@ -140,47 +125,11 @@ export const matchesDeliveryFilter = (orderStatus, filter) => {
 }
 
 /**
- * Get all delivery orders with their statuses
+ * Get all delivery orders with their statuses (Legacy function)
  * @returns {Array} - Array of orders with status
  */
 export const getAllDeliveryOrders = () => {
-  try {
-    const ordersMap = new Map()
-    
-    // Get active order from localStorage
-    const activeOrder = localStorage.getItem('activeOrder')
-    if (activeOrder) {
-      const order = JSON.parse(activeOrder)
-      order.status = getDeliveryOrderStatus(order.orderId)
-      ordersMap.set(order.orderId, order)
-    }
-    
-    // Get all order statuses from localStorage
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i)
-      if (key && key.startsWith('delivery_order_status_')) {
-        const orderId = key.replace('delivery_order_status_', '')
-        const status = localStorage.getItem(key)
-        
-        // Only add if not already in map (to avoid duplicates with activeOrder)
-        if (!ordersMap.has(orderId)) {
-          ordersMap.set(orderId, {
-            orderId,
-            status
-          })
-        } else {
-          // Update status if order already exists
-          const existingOrder = ordersMap.get(orderId)
-          existingOrder.status = status
-        }
-      }
-    }
-    
-    return Array.from(ordersMap.values())
-  } catch (error) {
-    console.error('Error getting all delivery orders:', error)
-    return []
-  }
+  return [] // Completely handled via MongoDB now
 }
 
 /**
@@ -206,4 +155,5 @@ export const getDeliveryOrdersCount = (status = null) => {
     cancelled: orders.filter(o => normalizeDeliveryStatus(o.status) === DELIVERY_ORDER_STATUS.CANCELLED).length
   }
 }
+
 

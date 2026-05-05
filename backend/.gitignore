@@ -11,3 +11,9 @@ firebase-service-account.json
 *.json
 !package.json
 !package-lock.json
+_appzeto_sync/
+benchmark_results_*.json
+benchmark_samples.json
+discovered_routes.json
+final_benchmark_report.json
+test_tokens.json
