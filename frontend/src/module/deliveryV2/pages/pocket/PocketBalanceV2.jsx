@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
-  ArrowLeft, AlertTriangle, Loader2, IndianRupee,
-  HelpCircle, ChevronRight
+  ArrowLeft, AlertTriangle, Loader2
 } from 'lucide-react';
 import { deliveryAPI } from '@food/api';
 import { toast } from 'sonner';
 import { formatCurrency } from '@food/utils/currency';
 import useDeliveryBackNavigation from '../../hooks/useDeliveryBackNavigation';
+import { loadBusinessSettings } from '@food/utils/businessSettings';
 
 /**
  * PocketBalanceV2 - 1:1 Match with Old PocketBalance Page.
@@ -31,6 +31,7 @@ export const PocketBalanceV2 = () => {
      canWithdraw: false
   });
   const [withdrawSubmitting, setWithdrawSubmitting] = useState(false);
+  const [withdrawalWindows, setWithdrawalWindows] = useState(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -71,7 +72,49 @@ export const PocketBalanceV2 = () => {
     fetchData();
   }, []);
 
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const settings = await loadBusinessSettings({ force: true });
+        if (mounted) setWithdrawalWindows(settings?.withdrawalWindows || null);
+      } catch (_) {
+        if (mounted) setWithdrawalWindows(null);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const isSameDay = (a, b) =>
+    a && b &&
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate();
+  const today = new Date();
+  const isSunday = today.getDay() === 0;
+  const deliveryWindow = withdrawalWindows?.delivery;
+  const openDates = deliveryWindow?.openDates || [];
+  const closedDates = deliveryWindow?.closedDates || [];
+  const isInList = (list) => list.some((d) => isSameDay(new Date(d), today));
+  let withdrawalAllowedToday = isSunday;
+  if (isInList(closedDates)) {
+    withdrawalAllowedToday = false;
+  } else if (isInList(openDates)) {
+    withdrawalAllowedToday = true;
+  }
+
+  const dayBannerText = withdrawalAllowedToday
+    ? "Withdrawals open today."
+    : "Withdrawals are allowed only on Sundays.";
+
   const handleWithdraw = async () => {
+     if (!withdrawalAllowedToday) {
+        toast.error("Withdrawal requests are allowed only on Sundays");
+        return;
+     }
+
      // Simplified verification
      const profileRes = await deliveryAPI.getProfile();
      const profile = profileRes?.data?.data?.profile || {};
@@ -127,13 +170,22 @@ export const PocketBalanceV2 = () => {
           </div>
        ) : (
           <>
+             {/* Withdrawal Day Banner */}
+             <div className={`p-4 flex items-start gap-3 border-b ${withdrawalAllowedToday ? "bg-green-100 text-green-900 border-green-200/60" : "bg-yellow-400 text-black border-yellow-500/10"}`}>
+                <AlertTriangle className="w-5 h-5 shrink-0" />
+                <div>
+                   <p className="text-xs font-bold">{withdrawalAllowedToday ? "Withdrawals open today" : "Withdraw currently disabled"}</p>
+                   <p className="text-[10px] font-medium opacity-80 leading-tight mt-1">{dayBannerText}</p>
+                </div>
+             </div>
+
              {/* Warning Banner */}
              {!walletState.canWithdraw && (
-               <div className="bg-yellow-400 p-4 flex items-start gap-3 border-b border-yellow-500/10">
-                  <AlertTriangle className="w-5 h-5 shrink-0" />
+               <div className="bg-yellow-50 p-4 flex items-start gap-3 border-b border-yellow-500/10">
+                  <AlertTriangle className="w-5 h-5 shrink-0 text-yellow-700" />
                   <div>
-                     <p className="text-xs font-bold">Withdraw currently disabled</p>
-                     <p className="text-[10px] font-medium opacity-80 leading-tight mt-1">
+                     <p className="text-xs font-bold text-yellow-900">Withdrawal amount threshold not met</p>
+                     <p className="text-[10px] font-medium text-yellow-800/80 leading-tight mt-1">
                         {walletState.withdrawableAmount <= 0 ? 'Withdrawable amount is ₹0' : `Minimum withdrawal requirement is ₹${walletState.withdrawalLimit}`}
                      </p>
                   </div>
@@ -147,9 +199,9 @@ export const PocketBalanceV2 = () => {
                 
                 <button 
                   onClick={handleWithdraw}
-                  disabled={!walletState.canWithdraw || withdrawSubmitting}
+                  disabled={!walletState.canWithdraw || !withdrawalAllowedToday || withdrawSubmitting}
                   className={`w-full py-4 rounded-xl font-bold text-sm shadow-lg transition-all active:scale-[0.98] ${
-                     walletState.canWithdraw 
+                     walletState.canWithdraw && withdrawalAllowedToday
                      ? 'bg-black text-white' 
                      : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                   } flex items-center justify-center gap-2`}
