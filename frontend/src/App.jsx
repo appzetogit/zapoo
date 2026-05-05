@@ -91,16 +91,8 @@ const AdminSignup = lazy(() => import("@/module/admin/pages/auth/AdminSignup"))
 const AdminForgotPassword = lazy(() => import("@/module/admin/pages/auth/AdminForgotPassword"))
 
 // Delivery Module
-const DeliveryRouter = lazy(() => import("@/module/delivery/components/DeliveryRouter"))
 const DeliveryV2Router = lazy(() => import("@/module/deliveryV2"))
-const DeliverySignIn = lazy(() => import("@/module/delivery/pages/auth/SignIn"))
-const DeliverySignup = lazy(() => import("@/module/delivery/pages/auth/Signup"))
-const DeliveryOTP = lazy(() => import("@/module/delivery/pages/auth/OTP"))
-const DeliverySignupStep1 = lazy(() => import("@/module/delivery/pages/auth/SignupStep1"))
-const DeliverySignupStep2 = lazy(() => import("@/module/delivery/pages/auth/SignupStep2"))
-const DeliveryWelcome = lazy(() => import("@/module/delivery/pages/auth/Welcome"))
 const DeliveryChallenges = lazy(() => import("@/module/delivery/pages/Challenges"))
-const DeliveryTermsPublic = lazy(() => import("@/module/delivery/pages/TermsAndConditions"))
 
 function UserPathRedirect() {
   const location = useLocation()
@@ -647,39 +639,24 @@ export default function App() {
         />
         {/* Delivery Public Routes */}
         <Route path="/food/delivery/*" element={<DeliveryV2Router />} />
-        <Route path="/delivery/sign-in" element={<DeliverySignIn />} />
-        <Route path="/delivery/signup" element={<DeliverySignup />} />
-        <Route path="/delivery/otp" element={<DeliveryOTP />} />
-        <Route path="/delivery/welcome" element={<AuthRedirect module="delivery"><DeliveryWelcome /></AuthRedirect>} />
-        <Route path="/delivery/terms" element={<DeliveryTermsPublic />} />
+        <Route path="/delivery/sign-in" element={<Navigate to="/food/delivery/login" replace />} />
+        <Route path="/delivery/signup" element={<Navigate to="/food/delivery/signup" replace />} />
+        <Route path="/delivery/otp" element={<Navigate to="/food/delivery/otp" replace />} />
+        <Route path="/delivery/welcome" element={<Navigate to="/food/delivery/welcome" replace />} />
+        <Route path="/delivery/terms" element={<Navigate to="/food/delivery/terms" replace />} />
 
         {/* Delivery Signup Routes (Protected - require authentication) */}
         <Route
           path="/delivery/signup/details"
-          element={
-            <ProtectedRoute requiredRole="delivery" loginPath="/delivery/sign-in">
-              <DeliverySignupStep1 />
-            </ProtectedRoute>
-          }
+          element={<Navigate to="/food/delivery/signup/details" replace />}
         />
         <Route
           path="/delivery/signup/documents"
-          element={
-            <ProtectedRoute requiredRole="delivery" loginPath="/delivery/sign-in">
-              <DeliverySignupStep2 />
-            </ProtectedRoute>
-          }
+          element={<Navigate to="/food/delivery/signup/documents" replace />}
         />
 
         {/* Delivery Protected Routes */}
-        <Route
-          path="/delivery/*"
-          element={
-            <ProtectedRoute requiredRole="delivery" loginPath="/delivery/sign-in">
-              <DeliveryRouter />
-            </ProtectedRoute>
-          }
-        />
+        <Route path="/delivery/*" element={<DeliveryV2Router />} />
 
         {/* Admin Public Routes */}
         <Route path="/admin/login" element={<AuthRedirect module="admin"><AdminLogin /></AuthRedirect>} />
