@@ -51,6 +51,24 @@ const hasActiveSubscription = (restaurant) => {
   );
 };
 
+const getSubscriptionDisplayMeta = (subscription) => {
+  const paymentId = String(subscription?.paymentId || "").toUpperCase();
+  const resolvedPlanName = subscription?.planId?.name || subscription?.planName || "";
+  const isTrialSubscription =
+    paymentId.startsWith("TRIAL_") ||
+    (
+      Number(subscription?.amount || 0) === 0 &&
+      subscription?.autoRenew === false &&
+      /^growth$/i.test(String(resolvedPlanName))
+    );
+
+  return {
+    isTrialSubscription,
+    subscriptionDisplayName: isTrialSubscription ? "Free Trial" : (resolvedPlanName || "N/A"),
+    subscriptionType: isTrialSubscription ? "trial" : "paid",
+  };
+};
+
 const buildSubscriptionHistoryPipelines = ({
   period,
   paymentStatus = "completed",
@@ -524,9 +542,14 @@ export const getMySubscription = async (req, res) => {
       });
     }
 
+    const subscriptionMeta = getSubscriptionDisplayMeta(restaurant.subscription);
+
     res.status(200).json({
       success: true,
-      data: restaurant.subscription,
+      data: {
+        ...restaurant.subscription.toObject(),
+        ...subscriptionMeta,
+      },
       queuedSubscription:
         restaurant.queuedSubscription?.status === "pending" &&
         restaurant.queuedSubscription?.planId &&

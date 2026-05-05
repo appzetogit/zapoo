@@ -31,6 +31,20 @@ export const updateLocation = asyncHandler(async (req, res) => {
   try {
     const delivery = req.delivery;
     const { latitude, longitude, isOnline } = req.body;
+    const isTryingToGoOnline = isOnline === true;
+
+    // Verification guard: unverified delivery partners cannot switch online.
+    // Offline/location updates remain allowed.
+    if (isTryingToGoOnline) {
+      const isAdminVerified = ['approved', 'active'].includes(delivery?.status);
+      if (!isAdminVerified) {
+        return errorResponse(
+          res,
+          403,
+          'Your account is not verified by admin yet. You can go online after approval.'
+        );
+      }
+    }
 
     // Manual validation: at least one field must be provided
     const hasLatitude = latitude !== undefined && latitude !== null;

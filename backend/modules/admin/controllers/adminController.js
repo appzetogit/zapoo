@@ -29,6 +29,24 @@ const logger = winston.createLogger({
   })]
 });
 
+const getSubscriptionDisplayMeta = (subscription) => {
+  const paymentId = String(subscription?.paymentId || "").toUpperCase();
+  const resolvedPlanName = subscription?.planId?.name || subscription?.planName || "";
+  const isTrialSubscription =
+    paymentId.startsWith("TRIAL_") ||
+    (
+      Number(subscription?.amount || 0) === 0 &&
+      subscription?.autoRenew === false &&
+      /^growth$/i.test(String(resolvedPlanName))
+    );
+
+  return {
+    isTrialSubscription,
+    subscriptionDisplayName: isTrialSubscription ? "Free Trial" : (resolvedPlanName || "N/A"),
+    subscriptionType: isTrialSubscription ? "trial" : "paid",
+  };
+};
+
 /**
  * Get Admin Dashboard Statistics
  * GET /api/admin/dashboard/stats
@@ -1569,7 +1587,7 @@ export const getRestaurantById = asyncHandler(async (req, res) => {
         ? purchasedSubscription.planId
         : null;
 
-      restaurant.subscription = {
+      const computedSubscription = {
         ...existingSubscription,
         planId: planDoc?._id || existingSubscription.planId || null,
         planName: planDoc?.name || existingSubscription?.planId?.name || null,
@@ -1582,6 +1600,10 @@ export const getRestaurantById = asyncHandler(async (req, res) => {
         amount: purchasedSubscription.amount ?? existingSubscription.amount ?? 0,
         features: planDoc?.features || existingSubscription.features || [],
         durationInDays: planDoc?.durationInDays || existingSubscription.durationInDays || null,
+      };
+      restaurant.subscription = {
+        ...computedSubscription,
+        ...getSubscriptionDisplayMeta(computedSubscription),
       };
     }
 

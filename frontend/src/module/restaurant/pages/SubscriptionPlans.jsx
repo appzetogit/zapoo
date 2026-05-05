@@ -147,6 +147,10 @@ export default function SubscriptionPlans() {
     const hasValidEndDate = !!endDateObj && !Number.isNaN(endDateObj.getTime());
     const isDateValid = hasValidEndDate ? endDateObj.getTime() > Date.now() : false;
     const isSubscribed = !!activePlanId && currentSubscription?.status === "active" && isDateValid;
+    const currentSubscriptionDisplayName =
+        currentSubscription?.subscriptionDisplayName ||
+        currentSubscription?.planId?.name ||
+        "Active";
     const expiresLabel = hasValidEndDate
         ? endDateObj.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })
         : "N/A";
@@ -171,7 +175,7 @@ export default function SubscriptionPlans() {
                                 : "bg-red-100 text-red-700 border-red-200"
                         }`}
                     >
-                        {isSubscribed ? (currentSubscription.planId?.name || "Active") : "Expired"}
+                        {isSubscribed ? currentSubscriptionDisplayName : "Expired"}
                     </span>
                 )}
             </div>
@@ -214,7 +218,7 @@ export default function SubscriptionPlans() {
                                     </h3>
                                     <p className="text-gray-600 text-sm mt-0.5">
                                         You are on{" "}
-                                        <span className="font-semibold text-orange-600">{currentSubscription.planId?.name}</span>.{" "}
+                                        <span className="font-semibold text-orange-600">{currentSubscriptionDisplayName}</span>.{" "}
                                         {isSubscribed ? `Expires ${expiresLabel}` : `Expired at ${expiresLabel}`}
                                     </p>
                                 </div>

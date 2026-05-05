@@ -141,18 +141,16 @@ export default function SignupStep1() {
     }
 
     setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
+    return newErrors
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
 
-    if (!validate()) {
-      if (formData.email && !EMAIL_REGEX.test(formData.email)) {
-        toast.error("Enter a valid email")
-      } else {
-        toast.error("Please fill all required fields correctly")
-      }
+    const validationErrors = validate()
+    if (Object.keys(validationErrors).length > 0) {
+      const firstError = Object.values(validationErrors)[0] || "Please fill all required fields correctly"
+      toast.error(firstError)
       return
     }
 

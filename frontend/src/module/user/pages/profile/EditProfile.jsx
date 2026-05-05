@@ -97,7 +97,7 @@ export default function EditProfile() {
     const trimmed = phone.trim();
     if (!trimmed) return true;
     const digits = trimmed.replace(/\D/g, "");
-    return digits.length === 10;
+    return /^[6-9]\d{9}$/.test(digits);
   };
 
   const validateDateOfBirth = dateValue => {

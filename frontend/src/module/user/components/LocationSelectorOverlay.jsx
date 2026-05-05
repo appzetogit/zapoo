@@ -1,6 +1,6 @@
 import { useState, useEffect, useLayoutEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronLeft, Search, ChevronRight, Plus, MapPin, MoreHorizontal, Navigation, Home, Building2, Briefcase, Phone, X, Crosshair } from "lucide-react";
+import { ChevronLeft, Search, ChevronRight, Plus, MapPin, MoreHorizontal, Navigation, Home, Building2, Briefcase, X, Crosshair } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -2411,24 +2411,6 @@ export default function LocationSelectorOverlay({
                 Additional address details*
               </Label>
               <Input id="additionalDetails" name="additionalDetails" placeholder="E.g. Floor, House no." value={addressFormData.additionalDetails} onChange={handleAddressFormChange} className="bg-white dark:bg-[#1a1a1a] border-gray-200 dark:border-gray-700" />
-            </div>
-
-            {/* Receiver Details */}
-            <div>
-              <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 block">
-                Receiver details for this address
-              </Label>
-              <div className="bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-700 rounded-lg p-3 space-y-3">
-                <Phone className="h-5 w-5 text-gray-600 dark:text-gray-400 shrink-0" />
-                <Input name="receiverName" placeholder="Receiver name" value={addressFormData.receiverName || ""} onChange={handleAddressFormChange} className="bg-white dark:bg-[#1a1a1a] border-gray-200 dark:border-gray-700" />
-                <Input name="phone" type="tel" inputMode="numeric" maxLength={15} placeholder="Receiver phone number" value={addressFormData.phone || ""} onChange={e => {
-                const onlyDigits = e.target.value.replace(/\D/g, "");
-                setAddressFormData({
-                  ...addressFormData,
-                  phone: onlyDigits
-                });
-              }} className="bg-white dark:bg-[#1a1a1a] border-gray-200 dark:border-gray-700" />
-              </div>
             </div>
 
             {/* Save Address As */}

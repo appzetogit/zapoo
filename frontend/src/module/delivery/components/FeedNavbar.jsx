@@ -186,7 +186,9 @@ export default function FeedNavbar({
       console.error('❌ Error updating online status in backend:', error);
       // Revert state if backend update fails
       setIsOnline(!next);
-      toast.error('Failed to update status. Please try again.');
+      toast.dismiss(TOAST_ID_KEY);
+      const backendMessage = error?.response?.data?.message;
+      toast.error(backendMessage || 'Failed to update status. Please try again.');
     }
   };
 
