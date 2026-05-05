@@ -19,6 +19,7 @@ import {
   evaluateChallengesOnDeliveryCompleted,
   evaluateChallengesOnDeliveryAccepted
 } from '../../order/services/challengeEngineService.js';
+import { createPaymentLink, fetchPaymentLink } from '../../payment/services/razorpayService.js';
 import mongoose from 'mongoose';
 import winston from 'winston';
 const logger = winston.createLogger({
@@ -44,6 +45,27 @@ const applyCustomerSnapshot = (order) => {
     userId: patchedUser
   };
 };
+
+const buildOrderLookupQuery = (orderId) => {
+  const normalizedOrderId = String(orderId || '').trim();
+  if (mongoose.Types.ObjectId.isValid(normalizedOrderId) && normalizedOrderId.length === 24) {
+    return {
+      $or: [{ _id: normalizedOrderId }, { orderId: normalizedOrderId }]
+    };
+  }
+  return { orderId: normalizedOrderId };
+};
+
+const mapPaymentStatusForDeliveryClient = (status) => {
+  const normalized = String(status || '').toLowerCase();
+  if (['paid', 'captured', 'authorized', 'success', 'completed'].includes(normalized)) return 'paid';
+  if (['partially_paid'].includes(normalized)) return 'partially_paid';
+  if (['failed', 'cancelled', 'expired'].includes(normalized)) return 'failed';
+  if (['pending', 'created', 'processing', 'issued'].includes(normalized)) return 'pending';
+  return normalized || 'pending';
+};
+
+const generateDropOtpCode = () => String(Math.floor(1000 + Math.random() * 9000));
 
 /**
  * Get Delivery Partner Orders
@@ -280,15 +302,21 @@ export const acceptOrder = asyncHandler(async (req, res) => {
       console.error(`❌ Invalid orderId provided: ${orderId}`);
       return errorResponse(res, 400, 'Invalid order ID');
     }
-    // Find order - try both by _id and orderId
+    const buildOrderLookupQuery = (idValue) => {
+      const normalized = idValue?.toString?.() || String(idValue || '');
+      const conditions = [{ orderId: normalized }];
+      if (mongoose.Types.ObjectId.isValid(normalized) && normalized.length === 24) {
+        conditions.unshift({ _id: normalized });
+      }
+      return { $or: conditions };
+    };
+
+    // Find order - try both by _id and orderId (ObjectId-safe)
     // First check if order exists (without deliveryPartnerId filter)
-    let order = await Order.findOne({
-      $or: [{
-        _id: orderId
-      }, {
-        orderId: orderId
-      }]
-    }).populate('restaurantId', 'name location address phone ownerPhone').populate('userId', 'name phone').lean();
+    let order = await Order.findOne(buildOrderLookupQuery(orderId))
+      .populate('restaurantId', 'name location address phone ownerPhone')
+      .populate('userId', 'name phone')
+      .lean();
     if (!order) {
       console.error(`❌ Order ${orderId} not found in database`);
       return errorResponse(res, 404, 'Order not found');
@@ -371,13 +399,7 @@ export const acceptOrder = asyncHandler(async (req, res) => {
       // Proceed with assignment
       let orderDoc;
       try {
-        orderDoc = await Order.findOne({
-          $or: [{
-            _id: orderId
-          }, {
-            orderId: orderId
-          }]
-        });
+        orderDoc = await Order.findOne(buildOrderLookupQuery(orderId));
         if (!orderDoc) {
           console.error(`❌ Order document not found for ID: ${orderId}`);
           return errorResponse(res, 404, 'Order not found');
@@ -461,13 +483,10 @@ export const acceptOrder = asyncHandler(async (req, res) => {
       // Reload order with populated data (use orderDoc._id to ensure we get the updated order)
       const updatedOrderId = orderDoc._id || orderId;
       try {
-        order = await Order.findOne({
-          $or: [{
-            _id: updatedOrderId
-          }, {
-            orderId: orderId
-          }]
-        }).populate('restaurantId', 'name location address phone ownerPhone').populate('userId', 'name phone').lean();
+        order = await Order.findOne(buildOrderLookupQuery(updatedOrderId || orderId))
+          .populate('restaurantId', 'name location address phone ownerPhone')
+          .populate('userId', 'name phone')
+          .lean();
         if (!order) {
           console.error(`❌ Order not found after assignment: ${updatedOrderId}`);
           return errorResponse(res, 500, 'Order not found after assignment. Please try again.');
@@ -1429,18 +1448,13 @@ export const confirmReachedDrop = asyncHandler(async (req, res) => {
     }
 
     // Find order by _id or orderId, and ensure it's assigned to this delivery partner
-    // Try multiple comparison methods for deliveryPartnerId (ObjectId vs string)
+    // Use ObjectId-safe lookup for custom IDs like ORD-xxxx
     const deliveryId = delivery._id;
+    const orderLookup = buildOrderLookupQuery(orderId);
     // Try finding order with different deliveryPartnerId comparison methods
     // First try without lean() to get Mongoose document (needed for proper ObjectId comparison)
     let order = await Order.findOne({
-      $and: [{
-        $or: [{
-          _id: orderId
-        }, {
-          orderId: orderId
-        }]
-      }, {
+      $and: [orderLookup, {
         deliveryPartnerId: deliveryId // Try as ObjectId first (most common)
       }]
     });
@@ -1448,13 +1462,7 @@ export const confirmReachedDrop = asyncHandler(async (req, res) => {
     // If not found, try with string comparison
     if (!order) {
       order = await Order.findOne({
-        $and: [{
-          $or: [{
-            _id: orderId
-          }, {
-            orderId: orderId
-          }]
-        }, {
+        $and: [orderLookup, {
           deliveryPartnerId: deliveryId.toString() // Try as string
         }]
       });
@@ -1488,10 +1496,18 @@ export const confirmReachedDrop = asyncHandler(async (req, res) => {
     let finalOrder = null;
     if (order.deliveryState.currentPhase !== 'at_delivery') {
       try {
+        const otpCode = generateDropOtpCode();
         // Update the order document directly since we have it
         order.deliveryState.status = 'en_route_to_delivery';
         order.deliveryState.currentPhase = 'at_delivery';
         order.deliveryState.reachedDropAt = new Date();
+        order.deliveryVerification = order.deliveryVerification || {};
+        order.deliveryVerification.dropOtp = {
+          code: otpCode,
+          generatedAt: new Date(),
+          verified: false,
+          verifiedAt: null
+        };
 
         // Save the order
         await order.save();
@@ -1504,6 +1520,11 @@ export const confirmReachedDrop = asyncHandler(async (req, res) => {
           return errorResponse(res, 500, 'Failed to update order state');
         }
         finalOrder = updatedOrder;
+        console.log('🔐 [DeliveryOTP] Drop OTP generated', {
+          orderId: finalOrder.orderId || finalOrder._id?.toString?.() || orderId,
+          orderMongoId: finalOrder._id?.toString?.() || null,
+          otpCode
+        });
       } catch (updateError) {
         console.error(`❌ Error updating order ${order._id}:`, updateError);
         console.error('Update error stack:', updateError.stack);
@@ -1554,6 +1575,83 @@ export const confirmReachedDrop = asyncHandler(async (req, res) => {
 });
 
 /**
+ * Verify Drop OTP (Delivery Boy verifies customer code)
+ * POST /api/delivery/orders/:orderId/verify-drop-otp
+ */
+export const verifyDropOtp = asyncHandler(async (req, res) => {
+  try {
+    const delivery = req.delivery;
+    const { orderId } = req.params;
+    const enteredOtp = String(req.body?.otp || '').trim();
+
+    if (!delivery?._id) {
+      return errorResponse(res, 401, 'Delivery partner authentication required');
+    }
+    if (!orderId) {
+      return errorResponse(res, 400, 'Order ID is required');
+    }
+    if (!/^\d{4}$/.test(enteredOtp)) {
+      return errorResponse(res, 400, 'OTP must be 4 digits');
+    }
+
+    const orderLookup = buildOrderLookupQuery(orderId);
+    const deliveryId = delivery._id;
+    let order = await Order.findOne({ $and: [orderLookup, { deliveryPartnerId: deliveryId }] });
+    if (!order) {
+      order = await Order.findOne({ $and: [orderLookup, { deliveryPartnerId: deliveryId.toString() }] });
+    }
+    if (!order) {
+      return errorResponse(res, 404, 'Order not found or not assigned to you');
+    }
+
+    const savedOtp = String(order?.deliveryVerification?.dropOtp?.code || '').trim();
+    const isAlreadyVerified = Boolean(order?.deliveryVerification?.dropOtp?.verified);
+
+    if (!savedOtp) {
+      return errorResponse(res, 400, 'Drop OTP not generated yet');
+    }
+
+    if (isAlreadyVerified) {
+      const latestOrder = await Order.findById(order._id)
+        .populate('restaurantId', 'name location address phone ownerPhone')
+        .populate('userId', 'name phone')
+        .lean();
+      return successResponse(res, 200, 'OTP already verified', { order: latestOrder });
+    }
+
+    if (savedOtp !== enteredOtp) {
+      return errorResponse(res, 400, 'Invalid OTP');
+    }
+
+    order.deliveryVerification = order.deliveryVerification || {};
+    order.deliveryVerification.dropOtp = {
+      ...(order.deliveryVerification.dropOtp || {}),
+      verified: true,
+      verifiedAt: new Date()
+    };
+    await order.save();
+
+    const updatedOrder = await Order.findById(order._id)
+      .populate('restaurantId', 'name location address phone ownerPhone')
+      .populate('userId', 'name phone')
+      .lean();
+
+    console.log('✅ [DeliveryOTP] Drop OTP verified', {
+      orderId: updatedOrder?.orderId || order.orderId || orderId,
+      orderMongoId: updatedOrder?._id?.toString?.() || order._id?.toString?.(),
+      deliveryId: deliveryId?.toString?.()
+    });
+
+    return successResponse(res, 200, 'OTP verified successfully', {
+      order: updatedOrder
+    });
+  } catch (error) {
+    logger.error(`Error verifying drop OTP: ${error.message}`);
+    return errorResponse(res, 500, `Failed to verify OTP: ${error.message}`);
+  }
+});
+
+/**
  * Confirm Delivery Complete
  * PATCH /api/delivery/orders/:orderId/complete-delivery
  */
@@ -1575,34 +1673,19 @@ export const completeDelivery = asyncHandler(async (req, res) => {
       return errorResponse(res, 400, 'Order ID is required');
     }
 
-    // Find order - try both by _id and orderId, and ensure it's assigned to this delivery partner
+    // Find order - try both by _id and orderId (ObjectId-safe), and ensure it's assigned to this delivery partner
     const deliveryId = delivery._id;
+    const orderLookup = buildOrderLookupQuery(orderId);
     let order = null;
 
-    // Check if orderId is a valid MongoDB ObjectId
-    if (mongoose.Types.ObjectId.isValid(orderId) && orderId.length === 24) {
-      order = await Order.findOne({
-        _id: orderId,
-        deliveryPartnerId: deliveryId
-      }).populate('restaurantId', 'name location address phone ownerPhone').populate('userId', 'name phone').lean();
-    } else {
-      // If not a valid ObjectId, search by orderId field
-      order = await Order.findOne({
-        orderId: orderId,
-        deliveryPartnerId: deliveryId
-      }).populate('restaurantId', 'name location address phone ownerPhone').populate('userId', 'name phone').lean();
-    }
+    order = await Order.findOne({
+      $and: [orderLookup, { deliveryPartnerId: deliveryId }]
+    }).populate('restaurantId', 'name location address phone ownerPhone').populate('userId', 'name phone').lean();
 
     // If still not found, try with string comparison for deliveryPartnerId
     if (!order) {
       order = await Order.findOne({
-        $and: [{
-          $or: [{
-            _id: orderId
-          }, {
-            orderId: orderId
-          }]
-        }, {
+        $and: [orderLookup, {
           deliveryPartnerId: deliveryId.toString()
         }]
       }).populate('restaurantId', 'name location address phone ownerPhone').populate('userId', 'name phone').lean();
@@ -2100,5 +2183,241 @@ export const completeDelivery = asyncHandler(async (req, res) => {
       deliveryId: req.delivery?._id
     });
     return errorResponse(res, 500, `Failed to complete delivery: ${error.message}`);
+  }
+});
+
+/**
+ * Create QR link for COD collection (delivery app)
+ * POST /api/delivery/orders/:orderId/collect/qr
+ */
+export const createCollectQr = asyncHandler(async (req, res) => {
+  try {
+    const delivery = req.delivery;
+    const { orderId } = req.params;
+    const customerName = String(req.body?.name || '').trim();
+    const customerPhone = String(req.body?.phone || '').trim();
+
+    if (!delivery?._id) {
+      return errorResponse(res, 401, 'Delivery partner authentication required');
+    }
+    if (!orderId) {
+      return errorResponse(res, 400, 'Order ID is required');
+    }
+
+    const orderLookup = buildOrderLookupQuery(orderId);
+    const deliveryId = delivery._id;
+    let order = await Order.findOne({ $and: [orderLookup, { deliveryPartnerId: deliveryId }] }).lean();
+    if (!order) {
+      order = await Order.findOne({ $and: [orderLookup, { deliveryPartnerId: deliveryId.toString() }] }).lean();
+    }
+    if (!order) {
+      return errorResponse(res, 404, 'Order not found or not assigned to you');
+    }
+
+    const amount = Number(order?.pricing?.total || 0);
+    const displayOrderId = order.orderId || order._id?.toString();
+    const payeeName = customerName || order?.customerName || order?.userId?.name || 'Customer';
+    const payeePhone = customerPhone || order?.customerPhone || order?.userId?.phone || '';
+    const amountPaise = Math.round(Math.max(amount, 0) * 100);
+    if (!Number.isFinite(amountPaise) || amountPaise <= 0) {
+      return errorResponse(res, 400, 'Invalid amount for QR generation');
+    }
+
+    let shortUrl = null;
+    try {
+      const link = await createPaymentLink({
+        amount: amountPaise,
+        currency: 'INR',
+        description: `COD collect for order ${displayOrderId}`,
+        reference_id: displayOrderId,
+        customer: { name: payeeName || undefined, contact: payeePhone || undefined },
+        notify: { sms: false, email: false },
+        notes: {
+          source: 'delivery_app',
+          flow: 'cod_collect',
+          orderId: displayOrderId,
+          orderMongoId: order._id?.toString?.() || ''
+        }
+      });
+      shortUrl = link?.short_url || link?.payment_link || null;
+      if (!shortUrl) {
+        throw new Error('Razorpay did not return a short payment URL');
+      }
+
+      await Order.updateOne(
+        { _id: order._id },
+        {
+          $set: {
+            'payment.razorpayPaymentId': link?.id || null,
+            'payment.transactionId': link?.reference_id || displayOrderId,
+            'payment.method': 'upi',
+            'payment.status': 'pending'
+          }
+        }
+      );
+
+      console.log('💳 [COD] Razorpay payment link generated', {
+        orderId: displayOrderId,
+        orderMongoId: order._id?.toString?.(),
+        deliveryId: deliveryId?.toString?.(),
+        amount,
+        amountPaise,
+        paymentLinkId: link?.id || null,
+        shortUrl: link?.short_url || null
+      });
+    } catch (rzError) {
+      logger.error(`COD QR payment link creation failed: ${rzError.message}`);
+      return errorResponse(
+        res,
+        502,
+        `Failed to generate Razorpay payment link: ${rzError?.error?.description || rzError.message}`
+      );
+    }
+
+    console.log('💳 [COD] Collect QR generated', {
+      orderId: displayOrderId,
+      orderMongoId: order._id?.toString?.(),
+      deliveryId: deliveryId?.toString?.(),
+      amount,
+      amountPaise,
+      customerPhone: payeePhone || null
+    });
+
+    return successResponse(res, 200, 'QR generated successfully', { shortUrl });
+  } catch (error) {
+    logger.error(`Error generating collect QR: ${error.message}`);
+    return errorResponse(res, 500, `Failed to generate QR: ${error.message}`);
+  }
+});
+
+/**
+ * Get payment status for a delivery order
+ * GET /api/delivery/orders/:orderId/payment-status
+ */
+export const getPaymentStatus = asyncHandler(async (req, res) => {
+  try {
+    const delivery = req.delivery;
+    const { orderId } = req.params;
+
+    if (!delivery?._id) {
+      return errorResponse(res, 401, 'Delivery partner authentication required');
+    }
+    if (!orderId) {
+      return errorResponse(res, 400, 'Order ID is required');
+    }
+
+    const orderLookup = buildOrderLookupQuery(orderId);
+    const deliveryId = delivery._id;
+    let order = await Order.findOne({ $and: [orderLookup, { deliveryPartnerId: deliveryId }] }).lean();
+    if (!order) {
+      order = await Order.findOne({ $and: [orderLookup, { deliveryPartnerId: deliveryId.toString() }] }).lean();
+    }
+    if (!order) {
+      return errorResponse(res, 404, 'Order not found or not assigned to you');
+    }
+
+    let payment = await Payment.findOne({ orderId: order._id }).sort({ createdAt: -1 }).lean();
+    let normalizedStatus = mapPaymentStatusForDeliveryClient(payment?.status || order?.payment?.status || 'pending');
+    let normalizedMethod = String(payment?.method || order?.payment?.method || 'cash').toLowerCase();
+
+    const paymentLinkId = String(order?.payment?.razorpayPaymentId || '').trim();
+    if (paymentLinkId && paymentLinkId.startsWith('plink_')) {
+      try {
+        const link = await fetchPaymentLink(paymentLinkId);
+        const linkStatus = String(link?.status || '').toLowerCase();
+        normalizedMethod = 'upi';
+        normalizedStatus = mapPaymentStatusForDeliveryClient(linkStatus);
+
+        if (normalizedStatus === 'paid' || normalizedStatus === 'partially_paid') {
+          await Order.updateOne(
+            { _id: order._id },
+            {
+              $set: {
+                'payment.method': 'upi',
+                'payment.status': normalizedStatus === 'paid' ? 'completed' : 'processing'
+              }
+            }
+          );
+        }
+
+        console.log('💳 [COD] Razorpay link status sync', {
+          orderId: order.orderId || order._id?.toString?.(),
+          orderMongoId: order._id?.toString?.(),
+          paymentLinkId,
+          linkStatus,
+          normalizedStatus,
+          amountPaid: Number(link?.amount_paid || 0) / 100,
+          amountDue: Number(link?.amount_due || 0) / 100
+        });
+      } catch (syncErr) {
+        logger.warn(`COD payment status sync failed for ${paymentLinkId}: ${syncErr.message}`);
+      }
+    }
+
+    console.log('💳 [COD] Payment status check', {
+      orderId: order.orderId || order._id?.toString?.(),
+      orderMongoId: order._id?.toString?.(),
+      paymentStatus: normalizedStatus,
+      paymentMethod: normalizedMethod,
+      paymentLinkId: paymentLinkId || null
+    });
+
+    return successResponse(res, 200, 'Payment status fetched', {
+      payment: {
+        status: normalizedStatus,
+        method: normalizedMethod,
+        amount: Number(payment?.amount ?? order?.pricing?.total ?? 0),
+        paymentId: payment?.paymentId || null
+      }
+    });
+  } catch (error) {
+    logger.error(`Error fetching payment status: ${error.message}`);
+    return errorResponse(res, 500, `Failed to fetch payment status: ${error.message}`);
+  }
+});
+
+/**
+ * Switch order payment mode to cash collection
+ * POST /api/delivery/orders/:orderId/collect/cash
+ */
+export const switchToCash = asyncHandler(async (req, res) => {
+  try {
+    const delivery = req.delivery;
+    const { orderId } = req.params;
+
+    if (!delivery?._id) {
+      return errorResponse(res, 401, 'Delivery partner authentication required');
+    }
+    if (!orderId) {
+      return errorResponse(res, 400, 'Order ID is required');
+    }
+
+    const orderLookup = buildOrderLookupQuery(orderId);
+    const deliveryId = delivery._id;
+    let order = await Order.findOne({ $and: [orderLookup, { deliveryPartnerId: deliveryId }] });
+    if (!order) {
+      order = await Order.findOne({ $and: [orderLookup, { deliveryPartnerId: deliveryId.toString() }] });
+    }
+    if (!order) {
+      return errorResponse(res, 404, 'Order not found or not assigned to you');
+    }
+
+    order.payment = order.payment || {};
+    order.payment.method = 'cash';
+    order.payment.status = 'pending';
+    await order.save();
+
+    console.log('💳 [COD] Switched to cash collection', {
+      orderId: order.orderId || order._id?.toString?.(),
+      orderMongoId: order._id?.toString?.(),
+      deliveryId: deliveryId?.toString?.()
+    });
+
+    return successResponse(res, 200, 'Switched to cash collection successfully', {
+      payment: { method: 'cash', status: 'pending' }
+    });
+  } catch (error) {
+    logger.error(`Error switching to cash: ${error.message}`);
+    return errorResponse(res, 500, `Failed to switch to cash: ${error.message}`);
   }
 });

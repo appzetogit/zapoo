@@ -1,0 +1,19 @@
+# Recovery / migration artifacts (must never be versioned)
+recovery_dump/
+backend/_appzeto_sync/
+
+# Local dependency folders
+backend/node_modules/
+frontend/node_modules/
+
+# Local env files
+backend/.env
+frontend/.env
+recovery_dump/
+
+# Local diagnostics generated during debugging
+backend/benchmark_results_*.json
+backend/benchmark_samples.json
+backend/discovered_routes.json
+backend/final_benchmark_report.json
+backend/test_tokens.json

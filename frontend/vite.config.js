@@ -7,9 +7,15 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
 
   resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./src"),
-    },
+    alias: [
+      { find: "@food/components", replacement: path.resolve(__dirname, "./src/components") },
+      { find: "@food/api/config", replacement: path.resolve(__dirname, "./src/lib/api/config.js") },
+      { find: "@food/api/axios", replacement: path.resolve(__dirname, "./src/lib/api/axios.js") },
+      { find: "@food/api", replacement: path.resolve(__dirname, "./src/lib/api/index.js") },
+      { find: "@food", replacement: path.resolve(__dirname, "./src/module/delivery") },
+      { find: "@delivery", replacement: path.resolve(__dirname, "./src/module/deliveryV2") },
+      { find: "@", replacement: path.resolve(__dirname, "./src") },
+    ],
     dedupe: ["react", "react-dom"],
   },
 

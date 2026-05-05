@@ -56,6 +56,17 @@ export const api = {
   },
 };
 
+// Public cached GET helper used by delivery V2 utilities
+export const publicGetOnce = (url, options = {}) => {
+  const { force = false, ttl = 5 * 60 * 1000, config = {} } = options;
+  const key = `public:${url}`;
+  return getCachedResource(
+    key,
+    () => apiClient.get(url, config),
+    { ttl, force }
+  );
+};
+
 // Export auth helper functions
 export const authAPI = {
   // Send OTP (supports both phone and email)
@@ -1000,6 +1011,9 @@ export const deliveryAPI = {
   getCurrentDelivery: () => {
     return apiClient.get(API_ENDPOINTS.DELIVERY.AUTH.ME);
   },
+  getMe: () => {
+    return apiClient.get(API_ENDPOINTS.DELIVERY.AUTH.ME);
+  },
 
   // Dashboard
   getDashboard: () => {
@@ -1050,6 +1064,18 @@ export const deliveryAPI = {
       params: { period },
     });
   },
+  getCashLimit: () => {
+    return apiClient.get(API_ENDPOINTS.DELIVERY.CASH_LIMIT);
+  },
+  getPocketDetails: (params = {}) => {
+    return apiClient.get(API_ENDPOINTS.DELIVERY.POCKET_DETAILS, { params });
+  },
+  getActiveEarningAddons: () => {
+    return apiClient.get(API_ENDPOINTS.DELIVERY.EARNING_ADDONS_ACTIVE);
+  },
+  getReferralStats: () => {
+    return apiClient.get(API_ENDPOINTS.DELIVERY.REFERRAL_STATS);
+  },
 
   // Get emergency help numbers
   getEmergencyHelp: () => {
@@ -1079,6 +1105,11 @@ export const deliveryAPI = {
   // Update delivery profile
   updateProfile: (data) => {
     return apiClient.put(API_ENDPOINTS.DELIVERY.PROFILE, data);
+  },
+  updateBankDetailsMultipart: (formData) => {
+    return apiClient.put(API_ENDPOINTS.DELIVERY.PROFILE, formData, {
+      headers: { "Content-Type": "multipart/form-data" }
+    });
   },
   deleteAccount: () => {
     return apiClient.delete(API_ENDPOINTS.DELIVERY.PROFILE);
@@ -1143,6 +1174,28 @@ export const deliveryAPI = {
       API_ENDPOINTS.DELIVERY.ORDER_REACHED_DROP.replace(":orderId", orderId),
     );
   },
+  verifyDropOtp: (orderId, otp) => {
+    return apiClient.post(
+      API_ENDPOINTS.DELIVERY.ORDER_VERIFY_DROP_OTP.replace(":orderId", orderId),
+      { otp }
+    );
+  },
+  createCollectQr: (orderId, customerInfo = {}) => {
+    return apiClient.post(
+      API_ENDPOINTS.DELIVERY.ORDER_COLLECT_QR.replace(":orderId", orderId),
+      customerInfo,
+    );
+  },
+  getPaymentStatus: (orderId) => {
+    return apiClient.get(
+      API_ENDPOINTS.DELIVERY.ORDER_PAYMENT_STATUS.replace(":orderId", orderId),
+    );
+  },
+  switchToCash: (orderId) => {
+    return apiClient.post(
+      API_ENDPOINTS.DELIVERY.ORDER_COLLECT_CASH.replace(":orderId", orderId),
+    );
+  },
   completeDelivery: (orderId, rating = null, review = "") => {
     return apiClient.patch(
       API_ENDPOINTS.DELIVERY.ORDER_COMPLETE_DELIVERY.replace(
@@ -1191,6 +1244,9 @@ export const deliveryAPI = {
   },
   submitSignupDocuments: (data) => {
     return apiClient.post(API_ENDPOINTS.DELIVERY.SIGNUP.DOCUMENTS, data);
+  },
+  register: (payload) => {
+    return apiClient.post(API_ENDPOINTS.DELIVERY.SIGNUP.DOCUMENTS, payload);
   },
 
   // Reverify (resubmit for approval)
@@ -1276,6 +1332,21 @@ export const telephonyAPI = {
         throw error;
       });
   },
+};
+
+export const publicAPI = {
+  getPrivacy: (params = {}) => {
+    return apiClient.get(API_ENDPOINTS.ADMIN.PRIVACY_PUBLIC, { params });
+  },
+  getTerms: (params = {}) => {
+    return apiClient.get(API_ENDPOINTS.ADMIN.TERMS_PUBLIC, { params });
+  },
+  getBusinessSettings: (params = {}) => {
+    return apiClient.get(API_ENDPOINTS.ADMIN.BUSINESS_SETTINGS_PUBLIC, { params });
+  },
+  getPublicEnv: () => {
+    return apiClient.get("/env/public");
+  }
 };
 
 // Export admin API helper functions

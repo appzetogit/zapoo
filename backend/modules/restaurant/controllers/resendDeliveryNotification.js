@@ -16,22 +16,47 @@ export const resendDeliveryNotification = asyncHandler(async (req, res) => {
       id
     } = req.params;
     const restaurantId = restaurant._id?.toString() || restaurant.restaurantId || restaurant.id;
+    const restaurantIdVariations = [restaurantId].filter(Boolean);
+    if (restaurant?._id) {
+      const mongoId = restaurant._id.toString();
+      if (!restaurantIdVariations.includes(mongoId)) {
+        restaurantIdVariations.push(mongoId);
+      }
+    }
+    if (restaurant?.restaurantId && !restaurantIdVariations.includes(restaurant.restaurantId)) {
+      restaurantIdVariations.push(restaurant.restaurantId);
+    }
+    if (mongoose.Types.ObjectId.isValid(restaurantId) && restaurantId.length === 24) {
+      const objectIdString = new mongoose.Types.ObjectId(restaurantId).toString();
+      if (!restaurantIdVariations.includes(objectIdString)) {
+        restaurantIdVariations.push(objectIdString);
+      }
+    }
 
     // Try to find order by MongoDB _id or orderId
     let order = null;
     if (mongoose.Types.ObjectId.isValid(id) && id.length === 24) {
       order = await Order.findOne({
         _id: id,
-        restaurantId
+        restaurantId: {
+          $in: restaurantIdVariations
+        }
       });
     }
     if (!order) {
       order = await Order.findOne({
         orderId: id,
-        restaurantId
+        restaurantId: {
+          $in: restaurantIdVariations
+        }
       });
     }
     if (!order) {
+      console.warn('⚠️ [DeliveryAssign] Resend failed: order not found for restaurant', {
+        orderParam: id,
+        restaurantId,
+        restaurantIdVariations
+      });
       return errorResponse(res, 404, 'Order not found');
     }
 
@@ -41,11 +66,53 @@ export const resendDeliveryNotification = asyncHandler(async (req, res) => {
     }
 
     // Get restaurant location
-    const restaurantDoc = await Restaurant.findById(restaurantId).select('location').lean();
+    let restaurantDoc = null;
+    if (mongoose.Types.ObjectId.isValid(restaurantId) && restaurantId.length === 24) {
+      restaurantDoc = await Restaurant.findById(restaurantId).select('location restaurantId').lean();
+    }
+    if (!restaurantDoc) {
+      restaurantDoc = await Restaurant.findOne({
+        $or: [
+          {
+            _id: mongoose.Types.ObjectId.isValid(restaurantId) && restaurantId.length === 24
+              ? new mongoose.Types.ObjectId(restaurantId)
+              : null
+          },
+          {
+            restaurantId: {
+              $in: restaurantIdVariations
+            }
+          },
+          {
+            _id: mongoose.Types.ObjectId.isValid(order.restaurantId) && String(order.restaurantId).length === 24
+              ? new mongoose.Types.ObjectId(order.restaurantId)
+              : null
+          },
+          {
+            restaurantId: order.restaurantId
+          }
+        ]
+      }).select('location restaurantId').lean();
+    }
     if (!restaurantDoc || !restaurantDoc.location || !restaurantDoc.location.coordinates) {
+      console.warn('⚠️ [DeliveryAssign] Resend failed: restaurant coordinates missing', {
+        orderId: order.orderId || null,
+        orderMongoId: order._id?.toString?.() || null,
+        restaurantId,
+        orderRestaurantId: order.restaurantId
+      });
       return errorResponse(res, 400, 'Restaurant location not found. Please update restaurant location.');
     }
     const [restaurantLng, restaurantLat] = restaurantDoc.location.coordinates;
+
+    console.log('📤 [DeliveryAssign] Resend trigger', {
+      orderId: order.orderId || null,
+      orderMongoId: order._id?.toString?.() || null,
+      restaurantId: restaurantId?.toString?.() || String(restaurantId || ''),
+      orderRestaurantId: order.restaurantId,
+      restaurantLat,
+      restaurantLng
+    });
 
     const result = await broadcastDeliveryRequest(order._id.toString(), restaurantLat, restaurantLng, { trigger: 'manual_resend' });
     console.log('📊 [DeliveryAssign] Resend broadcast recipients', {

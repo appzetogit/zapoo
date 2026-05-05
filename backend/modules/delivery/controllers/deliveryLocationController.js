@@ -81,8 +81,10 @@ export const updateLocation = asyncHandler(async (req, res) => {
     const now = new Date();
     const isOnlineChanged = typeof isOnline === 'boolean' && isOnline !== delivery.availability?.isOnline;
 
-    // Throttle DB updates to once every 30 seconds, unless online status changes
-    const shouldUpdateDb = !lastUpdate || (now - new Date(lastUpdate) > 30000) || isOnlineChanged;
+    // Throttle DB updates to once every 5 seconds for accurate live tracking,
+    // unless online status changes (which should always persist immediately).
+    const LOCATION_UPDATE_THROTTLE_MS = 5000;
+    const shouldUpdateDb = !lastUpdate || (now - new Date(lastUpdate) > LOCATION_UPDATE_THROTTLE_MS) || isOnlineChanged;
 
     // Build update object
     if (typeof latitude === 'number' && typeof longitude === 'number') {
@@ -303,4 +305,3 @@ export const getZonesInRadius = asyncHandler(async (req, res) => {
     return errorResponse(res, 500, 'Failed to fetch zones');
   }
 });
-
