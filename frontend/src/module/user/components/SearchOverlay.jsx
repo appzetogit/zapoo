@@ -433,12 +433,12 @@ export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchCh
 
               {restaurantMatches.map((r) => {
                 const inRange = isWithinDeliveryRangeKm(r.distanceInKm, r.deliveryRange, { userHasLocation })
-                if (!inRange) return null
                 const isClosed = !isOpenForDeliveryNow({ openDays: r.openDays, deliveryTimings: r.deliveryTimings })
+                const isDisabled = !inRange || isClosed
                 const slug = r.slug || r.name?.toLowerCase().replace(/\s+/g, "-")
                 const content = (
                   <div className={`flex items-center gap-3 rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50/80 dark:bg-[#141414] p-3 transition-colors ${
-                    isClosed ? "grayscale opacity-80 cursor-not-allowed" : "hover:border-orange-200 dark:hover:border-orange-900"
+                    isDisabled ? "grayscale opacity-80 cursor-not-allowed" : "hover:border-orange-200 dark:hover:border-orange-900"
                   }`}>
                     <div className="h-14 w-14 flex-shrink-0 overflow-hidden rounded-lg bg-gray-200 dark:bg-gray-800">
                       <img
@@ -455,14 +455,14 @@ export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchCh
                       <p className="font-semibold text-gray-900 dark:text-white truncate">{r.name}</p>
                       <p className="text-xs text-gray-500 dark:text-gray-400 truncate">Restaurant</p>
                     </div>
-                    {isClosed && (
+                    {isDisabled && (
                       <span className="text-[10px] font-semibold text-gray-500 border border-gray-200 rounded-full px-2 py-0.5">
-                        Closed
+                        {!inRange ? "Out of range" : "Closed"}
                       </span>
                     )}
                   </div>
                 )
-                return isClosed ? (
+                return isDisabled ? (
                   <div key={String(r.id)}>{content}</div>
                 ) : (
                   <Link

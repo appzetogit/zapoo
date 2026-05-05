@@ -144,18 +144,14 @@ export default function RestaurantDetails() {
   const [restaurantError, setRestaurantError] = useState(null);
   const [outOfRange, setOutOfRange] = useState(false); // true when user is beyond restaurant's deliveryRange
   const fetchedRestaurantRef = useRef(false); // Track if restaurant has been fetched for current slug
+  const activeFetchIdRef = useRef(0);
 
   // Fetch restaurant data from API
   useEffect(() => {
     const fetchRestaurant = async () => {
       if (!slug) return;
-      if (isOutOfService) {
-        setRestaurant(null);
-        setRestaurantError('You are outside the service zone. Please select a location within the service area.');
-        setOutOfRange(false);
-        setLoadingRestaurant(false);
-        return;
-      }
+      const fetchId = ++activeFetchIdRef.current;
+      const isStaleFetch = () => fetchId !== activeFetchIdRef.current;
 
       // Prevent re-fetching if we've already fetched for this slug and zoneId hasn't changed meaningfully
       // Only re-fetch if slug changed or if we're waiting for zoneId and it just became available
@@ -169,6 +165,7 @@ export default function RestaurantDetails() {
       let response;
       let apiRestaurant;
       try {
+        if (isStaleFetch()) return;
         setLoadingRestaurant(true);
         setRestaurantError(null);
         setOutOfRange(false);
@@ -183,6 +180,7 @@ export default function RestaurantDetails() {
         // Fetch restaurant directly from restaurantAPI (pass coords for outOfRange check)
         try {
           response = await restaurantAPI.getRestaurantById(slug, coordParams);
+          if (isStaleFetch()) return;
           const data = response.data?.data;
           if (response.data && response.data.success && data) {
             apiRestaurant = data.restaurant ?? data;
@@ -205,11 +203,13 @@ export default function RestaurantDetails() {
               searchParams.longitude = userLocation.longitude;
             }
             const searchResponse = await restaurantAPI.getRestaurants(searchParams);
+            if (isStaleFetch()) return;
             const restaurants = searchResponse?.data?.data?.restaurants || searchResponse?.data?.data || [];
             const restaurantName = slug.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
             const matchingRestaurant = restaurants.find(r => r.slug === slug || r.name?.toLowerCase().replace(/\s+/g, '-') === slug.toLowerCase() || r.name?.toLowerCase() === restaurantName.toLowerCase());
             if (matchingRestaurant) {
               const fullResponse = await restaurantAPI.getRestaurantById(matchingRestaurant._id || matchingRestaurant.restaurantId, coordParams);
+              if (isStaleFetch()) return;
               const fullData = fullResponse.data?.data;
               if (fullResponse.data && fullResponse.data.success && fullData) {
                 apiRestaurant = fullData.restaurant ?? fullData;
@@ -219,6 +219,7 @@ export default function RestaurantDetails() {
           }
         }
         if (apiRestaurant) {
+          if (isStaleFetch()) return;
           const actualRestaurant = apiRestaurant;
 
           // Helper function to format address with zone and pin code
@@ -451,6 +452,7 @@ export default function RestaurantDetails() {
           if (restaurantIdForMenu) {
             try {
               const menuResponse = await restaurantAPI.getMenuByRestaurantId(restaurantIdForMenu);
+              if (isStaleFetch()) return;
               if (menuResponse.data && menuResponse.data.success && menuResponse.data.data && menuResponse.data.data.menu) {
                 const menuSections = menuResponse.data.data.menu.sections || [];
 
@@ -497,10 +499,10 @@ export default function RestaurantDetails() {
                   items: recommendedItems,
                   subsections: []
                 }, ...menuSections];
-                setRestaurant(prev => ({
+                setRestaurant(prev => prev ? {
                   ...prev,
                   menuSections: finalMenuSections
-                }));
+                } : prev);
 
                 // Keep all sections/subsections expanded by default so all categories and items are visible on open
                 const defaultExpandedSections = new Set();
@@ -519,6 +521,7 @@ export default function RestaurantDetails() {
             }
             try {
               const inventoryResponse = await restaurantAPI.getInventoryByRestaurantId(restaurantIdForMenu);
+              if (isStaleFetch()) return;
               if (inventoryResponse.data && inventoryResponse.data.success && inventoryResponse.data.data && inventoryResponse.data.data.inventory) {
                 const inventoryCategories = inventoryResponse.data.data.inventory.categories || [];
 
@@ -541,10 +544,10 @@ export default function RestaurantDetails() {
                   })) : [],
                   order: category.order !== undefined ? category.order : index
                 }));
-                setRestaurant(prev => ({
+                setRestaurant(prev => prev ? {
                   ...prev,
                   inventory: normalizedInventory
-                }));
+                } : prev);
               }
             } catch (inventoryError) {
               console.error('❌ Error fetching inventory:', inventoryError);
@@ -582,6 +585,7 @@ export default function RestaurantDetails() {
           setRestaurant(null);
         }
       } finally {
+        if (isStaleFetch()) return;
         setLoadingRestaurant(false);
       }
     };
@@ -597,7 +601,7 @@ export default function RestaurantDetails() {
       return;
     }
     fetchRestaurant();
-  }, [slug, zoneId, loadingZone, restaurant?.slug, isOutOfService, pureVegOnlySelected]);
+  }, [slug, zoneId, loadingZone, pureVegOnlySelected, userLocation?.latitude, userLocation?.longitude]);
 
   // Track previous values to prevent unnecessary recalculations
   const prevCoordsRef = useRef({
@@ -697,12 +701,6 @@ export default function RestaurantDetails() {
           from: location.pathname
         }
       });
-      return;
-    }
-
-    // CRITICAL: Check if user is in service zone or restaurant is available
-    if (isOutOfService) {
-      toast.error(t("user.restaurantDetails.toast.outsideServiceZone"));
       return;
     }
 
@@ -1228,8 +1226,8 @@ export default function RestaurantDetails() {
       </AnimatedPage>;
   }
 
-  // Only show grayscale when user is out of service (not based on restaurant availability)
-  const shouldShowGrayscale = isOutOfService;
+  // Zone-based grayscale is disabled: if restaurant is visible on Home, details must remain orderable.
+  const shouldShowGrayscale = false;
   return <AnimatedPage id="scrollingelement" className={`min-h-screen bg-white dark:bg-[#0a0a0a] flex flex-col transition-all duration-300 ${shouldShowGrayscale ? 'grayscale opacity-75' : ''}`}>
       {/* Header - Back, Search, Menu (like reference image) */}
       <div className="px-4 sm:px-6 md:px-8 lg:px-10 xl:px-12 pt-3 md:pt-4 lg:pt-5 pb-2 md:pb-3 bg-white dark:bg-[#1a1a1a]">

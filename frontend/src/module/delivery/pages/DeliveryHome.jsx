@@ -615,9 +615,14 @@ export default function DeliveryHome() {
   const [showOrderDeliveredAnimation, setShowOrderDeliveredAnimation] = useState(false);
   const [showCustomerReviewPopup, setShowCustomerReviewPopup] = useState(false);
   const [showPaymentPage, setShowPaymentPage] = useState(false);
+  const isTransitioningToDropRef = useRef(false); // Prevent popup flicker during order-confirmed -> reached-drop transition
   const [customerRating, setCustomerRating] = useState(0);
   const [customerReviewText, setCustomerReviewText] = useState("");
   const [orderEarnings, setOrderEarnings] = useState(0); // Store earnings from completed order
+  const [orderEarningsBreakdown, setOrderEarningsBreakdown] = useState(null); // Store payout split from backend
+  const [lockedOrderEarnings, setLockedOrderEarnings] = useState(0); // Preserve initially shown earning for consistency
+  const [lockedOrderEarningsBreakdown, setLockedOrderEarningsBreakdown] = useState(null);
+  const [lockedOrderEarningsOrderId, setLockedOrderEarningsOrderId] = useState(null);
   const [routePolyline, setRoutePolyline] = useState([]);
   const [showRoutePath, setShowRoutePath] = useState(false); // Toggle to show/hide route path - disabled by default
   const [directionsResponse, setDirectionsResponse] = useState(null); // Directions API response for road-based routing
@@ -658,6 +663,87 @@ export default function DeliveryHome() {
   const orderDeliveredSwipeStartX = useRef(0);
   const orderDeliveredSwipeStartY = useRef(0);
   const orderDeliveredIsSwiping = useRef(false);
+
+  const getNumericEarningsValue = (value) => {
+    if (!value) return 0;
+    if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+    if (typeof value === 'object') {
+      const v = Number(value.totalEarning ?? value.basePayout ?? 0);
+      return Number.isFinite(v) ? v : 0;
+    }
+    return 0;
+  };
+
+  const getEarningsBreakdownValue = (value) => {
+    if (!value || typeof value !== 'object') return null;
+    return value.breakdown || value;
+  };
+
+  const getPaymentEarningsDetails = () => {
+    let total = Number(orderEarnings) || 0;
+    let breakdown = orderEarningsBreakdown;
+
+    if (total <= 0) {
+      total = Number(lockedOrderEarnings) || 0;
+      breakdown = breakdown || lockedOrderEarningsBreakdown;
+    }
+
+    if (total <= 0) {
+      const estimated = selectedRestaurant?.amount || selectedRestaurant?.estimatedEarnings || 0;
+      total = getNumericEarningsValue(estimated);
+      breakdown = breakdown || getEarningsBreakdownValue(estimated);
+    }
+
+    total = Number.isFinite(total) && total > 0 ? total : 0;
+
+    let tripPay = Number(breakdown?.basePayout);
+    let returnPay = Number(breakdown?.distanceCommission);
+
+    if (!Number.isFinite(tripPay)) {
+      tripPay = total;
+    }
+    if (!Number.isFinite(returnPay)) {
+      returnPay = Math.max(0, total - tripPay);
+    }
+
+    // Keep display perfectly in sync with total earning shown to rider.
+    const roundedTotal = Number(total.toFixed(2));
+    const roundedTrip = Number(Math.max(0, tripPay).toFixed(2));
+    let roundedReturn = Number(Math.max(0, returnPay).toFixed(2));
+    const diff = Number((roundedTotal - (roundedTrip + roundedReturn)).toFixed(2));
+    if (Math.abs(diff) >= 0.01) {
+      roundedReturn = Number((roundedReturn + diff).toFixed(2));
+    }
+
+    return {
+      total: roundedTotal,
+      tripPay: roundedTotal,
+      returnPay: Math.max(0, roundedReturn)
+    };
+  };
+
+  useEffect(() => {
+    const orderId = selectedRestaurant?.id || selectedRestaurant?.orderId || null;
+    if (!orderId) return;
+
+    // Reset lock when the active order changes.
+    if (lockedOrderEarningsOrderId !== orderId) {
+      setLockedOrderEarningsOrderId(orderId);
+      setLockedOrderEarnings(0);
+      setLockedOrderEarningsBreakdown(null);
+    }
+
+    const source = selectedRestaurant?.estimatedEarnings ?? selectedRestaurant?.amount ?? 0;
+    const sourceTotal = getNumericEarningsValue(source);
+    const sourceBreakdown = getEarningsBreakdownValue(source);
+
+    if (sourceTotal > 0) {
+      setLockedOrderEarnings(sourceTotal);
+    }
+    if (sourceBreakdown) {
+      setLockedOrderEarningsBreakdown(sourceBreakdown);
+    }
+  }, [selectedRestaurant?.id, selectedRestaurant?.orderId, selectedRestaurant?.estimatedEarnings, selectedRestaurant?.amount, lockedOrderEarningsOrderId]);
   const bottomSheetRef = useRef(null);
   const handleRef = useRef(null);
   const acceptButtonRef = useRef(null);
@@ -2526,8 +2612,8 @@ export default function DeliveryHome() {
       // Close reached drop popup
       setShowReachedDropPopup(false);
 
-      // Show delivery complete popup (this triggers review -> completeDelivery flow)
-      setShowOrderDeliveredAnimation(true);
+      // Avoid intermediate delivered animation popup here to prevent flicker/reopen loops.
+      setShowOrderDeliveredAnimation(false);
       // Mark that this order has reached drop to avoid showing earlier popups on refresh
       try {
         const orderIdForApi = selectedRestaurant?.id || newOrder?.orderMongoId || newOrder?._id || selectedRestaurant?.orderId || newOrder?.orderId;
@@ -2549,7 +2635,9 @@ export default function DeliveryHome() {
             // Use MongoDB _id for API call to avoid ObjectId casting errors
 
             const response = await deliveryAPI.confirmReachedDrop(orderIdForApi);
-            if (response.data?.success) { } else {
+            if (response.data?.success) {
+              setShowCustomerReviewPopup(true);
+            } else {
               console.error('❌ Failed to confirm reached drop:', response.data);
               toast.error(response.data?.message || 'Failed to confirm reached drop. Please try again.');
             }
@@ -2958,6 +3046,7 @@ export default function DeliveryHome() {
             billImageUrl: billImageUrl
           });
           if (response.data?.success && response.data.data) {
+            isTransitioningToDropRef.current = true;
             const orderData = response.data.data;
             const order = orderData.order || orderData;
             const routeData = orderData.route || order.deliveryState?.routeToDelivery;
@@ -3134,15 +3223,15 @@ export default function DeliveryHome() {
               duration: 4000
             });
 
-            // Show Reached Drop popup instantly after Order Picked Up is confirmed
-            // Use setTimeout to ensure state updates are processed and useEffect doesn't block it
-
+            // Show Reached Drop popup instantly and keep transition lock briefly
+            setShowReachedDropPopup(true);
             setTimeout(() => {
-              setShowReachedDropPopup(true);
-            }, 100); // Small delay to ensure showOrderIdConfirmationPopup state is updated
+              isTransitioningToDropRef.current = false;
+            }, 1200);
           } else {
             console.error('❌ Failed to confirm order ID:', response.data);
             toast.error(response.data?.message || 'Failed to confirm order ID. Please try again.');
+            isTransitioningToDropRef.current = false;
           }
         } catch (error) {
           const status = error.response?.status;
@@ -3153,6 +3242,7 @@ export default function DeliveryHome() {
             data: error.response?.data
           });
           toast.error(msg || 'Failed to confirm order ID. Please try again.');
+          isTransitioningToDropRef.current = false;
         }
 
         // Reset after animation
@@ -6490,6 +6580,9 @@ export default function DeliveryHome() {
   // Monitor delivery boy's location for "Reached Pickup" detection
   // Show "Reached Pickup" popup when delivery boy is within 500 meters of restaurant location
   useEffect(() => {
+    if (isTransitioningToDropRef.current) {
+      return;
+    }
     // Don't show if popup is already showing, or if order hasn't been accepted yet
     if (showreachedPickupPopup || showNewOrderPopup || showOrderIdConfirmationPopup ||
       // Don't show if order ID is already being confirmed
@@ -6717,6 +6810,9 @@ export default function DeliveryHome() {
     return selectedRestaurant?.deliveryState?.status ?? null;
   }, [selectedRestaurant?.deliveryState?.status]);
   useEffect(() => {
+    if (isTransitioningToDropRef.current) {
+      return;
+    }
     // CRITICAL: If payment page is showing, delivery is completed - do NOT show reached drop popup
     if (showPaymentPage || showCustomerReviewPopup || showOrderDeliveredAnimation) {
       if (showReachedDropPopup) setShowReachedDropPopup(false);
@@ -8194,7 +8290,7 @@ export default function DeliveryHome() {
 }
 
 {/* Reached Drop Popup - shown instantly after Order Picked Up confirmation */ }
-<BottomPopup isOpen={showReachedDropPopup} onClose={() => setShowReachedDropPopup(false)} showCloseButton={false} closeOnBackdropClick={false} maxHeight="70vh" showHandle={true} showBackdrop={false} backdropBlocksInteraction={false}>
+<BottomPopup isOpen={showReachedDropPopup} onClose={() => setShowReachedDropPopup(false)} showCloseButton={false} closeOnBackdropClick={false} disableSwipeToClose={true} maxHeight="70vh" showHandle={true} showBackdrop={false} backdropBlocksInteraction={false}>
   <div className="">
     {/* Drop Label */}
     <div className="mb-4">
@@ -8465,8 +8561,11 @@ export default function DeliveryHome() {
             if (response.data?.success) {
               // Get updated earnings from response
               // Note: completeDelivery API already adds earnings and COD cash collected to wallet
-              const earnings = response.data.data?.earnings?.amount || response.data.data?.totalEarning || orderEarnings;
-              setOrderEarnings(earnings);
+              const earnings = response.data.data?.earnings?.amount || response.data.data?.totalEarning || 0;
+              const earningsBreakdown = response.data.data?.earnings?.breakdown || null;
+              const resolvedEarnings = Number(earnings) || 0;
+              setOrderEarnings(prev => (resolvedEarnings > 0 ? resolvedEarnings : prev));
+              setOrderEarningsBreakdown(prev => (earningsBreakdown || prev));
               // Notify wallet listeners (Pocket balance, Pocket page) so cash collected updates
               window.dispatchEvent(new Event('deliveryWalletStateUpdated'));
 
@@ -8526,17 +8625,7 @@ export default function DeliveryHome() {
     <div className="px-6 py-8 text-center bg-gray-50">
       <p className="text-gray-600 text-sm mb-2">Earnings from this order</p>
       <p className="text-5xl font-bold text-gray-900">
-        ₹{(() => {
-          if (orderEarnings > 0) {
-            return orderEarnings.toFixed(2);
-          }
-          // Handle estimatedEarnings - can be number or object
-          const earnings = selectedRestaurant?.amount || selectedRestaurant?.estimatedEarnings || 0;
-          if (typeof earnings === 'object' && earnings.totalEarning) {
-            return earnings.totalEarning.toFixed(2);
-          }
-          return typeof earnings === 'number' ? earnings.toFixed(2) : '0.00';
-        })()}
+        ₹{getPaymentEarningsDetails().total.toFixed(2)}
       </p>
       <p className="text-green-600 text-sm mt-2">💰 Added to your wallet</p>
     </div>
@@ -8549,40 +8638,12 @@ export default function DeliveryHome() {
         <div className="space-y-3">
           <div className="flex justify-between items-center py-2 border-b border-gray-100">
             <span className="text-gray-600">Trip pay</span>
-            <span className="text-gray-900 font-semibold">₹{(() => {
-              let earnings = 0;
-              if (orderEarnings > 0) {
-                earnings = orderEarnings;
-              } else {
-                const estEarnings = selectedRestaurant?.amount || selectedRestaurant?.estimatedEarnings || 0;
-                if (typeof estEarnings === 'object' && estEarnings.totalEarning) {
-                  earnings = estEarnings.totalEarning;
-                } else if (typeof estEarnings === 'number') {
-                  earnings = estEarnings;
-                }
-              }
-              return (earnings - 5).toFixed(2);
-            })()}</span>
-          </div>
-
-          <div className="flex justify-between items-center py-2 border-b border-gray-100">
-            <span className="text-gray-600">Long distance return pay</span>
-            <span className="text-gray-900 font-semibold">₹5.00</span>
+            <span className="text-gray-900 font-semibold">₹{getPaymentEarningsDetails().tripPay.toFixed(2)}</span>
           </div>
 
           <div className="flex justify-between items-center py-2">
             <span className="text-lg font-bold text-gray-900">Total Earnings</span>
-            <span className="text-lg font-bold text-gray-900">₹{(() => {
-              if (orderEarnings > 0) {
-                return orderEarnings.toFixed(2);
-              }
-              // Handle estimatedEarnings - can be number or object
-              const earnings = selectedRestaurant?.amount || selectedRestaurant?.estimatedEarnings || 0;
-              if (typeof earnings === 'object' && earnings.totalEarning) {
-                return earnings.totalEarning.toFixed(2);
-              }
-              return typeof earnings === 'number' ? earnings.toFixed(2) : '0.00';
-            })()}</span>
+            <span className="text-lg font-bold text-gray-900">₹{getPaymentEarningsDetails().total.toFixed(2)}</span>
           </div>
         </div>
       </div>

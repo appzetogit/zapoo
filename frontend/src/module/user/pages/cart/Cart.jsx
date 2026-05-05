@@ -168,7 +168,8 @@ export default function Cart() {
     getDefaultPaymentMethod,
     addresses,
     paymentMethods,
-    userProfile
+    userProfile,
+    vegMode
   } = useProfile();
   const {
     createOrder
@@ -319,6 +320,19 @@ export default function Cart() {
     // If restaurantData is not loaded yet, return null to wait
     return null;
   }, [restaurantData]);
+
+  const filteredAddons = useMemo(() => {
+    if (!Array.isArray(addons)) return [];
+    if (vegMode !== true) return addons;
+
+    return addons.filter((addon) => {
+      const normalizedFoodType = String(addon?.foodType || "").trim().toLowerCase();
+      if (normalizedFoodType) {
+        return normalizedFoodType === "veg" || normalizedFoodType === "vegetarian";
+      }
+      return addon?.isVeg === true;
+    });
+  }, [addons, vegMode]);
 
   // Lock body scroll and scroll to top when any full-screen modal opens
   useEffect(() => {
@@ -1429,7 +1443,7 @@ export default function Cart() {
                 </div>}
 
               {/* Complete your meal section - Approved Addons */}
-              {addons.length > 0 && <div className="bg-white dark:bg-[#1a1a1a] px-4 md:px-6 py-3 md:py-4 rounded-lg md:rounded-xl">
+              {filteredAddons.length > 0 && <div className="bg-white dark:bg-[#1a1a1a] px-4 md:px-6 py-3 md:py-4 rounded-lg md:rounded-xl">
                   <div className="flex items-center gap-2 md:gap-3 mb-3 md:mb-4">
                     <div className="w-6 h-6 md:w-8 md:h-8 bg-gray-100 dark:bg-gray-800 rounded flex items-center justify-center">
                       <span className="text-xs md:text-base">🍽️</span>
@@ -1443,7 +1457,7 @@ export default function Cart() {
                           <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded mt-1 w-2/3" />
                         </div>)}
                     </div> : <div className="flex gap-3 md:gap-4 overflow-x-auto pb-2 -mx-4 md:-mx-6 px-4 md:px-6 scrollbar-hide">
-                      {addons.map(addon => <div key={addon.id} className="flex-shrink-0 w-28 md:w-36">
+                      {filteredAddons.map(addon => <div key={addon.id} className="flex-shrink-0 w-28 md:w-36">
                           <div className="relative bg-gray-100 dark:bg-gray-800 rounded-lg md:rounded-xl overflow-hidden">
                             <img src={addon.image || addon.images && addon.images[0] || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200&h=200&fit=crop"} alt={addon.name} className="w-full h-28 md:h-36 object-cover rounded-lg md:rounded-xl" onError={e => {
                       e.target.onerror = null;

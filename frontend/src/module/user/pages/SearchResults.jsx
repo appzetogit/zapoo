@@ -638,13 +638,12 @@ export default function SearchResults() {
     if (!searchQuery.trim() && selectedCategory === 'all') return [];
     const lowerQuery = searchQuery.toLowerCase();
     return (restaurantsData || []).filter(r => {
-      const inRange = isWithinDeliveryRangeKm(r.distanceInKm, r.deliveryRange, { userHasLocation });
-      if (!inRange) return false;
       const nameMatch = r.name?.toLowerCase().includes(lowerQuery);
       const cuisineMatch = r.cuisine?.toLowerCase().includes(lowerQuery);
       return Boolean(nameMatch || cuisineMatch);
     }).map(r => ({
       ...r,
+      inRange: isWithinDeliveryRangeKm(r.distanceInKm, r.deliveryRange, { userHasLocation }),
       isClosed: !isOpenForDeliveryNow({ openDays: r.openDays, deliveryTimings: r.deliveryTimings })
     }));
   }, [searchQuery, selectedCategory, restaurantsData, userHasLocation]);
@@ -772,7 +771,7 @@ export default function SearchResults() {
 
             {matchingRestaurants.map(restaurant => {
               const restaurantSlug = restaurant.slug || restaurant.name.toLowerCase().replace(/\s+/g, "-");
-              const disabled = restaurant.isClosed;
+              const disabled = restaurant.isClosed || !restaurant.inRange;
               const content = (
                 <div className={`flex items-center gap-3 p-3 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#1a1a1a] shadow-sm transition-shadow ${disabled ? 'grayscale opacity-70 cursor-not-allowed' : 'hover:shadow-md'}`}>
                   <div className="w-11 h-11 rounded-full overflow-hidden bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
@@ -788,7 +787,7 @@ export default function SearchResults() {
                   </div>
                   {disabled && (
                     <span className="text-[10px] font-semibold text-gray-500 border border-gray-200 rounded-full px-2 py-0.5">
-                      {t("user.searchResults.closed")}
+                      {!restaurant.inRange ? "Out of range" : t("user.searchResults.closed")}
                     </span>
                   )}
                 </div>
