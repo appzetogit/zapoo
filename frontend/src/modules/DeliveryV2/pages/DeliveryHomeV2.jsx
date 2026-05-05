@@ -661,7 +661,7 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
                       <span className="text-[9px] text-white/70 font-black uppercase tracking-[0.15em] mb-1">Distance</span>
                       <div className="flex items-end gap-1">
                         <span className="text-2xl font-black text-white leading-none tracking-tighter">
-                          {distanceToTarget && distanceToTarget !== Infinity ? (distanceToTarget / 1000).toFixed(1) : '--'}
+                          {Number.isFinite(Number(distanceToTarget)) && Number(distanceToTarget) > 0 ? (Number(distanceToTarget) / 1000).toFixed(1) : '--'}
                         </span>
                         <span className="text-[11px] text-white/80 font-bold mb-0.5">KM</span>
                       </div>
@@ -863,7 +863,9 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
                                  <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full border ${isWithinRange ? 'bg-emerald-50 border-emerald-100' : 'bg-orange-50 border-orange-100'}`}>
                                    <div className={`w-1.5 h-1.5 rounded-full ${isWithinRange ? 'bg-emerald-500 animate-pulse' : 'bg-orange-500'}`} />
                                    <span className={`text-[10px] font-black uppercase tracking-widest ${isWithinRange ? 'text-emerald-600' : 'text-orange-500'}`}>
-                                     {isWithinRange ? 'Ready to Arrive' : `${(distanceToTarget / 1000).toFixed(1)} km • ${eta || '--'} min`}
+                                     {isWithinRange
+                                       ? 'Ready to Arrive'
+                                       : `${Number.isFinite(Number(distanceToTarget)) && Number(distanceToTarget) > 0 ? (Number(distanceToTarget) / 1000).toFixed(1) : '--'} km • ${eta || '--'} min`}
                                    </span>
                                  </div>
                               </div>

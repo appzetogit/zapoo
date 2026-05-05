@@ -87,7 +87,27 @@ export const NewOrderModal = ({ order, onAccept, onReject, onMinimize }) => {
   const earnings = resolveRiderEarning(order);
   const restaurantName = order.restaurantName || order.restaurant_name || (order.restaurantId?.name) || 'Restaurant';
   const restaurantAddress = order.restaurantAddress || order.restaurant_address || (order.restaurantId?.location?.address) || 'Address not available';
-  const deliveryAddress = order?.deliveryAddress || {};
+  const deliveryAddress = (order?.deliveryAddress && typeof order.deliveryAddress === 'object') ? order.deliveryAddress : {};
+
+  const normalizeLocation = (loc) => {
+    if (!loc) return null;
+    if (Array.isArray(loc?.location?.coordinates) && loc.location.coordinates.length >= 2) {
+      const lng = Number(loc.location.coordinates[0]);
+      const lat = Number(loc.location.coordinates[1]);
+      if (Number.isFinite(lat) && Number.isFinite(lng)) return { lat, lng, address: loc.address || loc.formattedAddress || '' };
+    }
+    if (Array.isArray(loc?.coordinates) && loc.coordinates.length >= 2) {
+      const lng = Number(loc.coordinates[0]);
+      const lat = Number(loc.coordinates[1]);
+      if (Number.isFinite(lat) && Number.isFinite(lng)) return { lat, lng, address: loc.address || loc.formattedAddress || '' };
+    }
+    const lat = Number(loc.lat ?? loc.latitude);
+    const lng = Number(loc.lng ?? loc.longitude);
+    if (Number.isFinite(lat) && Number.isFinite(lng)) {
+      return { lat, lng, address: loc.address || loc.formattedAddress || '' };
+    }
+    return null;
+  };
 
   const geoCoords =
     Array.isArray(deliveryAddress?.location?.coordinates) &&
@@ -98,7 +118,7 @@ export const NewOrderModal = ({ order, onAccept, onReject, onMinimize }) => {
         }
       : null;
 
-  const customerLocation = order.customerLocation || order.deliveryLocation || geoCoords || null;
+  const customerLocation = normalizeLocation(order.customerLocation) || normalizeLocation(order.deliveryLocation) || normalizeLocation(geoCoords) || null;
 
   const addressPartsFromSchema = [
     deliveryAddress.street,
@@ -113,6 +133,9 @@ export const NewOrderModal = ({ order, onAccept, onReject, onMinimize }) => {
   const customerAddress =
     order.customerAddress ||
     order.customer_address ||
+    order?.customerLocation?.address ||
+    order?.deliveryAddress?.address ||
+    (typeof order?.deliveryAddress === 'string' ? order.deliveryAddress : '') ||
     (addressPartsFromSchema.length ? addressPartsFromSchema.join(', ') : '') ||
     (customerLocation?.lat != null && customerLocation?.lng != null
       ? `Lat ${Number(customerLocation.lat).toFixed(5)}, Lng ${Number(customerLocation.lng).toFixed(5)}`

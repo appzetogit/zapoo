@@ -46,26 +46,38 @@ export const useOrderManager = () => {
           if (ref.location) {
             // Handle GeoJSON format: location: { type: 'Point', coordinates: [lng, lat] }
             if (Array.isArray(ref.location.coordinates) && ref.location.coordinates.length >= 2) {
-              return {
-                lat: ref.location.coordinates[1], // Latitude is second in GeoJSON [lng, lat]
-                lng: ref.location.coordinates[0]  // Longitude is first
-              };
+              const lat = Number(ref.location.coordinates[1]);
+              const lng = Number(ref.location.coordinates[0]);
+              if (Number.isFinite(lat) && Number.isFinite(lng)) {
+                return { lat, lng };
+              }
             }
             // Handle standard object format: location: { latitude: 12.3, longitude: 45.6 }
-            return {
-              lat: ref.location.latitude || ref.location.lat,
-              lng: ref.location.longitude || ref.location.lng
-            };
+            const lat = Number(ref.location.latitude ?? ref.location.lat);
+            const lng = Number(ref.location.longitude ?? ref.location.lng);
+            if (Number.isFinite(lat) && Number.isFinite(lng)) {
+              return { lat, lng };
+            }
+            return null;
           }
           // Handle direct GeoJSON shape: { type: 'Point', coordinates: [lng, lat] }
           if (Array.isArray(ref.coordinates) && ref.coordinates.length >= 2) {
-            return {
-              lat: ref.coordinates[1],
-              lng: ref.coordinates[0]
-            };
+            const lat = Number(ref.coordinates[1]);
+            const lng = Number(ref.coordinates[0]);
+            if (Number.isFinite(lat) && Number.isFinite(lng)) {
+              return { lat, lng };
+            }
           }
           // Handle flat objects or direct lat/lng keys
-          for (const k of keysLat) { if (ref[k] != null) return { lat: ref[k], lng: ref[keysLng[keysLat.indexOf(k)]] }; }
+          for (const k of keysLat) {
+            if (ref[k] != null) {
+              const lat = Number(ref[k]);
+              const lng = Number(ref[keysLng[keysLat.indexOf(k)]]);
+              if (Number.isFinite(lat) && Number.isFinite(lng)) {
+                return { lat, lng };
+              }
+            }
+          }
           return null;
         };
 
@@ -84,6 +96,14 @@ export const useOrderManager = () => {
           getLoc(fullOrder, ['customer_lat', 'customerLat', 'latitude'], ['customer_lng', 'customerLng', 'longitude']);
 
         console.log('[OrderManager] Locations Mapped Result:', { resLoc, cusLoc });
+        console.log('🧭 [CoordDebug][Accept][ResolvedLocations]', {
+          orderId,
+          riderLocation: riderLocation || null,
+          restaurantLocation: resLoc,
+          customerLocation: cusLoc,
+          rawRestaurant: fullOrder?.restaurantLocation || fullOrder?.restaurantId?.location || null,
+          rawCustomer: fullOrder?.customerLocation || fullOrder?.deliveryAddress || fullOrder?.address?.location || null
+        });
 
         setActiveOrder({
           ...fullOrder,

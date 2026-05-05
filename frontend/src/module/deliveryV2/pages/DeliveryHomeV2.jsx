@@ -885,7 +885,9 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
                                  <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full border ${isWithinRange ? 'bg-emerald-50 border-emerald-100' : 'bg-orange-50 border-orange-100'}`}>
                                    <div className={`w-1.5 h-1.5 rounded-full ${isWithinRange ? 'bg-emerald-500 animate-pulse' : 'bg-orange-500'}`} />
                                    <span className={`text-[10px] font-black uppercase tracking-widest ${isWithinRange ? 'text-emerald-600' : 'text-orange-500'}`}>
-                                     {isWithinRange ? 'Ready to Arrive' : `${((computedDistanceMeters || 0) / 1000).toFixed(1)} km • ${computedEta || '--'} min`}
+                                     {isWithinRange
+                                       ? 'Ready to Arrive'
+                                       : `${Number.isFinite(Number(computedDistanceMeters)) && Number(computedDistanceMeters) > 0 ? (Number(computedDistanceMeters) / 1000).toFixed(1) : '--'} km • ${computedEta || '--'} min`}
                                    </span>
                                  </div>
                               </div>

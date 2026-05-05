@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ChefHat, MapPin, Phone, 
@@ -76,6 +76,27 @@ export const PickupActionModal = ({
   const restaurantPhone = order.restaurantPhone || order.restaurant_phone || order.restaurantId?.phone || '';
   const items = order.items || [];
   const restaurantLogo = order.restaurantImage || order.restaurant?.logo || order.restaurant?.profileImage || 'https://cdn-icons-png.flaticon.com/512/3170/3170733.png';
+  const fallbackDistanceMeters = useMemo(() => {
+    const pickupKm = Number(order?.deliveryState?.routeToPickup?.distance);
+    const dropKm =
+      Number(order?.deliveryState?.routeToCustomer?.distance) ||
+      Number(order?.deliveryState?.routeToDelivery?.distance);
+    if (status === 'PICKING_UP' || status === 'REACHED_PICKUP') {
+      if (Number.isFinite(pickupKm) && pickupKm > 0) return pickupKm * 1000;
+    } else {
+      if (Number.isFinite(dropKm) && dropKm > 0) return dropKm * 1000;
+    }
+    return null;
+  }, [order, status]);
+
+  const displayDistanceMeters =
+    Number.isFinite(Number(distanceToTarget)) && Number(distanceToTarget) > 0
+      ? Number(distanceToTarget)
+      : fallbackDistanceMeters;
+
+  const distanceKmLabel = Number.isFinite(Number(displayDistanceMeters)) && Number(displayDistanceMeters) > 0
+    ? (Number(displayDistanceMeters) / 1000).toFixed(1)
+    : '--';
 
   return (
     <div className="absolute inset-0 z-[110] flex items-end justify-center">
@@ -121,7 +142,7 @@ export const PickupActionModal = ({
                     ) : (
                       <div className="bg-orange-50 px-3 py-1 rounded-full border border-orange-100">
                         <span className="text-orange-600 text-[10px] font-black uppercase tracking-widest">
-                          {(distanceToTarget / 1000).toFixed(1)} km • {eta || '--'} min
+                          {distanceKmLabel} km • {eta || '--'} min
                         </span>
                       </div>
                     )}

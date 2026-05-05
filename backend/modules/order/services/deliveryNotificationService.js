@@ -573,6 +573,18 @@ export async function notifyMultipleDeliveryBoys(order, deliveryPartnerIds, phas
       // Include full order for frontend use
       fullOrder: orderWithUser
     };
+
+    console.log('🧭 [CoordDebug][Dispatch][OrderPayload]', {
+      orderId: orderNotification.orderId,
+      orderMongoId: orderNotification.orderMongoId,
+      phase,
+      restaurantLocation: orderNotification.restaurantLocation,
+      customerLocation: orderNotification.customerLocation,
+      restaurantLat: orderNotification.restaurantLat,
+      restaurantLng: orderNotification.restaurantLng,
+      deliveryLat: orderNotification.deliveryLat,
+      deliveryLng: orderNotification.deliveryLng
+    });
     // Notify each delivery partner
     for (const deliveryPartnerId of deliveryPartnerIds) {
       try {
