@@ -51,7 +51,7 @@ const DeliveryV2Router = () => {
         <Route path="welcome" element={<Welcome />} />
         <Route path="login" element={<SignIn />} />
         <Route path="otp" element={<OTP />} />
-        <Route path="signup" element={<Navigate to="/food/delivery/login" replace />} />
+        <Route path="signup" element={<Navigate to="../login" relative="path" replace />} />
         <Route path="signup/details" element={<SignupStep1 />} />
         <Route path="signup/documents" element={<SignupStep2 />} />
         <Route path="terms" element={<TermsAndConditionsV2 />} />
@@ -85,7 +85,7 @@ const DeliveryV2Router = () => {
         <Route path="/pocket/details" element={<ProtectedRoute><PocketDetailsV2 /></ProtectedRoute>} />
 
         {/* Fallback */}
-        <Route path="*" element={<Navigate to="/food/delivery" replace />} />
+        <Route path="*" element={<Navigate to=".." relative="path" replace />} />
       </Routes>
     </Suspense>
   );
