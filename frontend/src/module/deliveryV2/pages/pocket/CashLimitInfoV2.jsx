@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  ArrowLeft, Loader2, IndianRupee, HelpCircle,
-  ShieldCheck, AlertTriangle
+  ArrowLeft, Loader2, HelpCircle,
+  ShieldCheck
 } from 'lucide-react';
 import { deliveryAPI } from '@food/api';
 import { toast } from 'sonner';
@@ -29,14 +29,18 @@ export const CashLimitInfoV2 = () => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const profileRes = await deliveryAPI.getProfile();
-        const profile = profileRes?.data?.data?.profile || {};
-        
-        const totalLimit = profile.totalCashLimit || 0;
-        const cashInHand = profile.cashInHand || 0;
-        const deductions = profile.deductions || 0;
-        const withdrawals = profile.totalWithdrawn || 0;
-        const available = profile.availableCashLimit || 0;
+        const cashLimitRes = await deliveryAPI.getCashLimit();
+        const payload = cashLimitRes?.data?.data || {};
+        const toNumber = (value) => {
+          const num = Number(value);
+          return Number.isFinite(num) ? num : 0;
+        };
+
+        const totalLimit = toNumber(payload.totalCashLimit);
+        const cashInHand = toNumber(payload.cashInHand);
+        const deductions = toNumber(payload.deductions);
+        const withdrawals = toNumber(payload.pocketWithdrawals);
+        const available = toNumber(payload.availableCashLimit);
 
         setWalletState({
            totalCashLimit: totalLimit,
