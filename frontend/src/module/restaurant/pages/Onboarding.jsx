@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Image as ImageIcon, Upload, Clock, Calendar as CalendarIcon, Sparkles, X } from "lucide-react";
+import { Image as ImageIcon, Upload, Clock, Calendar as CalendarIcon, X } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -1474,7 +1474,6 @@ export default function RestaurantOnboarding() {
               onClick={captureMenuImageFromCamera}
               className="inline-flex justify-center items-center gap-1.5 px-3 py-1.5 rounded-sm bg-blue-600 text-white border border-blue-600 text-xs font-medium w-full"
             >
-              <Sparkles className="w-4.5 h-4.5" />
               <span>Take photo</span>
             </button>
           )}
@@ -1576,7 +1575,6 @@ export default function RestaurantOnboarding() {
                 }}
                 className="inline-flex justify-center items-center gap-1.5 px-3 py-1.5 rounded-sm bg-blue-600 text-white border border-blue-600 text-xs font-medium w-full"
               >
-                <Sparkles className="w-4.5 h-4.5" />
                 <span>Take photo</span>
               </button>
             )}
@@ -1702,7 +1700,6 @@ export default function RestaurantOnboarding() {
             }}
             className="mt-1 inline-flex justify-center items-center gap-1.5 px-3 py-1.5 rounded-sm bg-blue-600 text-white border border-blue-600 text-xs font-medium w-full"
           >
-            <Sparkles className="w-4.5 h-4.5" />
             <span>Take photo</span>
           </button>
         )}
@@ -1802,7 +1799,6 @@ export default function RestaurantOnboarding() {
               }}
               className="mt-1 inline-flex justify-center items-center gap-1.5 px-3 py-1.5 rounded-sm bg-blue-600 text-white border border-blue-600 text-xs font-medium w-full"
             >
-              <Sparkles className="w-4.5 h-4.5" />
               <span>Take photo</span>
             </button>
           )}
@@ -1909,7 +1905,6 @@ export default function RestaurantOnboarding() {
             }}
             className="mt-1 inline-flex justify-center items-center gap-1.5 px-3 py-1.5 rounded-sm bg-blue-600 text-white border border-blue-600 text-xs font-medium w-full"
           >
-            <Sparkles className="w-4.5 h-4.5" />
             <span>Take photo</span>
           </button>
         )}

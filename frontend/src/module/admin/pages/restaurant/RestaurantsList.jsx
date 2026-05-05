@@ -712,10 +712,6 @@ export default function RestaurantsList() {
                       </span>}
                     </div>
                   </div>
-                  {restaurantDetails?.offer && <div>
-                    <p className="text-xs text-slate-500 mb-1">Current Offer</p>
-                    <p className="text-sm font-medium text-green-600">{restaurantDetails.offer}</p>
-                  </div>}
                 </div>
               </div>
 
@@ -1104,10 +1100,6 @@ export default function RestaurantsList() {
                 {restaurantDetails.onboarding.step4.featuredDish && <div>
                   <p className="text-xs text-slate-500 mb-1">Featured Dish (at registration)</p>
                   <p className="font-medium text-slate-900">{restaurantDetails.onboarding.step4.featuredDish}</p>
-                </div>}
-                {restaurantDetails.onboarding.step4.offer && <div>
-                  <p className="text-xs text-slate-500 mb-1">Offer (at registration)</p>
-                  <p className="font-medium text-green-600">{restaurantDetails.onboarding.step4.offer}</p>
                 </div>}
               </div>
             </div>}

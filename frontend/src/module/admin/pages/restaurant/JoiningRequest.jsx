@@ -644,10 +644,6 @@ export default function JoiningRequest() {
                                 </span>) : <span className="text-sm text-slate-700">N/A</span>}
                           </div>
                         </div>
-                        {restaurantDetails?.offer && <div>
-                            <p className="text-xs text-slate-500 mb-1">Current Offer</p>
-                            <p className="text-sm font-medium text-green-600">{restaurantDetails.offer}</p>
-                          </div>}
                         {restaurantDetails?.featuredDish && <div>
                             <p className="text-xs text-slate-500 mb-1">Featured Dish</p>
                             <p className="text-sm font-medium text-slate-900">{restaurantDetails.featuredDish}</p>
