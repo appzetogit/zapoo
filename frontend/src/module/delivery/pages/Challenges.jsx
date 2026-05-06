@@ -19,6 +19,7 @@ import Loader from "@/components/Loader"
 export default function DeliveryChallenges() {
     const navigate = useNavigate()
     const [challenges, setChallenges] = useState([])
+    const [weeklyBonus, setWeeklyBonus] = useState(0)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
 
@@ -29,13 +30,38 @@ export default function DeliveryChallenges() {
     const fetchChallenges = async () => {
         try {
             setLoading(true)
-            const res = await deliveryAPI.getMyChallenges()
-            if (res.data?.success) {
+            const [challengesRes, walletRes] = await Promise.all([
+                deliveryAPI.getMyChallenges(),
+                deliveryAPI.getWallet().catch(() => null)
+            ])
+
+            if (challengesRes.data?.success) {
                 // Backend returns { challenges: [...] }
-                setChallenges(res.data.data.challenges || [])
+                setChallenges(challengesRes.data.data.challenges || [])
             } else {
                 setError("Failed to load challenges")
             }
+
+            const txns = walletRes?.data?.data?.wallet?.transactions || []
+            const now = new Date()
+            const weekStart = new Date(now)
+            const day = weekStart.getDay()
+            const diff = weekStart.getDate() - day + (day === 0 ? -6 : 1)
+            weekStart.setDate(diff)
+            weekStart.setHours(0, 0, 0, 0)
+            const weekEnd = new Date(weekStart)
+            weekEnd.setDate(weekStart.getDate() + 6)
+            weekEnd.setHours(23, 59, 59, 999)
+
+            const weekBonus = txns
+                .filter((t) => t?.type === "bonus" && t?.status === "Completed")
+                .filter((t) => {
+                    const d = new Date(t?.createdAt || t?.date || 0)
+                    return !Number.isNaN(d.getTime()) && d >= weekStart && d <= weekEnd
+                })
+                .reduce((sum, t) => sum + (Number(t?.amount) || 0), 0)
+
+            setWeeklyBonus(weekBonus)
         } catch (err) {
             console.error(err)
             setError("Unable to connect. Please try again.")
@@ -94,7 +120,7 @@ export default function DeliveryChallenges() {
                             </div>
                             <div>
                                 <div className="text-[10px] text-red-600 font-bold uppercase">This Week</div>
-                                <div className="text-lg font-black text-gray-900">₹0 Bonuses</div>
+                                <div className="text-lg font-black text-gray-900">₹{Number(weeklyBonus || 0).toFixed(0)} Bonuses</div>
                             </div>
                         </div>
                     </div>

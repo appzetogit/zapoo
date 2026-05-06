@@ -4,6 +4,7 @@ import {
   User,
   ArrowRight,
   Bike,
+  Trophy,
   Ticket,
   ChevronRight,
   Share2,
@@ -157,6 +158,15 @@ export const ProfileV2 = () => {
               <Bike className="w-6 h-6 text-gray-700" />
             </div>
             <span className="text-sm font-bold text-gray-900">Trips history</span>
+          </button>
+          <button
+            onClick={() => navigate("/food/delivery/challenges")}
+            className="bg-white rounded-xl p-4 flex flex-col items-center gap-2 border border-transparent active:bg-gray-50 transition-colors"
+          >
+            <div className="rounded-full bg-gray-50 p-3">
+              <Trophy className="w-6 h-6 text-gray-700" />
+            </div>
+            <span className="text-sm font-bold text-gray-900">Earning challenges</span>
           </button>
         </div>
 

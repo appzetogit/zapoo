@@ -37,14 +37,17 @@ export const PocketBalanceV2 = () => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const [profileRes, earningsRes, walletRes] = await Promise.all([
-          deliveryAPI.getProfile(),
-          deliveryAPI.getEarnings({ period: 'week' }),
+        const now = new Date();
+        const weekStart = new Date(now);
+        weekStart.setDate(now.getDate() - now.getDay());
+        weekStart.setHours(0, 0, 0, 0);
+
+        const [pocketRes, walletRes] = await Promise.all([
+          deliveryAPI.getPocketDetails({ date: weekStart.toISOString(), limit: 2000 }),
           deliveryAPI.getWallet()
         ]);
         
-        const profile = profileRes?.data?.data?.profile || {};
-        const summary = earningsRes?.data?.data?.summary || {};
+        const summary = pocketRes?.data?.data?.summary || {};
         const wallet = walletRes?.data?.data?.wallet || {};
         
         // Use wallet data from backend instead of non-existent profile.walletBalance
@@ -54,7 +57,7 @@ export const PocketBalanceV2 = () => {
 
         setWalletState({
            pocketBalance: pocketBalance,
-           weeklyEarnings: Number(summary.totalEarnings) || 0,
+           weeklyEarnings: Number(summary.totalEarning) || 0,
            totalBonus: Number(wallet.totalBonus) || 0,
            totalWithdrawn: Number(wallet.totalWithdrawn) || 0,
            cashCollected: Number(wallet.cashInHand) || 0,
