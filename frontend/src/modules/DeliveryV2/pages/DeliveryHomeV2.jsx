@@ -587,14 +587,24 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
 
 
   const handleCenterMap = () => {
-    if (mapRef.current && useDeliveryStore.getState().riderLocation) {
-      const loc = useDeliveryStore.getState().riderLocation;
-      mapRef.current.panTo({ 
-        lat: parseFloat(loc.lat || loc.latitude), 
-        lng: parseFloat(loc.lng || loc.longitude) 
-      });
-    }
+    if (!mapRef.current) return;
+    const loc = useDeliveryStore.getState().riderLocation;
+    const lat = parseFloat(loc?.lat || loc?.latitude);
+    const lng = parseFloat(loc?.lng || loc?.longitude);
+    const fallbackCenter = { lat: 22.7196, lng: 75.8577 };
+    const target = Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : fallbackCenter;
+    mapRef.current.panTo(target);
   };
+
+  useEffect(() => {
+    if (currentTab !== 'feed' || !mapRef.current || !window.google?.maps) return;
+    // When feed tab mounts in WebView, force tiles refresh and recenter once
+    window.setTimeout(() => {
+      if (!mapRef.current) return;
+      window.google.maps.event.trigger(mapRef.current, 'resize');
+      handleCenterMap();
+    }, 120);
+  }, [currentTab]);
 
   const handleMapClick = (lat, lng) => {
     if (activeOrder || incomingOrder || showVerification) {

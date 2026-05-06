@@ -41,6 +41,7 @@ const mapOptions = {
   ]
 };
 const LIBRARIES = ['places', 'geometry'];
+const FALLBACK_CENTER = { lat: 22.7196, lng: 75.8577 }; // Indore fallback to avoid gray map on first load
 
 export const LiveMap = ({ onMapClick, onMapLoad, onPathReceived, onPolylineReceived, zoom = 12 }) => {
   const { riderLocation, activeOrder, tripStatus } = useDeliveryStore();
@@ -68,6 +69,14 @@ export const LiveMap = ({ onMapClick, onMapLoad, onPathReceived, onPolylineRecei
       fullscreenControl: false
     });
     setMapInternal(mapInstance);
+    mapInstance.setCenter(mapCenter);
+    // WebView-safe: force a resize pass after mount so tiles render reliably
+    window.setTimeout(() => {
+      if (window.google?.maps && mapInstance) {
+        window.google.maps.event.trigger(mapInstance, 'resize');
+        mapInstance.setCenter(mapCenter);
+      }
+    }, 100);
     if (onMapLoad) onMapLoad(mapInstance);
   };
 
@@ -100,6 +109,7 @@ export const LiveMap = ({ onMapClick, onMapLoad, onPathReceived, onPolylineRecei
   }, [riderLocation]);
 
   const effectiveRiderLocation = parsedRiderLocation || localGpsRiderLocation;
+  const mapCenter = effectiveRiderLocation || targetLocation || FALLBACK_CENTER;
 
   useEffect(() => {
     if (parsedRiderLocation || typeof navigator === 'undefined' || !navigator.geolocation) return undefined;
@@ -119,6 +129,11 @@ export const LiveMap = ({ onMapClick, onMapLoad, onPathReceived, onPolylineRecei
   }, [parsedRiderLocation]);
 
   useEffect(() => { if (map) map.setZoom(zoom); }, [zoom, map]);
+
+  useEffect(() => {
+    if (!map || !mapCenter) return;
+    map.setCenter(mapCenter);
+  }, [map, mapCenter]);
 
   const shouldUpdateRoute = useMemo(() => {
     const now = Date.now();
@@ -235,6 +250,8 @@ export const LiveMap = ({ onMapClick, onMapLoad, onPathReceived, onPolylineRecei
       <GoogleMap
         onLoad={handleMapLoad}
         mapContainerStyle={mapContainerStyle}
+        center={mapCenter}
+        defaultCenter={FALLBACK_CENTER}
         zoom={14}
         onClick={(e) => onMapClick?.(e.latLng.lat(), e.latLng.lng())}
         options={mapOptions}
