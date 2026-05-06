@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import Lenis from "lenis";
 import { ArrowLeft, Search, User, UserRound, Store, ChevronRight, Info, Clock, Users, Truck, FileText, Star, MessageSquare, HelpCircle, Edit, IndianRupee, Receipt, X, MapPin, Zap, Languages } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -774,26 +774,17 @@ export default function ExploreMore() {
               {/* Footer Links */}
               <div className="px-6 py-4 border-t border-gray-200">
                 <div className="flex items-center justify-center gap-2 text-sm text-gray-500">
-                  <a href="#" className="hover:text-gray-700 transition-colors border-b border-dotted border-gray-400" onClick={e => {
-                e.preventDefault();
-                // Navigate to terms of service
-              }}>
+                  <Link to="/restaurant/legal/terms" className="hover:text-gray-700 transition-colors border-b border-dotted border-gray-400">
                     {t("restaurant.exploreMore.footer.terms")}
-                  </a>
+                  </Link>
                   <span className="text-gray-400">|</span>
-                  <a href="#" className="hover:text-gray-700 transition-colors border-b border-dotted border-gray-400" onClick={e => {
-                e.preventDefault();
-                // Navigate to privacy policy
-              }}>
+                  <Link to="/restaurant/legal/privacy" className="hover:text-gray-700 transition-colors border-b border-dotted border-gray-400">
                     {t("restaurant.exploreMore.footer.privacy")}
-                  </a>
+                  </Link>
                   <span className="text-gray-400">|</span>
-                  <a href="#" className="hover:text-gray-700 transition-colors border-b border-dotted border-gray-400" onClick={e => {
-                e.preventDefault();
-                // Navigate to code of conduct
-              }}>
+                  <Link to="/restaurant/legal/code-of-conduct" className="hover:text-gray-700 transition-colors border-b border-dotted border-gray-400">
                     {t("restaurant.exploreMore.footer.codeOfConduct")}
-                  </a>
+                  </Link>
                 </div>
               </div>
             </motion.div>

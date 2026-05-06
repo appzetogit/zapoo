@@ -10,6 +10,26 @@ const STATUS_CONFIG = {
     rejected: { labelKey: 'restaurant.notificationRequest.status.rejected', color: 'bg-red-100 text-red-800 border-red-200', icon: XCircle },
 };
 
+const isFlutterInAppWebViewAvailable = () =>
+    typeof window !== "undefined" &&
+    typeof window.flutter_inappwebview?.callHandler === "function";
+
+const flutterImageResultToFile = async (result, fallbackName) => {
+    if (!result || result.success === false || !result.base64) return null;
+
+    const mimeType = result.mimeType || "image/jpeg";
+    const normalizedBase64 = String(result.base64).includes(",")
+        ? String(result.base64).split(",")[1]
+        : String(result.base64);
+    const dataUrl = `data:${mimeType};base64,${normalizedBase64}`;
+    const response = await fetch(dataUrl);
+    const blob = await response.blob();
+
+    return new File([blob], result.fileName || fallbackName, {
+        type: mimeType || blob.type || "image/jpeg",
+    });
+};
+
 export default function RestaurantNotificationRequest() {
     const { t, i18n } = useTranslation();
     const navigate = useNavigate();
@@ -66,8 +86,7 @@ export default function RestaurantNotificationRequest() {
     }, []);
 
     // ── Image handling ────────────────────────────────────────────────────────
-    const handleImageChange = async (e) => {
-        const file = e.target.files?.[0];
+    const processImageFile = async (file) => {
         if (!file) return;
 
         // Client-side validation
@@ -107,6 +126,39 @@ export default function RestaurantNotificationRequest() {
             setImagePreview(null);
         } finally {
             setUploadingImage(false);
+        }
+    };
+
+    const handleImageChange = async (e) => {
+        const file = e.target.files?.[0];
+        await processImageFile(file);
+    };
+
+    const pickImageFromFlutter = async (source) => {
+        if (!isFlutterInAppWebViewAvailable()) return false;
+
+        try {
+            const result = await window.flutter_inappwebview.callHandler(
+                source === "camera" ? "openCamera" : "openGallery",
+                {
+                    source,
+                    accept: "image/*",
+                    multiple: false,
+                    quality: 0.8,
+                }
+            );
+
+            const file = await flutterImageResultToFile(
+                result,
+                `notification-${source}-${Date.now()}.jpg`
+            );
+            if (!file) return false;
+
+            await processImageFile(file);
+            return true;
+        } catch (err) {
+            console.error(`Failed to pick ${source} image from Flutter bridge:`, err);
+            return false;
         }
     };
 
@@ -279,7 +331,13 @@ export default function RestaurantNotificationRequest() {
 
                                     <button
                                         type="button"
-                                        onClick={() => fileInputRef.current?.click()}
+                                        onClick={async () => {
+                                            if (isFlutterInAppWebViewAvailable()) {
+                                                const picked = await pickImageFromFlutter("gallery");
+                                                if (picked) return;
+                                            }
+                                            fileInputRef.current?.click();
+                                        }}
                                         disabled={formDisabled}
                                         className={`flex items-center justify-center gap-2 w-full h-12 border-2 border-dashed rounded-lg transition-colors ${formDisabled
                                             ? 'border-slate-200 bg-slate-50 cursor-not-allowed opacity-50'
@@ -292,7 +350,13 @@ export default function RestaurantNotificationRequest() {
 
                                     <button
                                         type="button"
-                                        onClick={() => cameraInputRef.current?.click()}
+                                        onClick={async () => {
+                                            if (isFlutterInAppWebViewAvailable()) {
+                                                const picked = await pickImageFromFlutter("camera");
+                                                if (picked) return;
+                                            }
+                                            cameraInputRef.current?.click();
+                                        }}
                                         disabled={formDisabled}
                                         className={`flex items-center justify-center gap-2 w-full h-12 border-2 border-dashed rounded-lg transition-colors ${formDisabled
                                             ? 'border-slate-200 bg-slate-50 cursor-not-allowed opacity-50'

@@ -1,4 +1,5 @@
 import Order from '../../order/models/Order.js';
+import Refund from '../../refund/models/Refund.js';
 import { calculateOrderSettlement } from '../../order/services/orderSettlementService.js';
 import { successResponse, errorResponse } from '../../../shared/utils/response.js';
 import asyncHandler from '../../../shared/middleware/asyncHandler.js';
@@ -26,14 +27,14 @@ export const getOrders = asyncHandler(async (req, res) => {
       paymentType
     } = req.query;
     const escapeRegex = (value = '') => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const normalizedStatus = status ? String(status).toLowerCase() : null;
 
     // Build query
     const query = {};
+    let refundedOrderIds = null;
 
     // Status filter
     if (status && status !== 'all') {
-      const normalizedStatus = String(status).toLowerCase();
-
       if (normalizedStatus === 'offline-payments') {
         query['payment.method'] = {
           $in: ['cash', 'cod']
@@ -62,6 +63,28 @@ export const getOrders = asyncHandler(async (req, res) => {
         } else if (normalizedStatus === 'payment-failed') {
           // Payment-failed orders are stored with failed order/payment status.
           query.status = 'failed';
+        } else if (normalizedStatus === 'refunded') {
+          // Razorpay-confirmed refunds only.
+          // We intentionally trust Refund.status='success' rather than cancellation/initiation states.
+          const successfulRefunds = await Refund.find({
+            status: 'success',
+            orderId: { $exists: true, $ne: null }
+          })
+            .select('orderId')
+            .lean();
+
+          refundedOrderIds = [
+            ...new Set(
+              successfulRefunds
+                .map((refund) => refund.orderId?.toString())
+                .filter(Boolean)
+            )
+          ];
+
+          // If no successful refunds exist, make query return empty set deterministically.
+          query._id = refundedOrderIds.length > 0
+            ? { $in: refundedOrderIds.map((id) => new mongoose.Types.ObjectId(id)) }
+            : { $in: [] };
         } else {
           const mappedStatus = statusMap[normalizedStatus] || normalizedStatus;
           query.status = mappedStatus;
@@ -272,6 +295,8 @@ export const getOrders = asyncHandler(async (req, res) => {
     // Batch fetch settlements for platform fee and refund status (more efficient than individual queries)
     let settlementMap = new Map();
     let refundStatusMap = new Map();
+    let refundAmountMap = new Map();
+    let refundIdsMap = new Map();
     let settlementCouponMap = new Map();
     try {
       const OrderSettlement = (await import('../../order/models/OrderSettlement.js')).default;
@@ -296,6 +321,41 @@ export const getOrders = asyncHandler(async (req, res) => {
       });
     } catch (err) {
       console.warn('Could not batch fetch settlements:', err.message);
+    }
+
+    // For refunded tab, enrich rows using only gateway-confirmed refunds (status=success).
+    if (normalizedStatus === 'refunded' && orders.length > 0) {
+      try {
+        const orderIds = orders.map((o) => o._id);
+        const successfulRefunds = await Refund.find({
+          status: 'success',
+          orderId: { $in: orderIds }
+        })
+          .select('orderId amount refundId')
+          .lean();
+
+        const refundAmountAccumulator = new Map();
+        successfulRefunds.forEach((refund) => {
+          const orderId = refund.orderId?.toString();
+          if (!orderId) return;
+
+          const amount = Number(refund.amount || 0);
+          refundAmountAccumulator.set(orderId, (refundAmountAccumulator.get(orderId) || 0) + amount);
+
+          if (!refundIdsMap.has(orderId)) {
+            refundIdsMap.set(orderId, []);
+          }
+          refundIdsMap.get(orderId).push(refund.refundId);
+          refundStatusMap.set(orderId, 'processed');
+        });
+
+        refundAmountAccumulator.forEach((amount, orderId) => {
+          refundAmountMap.set(orderId, Math.round(amount * 100) / 100);
+        });
+
+      } catch (err) {
+        console.warn('Could not fetch successful refund metadata:', err.message);
+      }
     }
 
     // Fallback lookup: infer coupon source by coupon code when source is missing.
@@ -376,7 +436,9 @@ export const getOrders = asyncHandler(async (req, res) => {
       // Map order status for display
       // Check if cancelled and determine who cancelled it
       let orderStatusDisplay;
-      if (order.status === 'cancelled') {
+      if (normalizedStatus === 'refunded') {
+        orderStatusDisplay = 'Refunded';
+      } else if (order.status === 'cancelled') {
         // Check cancelledBy field to determine who cancelled
         if (order.cancelledBy === 'restaurant') {
           orderStatusDisplay = 'Cancelled by Restaurant';
@@ -520,7 +582,9 @@ export const getOrders = asyncHandler(async (req, res) => {
         zoneId: order.assignmentInfo?.zoneId || null,
         zoneName: order.assignmentInfo?.zoneName || null,
         // Refund status from settlement
-        refundStatus: refundStatusMap.get(order._id.toString()) || null
+        refundStatus: refundStatusMap.get(order._id.toString()) || null,
+        refundedAmount: refundAmountMap.get(order._id.toString()) || 0,
+        refundIds: refundIdsMap.get(order._id.toString()) || []
       };
     });
     return successResponse(res, 200, 'Orders retrieved successfully', {
