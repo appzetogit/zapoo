@@ -2595,8 +2595,6 @@ export const getRestaurantAnalytics = asyncHandler(async (req, res) => {
     const restaurantIdForSettlement = restaurant._id instanceof mongoose.Types.ObjectId ? restaurant._id : new mongoose.Types.ObjectId(restaurant._id);
     const last12MonthsStart = new Date(now.getFullYear(), now.getMonth() - 12, 1);
     const RestaurantCommission = (await import("../models/RestaurantCommission.js")).default;
-    const FeedbackExperience = (await import("../models/FeedbackExperience.js")).default;
-
     const [orderInsights, settlementInsights, commissionConfigRaw, ratingStats, totalCommissionConfigs] = await Promise.all([
       Order.aggregate([
         { $match: orderMatchQuery },
@@ -2715,22 +2713,26 @@ export const getRestaurantAnalytics = asyncHandler(async (req, res) => {
       })
         .sort({ status: -1, updatedAt: -1 })
         .lean(),
-      FeedbackExperience.aggregate([{
-        $match: {
-          restaurantId: restaurantIdForSettlement,
-          rating: {
-            $exists: true,
-            $ne: null,
-            $gt: 0
+      Order.aggregate([
+        {
+          $match: {
+            ...orderMatchQuery,
+            status: "delivered",
+            "review.rating": {
+              $exists: true,
+              $ne: null,
+              $gt: 0
+            }
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            averageRating: { $avg: "$review.rating" },
+            totalRatings: { $sum: 1 }
           }
         }
-      }, {
-        $group: {
-          _id: null,
-          averageRating: { $avg: "$rating" },
-          totalRatings: { $sum: 1 }
-        }
-      }]),
+      ]),
       Order.aggregate([{
         $match: {
           ...orderMatchQuery,
@@ -2811,7 +2813,7 @@ export const getRestaurantAnalytics = asyncHandler(async (req, res) => {
 
     // Log the final commission percentage being returned
 
-    // Get ratings from FeedbackExperience (restaurantId is ObjectId in FeedbackExperience)
+    // Use delivered order reviews for ratings (aligned with user-side cards).
     const averageRating = ratingStats[0]?.averageRating || 0;
     const totalRatings = ratingStats[0]?.totalRatings || 0;
     const totalCustomers = customerSummary.totalCustomers || 0;

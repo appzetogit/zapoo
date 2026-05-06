@@ -503,14 +503,15 @@ export const getOrders = asyncHandler(async (req, res) => {
         }
       }
 
-      // For report: itemDiscount is the discount applied to items
+      // For report: itemDiscount is the total discount applied
       const itemDiscount = discount;
-      // Discounted amount is subtotal after discount
-      const discountedAmount = Math.max(0, subtotal - discount);
       // Coupon discounts split by source
       const adminCouponDiscount = settlementCoupon?.adminCouponDiscount ?? (couponSource === 'admin' ? discount : 0);
       const restaurantCouponDiscount = settlementCoupon?.restaurantCouponDiscount ?? (couponSource === 'restaurant' ? discount : 0);
       const couponDiscount = adminCouponDiscount + restaurantCouponDiscount;
+      // Transaction table requirement: "Discounted Amount" should show
+      // total discount received in that order (admin + restaurant coupon).
+      const discountedAmount = Math.max(0, couponDiscount || discount || 0);
       // Referral discount (not currently in model, default to 0)
       const referralDiscount = 0;
       // GST
@@ -1198,10 +1199,100 @@ export const getTransactionReport = asyncHandler(async (req, res) => {
     const OrderSettlement = (await import('../../order/models/OrderSettlement.js')).default;
     const settlements = await OrderSettlement.find({
       orderId: { $in: orderIds }
-    }).select('orderId adminCouponDiscount restaurantCouponDiscount couponDiscount').lean();
+    }).select('orderId adminCouponDiscount restaurantCouponDiscount couponDiscount recommendedItemFee adminEarning.recommendedItemFee').lean();
     const settlementCouponMap = new Map(
       settlements.map((settlement) => [settlement.orderId?.toString(), settlement])
     );
+
+    // Build tier-fee fallback maps for orders where recommended fee wasn't persisted
+    const Restaurant = (await import('../../restaurant/models/Restaurant.js')).default;
+    const Tier = (await import('../models/Tier.js')).default;
+    const orderTierIds = new Set();
+    const orderRestaurantIds = new Set();
+    orders.forEach((order) => {
+      const tierIdFromOrder = order?.pricing?.pricingMeta?.tierId;
+      if (tierIdFromOrder && mongoose.Types.ObjectId.isValid(String(tierIdFromOrder))) {
+        orderTierIds.add(String(tierIdFromOrder));
+      }
+      const restaurantObjectId =
+        order?.restaurantId && typeof order.restaurantId === 'object'
+          ? order.restaurantId?._id
+          : order?.restaurantId;
+      if (restaurantObjectId && mongoose.Types.ObjectId.isValid(String(restaurantObjectId))) {
+        orderRestaurantIds.add(String(restaurantObjectId));
+      }
+    });
+
+    const [restaurantTierDocs, tierDocs] = await Promise.all([
+      orderRestaurantIds.size > 0
+        ? Restaurant.find({ _id: { $in: [...orderRestaurantIds] } }).select('_id tierId').lean()
+        : Promise.resolve([]),
+      orderTierIds.size > 0
+        ? Tier.find({ _id: { $in: [...orderTierIds] } }).select('_id recommendedItemFee').lean()
+        : Promise.resolve([])
+    ]);
+
+    const restaurantTierMap = new Map(
+      (restaurantTierDocs || []).map((doc) => [String(doc._id), doc?.tierId ? String(doc.tierId) : null])
+    );
+
+    // Load missing tiers from restaurant tierId where order snapshot tierId is absent
+    const tierIdsFromRestaurants = new Set(
+      [...restaurantTierMap.values()].filter((tierId) => tierId && !orderTierIds.has(tierId))
+    );
+    let extraTierDocs = [];
+    if (tierIdsFromRestaurants.size > 0) {
+      extraTierDocs = await Tier.find({ _id: { $in: [...tierIdsFromRestaurants] } }).select('_id recommendedItemFee').lean();
+    }
+
+    const tierRecommendedFeeMap = new Map(
+      [...(tierDocs || []), ...(extraTierDocs || [])].map((doc) => [String(doc._id), Number(doc?.recommendedItemFee || 0)])
+    );
+
+    // Fallback source for legacy orders:
+    // when order.items[].isRecommended was not persisted correctly, derive recommended items
+    // from restaurant menu master by itemId.
+    const Menu = (await import('../../restaurant/models/Menu.js')).default;
+    const initialMenuRestaurantIds = new Set(
+      [...orders]
+        .map((order) => {
+          const restaurantObjectId =
+            order?.restaurantId && typeof order.restaurantId === 'object'
+              ? order.restaurantId?._id
+              : order?.restaurantId;
+          if (restaurantObjectId && mongoose.Types.ObjectId.isValid(String(restaurantObjectId))) {
+            return String(restaurantObjectId);
+          }
+          return null;
+        })
+        .filter(Boolean)
+    );
+    const menuDocs = initialMenuRestaurantIds.size > 0
+      ? await Menu.find({ restaurant: { $in: [...initialMenuRestaurantIds] } }).select('restaurant sections.items.id sections.items.isRecommended sections.subsections.items.id sections.subsections.items.isRecommended').lean()
+      : [];
+    const restaurantRecommendedIdsMap = new Map();
+    (menuDocs || []).forEach((menuDoc) => {
+      const recIdSet = new Set();
+      (menuDoc?.sections || []).forEach((section) => {
+        (section?.items || []).forEach((item) => {
+          if (item?.isRecommended === true && item?.id) {
+            recIdSet.add(String(item.id));
+          }
+        });
+        (section?.subsections || []).forEach((subsection) => {
+          (subsection?.items || []).forEach((item) => {
+            if (item?.isRecommended === true && item?.id) {
+              recIdSet.add(String(item.id));
+            }
+          });
+        });
+      });
+      restaurantRecommendedIdsMap.set(String(menuDoc.restaurant), recIdSet);
+    });
+
+    const computeRecommendedFeeForOrder = (order) => {
+      return Number(order?.pricing?.internalRecommendedFee || 0);
+    };
 
     // Fallback lookup: infer coupon source by coupon code when source is missing in order/settlement
     const unresolvedCouponCodes = [
@@ -1300,6 +1391,103 @@ export const getTransactionReport = asyncHandler(async (req, res) => {
     };
     const allOrdersForSummary = await Order.find(summaryQuery).populate('userId', 'name').populate('restaurantId', 'name').lean();
 
+    // Extend recommended-fee lookup maps to include summary orders too
+    const feeSourceOrders = [...orders, ...allOrdersForSummary];
+    const feeSourceOrderIds = [
+      ...new Set(feeSourceOrders.map((order) => order?._id?.toString()).filter(Boolean))
+    ];
+    const existingSettlementIds = new Set([...settlementCouponMap.keys()]);
+    const missingSettlementOrderIds = feeSourceOrderIds.filter((id) => !existingSettlementIds.has(id));
+    if (missingSettlementOrderIds.length > 0) {
+      const additionalSettlements = await OrderSettlement.find({
+        orderId: { $in: missingSettlementOrderIds }
+      }).select('orderId recommendedItemFee adminEarning.recommendedItemFee').lean();
+      additionalSettlements.forEach((settlement) => {
+        settlementCouponMap.set(settlement.orderId?.toString(), settlement);
+      });
+    }
+
+    const missingRestaurantIds = new Set();
+    const missingTierIds = new Set();
+    feeSourceOrders.forEach((order) => {
+      const tierIdFromOrder = order?.pricing?.pricingMeta?.tierId;
+      if (tierIdFromOrder && mongoose.Types.ObjectId.isValid(String(tierIdFromOrder)) && !tierRecommendedFeeMap.has(String(tierIdFromOrder))) {
+        missingTierIds.add(String(tierIdFromOrder));
+      }
+
+      const restaurantObjectId =
+        order?.restaurantId && typeof order.restaurantId === 'object'
+          ? order.restaurantId?._id
+          : order?.restaurantId;
+      if (
+        restaurantObjectId &&
+        mongoose.Types.ObjectId.isValid(String(restaurantObjectId)) &&
+        !restaurantTierMap.has(String(restaurantObjectId))
+      ) {
+        missingRestaurantIds.add(String(restaurantObjectId));
+      }
+    });
+
+    if (missingRestaurantIds.size > 0) {
+      const moreRestaurants = await Restaurant.find({ _id: { $in: [...missingRestaurantIds] } }).select('_id tierId').lean();
+      moreRestaurants.forEach((doc) => {
+        restaurantTierMap.set(String(doc._id), doc?.tierId ? String(doc.tierId) : null);
+        if (doc?.tierId && !tierRecommendedFeeMap.has(String(doc.tierId))) {
+          missingTierIds.add(String(doc.tierId));
+        }
+      });
+    }
+
+    // Extend menu-recommended item map for summary-only restaurants
+    const missingMenuRestaurantIds = [
+      ...new Set(
+        feeSourceOrders
+          .map((order) => {
+            const restaurantObjectId =
+              order?.restaurantId && typeof order.restaurantId === 'object'
+                ? order.restaurantId?._id
+                : order?.restaurantId;
+            if (restaurantObjectId && mongoose.Types.ObjectId.isValid(String(restaurantObjectId))) {
+              return String(restaurantObjectId);
+            }
+            return null;
+          })
+          .filter(Boolean)
+      )
+    ].filter((restaurantId) => !restaurantRecommendedIdsMap.has(restaurantId));
+
+    if (missingMenuRestaurantIds.length > 0) {
+      const additionalMenus = await Menu.find({ restaurant: { $in: missingMenuRestaurantIds } })
+        .select('restaurant sections.items.id sections.items.isRecommended sections.subsections.items.id sections.subsections.items.isRecommended')
+        .lean();
+
+      (additionalMenus || []).forEach((menuDoc) => {
+        const recIdSet = new Set();
+        (menuDoc?.sections || []).forEach((section) => {
+          (section?.items || []).forEach((item) => {
+            if (item?.isRecommended === true && item?.id) {
+              recIdSet.add(String(item.id));
+            }
+          });
+          (section?.subsections || []).forEach((subsection) => {
+            (subsection?.items || []).forEach((item) => {
+              if (item?.isRecommended === true && item?.id) {
+                recIdSet.add(String(item.id));
+              }
+            });
+          });
+        });
+        restaurantRecommendedIdsMap.set(String(menuDoc.restaurant), recIdSet);
+      });
+    }
+
+    if (missingTierIds.size > 0) {
+      const moreTiers = await Tier.find({ _id: { $in: [...missingTierIds] } }).select('_id recommendedItemFee').lean();
+      moreTiers.forEach((doc) => {
+        tierRecommendedFeeMap.set(String(doc._id), Number(doc?.recommendedItemFee || 0));
+      });
+    }
+
     // Calculate completed transactions (delivered orders)
     const completedOrders = allOrdersForSummary.filter(order => order.status === 'delivered' && order.payment?.status === 'completed');
     const completedTransaction = completedOrders.reduce((sum, order) => sum + (order.pricing?.total || 0), 0);
@@ -1309,7 +1497,7 @@ export const getTransactionReport = asyncHandler(async (req, res) => {
     const refundedTransaction = refundedOrders.reduce((sum, order) => sum + (order.pricing?.total || 0), 0);
 
     // Calculate recommended item fees from orders
-    const totalRecommendedFee = completedOrders.reduce((sum, order) => sum + (order.pricing?.internalRecommendedFee || 0), 0);
+    const totalRecommendedFee = completedOrders.reduce((sum, order) => sum + computeRecommendedFeeForOrder(order), 0);
 
     // Get admin earning from AdminCommission
     const adminCommissionQuery = {
@@ -1389,7 +1577,7 @@ export const getTransactionReport = asyncHandler(async (req, res) => {
         vatTax: gst,
         deliveryCharge: deliveryCharge,
         orderAmount: orderAmount,
-        recommendedItemFee: order.pricing?.internalRecommendedFee || 0
+        recommendedItemFee: computeRecommendedFeeForOrder(order)
       };
     });
     return successResponse(res, 200, 'Transaction report retrieved successfully', {
@@ -1432,7 +1620,6 @@ export const getRestaurantReport = asyncHandler(async (req, res) => {
     const escapeRegex = (value = '') => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const Restaurant = (await import('../../restaurant/models/Restaurant.js')).default;
     const AdminCommission = (await import('../models/AdminCommission.js')).default;
-    const FeedbackExperience = (await import('../models/FeedbackExperience.js')).default;
 
     // Build restaurant query
     const restaurantQuery = {};
@@ -1606,7 +1793,7 @@ export const getRestaurantReport = asyncHandler(async (req, res) => {
         ...dateQuery,
         restaurantId: { $in: orderIdentifiers }
       })
-        .select('restaurantId pricing.total pricing.discount pricing.tax items.itemId')
+        .select('restaurantId status payment.status pricing.total pricing.discount pricing.tax items.itemId')
         .lean(),
       AdminCommission.aggregate([
         {
@@ -1623,21 +1810,20 @@ export const getRestaurantReport = asyncHandler(async (req, res) => {
           }
         }
       ]),
-      FeedbackExperience.aggregate([
+      // Keep rating source aligned with user-side restaurant cards:
+      // derive from delivered order reviews.
+      Order.aggregate([
         {
           $match: {
-            restaurantId: { $in: restaurantObjectIds },
-            rating: {
-              $exists: true,
-              $ne: null,
-              $gt: 0
-            }
+            status: 'delivered',
+            restaurantId: { $in: orderIdentifiers },
+            'review.rating': { $exists: true, $ne: null, $gt: 0 }
           }
         },
         {
           $group: {
             _id: '$restaurantId',
-            averageRating: { $avg: '$rating' },
+            averageRating: { $avg: '$review.rating' },
             totalRatings: { $sum: 1 }
           }
         }
@@ -1653,13 +1839,24 @@ export const getRestaurantReport = asyncHandler(async (req, res) => {
       const stats = orderStatsByRestaurant.get(canonicalId) || {
         totalOrder: 0,
         totalOrderAmount: 0,
+        totalCancelledRefundedAmount: 0,
         totalDiscountGiven: 0,
         totalVATTAX: 0,
         uniqueItemIds: new Set()
       };
 
       stats.totalOrder += 1;
-      stats.totalOrderAmount += order.pricing?.total || 0;
+      const orderTotal = order.pricing?.total || 0;
+      const normalizedStatus = String(order.status || '').trim().toLowerCase();
+      const isCancelledOrRefunded = normalizedStatus === 'cancelled' || normalizedStatus === 'canceled' || normalizedStatus === 'refunded';
+      const normalizedPaymentStatus = String(order.payment?.status || '').trim().toLowerCase();
+      const isRefundedPayment = normalizedPaymentStatus === 'refunded';
+      // Net order amount: cancelled/refunded orders should reduce the total.
+      stats.totalOrderAmount += isCancelledOrRefunded ? -orderTotal : orderTotal;
+      // Explicit cancelled/refunded amount: only those orders that were paid and later refunded.
+      if (isCancelledOrRefunded && isRefundedPayment) {
+        stats.totalCancelledRefundedAmount += orderTotal;
+      }
       stats.totalDiscountGiven += order.pricing?.discount || 0;
       stats.totalVATTAX += order.pricing?.tax || 0;
 
@@ -1677,15 +1874,24 @@ export const getRestaurantReport = asyncHandler(async (req, res) => {
     const commissionByRestaurant = new Map(
       commissionAgg.map((entry) => [entry._id?.toString(), entry.totalAdminCommission || 0])
     );
-    const ratingsByRestaurant = new Map(
-      ratingAgg.map((entry) => [
-        entry._id?.toString(),
-        {
-          averageRating: entry.averageRating || 0,
-          totalRatings: entry.totalRatings || 0
-        }
-      ])
-    );
+    // ratingAgg can be grouped by either internal _id string or public restaurantId string.
+    // Normalize both to canonical restaurant _id and merge if both variants exist.
+    const ratingsByRestaurant = new Map();
+    for (const entry of ratingAgg) {
+      const groupedRestaurantId = entry._id?.toString?.() || String(entry._id || '');
+      const canonicalId = restaurantKeyByIdentifier.get(groupedRestaurantId);
+      if (!canonicalId) continue;
+
+      const prev = ratingsByRestaurant.get(canonicalId) || {
+        ratingSum: 0,
+        totalRatings: 0
+      };
+      const count = Number(entry.totalRatings || 0);
+      const avg = Number(entry.averageRating || 0);
+      prev.ratingSum += avg * count;
+      prev.totalRatings += count;
+      ratingsByRestaurant.set(canonicalId, prev);
+    }
 
     const formatCurrency = (amount) => `₹${amount.toLocaleString('en-US', {
       minimumFractionDigits: 2,
@@ -1697,13 +1903,19 @@ export const getRestaurantReport = asyncHandler(async (req, res) => {
       const orderStats = orderStatsByRestaurant.get(restaurantId) || {
         totalOrder: 0,
         totalOrderAmount: 0,
+        totalCancelledRefundedAmount: 0,
         totalDiscountGiven: 0,
         totalVATTAX: 0,
         uniqueItemIds: new Set()
       };
       const ratingStats = ratingsByRestaurant.get(restaurantId);
-      const averageRatings = ratingStats?.averageRating || restaurant.rating || 0;
-      const reviews = ratingStats?.totalRatings || restaurant.totalRatings || 0;
+      const liveTotalRatings = Number(ratingStats?.totalRatings || 0);
+      const liveAverageRating = liveTotalRatings > 0
+        ? Number((ratingStats.ratingSum / liveTotalRatings).toFixed(1))
+        : 0;
+      // Match user-side behavior: use live review stats, else fallback to Restaurant fields.
+      const averageRatings = liveTotalRatings > 0 ? liveAverageRating : Number(restaurant.rating || 0);
+      const reviews = liveTotalRatings > 0 ? liveTotalRatings : Number(restaurant.totalRatings || 0);
 
       return {
         sl: 0,
@@ -1714,6 +1926,7 @@ export const getRestaurantReport = asyncHandler(async (req, res) => {
         totalFood: orderStats.uniqueItemIds.size,
         totalOrder: orderStats.totalOrder,
         totalOrderAmount: formatCurrency(orderStats.totalOrderAmount),
+        totalCancelledRefundedAmount: formatCurrency(orderStats.totalCancelledRefundedAmount),
         totalDiscountGiven: formatCurrency(orderStats.totalDiscountGiven),
         totalAdminCommission: formatCurrency(commissionByRestaurant.get(restaurantId) || 0),
         totalVATTAX: formatCurrency(orderStats.totalVATTAX),

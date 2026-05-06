@@ -138,6 +138,29 @@ export default function FoodApproval() {
     setShowRejectModal(true)
   }
 
+  const getItemTypeLabel = (request) => {
+    const rawType =
+      request?.foodType ||
+      request?.type ||
+      request?.itemType ||
+      request?.dietaryType ||
+      request?.addonType ||
+      request?.item?.foodType ||
+      request?.item?.type ||
+      request?.item?.itemType ||
+      request?.item?.dietaryType ||
+      request?.item?.addonType
+
+    if (!rawType) return "-"
+
+    const normalized = String(rawType).trim().toLowerCase()
+    if (normalized === "veg" || normalized === "vegetarian") return "Veg"
+    if (normalized === "nonveg" || normalized === "non-veg" || normalized === "non veg") return "Non-Veg"
+    if (normalized === "egg") return "Egg"
+
+    return String(rawType)
+  }
+
   return (
     <div className="p-6 space-y-4">
       {/* Page Header */}
@@ -340,6 +363,10 @@ export default function FoodApproval() {
                   <div>
                     <label className="text-xs font-bold text-gray-400 uppercase">Category</label>
                     <p className="text-sm text-gray-900 font-medium">{selectedRequest.category || selectedRequest.item?.category || '-'}</p>
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-gray-400 uppercase">Item Type</label>
+                    <p className="text-sm text-gray-900 font-medium">{getItemTypeLabel(selectedRequest)}</p>
                   </div>
                 </div>
 

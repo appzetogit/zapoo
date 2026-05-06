@@ -1,4 +1,5 @@
 import Restaurant from '../../restaurant/models/Restaurant.js';
+import Menu from '../../restaurant/models/Menu.js';
 import Offer from '../../restaurant/models/Offer.js';
 import AdminCoupon from '../../admin/models/AdminCoupon.js';
 import FeeSettings from '../../admin/models/FeeSettings.js';
@@ -13,6 +14,21 @@ import { DEFAULT_LOCALE, normalizeLocale } from '../../../shared/i18n/localeCons
 const roundCurrency = (value) => Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
 const normalizeCouponCode = (code = '') => String(code || '').trim().toUpperCase();
 const ADMIN_DELIVERY_GST_RATE = 0.18;
+const normalizeItemIdentifier = (value) => String(value || '').trim();
+const deriveItemIdentifierCandidates = (value) => {
+  const raw = normalizeItemIdentifier(value);
+  if (!raw) return [];
+  const out = new Set([raw]);
+  if (raw.includes('-dish-')) {
+    const suffix = raw.split('-dish-').pop();
+    if (suffix) out.add(String(suffix).trim());
+  }
+  if (raw.includes('_')) {
+    const suffix = raw.split('_').pop();
+    if (suffix) out.add(String(suffix).trim());
+  }
+  return [...out].filter(Boolean);
+};
 
 /** Treat common truthy shapes from JSON / older clients */
 const isRestaurantCustomDeliveryEnabled = (restaurant) => {
@@ -581,6 +597,11 @@ export const calculateOrderPricing = async ({
   locale = DEFAULT_LOCALE,
 }) => {
   try {
+    const orderedItemIds = new Set();
+    (items || []).forEach((item) => {
+      const candidates = deriveItemIdentifierCandidates(item?.itemId || item?.id || null);
+      candidates.forEach((candidate) => orderedItemIds.add(candidate));
+    });
     const subtotal = items.reduce((sum, item) => {
       return sum + (item.price || 0) * (item.quantity || 1);
     }, 0);
@@ -796,10 +817,50 @@ export const calculateOrderPricing = async ({
       recommendedFeePerItem = Number(tier.recommendedItemFee);
     }
 
-    if (recommendedFeePerItem > 0) {
-      items.forEach(item => {
-        if (item.isRecommended) {
-          internalRecommendedFee += recommendedFeePerItem * (item.quantity || 1);
+    // Authoritative recommended-item resolution must be server-side (Menu master),
+    // not client payload flags, to avoid missing fee when app omits isRecommended.
+    const recommendedItemIdSet = new Set();
+    let restaurantObjectId = restaurant?._id || null;
+    if (!restaurantObjectId && mongoose.Types.ObjectId.isValid(restaurantId) && String(restaurantId).length === 24) {
+      restaurantObjectId = new mongoose.Types.ObjectId(restaurantId);
+    }
+    if (restaurantObjectId && orderedItemIds.size > 0) {
+      const menuDoc = await Menu.findOne({
+        restaurant: restaurantObjectId,
+        isActive: true
+      })
+        .select('sections.items.id sections.items.isRecommended sections.subsections.items.id sections.subsections.items.isRecommended')
+        .lean();
+
+      (menuDoc?.sections || []).forEach((section) => {
+        (section?.items || []).forEach((menuItem) => {
+            const menuItemIdCandidates = deriveItemIdentifierCandidates(menuItem?.id || menuItem?._id || null);
+            if (
+              menuItem?.isRecommended === true &&
+              menuItemIdCandidates.some((candidate) => orderedItemIds.has(candidate))
+            ) {
+              menuItemIdCandidates.forEach((candidate) => recommendedItemIdSet.add(candidate));
+            }
+          });
+        (section?.subsections || []).forEach((subsection) => {
+          (subsection?.items || []).forEach((menuItem) => {
+            const menuItemIdCandidates = deriveItemIdentifierCandidates(menuItem?.id || menuItem?._id || null);
+            if (
+              menuItem?.isRecommended === true &&
+              menuItemIdCandidates.some((candidate) => orderedItemIds.has(candidate))
+            ) {
+              menuItemIdCandidates.forEach((candidate) => recommendedItemIdSet.add(candidate));
+            }
+          });
+        });
+      });
+    }
+
+    if (recommendedFeePerItem > 0 && recommendedItemIdSet.size > 0) {
+      items.forEach((item) => {
+        const itemIdCandidates = deriveItemIdentifierCandidates(item?.itemId || item?.id || null);
+        if (itemIdCandidates.some((candidate) => recommendedItemIdSet.has(candidate))) {
+          internalRecommendedFee += recommendedFeePerItem * Number(item?.quantity || 1);
         }
       });
     }
@@ -854,6 +915,7 @@ export const calculateOrderPricing = async ({
       customerPayableTotal: total,
       savings,
       internalRecommendedFee: roundCurrency(internalRecommendedFee),
+      recommendedItemIds: Array.from(recommendedItemIdSet),
       internalAdminDeliveryCost: adminDeliveryCost,
       adminDeliveryGst,
       restaurantPayableToAdmin,

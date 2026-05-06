@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import BottomNavOrders from "../components/BottomNavOrders";
 import { clearModuleAuth, clearAuthData } from "@/lib/utils/auth";
 import { restaurantAPI } from "@/lib/api";
 import { firebaseAuth } from "@/lib/firebase";
@@ -538,7 +539,7 @@ export default function ExploreMore() {
       </motion.div>
 
       {/* Main Content */}
-      <div className="px-4 py-6">
+      <div className="px-4 py-6 pb-24">
         {/* Restaurant Information Card */}
         <motion.div initial={{
         opacity: 0,
@@ -828,5 +829,6 @@ export default function ExploreMore() {
         </DialogContent>
       </Dialog>
 
+      <BottomNavOrders />
     </motion.div>;
 }

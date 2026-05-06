@@ -690,7 +690,7 @@ export const resources = {
           payment: "Payment:",
           locationNotAvailable: "Location not available",
           restaurantFallback: "Restaurant",
-          brandName: "appzeto",
+          brandName: "zapoo",
           deliveryLabel: "Delivery",
           noItemsFound: "No items found",
           itemFallback: "Item",

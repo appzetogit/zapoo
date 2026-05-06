@@ -199,6 +199,10 @@ export const createOrder = async (req, res) => {
     });
 
     // Create the order
+    const recommendedItemIdSet = new Set(
+      (pricingData?.recommendedItemIds || []).map((id) => String(id))
+    );
+
     const order = new Order({
       orderId: generatedOrderId,
       // Re-added orderId generation
@@ -208,14 +212,14 @@ export const createOrder = async (req, res) => {
       restaurantId: assignedRestaurantId,
       restaurantName: assignedRestaurantName,
       items: items.map(item => ({
-        itemId: item.itemId,
+        itemId: String(item.itemId || item.id || '').trim(),
         name: item.name,
         price: item.price,
         quantity: item.quantity,
         image: item.image,
         description: item.description,
         isVeg: item.isVeg,
-        isRecommended: item.isRecommended === true
+        isRecommended: recommendedItemIdSet.has(String(item?.itemId || ''))
       })),
       address,
       pricing: {
