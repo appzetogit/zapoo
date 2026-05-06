@@ -14,7 +14,7 @@ const feedbackSchema = new mongoose.Schema(
     },
     userEmail: {
       type: String,
-      required: true,
+      required: false,
       trim: true
     },
     message: {
@@ -53,4 +53,3 @@ feedbackSchema.index({ status: 1 });
 feedbackSchema.index({ createdAt: -1 });
 
 export default mongoose.model('Feedback', feedbackSchema);
-

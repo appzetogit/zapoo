@@ -51,7 +51,7 @@ const tierSchema = new mongoose.Schema(
         maxArea: {
             type: Number,
             required: true,
-            min: 0,
+            min: 1,
         },
         description: {
             type: String,

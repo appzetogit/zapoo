@@ -109,6 +109,12 @@ export const createTier = async (req, res) => {
         return errorResponse(res, 400, validationError);
       }
     }
+    if (Number(minArea) < 0) {
+      return errorResponse(res, 400, "minArea must be greater than or equal to 0");
+    }
+    if (Number(maxArea) < 1) {
+      return errorResponse(res, 400, "maxArea must be greater than or equal to 1");
+    }
     if (minArea >= maxArea) {
       return errorResponse(res, 400, "minArea must be less than maxArea");
     }
@@ -251,6 +257,12 @@ export const updateTier = async (req, res) => {
     if (minArea !== undefined || maxArea !== undefined) {
       const checkMin = minArea !== undefined ? minArea : tier.minArea;
       const checkMax = maxArea !== undefined ? maxArea : tier.maxArea;
+      if (Number(checkMin) < 0) {
+        return errorResponse(res, 400, "minArea must be greater than or equal to 0");
+      }
+      if (Number(checkMax) < 1) {
+        return errorResponse(res, 400, "maxArea must be greater than or equal to 1");
+      }
       if (checkMin >= checkMax) {
         return errorResponse(res, 400, "minArea must be less than maxArea");
       }

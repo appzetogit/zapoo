@@ -14,7 +14,7 @@ const safetyEmergencySchema = new mongoose.Schema(
     },
     userEmail: {
       type: String,
-      required: true,
+      required: false,
       trim: true
     },
     message: {
@@ -63,4 +63,3 @@ safetyEmergencySchema.index({ priority: 1 });
 safetyEmergencySchema.index({ createdAt: -1 });
 
 export default mongoose.model('SafetyEmergency', safetyEmergencySchema);
-

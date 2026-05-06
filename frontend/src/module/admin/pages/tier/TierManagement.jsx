@@ -311,9 +311,10 @@ export default function TierManagement() {
                       type="number"
                       placeholder="0"
                       step="0.1"
+                      min="0"
                       className="pl-10 h-8 border-neutral-200 text-sm bg-white"
                       onWheel={(e) => e.target.blur()}
-                      {...register("minArea", { required: "Required" })}
+                      {...register("minArea", { required: "Required", min: 0 })}
                     />
                   </div>
                   <div className="h-px w-3 bg-neutral-200"></div>
@@ -325,9 +326,10 @@ export default function TierManagement() {
                       type="number"
                       placeholder="10"
                       step="0.1"
+                      min="1"
                       className="pl-10 h-8 border-neutral-200 text-sm bg-white"
                       onWheel={(e) => e.target.blur()}
-                      {...register("maxArea", { required: "Required" })}
+                      {...register("maxArea", { required: "Required", min: 1 })}
                     />
                   </div>
                 </div>
