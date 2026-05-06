@@ -314,12 +314,13 @@ export const getWallet = asyncHandler(async (req, res) => {
 
     // Calculate bonus amount from transactions for logging
     const bonusTransactions = transactions.filter(t => t.type === 'bonus' && t.status === 'Completed');
-    const totalBonus = bonusTransactions.reduce((sum, t) => sum + (t.amount || 0), 0);
+    const totalBonus = bonusTransactions.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
     const walletData = {
       totalBalance: wallet.totalBalance || 0,
       cashInHand: cashInHandForLimit,
       totalWithdrawn: wallet.totalWithdrawn || 0,
       totalEarned: wallet.totalEarned || 0,
+      totalBonus: totalBonus,
       totalCashLimit: totalCashLimit,
       availableCashLimit: Math.max(0, totalCashLimit - cashInHandForLimit),
       deliveryWithdrawalLimit: withdrawalLimit,
