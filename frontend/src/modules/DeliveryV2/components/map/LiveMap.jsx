@@ -5,7 +5,6 @@ import {
   DirectionsService, 
   Polygon,
   Polyline,
-  useJsApiLoader,
   OverlayView
 } from '@react-google-maps/api';
 import { useDeliveryStore } from '@/modules/DeliveryV2/store/useDeliveryStore';
@@ -40,16 +39,13 @@ const mapOptions = {
     { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#9e9e9e" }] }
   ]
 };
-const LIBRARIES = ['places', 'geometry'];
 const FALLBACK_CENTER = { lat: 22.7196, lng: 75.8577 }; // Indore fallback to avoid gray map on first load
 
 export const LiveMap = ({ onMapClick, onMapLoad, onPathReceived, onPolylineReceived, zoom = 12 }) => {
   const { riderLocation, activeOrder, tripStatus } = useDeliveryStore();
-  
-  const { isLoaded, loadError } = useJsApiLoader({
-    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
-    libraries: LIBRARIES
-  });
+  const [mapsReady, setMapsReady] = useState(
+    Boolean(window.google?.maps?.Map && window.google?.maps?.geometry)
+  );
 
   const [directions, setDirections] = useState(null);
   const [map, setMapInternal] = useState(null);
@@ -57,6 +53,29 @@ export const LiveMap = ({ onMapClick, onMapLoad, onPathReceived, onPolylineRecei
   const [lastDirectionsAt, setLastDirectionsAt] = useState(0);
   const [riderIconFallback, setRiderIconFallback] = useState(false);
   const [localGpsRiderLocation, setLocalGpsRiderLocation] = useState(null);
+
+  useEffect(() => {
+    if (mapsReady) return undefined;
+
+    let cancelled = false;
+    const checkReady = () => {
+      if (cancelled) return;
+      const ready = Boolean(window.google?.maps?.Map && window.google?.maps?.geometry);
+      if (ready) {
+        setMapsReady(true);
+      }
+    };
+
+    checkReady();
+    const interval = window.setInterval(checkReady, 350);
+    window.addEventListener('google-maps-ready', checkReady);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+      window.removeEventListener('google-maps-ready', checkReady);
+    };
+  }, [mapsReady]);
 
   const handleMapLoad = (mapInstance) => {
     mapInstance.setOptions({
@@ -236,8 +255,7 @@ export const LiveMap = ({ onMapClick, onMapLoad, onPathReceived, onPolylineRecei
     return [{ lat: effectiveRiderLocation.lat, lng: effectiveRiderLocation.lng }, ...fullPath.slice(closestIndex + 1)];
   }, [directions, effectiveRiderLocation]);
 
-  if (loadError) return <div className="absolute inset-0 flex items-center justify-center bg-gray-50 text-red-500 font-bold">Map Load Error</div>;
-  if (!isLoaded) return <div className="absolute inset-0 flex items-center justify-center bg-gray-50"><div className="w-10 h-10 border-4 border-green-500 border-t-transparent rounded-full animate-spin" /></div>;
+  if (!mapsReady) return <div className="absolute inset-0 flex items-center justify-center bg-gray-50"><div className="w-10 h-10 border-4 border-green-500 border-t-transparent rounded-full animate-spin" /></div>;
 
   const directionsServiceOptions = (effectiveRiderLocation && targetLocation) ? {
     origin: effectiveRiderLocation,
