@@ -1226,6 +1226,12 @@ export default function OrdersMain() {
   };
 
   const handleSelectOrder = async order => {
+    if (!order || (!order.mongoId && !order.orderId)) {
+      setIsSheetOpen(true);
+      setIsSheetLoading(false);
+      setSheetError("Order details unavailable");
+      return;
+    }
     setIsSheetOpen(true);
     setIsSheetLoading(true);
     setSheetError("");
@@ -1955,12 +1961,9 @@ function ResendNotificationButton({
       const response = await restaurantAPI.resendDeliveryNotification(id);
       if (response.data?.success) {
         toast.success(`Notification sent to ${response.data.data?.notifiedCount || 0} delivery partners`);
-        // Refresh orders if onSuccess callback is provided
-        if (onSuccess) {
-          // Trigger a refresh by calling onSuccess with a special flag
-          setTimeout(() => {
-            window.location.reload(); // Simple refresh for now
-          }, 1000);
+        // Soft refresh only (no full-page reload)
+        if (typeof onSuccess === 'function') {
+          onSuccess();
         }
       } else {
         toast.error(response.data?.message || 'Failed to send notification');
@@ -2125,7 +2128,6 @@ function OrderCard({
                   <ResendNotificationButton
                     orderId={orderId}
                     mongoId={mongoId}
-                    onSuccess={onSelect}
                   />
                 )}
               </div>

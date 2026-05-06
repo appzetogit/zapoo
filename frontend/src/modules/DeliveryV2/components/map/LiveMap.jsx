@@ -56,6 +56,27 @@ export const LiveMap = ({ onMapClick, onMapLoad, onPathReceived, onPolylineRecei
 
   useEffect(() => {
     if (mapsReady) return undefined;
+    let cancelled = false;
+    const checkReady = () => {
+      if (cancelled) return;
+      const ready = Boolean(window.google?.maps?.Map && window.google?.maps?.geometry);
+      if (ready) {
+        console.log('🗺️ [PolylineDebug][MapReady] Google Maps + geometry loaded');
+        setMapsReady(true);
+      }
+    };
+    checkReady();
+    const interval = window.setInterval(checkReady, 350);
+    window.addEventListener('google-maps-ready', checkReady);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+      window.removeEventListener('google-maps-ready', checkReady);
+    };
+  }, [mapsReady]);
+
+  useEffect(() => {
+    if (mapsReady) return undefined;
 
     let cancelled = false;
     const checkReady = () => {
@@ -106,19 +127,38 @@ export const LiveMap = ({ onMapClick, onMapLoad, onPathReceived, onPolylineRecei
     }
   }, [tripStatus, activeOrder?._id, activeOrder]);
 
+  const readPoint = useCallback((rawLoc) => {
+    if (!rawLoc) return null;
+    if (Array.isArray(rawLoc?.coordinates) && rawLoc.coordinates.length >= 2) {
+      const lat = Number(rawLoc.coordinates[1]);
+      const lng = Number(rawLoc.coordinates[0]);
+      return (Number.isFinite(lat) && Number.isFinite(lng)) ? { lat, lng } : null;
+    }
+    const lat = Number(rawLoc.lat ?? rawLoc.latitude);
+    const lng = Number(rawLoc.lng ?? rawLoc.longitude);
+    return (Number.isFinite(lat) && Number.isFinite(lng)) ? { lat, lng } : null;
+  }, []);
+
   const targetLocation = useMemo(() => {
     if (!activeOrder) return null;
-    let rawLoc = null;
-    if (tripStatus === 'PICKING_UP' || tripStatus === 'REACHED_PICKUP') {
-      rawLoc = activeOrder.restaurantLocation;
-    } else if (tripStatus === 'PICKED_UP' || tripStatus === 'REACHED_DROP') {
-      rawLoc = activeOrder.customerLocation;
+    const isPickupLeg = tripStatus === 'PICKING_UP' || tripStatus === 'REACHED_PICKUP';
+    if (isPickupLeg) {
+      return (
+        readPoint(activeOrder.restaurantLocation) ||
+        readPoint(activeOrder.restaurant?.location) ||
+        readPoint(activeOrder.restaurantId?.location) ||
+        readPoint(activeOrder.restaurant) ||
+        readPoint(activeOrder.restaurantId)
+      );
     }
-    if (!rawLoc) return null;
-    const lat = parseFloat(rawLoc.lat || rawLoc.latitude);
-    const lng = parseFloat(rawLoc.lng || rawLoc.longitude);
-    return (Number.isFinite(lat) && Number.isFinite(lng)) ? { lat, lng } : null;
-  }, [activeOrder, tripStatus]);
+    return (
+      readPoint(activeOrder.customerLocation) ||
+      readPoint(activeOrder.deliveryAddress?.location) ||
+      readPoint(activeOrder.address?.location) ||
+      readPoint(activeOrder.address) ||
+      readPoint(activeOrder.deliveryAddress)
+    );
+  }, [activeOrder, tripStatus, readPoint]);
 
   const parsedRiderLocation = useMemo(() => {
     if (!riderLocation) return null;
@@ -129,6 +169,19 @@ export const LiveMap = ({ onMapClick, onMapLoad, onPathReceived, onPolylineRecei
 
   const effectiveRiderLocation = parsedRiderLocation || localGpsRiderLocation;
   const mapCenter = effectiveRiderLocation || targetLocation || FALLBACK_CENTER;
+
+  useEffect(() => {
+    console.log('🧭 [PolylineDebug][Inputs]', {
+      mapsReady,
+      tripStatus,
+      orderId: activeOrder?.orderId || activeOrder?._id || null,
+      riderStore: riderLocation || null,
+      riderParsed: parsedRiderLocation || null,
+      riderFallbackGps: localGpsRiderLocation || null,
+      riderEffective: effectiveRiderLocation || null,
+      targetLocation: targetLocation || null
+    });
+  }, [mapsReady, tripStatus, activeOrder?._id, activeOrder?.orderId, riderLocation, parsedRiderLocation, localGpsRiderLocation, effectiveRiderLocation, targetLocation]);
 
   useEffect(() => {
     if (parsedRiderLocation || typeof navigator === 'undefined' || !navigator.geolocation) return undefined;
@@ -185,10 +238,20 @@ export const LiveMap = ({ onMapClick, onMapLoad, onPathReceived, onPolylineRecei
   }, [directions, onPathReceived]);
 
   const directionsCallback = useCallback((result, status) => {
+    console.log('🧭 [PolylineDebug][DirectionsCallback]', {
+      status,
+      hasResult: Boolean(result),
+      routeCount: result?.routes?.length || 0
+    });
     if (status === 'OK' && result) {
       setDirections(result);
       setLastDirectionsAt(Date.now());
       const encodedPolyline = result.routes[0]?.overview_polyline;
+      console.log('🧭 [PolylineDebug][DirectionsOK]', {
+        hasOverviewPath: Boolean(result?.routes?.[0]?.overview_path?.length),
+        overviewPathPoints: result?.routes?.[0]?.overview_path?.length || 0,
+        hasEncodedPolyline: Boolean(encodedPolyline)
+      });
       if (encodedPolyline && onPolylineReceived) onPolylineReceived(encodedPolyline);
     }
   }, [onPolylineReceived]);
@@ -254,6 +317,15 @@ export const LiveMap = ({ onMapClick, onMapLoad, onPathReceived, onPolylineRecei
     }
     return [{ lat: effectiveRiderLocation.lat, lng: effectiveRiderLocation.lng }, ...fullPath.slice(closestIndex + 1)];
   }, [directions, effectiveRiderLocation]);
+
+  useEffect(() => {
+    console.log('🧭 [PolylineDebug][RenderCheck]', {
+      hasDirectionsServiceOptions: Boolean(effectiveRiderLocation && targetLocation),
+      shouldUpdateRoute,
+      hasDirections: Boolean(directions),
+      remainingPathPoints: remainingPath.length
+    });
+  }, [effectiveRiderLocation, targetLocation, shouldUpdateRoute, directions, remainingPath.length]);
 
   if (!mapsReady) return <div className="absolute inset-0 flex items-center justify-center bg-gray-50"><div className="w-10 h-10 border-4 border-green-500 border-t-transparent rounded-full animate-spin" /></div>;
 
