@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react"
 import { useNavigate } from "react-router-dom"
 import { ArrowLeft, Upload, X, Check, Camera, Image as ImageIcon } from "lucide-react"
 import { deliveryAPI } from "@food/api"
+import { uploadAPI } from "@food/api"
 import { toast } from "sonner"
 import { isFlutterBridgeAvailable, openCamera } from "@food/utils/imageUploadUtils"
 import useDeliveryBackNavigation from "../../hooks/useDeliveryBackNavigation"
@@ -224,77 +225,59 @@ export default function SignupStep2() {
       return
     }
 
-    const formData = new FormData()
-    formData.append("name", details.name || "")
-    formData.append("phone", String(details.phone || "").replace(/\D/g, "").slice(0, 15))
-    if (details.email) formData.append("email", String(details.email).trim())
-    if (details.ref) formData.append("ref", String(details.ref).trim())
-    if (details.countryCode) formData.append("countryCode", details.countryCode)
-    if (details.address) formData.append("address", details.address)
-    if (details.city) formData.append("city", details.city)
-    if (details.state) formData.append("state", details.state)
-    if (details.vehicleType) formData.append("vehicleType", details.vehicleType)
-    if (details.vehicleName) formData.append("vehicleName", details.vehicleName)
-    if (details.vehicleNumber) formData.append("vehicleNumber", details.vehicleNumber)
-    if (details.drivingLicenseNumber) {
-      formData.append("drivingLicenseNumber", details.drivingLicenseNumber)
-      formData.append("documents[drivingLicense][number]", details.drivingLicenseNumber)
-    }
-    if (details.panNumber) formData.append("panNumber", details.panNumber)
-    if (details.aadharNumber) formData.append("aadharNumber", details.aadharNumber)
-    formData.append("profilePhoto", documents.profilePhoto)
-    formData.append("aadharPhoto", documents.aadharPhoto)
-    formData.append("panPhoto", documents.panPhoto)
-    formData.append("drivingLicensePhoto", documents.drivingLicensePhoto)
-
-    // Try to get FCM token before registering
-    let fcmToken = null;
-    let platform = "web";
-    try {
-      if (typeof window !== "undefined") {
-        if (window.flutter_inappwebview) {
-          platform = "mobile";
-          const handlerNames = ["getFcmToken", "getFCMToken", "getPushToken", "getFirebaseToken"];
-          for (const handlerName of handlerNames) {
-            try {
-              const t = await window.flutter_inappwebview.callHandler(handlerName, { module: "delivery" });
-              if (t && typeof t === "string" && t.length > 20) {
-                fcmToken = t.trim();
-                break;
-              }
-            } catch (e) {}
-          }
-        } else {
-          fcmToken = localStorage.getItem("fcm_web_registered_token_delivery") || null;
-        }
-      }
-    } catch (e) {
-      debugWarn("Failed to get FCM token during signup", e);
-    }
-
-    if (fcmToken) {
-      formData.append("fcmToken", fcmToken);
-      formData.append("platform", platform);
-    }
-
     const isCompleteProfile = sessionStorage.getItem("deliveryNeedsRegistration") === "true"
 
     setIsSubmitting(true)
 
     try {
-      // New number (OTP ke baad pehli baar): DB me abhi partner nahi hai,
-      // is case me register hi call karna hai (no auth token needed).
+      const [profileUpload, aadharUpload, panUpload, dlUpload] = await Promise.all([
+        uploadAPI.uploadMedia(documents.profilePhoto, { folder: "delivery/docs" }),
+        uploadAPI.uploadMedia(documents.aadharPhoto, { folder: "delivery/docs" }),
+        uploadAPI.uploadMedia(documents.panPhoto, { folder: "delivery/docs" }),
+        uploadAPI.uploadMedia(documents.drivingLicensePhoto, { folder: "delivery/docs" })
+      ])
+
+      const payload = {
+        profilePhoto: {
+          url: profileUpload?.data?.data?.url,
+          publicId: profileUpload?.data?.data?.publicId
+        },
+        aadharPhoto: {
+          url: aadharUpload?.data?.data?.url,
+          publicId: aadharUpload?.data?.data?.publicId
+        },
+        panPhoto: {
+          url: panUpload?.data?.data?.url,
+          publicId: panUpload?.data?.data?.publicId
+        },
+        drivingLicensePhoto: {
+          url: dlUpload?.data?.data?.url,
+          publicId: dlUpload?.data?.data?.publicId
+        }
+      }
+
+      if (!payload.profilePhoto.url || !payload.aadharPhoto.url || !payload.panPhoto.url || !payload.drivingLicensePhoto.url) {
+        throw new Error("Document upload failed. Please retry.")
+      }
+
       const response = isCompleteProfile
-        ? await deliveryAPI.register(formData)
-        : await deliveryAPI.completeProfile(formData)
+        ? await deliveryAPI.register(payload)
+        : await deliveryAPI.completeProfile(payload)
 
       if (response?.data?.success) {
         sessionStorage.removeItem("deliverySignupDetails")
         sessionStorage.removeItem("deliverySignupDocs")
         if (isCompleteProfile) {
           sessionStorage.removeItem("deliveryNeedsRegistration")
-          toast.success("Registration successful. Please login with OTP.")
-          setTimeout(() => navigate("/food/delivery/login", { replace: true }), 1500)
+          sessionStorage.setItem("deliveryAuthData", JSON.stringify({
+            phone: String(details.phone || "").replace(/\D/g, "").slice(0, 15),
+            purpose: "login"
+          }))
+          sessionStorage.setItem("deliveryPendingState", JSON.stringify({
+            pendingMessage: "Your profile is under review. We'll notify you once approved."
+          }))
+          toast.success("Profile submitted successfully")
+          setTimeout(() => navigate("/food/delivery/otp", { replace: true }), 900)
         } else {
           toast.success("Profile submitted. Waiting for admin approval.")
           setTimeout(() => navigate("/food/delivery", { replace: true }), 1500)

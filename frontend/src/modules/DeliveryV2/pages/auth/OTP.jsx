@@ -31,6 +31,18 @@ export default function DeliveryOTP() {
 
   useEffect(() => {
     const stored = sessionStorage.getItem("deliveryAuthData")
+    const pendingRaw = sessionStorage.getItem("deliveryPendingState")
+    if (pendingRaw) {
+      try {
+        const pendingState = JSON.parse(pendingRaw)
+        if (pendingState?.pendingMessage) {
+          setPendingMessage(pendingState.pendingMessage)
+          setIsRejected(Boolean(pendingState.isRejected))
+          setRejectionReason(pendingState.rejectionReason || "")
+        }
+      } catch (e) {}
+      sessionStorage.removeItem("deliveryPendingState")
+    }
     if (stored) {
       setAuthData(JSON.parse(stored))
     } else {
@@ -156,11 +168,18 @@ export default function DeliveryOTP() {
         setIsLoading(false); setPendingMessage(data.message); setIsRejected(data.isRejected || false); setRejectionReason(data.rejectionReason || "");
         return
       }
-      if (data.needsRegistration === true) {
+      if (data.needsRegistration === true || data.needsSignup === true) {
+        const { accessToken, refreshToken, user } = data
+        if (accessToken && user) {
+          storeAuthData("delivery", accessToken, user, refreshToken)
+          window.dispatchEvent(new Event("deliveryAuthChanged"))
+        }
         sessionStorage.removeItem("deliveryAuthData")
         sessionStorage.setItem("deliveryNeedsRegistration", "true")
         sessionStorage.setItem("deliverySignupDetails", JSON.stringify({ name: "", phone: phone.replace(/\D/g, "").slice(-10), countryCode: "+91" }))
-        setIsLoading(false); navigate("/food/delivery/signup/details", { replace: true });
+        const signupStep = data?.signupStep === "documents" ? "documents" : "details"
+        const signupPath = signupStep === "documents" ? "/food/delivery/signup/documents" : "/food/delivery/signup/details"
+        setIsLoading(false); navigate(signupPath, { replace: true });
         return
       }
       const { accessToken, refreshToken, user } = data
@@ -169,7 +188,12 @@ export default function DeliveryOTP() {
         window.dispatchEvent(new Event("deliveryAuthChanged"))
         setTimeout(() => navigate("/food/delivery", { replace: true }), 500)
       }
-    } catch (err) { setError(err?.response?.data?.message || "Invalid OTP."); setIsLoading(false); }
+    } catch (err) {
+      setError(err?.response?.data?.message || "Invalid OTP.")
+      setOtp(["", "", "", ""])
+      setTimeout(() => inputRefs.current[0]?.focus(), 0)
+      setIsLoading(false)
+    }
   }
 
   const handleSubmitName = async () => {
