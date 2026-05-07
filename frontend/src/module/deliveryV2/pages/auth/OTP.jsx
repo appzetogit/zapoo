@@ -159,11 +159,18 @@ export default function DeliveryOTP() {
         setIsLoading(false); setPendingMessage(data.message); setIsRejected(data.isRejected || false); setRejectionReason(data.rejectionReason || "");
         return
       }
-      if (data.needsRegistration === true) {
+      if (data.needsRegistration === true || data.needsSignup === true) {
+        const { accessToken, refreshToken, user } = data
+        if (accessToken && user) {
+          storeAuthData("delivery", accessToken, user, refreshToken)
+          window.dispatchEvent(new Event("deliveryAuthChanged"))
+        }
         sessionStorage.removeItem("deliveryAuthData")
         sessionStorage.setItem("deliveryNeedsRegistration", "true")
         sessionStorage.setItem("deliverySignupDetails", JSON.stringify({ name: "", phone: phone.replace(/\D/g, "").slice(-10), countryCode: "+91" }))
-        setIsLoading(false); navigate("/food/delivery/signup/details", { replace: true });
+        const signupStep = data?.signupStep === "documents" ? "documents" : "details"
+        const signupPath = signupStep === "documents" ? "/food/delivery/signup/documents" : "/food/delivery/signup/details"
+        setIsLoading(false); navigate(signupPath, { replace: true });
         return
       }
       const { accessToken, refreshToken, user } = data

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { ArrowLeft } from "lucide-react"
 import { toast } from "sonner"
+import { deliveryAPI } from "@food/api"
 import useDeliveryBackNavigation from "../../hooks/useDeliveryBackNavigation"
 const debugLog = (...args) => {}
 const debugWarn = (...args) => {}
@@ -210,6 +211,9 @@ export default function SignupStep1() {
         panNumber: formData.panNumber.trim().toUpperCase(),
         aadharNumber: formData.aadharNumber.replace(/\s/g, "")
       }
+
+      // Persist step-1 details to backend so signup status no longer falls back on placeholder values.
+      await deliveryAPI.submitSignupDetails(details)
       sessionStorage.setItem("deliverySignupDetails", JSON.stringify(details))
       toast.success("Details saved")
       navigate("/food/delivery/signup/documents")
