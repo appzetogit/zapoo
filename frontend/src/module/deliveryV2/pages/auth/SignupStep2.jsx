@@ -352,17 +352,17 @@ export default function SignupStep2() {
             >
               <X className="w-4 h-4" />
             </button>
-            <div className="absolute bottom-2 left-2 bg-green-500 text-white px-3 py-1 rounded-full flex items-center gap-1 text-sm">
+            <div className="absolute bottom-2 left-2 bg-[#ff525d] text-white px-3 py-1 rounded-full flex items-center gap-1 text-sm">
               <Check className="w-4 h-4" />
               <span>Uploaded</span>
             </div>
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-gray-300 rounded-lg hover:border-green-500 transition-colors px-4">
+          <div className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-gray-300 rounded-lg hover:border-[#ff525d] transition-colors px-4">
             <div className="flex flex-col items-center justify-center pt-5 pb-3">
               {isUploading ? (
                 <>
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500 mb-2"></div>
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#ff525d] mb-2"></div>
                   <p className="text-sm text-gray-500">Uploading...</p>
                 </>
               ) : (
@@ -387,7 +387,7 @@ export default function SignupStep2() {
                 <button
                   type="button"
                   onClick={() => handlePickFromGallery(docType)}
-                  className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-[#00B761] text-white text-xs font-bold cursor-pointer hover:bg-[#00A055] transition-all active:scale-95"
+                  className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-[#ff525d] text-white text-xs font-bold cursor-pointer hover:bg-[#ff3e4c] transition-all active:scale-95"
                 >
                   <ImageIcon className="w-4 h-4" />
                   <span>Gallery</span>
@@ -421,22 +421,22 @@ export default function SignupStep2() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-[#fff8f8]">
       {/* Header */}
-      <div className="bg-white px-4 py-3 flex items-center gap-4 border-b border-gray-200">
+      <div className="bg-white px-4 py-3 flex items-center gap-4 border-b border-[#ffd7db]">
         <button
           onClick={goBack}
-          className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+          className="p-2 hover:bg-[#fff1f2] rounded-full transition-colors"
         >
-          <ArrowLeft className="w-5 h-5" />
+          <ArrowLeft className="w-5 h-5 text-[#ff525d]" />
         </button>
-        <h1 className="text-lg font-medium">Upload Documents</h1>
+        <h1 className="text-lg font-black text-[#1f2430]">Upload Documents</h1>
       </div>
 
       {/* Content */}
       <div className="px-4 py-6">
         <div className="mb-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-2">Document Verification</h2>
+          <h2 className="text-xl font-black text-[#1f2430] mb-2">Document Verification</h2>
           <p className="text-sm text-gray-600">Please upload clear photos of your documents</p>
         </div>
 
@@ -452,7 +452,7 @@ export default function SignupStep2() {
             disabled={isSubmitting || !uploadedDocs.profilePhoto || !uploadedDocs.aadharPhoto || !uploadedDocs.panPhoto || !uploadedDocs.drivingLicensePhoto}
             className={`w-full py-4 rounded-lg font-bold text-white text-base transition-colors mt-6 ${isSubmitting || !uploadedDocs.profilePhoto || !uploadedDocs.aadharPhoto || !uploadedDocs.panPhoto || !uploadedDocs.drivingLicensePhoto
               ? "bg-gray-400 cursor-not-allowed"
-              : "bg-[#00B761] hover:bg-[#00A055]"
+              : "bg-[#ff525d] hover:bg-[#ff3e4c]"
               }`}
           >
             {isSubmitting ? "Submitting..." : "Complete Signup"}
