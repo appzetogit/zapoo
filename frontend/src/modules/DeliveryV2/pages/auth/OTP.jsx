@@ -31,6 +31,18 @@ export default function DeliveryOTP() {
 
   useEffect(() => {
     const stored = sessionStorage.getItem("deliveryAuthData")
+    const pendingRaw = sessionStorage.getItem("deliveryPendingState")
+    if (pendingRaw) {
+      try {
+        const pendingState = JSON.parse(pendingRaw)
+        if (pendingState?.pendingMessage) {
+          setPendingMessage(pendingState.pendingMessage)
+          setIsRejected(Boolean(pendingState.isRejected))
+          setRejectionReason(pendingState.rejectionReason || "")
+        }
+      } catch (e) {}
+      sessionStorage.removeItem("deliveryPendingState")
+    }
     if (stored) {
       setAuthData(JSON.parse(stored))
     } else {

@@ -269,8 +269,15 @@ export default function SignupStep2() {
         sessionStorage.removeItem("deliverySignupDocs")
         if (isCompleteProfile) {
           sessionStorage.removeItem("deliveryNeedsRegistration")
-          toast.success("Registration successful. Please login with OTP.")
-          setTimeout(() => navigate("/food/delivery/login", { replace: true }), 1500)
+          sessionStorage.setItem("deliveryAuthData", JSON.stringify({
+            phone: String(details.phone || "").replace(/\D/g, "").slice(0, 15),
+            purpose: "login"
+          }))
+          sessionStorage.setItem("deliveryPendingState", JSON.stringify({
+            pendingMessage: "Your profile is under review. We'll notify you once approved."
+          }))
+          toast.success("Profile submitted successfully")
+          setTimeout(() => navigate("/food/delivery/otp", { replace: true }), 900)
         } else {
           toast.success("Profile submitted. Waiting for admin approval.")
           setTimeout(() => navigate("/food/delivery", { replace: true }), 1500)
