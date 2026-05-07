@@ -296,7 +296,12 @@ export const ProfileDetailsV2 = () => {
   const handleDeletePhoto = async () => {
     try {
       setIsDeletingImage(true)
-      const response = await deliveryAPI.updateProfileDetails({ profilePhoto: "" })
+      const response = await deliveryAPI.updateProfile({
+        profileImage: {
+          url: "",
+          publicId: ""
+        }
+      })
       // Backend might return different structures; check for success
       if (response?.status === 200) {
         toast.success("Profile photo removed")
@@ -374,6 +379,7 @@ export const ProfileDetailsV2 = () => {
             accountNumber: (bankDetails.accountNumber || "").trim(),
             ifscCode: (bankDetails.ifscCode || "").trim().toUpperCase(),
             bankName: (bankDetails.bankName || "").trim(),
+            upiId: (bankDetails.upiId || "").trim(),
           },
           pan: {
             number: (bankDetails.panNumber || "").trim().toUpperCase(),

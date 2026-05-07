@@ -73,22 +73,14 @@ export default function DeliveryPricing() {
         setTier(data.tier || null);
         setDistanceSlabs(fetchedDistanceSlabs);
         setOrderValueSlabs(
-          fetchedOrderSlabs.length > 0
-            ? fetchedOrderSlabs.map((slab) => ({
-                _id: String(slab._id || createClientId()),
-                minOrderValue: String(slab.minOrderValue ?? 0),
-                maxOrderValue:
-                  slab.maxOrderValue === null || slab.maxOrderValue === undefined
-                    ? ""
-                    : String(slab.maxOrderValue),
-              }))
-            : [
-                {
-                  _id: createClientId(),
-                  minOrderValue: "0",
-                  maxOrderValue: "",
-                },
-              ]
+          fetchedOrderSlabs.map((slab) => ({
+            _id: String(slab._id || createClientId()),
+            minOrderValue: String(slab.minOrderValue ?? 0),
+            maxOrderValue:
+              slab.maxOrderValue === null || slab.maxOrderValue === undefined
+                ? ""
+                : String(slab.maxOrderValue),
+          }))
         );
 
         const nextRateMap = {};
@@ -149,11 +141,6 @@ export default function DeliveryPricing() {
   const handleSave = async () => {
     if (activeDistanceSlabs.length === 0) {
       toast.error("No active distance slabs found for your assigned tier");
-      return;
-    }
-
-    if (orderValueSlabs.length === 0) {
-      toast.error("Add at least one order value slab");
       return;
     }
 
@@ -271,8 +258,7 @@ export default function DeliveryPricing() {
                   <button
                     type="button"
                     onClick={() => removeOrderSlab(slab._id)}
-                    disabled={orderValueSlabs.length === 1}
-                    className="h-9 w-9 rounded-lg border border-red-200 text-red-600 flex items-center justify-center hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="h-9 w-9 rounded-lg border border-red-200 text-red-600 flex items-center justify-center hover:bg-red-50"
                     title={`Remove slab ${index + 1}`}
                   >
                     <Trash2 className="w-4 h-4" />
@@ -300,6 +286,11 @@ export default function DeliveryPricing() {
                 </div>
               </div>
             ))}
+            {orderValueSlabs.length === 0 && (
+              <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-4 text-sm text-gray-600">
+                No price slab added yet. Tap <span className="font-semibold">Add slab</span> to create one.
+              </div>
+            )}
           </div>
 
           <Button
@@ -342,7 +333,7 @@ export default function DeliveryPricing() {
                             <div className="mb-2">
                               <p className="text-xs font-semibold text-gray-900">{formatDistanceRange(distanceSlab)}</p>
                               <p className="text-[11px] text-gray-500 mt-1">
-                                Admin tier price: {formatCurrency(getAdminReferencePrice(distanceSlab, tier))}
+                                Admin tier price: {formatCurrency(getAdminReferencePrice(distanceSlab, tier))}/km
                               </p>
                             </div>
                             <div className="relative">
@@ -360,6 +351,11 @@ export default function DeliveryPricing() {
                     </div>
                   </div>
                 ))}
+                {orderValueSlabs.length === 0 && (
+                  <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-4 text-sm text-gray-600">
+                    No order value slab found. Add a slab to set per-km customer rates.
+                  </div>
+                )}
               </div>
 
               <div className="hidden md:block overflow-x-auto">
@@ -376,7 +372,7 @@ export default function DeliveryPricing() {
                       >
                         <div>{formatDistanceRange(distanceSlab)}</div>
                         <div className="text-[11px] font-normal text-gray-400 mt-1">
-                          Admin: {formatCurrency(getAdminReferencePrice(distanceSlab, tier))}
+                          Admin: {formatCurrency(getAdminReferencePrice(distanceSlab, tier))}/km
                         </div>
                       </th>
                     ))}
@@ -394,7 +390,7 @@ export default function DeliveryPricing() {
                         return (
                           <td key={cellKey} className="p-3 border-b border-gray-100 align-top">
                             <p className="text-[11px] text-gray-500 mb-2">
-                              Admin tier price: {formatCurrency(getAdminReferencePrice(distanceSlab, tier))}
+                              Admin tier price: {formatCurrency(getAdminReferencePrice(distanceSlab, tier))}/km
                             </p>
                             <div className="relative">
                               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">Rs</span>
@@ -410,6 +406,13 @@ export default function DeliveryPricing() {
                       })}
                     </tr>
                   ))}
+                  {orderValueSlabs.length === 0 && (
+                    <tr>
+                      <td colSpan={activeDistanceSlabs.length + 1} className="p-4 text-sm text-gray-600">
+                        No order value slab found. Add a slab to set per-km customer rates.
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
               </div>

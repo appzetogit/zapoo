@@ -79,7 +79,8 @@ const updateProfileSchema = Joi.object({
       accountHolderName: Joi.string().trim().min(2).max(100).pattern(BANK_NAME_REGEX).optional().allow(null, ''),
       accountNumber: Joi.string().trim().pattern(BANK_ACCOUNT_REGEX).optional().allow(null, ''),
       ifscCode: Joi.string().trim().uppercase().pattern(IFSC_REGEX).optional().allow(null, ''),
-      bankName: Joi.string().trim().min(2).max(100).pattern(BANK_NAME_REGEX).optional().allow(null, '')
+      bankName: Joi.string().trim().min(2).max(100).pattern(BANK_NAME_REGEX).optional().allow(null, ''),
+      upiId: Joi.string().trim().max(100).optional().allow(null, '')
     }).optional()
   }).optional()
 });

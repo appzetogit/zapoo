@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
-import { Loader2, RefreshCw } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import {
   isModuleAuthenticated,
   getDeliverySignupPendingStep,
@@ -18,7 +18,6 @@ export default function ProtectedRoute({ children, requiredRole, loginPath }) {
   const [subscriptionLoading, setSubscriptionLoading] = useState(requiredRole === "restaurant");
   const [hasActiveSubscription, setHasActiveSubscription] = useState(true);
   const [featureLock, setFeatureLock] = useState(null);
-  const [manualRefreshing, setManualRefreshing] = useState(false);
 
   const gatedRestaurantPaths = useMemo(
     () => [
@@ -172,37 +171,10 @@ export default function ProtectedRoute({ children, requiredRole, loginPath }) {
       return <FeatureLockedScreen requiredFeature={featureLock} />;
     }
 
-    const handleManualRefresh = () => {
-      if (manualRefreshing) return;
-      setManualRefreshing(true);
-      // Manual refresh only. This does not run automatically.
-      window.location.reload();
-    };
-
     return (
       <div className="theme-blue h-full w-full">
         {!shouldRenderNoPlanPopup && children}
         {shouldRenderNoPlanPopup && <NoPlanPopup />}
-        {!shouldRenderNoPlanPopup && (
-          <>
-            {manualRefreshing && (
-              <div className="fixed inset-0 z-[9998] bg-black/10 backdrop-blur-[1px] flex items-center justify-center pointer-events-none">
-                <div className="h-14 w-14 rounded-full bg-white shadow-lg border border-gray-200 flex items-center justify-center">
-                  <Loader2 className="h-7 w-7 animate-spin text-gray-500" />
-                </div>
-              </div>
-            )}
-            <button
-              type="button"
-              onClick={handleManualRefresh}
-              aria-label="Refresh page"
-              title="Refresh page"
-              className="fixed right-4 bottom-24 z-[9999] h-14 w-14 rounded-2xl bg-[#bdbdbd] text-white shadow-lg flex items-center justify-center active:scale-95 transition-transform"
-            >
-              <RefreshCw className="h-7 w-7" />
-            </button>
-          </>
-        )}
       </div>
     );
   }
