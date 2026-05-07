@@ -193,12 +193,14 @@ export default function DeliveryOTP() {
       }
     } catch (err) {
       console.error("[DeliveryV2][OTP] verify failed", {
-        phone,
-        purpose,
+        phone: authData?.phone,
+        purpose: authData?.purpose || "login",
         status: err?.response?.status,
         message: err?.response?.data?.message || err?.message
       })
       setError(err?.response?.data?.message || "Invalid OTP.")
+      setOtp(Array(OTP_LENGTH).fill(""))
+      setTimeout(() => inputRefs.current[0]?.focus(), 0)
       setIsLoading(false)
     }
   }
