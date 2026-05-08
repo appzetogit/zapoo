@@ -5,7 +5,7 @@ import { useProximityCheck } from '@/modules/DeliveryV2/hooks/useProximityCheck'
 import { useOrderManager } from '@/modules/DeliveryV2/hooks/useOrderManager';
 import { useDeliveryNotifications } from '@food/hooks/useDeliveryNotifications';
 import { writeOrderTracking } from '@food/realtimeTracking';
-import { deliveryAPI } from '@food/api';
+import { deliveryAPI, telephonyAPI } from '@food/api';
 import { toast } from 'sonner';
 
 // Components
@@ -26,7 +26,7 @@ import {
   Bell, HelpCircle, AlertTriangle, 
   Wallet, History, User as UserIcon, LayoutGrid,
   Plus, Minus, Navigation2, Target, Play, CheckCircle2, Clock, ChevronDown,
-  Contact, Package
+  Contact, Package, Phone, Loader2
 } from 'lucide-react';
 
 import { getHaversineDistance, calculateETA, calculateHeading } from '@/modules/DeliveryV2/utils/geo';
@@ -117,6 +117,7 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
   const [simIndex, setSimIndex] = useState(0);
   const [simProgress, setSimProgress] = useState(0); // 0 to 1 between points
   const [activePolyline, setActivePolyline] = useState(null);
+  const [isCallingCustomer, setIsCallingCustomer] = useState(false);
   const mapRef = useRef(null);
 
   const isLoggingOut = useRef(false);
@@ -501,6 +502,23 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
     }
   }, [activeOrder, incomingOrder]);
 
+  const handleCallCustomerMasked = useCallback(async () => {
+    const orderId = activeOrder?.orderId || activeOrder?._id;
+    if (!orderId || isCallingCustomer) return;
+    try {
+      setIsCallingCustomer(true);
+      await telephonyAPI.initiateMaskedCall({
+        orderId,
+        targetRole: "customer",
+      });
+      toast.success("Calling customer");
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Calling is currently unavailable. Please try again shortly.");
+    } finally {
+      setIsCallingCustomer(false);
+    }
+  }, [activeOrder, isCallingCustomer]);
+
   useEffect(() => {
     if (!isOnline) return;
     if (currentTab !== 'feed') return;
@@ -858,18 +876,31 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
                           />
                         </div>
 
-                        <div className="flex-1 overflow-y-auto no-scrollbar p-8 pt-4">
-                          <div className="flex justify-between w-full items-center mb-8">
-                            <div className="flex items-center gap-4">
-                              <div className="w-16 h-16 rounded-[1.5rem] overflow-hidden border-4 border-gray-50 shadow-xl ring-1 ring-gray-100">
+                        <div className="flex-1 overflow-y-auto no-scrollbar px-5 pt-3 pb-4 sm:p-8 sm:pt-4">
+                          <div className="w-full mb-5 sm:mb-8">
+                            <div className="flex items-start gap-3 sm:gap-4">
+                              <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl sm:rounded-[1.5rem] overflow-hidden border-4 border-gray-50 shadow-xl ring-1 ring-gray-100 shrink-0">
                                  <img 
                                    src={activeOrder?.user?.logo || activeOrder?.user?.profileImage || 'https://cdn-icons-png.flaticon.com/512/1275/1275302.png'} 
                                    className="w-full h-full object-cover" 
                                    alt="User"
                                  />
                               </div>
-                              <div>
-                                 <h3 className="text-gray-950 text-2xl font-black tracking-tight leading-none mb-2 underline decoration-emerald-500/30 decoration-4 underline-offset-4">Handover Drop</h3>
+                              <div className="min-w-0 flex-1">
+                                 <h3 className="text-gray-950 text-[1.65rem] sm:text-2xl font-black tracking-tight leading-none mb-2 underline decoration-emerald-500/30 decoration-4 underline-offset-4">Handover Drop</h3>
+                                 <div className="flex items-center justify-between gap-2 mb-2">
+                                   <p className="text-[15px] sm:text-sm font-extrabold text-gray-900 tracking-tight truncate">
+                                     {activeOrder?.user?.name || activeOrder?.userName || activeOrder?.customerName || 'Customer'}
+                                   </p>
+                                   <button
+                                     onClick={handleCallCustomerMasked}
+                                     disabled={isCallingCustomer || !(activeOrder?.orderId || activeOrder?._id)}
+                                     className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 border border-emerald-100 hover:bg-emerald-100 transition-colors active:scale-90 disabled:opacity-60 shrink-0"
+                                     title="Call Customer"
+                                   >
+                                     {isCallingCustomer ? <Loader2 className="w-4 h-4 animate-spin" /> : <Phone className="w-4 h-4" />}
+                                   </button>
+                                 </div>
                                  <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full border ${isWithinRange ? 'bg-emerald-50 border-emerald-100' : 'bg-orange-50 border-orange-100'}`}>
                                    <div className={`w-1.5 h-1.5 rounded-full ${isWithinRange ? 'bg-emerald-500 animate-pulse' : 'bg-orange-500'}`} />
                                    <span className={`text-[10px] font-black uppercase tracking-widest ${isWithinRange ? 'text-emerald-600' : 'text-orange-500'}`}>
@@ -899,8 +930,8 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
                           )}
                         </div>
 
-                        <div className="p-8 pt-0 pb-12 bg-white border-t border-gray-50">
-                          <div className="pt-6">
+                        <div className="px-5 pb-8 pt-2 sm:p-8 sm:pt-0 sm:pb-12 bg-white border-t border-gray-50">
+                          <div className="pt-4 sm:pt-6">
                             <ActionSlider 
                               label="Slide to Arrive" 
                               successLabel="Arrived ✓" 

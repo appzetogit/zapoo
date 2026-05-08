@@ -536,9 +536,20 @@ export const initiateBridgeCall = async (req, res) => {
     debugMaskingFlow("BRIDGE_ERROR", {
       message: error?.message || "Failed to initiate bridge call",
       name: error?.name || null,
+      code: error?.code || null,
       timestamp: new Date(),
     });
     console.error("Bridge call initiation failed:", error);
+
+    // Graceful business error: masking is not configured, so caller can retry later.
+    if (error?.code === "NO_VIRTUAL_NUMBER") {
+      return res.status(409).json({
+        success: false,
+        code: "MASKING_UNAVAILABLE",
+        message: "Calling is currently unavailable. Please try again shortly.",
+      });
+    }
+
     return res.status(500).json({
       success: false,
       message: error.message || "Failed to initiate bridge call",
@@ -935,6 +946,21 @@ export const getVirtualNumbers = async (req, res) => {
       data: virtualNumbers,
     });
   } catch (error) {
+    if (error?.code === "NO_VIRTUAL_NUMBER") {
+      return res.status(200).json({
+        success: false,
+        code: "MASKING_UNAVAILABLE",
+        message: "Calling is currently unavailable.",
+        data: {
+          restaurant_call: null,
+          customer_call: null,
+          delivery_partner_call: null,
+          customer_delivery_call: null,
+          city: process.env.EXOTEL_VIRTUAL_CITY || null,
+          all: [],
+        },
+      });
+    }
     console.error("Error getting virtual numbers:", error);
     return res.status(500).json({
       success: false,
