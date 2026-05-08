@@ -79,6 +79,7 @@ export const createTier = async (req, res) => {
       rank,
       recommendedItemFee,
       platformFee,
+      restaurantBannerPricePerDay,
       baseDistance,
       extraKmCharge,
       basePay,
@@ -138,7 +139,8 @@ export const createTier = async (req, res) => {
         distanceSlabs: normalizeDistanceSlabs(safeDistanceSlabs)
       },
       recommendedItemFee: feeSettings.recommendedItemFee,
-      platformFee: platformFee !== undefined ? Number(platformFee) : feeSettings.platformFee
+      platformFee: platformFee !== undefined ? Number(platformFee) : feeSettings.platformFee,
+      restaurantBannerPricePerDay: restaurantBannerPricePerDay !== undefined ? Number(restaurantBannerPricePerDay) : 500
     });
 
     // Sync delivery commission rules for this tier based on its distance slabs
@@ -210,6 +212,7 @@ export const updateTier = async (req, res) => {
       maxBanners,
       recommendedItemFee,
       platformFee,
+      restaurantBannerPricePerDay,
       baseDistance,
       extraKmCharge,
       basePay,
@@ -309,6 +312,9 @@ export const updateTier = async (req, res) => {
     }
     if (platformFee !== undefined) {
       tier.platformFee = Number(platformFee);
+    }
+    if (restaurantBannerPricePerDay !== undefined) {
+      tier.restaurantBannerPricePerDay = Number(restaurantBannerPricePerDay);
     }
 
     const feeSettingsChanged =

@@ -60,6 +60,11 @@ export default function TierManagement() {
   };
 
   const onSubmit = async (data) => {
+    const hasBannerPriceInput =
+      data.restaurantBannerPricePerDay !== undefined &&
+      data.restaurantBannerPricePerDay !== null &&
+      String(data.restaurantBannerPricePerDay).trim() !== "";
+
     try {
       const formattedData = {
         ...data,
@@ -67,6 +72,7 @@ export default function TierManagement() {
         maxArea: parseFloat(data.maxArea),
         rank: parseInt(data.rank),
         basePay: parseFloat(data.basePay || 0),
+        restaurantBannerPricePerDay: hasBannerPriceInput ? parseFloat(data.restaurantBannerPricePerDay) : 500,
       };
 
       if (editingTier) {
@@ -95,6 +101,7 @@ export default function TierManagement() {
     setValue("description", tier.description);
     setValue("rank", tier.rank);
     setValue("basePay", tier.deliveryPricing?.basePay || 0);
+    setValue("restaurantBannerPricePerDay", tier.restaurantBannerPricePerDay ?? 500);
     setIsDialogOpen(true);
   };
 
@@ -116,6 +123,7 @@ export default function TierManagement() {
     reset({
       rank: tiers.length + 1,
       basePay: 0,
+      restaurantBannerPricePerDay: 500,
       isActive: true,
     });
     setIsDialogOpen(true);
@@ -162,6 +170,7 @@ export default function TierManagement() {
                   <TableHead>Area Range</TableHead>
                   <TableHead>Delivery Pricing</TableHead>
                   <TableHead>Platform Fee</TableHead>
+                  <TableHead>Banner Price/Day</TableHead>
                   <TableHead>Description</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -169,7 +178,7 @@ export default function TierManagement() {
               <TableBody>
                 {tiers.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-10 text-neutral-500">
+                    <TableCell colSpan={8} className="text-center py-10 text-neutral-500">
                       No tiers configured yet.
                     </TableCell>
                   </TableRow>
@@ -200,6 +209,9 @@ export default function TierManagement() {
                       </TableCell>
                       <TableCell>
                         <span className="font-medium text-neutral-900 text-sm">Rs {tier.platformFee || 0}</span>
+                      </TableCell>
+                      <TableCell>
+                        <span className="font-medium text-neutral-900 text-sm">Rs {tier.restaurantBannerPricePerDay ?? 500}</span>
                       </TableCell>
                       <TableCell className="text-neutral-500 max-w-[200px] truncate">{tier.description}</TableCell>
 
@@ -285,6 +297,18 @@ export default function TierManagement() {
                       className="h-9 bg-white border-neutral-200 focus:border-orange-500"
                       onWheel={(e) => e.target.blur()}
                       {...register("basePay", { required: "Required", min: 0 })}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="restaurantBannerPricePerDay" className="text-xs text-neutral-700 font-medium">Restaurant Banner Price Per Day (Rs)</Label>
+                    <Input
+                      id="restaurantBannerPricePerDay"
+                      type="number"
+                      min="0"
+                      placeholder="500"
+                      className="h-9 bg-white border-neutral-200 focus:border-orange-500"
+                      onWheel={(e) => e.target.blur()}
+                      {...register("restaurantBannerPricePerDay", { required: "Required", min: 0 })}
                     />
                   </div>
                 </div>

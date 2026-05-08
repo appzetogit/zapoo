@@ -117,6 +117,12 @@ const tierSchema = new mongoose.Schema(
             min: 0,
             comment: 'Default platform fee for orders in this tier'
         },
+        restaurantBannerPricePerDay: {
+            type: Number,
+            default: 500,
+            min: 0,
+            comment: 'Per-day banner promotion price for restaurants in this tier'
+        },
     },
     {
         timestamps: true,

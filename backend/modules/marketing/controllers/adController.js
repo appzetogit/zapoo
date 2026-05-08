@@ -4,7 +4,6 @@ import ChallengeBanner from '../models/ChallengeBanner.js';
 import { createOrder, verifyPayment } from '../../payment/services/razorpayService.js';
 import express from 'express';
 import Zone from '../../admin/models/Zone.js';
-import Tier from '../../admin/models/Tier.js';
 import Restaurant from '../../restaurant/models/Restaurant.js';
 import BusinessSettings from '../../admin/models/BusinessSettings.js';
 import { calculateDistance } from '../../order/services/orderCalculationService.js';
@@ -17,17 +16,7 @@ import {
 } from '../services/freeBannerCreditService.js';
 import { notifyAdminsAdPaymentCompleted } from '../services/adAdminNotificationService.js';
 
-// Pricing configuration based on Tier Rank
-const AD_PRICING = {
-  1: 300,
-  // Tier 1
-  2: 500,
-  // Tier 2
-  3: 800,
-  // Tier 3
-  4: 1200 // Tier 4
-};
-const DEFAULT_PRICING = 500;
+const DEFAULT_BANNER_PRICE_PER_DAY = 500;
 
 // NOTE: Slot-based capacity (max banners per tier/zone) has been removed.
 // Ads are no longer limited by per-day slot counts; only dates and status
@@ -164,6 +153,14 @@ const getCurrentDayBounds = () => {
   return getISTDayBoundsFromDate(new Date());
 };
 
+const resolveTierBannerPricePerDay = (tierDoc) => {
+  const price = Number(tierDoc?.restaurantBannerPricePerDay);
+  if (Number.isFinite(price) && price >= 0) {
+    return price;
+  }
+  return DEFAULT_BANNER_PRICE_PER_DAY;
+};
+
 const calculateCampaignPricing = async ({ targetZoneIds, days }) => {
   let totalCost = 0;
 
@@ -181,8 +178,7 @@ const calculateCampaignPricing = async ({ targetZoneIds, days }) => {
       throw notFound;
     }
 
-    const tierRank = zone?.tierId?.rank || 2;
-    const pricePerDay = AD_PRICING[tierRank] || DEFAULT_PRICING;
+    const pricePerDay = resolveTierBannerPricePerDay(zone?.tierId);
     totalCost += pricePerDay * days;
   }
 
@@ -1163,19 +1159,18 @@ export const getMyZone = async (req, res) => {
     }
     // ─────────────────────────────────────────────────────────────────────
 
-    const zone = await Zone.findById(zoneId).populate('tierId', 'name rank');
+    const zone = await Zone.findById(zoneId).populate('tierId', 'name rank restaurantBannerPricePerDay');
     if (!zone || !zone.isActive) {
       return res.status(404).json({
         success: false,
         message: 'Your zone is not currently available for advertising.'
       });
     }
-    const tierRank = zone.tierId?.rank || 2;
     const zoneData = {
       _id: zone._id,
       name: zone.name || zone.zoneName,
       tier: zone.tierId?.name || 'Standard',
-      pricePerDay: AD_PRICING[tierRank] || DEFAULT_PRICING
+      pricePerDay: resolveTierBannerPricePerDay(zone.tierId)
     };
     res.status(200).json({
       success: true,
