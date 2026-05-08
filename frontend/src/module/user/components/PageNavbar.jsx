@@ -594,31 +594,32 @@ export default function PageNavbar({
   };
   const isDarkTheme = theme === "dark";
   const textColorClass = isDarkTheme || textColor === "white" ? "text-white" : "text-black";
-  const iconFill = isDarkTheme || textColor === "white" ? "white" : "black";
-  const ringColor = isDarkTheme ? "ring-white/20" : (textColor === "white" ? "ring-white/30" : "ring-gray-800/30");
+  const ringColor = isDarkTheme ? "ring-white/15" : "ring-[#d8cfbf]";
   const zIndexClass = zIndex === 50 ? "z-50" : "z-20";
-  const navBgClass = isDarkTheme ? "bg-[#1a1a1a]/90 backdrop-blur-md border-b border-gray-800/80 shadow-sm" : (textColor === "white" ? "bg-white/10 backdrop-blur-md border-b border-white/20" : "bg-white/90 backdrop-blur-md border-b border-black/5 shadow-sm");
-  return <nav className={`md:hidden relative ${zIndexClass} w-full px-2 sm:px-3 md:px-4 lg:px-6 xl:px-8 py-2 sm:py-3 ${navBgClass}`} onClick={onNavClick}>
+  const navBgClass = isDarkTheme
+    ? "bg-gradient-to-b from-[#141414] to-[#0f0f0f] border-b border-[#242424]"
+    : "bg-gradient-to-b from-[#fffaf2] via-white to-white border-b border-[#efe5d6]";
+  return <nav className={`md:hidden relative ${zIndexClass} w-full px-2 sm:px-3 md:px-4 lg:px-6 xl:px-8 py-2 sm:py-3 backdrop-blur-md ${navBgClass}`} onClick={onNavClick}>
       <div className="flex items-center justify-between gap-2 sm:gap-3 md:gap-4 lg:gap-6 max-w-7xl mx-auto">
         {/* Left: Location - Hidden on desktop, shown on mobile */}
         <div className="flex md:hidden items-center gap-2 sm:gap-3 min-w-0 flex-1">
           {/* Location Button */}
-          <Button variant="ghost" onClick={handleLocationClick} disabled={loading} className={`h-auto px-2 py-1 rounded-lg transition-colors flex-shrink-0 max-w-full ${textColor === "white" ? "hover:bg-white/10" : "hover:bg-black/5"}`}>
+          <Button variant="ghost" onClick={handleLocationClick} disabled={loading} className={`h-auto w-full px-2.5 py-1.5 rounded-xl transition-colors flex-shrink-0 max-w-full border justify-start text-left ${isDarkTheme ? "border-[#2c2c2c] bg-[#1b1b1b]/90 hover:bg-[#242424]" : "border-[#e6dccb] bg-white/95 hover:bg-[#faf5ec]"}`}>
             {loading ? <span className={`text-sm font-bold ${textColorClass} ${textColor === "white" ? "drop-shadow-lg" : ""}`}>
                 Loading...
               </span> : <div className="flex items-start gap-2 min-w-0">
-                <div className={`mt-0.5 h-7 w-7 rounded-full flex items-center justify-center ${textColor === "white" ? "bg-white/15 ring-1 ring-white/30" : "bg-black/5 ring-1 ring-black/10"}`}>
-                  <FaLocationDot className={`h-3.5 w-3.5 ${textColorClass}`} />
+                <div className={`mt-0.5 h-7 w-7 rounded-full flex items-center justify-center ring-1 ${isDarkTheme ? "bg-[#2a2a2a] ring-[#3a3a3a]" : "bg-[#f5efe4] ring-[#e2d8c8]"}`}>
+                  <FaLocationDot className={`h-3.5 w-3.5 ${isDarkTheme ? "text-white" : "text-[#2f2a22]"}`} />
                 </div>
                 <div className="flex flex-col items-start min-w-0 max-w-[52vw] sm:max-w-[56vw] overflow-hidden">
                   <div className="flex items-center gap-1.5 min-w-0 max-w-full overflow-hidden">
-                    <span title={mainLocationName} className={`text-[15px] sm:text-base font-bold ${textColorClass} truncate max-w-full ${textColor === "white" ? "drop-shadow-lg" : ""}`}>
+                    <span title={mainLocationName} className={`text-[15px] sm:text-base font-extrabold ${isDarkTheme ? "text-white" : "text-[#1f1b16]"} truncate max-w-full`}>
                     {mainLocationName}
                   </span>
-                    <ChevronDown className={`h-4 w-4 sm:h-5 sm:w-5 ${textColorClass} flex-shrink-0 ${textColor === "white" ? "drop-shadow-lg" : ""}`} strokeWidth={2.5} />
+                    <ChevronDown className={`h-4 w-4 sm:h-5 sm:w-5 ${isDarkTheme ? "text-white/90" : "text-[#3f372d]"} flex-shrink-0`} strokeWidth={2.5} />
                   </div>
                   {/* Show sub location (city, state) in second line */}
-                  {subLocationName && <span title={subLocationName} className={`text-[11px] sm:text-xs font-semibold ${textColorClass}${textColor === "white" ? "/90" : ""} truncate max-w-full mt-0.5 ${textColor === "white" ? "drop-shadow-md" : ""}`}>
+                  {subLocationName && <span title={subLocationName} className={`text-[11px] sm:text-xs font-semibold ${isDarkTheme ? "text-white/70" : "text-[#6f6558]"} truncate max-w-full mt-0.5`}>
                       {subLocationName}
                     </span>}
                 </div>
@@ -631,30 +632,30 @@ export default function PageNavbar({
           {/* Theme Toggle */}
           {/* Wallet Icon */}
           <Link to="/user/wallet">
-            <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-9 sm:w-9 rounded-full p-0 hover:opacity-80 transition-opacity" title="Wallet">
-              <div className={`h-full w-full rounded-full ${isDarkTheme ? "bg-white/10" : "bg-white/20"} flex items-center justify-center ring-2 ${ringColor}`}>
-                <Wallet className={`h-4 w-4 sm:h-5 sm:w-5 ${isDarkTheme ? "text-white/90" : "text-gray-800"}`} strokeWidth={2} />
+            <Button variant="ghost" size="icon" className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl p-0 transition-all hover:scale-105" title="Wallet">
+              <div className={`h-full w-full rounded-xl ${isDarkTheme ? "bg-[#1f1f1f]" : "bg-white"} flex items-center justify-center ring-1 ${ringColor} shadow-sm`}>
+                <Wallet className={`h-4 w-4 sm:h-5 sm:w-5 ${isDarkTheme ? "text-white/90" : "text-[#3b332a]"}`} strokeWidth={2} />
               </div>
             </Button>
           </Link>
 
           {/* Cart Icon */}
           <Link to="/user/cart">
-            <Button variant="ghost" size="icon" className="relative h-8 w-8 sm:h-9 sm:w-9 rounded-full p-0 hover:opacity-80 transition-opacity" title="Cart">
-              <div className={`h-full w-full rounded-full ${isDarkTheme ? "bg-white/10" : "bg-white/20"} flex items-center justify-center ring-2 ${ringColor}`}>
-                <ShoppingCart className={`h-4 w-4 sm:h-5 sm:w-5 ${isDarkTheme ? "text-white/90" : "text-gray-800"}`} strokeWidth={2} />
+            <Button variant="ghost" size="icon" className="relative h-9 w-9 sm:h-10 sm:w-10 rounded-xl p-0 transition-all hover:scale-105" title="Cart">
+              <div className={`h-full w-full rounded-xl ${isDarkTheme ? "bg-[#1f1f1f]" : "bg-white"} flex items-center justify-center ring-1 ${ringColor} shadow-sm`}>
+                <ShoppingCart className={`h-4 w-4 sm:h-5 sm:w-5 ${isDarkTheme ? "text-white/90" : "text-[#3b332a]"}`} strokeWidth={2} />
               </div>
-              {cartCount > 0 && <span className={`absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center ring-2 ${textColor === "white" ? "ring-white/50" : "ring-gray-800/30"}`}>
-                  <span className="text-[9px] font-bold text-white">{cartCount > 99 ? "99+" : cartCount}</span>
+              {cartCount > 0 && <span className={`absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-[#ff4d4f] rounded-full flex items-center justify-center ring-2 ${isDarkTheme ? "ring-[#101010]" : "ring-white"}`}>
+                  <span className="text-[9px] font-extrabold text-white leading-none">{cartCount > 99 ? "99+" : cartCount}</span>
                 </span>}
             </Button>
           </Link>
 
           {/* Profile - Only shown if showProfile is true */}
           {showProfile && <Link to="/user/profile">
-              <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-9 sm:w-9 rounded-full p-0 hover:opacity-80 transition-opacity" title="Profile">
-                <div className={`h-full w-full rounded-full bg-white flex items-center justify-center shadow-lg ring-2 ${ringColor}`}>
-                  <span className="text-black text-xs sm:text-sm font-extrabold">
+              <Button variant="ghost" size="icon" className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl p-0 transition-all hover:scale-105" title="Profile">
+                <div className={`h-full w-full rounded-xl ${isDarkTheme ? "bg-[#1f1f1f]" : "bg-white"} flex items-center justify-center shadow-sm ring-1 ${ringColor}`}>
+                  <span className={`text-xs sm:text-sm font-extrabold ${isDarkTheme ? "text-white" : "text-[#3b332a]"}`}>
                     A
                   </span>
                 </div>

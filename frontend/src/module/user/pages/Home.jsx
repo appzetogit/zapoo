@@ -274,6 +274,38 @@ export default function Home() {
   const touchEndY = useRef(0);
   const isSwiping = useRef(false);
   const autoSlideIntervalRef = useRef(null);
+  const navbarStickyRef = useRef(null);
+  const searchStickyRef = useRef(null);
+  const [stickyOffsets, setStickyOffsets] = useState({
+    searchTop: 0,
+    categoriesTop: 0
+  });
+
+  useEffect(() => {
+    const updateStickyOffsets = () => {
+      // Sticky stacking is mobile-only; keep desktop untouched.
+      if (typeof window === "undefined" || window.innerWidth >= 768) {
+        setStickyOffsets({
+          searchTop: 0,
+          categoriesTop: 0
+        });
+        return;
+      }
+
+      const navHeight = navbarStickyRef.current?.offsetHeight || 0;
+      const searchHeight = searchStickyRef.current?.offsetHeight || 0;
+      setStickyOffsets({
+        searchTop: navHeight,
+        categoriesTop: navHeight + searchHeight
+      });
+    };
+
+    updateStickyOffsets();
+    window.addEventListener("resize", updateStickyOffsets);
+    return () => {
+      window.removeEventListener("resize", updateStickyOffsets);
+    };
+  }, []);
 
   // Sync prevVegMode when vegMode changes from context
   useEffect(() => {
@@ -1421,8 +1453,8 @@ export default function Home() {
         `}</style>
       </div>
 
-      {/* 1. Sticky Navbar Section - Light Orange Background - Mobile only */}
-      <motion.div className="md:hidden sticky top-0 z-50 bg-white dark:bg-[#0a0a0a]" initial={{
+      {/* 1. Sticky Navbar Section - Mobile only */}
+      <motion.div ref={navbarStickyRef} className="md:hidden sticky top-0 z-50 bg-gradient-to-b from-[#fffaf2] to-white/95 dark:from-[#101010] dark:to-[#0a0a0a]/95 backdrop-blur-md border-b border-[#f2e9dc] dark:border-[#1f1f1f]" initial={{
       y: -100
     }} animate={{
       y: 0
@@ -1433,20 +1465,23 @@ export default function Home() {
         <PageNavbar textColor="black" zIndex={50} />
       </motion.div>
 
-      {/* 2. Search & Veg Mode Bar - Non-sticky on white background */}
-      <div className="relative z-40 bg-white dark:bg-[#0a0a0a] py-2 sm:py-3 px-3 sm:px-6 lg:px-8 border-b border-gray-50 dark:border-gray-800 shadow-sm">
-        <div className="max-w-7xl mx-auto flex items-center gap-3 sm:gap-4 lg:gap-6">
-          {/* Enhanced Search Input */}
-          <motion.div className="flex-1 relative" whileHover={{
+      {/* 2. Search & Veg Mode Bar */}
+      <div ref={searchStickyRef} className="relative md:static sticky z-40 -mt-px bg-gradient-to-b from-[#fffaf2] via-white to-white dark:from-[#101010] dark:via-[#0d0d0d] dark:to-[#0a0a0a] py-3 sm:py-4 px-3 sm:px-6 lg:px-8 border-b border-[#f5ecde] dark:border-[#1f1f1f]" style={{
+      top: Math.max(stickyOffsets.searchTop - 1, 0)
+    }}>
+        <div className="max-w-7xl mx-auto">
+          <div className="flex items-center gap-2 sm:gap-3 lg:gap-4 rounded-2xl border border-[#eadfce] dark:border-[#252525] bg-white/90 dark:bg-[#151515]/90 backdrop-blur px-2.5 sm:px-3 py-2 shadow-[0_10px_30px_rgba(0,0,0,0.04)] dark:shadow-[0_12px_24px_rgba(0,0,0,0.3)]">
+            {/* Enhanced Search Input */}
+            <motion.div className="flex-1 relative" whileHover={{
           scale: 1.01
         }} transition={{
           type: "spring",
           stiffness: 300,
           damping: 20
         }}>
-            <div className="relative bg-gray-50 dark:bg-neutral-900 rounded-full border border-gray-200 dark:border-neutral-800 p-0.5 lg:p-1 transition-all">
+              <div className="relative bg-[#f9f5ee] dark:bg-[#1b1b1b] rounded-xl border border-[#e9dfd0] dark:border-[#2b2b2b] p-0.5 transition-all">
               <div className="flex items-center gap-2 sm:gap-3">
-                <Search className="h-4 w-4 lg:h-5 lg:w-5 text-gray-400 flex-shrink-0 ml-3 sm:ml-4" strokeWidth={2.5} />
+                  <Search className="h-4 w-4 lg:h-5 lg:w-5 text-[#9a8f80] dark:text-gray-400 flex-shrink-0 ml-3 sm:ml-4" strokeWidth={2.5} />
                 <div className="flex-1 relative">
                   <Input value={heroSearch} onChange={e => setHeroSearch(e.target.value)} onFocus={handleSearchFocus} onKeyDown={e => {
                   if (e.key === 'Enter' && heroSearch.trim()) {
@@ -1454,7 +1489,7 @@ export default function Home() {
                     closeSearch();
                     setHeroSearch("");
                   }
-                }} placeholder="" className="pl-0 pr-2 h-9 sm:h-10 lg:h-11 w-full bg-transparent border-0 text-sm sm:text-base lg:text-lg font-medium text-gray-700 dark:text-white focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none" />
+                }} placeholder="" className="pl-0 pr-2 h-9 sm:h-10 lg:h-11 w-full bg-transparent border-0 text-sm sm:text-base lg:text-lg font-semibold text-gray-800 dark:text-white focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none" />
                   {!heroSearch && <div className="absolute left-0 top-1/2 -translate-y-1/2 pointer-events-none h-5 overflow-hidden">
                       <AnimatePresence mode="wait">
                         <motion.span key={placeholderIndex} initial={{
@@ -1468,28 +1503,29 @@ export default function Home() {
                       opacity: 0
                     }} transition={{
                       duration: 0.3
-                    }} className="text-sm sm:text-base lg:text-lg font-medium text-gray-400 inline-block">
+                    }} className="text-sm sm:text-base lg:text-lg font-medium text-[#9f9588] dark:text-gray-400 inline-block">
                           {placeholders[placeholderIndex]}
                         </motion.span>
                       </AnimatePresence>
                     </div>}
                 </div>
-                {heroSearch ? <button type="button" onClick={() => setHeroSearch("")} className="mr-1 p-1.5 hover:bg-gray-200 dark:hover:bg-neutral-800 rounded-full transition-colors">
-                    <X className="h-4 w-4 lg:h-5 lg:w-5 text-gray-400" strokeWidth={2.5} />
-                  </button> : <button type="button" onClick={handleVoiceSearch} className="mr-1 p-1.5 hover:bg-gray-200 dark:hover:bg-neutral-800 rounded-full transition-colors">
-                    <Mic className="h-4 w-4 lg:h-5 lg:w-5 text-gray-400" strokeWidth={2.5} />
-                  </button>}
+                  {heroSearch ? <button type="button" onClick={() => setHeroSearch("")} className="mr-1 p-1.5 hover:bg-[#ede3d4] dark:hover:bg-neutral-800 rounded-full transition-colors">
+                      <X className="h-4 w-4 lg:h-5 lg:w-5 text-[#988d7f] dark:text-gray-400" strokeWidth={2.5} />
+                    </button> : <button type="button" onClick={handleVoiceSearch} className="mr-1 p-1.5 hover:bg-[#ede3d4] dark:hover:bg-neutral-800 rounded-full transition-colors">
+                      <Mic className="h-4 w-4 lg:h-5 lg:w-5 text-[#988d7f] dark:text-gray-400" strokeWidth={2.5} />
+                    </button>}
+                </div>
               </div>
-            </div>
-          </motion.div>
+            </motion.div>
 
-          {/* VEG MODE Switch */}
-          <div ref={vegModeToggleRef} className="flex items-center gap-2 lg:gap-3 flex-shrink-0">
-            <div className="flex flex-col items-end leading-none">
-              <span className="text-emerald-600 text-[10px] lg:text-xs font-black">VEG</span>
-              <span className="text-emerald-600 text-[8px] lg:text-[10px] font-bold">{t("user.home.vegMode")}</span>
+            {/* VEG MODE Switch */}
+            <div ref={vegModeToggleRef} className="flex items-center gap-2 flex-shrink-0 rounded-xl border border-[#dbe8dd] dark:border-[#24412a] bg-[#f2faf3] dark:bg-[#122116] px-2 py-1.5">
+              <div className="flex flex-col items-end leading-none">
+                <span className="text-emerald-700 dark:text-emerald-400 text-[10px] tracking-wide font-black">VEG</span>
+                <span className="text-emerald-700 dark:text-emerald-400 text-[8px] lg:text-[10px] font-bold">{t("user.home.vegMode")}</span>
+              </div>
+              <Switch checked={vegMode} onCheckedChange={handleVegModeChange} className="data-[state=checked]:bg-emerald-500 data-[state=unchecked]:bg-gray-300 dark:data-[state=unchecked]:bg-gray-600 w-8 h-4 lg:w-10 lg:h-5" />
             </div>
-            <Switch checked={vegMode} onCheckedChange={handleVegModeChange} className="data-[state=checked]:bg-emerald-500 data-[state=unchecked]:bg-gray-200 w-8 h-4 lg:w-10 lg:h-5" />
           </div>
         </div>
       </div>
