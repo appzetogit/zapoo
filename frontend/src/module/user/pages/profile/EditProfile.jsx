@@ -14,6 +14,7 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import dayjs from 'dayjs';
+import { openCamera, openGallery } from "@/module/delivery/utils/imageUploadUtils";
 
 // Gender options
 const genderOptions = [{
@@ -163,9 +164,7 @@ export default function EditProfile() {
     }));
     clearFieldError(field);
   };
-  const handleImageSelect = async e => {
-    const input = e.target;
-    const file = e.target.files?.[0];
+  const handleImageFile = async file => {
     if (!file) return;
 
     // Validate file type
@@ -218,10 +217,36 @@ export default function EditProfile() {
       setImagePreview(profileImage);
     } finally {
       setIsUploadingImage(false);
+    }
+  };
+  const handleImageSelect = async e => {
+    const input = e.target;
+    const file = e.target.files?.[0];
+    try {
+      await handleImageFile(file);
+    } finally {
       if (input) {
         input.value = "";
       }
     }
+  };
+  const handleTakePhoto = async () => {
+    if (isUploadingImage) return;
+    await openCamera({
+      onSelectFile: file => {
+        handleImageFile(file);
+      },
+      fileNamePrefix: "user-profile-camera"
+    });
+  };
+  const handlePickFromGallery = async () => {
+    if (isUploadingImage) return;
+    await openGallery({
+      onSelectFile: file => {
+        handleImageFile(file);
+      },
+      fileNamePrefix: "user-profile-gallery"
+    });
   };
   const handleRemoveImage = async () => {
     if (!profileImage && !imagePreview) return;
@@ -431,11 +456,11 @@ export default function EditProfile() {
         </div>
 
         <div className="flex flex-wrap justify-center gap-2">
-          <Button type="button" variant="outline" onClick={() => cameraInputRef.current?.click()} disabled={isUploadingImage} className="gap-2">
+          <Button type="button" variant="outline" onClick={handleTakePhoto} disabled={isUploadingImage} className="gap-2">
             {isUploadingImage ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
             Take photo
           </Button>
-          <Button type="button" variant="outline" onClick={() => galleryInputRef.current?.click()} disabled={isUploadingImage} className="gap-2">
+          <Button type="button" variant="outline" onClick={handlePickFromGallery} disabled={isUploadingImage} className="gap-2">
             {isUploadingImage ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageUp className="h-4 w-4" />}
             Choose from gallery
           </Button>
