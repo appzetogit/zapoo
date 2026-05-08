@@ -483,6 +483,9 @@ export default function Under250() {
 
   // Check if should show grayscale (only when user is out of service)
   const shouldShowGrayscale = isOutOfService
+  const bannerImageUrl = typeof bannerImage === "string"
+    ? bannerImage
+    : bannerImage?.imageUrl || bannerImage?.url || bannerImage?.image || ""
 
   return (
     <div className={`relative min-h-screen bg-white dark:bg-[#0a0a0a] ${shouldShowGrayscale ? 'grayscale opacity-75' : ''}`}>
@@ -497,53 +500,36 @@ export default function Under250() {
       </motion.div>
 
       {/* Banner Section */}
-      <div className="relative w-full overflow-hidden min-h-[39vh] lg:min-h-[50vh] md:pt-16">
-        <div className="relative z-10 w-full pt-3 sm:pt-4">
+      <div className="relative w-full overflow-hidden">
+        <div className="relative z-10 w-full pt-0">
           <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
             {loadingBanner ? (
               <div className="w-full rounded-2xl bg-gray-100 dark:bg-gray-900 flex items-center justify-center" style={{ minHeight: '220px' }}>
                 <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
               </div>
             ) : (
-              <div className="relative w-full rounded-2xl overflow-hidden shadow-md border border-gray-100 dark:border-gray-800 bg-white dark:bg-[#1a1a1a]" style={{ minHeight: '220px' }}>
-                {/* Top: Text */}
-                <div className="px-5 pt-5 pb-3 bg-white dark:bg-[#1a1a1a] relative z-10 min-h-[110px]">
-                  <h2 className="text-2xl font-extrabold text-gray-900 dark:text-white leading-tight mb-1">
-                    {t("user.under250.bannerTitle")}
-                  </h2>
-                </div>
-
-                {/* CTA Badge */}
-                <div
-                  className="absolute left-5 z-20"
-                  style={{ top: '105px' }}
-                >
-                  <div
-                    className="flex flex-col items-center justify-center bg-orange-500 text-white font-bold text-[10px] leading-tight rounded-full shadow-lg px-3 py-3 text-center uppercase pointer-events-none"
-                    style={{ width: '72px', height: '72px' }}
-                  >
-                    {t("user.home.orderNow")}
-                  </div>
-                </div>
-
-                {/* Bottom: Image with curved top */}
-                <div className="relative w-full overflow-hidden bg-white dark:bg-[#1a1a1a]" style={{ aspectRatio: '16/7', marginTop: '-2px' }}>
-                  {bannerImage ? (
+              <div className="relative w-full rounded-2xl overflow-hidden shadow-md border border-gray-100 dark:border-gray-800 bg-white dark:bg-[#1a1a1a]" style={{ height: '230px' }}>
+                {/* Full image area */}
+                <div className="relative w-full h-full overflow-hidden bg-white dark:bg-[#1a1a1a]">
+                  {bannerImageUrl ? (
                     <img
-                      src={bannerImage}
+                      src={bannerImageUrl}
                       alt={t("user.under250.bannerAlt")}
-                      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center', display: 'block' }}
                       loading="eager"
                     />
                   ) : (
                     <div className="w-full h-full bg-gradient-to-br from-green-100 to-blue-100 dark:from-green-900 dark:to-blue-900" />
                   )}
 
-                  {/* Curved white overlay at top */}
-                  <div
-                    className="absolute inset-x-0 top-0 z-10 bg-white dark:bg-[#1a1a1a] pointer-events-none"
-                    style={{ height: '36px', borderRadius: '0 0 50% 50% / 0 0 100% 100%' }}
-                  />
+                  {/* Banner title overlay */}
+                  <div className="absolute inset-x-0 top-0 z-10 p-4">
+                    <div className="inline-block max-w-[90%] rounded-xl bg-black/40 backdrop-blur-sm px-3 py-2">
+                      <h2 className="text-xl font-extrabold text-white leading-tight">
+                        {t("user.under250.bannerTitle")}
+                      </h2>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
@@ -553,11 +539,11 @@ export default function Under250() {
       </div>
 
       {/* Content Section */}
-      <div className="relative max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 xl:px-12 space-y-0 pt-2 sm:pt-3 md:pt-4 lg:pt-6 pb-28 md:pb-16 lg:pb-20">
+      <div className="relative max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 xl:px-12 space-y-0 pt-5 pb-28 md:pb-16 lg:pb-20">
 
         <section className="space-y-1 sm:space-y-1.5">
           <div
-            className="flex gap-3 sm:gap-4 md:gap-5 lg:gap-6 overflow-x-auto md:overflow-x-visible overflow-y-visible scrollbar-hide scroll-smooth px-2 sm:px-3 py-2 sm:py-3 md:py-4"
+            className="flex gap-3 sm:gap-4 md:gap-5 lg:gap-6 overflow-x-auto md:overflow-x-visible overflow-y-visible scrollbar-hide scroll-smooth px-2 sm:px-3 pt-0 pb-2 sm:pb-3 md:pb-4"
             style={{
               scrollbarWidth: "none",
               msOverflowStyle: "none",
