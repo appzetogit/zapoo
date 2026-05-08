@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Plus, Minus, ArrowLeft, ChevronRight, Clock, MapPin, Phone, FileText, Utensils, Percent, Share2, ChevronUp, ChevronDown, X, Check, Settings, CreditCard, Wallet, Building2, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -321,18 +321,32 @@ export default function Cart() {
     return null;
   }, [restaurantData]);
 
+  const effectiveVegMode = useMemo(() => {
+    if (vegMode === true) return true;
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("userVegMode") === "true";
+  }, [vegMode]);
+
+  const isVegAddon = useCallback((addon) => {
+    const normalizedFoodType = String(addon?.foodType || "").trim().toLowerCase();
+    if (normalizedFoodType) {
+      if (
+        normalizedFoodType.includes("non") ||
+        normalizedFoodType.includes("egg")
+      ) {
+        return false;
+      }
+      return normalizedFoodType === "veg" || normalizedFoodType === "vegetarian";
+    }
+    return addon?.isVeg === true;
+  }, []);
+
   const filteredAddons = useMemo(() => {
     if (!Array.isArray(addons)) return [];
-    if (vegMode !== true) return addons;
+    if (!effectiveVegMode) return addons;
 
-    return addons.filter((addon) => {
-      const normalizedFoodType = String(addon?.foodType || "").trim().toLowerCase();
-      if (normalizedFoodType) {
-        return normalizedFoodType === "veg" || normalizedFoodType === "vegetarian";
-      }
-      return addon?.isVeg === true;
-    });
-  }, [addons, vegMode]);
+    return addons.filter(isVegAddon);
+  }, [addons, effectiveVegMode, isVegAddon]);
 
   // Lock body scroll and scroll to top when any full-screen modal opens
   useEffect(() => {

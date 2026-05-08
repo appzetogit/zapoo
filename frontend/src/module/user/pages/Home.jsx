@@ -253,6 +253,7 @@ export default function Home() {
   const [showAllCategoriesModal, setShowAllCategoriesModal] = useState(false);
   const [top10Restaurants, setTop10Restaurants] = useState([]);
   const [loadingTop10, setLoadingTop10] = useState(true);
+  const [hasSpotlightAds, setHasSpotlightAds] = useState(false);
   const isHandlingSwitchOff = useRef(false);
   const [recommendedPreviewByRestaurantId, setRecommendedPreviewByRestaurantId] = useState({});
   const placeholders = useMemo(() => ([
@@ -1507,62 +1508,13 @@ export default function Home() {
           const hasLinkedRestaurants = linkedRestaurants.length > 0;
           return <>
                   {/* MOBILE: Vertical card layout (hidden on sm+) */}
-                  <div className="sm:hidden relative w-full rounded-2xl overflow-hidden shadow-md border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-[#1a1a1a]" style={{
-              minHeight: '270px'
+                  <div className="sm:hidden relative w-full rounded-2xl overflow-hidden shadow-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#1a1a1a]" style={{
+              height: '230px'
             }} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
-                    {/* Top: Text with Animation */}
-                    <div className="px-5 pt-5 pb-3 bg-white dark:bg-[#1a1a1a] relative z-10 min-h-[110px]">
-                      <AnimatePresence mode="wait">
-                        <motion.div key={currentBannerIndex} initial={{
-                    opacity: 0,
-                    x: 20
-                  }} animate={{
-                    opacity: 1,
-                    x: 0
-                  }} exit={{
-                    opacity: 0,
-                    x: -20
-                  }} transition={{
-                    duration: 0.4,
-                    ease: "easeOut"
-                  }}>
-                          {currentBanner?.title && <h2 className="text-2xl font-extrabold text-gray-900 dark:text-white leading-tight mb-1">
-                              {currentBanner.title}
-                            </h2>}
-                        </motion.div>
-                      </AnimatePresence>
-                    </div>
-
-                    {/* CTA Badge overlapping with Animation */}
-                    <AnimatePresence mode="wait">
-                      {currentBanner?.ctaText && <motion.div key={currentBannerIndex} initial={{
-                  opacity: 0,
-                  scale: 0.8
-                }} animate={{
-                  opacity: 1,
-                  scale: 1
-                }} exit={{
-                  opacity: 0,
-                  scale: 0.8
-                }} transition={{
-                  duration: 0.3
-                }} className="absolute left-5 z-20" style={{
-                  top: hasText ? '105px' : '12px'
-                }}>
-                          <button className="flex flex-col items-center justify-center bg-orange-500 text-white font-bold text-[10px] leading-tight rounded-full shadow-lg px-3 py-3 text-center uppercase pointer-events-none" style={{
-                    width: '72px',
-                    height: '72px'
-                  }}>
-                            {currentBanner.ctaText}
-                          </button>
-                        </motion.div>}
-                    </AnimatePresence>
-
-                    {/* Bottom: Image with curved top */}
+                    {/* Full-height image area */}
                     <div className="relative w-full overflow-hidden bg-white dark:bg-[#1a1a1a]" style={{
-                aspectRatio: '16/7',
-                marginTop: '-2px'
-              }} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
+                height: '230px'
+              }}>
                       {/* Swipeable image strip */}
                       <motion.div className="flex" animate={{
                   x: `-${currentBannerIndex * 100 / (heroBannerImages.length || 1)}%`
@@ -1572,7 +1524,7 @@ export default function Home() {
                 }} style={{
                   width: `${heroBannerImages.length * 100}%`,
                   height: '100%'
-                }}>
+                      }}>
                         {heroBannerImages.map((image, index) => <div key={index} className="flex-shrink-0" style={{
                     width: `${100 / heroBannerImages.length}%`,
                     height: '100%'
@@ -1581,16 +1533,39 @@ export default function Home() {
                       width: '100%',
                       height: '100%',
                       objectFit: 'cover',
+                      objectPosition: 'center',
                       display: 'block'
                     }} loading={index === 0 ? 'eager' : 'lazy'} />
                           </div>)}
                       </motion.div>
 
-                      {/* Curved white overlay at top */}
-                      <div className="absolute inset-x-0 top-0 z-10 bg-white dark:bg-[#1a1a1a] pointer-events-none" style={{
-                  height: '36px',
-                  borderRadius: '0 0 50% 50% / 0 0 100% 100%'
-                }} />
+                      {/* Text inside image */}
+                      {(currentBanner?.title || currentBanner?.subtitle) && <div className="absolute inset-x-0 top-0 z-20 p-4">
+                          <AnimatePresence mode="wait">
+                            <motion.div key={currentBannerIndex} initial={{
+                      opacity: 0,
+                      y: -8
+                    }} animate={{
+                      opacity: 1,
+                      y: 0
+                    }} exit={{
+                      opacity: 0,
+                      y: -8
+                    }} transition={{
+                      duration: 0.35,
+                      ease: "easeOut"
+                    }}>
+                              <div className="inline-block max-w-[90%] rounded-xl bg-black/40 backdrop-blur-sm px-3 py-2">
+                                {currentBanner?.title && <h2 className="text-white text-xl font-extrabold leading-tight">
+                                    {currentBanner.title}
+                                  </h2>}
+                                {currentBanner?.subtitle && <p className="text-white/90 text-xs mt-1 leading-snug">
+                                    {currentBanner.subtitle}
+                                  </p>}
+                              </div>
+                            </motion.div>
+                          </AnimatePresence>
+                        </div>}
 
                       {/* Indicators */}
                       {heroBannerImages.length > 1 && <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5 z-20">
@@ -1653,9 +1628,7 @@ export default function Home() {
                     </div>
                   </div>
                 </>;
-        })() : <div className="w-full rounded-2xl bg-gradient-to-r from-orange-400 to-rose-400" style={{
-          minHeight: '220px'
-        }} />}
+        })() : null}
         </div>
       </div>
 
@@ -2074,7 +2047,7 @@ export default function Home() {
         </motion.section>
 
         {/* In the Spotlight */}
-        <motion.section className="pt-1.5 sm:pt-2 lg:pt-3 pb-0.5 sm:pb-1" initial={{
+        <motion.section className={`pt-1.5 sm:pt-2 lg:pt-3 pb-0.5 sm:pb-1 ${hasSpotlightAds ? "" : "hidden"}`} initial={{
         opacity: 0,
         y: 20
       }} whileInView={{
@@ -2101,7 +2074,7 @@ export default function Home() {
           </motion.h2>
           <div className="relative w-full bg-white dark:bg-[#0a0a0a] pt-4 sm:pt-4 pb-1 sm:pb-2">
             <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
-              <ZoneAdBanner />
+              <ZoneAdBanner onHasAdsChange={setHasSpotlightAds} />
             </div>
           </div>
         </motion.section>

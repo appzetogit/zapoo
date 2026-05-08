@@ -7,32 +7,7 @@ import { useNavigate } from "react-router-dom"
 import { ExternalLink, ChevronLeft, ChevronRight } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 
-// Fallback ads to show when no active ads are available for the zone
-const FALLBACK_ADS = [
-    {
-        _id: "fallback-1",
-        title: "Delicious Meals Delivered Fast",
-        bannerImage: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=1200&h=400&fit=crop",
-        redirectTarget: "home",
-        description: "Explore the best tastes around you"
-    },
-    {
-        _id: "fallback-2",
-        title: "Get 20% OFF on Your First Order",
-        bannerImage: "https://images.unsplash.com/photo-1543353071-873f17a7a088?w=1200&h=400&fit=crop",
-        redirectTarget: "gourmet",
-        description: "Special deals for new users"
-    },
-    {
-        _id: "fallback-3",
-        title: "Explore Top Rated Restaurants",
-        bannerImage: "https://images.unsplash.com/photo-1552566626-52f8b828add9?w=1200&h=400&fit=crop",
-        redirectTarget: "top-10",
-        description: "Hand-picked favorites for you"
-    }
-]
-
-export default function ZoneAdBanner() {
+export default function ZoneAdBanner({ onHasAdsChange = () => {} }) {
     const { location } = useLocation()
     const { zoneId, loading: zoneLoading } = useZone(location)
     const [ads, setAds] = useState([])
@@ -51,7 +26,7 @@ export default function ZoneAdBanner() {
 
             if (!zoneId && !hasCoords) {
                 setLoading(false)
-                setAds(FALLBACK_ADS)
+                setAds([])
                 return
             }
 
@@ -72,11 +47,11 @@ export default function ZoneAdBanner() {
                 if (res.data.success && res.data.data && res.data.data.length > 0) {
                     setAds(res.data.data)
                 } else {
-                    setAds(FALLBACK_ADS)
+                    setAds([])
                 }
             } catch (error) {
                 console.error("Failed to fetch ads:", error)
-                setAds(FALLBACK_ADS)
+                setAds([])
             } finally {
                 setLoading(false)
             }
@@ -84,6 +59,11 @@ export default function ZoneAdBanner() {
 
         fetchAds()
     }, [zoneId, location?.latitude, location?.longitude])
+
+    useEffect(() => {
+        if (loading || zoneLoading) return
+        onHasAdsChange(ads.length > 0)
+    }, [ads.length, loading, zoneLoading, onHasAdsChange])
 
     // Auto-slide logic
     useEffect(() => {
@@ -284,7 +264,7 @@ export default function ZoneAdBanner() {
 
                 {/* Status Badge */}
                 <div className="absolute top-4 left-4 bg-black/40 backdrop-blur-md text-white text-[10px] md:text-xs font-bold px-2.5 py-1 rounded-full border border-white/20 z-10">
-                    {currentAd?._id?.startsWith('fallback-') ? 'SUGGESTED' : currentAd?.source === 'challenge' ? 'FREE REWARD' : 'AD'}
+                    {currentAd?.source === 'challenge' ? 'FREE REWARD' : 'AD'}
                 </div>
             </div>
         </div>
