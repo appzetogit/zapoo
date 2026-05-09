@@ -7,6 +7,16 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import BottomNavOrders from "../components/BottomNavOrders";
 
+const formatFeatureLabel = (feature) => {
+    if (!feature) return "";
+    const readable = String(feature)
+        .replace(/([a-z])([A-Z])/g, "$1 $2")
+        .replace(/[_-]+/g, " ")
+        .toLowerCase()
+        .trim();
+    return readable.charAt(0).toUpperCase() + readable.slice(1);
+};
+
 export default function SubscriptionPlans() {
     const navigate = useNavigate();
     const [plans, setPlans] = useState([]);
@@ -320,7 +330,7 @@ export default function SubscriptionPlans() {
                                                 <div className="mt-0.5 w-4 h-4 rounded-full bg-green-100 flex items-center justify-center shrink-0">
                                                     <Check className="w-2.5 h-2.5 text-green-600" />
                                                 </div>
-                                                <span className="text-gray-600 font-medium text-sm leading-snug">{feature}</span>
+                                                <span className="text-gray-600 font-medium text-sm leading-snug">{formatFeatureLabel(feature)}</span>
                                             </div>
                                         ))}
                                     </div>

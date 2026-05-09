@@ -522,14 +522,6 @@ export default function Under250() {
                     <div className="w-full h-full bg-gradient-to-br from-green-100 to-blue-100 dark:from-green-900 dark:to-blue-900" />
                   )}
 
-                  {/* Banner title overlay */}
-                  <div className="absolute inset-x-0 top-0 z-10 p-4">
-                    <div className="inline-block max-w-[90%] rounded-xl bg-black/40 backdrop-blur-sm px-3 py-2">
-                      <h2 className="text-xl font-extrabold text-white leading-tight">
-                        {t("user.under250.bannerTitle")}
-                      </h2>
-                    </div>
-                  </div>
                 </div>
               </div>
             )}
