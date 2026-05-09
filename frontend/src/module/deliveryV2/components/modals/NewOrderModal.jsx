@@ -120,6 +120,13 @@ export const NewOrderModal = ({ order, onAccept, onReject, onMinimize }) => {
 
   const customerLocation = normalizeLocation(order.customerLocation) || normalizeLocation(order.deliveryLocation) || normalizeLocation(geoCoords) || null;
 
+  const isCoordinateOnlyText = (value) => {
+    const text = String(value || '').trim();
+    if (!text) return false;
+    // Matches: "22.7176, 75.8719" / "Lat 22.7176, Lng 75.8719"
+    return /^((lat\s*)?-?\d+(\.\d+)?\s*,\s*(lng\s*)?-?\d+(\.\d+)?)$/i.test(text);
+  };
+
   const addressPartsFromSchema = [
     deliveryAddress.street,
     deliveryAddress.additionalDetails,
@@ -130,16 +137,20 @@ export const NewOrderModal = ({ order, onAccept, onReject, onMinimize }) => {
     .map((v) => String(v || '').trim())
     .filter(Boolean);
 
-  const customerAddress =
+  const rawCustomerAddress =
     order.customerAddress ||
     order.customer_address ||
     order?.customerLocation?.address ||
+    order?.customerLocation?.formattedAddress ||
     order?.deliveryAddress?.address ||
+    order?.deliveryAddress?.formattedAddress ||
     (typeof order?.deliveryAddress === 'string' ? order.deliveryAddress : '') ||
-    (addressPartsFromSchema.length ? addressPartsFromSchema.join(', ') : '') ||
-    (customerLocation?.lat != null && customerLocation?.lng != null
-      ? `Lat ${Number(customerLocation.lat).toFixed(5)}, Lng ${Number(customerLocation.lng).toFixed(5)}`
-      : 'Location not available');
+    (addressPartsFromSchema.length ? addressPartsFromSchema.join(', ') : '');
+
+  const customerAddress =
+    !isCoordinateOnlyText(rawCustomerAddress) && String(rawCustomerAddress || '').trim()
+      ? String(rawCustomerAddress).trim()
+      : 'Location not available';
 
   const mapsLink =
     customerLocation?.lat != null && customerLocation?.lng != null

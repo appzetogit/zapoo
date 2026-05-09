@@ -6,7 +6,7 @@ import {
   Navigation, CheckCircle2, Camera, Loader2, Image as ImageIcon
 } from 'lucide-react';
 import { ActionSlider } from '@/modules/DeliveryV2/components/ui/ActionSlider';
-import { uploadAPI } from '@food/api';
+import { uploadAPI, telephonyAPI } from '@food/api';
 import { toast } from 'sonner';
 import { openCamera } from "@food/utils/imageUploadUtils";
 
@@ -28,6 +28,7 @@ export const PickupActionModal = ({
   const [isUploadingBill, setIsUploadingBill] = useState(false);
   const [billImageUploaded, setBillImageUploaded] = useState(false);
   const [billImageUrl, setBillImageUrl] = useState(null);
+  const [isCallingRestaurant, setIsCallingRestaurant] = useState(false);
   const cameraInputRef = useRef(null);
 
   if (!order) return null;
@@ -73,7 +74,7 @@ export const PickupActionModal = ({
   const isAtPickup = status === 'REACHED_PICKUP';
   const restaurantName = order.restaurantName || order.restaurant_name || 'Restaurant';
   const restaurantAddress = order.restaurantAddress || order.restaurant_address || order.restaurantLocation?.address || 'Address not available';
-  const restaurantPhone = order.restaurantPhone || order.restaurant_phone || order.restaurantId?.phone || '';
+  const orderId = order?.orderId || order?._id || '';
   const items = order.items || [];
   const restaurantLogo = order.restaurantImage || order.restaurant?.logo || order.restaurant?.profileImage || 'https://cdn-icons-png.flaticon.com/512/3170/3170733.png';
   const fallbackDistanceMeters = useMemo(() => {
@@ -97,6 +98,22 @@ export const PickupActionModal = ({
   const distanceKmLabel = Number.isFinite(Number(displayDistanceMeters)) && Number(displayDistanceMeters) > 0
     ? (Number(displayDistanceMeters) / 1000).toFixed(1)
     : '--';
+
+  const handleCallRestaurantMasked = async () => {
+    if (!orderId || isCallingRestaurant) return;
+    try {
+      setIsCallingRestaurant(true);
+      await telephonyAPI.initiateMaskedCall({
+        orderId,
+        targetRole: "restaurant",
+      });
+      toast.success("Calling restaurant");
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Calling is currently unavailable. Please try again shortly.");
+    } finally {
+      setIsCallingRestaurant(false);
+    }
+  };
 
   return (
     <div className="absolute inset-0 z-[110] flex items-end justify-center">
@@ -151,14 +168,14 @@ export const PickupActionModal = ({
               </div>
 
               <div className="flex gap-2.5">
-                {restaurantPhone && (
-                  <button
-                    onClick={() => window.location.href = `tel:${restaurantPhone}`}
-                    className="w-11 h-11 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600 border border-emerald-100 hover:bg-emerald-100 transition-colors active:scale-90"
-                  >
-                    <Phone className="w-5 h-5" />
-                  </button>
-                )}
+                <button
+                  onClick={handleCallRestaurantMasked}
+                  disabled={!orderId || isCallingRestaurant}
+                  className="w-11 h-11 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600 border border-emerald-100 hover:bg-emerald-100 transition-colors active:scale-90 disabled:opacity-60"
+                  title="Call Restaurant"
+                >
+                  {isCallingRestaurant ? <Loader2 className="w-5 h-5 animate-spin" /> : <Phone className="w-5 h-5" />}
+                </button>
                 <button 
                   onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(restaurantAddress)}`, '_blank')}
                   className="w-11 h-11 rounded-2xl bg-gray-950 flex items-center justify-center text-white shadow-xl hover:bg-gray-800 transition-colors active:scale-90"

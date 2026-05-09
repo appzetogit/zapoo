@@ -2,9 +2,9 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ShieldCheck, DollarSign, CheckCircle2, 
-  QrCode, Loader2, Info, X, RefreshCw, Package
+  QrCode, Loader2, Info, X, RefreshCw, Package, Phone
 } from 'lucide-react';
-import { deliveryAPI } from '@food/api';
+import { deliveryAPI, telephonyAPI } from '@food/api';
 import { toast } from 'sonner';
 import { ActionSlider } from '@/modules/DeliveryV2/components/ui/ActionSlider';
 
@@ -52,6 +52,7 @@ const OtpModal = ({ order, onVerified, onClose }) => {
   const [otp, setOtp] = useState(['', '', '', '']);
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
   const [isOtpVerified, setIsOtpVerified] = useState(false);
+  const [isCallingCustomer, setIsCallingCustomer] = useState(false);
   const inputRefs = [useRef(), useRef(), useRef(), useRef()];
 
   useEffect(() => {
@@ -99,6 +100,23 @@ const OtpModal = ({ order, onVerified, onClose }) => {
   };
 
   const isAlreadyVerified = order?.deliveryVerification?.dropOtp?.verified;
+  const customerName = order?.userName || order?.customerName || 'Customer';
+
+  const handleCallCustomerMasked = async () => {
+    if (isCallingCustomer) return;
+    try {
+      setIsCallingCustomer(true);
+      await telephonyAPI.initiateMaskedCall({
+        orderId,
+        targetRole: "customer",
+      });
+      toast.success(`Calling ${customerName}`);
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Calling is currently unavailable. Please try again shortly.");
+    } finally {
+      setIsCallingCustomer(false);
+    }
+  };
 
   return (
     <div className="absolute inset-0 z-120 flex items-end justify-center pointer-events-none">
@@ -124,7 +142,17 @@ const OtpModal = ({ order, onVerified, onClose }) => {
                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Step 1 of 2 • Secure Drop</p>
                </div>
              </div>
-             <button onClick={onClose} className="p-3 bg-gray-50 rounded-2xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all active:scale-90"><X className="w-5 h-5"/></button>
+             <div className="flex items-center gap-2">
+               <button
+                 onClick={handleCallCustomerMasked}
+                 disabled={isCallingCustomer}
+                 className="p-3 bg-emerald-50 rounded-2xl text-emerald-600 border border-emerald-100 hover:bg-emerald-100 transition-all active:scale-90 disabled:opacity-60"
+                 title="Call Customer"
+               >
+                 {isCallingCustomer ? <Loader2 className="w-5 h-5 animate-spin" /> : <Phone className="w-5 h-5" />}
+               </button>
+               <button onClick={onClose} className="p-3 bg-gray-50 rounded-2xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all active:scale-90"><X className="w-5 h-5"/></button>
+             </div>
           </div>
 
           <DeliveryInstructionsPanel note={order?.note} />
@@ -174,10 +202,12 @@ const PaymentModal = ({ order, otpString, onComplete, onClose }) => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isCashAccepted, setIsCashAccepted] = useState(false);
   const [isSwitchingToCash, setIsSwitchingToCash] = useState(false);
+  const [isCallingCustomer, setIsCallingCustomer] = useState(false);
   const pollingRef = useRef(null);
 
   const orderId = order.orderId || order._id || 'ORD';
   const amountToCollect = order.pricing?.total || order.amountToCollect || 0;
+  const customerName = order?.userName || order?.customerName || 'Customer';
 
 
   const checkPaymentSync = useCallback(async () => {
@@ -271,6 +301,22 @@ const PaymentModal = ({ order, otpString, onComplete, onClose }) => {
   const isPaid = paymentStatus === 'paid';
   const canComplete = isPaid || isCashAccepted;
 
+  const handleCallCustomerMasked = async () => {
+    if (isCallingCustomer) return;
+    try {
+      setIsCallingCustomer(true);
+      await telephonyAPI.initiateMaskedCall({
+        orderId,
+        targetRole: "customer",
+      });
+      toast.success(`Calling ${customerName}`);
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Calling is currently unavailable. Please try again shortly.");
+    } finally {
+      setIsCallingCustomer(false);
+    }
+  };
+
   return (
     <>
       <div className="absolute inset-0 z-120 flex items-end justify-center pointer-events-none">
@@ -295,7 +341,17 @@ const PaymentModal = ({ order, otpString, onComplete, onClose }) => {
                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Step 2 of 2 • Handover</p>
                  </div>
                </div>
-               <button onClick={onClose} className="p-3 bg-gray-50 rounded-2xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all active:scale-90"><X className="w-5 h-5"/></button>
+               <div className="flex items-center gap-2">
+                 <button
+                   onClick={handleCallCustomerMasked}
+                   disabled={isCallingCustomer}
+                   className="p-3 bg-emerald-50 rounded-2xl text-emerald-600 border border-emerald-100 hover:bg-emerald-100 transition-all active:scale-90 disabled:opacity-60"
+                   title="Call Customer"
+                 >
+                   {isCallingCustomer ? <Loader2 className="w-5 h-5 animate-spin" /> : <Phone className="w-5 h-5" />}
+                 </button>
+                 <button onClick={onClose} className="p-3 bg-gray-50 rounded-2xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all active:scale-90"><X className="w-5 h-5"/></button>
+               </div>
             </div>
 
             <DeliveryInstructionsPanel note={order?.note} />
