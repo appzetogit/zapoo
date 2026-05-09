@@ -79,6 +79,9 @@ export default function EditProfile() {
   const [imagePreview, setImagePreview] = useState(initialProfile?.profileImage || "");
   const cameraInputRef = useRef(null);
   const galleryInputRef = useRef(null);
+  const signupMethod = (initialProfile.signupMethod || userProfile?.signupMethod || "").toLowerCase();
+  const isPhoneRegistered = signupMethod === "phone";
+  const isEmailRegistered = signupMethod === "email";
 
   const normalizeFormData = data => ({
     name: data.name ?? "",
@@ -151,6 +154,9 @@ export default function EditProfile() {
     setHasChanges(currentData !== savedData);
   }, [formData, initialData]);
   const handleChange = (field, value) => {
+    if (field === 'mobile' && isPhoneRegistered) return;
+    if (field === 'email' && isEmailRegistered) return;
+
     setFormData(prev => ({
       ...prev,
       [field]: value
@@ -158,6 +164,9 @@ export default function EditProfile() {
     clearFieldError(field);
   };
   const handleClear = field => {
+    if (field === 'mobile' && isPhoneRegistered) return;
+    if (field === 'email' && isEmailRegistered) return;
+
     setFormData(prev => ({
       ...prev,
       [field]: ""
@@ -288,10 +297,10 @@ export default function EditProfile() {
     if (!formData.name.trim()) {
       nextErrors.name = "Name is required";
     }
-    if (formData.email && !validateEmail(formData.email)) {
+    if (!isEmailRegistered && formData.email && !validateEmail(formData.email)) {
       nextErrors.email = "Enter a valid email address";
     }
-    if (formData.mobile && !validatePhone(formData.mobile)) {
+    if (!isPhoneRegistered && formData.mobile && !validatePhone(formData.mobile)) {
       nextErrors.mobile = "Enter a valid phone number";
     }
     if (formData.dateOfBirth && !validateDateOfBirth(formData.dateOfBirth)) {
@@ -310,8 +319,8 @@ export default function EditProfile() {
       // Prepare data for API
       const updateData = {
         name: formData.name,
-        email: formData.email || undefined,
-        phone: formData.mobile || undefined,
+        email: isEmailRegistered ? undefined : formData.email || undefined,
+        phone: isPhoneRegistered ? undefined : formData.mobile || undefined,
         dateOfBirth: formData.dateOfBirth ? formData.dateOfBirth.format('YYYY-MM-DD') : undefined,
         gender: formData.gender || undefined,
         profileImage: profileImage || undefined // Include profileImage in update
@@ -498,8 +507,9 @@ export default function EditProfile() {
                 Mobile
               </Label>
               <div className="flex items-center gap-2">
-                <Input id="mobile" type="tel" inputMode="numeric" maxLength={10} value={formData.mobile} onChange={e => handleChange('mobile', e.target.value.replace(/\D/g, '').slice(0, 10))} className="flex-1 h-12 text-base  border border-gray-300 dark:border-gray-700 focus:border-green-600 focus:ring-1 focus:ring-green-600 rounded-lg bg-white dark:bg-[#1a1a1a] text-gray-900 dark:text-white" placeholder="Mobile" />
+                <Input id="mobile" type="tel" inputMode="numeric" maxLength={10} value={formData.mobile} onChange={e => handleChange('mobile', e.target.value.replace(/\D/g, '').slice(0, 10))} disabled={isPhoneRegistered} className="flex-1 h-12 text-base  border border-gray-300 dark:border-gray-700 focus:border-green-600 focus:ring-1 focus:ring-green-600 rounded-lg bg-white dark:bg-[#1a1a1a] text-gray-900 dark:text-white disabled:opacity-70 disabled:cursor-not-allowed" placeholder="Mobile" />
               </div>
+              {isPhoneRegistered && <p className="text-xs text-gray-500">Registered with mobile, number cannot be edited.</p>}
               {errors.mobile && <p className="text-sm text-red-500">{errors.mobile}</p>}
             </div>
 
@@ -509,8 +519,9 @@ export default function EditProfile() {
                 Email
               </Label>
               <div className="flex items-center gap-2">
-                <Input id="email" type="email" value={formData.email} onChange={e => handleChange('email', e.target.value)} className="flex-1 h-12 text-base border border-gray-300 dark:border-gray-700 focus:border-green-600 focus:ring-1 focus:ring-green-600 rounded-lg bg-white dark:bg-[#1a1a1a] text-gray-900 dark:text-white" placeholder="Email" />
+                <Input id="email" type="email" value={formData.email} onChange={e => handleChange('email', e.target.value)} disabled={isEmailRegistered} className="flex-1 h-12 text-base border border-gray-300 dark:border-gray-700 focus:border-green-600 focus:ring-1 focus:ring-green-600 rounded-lg bg-white dark:bg-[#1a1a1a] text-gray-900 dark:text-white disabled:opacity-70 disabled:cursor-not-allowed" placeholder="Email" />
               </div>
+              {isEmailRegistered && <p className="text-xs text-gray-500">Registered with email, email cannot be edited.</p>}
               {errors.email && <p className="text-sm text-red-500">{errors.email}</p>}
             </div>
 

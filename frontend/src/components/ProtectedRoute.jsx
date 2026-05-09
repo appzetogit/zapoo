@@ -8,6 +8,7 @@ import {
 import { restaurantAPI } from "@/lib/api";
 import FeatureLockedScreen from "@/module/restaurant/components/FeatureLockedScreen";
 import NoPlanPopup from "@/module/restaurant/components/NoPlanPopup";
+import { determineStepToShow } from "@/module/restaurant/utils/onboardingUtils";
 
 /**
  * Role-based Protected Route Component
@@ -18,6 +19,7 @@ export default function ProtectedRoute({ children, requiredRole, loginPath }) {
   const [subscriptionLoading, setSubscriptionLoading] = useState(requiredRole === "restaurant");
   const [hasActiveSubscription, setHasActiveSubscription] = useState(true);
   const [featureLock, setFeatureLock] = useState(null);
+  const [onboardingStepToShow, setOnboardingStepToShow] = useState(null);
 
   const gatedRestaurantPaths = useMemo(
     () => [
@@ -54,6 +56,7 @@ export default function ProtectedRoute({ children, requiredRole, loginPath }) {
     if (!needsSubscription || isAllowedPath) {
       setHasActiveSubscription(true);
       setFeatureLock(null);
+      setOnboardingStepToShow(null);
       setSubscriptionLoading(false);
       return;
     }
@@ -65,6 +68,15 @@ export default function ProtectedRoute({ children, requiredRole, loginPath }) {
       .then((response) => {
         if (!isMounted) return;
         const restaurant = response?.data?.data?.restaurant;
+        const stepToShow = determineStepToShow(restaurant?.onboarding);
+        setOnboardingStepToShow(stepToShow);
+
+        if (stepToShow) {
+          setHasActiveSubscription(true);
+          setFeatureLock(null);
+          return;
+        }
+
         const subscription = restaurant?.subscription;
         const isActive = subscription?.status === "active";
         const isDateValid = subscription?.endDate ? new Date(subscription.endDate) > new Date() : false;
@@ -105,6 +117,7 @@ export default function ProtectedRoute({ children, requiredRole, loginPath }) {
         if (isMounted) {
           setHasActiveSubscription(false);
           setFeatureLock(null);
+          setOnboardingStepToShow(1);
         }
       })
       .finally(() => {
@@ -162,6 +175,10 @@ export default function ProtectedRoute({ children, requiredRole, loginPath }) {
 
   if (requiredRole === "restaurant") {
     const path = location.pathname;
+    if (onboardingStepToShow && !path.startsWith("/restaurant/onboarding")) {
+      return <Navigate to={`/restaurant/onboarding?step=${onboardingStepToShow}`} replace />;
+    }
+
     const isAllowedPath = allowedWithoutSubscription.some((prefix) => path.startsWith(prefix));
     const isRestaurantHome = path === "/restaurant";
     const needsSubscription =

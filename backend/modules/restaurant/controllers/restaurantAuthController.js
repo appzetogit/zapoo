@@ -1023,34 +1023,53 @@ const finalizeRestaurantGoogleLogin = async ({
       // Set isActive to false - restaurant needs admin approval before becoming active
       isActive: false
     };
-    try {
+  try {
       restaurant = await Restaurant.create(restaurantData);
     } catch (createError) {
       if (createError.code === 11000) {
-        logger.warn('Duplicate key error during restaurant creation, retrying find', {
-          email
-        });
-        restaurant = await Restaurant.findOne({
-          email
-        });
-        if (!restaurant) {
-          logger.error('Restaurant not found after duplicate key error', {
+        if (createError.keyPattern && createError.keyPattern.slug) {
+          logger.warn('Slug conflict during Google restaurant creation, retrying with unique slug', {
             email
           });
-          throw createError;
-        }
-        if (!restaurant.googleId) {
-          restaurant.googleId = googleId;
-          restaurant.googleEmail = email;
-          if (!restaurant.profileImage && picture) {
-            restaurant.profileImage = {
-              url: picture
-            };
+          const baseSlug = String(name || 'Restaurant')
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/(^-|-$)/g, '') || 'restaurant';
+          let counter = 1;
+          let uniqueSlug = `${baseSlug}-${counter}`;
+          while (await Restaurant.findOne({ slug: uniqueSlug })) {
+            counter += 1;
+            uniqueSlug = `${baseSlug}-${counter}`;
           }
-          if (!restaurant.signupMethod) {
-            restaurant.signupMethod = 'google';
+
+          restaurantData.slug = uniqueSlug;
+          restaurant = await Restaurant.create(restaurantData);
+        } else {
+          logger.warn('Duplicate key error during restaurant creation, retrying find', {
+            email
+          });
+          restaurant = await Restaurant.findOne({
+            email
+          });
+          if (!restaurant) {
+            logger.error('Restaurant not found after duplicate key error', {
+              email
+            });
+            throw createError;
           }
-          await restaurant.save();
+          if (!restaurant.googleId) {
+            restaurant.googleId = googleId;
+            restaurant.googleEmail = email;
+            if (!restaurant.profileImage && picture) {
+              restaurant.profileImage = {
+                url: picture
+              };
+            }
+            if (!restaurant.signupMethod) {
+              restaurant.signupMethod = 'google';
+            }
+            await restaurant.save();
+          }
         }
       } else {
         logger.error(`Error creating restaurant via ${sourceLabel} login`, {

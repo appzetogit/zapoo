@@ -341,28 +341,36 @@ apiClient.interceptors.response.use(response => {
         return apiClient(originalRequest);
       }
     } catch (refreshError) {
+      const currentPath = window.location.pathname;
+
       // Show error toast in development mode for refresh errors
       if (import.meta.env.DEV) {
         const refreshErrorMessage = refreshError.response?.data?.message || refreshError.response?.data?.error || refreshError.message || "Token refresh failed";
-        toast.error(refreshErrorMessage, {
-          duration: 3000,
-          style: {
-            background: "linear-gradient(135deg, #ef4444 0%, #dc2626 100%)",
-            color: "#ffffff",
-            border: "1px solid #b91c1c",
-            borderRadius: "12px",
-            padding: "16px",
-            fontSize: "14px",
-            fontWeight: "500",
-            boxShadow: "0 10px 25px -5px rgba(239, 68, 68, 0.3), 0 8px 10px -6px rgba(239, 68, 68, 0.2)"
-          },
-          className: "error-toast"
-        });
+        const refreshErrorMessageLower = String(refreshErrorMessage).toLowerCase();
+        const isOnboardingInactiveRefreshError =
+          currentPath.startsWith("/restaurant/onboarding") &&
+          refreshErrorMessageLower.includes("restaurant account is inactive");
+
+        if (!isOnboardingInactiveRefreshError) {
+          toast.error(refreshErrorMessage, {
+            duration: 3000,
+            style: {
+              background: "linear-gradient(135deg, #ef4444 0%, #dc2626 100%)",
+              color: "#ffffff",
+              border: "1px solid #b91c1c",
+              borderRadius: "12px",
+              padding: "16px",
+              fontSize: "14px",
+              fontWeight: "500",
+              boxShadow: "0 10px 25px -5px rgba(239, 68, 68, 0.3), 0 8px 10px -6px rgba(239, 68, 68, 0.2)"
+            },
+            className: "error-toast"
+          });
+        }
       }
 
       // Refresh failed, clear module-specific token and redirect to login
       // BUT: Don't auto-redirect on certain pages - let them handle errors gracefully
-      const currentPath = window.location.pathname;
       const isDeliveryPath = currentPath.startsWith("/delivery") || currentPath.startsWith("/food/delivery");
       const isOnboardingPage = currentPath.includes("/onboarding");
       const isLandingPageManagement = currentPath.includes("/hero-banner-management") || currentPath.includes("/landing-page");

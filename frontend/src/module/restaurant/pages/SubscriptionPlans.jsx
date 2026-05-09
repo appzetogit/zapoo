@@ -26,20 +26,30 @@ export default function SubscriptionPlans() {
     const fetchData = async () => {
         try {
             setLoading(true);
-            const [plansRes, subRes, restaurantRes] = await Promise.all([
+            const [plansResult, subResult, restaurantResult] = await Promise.allSettled([
                 subscriptionAPI.getPlans(),
                 subscriptionAPI.getMySubscription(),
                 restaurantAPI.getCurrentRestaurant()
             ]);
 
-            if (plansRes.data.success) {
-                setPlans(plansRes.data.data);
+            const plansRes = plansResult.status === "fulfilled" ? plansResult.value : null;
+            const subRes = subResult.status === "fulfilled" ? subResult.value : null;
+            const restaurantRes = restaurantResult.status === "fulfilled" ? restaurantResult.value : null;
+
+            if (plansRes?.data?.success) {
+                setPlans(plansRes.data.data || []);
+            } else {
+                throw new Error("Failed to fetch subscription plans");
             }
 
-            if (subRes.data.success && subRes.data.data) {
+            // Optional for first-time/no-plan/inactive restaurants.
+            if (subRes?.data?.success && subRes?.data?.data) {
                 setCurrentSubscription(subRes.data.data);
+            } else {
+                setCurrentSubscription(null);
             }
             setQueuedSubscription(subRes?.data?.queuedSubscription || null);
+
             const restaurant = restaurantRes?.data?.data?.restaurant || restaurantRes?.data?.restaurant;
             setTrialUsed(!!restaurant?.trialUsed);
         } catch (error) {
