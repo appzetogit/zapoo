@@ -284,7 +284,7 @@ export default function AdminNotificationRequests() {
                     <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
                         <div className="p-6">
                             <h3 className="text-lg font-bold text-slate-900 mb-1">Approve & Send Notification</h3>
-                            <p className="text-sm text-slate-500 mb-4">You can edit the content before sending to all users.</p>
+                            <p className="text-sm text-slate-500 mb-4">You can edit the content before sending to users in this restaurant's delivery range.</p>
 
                             <div className="space-y-4">
                                 <div>
@@ -321,7 +321,7 @@ export default function AdminNotificationRequests() {
                                     disabled={actionId !== null}
                                     className="px-5 py-2 text-sm font-medium bg-[#FF5200] text-white rounded-lg hover:bg-[#E64A00] transition-all shadow-md disabled:opacity-50"
                                 >
-                                    {actionId !== null ? 'Sending...' : 'Send to All Users'}
+                                    {actionId !== null ? 'Sending...' : 'Send to Users in Range'}
                                 </button>
                             </div>
                         </div>

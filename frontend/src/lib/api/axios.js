@@ -575,9 +575,23 @@ apiClient.interceptors.response.use(response => {
     // Prevent duplicate toasts for the same message within 10 seconds
     const toastCache = window._errorToastCache || {};
     window._errorToastCache = toastCache;
+    const currentPath = window.location.pathname;
+    const isOnboardingPath = currentPath.startsWith("/restaurant/onboarding");
 
     // Show beautiful error toast for each error message
     errorMessages.forEach((errorMessage, index) => {
+      const errorMessageLower = String(errorMessage || "").toLowerCase();
+      const isOnboardingInactiveMessage =
+        isOnboardingPath &&
+        (errorMessageLower.includes("restaurant account is inactive") ||
+          errorMessageLower.includes("wait for admin approval"));
+
+      // During onboarding, suppress inactive-account toasts so the flow isn't blocked/noisy.
+      // The onboarding page will handle its own validation/errors.
+      if (isOnboardingInactiveMessage) {
+        return;
+      }
+
       const now = Date.now();
       const lastShown = toastCache[errorMessage] || 0;
 

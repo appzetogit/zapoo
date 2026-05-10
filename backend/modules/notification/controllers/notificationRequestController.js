@@ -10,6 +10,25 @@ import { calculateDistance } from '../../order/services/orderCalculationService.
 import { resolveLocaleFromRequest } from '../../../shared/i18n/localeResolver.js';
 import { resolveLocalizedText } from '../../../shared/i18n/localizedText.js';
 
+const isValidLngLat = (lng, lat) =>
+  Number.isFinite(lng) &&
+  Number.isFinite(lat) &&
+  !(lng === 0 && lat === 0);
+
+const resolveRestaurantCoordinates = (restaurant) => {
+  const coords = restaurant?.location?.coordinates;
+  if (Array.isArray(coords) && coords.length >= 2) {
+    const [lng, lat] = coords;
+    if (isValidLngLat(lng, lat)) return [lng, lat];
+  }
+
+  const lng = Number(restaurant?.location?.longitude);
+  const lat = Number(restaurant?.location?.latitude);
+  if (isValidLngLat(lng, lat)) return [lng, lat];
+
+  return null;
+};
+
 /**
  * POST /api/notification-requests
  * Restaurant submits a push notification request to admin.
@@ -167,8 +186,15 @@ export const adminApproveRequest = asyncHandler(async (req, res) => {
     return errorResponse(res, 400, `Request already processed (status: ${request.status})`);
   }
   const restaurant = await Restaurant.findById(request.restaurantId).select('name location deliveryRange').lean();
-  const restaurantCoords = restaurant?.location?.coordinates;
-  const hasValidRestaurantCoords = Array.isArray(restaurantCoords) && restaurantCoords.length >= 2 && Number.isFinite(restaurantCoords[0]) && Number.isFinite(restaurantCoords[1]) && !(restaurantCoords[0] === 0 && restaurantCoords[1] === 0);
+  const restaurantCoords = resolveRestaurantCoordinates(restaurant);
+  const hasValidRestaurantCoords = Array.isArray(restaurantCoords) && restaurantCoords.length === 2;
+  if (!hasValidRestaurantCoords) {
+    return errorResponse(
+      res,
+      400,
+      'Restaurant location is missing or invalid. Please update restaurant location before approving this notification request.'
+    );
+  }
   const targetRangeKm = Number(restaurant?.deliveryRange) > 0 ? Number(restaurant.deliveryRange) : 5;
   const notification = await Notification.create({
     title: (titleOverride || request.title).trim(),
@@ -177,9 +203,7 @@ export const adminApproveRequest = asyncHandler(async (req, res) => {
     target: 'all_users',
     sourceType: 'restaurant_request',
     restaurantId: request.restaurantId,
-    restaurantLocation: hasValidRestaurantCoords
-      ? { type: 'Point', coordinates: restaurantCoords }
-      : undefined,
+    restaurantLocation: { type: 'Point', coordinates: restaurantCoords },
     deliveryRangeKm: targetRangeKm
   });
   const userFilter = {
@@ -209,19 +233,15 @@ export const adminApproveRequest = asyncHandler(async (req, res) => {
       }
     }]
   };
-  if (hasValidRestaurantCoords) {
-    userFilter['currentLocation.location'] = {
-      $nearSphere: {
-        $geometry: {
-          type: 'Point',
-          coordinates: restaurantCoords
-        },
-        $maxDistance: Math.round(targetRangeKm * 1000)
-      }
-    };
-  } else {
-    console.warn(`[Notification] Restaurant ${request.restaurantId} has invalid coordinates. Sending without range filter.`);
-  }
+  userFilter['currentLocation.location'] = {
+    $nearSphere: {
+      $geometry: {
+        type: 'Point',
+        coordinates: restaurantCoords
+      },
+      $maxDistance: Math.round(targetRangeKm * 1000)
+    }
+  };
   const usersWithTokens = await User.find(userFilter, {
     _id: 1,
     fcmTokens: 1,
@@ -398,22 +418,35 @@ export const updateNotificationSettings = asyncHandler(async (req, res) => {
 export const getUserNotifications = asyncHandler(async (req, res) => {
   const locale = resolveLocaleFromRequest(req);
   const { latitude, longitude } = req.query;
-  const userLat = latitude != null ? parseFloat(latitude) : null;
-  const userLng = longitude != null ? parseFloat(longitude) : null;
+  let userLat = latitude != null ? parseFloat(latitude) : null;
+  let userLng = longitude != null ? parseFloat(longitude) : null;
+
+  // Fallback to persisted user location when caller does not pass lat/lng.
+  if (!(Number.isFinite(userLat) && Number.isFinite(userLng))) {
+    const userLocation = await User.findById(req.user?._id || req.user?.id)
+      .select('currentLocation.location')
+      .lean();
+    const coords = userLocation?.currentLocation?.location?.coordinates;
+    if (Array.isArray(coords) && coords.length >= 2 && isValidLngLat(coords[0], coords[1])) {
+      userLng = Number(coords[0]);
+      userLat = Number(coords[1]);
+    }
+  }
 
   let notifications = await Notification.find({
     target: 'all_users',
     isActive: true
   }).sort({ sentAt: -1 }).limit(50).lean();
 
-  if (userLat != null && userLng != null && Number.isFinite(userLat) && Number.isFinite(userLng)) {
-    notifications = notifications.filter(n => {
-      if (n.sourceType !== 'restaurant_request') return true;
-      if (!n.restaurantLocation?.coordinates || n.restaurantLocation.coordinates.length < 2) return true;
-      const dist = calculateDistance(n.restaurantLocation.coordinates, [userLng, userLat]);
-      return dist <= (n.deliveryRangeKm || 5);
-    });
-  }
+  const hasViewerLocation = Number.isFinite(userLat) && Number.isFinite(userLng);
+  notifications = notifications.filter(n => {
+    if (n.sourceType !== 'restaurant_request') return true;
+    // Without viewer location, do not expose restaurant-range notifications.
+    if (!hasViewerLocation) return false;
+    if (!n.restaurantLocation?.coordinates || n.restaurantLocation.coordinates.length < 2) return false;
+    const dist = calculateDistance(n.restaurantLocation.coordinates, [userLng, userLat]);
+    return dist <= (n.deliveryRangeKm || 5);
+  });
 
   return successResponse(res, 200, 'Notifications fetched', {
     notifications: notifications.map((notification) => ({

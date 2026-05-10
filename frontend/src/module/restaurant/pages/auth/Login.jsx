@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { restaurantAPI } from "@/lib/api"
 import { firebaseAuth, googleProvider } from "@/lib/firebase"
 import { useCompanyName } from "@/lib/hooks/useCompanyName"
+import { determineStepToShow } from "@/module/restaurant/utils/onboardingUtils"
 
 export default function RestaurantLogin() {
   const companyName = useCompanyName()
@@ -198,6 +199,15 @@ export default function RestaurantLogin() {
     setApiError("")
     setIsSending(true)
 
+    const navigatePostGoogleLogin = (restaurant) => {
+      const onboardingStep = determineStepToShow(restaurant?.onboarding)
+      if (onboardingStep) {
+        navigate(`/restaurant/onboarding?step=${onboardingStep}`, { replace: true })
+        return
+      }
+      navigate("/restaurant", { replace: true })
+    }
+
     try {
       const isFlutterBridgeAvailable =
         typeof window !== "undefined" &&
@@ -223,7 +233,7 @@ export default function RestaurantLogin() {
 
           setAuthData("restaurant", accessToken, restaurant)
           window.dispatchEvent(new Event("restaurantAuthChanged"))
-          navigate("/restaurant")
+          navigatePostGoogleLogin(restaurant)
           return
         }
 
@@ -262,8 +272,8 @@ export default function RestaurantLogin() {
       // Notify any listeners that auth state has changed
       window.dispatchEvent(new Event("restaurantAuthChanged"))
 
-      // Navigate to restaurant home
-      navigate("/restaurant")
+      // Route exactly like OTP flow: incomplete onboarding -> onboarding, else home
+      navigatePostGoogleLogin(restaurant)
     } catch (error) {
       console.error("Firebase Google login error:", error)
       const message =
