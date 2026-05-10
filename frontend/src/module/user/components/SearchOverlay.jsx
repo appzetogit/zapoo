@@ -92,6 +92,8 @@ function transformRestaurantForOverlay(restaurant, userLat, userLng) {
     isAcceptingOrders: restaurant.isAcceptingOrders !== false,
     openDays: restaurant.openDays,
     deliveryTimings: restaurant.deliveryTimings,
+    weeklyTimings: restaurant.weeklyTimings,
+    outletTimingsActive: restaurant.outletTimingsActive,
     deliveryRange:
       restaurant.deliveryRange != null && Number.isFinite(Number(restaurant.deliveryRange))
         ? Number(restaurant.deliveryRange)
@@ -236,7 +238,12 @@ export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchCh
 
         const eligibleForMenu = transformed.filter((r) => {
           const inRange = isWithinDeliveryRangeKm(r.distanceInKm, r.deliveryRange, { userHasLocation })
-          const isOpen = isOpenForDeliveryNow({ openDays: r.openDays, deliveryTimings: r.deliveryTimings })
+          const isOpen = isOpenForDeliveryNow({
+            openDays: r.openDays,
+            deliveryTimings: r.deliveryTimings,
+            weeklyTimings: r.weeklyTimings,
+            outletTimingsActive: r.outletTimingsActive,
+          })
           return inRange && isOpen
         })
 
@@ -289,6 +296,8 @@ export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchCh
       const isOpen = isOpenForDeliveryNow({
         openDays: restaurant.openDays,
         deliveryTimings: restaurant.deliveryTimings,
+        weeklyTimings: restaurant.weeklyTimings,
+        outletTimingsActive: restaurant.outletTimingsActive,
       })
       if (!inRange || !isOpen) return
       const menu = restaurant.menu
@@ -433,7 +442,12 @@ export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchCh
 
               {restaurantMatches.map((r) => {
                 const inRange = isWithinDeliveryRangeKm(r.distanceInKm, r.deliveryRange, { userHasLocation })
-                const isClosed = !isOpenForDeliveryNow({ openDays: r.openDays, deliveryTimings: r.deliveryTimings })
+                const isClosed = !isOpenForDeliveryNow({
+                  openDays: r.openDays,
+                  deliveryTimings: r.deliveryTimings,
+                  weeklyTimings: r.weeklyTimings,
+                  outletTimingsActive: r.outletTimingsActive,
+                })
                 const isDisabled = !inRange || isClosed
                 const slug = r.slug || r.name?.toLowerCase().replace(/\s+/g, "-")
                 const content = (

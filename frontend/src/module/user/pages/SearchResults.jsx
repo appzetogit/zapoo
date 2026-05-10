@@ -595,6 +595,8 @@ export default function SearchResults() {
       const isOpen = isOpenForDeliveryNow({
         openDays: restaurant.openDays,
         deliveryTimings: restaurant.deliveryTimings,
+        weeklyTimings: restaurant.weeklyTimings,
+        outletTimingsActive: restaurant.outletTimingsActive,
       });
       if (!inRange || !isOpen) return;
 
@@ -644,7 +646,12 @@ export default function SearchResults() {
     }).map(r => ({
       ...r,
       inRange: isWithinDeliveryRangeKm(r.distanceInKm, r.deliveryRange, { userHasLocation }),
-      isClosed: !isOpenForDeliveryNow({ openDays: r.openDays, deliveryTimings: r.deliveryTimings })
+      isClosed: !isOpenForDeliveryNow({
+        openDays: r.openDays,
+        deliveryTimings: r.deliveryTimings,
+        weeklyTimings: r.weeklyTimings,
+        outletTimingsActive: r.outletTimingsActive,
+      })
     }));
   }, [searchQuery, selectedCategory, restaurantsData, userHasLocation]);
   // Filtered restaurant lists removed (blank search view + focused suggestions)

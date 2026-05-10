@@ -693,6 +693,18 @@ const finalizeGoogleLogin = async ({
       }
     }
   } else {
+    // Keep existing Google auto-create behavior for restaurant/delivery as-is.
+    // For app users, align with OTP-first onboarding/login flow:
+    // new Google email should continue via OTP + needsName step (same as new phone login).
+    if (userRole === "user") {
+      return successResponse(res, 200, `${sourceLabel} email requires OTP verification for first-time login`, {
+        needsOtpRegistration: true,
+        email: email.toLowerCase().trim(),
+        name: String(name || "Google User").trim(),
+        role: userRole
+      });
+    }
+
     const userData = {
       name: String(name || "Google User").trim(),
       email: email.toLowerCase().trim(),

@@ -11,6 +11,8 @@ import { setAuthData } from "@/lib/utils/auth";
 import loginBanner from "@/assets/loginbanner.png";
 import { useTranslation } from "react-i18next";
 
+const GOOGLE_REDIRECT_PENDING_KEY = "user_google_redirect_pending";
+
 export default function SignIn() {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -45,6 +47,18 @@ export default function SignIn() {
       const idToken = await user.getIdToken();
       const response = await authAPI.firebaseGoogleLogin(idToken, "user");
       const data = response?.data?.data || {};
+      if (data?.needsOtpRegistration && data?.email) {
+        await authAPI.sendOTP(null, "login", data.email);
+        sessionStorage.setItem("userAuthData", JSON.stringify({
+          method: "email",
+          email: data.email,
+          isSignUp: false,
+          module: "user"
+        }));
+        navigate("/user/auth/otp", { replace: true });
+        return;
+      }
+
       const accessToken = data.accessToken;
       const appUser = data.user;
       if (accessToken && appUser) {
@@ -87,6 +101,16 @@ export default function SignIn() {
 
   // Handle Firebase redirect result on component mount and URL changes
   useEffect(() => {
+    const isRedirectPending =
+      typeof window !== "undefined" &&
+      sessionStorage.getItem(GOOGLE_REDIRECT_PENDING_KEY) === "1";
+
+    // Don't auto-login from stale Firebase session unless a redirect flow is in progress.
+    if (!isRedirectPending) {
+      setIsLoading(false);
+      return;
+    }
+
     // Prevent multiple calls
     if (redirectHandledRef.current) {
       return;
@@ -124,15 +148,18 @@ export default function SignIn() {
         if (result && result.user) {
           // Process redirect result
           await processSignedInUser(result.user, "redirect-result");
+          sessionStorage.removeItem(GOOGLE_REDIRECT_PENDING_KEY);
         } else {
           // No redirect result - check if user is already signed in
           const currentUser = firebaseAuth.currentUser;
           if (currentUser && !redirectHandledRef.current) {
             // Process current user
             await processSignedInUser(currentUser, "current-user-check");
+            sessionStorage.removeItem(GOOGLE_REDIRECT_PENDING_KEY);
           } else {
             // No redirect result - this is normal on first load
 
+            sessionStorage.removeItem(GOOGLE_REDIRECT_PENDING_KEY);
             setIsLoading(false);
           }
         }
@@ -153,6 +180,7 @@ export default function SignIn() {
         if (errorCode === "auth/no-auth-event" || errorCode === "auth/popup-closed-by-user") {
           // These are expected cases, don't show error
 
+          sessionStorage.removeItem(GOOGLE_REDIRECT_PENDING_KEY);
           setIsLoading(false);
           return;
         }
@@ -183,6 +211,7 @@ export default function SignIn() {
           }
         }
         setApiError(message);
+        sessionStorage.removeItem(GOOGLE_REDIRECT_PENDING_KEY);
         setIsLoading(false);
       }
     };
@@ -292,7 +321,7 @@ export default function SignIn() {
         unsubscribe();
       }
     };
-  }, [navigate, searchParams]);
+  }, [navigate, searchParams, t]);
 
   const validateEmail = email => {
     if (!email.trim()) {
@@ -481,6 +510,18 @@ const sanitizeNameInput = (value) => value.replace(/[^a-zA-Z\s]/g, "")
             });
 
             const data = response?.data?.data || {};
+            if (data?.needsOtpRegistration && data?.email) {
+              await authAPI.sendOTP(null, "login", data.email);
+              sessionStorage.setItem("userAuthData", JSON.stringify({
+                method: "email",
+                email: data.email,
+                isSignUp: false,
+                module: "user"
+              }));
+              navigate("/user/auth/otp", { replace: true });
+              return;
+            }
+
             if (data.accessToken && data.user) {
               setAuthData("user", data.accessToken, data.user);
               window.dispatchEvent(new Event("userAuthChanged"));
@@ -512,17 +553,22 @@ const sanitizeNameInput = (value) => value.replace(/[^a-zA-Z\s]/g, "")
         signInWithPopup,
         signInWithRedirect
       } = await import("firebase/auth");
+      const providerWithPrompt = googleProvider;
+      providerWithPrompt.setCustomParameters({
+        prompt: "select_account"
+      });
 
       // Prefer popup flow on desktop (more reliable than redirect result races).
       // Keep redirect as fallback when popup is blocked.
-      const result = await signInWithPopup(firebaseAuth, googleProvider);
+      const result = await signInWithPopup(firebaseAuth, providerWithPrompt);
       if (result?.user) {
         await processSignedInUser(result.user, "popup");
         return;
       }
 
       // Extremely rare fallback: if popup returns no user, try redirect.
-      await signInWithRedirect(firebaseAuth, googleProvider);
+      sessionStorage.setItem(GOOGLE_REDIRECT_PENDING_KEY, "1");
+      await signInWithRedirect(firebaseAuth, providerWithPrompt);
     } catch (error) {
       // If popup was blocked/cancelled by browser policy, fallback to redirect.
       if (error?.code === "auth/popup-blocked" || error?.code === "auth/cancelled-popup-request") {
@@ -530,7 +576,12 @@ const sanitizeNameInput = (value) => value.replace(/[^a-zA-Z\s]/g, "")
           const {
             signInWithRedirect
           } = await import("firebase/auth");
-          await signInWithRedirect(firebaseAuth, googleProvider);
+          const providerWithPrompt = googleProvider;
+          providerWithPrompt.setCustomParameters({
+            prompt: "select_account"
+          });
+          sessionStorage.setItem(GOOGLE_REDIRECT_PENDING_KEY, "1");
+          await signInWithRedirect(firebaseAuth, providerWithPrompt);
           return;
         } catch (redirectError) {
           error = redirectError;
@@ -563,6 +614,7 @@ const sanitizeNameInput = (value) => value.replace(/[^a-zA-Z\s]/g, "")
         message = error.response.data.error;
       }
       setApiError(message);
+      sessionStorage.removeItem(GOOGLE_REDIRECT_PENDING_KEY);
     }
   };
   const toggleMode = () => {
