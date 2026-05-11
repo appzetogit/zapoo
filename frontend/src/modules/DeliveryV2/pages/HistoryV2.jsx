@@ -7,8 +7,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { deliveryAPI } from '@food/api';
 import { toast } from 'sonner';
 import useDeliveryBackNavigation from '../hooks/useDeliveryBackNavigation';
-import { useNavigate } from 'react-router-dom';
-import { useDeliveryStore } from '@/modules/DeliveryV2/store/useDeliveryStore';
 
 /**
  * HistoryV2 - EXACT 1:1 Match with User Screenshot.
@@ -18,9 +16,6 @@ import { useDeliveryStore } from '@/modules/DeliveryV2/store/useDeliveryStore';
  */
 export const HistoryV2 = () => {
   const goBack = useDeliveryBackNavigation();
-  const navigate = useNavigate();
-  const setActiveOrder = useDeliveryStore((state) => state.setActiveOrder);
-  const updateTripStatus = useDeliveryStore((state) => state.updateTripStatus);
   const [activeTab, setActiveTab] = useState("daily");
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [selectedTripType, setSelectedTripType] = useState("ALL TRIPS");
@@ -31,7 +26,6 @@ export const HistoryV2 = () => {
   const [showBonusModal, setShowBonusModal] = useState(false);
   const [bonusTransactions, setBonusTransactions] = useState([]);
   const [bonusLoading, setBonusLoading] = useState(false);
-  const [resumingOrderId, setResumingOrderId] = useState(null);
 
   const tripTypes = ["ALL TRIPS", "Completed", "Cancelled", "Pending"];
 
@@ -118,89 +112,6 @@ export const HistoryV2 = () => {
     const name = first.name || first.itemName || 'Item';
     return `${qty}x ${name}${items.length > 1 ? ` +${items.length - 1} more` : ''}`;
   }
-
-  const mapTripStatusFromOrder = (order) => {
-    const backendStatus = String(order?.deliveryStatus || order?.orderState?.status || order?.orderStatus || order?.status || "").toLowerCase();
-    const currentPhase = String(order?.deliveryState?.currentPhase || "").toLowerCase();
-
-    if (['delivered', 'completed'].includes(backendStatus)) return 'COMPLETED';
-    if (currentPhase === 'at_drop' || currentPhase === 'at_delivery' || backendStatus === 'reached_drop') return 'REACHED_DROP';
-    if (currentPhase === 'en_route_to_delivery' || backendStatus === 'order_confirmed' || backendStatus === 'en_route_to_delivery' || backendStatus === 'picked_up') return 'PICKED_UP';
-    if (currentPhase === 'at_pickup' || backendStatus === 'reached_pickup') return 'REACHED_PICKUP';
-    return 'PICKING_UP';
-  };
-
-  const getLoc = (ref, keysLat = ['latitude', 'lat'], keysLng = ['longitude', 'lng']) => {
-    if (!ref) return null;
-    if (ref.location) {
-      if (Array.isArray(ref.location.coordinates) && ref.location.coordinates.length >= 2) {
-        const lat = Number(ref.location.coordinates[1]);
-        const lng = Number(ref.location.coordinates[0]);
-        if (Number.isFinite(lat) && Number.isFinite(lng)) return { lat, lng };
-      }
-      const lat = Number(ref.location.latitude ?? ref.location.lat);
-      const lng = Number(ref.location.longitude ?? ref.location.lng);
-      if (Number.isFinite(lat) && Number.isFinite(lng)) return { lat, lng };
-    }
-    if (Array.isArray(ref.coordinates) && ref.coordinates.length >= 2) {
-      const lat = Number(ref.coordinates[1]);
-      const lng = Number(ref.coordinates[0]);
-      if (Number.isFinite(lat) && Number.isFinite(lng)) return { lat, lng };
-    }
-    for (let i = 0; i < keysLat.length; i += 1) {
-      const lat = Number(ref[keysLat[i]]);
-      const lng = Number(ref[keysLng[i]]);
-      if (Number.isFinite(lat) && Number.isFinite(lng)) return { lat, lng };
-    }
-    return null;
-  };
-
-  const handleResumePendingTrip = async (trip) => {
-    const tripStatus = String(trip?.status || "").toLowerCase();
-    if (tripStatus !== "pending") return;
-
-    const refId = trip?.id || trip?._id || trip?.orderId;
-    if (!refId) {
-      toast.error("Order reference missing.");
-      return;
-    }
-
-    try {
-      setResumingOrderId(refId);
-      const response = await deliveryAPI.getOrderDetails(refId);
-      const order = response?.data?.data?.order;
-      if (!response?.data?.success || !order) {
-        throw new Error(response?.data?.message || "Unable to load pending order.");
-      }
-
-      const restaurantLocation =
-        getLoc(order?.restaurantId) ||
-        getLoc(order?.restaurantLocation) ||
-        getLoc(order, ['restaurant_lat', 'restaurantLat', 'latitude'], ['restaurant_lng', 'restaurantLng', 'longitude']);
-      const customerLocation =
-        getLoc(order?.address) ||
-        getLoc(order?.address?.location) ||
-        getLoc(order?.deliveryAddress) ||
-        getLoc(order?.customerLocation) ||
-        getLoc(order, ['customer_lat', 'customerLat', 'latitude'], ['customer_lng', 'customerLng', 'longitude']);
-
-      const normalizedOrder = {
-        ...order,
-        orderId: order?.orderId || order?._id || trip?.orderId,
-        restaurantLocation,
-        customerLocation
-      };
-
-      setActiveOrder(normalizedOrder);
-      updateTripStatus(mapTripStatusFromOrder(order));
-      navigate('/food/delivery/feed');
-      toast.success('Pending delivery resumed.');
-    } catch (error) {
-      toast.error(error?.response?.data?.message || error?.message || "Failed to resume pending trip.");
-    } finally {
-      setResumingOrderId(null);
-    }
-  };
 
   return (
     <div className="min-h-screen bg-white font-poppins pb-32">
@@ -318,15 +229,7 @@ export const HistoryV2 = () => {
                    const isCOD = (trip.paymentMethod || '').toLowerCase() === 'cash' || (trip.paymentMethod || '').toLowerCase() === 'cod';
 
                    return (
-                      <button
-                        key={trip.orderId || idx}
-                        type="button"
-                        disabled={!isPending || resumingOrderId === (trip.id || trip._id || trip.orderId)}
-                        onClick={() => handleResumePendingTrip(trip)}
-                        className={`w-full text-left bg-white rounded-2xl p-5 border border-gray-100 shadow-sm transition-all ${
-                          isPending ? 'active:scale-[0.99] cursor-pointer' : 'cursor-default'
-                        } ${resumingOrderId === (trip.id || trip._id || trip.orderId) ? 'opacity-70' : ''}`}
-                      >
+                      <div key={trip.orderId || idx} className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm active:scale-[0.99] transition-all">
                          <div className="flex justify-between items-start mb-2">
                              <div>
                                 <h4 className="text-base font-bold text-gray-950">{trip.orderId || 'ORDER-ID'}</h4>
@@ -358,7 +261,7 @@ export const HistoryV2 = () => {
                                 <p className="text-sm font-bold text-gray-950">₹{payout.toFixed(2)}</p>
                              </div>
                          </div>
-                      </button>
+                      </div>
                    );
                 })}
              </div>
