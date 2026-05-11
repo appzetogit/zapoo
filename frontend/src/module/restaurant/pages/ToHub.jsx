@@ -454,6 +454,12 @@ export default function ToHub() {
     change: "- 0%",
     color: "#2563eb"
   }]);
+  const [offersAnalytics, setOffersAnalytics] = useState({
+    offerClicks: null,
+    offerRedemptions: 0,
+    conversionRatePct: null,
+    costPerRedemption: 0
+  });
   const [recommendedStats, setRecommendedStats] = useState({
     count: 0,
     revenue: 0,
@@ -1285,6 +1291,7 @@ export default function ToHub() {
       const chart = Array.isArray(analytics.chartData) ? analytics.chartData : [];
       const mealtime = Array.isArray(analytics.mealtime) ? analytics.mealtime : [];
       const customers = Array.isArray(analytics.customers) ? analytics.customers : [];
+      const offers = analytics.offers && typeof analytics.offers === "object" ? analytics.offers : null;
 
       if (chart.length) {
         setChartData(chart);
@@ -1297,6 +1304,29 @@ export default function ToHub() {
 
       if (mealtime.length) setMealtimeMetrics(mealtime);
       if (customers.length) setCustomersMetrics(customers);
+      if (offers) {
+        const rawOfferClicks = offers.offerClicks;
+        const rawConversionRatePct = offers.conversionRatePct;
+        const parsedOfferClicks = Number(rawOfferClicks);
+        const parsedConversionRatePct = Number(rawConversionRatePct);
+        setOffersAnalytics({
+          offerClicks: rawOfferClicks === null || rawOfferClicks === undefined || rawOfferClicks === ""
+            ? null
+            : (Number.isFinite(parsedOfferClicks) ? parsedOfferClicks : null),
+          offerRedemptions: Number(offers.offerRedemptions || 0),
+          conversionRatePct: rawConversionRatePct === null || rawConversionRatePct === undefined || rawConversionRatePct === ""
+            ? null
+            : (Number.isFinite(parsedConversionRatePct) ? parsedConversionRatePct : null),
+          costPerRedemption: Number(offers.costPerRedemption || 0)
+        });
+      } else {
+        setOffersAnalytics({
+          offerClicks: null,
+          offerRedemptions: 0,
+          conversionRatePct: null,
+          costPerRedemption: 0
+        });
+      }
 
       // Kept as-is for now; this card still depends on item-level attribution flow.
       setRecommendedStats({
@@ -1672,27 +1702,27 @@ export default function ToHub() {
     value: "0",
     change: "- 0%"
   }];
-  const offersMetrics = [{
+  const offersMetrics = useMemo(() => [{
     title: "Offer clicks",
-    value: "0",
-    change: "- 0%",
+    value: offersAnalytics.offerClicks == null ? "N/A" : String(offersAnalytics.offerClicks),
+    change: "-",
     sub: "Clicks on offers"
   }, {
     title: "Offer redemptions",
-    value: "0",
-    change: "- 0%",
+    value: String(offersAnalytics.offerRedemptions || 0),
+    change: "-",
     sub: "Total redeemed"
   }, {
     title: "Conversion rate",
-    value: "0%",
-    change: "- 0%",
+    value: offersAnalytics.conversionRatePct == null ? "N/A" : `${offersAnalytics.conversionRatePct.toFixed(1)}%`,
+    change: "-",
     sub: "Redemptions / clicks"
   }, {
     title: "Cost per redemption",
-    value: "INR 0",
-    change: "- 0%",
+    value: `INR ${Number(offersAnalytics.costPerRedemption || 0).toFixed(2)}`,
+    change: "-",
     sub: "Est. cost"
-  }];
+  }], [offersAnalytics]);
   const offersCardSummary = {
     grossSales: "INR 0",
     grossPct: "0%",

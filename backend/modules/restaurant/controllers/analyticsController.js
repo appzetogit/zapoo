@@ -197,6 +197,45 @@ const buildMealtimeMetrics = (orders) => {
   ];
 };
 
+const buildOffersMetrics = (orders, totalOrders) => {
+  const safeTotalOrders = Number(totalOrders) || 0;
+  const offerOrders = orders.filter((order) => {
+    const discount = Number(order?.pricing?.discount || 0);
+    const couponCode = String(order?.pricing?.couponCode || "").trim();
+    return discount > 0 || couponCode.length > 0;
+  });
+
+  const offerRedemptions = offerOrders.length;
+  const grossSalesFromOffers = offerOrders.reduce(
+    (sum, order) => sum + Number(order?.pricing?.subtotal || 0),
+    0
+  );
+  const totalDiscountGiven = offerOrders.reduce(
+    (sum, order) => sum + Number(order?.pricing?.discount || 0),
+    0
+  );
+
+  const effectiveDiscountRate =
+    grossSalesFromOffers > 0 ? (totalDiscountGiven / grossSalesFromOffers) * 100 : 0;
+  const ordersFromOffersRate =
+    safeTotalOrders > 0 ? (offerRedemptions / safeTotalOrders) * 100 : 0;
+  const costPerRedemption =
+    offerRedemptions > 0 ? totalDiscountGiven / offerRedemptions : 0;
+
+  return {
+    // Click tracking is not yet persisted in current order/analytics flow.
+    offerClicks: null,
+    offerRedemptions,
+    conversionRatePct: null,
+    costPerRedemption,
+    grossSalesFromOffers,
+    totalDiscountGiven,
+    ordersFromOffers: offerRedemptions,
+    effectiveDiscountRate,
+    ordersFromOffersRate,
+  };
+};
+
 export const getRestaurantAnalytics = asyncHandler(async (req, res) => {
   try {
     const restaurant = req.restaurant;
@@ -259,6 +298,7 @@ export const getRestaurantAnalytics = asyncHandler(async (req, res) => {
     }));
     const totalOrders = filteredOrders.length;
     const averageOrderValue = totalOrders ? totalSales / totalOrders : 0;
+    const offers = buildOffersMetrics(filteredOrders, totalOrders);
 
     const ordersByUser = new Map();
     ordersTillEnd.forEach((order) => {
@@ -333,6 +373,7 @@ export const getRestaurantAnalytics = asyncHandler(async (req, res) => {
       chartData,
       mealtime: buildMealtimeMetrics(filteredOrders),
       customers,
+      offers,
       lastUpdated: new Date(),
     });
   } catch (error) {
