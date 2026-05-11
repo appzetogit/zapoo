@@ -124,6 +124,21 @@ const getBucketKeyFromDate = (period, date) => {
 };
 
 const buildMealtimeMetrics = (orders) => {
+  const getMinutesInIndiaTime = (dateInput) => {
+    const date = new Date(dateInput);
+    if (Number.isNaN(date.getTime())) return null;
+    const parts = new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Asia/Kolkata",
+      hour12: false,
+      hour: "2-digit",
+      minute: "2-digit",
+    }).formatToParts(date);
+    const hour = Number(parts.find((p) => p.type === "hour")?.value);
+    const minute = Number(parts.find((p) => p.type === "minute")?.value);
+    if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
+    return hour * 60 + minute;
+  };
+
   const buckets = {
     breakfast: { count: 0, color: "#111827" },
     lunch: { count: 0, color: "#ef4444" },
@@ -133,8 +148,8 @@ const buildMealtimeMetrics = (orders) => {
   };
 
   orders.forEach((order) => {
-    const d = new Date(order.createdAt);
-    const minutes = d.getHours() * 60 + d.getMinutes();
+    const minutes = getMinutesInIndiaTime(order.createdAt);
+    if (minutes == null) return;
     if (minutes >= 420 && minutes < 660) buckets.breakfast.count += 1;
     else if (minutes >= 660 && minutes < 960) buckets.lunch.count += 1;
     else if (minutes >= 960 && minutes < 1140) buckets.eveningSnacks.count += 1;

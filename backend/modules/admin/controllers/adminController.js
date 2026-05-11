@@ -2664,6 +2664,35 @@ export const getRestaurantAnalytics = asyncHandler(async (req, res) => {
           }
         },
         {
+          $lookup: {
+            from: 'orders',
+            localField: 'orderId',
+            foreignField: '_id',
+            as: 'orderDoc'
+          }
+        },
+        {
+          $unwind: {
+            path: '$orderDoc',
+            preserveNullAndEmptyArrays: true
+          }
+        },
+        {
+          $addFields: {
+            effectiveSettlementDate: {
+              $ifNull: [
+                '$orderDoc.deliveredAt',
+                {
+                  $ifNull: [
+                    '$orderDoc.updatedAt',
+                    '$createdAt'
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
           $facet: {
             summary: [
               {
@@ -2674,44 +2703,44 @@ export const getRestaurantAnalytics = asyncHandler(async (req, res) => {
                   totalFoodPrice: { $sum: { $ifNull: ["$restaurantEarning.foodPrice", 0] } },
                   monthlyCommission: {
                     $sum: {
-                      $cond: [{ $gte: ["$createdAt", startOfMonth] }, { $ifNull: ["$restaurantEarning.commission", 0] }, 0]
+                      $cond: [{ $gte: ["$effectiveSettlementDate", startOfMonth] }, { $ifNull: ["$restaurantEarning.commission", 0] }, 0]
                     }
                   },
                   monthlyRestaurantEarning: {
                     $sum: {
-                      $cond: [{ $gte: ["$createdAt", startOfMonth] }, { $ifNull: ["$restaurantEarning.netEarning", 0] }, 0]
+                      $cond: [{ $gte: ["$effectiveSettlementDate", startOfMonth] }, { $ifNull: ["$restaurantEarning.netEarning", 0] }, 0]
                     }
                   },
                   yearlyCommission: {
                     $sum: {
-                      $cond: [{ $gte: ["$createdAt", startOfYear] }, { $ifNull: ["$restaurantEarning.commission", 0] }, 0]
+                      $cond: [{ $gte: ["$effectiveSettlementDate", startOfYear] }, { $ifNull: ["$restaurantEarning.commission", 0] }, 0]
                     }
                   },
                   yearlyRestaurantEarning: {
                     $sum: {
-                      $cond: [{ $gte: ["$createdAt", startOfYear] }, { $ifNull: ["$restaurantEarning.netEarning", 0] }, 0]
+                      $cond: [{ $gte: ["$effectiveSettlementDate", startOfYear] }, { $ifNull: ["$restaurantEarning.netEarning", 0] }, 0]
                     }
                   },
                   monthlyCompletedOrders: {
                     $sum: {
-                      $cond: [{ $gte: ["$createdAt", startOfMonth] }, 1, 0]
+                      $cond: [{ $gte: ["$effectiveSettlementDate", startOfMonth] }, 1, 0]
                     }
                   },
                   yearlyCompletedOrders: {
                     $sum: {
-                      $cond: [{ $gte: ["$createdAt", startOfYear] }, 1, 0]
+                      $cond: [{ $gte: ["$effectiveSettlementDate", startOfYear] }, 1, 0]
                     }
                   }
                 }
               }
             ],
             monthlyBuckets: [
-              { $match: { createdAt: { $gte: last12MonthsStart } } },
+              { $match: { effectiveSettlementDate: { $gte: last12MonthsStart } } },
               {
                 $group: {
                   _id: {
-                    year: { $year: "$createdAt" },
-                    month: { $month: "$createdAt" }
+                    year: { $year: "$effectiveSettlementDate" },
+                    month: { $month: "$effectiveSettlementDate" }
                   },
                   netEarning: { $sum: { $ifNull: ["$restaurantEarning.netEarning", 0] } }
                 }
