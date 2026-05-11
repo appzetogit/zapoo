@@ -35,6 +35,11 @@ export const useProximityCheck = () => {
     return null;
   };
 
+  const parseRangeLimit = (value, fallback = 500) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+  };
+
   // Determine current target based on trip state
   const targetLocation = useMemo(() => {
     if (!activeOrder) return null;
@@ -72,8 +77,8 @@ export const useProximityCheck = () => {
 
   // Determine current range limit from admin settings
   const actionLimit = useMemo(() => {
-    if (tripStatus === 'PICKING_UP') return settings.pickupRangeLimit || 500;
-    if (tripStatus === 'PICKED_UP') return settings.deliveryRangeLimit || 500;
+    if (tripStatus === 'PICKING_UP') return parseRangeLimit(settings.pickupRangeLimit, 500);
+    if (tripStatus === 'PICKED_UP') return parseRangeLimit(settings.deliveryRangeLimit, 500);
     return 500;
   }, [tripStatus, settings]);
 
@@ -90,12 +95,32 @@ export const useProximityCheck = () => {
     );
   }, [riderLocation, targetLocation]);
 
+  // Fallback route distance (km -> meters) when live GPS/target resolution is temporarily unavailable.
+  const fallbackDistanceMeters = useMemo(() => {
+    if (!activeOrder) return Infinity;
+    if (['PICKING_UP', 'REACHED_PICKUP'].includes(tripStatus)) {
+      const pickupKm = Number(activeOrder?.deliveryState?.routeToPickup?.distance);
+      if (Number.isFinite(pickupKm) && pickupKm >= 0) return pickupKm * 1000;
+    }
+    if (['PICKED_UP', 'REACHED_DROP'].includes(tripStatus)) {
+      const dropKm =
+        Number(activeOrder?.deliveryState?.routeToCustomer?.distance) ||
+        Number(activeOrder?.deliveryState?.routeToDelivery?.distance);
+      if (Number.isFinite(dropKm) && dropKm >= 0) return dropKm * 1000;
+    }
+    return Infinity;
+  }, [activeOrder, tripStatus]);
+
+  const effectiveDistanceToTarget = Number.isFinite(distanceToTarget)
+    ? distanceToTarget
+    : fallbackDistanceMeters;
+
   // Dev mode bypass
   const isDevMode = import.meta.env.VITE_APP_MODE === 'developer' || 
                     import.meta.env.VITE_ENABLE_RANGE_BYPASS === 'true' ||
                     import.meta.env.DEV;
 
-  const isWithinRange = isDevMode ? true : (distanceToTarget <= actionLimit);
+  const isWithinRange = isDevMode ? true : (effectiveDistanceToTarget <= actionLimit);
 
   useEffect(() => {
     if (!activeOrder) return;
@@ -119,13 +144,14 @@ export const useProximityCheck = () => {
         activeOrder?.user?.location
       ),
       distanceToTarget,
+      effectiveDistanceToTarget,
       actionLimit,
       isWithinRange
     });
-  }, [activeOrder, tripStatus, riderLocation, targetLocation, distanceToTarget, actionLimit, isWithinRange]);
+  }, [activeOrder, tripStatus, riderLocation, targetLocation, distanceToTarget, effectiveDistanceToTarget, actionLimit, isWithinRange]);
 
   return {
-    distanceToTarget,
+    distanceToTarget: effectiveDistanceToTarget,
     isWithinRange,
     actionLimit,
   };
