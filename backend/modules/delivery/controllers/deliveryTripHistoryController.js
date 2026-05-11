@@ -229,6 +229,10 @@ export const getTripHistory = asyncHandler(async (req, res) => {
       if (paymentMethod !== 'cash' && codOrderIds.has(order._id?.toString())) {
         paymentMethod = 'cash';
       }
+      const normalizedPaymentMethod = String(paymentMethod || '').toLowerCase();
+      const isCodOrder = normalizedPaymentMethod === 'cash' || normalizedPaymentMethod === 'cod' || normalizedPaymentMethod === 'cash_on_delivery';
+      const orderTotal = Number(order.pricing?.total) || 0;
+      const codCollectedAmount = (displayStatus === 'Completed' && isCodOrder) ? orderTotal : 0;
 
       return {
         id: order._id.toString(),
@@ -240,6 +244,8 @@ export const getTripHistory = asyncHandler(async (req, res) => {
         time,
         amount,
         paymentMethod: paymentMethod,
+        orderTotal,
+        codCollectedAmount,
         payment: {
           method: paymentMethod
         },
