@@ -2656,7 +2656,13 @@ export const getRestaurantAnalytics = asyncHandler(async (req, res) => {
         }
       ]),
       OrderSettlement.aggregate([
-        { $match: { restaurantId: restaurantIdForSettlement } },
+        {
+          $match: {
+            restaurantId: restaurantIdForSettlement,
+            settlementStatus: 'completed',
+            'restaurantEarning.status': { $ne: 'cancelled' }
+          }
+        },
         {
           $facet: {
             summary: [
@@ -2684,6 +2690,16 @@ export const getRestaurantAnalytics = asyncHandler(async (req, res) => {
                   yearlyRestaurantEarning: {
                     $sum: {
                       $cond: [{ $gte: ["$createdAt", startOfYear] }, { $ifNull: ["$restaurantEarning.netEarning", 0] }, 0]
+                    }
+                  },
+                  monthlyCompletedOrders: {
+                    $sum: {
+                      $cond: [{ $gte: ["$createdAt", startOfMonth] }, 1, 0]
+                    }
+                  },
+                  yearlyCompletedOrders: {
+                    $sum: {
+                      $cond: [{ $gte: ["$createdAt", startOfYear] }, 1, 0]
                     }
                   }
                 }
@@ -2767,14 +2783,14 @@ export const getRestaurantAnalytics = asyncHandler(async (req, res) => {
     const totalOrders = (orderStatusMap.delivered || 0) + (orderStatusMap.cancelled || 0) + (orderStatusMap.pending || 0) + (orderStatusMap.confirmed || 0) + (orderStatusMap.preparing || 0) + (orderStatusMap.ready || 0) + (orderStatusMap.out_for_delivery || 0);
     const completedOrders = orderStatusMap.delivered || 0;
     const cancelledOrders = orderStatusMap.cancelled || 0;
-    const monthlyOrders = monthlyStats[0]?.count || 0;
-    const yearlyOrders = yearlyStats[0]?.count || 0;
 
     const settlementSummary = settlementStats[0] || {};
     let totalCommission = Math.round((settlementSummary.totalCommission || 0) * 100) / 100;
     let totalRestaurantEarning = Math.round((settlementSummary.totalRestaurantEarning || 0) * 100) / 100;
     let monthlyRestaurantEarning = Math.round((settlementSummary.monthlyRestaurantEarning || 0) * 100) / 100;
     let yearlyRestaurantEarning = Math.round((settlementSummary.yearlyRestaurantEarning || 0) * 100) / 100;
+    const monthlyOrdersForProfit = Number(settlementSummary.monthlyCompletedOrders) || 0;
+    const yearlyOrdersForProfit = Number(settlementSummary.yearlyCompletedOrders) || 0;
 
     const monthlyEarningsMap = new Map();
     monthlySettlementBuckets.forEach((bucket) => {
@@ -2851,8 +2867,8 @@ export const getRestaurantAnalytics = asyncHandler(async (req, res) => {
         totalRevenue: parseFloat(totalRevenue.toFixed(2)),
         totalCommission: parseFloat(totalCommission.toFixed(2)),
         restaurantEarning: parseFloat(totalRestaurantEarning.toFixed(2)),
-        monthlyOrders,
-        yearlyOrders,
+        monthlyOrders: monthlyOrdersForProfit,
+        yearlyOrders: yearlyOrdersForProfit,
         averageMonthlyProfit: parseFloat(avgMonthlyProfit.toFixed(2)),
         averageYearlyProfit: parseFloat(averageYearlyProfit.toFixed(2)),
         status: restaurant.isActive ? "active" : "inactive",

@@ -367,21 +367,27 @@ export const ProfileDetailsV2 = () => {
         return toast.error("Invalid UPI ID (e.g. user@bank)")
       }
 
-      // Send as FormData to support optional QR upload
-      const formData = new FormData()
-      formData.append("documents[bankDetails][accountHolderName]", (bankDetails.accountHolderName || "").trim())
-      formData.append("documents[bankDetails][accountNumber]", (bankDetails.accountNumber || "").trim())
-      formData.append("documents[bankDetails][ifscCode]", (bankDetails.ifscCode || "").trim().toUpperCase())
-      formData.append("documents[bankDetails][bankName]", (bankDetails.bankName || "").trim())
-      formData.append("documents[bankDetails][upiId]", (bankDetails.upiId || "").trim())
-      formData.append("documents[pan][number]", (bankDetails.panNumber || "").trim().toUpperCase())
-
-      if (upiQrFile) {
-        formData.append("upiQrCode", upiQrFile)
+      // Use JSON payload for /delivery/profile (this endpoint does not parse multipart payloads).
+      const payload = {
+        documents: {
+          bankDetails: {
+            accountHolderName: (bankDetails.accountHolderName || "").trim(),
+            accountNumber: (bankDetails.accountNumber || "").trim(),
+            ifscCode: (bankDetails.ifscCode || "").trim().toUpperCase(),
+            bankName: (bankDetails.bankName || "").trim(),
+            upiId: (bankDetails.upiId || "").trim(),
+          },
+          pan: {
+            number: (bankDetails.panNumber || "").trim().toUpperCase(),
+          }
+        }
       }
 
-      await deliveryAPI.updateBankDetailsMultipart(formData)
+      await deliveryAPI.updateProfile(payload)
       toast.success("Bank details updated")
+      if (upiQrFile) {
+        toast.message("UPI QR selected hai, lekin current profile API me QR image persistence enabled nahi hai.")
+      }
       setShowBankDetailsPopup(false)
       setUpiQrFile(null)
       setUpiQrPreview(null)
