@@ -318,7 +318,8 @@ export default function OrderTracking() {
               } : order.restaurantLocation,
               deliveryPartnerId: apiOrder.deliveryPartnerId?._id || apiOrder.deliveryPartnerId || apiOrder.assignmentInfo?.deliveryPartnerId || null,
               assignmentInfo: apiOrder.assignmentInfo || null,
-              deliveryState: apiOrder.deliveryState || null
+              deliveryState: apiOrder.deliveryState || null,
+              deliveryVerification: apiOrder.deliveryVerification || null
             };
             setOrder(transformedOrder);
             setOrderStatus(deriveTrackingUiStatus(apiOrder));

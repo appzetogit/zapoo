@@ -195,6 +195,20 @@ export const useOrderManager = () => {
   const completeDelivery = async (otp) => {
     const orderId = activeOrder?.orderId;
     try {
+      // Ensure drop OTP is generated before verification.
+      // In some resumes/refresh paths rider can land directly on verify step
+      // without hitting the explicit "reached drop" action.
+      const existingOtpCode = String(activeOrder?.deliveryVerification?.dropOtp?.code || "").trim();
+      if (!existingOtpCode) {
+        const reachedDropRes = await deliveryAPI.confirmReachedDrop(orderId);
+        if (reachedDropRes?.data?.success && reachedDropRes?.data?.data?.order) {
+          setActiveOrder({
+            ...(activeOrder || {}),
+            ...reachedDropRes.data.data.order
+          });
+        }
+      }
+
       // 1. Verify OTP first
       const verifyRes = await deliveryAPI.verifyDropOtp(orderId, otp);
       
