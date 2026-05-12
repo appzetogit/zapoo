@@ -1341,6 +1341,9 @@ export const publicAPI = {
   getTerms: (params = {}) => {
     return apiClient.get(API_ENDPOINTS.ADMIN.TERMS_PUBLIC, { params });
   },
+  getSupportContact: () => {
+    return apiClient.get(API_ENDPOINTS.ADMIN.SUPPORT_PUBLIC);
+  },
   getBusinessSettings: (params = {}) => {
     return apiClient.get(API_ENDPOINTS.ADMIN.BUSINESS_SETTINGS_PUBLIC, { params });
   },

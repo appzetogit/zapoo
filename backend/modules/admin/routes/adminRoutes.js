@@ -168,6 +168,10 @@ import {
   updateCodeOfConduct,
 } from "../controllers/codeOfConductController.js";
 import {
+  getSupport,
+  updateSupport,
+} from "../controllers/supportContactController.js";
+import {
   getAllFeedbacks,
   getFeedbackById,
   updateFeedbackStatus,
@@ -437,6 +441,10 @@ router.put("/cancellation", updateCancellation);
 // Code Of Conduct Management
 router.get("/code-of-conduct", getCodeOfConduct);
 router.put("/code-of-conduct", updateCodeOfConduct);
+
+// Shared Support Contact Management
+router.get("/support", getSupport);
+router.put("/support", updateSupport);
 
 // Feedback Management
 router.get("/feedback", getAllFeedbacks);

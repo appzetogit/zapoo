@@ -311,6 +311,8 @@ export const API_ENDPOINTS = {
     TERMS_PUBLIC: "/terms/public",
     PRIVACY: "/admin/privacy",
     PRIVACY_PUBLIC: "/privacy/public",
+    SUPPORT: "/admin/support",
+    SUPPORT_PUBLIC: "/support/public",
     REFUND: "/admin/refund",
     REFUND_PUBLIC: "/refund/public",
     SHIPPING: "/admin/shipping",

@@ -30,6 +30,7 @@ import { ProfileDetailsV2 } from './pages/profile/ProfileDetailsV2';
 import TermsAndConditionsV2 from './pages/TermsAndConditionsV2';
 import PrivacyPolicyV2 from './pages/PrivacyPolicyV2';
 import NotificationsV2 from './pages/NotificationsV2';
+import Support from './pages/Support';
 
 
 
@@ -56,6 +57,8 @@ const DeliveryV2Router = () => {
         <Route path="signup/details" element={<SignupStep1 />} />
         <Route path="signup/documents" element={<SignupStep2 />} />
         <Route path="terms" element={<TermsAndConditionsV2 />} />
+        <Route path="privacy" element={<PrivacyPolicyV2 />} />
+        <Route path="support" element={<Support />} />
 
         {/* Protected Core Routes */}
         <Route path="/" element={<ProtectedRoute><DeliveryHomeV2 tab="feed" /></ProtectedRoute>} />

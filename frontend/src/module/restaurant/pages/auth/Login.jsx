@@ -534,6 +534,8 @@ export default function RestaurantLogin() {
             <span>|</span>
             <Link to="/restaurant/legal/privacy">Privacy</Link>
             <span>|</span>
+            <Link to="/restaurant/support">Support</Link>
+            <span>|</span>
             <Link to="/restaurant/legal/code-of-conduct">Code of Conduct</Link>
           </div>
         </div>
@@ -541,4 +543,3 @@ export default function RestaurantLogin() {
     </div>
   )
 }
-

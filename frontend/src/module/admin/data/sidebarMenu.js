@@ -382,6 +382,10 @@ export const sidebarMenuData = [
             label: "Cancellation Policy",
             path: "/admin/pages-social-media/cancellation",
           },
+          {
+            label: "Support",
+            path: "/admin/pages-social-media/support",
+          },
         ],
       },
     ],

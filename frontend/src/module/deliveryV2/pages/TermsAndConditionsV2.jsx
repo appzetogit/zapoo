@@ -14,7 +14,7 @@ export default function TermsAndConditionsV2() {
     const fetchTerms = async () => {
       try {
         const response = await api.get(API_ENDPOINTS.ADMIN.TERMS_PUBLIC, {
-          params: { userType: 'delivery' }
+          params: { module: "delivery" }
         })
         const payload = response?.data?.data || response?.data || {}
         if (response?.data?.success) {

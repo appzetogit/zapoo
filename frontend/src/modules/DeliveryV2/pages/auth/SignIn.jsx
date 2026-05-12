@@ -194,8 +194,12 @@ export default function DeliverySignIn() {
 
           <footer className="mt-auto pt-10 text-center">
             <p className="text-[10px] text-zinc-400 dark:text-zinc-600 font-medium tracking-wide uppercase">
-              By continuing you agree to the<br />
-              <Link to="/food/delivery/terms" className="text-[#ff525d] font-black">Delivery Charter</Link>
+              By continuing you agree to<br />
+              <Link to="/food/delivery/terms" className="text-[#ff525d] font-black">Terms</Link>
+              <span className="mx-1 text-zinc-400">|</span>
+              <Link to="/food/delivery/privacy" className="text-[#ff525d] font-black">Privacy</Link>
+              <span className="mx-1 text-zinc-400">|</span>
+              <Link to="/food/delivery/support" className="text-[#ff525d] font-black">Support</Link>
             </p>
           </footer>
         </div>

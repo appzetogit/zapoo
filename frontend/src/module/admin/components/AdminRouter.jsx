@@ -107,6 +107,7 @@ const RefundPolicy = lazy(() => import("../pages/settings/RefundPolicy"));
 const ShippingPolicy = lazy(() => import("../pages/settings/ShippingPolicy"));
 const CancellationPolicy = lazy(() => import("../pages/settings/CancellationPolicy"));
 const CodeOfConduct = lazy(() => import("../pages/settings/CodeOfConduct"));
+const SupportContact = lazy(() => import("../pages/settings/SupportContact"));
 const ReactRegistration = lazy(() => import("../pages/settings/ReactRegistration"));
 // System Settings
 const ThirdParty = lazy(() => import("../pages/system/ThirdParty"));
@@ -136,6 +137,7 @@ const PAGE_ALLOWED_MODULES = {
   refund: ["user"],
   shipping: ["user"],
   cancellation: ["user"],
+  support: ["user"],
 };
 const getRememberedModule = (pageKey) => {
   if (typeof window === "undefined") return "user";
@@ -321,6 +323,7 @@ export default function AdminRouter() {
           <Route path="pages-social-media/:module/shipping" element={<ShippingPolicy />} />
           <Route path="pages-social-media/:module/cancellation" element={<CancellationPolicy />} />
           <Route path="pages-social-media/:module/code-of-conduct" element={<CodeOfConduct />} />
+          <Route path="pages-social-media/support" element={<SupportContact />} />
           <Route
             path="pages-social-media/terms"
             element={<PagesSocialMediaRedirect pageKey="terms" slug="terms" />}

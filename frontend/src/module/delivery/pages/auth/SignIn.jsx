@@ -165,6 +165,14 @@ export default function DeliverySignIn() {
               <Link to="/delivery/terms" className="text-[#DC2626] hover:underline">
                 Terms and Conditions
               </Link>
+              {" "}•{" "}
+              <Link to="/delivery/privacy" className="text-[#DC2626] hover:underline">
+                Privacy Policy
+              </Link>
+              {" "}•{" "}
+              <Link to="/delivery/support" className="text-[#DC2626] hover:underline">
+                Support
+              </Link>
             </p>
           </div>
         </div>

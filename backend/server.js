@@ -52,6 +52,7 @@ import feedbackPublicRoutes from './modules/admin/routes/feedbackPublicRoutes.js
 import feedbackExperiencePublicRoutes from './modules/admin/routes/feedbackExperiencePublicRoutes.js';
 import safetyEmergencyPublicRoutes from './modules/admin/routes/safetyEmergencyPublicRoutes.js';
 import zonePublicRoutes from './modules/admin/routes/zonePublicRoutes.js';
+import supportPublicRoutes from './modules/admin/routes/supportPublicRoutes.js';
 import subscriptionRoutes from './modules/subscription/index.js';
 import subscriptionAdminRoutes from './modules/admin/routes/subscriptionAdminRoutes.js';
 import uploadModuleRoutes from './modules/upload/index.js';
@@ -392,6 +393,7 @@ app.use('/api', feedbackPublicRoutes);
 app.use('/api', feedbackExperiencePublicRoutes);
 app.use('/api', safetyEmergencyPublicRoutes);
 app.use('/api', zonePublicRoutes);
+app.use('/api', supportPublicRoutes);
 app.use('/api/subscription', subscriptionRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/admin/subscriptions', subscriptionAdminRoutes);

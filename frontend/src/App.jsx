@@ -30,6 +30,7 @@ const RestaurantGoogleCallback = lazy(() => import("@/module/restaurant/pages/au
 const RestaurantWelcome = lazy(() => import("@/module/restaurant/pages/auth/Welcome"))
 const RestaurantLegalTerms = lazy(() => import("@/module/restaurant/pages/legal/TermsPage"))
 const RestaurantLegalPrivacy = lazy(() => import("@/module/restaurant/pages/legal/PrivacyPage"))
+const RestaurantLegalSupport = lazy(() => import("@/module/restaurant/pages/legal/Support"))
 const RestaurantLegalCodeOfConduct = lazy(() => import("@/module/restaurant/pages/legal/CodeOfConductPage"))
 
 const AdvertisementsPage = lazy(() => import("@/module/restaurant/pages/AdvertisementsPage"))
@@ -125,6 +126,7 @@ export default function App() {
         <Route path="/restaurant/auth/google-callback" element={<AuthRedirect module="restaurant"><RestaurantGoogleCallback /></AuthRedirect>} />
         <Route path="/restaurant/legal/terms" element={<RestaurantLegalTerms />} />
         <Route path="/restaurant/legal/privacy" element={<RestaurantLegalPrivacy />} />
+        <Route path="/restaurant/support" element={<RestaurantLegalSupport />} />
         <Route path="/restaurant/legal/code-of-conduct" element={<RestaurantLegalCodeOfConduct />} />
 
         {/* Restaurant Protected Routes */}
@@ -644,6 +646,8 @@ export default function App() {
         <Route path="/delivery/otp" element={<Navigate to="/food/delivery/otp" replace />} />
         <Route path="/delivery/welcome" element={<Navigate to="/food/delivery/welcome" replace />} />
         <Route path="/delivery/terms" element={<Navigate to="/food/delivery/terms" replace />} />
+        <Route path="/delivery/privacy" element={<Navigate to="/food/delivery/privacy" replace />} />
+        <Route path="/delivery/support" element={<Navigate to="/food/delivery/support" replace />} />
 
         {/* Delivery Signup Routes (Protected - require authentication) */}
         <Route

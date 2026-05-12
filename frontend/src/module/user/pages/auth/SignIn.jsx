@@ -778,6 +778,8 @@ const sanitizeNameInput = (value) => value.replace(/[^a-zA-Z\s]/g, "")
             <span>•</span>
             <Link to="/profile/privacy" className="underline hover:text-gray-700 dark:hover:text-gray-300 transition-colors">{t("user.auth.signIn.privacyPolicy")}</Link>
             <span>•</span>
+            <Link to="/support" className="underline hover:text-gray-700 dark:hover:text-gray-300 transition-colors">Support</Link>
+            <span>•</span>
             <Link to="/profile/content-policy" className="underline hover:text-gray-700 dark:hover:text-gray-300 transition-colors">{t("user.auth.signIn.contentPolicy")}</Link>
           </div>
         </div>
@@ -785,4 +787,3 @@ const sanitizeNameInput = (value) => value.replace(/[^a-zA-Z\s]/g, "")
     </div>
   </AnimatedPage>;
 }
-

@@ -249,6 +249,10 @@ export default function AdminSidebar({ isOpen = false, onClose, onCollapseChange
   }, [searchQuery])
 
   const isActive = (path, allPaths = []) => {
+    if (path === "/admin/pages-social-media/support") {
+      return location.pathname === path;
+    }
+
     if (path?.startsWith("/admin/pages-social-media/")) {
       const slug = path.split("/").pop()
       const moduleScopedPattern = new RegExp(`^/admin/pages-social-media/[^/]+/${slug}(/|$)`)

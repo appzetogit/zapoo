@@ -56,6 +56,7 @@ const Settings = lazy(() => import("../pages/profile/Settings"))
 const About = lazy(() => import("../pages/profile/About"))
 const Terms = lazy(() => import("../pages/profile/Terms"))
 const Privacy = lazy(() => import("../pages/profile/Privacy"))
+const Support = lazy(() => import("../pages/profile/Support"))
 const ContentPolicy = lazy(() => import("../pages/profile/ContentPolicy"))
 const Refund = lazy(() => import("../pages/profile/Refund"))
 const Shipping = lazy(() => import("../pages/profile/Shipping"))
@@ -248,6 +249,7 @@ export default function UserRouter() {
           />
           <Route path="/profile/terms" element={<Terms />} />
           <Route path="/profile/privacy" element={<Privacy />} />
+          <Route path="/support" element={<Support />} />
           <Route path="/profile/content-policy" element={<ContentPolicy />} />
           <Route
             path="/profile/refund"
