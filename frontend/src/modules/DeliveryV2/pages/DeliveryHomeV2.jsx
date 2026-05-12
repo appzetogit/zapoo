@@ -269,7 +269,7 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
         const response = await deliveryAPI.getCurrentDelivery();
         const rawData = response?.data?.data?.activeOrder || response?.data?.data;
         const serverData = (rawData && (rawData._id || rawData.orderId)) ? rawData : null;
-        
+
         if (serverData) {
           // Robust location mapping (Same as acceptOrder logic)
           const getLoc = (ref, keysLat, keysLng) => {
@@ -300,7 +300,7 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
             getLoc(serverData.restaurantId, ['latitude', 'lat'], ['longitude', 'lng']) ||
             getLoc(serverData.restaurantLocation, ['latitude', 'lat'], ['longitude', 'lng']) ||
             getLoc(serverData, ['restaurant_lat', 'restaurantLat', 'latitude'], ['restaurant_lng', 'restaurantLng', 'longitude']);
-                         
+
           const cusLoc =
             getLoc(serverData.address, ['latitude', 'lat'], ['longitude', 'lng']) ||
             getLoc(serverData.address?.location, ['latitude', 'lat'], ['longitude', 'lng']) ||
@@ -315,7 +315,7 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
           };
 
           setActiveOrder(syncedOrder);
-          
+
           const backendStatus = serverData.deliveryStatus || serverData.orderState?.status || serverData.orderStatus || serverData.status;
           const currentPhase = serverData.deliveryState?.currentPhase;
 
@@ -330,12 +330,12 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
           } else if (['confirmed', 'preparing', 'ready_for_pickup'].includes(backendStatus)) {
             updateTripStatus('PICKING_UP');
           }
-        } else {
-          clearActiveOrder();
         }
-      } catch (err) { 
-        console.error('Order Sync Failed:', err); 
-        clearActiveOrder();
+        // If server has no active order but we have a persisted one from localStorage, keep it.
+        // Let the UI use the Zustand-persisted activeOrder and tripStatus instead.
+      } catch (err) {
+        console.error('Order Sync Failed:', err);
+        // Don't clear activeOrder on network error - we might have a locally-persisted one
       }
     };
     syncWithServer();
