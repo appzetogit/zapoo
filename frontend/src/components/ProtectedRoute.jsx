@@ -16,6 +16,9 @@ import { determineStepToShow } from "@/module/restaurant/utils/onboardingUtils";
  */
 export default function ProtectedRoute({ children, requiredRole, loginPath }) {
   const location = useLocation();
+  const bypassRestaurantOnboardingForLogin =
+    requiredRole === "restaurant" &&
+    sessionStorage.getItem("restaurant_login_onboarding_bypass") === "true";
   const [subscriptionLoading, setSubscriptionLoading] = useState(requiredRole === "restaurant");
   const [hasActiveSubscription, setHasActiveSubscription] = useState(true);
   const [featureLock, setFeatureLock] = useState(null);
@@ -71,7 +74,7 @@ export default function ProtectedRoute({ children, requiredRole, loginPath }) {
         const stepToShow = determineStepToShow(restaurant?.onboarding);
         setOnboardingStepToShow(stepToShow);
 
-        if (stepToShow) {
+        if (stepToShow && !bypassRestaurantOnboardingForLogin) {
           setHasActiveSubscription(true);
           setFeatureLock(null);
           return;
@@ -129,7 +132,7 @@ export default function ProtectedRoute({ children, requiredRole, loginPath }) {
     return () => {
       isMounted = false;
     };
-  }, [allowedWithoutSubscription, gatedRestaurantPaths, location.pathname, requiredRole]);
+  }, [allowedWithoutSubscription, gatedRestaurantPaths, location.pathname, requiredRole, bypassRestaurantOnboardingForLogin]);
 
   // Check if user is authenticated for the required module using module-specific token
   if (!requiredRole) {
@@ -175,7 +178,11 @@ export default function ProtectedRoute({ children, requiredRole, loginPath }) {
 
   if (requiredRole === "restaurant") {
     const path = location.pathname;
-    if (onboardingStepToShow && !path.startsWith("/restaurant/onboarding")) {
+    if (
+      onboardingStepToShow &&
+      !bypassRestaurantOnboardingForLogin &&
+      !path.startsWith("/restaurant/onboarding")
+    ) {
       return <Navigate to={`/restaurant/onboarding?step=${onboardingStepToShow}`} replace />;
     }
 

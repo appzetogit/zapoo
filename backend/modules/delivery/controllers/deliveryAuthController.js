@@ -13,6 +13,43 @@ const logger = winston.createLogger({
   })]
 });
 
+const buildPhoneLookupVariants = (rawPhone) => {
+  const value = String(rawPhone || '').trim();
+  if (!value) return [];
+
+  const digits = value.replace(/\D/g, '');
+  const variants = new Set([value, value.replace(/\s+/g, '')]);
+
+  if (digits) {
+    variants.add(digits);
+    variants.add(`+${digits}`);
+  }
+
+  // India-specific normalization (frontend primarily uses +91)
+  if (digits.length === 10) {
+    variants.add(`+91${digits}`);
+    variants.add(`91${digits}`);
+    variants.add(`+91 ${digits}`);
+  } else if (digits.length === 12 && digits.startsWith('91')) {
+    const local10 = digits.slice(2);
+    variants.add(local10);
+    variants.add(`+${digits}`);
+    variants.add(`+91${local10}`);
+    variants.add(`+91 ${local10}`);
+    variants.add(`91${local10}`);
+  } else if (digits.length > 10 && digits.startsWith('0')) {
+    variants.add(digits.replace(/^0+/, ''));
+  }
+
+  return Array.from(variants).filter(Boolean);
+};
+
+const findDeliveryByPhone = async (phone) => {
+  const variants = buildPhoneLookupVariants(phone);
+  if (!variants.length) return null;
+  return Delivery.findOne({ phone: { $in: variants } });
+};
+
 const getSignupStatus = delivery => {
   const hasBasicDetails = Boolean(
     delivery?.name?.trim() &&
@@ -96,13 +133,12 @@ export const verifyOTP = asyncHandler(async (req, res) => {
   const normalizedName = name && typeof name === 'string' ? name.trim() : null;
   try {
     let delivery;
+    let isExistingDeliveryLogin = false;
     const identifier = phone;
     if (purpose === 'register') {
       // Registration flow
       // Check if delivery boy already exists
-      delivery = await Delivery.findOne({
-        phone
-      });
+      delivery = await findDeliveryByPhone(phone);
       if (delivery) {
         return errorResponse(res, 400, 'Delivery boy already exists with this phone number. Please login.');
       }
@@ -141,9 +177,8 @@ export const verifyOTP = asyncHandler(async (req, res) => {
       }
     } else {
       // Login (with optional auto-registration)
-      delivery = await Delivery.findOne({
-        phone
-      });
+      delivery = await findDeliveryByPhone(phone);
+      isExistingDeliveryLogin = Boolean(delivery);
 
       // Verify OTP first (before creating user)
       await otpService.verifyOTP(phone, otp, purpose, null);
@@ -164,9 +199,7 @@ export const verifyOTP = asyncHandler(async (req, res) => {
           delivery = await Delivery.create(deliveryData);
         } catch (createError) {
           if (createError.code === 11000) {
-            delivery = await Delivery.findOne({
-              phone
-            });
+            delivery = await findDeliveryByPhone(phone);
             if (!delivery) {
               throw createError;
             }
@@ -185,7 +218,9 @@ export const verifyOTP = asyncHandler(async (req, res) => {
     }
 
     const signupStatus = getSignupStatus(delivery);
-    if (signupStatus.needsSignup) {
+    // Existing registered delivery partners should not be forced back into onboarding on login.
+    // Keep onboarding flow only for new/registration flows.
+    if (signupStatus.needsSignup && !isExistingDeliveryLogin) {
       // Generate tokens for signup flow
       const tokens = jwtService.generateTokens({
         userId: delivery._id.toString(),

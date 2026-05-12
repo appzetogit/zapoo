@@ -190,7 +190,10 @@ export default function DeliveryOTP() {
       const data = response?.data?.data || {};
 
       // Check if user needs to complete signup
-      if (data.needsSignup) {
+      // Only explicit boolean true should trigger signup redirection.
+      const requiresSignup =
+        data?.needsSignup === true || data?.needsRegistration === true;
+      if (requiresSignup) {
         const signupStep = data.signupStep === "documents" ? "documents" : "details";
 
         // Store tokens for authenticated signup flow
