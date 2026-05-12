@@ -5,7 +5,6 @@ import { toast } from "sonner";
 import { subscriptionAPI, restaurantAPI } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import BottomNavOrders from "../components/BottomNavOrders";
 
 const formatFeatureLabel = (feature) => {
     if (!feature) return "";
@@ -435,8 +434,6 @@ export default function SubscriptionPlans() {
                     </div>
                 </div>
             )}
-
-            <BottomNavOrders />
         </div>
     );
 }

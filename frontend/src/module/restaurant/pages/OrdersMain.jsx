@@ -2000,6 +2000,7 @@ function OrderCard({
   photoUrl,
   photoAlt,
   deliveryPartnerId,
+  deliveryAssigned,
   restaurantMongoId,
   onSelect,
   onCancel,
@@ -2007,6 +2008,7 @@ function OrderCard({
 }) {
   const displayStatus = status === "confirmed" ? "preparing" : status;
   const isReady = displayStatus === "ready" || displayStatus === "Ready";
+  const isDeliveryAssigned = deliveryAssigned !== undefined ? Boolean(deliveryAssigned) : Boolean(deliveryPartnerId);
   const [isCallingDeliveryPartner, setIsCallingDeliveryPartner] = useState(false);
 
   const handleCallDeliveryPartner = async (e) => {
@@ -2112,19 +2114,19 @@ function OrderCard({
               <div className="flex items-center gap-1.5 flex-wrap">
                 <span
                   className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${
-                    deliveryPartnerId
+                    isDeliveryAssigned
                       ? "bg-green-100 text-green-700 border border-green-300"
                       : "bg-blue-100 text-blue-700 border border-blue-300"
                   }`}
                 >
                   <span
                     className={`h-1.5 w-1.5 rounded-full ${
-                      deliveryPartnerId ? "bg-green-500" : "bg-blue-500"
+                      isDeliveryAssigned ? "bg-green-500" : "bg-blue-500"
                     }`}
                   />
-                  {deliveryPartnerId ? "Assigned" : "Not Assigned"}
+                  {isDeliveryAssigned ? "Assigned" : "Not Assigned"}
                 </span>
-                {!deliveryPartnerId && displayStatus !== "preparing" && (
+                {!isDeliveryAssigned && displayStatus !== "preparing" && (
                   <ResendNotificationButton
                     orderId={orderId}
                     mongoId={mongoId}
@@ -2173,6 +2175,12 @@ function OrderCard({
     </div>
   </div>;
 }
+
+const isDeliveryAcceptedOrAssigned = (order) => {
+  const stateStatus = String(order?.deliveryState?.status || "").toLowerCase();
+  const acceptedStates = new Set(["accepted", "reached_pickup", "order_confirmed", "en_route_to_delivery", "delivered"]);
+  return Boolean(order?.deliveryPartnerId || order?.assignmentInfo?.deliveryPartnerId || acceptedStates.has(stateStatus));
+};
 
 // Preparing Orders List
 function PreparingOrders({
@@ -2244,7 +2252,8 @@ function PreparingOrders({
               itemsSummary: order.items?.map(item => `${item.quantity}x ${item.name}`).join(', ') || 'No items',
               photoUrl: order.items?.[0]?.image || null,
               photoAlt: order.items?.[0]?.name || 'Order',
-              deliveryPartnerId: order.deliveryPartnerId || null // Track if delivery partner is assigned
+              deliveryPartnerId: order.deliveryPartnerId || null, // For call action
+              deliveryAssigned: isDeliveryAcceptedOrAssigned(order)
             };
           });
           if (isMounted) {
@@ -2461,7 +2470,9 @@ function ReadyOrders({
             // Don't show ETA for ready orders
             itemsSummary: order.items?.map(item => `${item.quantity}x ${item.name}`).join(', ') || 'No items',
             photoUrl: order.items?.[0]?.image || null,
-            photoAlt: order.items?.[0]?.name || 'Order'
+            photoAlt: order.items?.[0]?.name || 'Order',
+            deliveryPartnerId: order.deliveryPartnerId || null,
+            deliveryAssigned: isDeliveryAcceptedOrAssigned(order)
           }));
           if (isMounted) {
             setOrders(transformedOrders);
@@ -2558,7 +2569,9 @@ const OutForDeliveryOrders = ({
             eta: null,
             itemsSummary: order.items?.map(item => `${item.quantity}x ${item.name}`).join(', ') || 'No items',
             photoUrl: order.items?.[0]?.image || null,
-            photoAlt: order.items?.[0]?.name || 'Order'
+            photoAlt: order.items?.[0]?.name || 'Order',
+            deliveryPartnerId: order.deliveryPartnerId || null,
+            deliveryAssigned: isDeliveryAcceptedOrAssigned(order)
           }));
           if (isMounted) {
             setOrders(transformedOrders);
