@@ -1,6 +1,7 @@
 import Order from '../../order/models/Order.js';
 import OrderSettlement from '../../order/models/OrderSettlement.js';
 import RestaurantCommission from '../../admin/models/RestaurantCommission.js';
+import Tier from '../../admin/models/Tier.js';
 import WithdrawalRequest from '../models/WithdrawalRequest.js';
 import RestaurantWallet from '../models/RestaurantWallet.js';
 import { successResponse, errorResponse } from '../../../shared/utils/response.js';
@@ -124,6 +125,26 @@ export const getRestaurantFinance = asyncHandler(async (req, res) => {
         .sort({ deliveredAt: -1 })
         .lean();
 
+      const normalizeTierId = (value) => {
+        if (!value) return null;
+        const asString = String(value).trim();
+        if (!asString || !mongoose.Types.ObjectId.isValid(asString)) return null;
+        return asString;
+      };
+
+      const tierIds = new Set();
+      orders.forEach((order) => {
+        const orderTierId = normalizeTierId(order?.pricing?.pricingMeta?.tierId);
+        if (orderTierId) tierIds.add(orderTierId);
+      });
+
+      const tierDocs = tierIds.size > 0
+        ? await Tier.find({ _id: { $in: [...tierIds] } }).select('_id recommendedItemFee').lean()
+        : [];
+      const tierRecommendedFeeMap = new Map(
+        (tierDocs || []).map((doc) => [String(doc._id), Number(doc?.recommendedItemFee || 0)])
+      );
+
       const orderIds = orders.map(order => order._id).filter(Boolean);
       const settlements = orderIds.length > 0
         ? await OrderSettlement.find({ orderId: { $in: orderIds } })
@@ -191,15 +212,26 @@ export const getRestaurantFinance = asyncHandler(async (req, res) => {
         totalRestaurantToAdminDeliveryFeeExclGst += restaurantToAdminDeliveryFeeExclGst;
         totalRestaurantToAdminDeliveryFeeInclGst += restaurantToAdminDeliveryFeeInclGst;
 
-        const internalFee = order.pricing?.internalRecommendedFee || 0;
-        recFees += internalFee;
+        const recommendedItemQuantity = (order.items || []).reduce((sum, item) => {
+          if (item.isRecommended) {
+            return sum + Number(item.quantity || 1);
+          }
+          return sum;
+        }, 0);
 
+        recCount += recommendedItemQuantity;
         (order.items || []).forEach(item => {
           if (item.isRecommended) {
-            recCount += (item.quantity || 1);
             recRev += (item.price || 0) * (item.quantity || 1);
           }
         });
+
+        const orderTierId = normalizeTierId(order?.pricing?.pricingMeta?.tierId);
+        const recommendedFeePerItem = orderTierId ? Number(tierRecommendedFeeMap.get(orderTierId) || 0) : 0;
+        const internalFee = recommendedItemQuantity > 0 && recommendedFeePerItem > 0
+          ? recommendedFeePerItem * recommendedItemQuantity
+          : 0;
+        recFees += internalFee;
 
         return {
           orderId: order.orderId || order._id.toString(),

@@ -811,11 +811,10 @@ export const calculateOrderPricing = async ({
     const gst = gstBreakdown.total;
 
     let internalRecommendedFee = 0;
-    let recommendedFeePerItem = Number(feeSettings.recommendedItemFee || 0);
-
-    if (tier?.recommendedItemFee !== undefined && tier?.recommendedItemFee !== null) {
-      recommendedFeePerItem = Number(tier.recommendedItemFee);
-    }
+    // Source of truth: tier.recommendedItemFee only.
+    const recommendedFeePerItem = (tier?.recommendedItemFee !== undefined && tier?.recommendedItemFee !== null)
+      ? Number(tier.recommendedItemFee)
+      : 0;
 
     // Authoritative recommended-item resolution must be server-side (Menu master),
     // not client payload flags, to avoid missing fee when app omits isRecommended.

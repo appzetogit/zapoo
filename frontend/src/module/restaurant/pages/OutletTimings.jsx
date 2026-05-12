@@ -20,8 +20,10 @@ const stringToTime = timeString => {
   }
   const [hours, minutes] = timeString.split(":").map(Number);
   // Ensure valid hours (0-23) and minutes (0-59)
-  const validHours = Math.max(0, Math.min(23, hours || 9));
-  const validMinutes = Math.max(0, Math.min(59, minutes || 0));
+  const parsedHours = Number(hours);
+  const parsedMinutes = Number(minutes);
+  const validHours = Number.isFinite(parsedHours) ? Math.max(0, Math.min(23, parsedHours)) : 9;
+  const validMinutes = Number.isFinite(parsedMinutes) ? Math.max(0, Math.min(59, parsedMinutes)) : 0;
   return new Date(2000, 0, 1, validHours, validMinutes);
 };
 
@@ -61,8 +63,8 @@ const toHHmmFromAny = (input) => {
     let hh = Number(m[1]);
     const mm = Number(m[2]);
     const period = String(m[3]).toLowerCase();
-    hh = Math.max(1, Math.min(12, hh || 9));
-    const mins = Math.max(0, Math.min(59, mm || 0));
+    hh = Number.isFinite(hh) ? Math.max(1, Math.min(12, hh)) : 9;
+    const mins = Number.isFinite(mm) ? Math.max(0, Math.min(59, mm)) : 0;
     let h24 = hh % 12;
     if (period === "pm") h24 += 12;
     return `${String(h24).padStart(2, "0")}:${String(mins).padStart(2, "0")}`;
@@ -162,7 +164,7 @@ export default function OutletTimings() {
               const parseSlotTime = (time, period) => {
                 if (!time) return "09:00";
                 const [hours, minutes] = time.split(":").map(Number);
-                let hour24 = hours || 9;
+                let hour24 = Number.isFinite(Number(hours)) ? Number(hours) : 9;
                 if (period === "pm" && hour24 !== 12) hour24 += 12;
                 if (period === "am" && hour24 === 12) hour24 = 0;
                 return `${hour24.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;

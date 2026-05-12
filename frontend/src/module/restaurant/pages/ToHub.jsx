@@ -1280,18 +1280,32 @@ export default function ToHub() {
       const endDateISO = new Date(endDate);
       endDateISO.setHours(23, 59, 59, 999);
 
-      const response = await restaurantAPI.getAnalytics({
+      const analyticsResponse = await restaurantAPI.getAnalytics({
         period: graphFilter,
         startDate: startDateISO.toISOString(),
         endDate: endDateISO.toISOString()
       });
 
-      const analytics = response?.data?.data || {};
+      let financeData = {};
+      try {
+        const financeResponse = await restaurantAPI.getFinance({
+          startDate: startDateISO.toISOString(),
+          endDate: endDateISO.toISOString()
+        });
+        financeData = financeResponse?.data?.data || {};
+      } catch (financeError) {
+        if (financeError?.response?.status !== 401) {
+          console.error("Error fetching finance for recommended stats:", financeError);
+        }
+      }
+
+      const analytics = analyticsResponse?.data?.data || {};
       const summary = analytics.summary || {};
       const chart = Array.isArray(analytics.chartData) ? analytics.chartData : [];
       const mealtime = Array.isArray(analytics.mealtime) ? analytics.mealtime : [];
       const customers = Array.isArray(analytics.customers) ? analytics.customers : [];
       const offers = analytics.offers && typeof analytics.offers === "object" ? analytics.offers : null;
+      const recommendedItems = financeData?.currentCycle?.recommendedItems || {};
 
       if (chart.length) {
         setChartData(chart);
@@ -1328,12 +1342,18 @@ export default function ToHub() {
         });
       }
 
-      // Kept as-is for now; this card still depends on item-level attribution flow.
+      const recommendedCount = Number(recommendedItems.count || 0);
+      const recommendedRevenue = Number(recommendedItems.revenue || 0);
+      const recommendedFees = Number(recommendedItems.fees || 0);
+      const recommendedContribution = totalSalesValue > 0
+        ? Number(((recommendedRevenue / totalSalesValue) * 100).toFixed(1))
+        : 0;
+
       setRecommendedStats({
-        count: 0,
-        revenue: 0,
-        fees: 0,
-        contribution: 0
+        count: recommendedCount,
+        revenue: recommendedRevenue,
+        fees: recommendedFees,
+        contribution: recommendedContribution
       });
       setLastUpdated(new Date());
     } catch (error) {

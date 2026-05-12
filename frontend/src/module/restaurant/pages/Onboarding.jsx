@@ -109,7 +109,11 @@ const stringToTime = timeString => {
     return null; // Return null so the picker shows empty/placeholder
   }
   const [hours, minutes] = timeString.split(":").map(Number);
-  return new Date(2000, 0, 1, hours || 10, minutes || 0);
+  const parsedHours = Number(hours);
+  const parsedMinutes = Number(minutes);
+  const safeHours = Number.isFinite(parsedHours) ? Math.max(0, Math.min(23, parsedHours)) : 10;
+  const safeMinutes = Number.isFinite(parsedMinutes) ? Math.max(0, Math.min(59, parsedMinutes)) : 0;
+  return new Date(2000, 0, 1, safeHours, safeMinutes);
 };
 
 // Helper function to convert Date object to "HH:mm" string

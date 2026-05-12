@@ -104,8 +104,8 @@ export default function RestaurantStatus() {
             let hh = Number(m[1]);
             const mm = Number(m[2]);
             const period = String(m[3]).toLowerCase();
-            hh = Math.max(1, Math.min(12, hh || 9));
-            const mins = Math.max(0, Math.min(59, mm || 0));
+            hh = Number.isFinite(hh) ? Math.max(1, Math.min(12, hh)) : 9;
+            const mins = Number.isFinite(mm) ? Math.max(0, Math.min(59, mm)) : 0;
             let h24 = hh % 12;
             if (period === "pm") h24 += 12;
             return `${String(h24).padStart(2, "0")}:${String(mins).padStart(2, "0")}`;
