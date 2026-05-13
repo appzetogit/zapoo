@@ -159,16 +159,6 @@ export default function RestaurantOTP() {
     setIsLoading(true);
     setError("");
 
-    // For email-based signup, use a two-step UX:
-    // ...
-    if (contactType === "email" && authData?.isSignUp && !showNameInput) {
-      // First step: show name input, don't hit backend yet (only for signups)
-      setShowNameInput(true);
-      setError("");
-      setIsLoading(false);
-      return;
-    }
-
     // If we are on step 2 for email signup (or any flow where name input is visible), require name
     if (showNameInput) {
       if (!name.trim()) {

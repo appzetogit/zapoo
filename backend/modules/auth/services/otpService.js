@@ -255,13 +255,13 @@ class OTPService {
         otpRecord = await Otp.findOne(query);
 
         if (!otpRecord) {
-          // CRITICAL FIX: Check if it was extremely recently verified (last 10 seconds)
-          // This handles cases where the user clicks twice or the frontend retries.
+          // Allow recently-verified OTP reuse for short two-step flows
+          // (e.g., valid OTP -> ask name -> submit). Keep window bounded.
           const recentlyVerifiedQuery = {
             otp,
             purpose,
             verified: true,
-            updatedAt: { $gt: new Date(Date.now() - 10000) }
+            updatedAt: { $gt: new Date(Date.now() - 5 * 60 * 1000) }
           };
           if (normalizedPhone) {
             if (normalizedPhone.startsWith('91') && normalizedPhone.length === 12) {

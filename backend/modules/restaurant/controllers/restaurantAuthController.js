@@ -366,15 +366,6 @@ export const verifyOTP = asyncHandler(async (req, res) => {
         });
         restaurant = null;
       }
-      if (!restaurant && !name) {
-        // Tell the client that we need restaurant name to proceed with auto-registration
-        return successResponse(res, 200, 'Restaurant not found. Please provide restaurant name for registration.', {
-          needsName: true,
-          identifierType,
-          identifier
-        });
-      }
-
       // Handle reset-password purpose
       if (purpose === 'reset-password') {
         if (!restaurant) {
@@ -390,6 +381,16 @@ export const verifyOTP = asyncHandler(async (req, res) => {
 
       // Verify OTP first (pass normalized phone for consistency with storage)
       await otpService.verifyOTP(normalizedPhone || phone || null, otp, purpose, email || null);
+
+      if (!restaurant && !name) {
+        // OTP is valid, now ask client for name to complete auto-registration.
+        return successResponse(res, 200, 'Restaurant not found. Please provide restaurant name for registration.', {
+          needsName: true,
+          identifierType,
+          identifier
+        });
+      }
+
       if (!restaurant) {
         // Auto-register new restaurant after OTP verification
         const restaurantData = {
