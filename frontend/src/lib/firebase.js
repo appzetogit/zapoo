@@ -57,6 +57,10 @@ function ensureFirebaseInitialized() {
       // Add scopes if needed
       googleProvider.addScope('email');
       googleProvider.addScope('profile');
+      // Force account chooser/consent UI to avoid silent re-login with last account.
+      googleProvider.setCustomParameters({
+        prompt: 'select_account consent'
+      });
       // Note: Don't set custom client_id - Firebase uses its own OAuth client
     }
   } catch (error) {

@@ -226,6 +226,13 @@ export default function RestaurantLogin() {
         typeof window.flutter_inappwebview.callHandler === "function"
 
       if (isFlutterBridgeAvailable) {
+        try {
+          // Best-effort: clear previously selected native Google account if app exposes this handler.
+          await window.flutter_inappwebview.callHandler("nativeGoogleSignOut")
+        } catch {
+          // Ignore if not implemented in native layer.
+        }
+
         const result = await window.flutter_inappwebview.callHandler("nativeGoogleSignIn")
 
         if (result?.success && (result.idToken || result.accessToken)) {
@@ -265,7 +272,15 @@ export default function RestaurantLogin() {
         throw new Error("Flutter Google sign-in did not return a valid token")
       }
 
-      const { signInWithPopup } = await import("firebase/auth")
+      const { signInWithPopup, signOut } = await import("firebase/auth")
+
+      // Always reset Firebase auth session before popup so Google shows account chooser.
+      if (firebaseAuth?.currentUser) {
+        await signOut(firebaseAuth)
+      }
+
+      // Ensure chooser/consent appears on every click (prevents silent last-account login).
+      googleProvider.setCustomParameters({ prompt: "select_account consent" })
 
       // Sign in with Google using Firebase Auth
       const result = await signInWithPopup(firebaseAuth, googleProvider)
