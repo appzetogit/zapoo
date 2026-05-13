@@ -675,7 +675,8 @@ export default function RestaurantOnboarding() {
     window.scrollTo(0, 0);
   }, [step]);
 
-  // Keep URL step in sync with actual UI step to avoid stale ?step mismatches on refresh.
+  // Keep URL step in sync with actual UI step.
+  // Use push navigation so browser back can move between onboarding stages.
   useEffect(() => {
     const currentUrlStep = Number(new URLSearchParams(window.location.search).get("step"));
     const normalizedCurrentUrlStep =
@@ -686,21 +687,36 @@ export default function RestaurantOnboarding() {
 
     if (normalizedCurrentUrlStep === effectiveStep) return;
 
-    navigate(`/restaurant/onboarding?step=${effectiveStep}`, { replace: true });
+    navigate(`/restaurant/onboarding?step=${effectiveStep}`, { replace: false });
   }, [step, navigate]);
 
   useEffect(() => {
     const handleBrowserBack = () => {
-      handleBack();
+      const currentPath = window.location.pathname || "";
+
+      // If browser back tries to leave onboarding flow, force the expected exit:
+      // step 1 back should always land on login.
+      if (!currentPath.startsWith("/restaurant/onboarding")) {
+        clearOnboardingFromLocalStorage();
+        exitToLoginFromOnboarding();
+        return;
+      }
+
+      // If still on onboarding route, derive stage from URL history entry.
+      const stepParam = Number(new URLSearchParams(window.location.search).get("step"));
+      const normalizedStepParam =
+        Number.isFinite(stepParam) && stepParam >= 1 && stepParam <= 3
+          ? Math.trunc(stepParam)
+          : 1;
+      setStep(normalizedStepParam);
     };
 
-    window.history.pushState({ onboarding: true }, "");
     window.addEventListener("popstate", handleBrowserBack);
 
     return () => {
       window.removeEventListener("popstate", handleBrowserBack);
     };
-  }, [handleBack]);
+  }, [exitToLoginFromOnboarding]);
 
   useEffect(() => {
     const fetchData = async () => {
