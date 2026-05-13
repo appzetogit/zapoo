@@ -232,6 +232,14 @@ export default function RestaurantLogin() {
           }
 
           setAuthData("restaurant", accessToken, restaurant)
+          sessionStorage.setItem(
+            "restaurantAuthData",
+            JSON.stringify({
+              method: "email",
+              email: restaurant?.ownerEmail || restaurant?.email || "",
+            })
+          )
+          localStorage.setItem("restaurant_auth_mode", "email")
           window.dispatchEvent(new Event("restaurantAuthChanged"))
           navigatePostGoogleLogin(restaurant)
           return
@@ -268,6 +276,14 @@ export default function RestaurantLogin() {
 
       // Store auth data for restaurant module using utility function
       setAuthData("restaurant", accessToken, restaurant)
+      sessionStorage.setItem(
+        "restaurantAuthData",
+        JSON.stringify({
+          method: "email",
+          email: restaurant?.ownerEmail || restaurant?.email || "",
+        })
+      )
+      localStorage.setItem("restaurant_auth_mode", "email")
 
       // Notify any listeners that auth state has changed
       window.dispatchEvent(new Event("restaurantAuthChanged"))

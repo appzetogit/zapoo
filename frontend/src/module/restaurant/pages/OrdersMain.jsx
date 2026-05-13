@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { checkOnboardingStatus } from "../utils/onboardingUtils";
+import { determineStepToShow } from "../utils/onboardingUtils";
 import { motion, AnimatePresence } from "framer-motion";
 import Lenis from "lenis";
 import { Printer, Volume2, VolumeX, ChevronDown, ChevronUp, Minus, Plus, X, AlertCircle, Loader2, Calendar, Clock, Users, MessageSquare, Phone } from "lucide-react";
@@ -471,17 +471,13 @@ export default function OrdersMain() {
             restaurantId: restaurant._id || null,
           });
 
-          // Check if onboarding is incomplete and redirect if needed
-          const completedSteps = restaurant.onboarding?.completedSteps || 0;
-          if (completedSteps < 4) {
-            // Onboarding is incomplete, redirect to onboarding page
-            const incompleteStep = await checkOnboardingStatus();
-            if (incompleteStep) {
-              navigate(`/restaurant/onboarding?step=${incompleteStep}`, {
-                replace: true
-              });
-              return;
-            }
+          // Keep onboarding routing aligned with shared 3-step utility logic.
+          const incompleteStep = determineStepToShow(restaurant.onboarding);
+          if (incompleteStep) {
+            navigate(`/restaurant/onboarding?step=${incompleteStep}`, {
+              replace: true
+            });
+            return;
           }
         }
       } catch (error) {

@@ -57,6 +57,11 @@ export default function RestaurantGoogleCallback() {
 
         // Store authentication data using utility function
         setAuthData("restaurant", token, user)
+        sessionStorage.setItem("restaurantAuthData", JSON.stringify({
+          method: "email",
+          email: user?.email || ""
+        }))
+        localStorage.setItem("restaurant_auth_mode", "email")
 
         // Notify any listeners that auth state has changed
         window.dispatchEvent(new Event("restaurantAuthChanged"))
@@ -150,5 +155,4 @@ export default function RestaurantGoogleCallback() {
     </div>
   )
 }
-
 

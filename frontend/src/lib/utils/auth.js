@@ -140,6 +140,9 @@ export function clearModuleAuth(module) {
   localStorage.removeItem(`${module}_accessToken`);
   localStorage.removeItem(`${module}_authenticated`);
   localStorage.removeItem(`${module}_user`);
+  if (module === "restaurant") {
+    localStorage.removeItem("restaurant_auth_mode");
+  }
   if (module === "delivery") {
     localStorage.removeItem(DELIVERY_SIGNUP_PENDING_STEP_KEY);
   }

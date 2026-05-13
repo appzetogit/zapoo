@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,8 @@ import { Image as ImageIcon, Upload, Clock, Calendar as CalendarIcon, X } from "
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { uploadAPI, api, subscriptionAPI } from "@/lib/api";
+import { uploadAPI, api } from "@/lib/api";
+import { clearModuleAuth } from "@/lib/utils/auth";
 import { MobileTimePicker } from "@mui/x-date-pickers/MobileTimePicker";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
@@ -282,9 +283,6 @@ export default function RestaurantOnboarding() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [showTrialOffer, setShowTrialOffer] = useState(false);
-  const [trialLoading, setTrialLoading] = useState(false);
-  const [trialError, setTrialError] = useState("");
   const [step1, setStep1] = useState({
     restaurantName: "",
     ownerName: "",
@@ -406,36 +404,23 @@ export default function RestaurantOnboarding() {
 
   const getRestaurantAuthMode = () => {
     try {
+      const authDataRaw = sessionStorage.getItem("restaurantAuthData");
+      if (authDataRaw) {
+        const authData = JSON.parse(authDataRaw);
+        if (authData?.method === "email" || authData?.method === "phone") {
+          return authData.method;
+        }
+      }
+
       const storedMode = localStorage.getItem("restaurant_auth_mode");
       if (storedMode === "email" || storedMode === "phone") {
         return storedMode;
-      }
-
-      const storedUserRaw = localStorage.getItem("restaurant_user");
-      if (storedUserRaw) {
-        const storedUser = JSON.parse(storedUserRaw);
-        const ownerEmail =
-          storedUser?.ownerEmail ||
-          storedUser?.email ||
-          storedUser?.contactEmail ||
-          "";
-        const ownerPhone =
-          storedUser?.ownerPhone ||
-          storedUser?.phone ||
-          storedUser?.contactNumber ||
-          "";
-
-        if (ownerEmail && !ownerEmail.endsWith("@restaurant.appzeto.com")) {
-          return "email";
-        }
-        if (ownerPhone) {
-          return "phone";
-        }
       }
     } catch (err) {
       console.error("Failed to determine restaurant auth mode:", err);
     }
 
+    // Safe default: lock email field when explicit auth mode is unavailable.
     return "email";
   };
 
@@ -540,6 +525,17 @@ export default function RestaurantOnboarding() {
 
   const authMode = getRestaurantAuthMode();
 
+  const exitToLoginFromOnboarding = useCallback(() => {
+    clearModuleAuth("restaurant");
+    navigate("/restaurant/login", { replace: true });
+  }, [navigate]);
+
+  const proceedAfterOnboarding = useCallback(() => {
+    navigate("/restaurant", {
+      replace: true
+    });
+  }, [navigate]);
+
   // Load from localStorage on mount and check URL parameter
   useEffect(() => {
     // Check if step is specified in URL (from OTP login redirect)
@@ -630,6 +626,20 @@ export default function RestaurantOnboarding() {
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [step]);
+
+  useEffect(() => {
+    const handleBrowserBack = () => {
+      exitToLoginFromOnboarding();
+    };
+
+    window.history.pushState({ onboarding: true }, "");
+    window.addEventListener("popstate", handleBrowserBack);
+
+    return () => {
+      window.removeEventListener("popstate", handleBrowserBack);
+    };
+  }, [exitToLoginFromOnboarding]);
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -705,10 +715,10 @@ export default function RestaurantOnboarding() {
           // Determine which step to show based on completeness
           const stepToShow = determineStepToShow(data);
           if (stepToShow == null) {
-            // Onboarding already complete (step 3 is final) - show trial offer flow
+            // Onboarding already complete (step 3 is final).
             clearOnboardingFromLocalStorage();
-            setShowTrialOffer(true);
-            setStep(3);
+            proceedAfterOnboarding();
+            return;
           } else {
             setStep(normalizeStep(stepToShow));
           }
@@ -1245,8 +1255,7 @@ export default function RestaurantOnboarding() {
         // Step 4 removed; onboarding completes after step 3.
         clearOnboardingFromLocalStorage();
 
-        // Show trial offer after completing all steps
-        setShowTrialOffer(true);
+        proceedAfterOnboarding();
       }
     } catch (err) {
       const msg = err?.response?.data?.message || err?.response?.data?.error || err?.message || "Failed to save onboarding data";
@@ -1254,27 +1263,6 @@ export default function RestaurantOnboarding() {
     } finally {
       setSaving(false);
     }
-  };
-  const proceedAfterOnboarding = () => {
-    navigate("/restaurant", {
-      replace: true
-    });
-  };
-  const handleClaimTrial = async () => {
-    setTrialLoading(true);
-    setTrialError("");
-    try {
-      await subscriptionAPI.claimTrial();
-      proceedAfterOnboarding();
-    } catch (err) {
-      const message = err?.response?.data?.message || err?.response?.data?.error || err?.message || "Failed to activate free trial.";
-      setTrialError(message);
-    } finally {
-      setTrialLoading(false);
-    }
-  };
-  const handleSkipTrial = () => {
-    proceedAfterOnboarding();
   };
   const toggleCuisine = cuisine => {
     setStep2(prev => {
@@ -2014,7 +2002,7 @@ export default function RestaurantOnboarding() {
 
       <footer className="px-4 sm:px-6 py-3 bg-white">
         <div className="flex justify-between items-center">
-          <Button variant="ghost" disabled={step === 1 || saving} onClick={() => setStep(s => Math.max(1, s - 1))} className="text-sm text-gray-700 bg-transparent">
+          <Button variant="ghost" disabled={saving} onClick={exitToLoginFromOnboarding} className="text-sm text-gray-700 bg-transparent">
             Back
           </Button>
           <Button onClick={handleNext} disabled={saving} className="text-sm bg-blue-600 text-white px-6 hover:bg-blue-700">
@@ -2023,21 +2011,6 @@ export default function RestaurantOnboarding() {
         </div>
       </footer>
 
-      {showTrialOffer && <div className="fixed inset-0 z-[60] bg-black/30 backdrop-blur-[1px] flex items-center justify-center p-6">
-          <div className="w-full max-w-sm bg-white rounded-2xl shadow-xl p-6 text-center">
-            <div className="text-lg font-bold text-gray-900">Get 1 month free</div>
-            <p className="mt-2 text-sm text-gray-600">
-              Activate your free Growth plan for 30 days. You can use all advanced analytics without paying.
-            </p>
-            {trialError && <p className="mt-3 text-xs text-red-600">{trialError}</p>}
-            <Button onClick={handleClaimTrial} disabled={trialLoading} className="mt-5 w-full h-11 rounded-lg font-bold text-sm bg-gray-900 hover:bg-black text-white">
-              {trialLoading ? "Activating..." : "Get 1 month free"}
-            </Button>
-            <button type="button" onClick={handleSkipTrial} className="mt-3 text-xs font-semibold text-gray-500 hover:text-gray-700">
-              Maybe later
-            </button>
-          </div>
-        </div>}
     </div>
   </LocalizationProvider>;
 }
