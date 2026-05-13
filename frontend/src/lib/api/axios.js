@@ -577,6 +577,14 @@ apiClient.interceptors.response.use(response => {
     window._errorToastCache = toastCache;
     const currentPath = window.location.pathname;
     const isOnboardingPath = currentPath.startsWith("/restaurant/onboarding");
+    const isAuthPath =
+      currentPath.includes("/login") ||
+      currentPath.includes("/otp") ||
+      currentPath.includes("/signup") ||
+      currentPath.includes("/sign-in") ||
+      currentPath.includes("/sign-up") ||
+      currentPath.includes("/forgot-password") ||
+      currentPath.includes("/auth/");
 
     // Show beautiful error toast for each error message
     errorMessages.forEach((errorMessage, index) => {
@@ -585,10 +593,18 @@ apiClient.interceptors.response.use(response => {
         isOnboardingPath &&
         (errorMessageLower.includes("restaurant account is inactive") ||
           errorMessageLower.includes("wait for admin approval"));
+      const isAuthInactiveMessage =
+        isAuthPath &&
+        (errorMessageLower.includes("restaurant account is inactive") ||
+          errorMessageLower.includes("wait for admin approval"));
 
       // During onboarding, suppress inactive-account toasts so the flow isn't blocked/noisy.
       // The onboarding page will handle its own validation/errors.
       if (isOnboardingInactiveMessage) {
+        return;
+      }
+      // On auth pages, suppress inactive-account toasts from background preference calls.
+      if (isAuthInactiveMessage) {
         return;
       }
 

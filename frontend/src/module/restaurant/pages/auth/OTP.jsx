@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { restaurantAPI } from "@/lib/api";
 import { setAuthData as setRestaurantAuthData } from "@/lib/utils/auth";
 import { determineStepToShow } from "../../utils/onboardingUtils";
+const ONBOARDING_SESSION_KEY = "restaurant_onboarding_session";
 export default function RestaurantOTP() {
   const navigate = useNavigate();
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
@@ -246,6 +247,7 @@ export default function RestaurantOTP() {
         setTimeout(async () => {
           // After signup, send to onboarding
           if (authData?.isSignUp) {
+            sessionStorage.setItem(ONBOARDING_SESSION_KEY, "1");
             navigate("/restaurant/onboarding", {
               replace: true
             });
@@ -254,6 +256,7 @@ export default function RestaurantOTP() {
             // fallback redirects on transient onboarding API failures.
             const incompleteStep = determineStepToShow(restaurant?.onboarding);
             if (incompleteStep) {
+              sessionStorage.setItem(ONBOARDING_SESSION_KEY, "1");
               navigate(`/restaurant/onboarding?step=${incompleteStep}`, {
                 replace: true
               });

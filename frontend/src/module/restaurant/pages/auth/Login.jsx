@@ -1,12 +1,13 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { ArrowLeft, Mail, Phone } from "lucide-react"
-import { setAuthData } from "@/lib/utils/auth"
+import { clearModuleAuth, setAuthData } from "@/lib/utils/auth"
 import { Button } from "@/components/ui/button"
 import { restaurantAPI } from "@/lib/api"
 import { firebaseAuth, googleProvider } from "@/lib/firebase"
 import { useCompanyName } from "@/lib/hooks/useCompanyName"
 import { determineStepToShow } from "@/module/restaurant/utils/onboardingUtils"
+const ONBOARDING_SESSION_KEY = "restaurant_onboarding_session"
 
 export default function RestaurantLogin() {
   const companyName = useCompanyName()
@@ -27,6 +28,15 @@ export default function RestaurantLogin() {
   })
   const [isSending, setIsSending] = useState(false)
   const [apiError, setApiError] = useState("")
+
+  useEffect(() => {
+    // Ensure login page always starts in a clean unauthenticated state.
+    // This prevents stale inactive tokens from triggering protected API calls
+    // (e.g. /restaurant/preferences or /restaurant/onboarding) while user is entering number.
+    clearModuleAuth("restaurant")
+    sessionStorage.removeItem(ONBOARDING_SESSION_KEY)
+    window.dispatchEvent(new Event("restaurantAuthChanged"))
+  }, [])
 
   // Phone number validation
   const validatePhone = (phone) => {
@@ -202,6 +212,7 @@ export default function RestaurantLogin() {
     const navigatePostGoogleLogin = (restaurant) => {
       const onboardingStep = determineStepToShow(restaurant?.onboarding)
       if (onboardingStep) {
+        sessionStorage.setItem(ONBOARDING_SESSION_KEY, "1")
         navigate(`/restaurant/onboarding?step=${onboardingStep}`, { replace: true })
         return
       }

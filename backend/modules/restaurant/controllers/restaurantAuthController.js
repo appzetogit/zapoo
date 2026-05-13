@@ -57,6 +57,13 @@ const logger = winston.createLogger({
   })]
 });
 
+const isAbandonedIncompleteRestaurant = restaurant => {
+  if (!restaurant) return false;
+  const completedSteps = Number(restaurant?.onboarding?.completedSteps || 0);
+  // Incomplete onboarding draft that never reached submit-complete state.
+  return restaurant.isActive === false && completedSteps < 3;
+};
+
 /**
  * Send OTP for restaurant phone number or email
  * POST /api/restaurant/auth/send-otp
@@ -137,6 +144,12 @@ export const verifyOTP = asyncHandler(async (req, res) => {
         email: email?.toLowerCase().trim()
       };
       restaurant = await Restaurant.findOne(findQuery);
+      if (isAbandonedIncompleteRestaurant(restaurant)) {
+        await Restaurant.deleteOne({
+          _id: restaurant._id
+        });
+        restaurant = null;
+      }
       if (restaurant) {
         return errorResponse(res, 400, `Restaurant already exists with this ${identifierType}. Please login.`);
       }
@@ -347,6 +360,12 @@ export const verifyOTP = asyncHandler(async (req, res) => {
         };
       }
       restaurant = await Restaurant.findOne(findQuery);
+      if (isAbandonedIncompleteRestaurant(restaurant)) {
+        await Restaurant.deleteOne({
+          _id: restaurant._id
+        });
+        restaurant = null;
+      }
       if (!restaurant && !name) {
         // Tell the client that we need restaurant name to proceed with auto-registration
         return successResponse(res, 200, 'Restaurant not found. Please provide restaurant name for registration.', {

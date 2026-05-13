@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import {
+  clearModuleAuth,
   isModuleAuthenticated,
   getDeliverySignupPendingStep,
 } from "@/lib/utils/auth";
@@ -15,6 +16,8 @@ import { determineStepToShow } from "@/module/restaurant/utils/onboardingUtils";
  * Only allows access if user is authenticated for the specific module
  */
 export default function ProtectedRoute({ children, requiredRole, loginPath }) {
+  const ONBOARDING_SESSION_KEY = "restaurant_onboarding_session";
+  const ONBOARDING_STORAGE_KEY = "restaurant_onboarding_data";
   const location = useLocation();
   const bypassRestaurantOnboardingForLogin =
     requiredRole === "restaurant" &&
@@ -178,6 +181,18 @@ export default function ProtectedRoute({ children, requiredRole, loginPath }) {
 
   if (requiredRole === "restaurant") {
     const path = location.pathname;
+    const hasOnboardingSession = sessionStorage.getItem(ONBOARDING_SESSION_KEY) === "1";
+
+    if (
+      onboardingStepToShow &&
+      !bypassRestaurantOnboardingForLogin &&
+      !hasOnboardingSession
+    ) {
+      clearModuleAuth("restaurant");
+      localStorage.removeItem(ONBOARDING_STORAGE_KEY);
+      return <Navigate to="/restaurant/login" replace />;
+    }
+
     if (
       onboardingStepToShow &&
       !bypassRestaurantOnboardingForLogin &&

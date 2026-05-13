@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -18,6 +18,7 @@ import { useCompanyName } from "@/lib/hooks/useCompanyName";
 const cuisinesOptions = ["North Indian", "South Indian", "Chinese", "Pizza", "Burgers", "Bakery", "Cafe"];
 const daysOfWeek = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const ONBOARDING_STORAGE_KEY = "restaurant_onboarding_data";
+const ONBOARDING_SESSION_KEY = "restaurant_onboarding_session";
 
 // Helper functions for localStorage
 const saveOnboardingToLocalStorage = (step1, step2, step3, currentStep) => {
@@ -210,15 +211,37 @@ const flutterResultToStoredImages = async (result, fallbackNamePrefix) => {
   return storedImages;
 };
 
+const normalizeRestoredImage = value => {
+  if (!value || value instanceof File) return value;
+  if (typeof value === "string") return value;
+
+  const normalized = { ...value };
+  const isBlobPreview =
+    typeof normalized.previewUrl === "string" && normalized.previewUrl.startsWith("blob:");
+  if (isBlobPreview) {
+    if (normalized.dataUrl) {
+      normalized.previewUrl = normalized.dataUrl;
+    } else if (normalized.url) {
+      normalized.previewUrl = normalized.url;
+    } else {
+      delete normalized.previewUrl;
+    }
+  }
+  return normalized;
+};
+
 const getImagePreviewUrl = value => {
   if (value instanceof File) {
     return URL.createObjectURL(value);
   }
-  if (value?.previewUrl) {
-    return value.previewUrl;
-  }
   if (value?.dataUrl) {
     return value.dataUrl;
+  }
+  if (value?.previewUrl) {
+    if (typeof value.previewUrl === "string" && value.previewUrl.startsWith("blob:")) {
+      return value?.url || null;
+    }
+    return value.previewUrl;
   }
   if (value?.url) {
     return value.url;
@@ -278,11 +301,11 @@ function TimeSelector({
 export default function RestaurantOnboarding() {
   const companyName = useCompanyName();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [isFssaiCalendarOpen, setIsFssaiCalendarOpen] = useState(false);
   const [step1, setStep1] = useState({
     restaurantName: "",
     ownerName: "",
@@ -324,6 +347,8 @@ export default function RestaurantOnboarding() {
     accountType: ""
   });
   const hasLocalDraftRef = useRef(false);
+  const hasLocalStepRef = useRef(false);
+  const [isBootstrapped, setIsBootstrapped] = useState(false);
 
   const normalizeStep = (value) => {
     const n = Number(value);
@@ -526,11 +551,13 @@ export default function RestaurantOnboarding() {
   const authMode = getRestaurantAuthMode();
 
   const exitToLoginFromOnboarding = useCallback(() => {
+    sessionStorage.removeItem(ONBOARDING_SESSION_KEY);
     clearModuleAuth("restaurant");
     navigate("/restaurant/login", { replace: true });
   }, [navigate]);
 
   const proceedAfterOnboarding = useCallback(() => {
+    sessionStorage.removeItem(ONBOARDING_SESSION_KEY);
     navigate("/restaurant", {
       replace: true
     });
@@ -538,16 +565,18 @@ export default function RestaurantOnboarding() {
 
   // Load from localStorage on mount and check URL parameter
   useEffect(() => {
-    // Check if step is specified in URL (from OTP login redirect)
-    const stepParam = searchParams.get("step");
-    if (stepParam) {
-      const stepNum = parseInt(stepParam, 10);
-      if (stepNum >= 1 && stepNum <= 3) {
-        setStep(stepNum);
-      }
+    const hasOnboardingSession = sessionStorage.getItem(ONBOARDING_SESSION_KEY) === "1";
+    if (!hasOnboardingSession) {
+      clearOnboardingFromLocalStorage();
+      clearModuleAuth("restaurant");
+      navigate("/restaurant/login", { replace: true });
+      return;
     }
+
+    const stepParam = new URLSearchParams(window.location.search).get("step");
     const localData = loadOnboardingFromLocalStorage();
     if (localData) {
+      hasLocalStepRef.current = Number.isFinite(Number(localData.currentStep));
       hasLocalDraftRef.current = hasMeaningfulOnboardingDraft(localData);
       if (localData.step1) {
         setStep1({
@@ -567,8 +596,8 @@ export default function RestaurantOnboarding() {
       }
       if (localData.step2) {
         setStep2({
-          menuImages: localData.step2.menuImages || [],
-          profileImage: localData.step2.profileImage || null,
+          menuImages: (localData.step2.menuImages || []).map(normalizeRestoredImage),
+          profileImage: normalizeRestoredImage(localData.step2.profileImage) || null,
           cuisines: localData.step2.cuisines || [],
           openingTime: localData.step2.openingTime || "",
           closingTime: localData.step2.closingTime || "",
@@ -579,15 +608,15 @@ export default function RestaurantOnboarding() {
         setStep3({
           panNumber: localData.step3.panNumber || "",
           nameOnPan: localData.step3.nameOnPan || "",
-          panImage: localData.step3.panImage || null,
+          panImage: normalizeRestoredImage(localData.step3.panImage) || null,
           gstRegistered: localData.step3.gstRegistered || false,
           gstNumber: localData.step3.gstNumber || "",
           gstLegalName: localData.step3.gstLegalName || "",
           gstAddress: localData.step3.gstAddress || "",
-          gstImage: localData.step3.gstImage || null,
+          gstImage: normalizeRestoredImage(localData.step3.gstImage) || null,
           fssaiNumber: localData.step3.fssaiNumber || "",
           fssaiExpiry: localData.step3.fssaiExpiry || "",
-          fssaiImage: localData.step3.fssaiImage || null,
+          fssaiImage: normalizeRestoredImage(localData.step3.fssaiImage) || null,
           accountNumber: localData.step3.accountNumber || "",
           confirmAccountNumber: localData.step3.confirmAccountNumber || "",
           ifscCode: localData.step3.ifscCode || "",
@@ -595,9 +624,15 @@ export default function RestaurantOnboarding() {
           accountType: localData.step3.accountType || ""
         });
       }
-      // Only set step from localStorage if URL doesn't have a step parameter
-      if (localData.currentStep && !stepParam) {
+      // Always prioritize locally saved step on refresh.
+      if (localData.currentStep) {
         setStep(normalizeStep(localData.currentStep));
+      }
+    } else if (stepParam) {
+      // Use URL step only when no local draft exists.
+      const stepNum = parseInt(stepParam, 10);
+      if (stepNum >= 1 && stepNum <= 3) {
+        setStep(stepNum);
       }
     }
 
@@ -616,20 +651,47 @@ export default function RestaurantOnboarding() {
         ownerPhone: prev.ownerPhone || prefilledOwnerPhone
       }));
     }
-  }, [searchParams]);
+
+    setIsBootstrapped(true);
+  }, []);
+
+  const handleBack = useCallback(() => {
+    const effectiveStep = normalizeStep(step);
+    if (effectiveStep > 1) {
+      setStep(effectiveStep - 1);
+    } else {
+      clearOnboardingFromLocalStorage();
+      exitToLoginFromOnboarding();
+    }
+  }, [step, exitToLoginFromOnboarding]);
 
   // Save to localStorage whenever step data changes
   useEffect(() => {
+    if (!isBootstrapped) return;
     saveOnboardingToLocalStorage(step1, step2, step3, step);
-  }, [step1, step2, step3, step]);
+  }, [isBootstrapped, step1, step2, step3, step]);
 
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [step]);
 
+  // Keep URL step in sync with actual UI step to avoid stale ?step mismatches on refresh.
+  useEffect(() => {
+    const currentUrlStep = Number(new URLSearchParams(window.location.search).get("step"));
+    const normalizedCurrentUrlStep =
+      Number.isFinite(currentUrlStep) && currentUrlStep >= 1 && currentUrlStep <= 3
+        ? Math.trunc(currentUrlStep)
+        : null;
+    const effectiveStep = normalizeStep(step);
+
+    if (normalizedCurrentUrlStep === effectiveStep) return;
+
+    navigate(`/restaurant/onboarding?step=${effectiveStep}`, { replace: true });
+  }, [step, navigate]);
+
   useEffect(() => {
     const handleBrowserBack = () => {
-      exitToLoginFromOnboarding();
+      handleBack();
     };
 
     window.history.pushState({ onboarding: true }, "");
@@ -638,7 +700,7 @@ export default function RestaurantOnboarding() {
     return () => {
       window.removeEventListener("popstate", handleBrowserBack);
     };
-  }, [exitToLoginFromOnboarding]);
+  }, [handleBack]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -649,8 +711,14 @@ export default function RestaurantOnboarding() {
         const data = payload?.onboarding;
         const baseRestaurantName = payload?.restaurantName || "";
 
-        // If user has a local draft (typed but not submitted yet), don't overwrite it from API on refresh.
-        if (hasLocalDraftRef.current) {
+        // If user has local step/draft state, don't let API step-computation override refresh state.
+        if (hasLocalDraftRef.current || hasLocalStepRef.current) {
+          // Don't overwrite data but still fetch to check if onboarding is complete
+          // Only redirect if onboarding is complete
+          if (data && determineStepToShow(data) === null) {
+            clearOnboardingFromLocalStorage();
+            proceedAfterOnboarding();
+          }
           return;
         }
 
@@ -1037,11 +1105,7 @@ export default function RestaurantOnboarding() {
     setSaving(true);
     try {
       if (effectiveStep === 1) {
-        const payload = {
-          step1,
-          completedSteps: 1
-        };
-        await api.put("/restaurant/onboarding", payload);
+        // Keep step1 local; persist to backend only on final submit.
         setStep(2);
       } else if (effectiveStep === 2) {
         const menuUploads = [];
@@ -1104,35 +1168,18 @@ export default function RestaurantOnboarding() {
         if (!profileUpload || !profileUpload.url) {
           throw new Error('Profile image must be uploaded');
         }
-        const payload = {
-          step2: {
-            menuImageUrls: allMenuUrls.length > 0 ? allMenuUrls : [],
-            profileImageUrl: profileUpload,
-            cuisines: step2.cuisines || [],
-            deliveryTimings: {
-              openingTime: step2.openingTime || "",
-              closingTime: step2.closingTime || ""
-            },
-            openDays: step2.openDays || []
-          },
-          completedSteps: 2
-        };
-        const response = await api.put("/restaurant/onboarding", payload);
-        // Verify response is successful
-        if (!response || !response.data) {
-          throw new Error('Invalid response from server');
-        }
-
-        // After step2, also update restaurant schema with step2 data
-        // This ensures data is saved immediately, not just in onboarding subdocument
-        if (response?.data?.data?.restaurant) { }
-
-        // Only proceed to step 3 if save was successful
-        if (response?.data?.data?.onboarding || response?.data?.data) {
-          setStep(3);
-        } else {
-          throw new Error('Failed to save step2 data');
-        }
+        // Keep step2 local; persist to backend only on final submit.
+        // Store uploaded URLs locally so final payload can be sent once at completion.
+        setStep2(prev => ({
+          ...prev,
+          menuImages: allMenuUrls.length > 0 ? allMenuUrls : [],
+          profileImage: profileUpload,
+          cuisines: prev.cuisines || [],
+          openingTime: prev.openingTime || "",
+          closingTime: prev.closingTime || "",
+          openDays: prev.openDays || []
+        }));
+        setStep(3);
       } else if (effectiveStep === 3) {
         // Upload PAN image if it's a File object
         let panImageUpload = null;
@@ -1222,7 +1269,38 @@ export default function RestaurantOnboarding() {
         if (!fssaiImageUpload || !fssaiImageUpload.url) {
           throw new Error('FSSAI image must be uploaded');
         }
+        const finalStep2MenuUrls = (step2.menuImages || []).filter(img => {
+          if (img instanceof File) return false;
+          if (img?.dataUrl) return false;
+          if (typeof img === "string" && img.startsWith("data:")) return false;
+          return Boolean(img?.url || (typeof img === "string" && img.startsWith("http")));
+        });
+        const finalStep2Profile =
+          step2.profileImage?.url
+            ? step2.profileImage
+            : (typeof step2.profileImage === "string" && step2.profileImage.startsWith("http")
+              ? { url: step2.profileImage }
+              : null);
+
+        if (!finalStep2MenuUrls.length) {
+          throw new Error("At least one menu image must be uploaded");
+        }
+        if (!finalStep2Profile?.url) {
+          throw new Error("Profile image must be uploaded");
+        }
+
         const payload = {
+          step1,
+          step2: {
+            menuImageUrls: finalStep2MenuUrls,
+            profileImageUrl: finalStep2Profile,
+            cuisines: step2.cuisines || [],
+            deliveryTimings: {
+              openingTime: step2.openingTime || "",
+              closingTime: step2.closingTime || ""
+            },
+            openDays: step2.openDays || []
+          },
           step3: {
             pan: {
               panNumber: step3.panNumber || "",
@@ -1837,7 +1915,7 @@ export default function RestaurantOnboarding() {
         </div>
         <div>
           <Label className="text-xs text-gray-700 mb-1 block">FSSAI expiry date*</Label>
-          <Popover>
+          <Popover open={isFssaiCalendarOpen} onOpenChange={setIsFssaiCalendarOpen}>
             <PopoverTrigger asChild>
               <button type="button" className="w-full px-3 py-2 border border-gray-200 rounded-md bg-white text-sm text-left flex items-center justify-between hover:bg-gray-50">
                 <span className={step3.fssaiExpiry ? "text-gray-900" : "text-gray-500"}>
@@ -1859,11 +1937,16 @@ export default function RestaurantOnboarding() {
                 }}
                 onSelect={date => {
                   if (date) {
-                    const formattedDate = date.toISOString().split("T")[0];
+                    // Use local date parts to avoid timezone shift (previous-day bug).
+                    const year = date.getFullYear();
+                    const month = String(date.getMonth() + 1).padStart(2, "0");
+                    const day = String(date.getDate()).padStart(2, "0");
+                    const formattedDate = `${year}-${month}-${day}`;
                     setStep3({
                       ...step3,
                       fssaiExpiry: formattedDate
                     });
+                    setIsFssaiCalendarOpen(false);
                   }
                 }} initialFocus className="rounded-md border border-gray-200" />
             </PopoverContent>
@@ -2002,7 +2085,7 @@ export default function RestaurantOnboarding() {
 
       <footer className="px-4 sm:px-6 py-3 bg-white">
         <div className="flex justify-between items-center">
-          <Button variant="ghost" disabled={saving} onClick={exitToLoginFromOnboarding} className="text-sm text-gray-700 bg-transparent">
+          <Button variant="ghost" disabled={saving} onClick={handleBack} className="text-sm text-gray-700 bg-transparent">
             Back
           </Button>
           <Button onClick={handleNext} disabled={saving} className="text-sm bg-blue-600 text-white px-6 hover:bg-blue-700">

@@ -116,28 +116,21 @@ export default function App() {
         {/* Removed /routes route - Home should be accessed through UserRouter */}
 
         {/* Restaurant Public Routes */}
-        <Route path="/restaurant/welcome" element={<AuthRedirect module="restaurant"><RestaurantWelcome /></AuthRedirect>} />
-        <Route path="/restaurant/auth/sign-in" element={<AuthRedirect module="restaurant"><RestaurantSignIn /></AuthRedirect>} />
-        <Route path="/restaurant/login" element={<AuthRedirect module="restaurant"><RestaurantLogin /></AuthRedirect>} />
-        <Route path="/restaurant/signup" element={<AuthRedirect module="restaurant"><RestaurantSignup /></AuthRedirect>} />
-        <Route path="/restaurant/signup-email" element={<AuthRedirect module="restaurant"><RestaurantSignupEmail /></AuthRedirect>} />
-        <Route path="/restaurant/forgot-password" element={<AuthRedirect module="restaurant"><RestaurantForgotPassword /></AuthRedirect>} />
-        <Route path="/restaurant/otp" element={<AuthRedirect module="restaurant"><RestaurantOTP /></AuthRedirect>} />
-        <Route path="/restaurant/auth/google-callback" element={<AuthRedirect module="restaurant"><RestaurantGoogleCallback /></AuthRedirect>} />
+        <Route path="/restaurant/welcome" element={<RestaurantWelcome />} />
+        <Route path="/restaurant/auth/sign-in" element={<RestaurantSignIn />} />
+        <Route path="/restaurant/login" element={<RestaurantLogin />} />
+        <Route path="/restaurant/signup" element={<RestaurantSignup />} />
+        <Route path="/restaurant/signup-email" element={<RestaurantSignupEmail />} />
+        <Route path="/restaurant/forgot-password" element={<RestaurantForgotPassword />} />
+        <Route path="/restaurant/otp" element={<RestaurantOTP />} />
+        <Route path="/restaurant/auth/google-callback" element={<RestaurantGoogleCallback />} />
         <Route path="/restaurant/legal/terms" element={<RestaurantLegalTerms />} />
         <Route path="/restaurant/legal/privacy" element={<RestaurantLegalPrivacy />} />
         <Route path="/restaurant/support" element={<RestaurantLegalSupport />} />
         <Route path="/restaurant/legal/code-of-conduct" element={<RestaurantLegalCodeOfConduct />} />
 
         {/* Restaurant Protected Routes */}
-        <Route
-          path="/restaurant/onboarding"
-          element={
-            <ProtectedRoute requiredRole="restaurant" loginPath="/restaurant/login">
-              <RestaurantOnboarding />
-            </ProtectedRoute>
-          }
-        />
+        <Route path="/restaurant/onboarding" element={<RestaurantOnboarding />} />
 
         {/* Restaurant Protected Routes - Old Routes */}
         <Route

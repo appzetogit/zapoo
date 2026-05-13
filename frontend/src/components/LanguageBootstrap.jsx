@@ -29,6 +29,19 @@ export default function LanguageBootstrap() {
     const applyLanguage = async () => {
       await setAppLanguage(getStoredLanguage());
 
+      const path = location.pathname || "";
+      const isAuthPath =
+        path.includes("/login") ||
+        path.includes("/otp") ||
+        path.includes("/signup") ||
+        path.includes("/sign-in") ||
+        path.includes("/sign-up") ||
+        path.includes("/forgot-password") ||
+        path.includes("/auth/");
+      if (isAuthPath) {
+        return;
+      }
+
       const module = getModuleFromPath(location.pathname);
       try {
         const response = await fetchLanguageForModule(module);

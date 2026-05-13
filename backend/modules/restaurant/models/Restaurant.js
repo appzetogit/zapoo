@@ -356,7 +356,6 @@ const restaurantSchema = new mongoose.Schema(
       },
       completedSteps: {
         type: Number,
-        default: 0,
       },
     },
     // Approval/Rejection fields
