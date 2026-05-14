@@ -335,6 +335,7 @@ export const useDeliveryNotifications = () => {
             vibrate: [200, 100, 200, 100, 300],
             icon: '/favicon.ico',
             data: notificationOptions.data,
+            actions: [],
           });
           return;
         }
@@ -347,6 +348,7 @@ export const useDeliveryNotifications = () => {
         silent: false,
         icon: '/favicon.ico',
         data: notificationOptions.data,
+        actions: [],
       });
     } catch (error) {
       debugWarn('Error showing background delivery notification:', error);

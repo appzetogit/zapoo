@@ -51,6 +51,74 @@ export default function DeliveryLayout({
     }
   }, [location.pathname])
 
+  useEffect(() => {
+    if (typeof window === "undefined" || !("ontouchstart" in window)) return
+    if (!location.pathname.startsWith("/food/delivery")) return
+
+    let startY = 0
+    let currentY = 0
+    let startTs = 0
+    let atTopOnStart = false
+    let locked = false
+
+    const getScrollableParent = (node) => {
+      let el = node
+      while (el && el !== document.body) {
+        if (!(el instanceof HTMLElement)) break
+        const style = window.getComputedStyle(el)
+        const overflowY = style.overflowY
+        const isScrollable = (overflowY === "auto" || overflowY === "scroll") && el.scrollHeight > el.clientHeight
+        if (isScrollable) return el
+        el = el.parentElement
+      }
+      return document.scrollingElement || document.documentElement
+    }
+
+    const isAtTop = (target) => {
+      const scroller = getScrollableParent(target)
+      if (scroller === document.scrollingElement || scroller === document.documentElement || scroller === document.body) {
+        return window.scrollY <= 0
+      }
+      return scroller.scrollTop <= 0
+    }
+
+    const onTouchStart = (event) => {
+      if (locked || !event.touches?.length) return
+      const touch = event.touches[0]
+      startY = touch.clientY
+      currentY = touch.clientY
+      startTs = Date.now()
+      atTopOnStart = isAtTop(event.target)
+    }
+
+    const onTouchMove = (event) => {
+      if (!event.touches?.length) return
+      currentY = event.touches[0].clientY
+    }
+
+    const onTouchEnd = () => {
+      if (locked || !atTopOnStart) return
+      const pullDistance = currentY - startY
+      const duration = Date.now() - startTs
+
+      // Trigger refresh only for a clear downward pull from top.
+      if (pullDistance > 95 && duration < 900) {
+        locked = true
+        window.location.reload()
+      }
+    }
+
+    window.addEventListener("touchstart", onTouchStart, { passive: true })
+    window.addEventListener("touchmove", onTouchMove, { passive: true })
+    window.addEventListener("touchend", onTouchEnd, { passive: true })
+
+    return () => {
+      window.removeEventListener("touchstart", onTouchStart)
+      window.removeEventListener("touchmove", onTouchMove)
+      window.removeEventListener("touchend", onTouchEnd)
+    }
+  }, [location.pathname])
+
   const showBottomNav = [
     "/food/delivery",
     "/food/delivery/requests",
