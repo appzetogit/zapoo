@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { X, ChevronDown } from "lucide-react"
+import { X } from "lucide-react"
 const debugLog = (...args) => {}
 const debugWarn = (...args) => {}
 const debugError = (...args) => {}
@@ -321,11 +321,14 @@ export default function BottomPopup({
                   e.stopPropagation()
                 }}
                 onTouchEnd={(e) => {
-                  // Handle touch end for mobile collapse toggle
-                  debugLog('?? Handle touched, current collapsed:', isCollapsed)
+                  // Handle touch end for mobile close/collapse toggle
                   e.stopPropagation()
                   e.preventDefault()
-                  handleCollapseToggle(e)
+                  if (closeOnHandleClick) {
+                    handleClose()
+                  } else {
+                    handleCollapseToggle(e)
+                  }
                 }}
                 onMouseDown={(e) => {
                   // Prevent drag when clicking handle
@@ -339,9 +342,6 @@ export default function BottomPopup({
                   background: 'transparent'
                 }}
               >
-                <ChevronDown
-                  className="w-6 h-6 text-gray-400 mb-1 pointer-events-none"
-                />
                 <div
                   className="w-12 h-1.5 bg-gray-300 rounded-full pointer-events-none"
                 />
@@ -362,7 +362,7 @@ export default function BottomPopup({
                     className="ml-auto p-2 rounded-full hover:bg-gray-100 transition-colors"
                     aria-label="Close"
                   >
-                    <ChevronDown className="w-6 h-6 text-gray-600" />
+                    <X className="w-5 h-5 text-gray-600" />
                   </button>
                 )}
               </div>

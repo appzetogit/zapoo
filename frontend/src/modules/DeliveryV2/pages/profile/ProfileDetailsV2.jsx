@@ -9,7 +9,7 @@ import {
 import BottomPopup from "@delivery/components/BottomPopup"
 import { toast } from "sonner"
 import { openCamera, isFlutterBridgeAvailable } from "@food/utils/imageUploadUtils"
-import { deliveryAPI } from "@food/api"
+import { deliveryAPI, uploadAPI } from "@food/api"
 import { motion, AnimatePresence } from "framer-motion"
 import useDeliveryBackNavigation from "../../hooks/useDeliveryBackNavigation"
 
@@ -58,6 +58,7 @@ export const ProfileDetailsV2 = () => {
   const [activePicker, setActivePicker] = useState(null) // { target: 'profilePhoto' | 'upiQrCode', ref: any, title: string }
   const drivingLicenseInputRef = useRef(null)
   const upiQrCameraInputRef = useRef(null)
+  const activeModalCountRef = useRef(0)
 
   // Fetch profile data
   useEffect(() => {
@@ -249,6 +250,56 @@ export const ProfileDetailsV2 = () => {
     }
   }
 
+  const closeActiveModalFromBack = () => {
+    if (showDocumentModal) {
+      setShowDocumentModal(false)
+      setSelectedDocument(null)
+      return true
+    }
+    if (showBankDetailsPopup) {
+      setShowBankDetailsPopup(false)
+      return true
+    }
+    if (showVehiclePopup) {
+      setShowVehiclePopup(false)
+      return true
+    }
+    if (showDeletePopup) {
+      setShowDeletePopup(false)
+      return true
+    }
+    return false
+  }
+
+  useEffect(() => {
+    const openModalCount = [
+      showDocumentModal,
+      showBankDetailsPopup,
+      showVehiclePopup,
+      showDeletePopup,
+    ].filter(Boolean).length
+
+    if (openModalCount > activeModalCountRef.current) {
+      window.history.pushState({ deliveryModal: true }, "")
+    }
+    activeModalCountRef.current = openModalCount
+  }, [showDocumentModal, showBankDetailsPopup, showVehiclePopup, showDeletePopup])
+
+  useEffect(() => {
+    const handlePopState = () => {
+      if (closeActiveModalFromBack()) {
+        return
+      }
+      const isDetailsPath = window.location.pathname.includes("/delivery/profile/details")
+      if (!isDetailsPath) {
+        navigate("/food/delivery/profile/details", { replace: true })
+      }
+    }
+
+    window.addEventListener("popstate", handlePopState)
+    return () => window.removeEventListener("popstate", handlePopState)
+  }, [navigate, showDocumentModal, showBankDetailsPopup, showVehiclePopup, showDeletePopup])
+
   const handlePickFromGallery = (target, ref) => {
     setUploadTarget(target)
     ref.current?.click()
@@ -258,15 +309,23 @@ export const ProfileDetailsV2 = () => {
   const uploadProfileFile = async (file) => {
     try {
       setIsUploadingImage(true)
-      const formData = new FormData()
-      formData.append("profilePhoto", file)
-      const response = await deliveryAPI.updateProfileMultipart(formData)
-      if (response?.data?.success) {
-        toast.success("Profile photo updated")
-        await refreshProfile()
-      } else {
-        toast.error(response?.data?.message || "Update failed")
+      const uploadRes = await uploadAPI.uploadMedia(file, { folder: "appzeto/delivery/profile" })
+      const uploadData = uploadRes?.data?.data || uploadRes?.data || {}
+      const imageUrl = uploadData?.url || uploadData?.secure_url
+      const publicId = uploadData?.publicId || uploadData?.public_id || ""
+
+      if (!imageUrl) {
+        throw new Error("Failed to upload image")
       }
+
+      await deliveryAPI.updateProfile({
+        profileImage: {
+          url: imageUrl,
+          publicId,
+        },
+      })
+      toast.success("Profile photo updated")
+      await refreshProfile()
     } catch (error) {
       toast.error(error?.response?.data?.message || "Update failed")
     } finally {
@@ -296,7 +355,12 @@ export const ProfileDetailsV2 = () => {
   const handleDeletePhoto = async () => {
     try {
       setIsDeletingImage(true)
-      const response = await deliveryAPI.updateProfileDetails({ profilePhoto: "" })
+      const response = await deliveryAPI.updateProfile({
+        profileImage: {
+          url: "",
+          publicId: "",
+        },
+      })
       // Backend might return different structures; check for success
       if (response?.status === 200) {
         toast.success("Profile photo removed")
@@ -367,7 +431,13 @@ export const ProfileDetailsV2 = () => {
         return toast.error("Invalid UPI ID (e.g. user@bank)")
       }
 
-      // Use JSON payload for /delivery/profile (this endpoint does not parse multipart payloads).
+      let upiQrUrl = bankDetails.upiQrCode || null
+      if (upiQrFile) {
+        const uploadRes = await uploadAPI.uploadMedia(upiQrFile, { folder: "appzeto/delivery/upi-qr" })
+        const uploadData = uploadRes?.data?.data || uploadRes?.data || {}
+        upiQrUrl = uploadData?.url || uploadData?.secure_url || upiQrUrl
+      }
+
       const payload = {
         documents: {
           bankDetails: {
@@ -376,6 +446,7 @@ export const ProfileDetailsV2 = () => {
             ifscCode: (bankDetails.ifscCode || "").trim().toUpperCase(),
             bankName: (bankDetails.bankName || "").trim(),
             upiId: (bankDetails.upiId || "").trim(),
+            upiQrCode: upiQrUrl,
           },
           pan: {
             number: (bankDetails.panNumber || "").trim().toUpperCase(),
@@ -385,9 +456,6 @@ export const ProfileDetailsV2 = () => {
 
       await deliveryAPI.updateProfile(payload)
       toast.success("Bank details updated")
-      if (upiQrFile) {
-        toast.message("UPI QR selected hai, lekin current profile API me QR image persistence enabled nahi hai.")
-      }
       setShowBankDetailsPopup(false)
       setUpiQrFile(null)
       setUpiQrPreview(null)
@@ -631,6 +699,25 @@ export const ProfileDetailsV2 = () => {
                     </button>
                  )}
               </div>
+
+              {bankDetails.upiQrCode && (
+                <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-3">UPI QR</p>
+                  <button
+                    onClick={() => {
+                      setSelectedDocument({ name: "UPI Scanner", url: bankDetails.upiQrCode })
+                      setShowDocumentModal(true)
+                    }}
+                    className="block"
+                  >
+                    <img
+                      src={bankDetails.upiQrCode}
+                      alt="UPI QR"
+                      className="w-24 h-24 rounded-xl object-cover border border-gray-200"
+                    />
+                  </button>
+                </div>
+              )}
            </div>
         </section>
 
@@ -806,7 +893,7 @@ export const ProfileDetailsV2 = () => {
                  }
 
                  try {
-                     await deliveryAPI.updateProfileDetails({ 
+                     await deliveryAPI.updateProfile({ 
                          vehicle: { 
                              number: num,
                              brand: brand,
@@ -817,9 +904,9 @@ export const ProfileDetailsV2 = () => {
                      setVehicleBrand(brand)
                      setVehicleType(type)
                      setShowVehiclePopup(false)
-                     toast.success("Flight details updated!")
+                     toast.success("Vehicle details updated")
                      await refreshProfile()
-                   } catch (e) { toast.error("Cloud storage sync failed") }
+                   } catch (e) { toast.error(e?.response?.data?.message || "Failed to update vehicle details") }
                }}
                className="w-full bg-black text-white py-5 rounded-[1.5rem] font-black uppercase tracking-[0.2em] shadow-xl hover:bg-gray-900 transition-all active:scale-95"
             >

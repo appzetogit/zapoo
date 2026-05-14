@@ -113,7 +113,7 @@ export const PocketV2 = () => {
     }
     
     if (amt > walletState.cashInHand) {
-       toast.error(`Deposit amount cannot exceed cash in hand (₹${walletState.cashInHand})`);
+       toast.error(`Deposit amount cannot exceed cash in hand (₹${Number(walletState.cashInHand || 0).toFixed(2)})`);
        return;
     }
 
@@ -394,7 +394,14 @@ export const PocketV2 = () => {
              <div className="fixed inset-0 z-[1000] flex items-end">
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowDepositPopup(false)} className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
                 <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: "spring", damping: 25, stiffness: 200 }} className="relative w-full bg-white rounded-t-[2.5rem] p-8 pb-12 shadow-2xl">
-                   <div className="w-16 h-1.5 bg-gray-100 rounded-full mx-auto mb-8" />
+                   <button
+                      type="button"
+                      onClick={() => setShowDepositPopup(false)}
+                      aria-label="Close deposit popup"
+                      className="block mx-auto mb-8 p-2 -mt-2"
+                   >
+                      <div className="w-16 h-1.5 bg-gray-200 rounded-full" />
+                   </button>
                    
                    <div className="text-center mb-8">
                       <div className="w-20 h-20 bg-orange-50 rounded-3xl flex items-center justify-center mx-auto mb-4 border border-orange-100 text-[#ff8100]">
@@ -407,13 +414,13 @@ export const PocketV2 = () => {
                    <div className="bg-gray-50 rounded-2xl p-6 mb-8 border border-gray-100">
                       <div className="flex justify-between items-center mb-4">
                          <span className="text-xs font-bold text-gray-400 uppercase">Cash in your hand</span>
-                         <span className="text-base font-black text-black">₹{walletState.cashInHand}</span>
+                         <span className="text-base font-black text-black">₹{Number(walletState.cashInHand || 0).toFixed(2)}</span>
                       </div>
                       <div className="relative">
                          <IndianRupee className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                          <input 
                             type="number" value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)}
-                            placeholder="Enter amount to deposit"
+                            placeholder="Enter amount"
                             className="w-full bg-white border border-gray-200 rounded-xl py-4 pl-12 pr-4 text-xl font-bold focus:border-[#ff8100] focus:ring-4 focus:ring-orange-500/10 outline-none transition-all"
                          />
                       </div>
