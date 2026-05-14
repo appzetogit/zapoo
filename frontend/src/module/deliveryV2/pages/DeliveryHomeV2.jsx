@@ -118,6 +118,10 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
   const [simProgress, setSimProgress] = useState(0); // 0 to 1 between points
   const [activePolyline, setActivePolyline] = useState(null);
   const [isCallingCustomer, setIsCallingCustomer] = useState(false);
+  const contentScrollRef = useRef(null);
+  const pullStartYRef = useRef(0);
+  const pullCurrentYRef = useRef(0);
+  const pullEligibleRef = useRef(false);
   const mapRef = useRef(null);
   const computedDistanceMeters = React.useMemo(() => {
     if (distanceToTarget != null && distanceToTarget !== Infinity && Number.isFinite(distanceToTarget)) {
@@ -652,6 +656,29 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
     }
   };
 
+  const handleContentTouchStart = (event) => {
+    if (!event.touches?.length) return;
+    const scroller = contentScrollRef.current;
+    if (!scroller) return;
+    pullStartYRef.current = event.touches[0].clientY;
+    pullCurrentYRef.current = event.touches[0].clientY;
+    pullEligibleRef.current = scroller.scrollTop <= 0;
+  };
+
+  const handleContentTouchMove = (event) => {
+    if (!event.touches?.length) return;
+    pullCurrentYRef.current = event.touches[0].clientY;
+  };
+
+  const handleContentTouchEnd = () => {
+    if (!pullEligibleRef.current) return;
+    const pullDistance = pullCurrentYRef.current - pullStartYRef.current;
+    pullEligibleRef.current = false;
+    if (pullDistance > 95) {
+      window.location.reload();
+    }
+  };
+
   return (
     <div className="relative h-screen w-full bg-white text-gray-900 overflow-hidden flex flex-col">
       {/* ─── 1. TOP HEADER (Premium Dark Gray) ─── */}
@@ -757,7 +784,13 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
       )}
 
       {/* ─── 2. MAIN CONTENT ─── */}
-      <div className={`flex-1 relative overflow-y-auto ${currentTab === 'history' ? 'pt-0' : 'pt-[120px]'} no-scrollbar`}>
+      <div
+        ref={contentScrollRef}
+        onTouchStart={handleContentTouchStart}
+        onTouchMove={handleContentTouchMove}
+        onTouchEnd={handleContentTouchEnd}
+        className={`flex-1 relative overflow-y-auto ${currentTab === 'history' ? 'pt-0' : 'pt-[120px]'} no-scrollbar`}
+      >
          {currentTab === 'feed' ? (
            <div className="absolute inset-0 top-[-120px]">
              <LiveMap 
