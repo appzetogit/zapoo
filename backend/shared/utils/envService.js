@@ -14,6 +14,15 @@ let envCache = null;
 let cacheTimestamp = null;
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
+const pickFirstNonEmpty = (...values) => {
+  for (const value of values) {
+    if (value === null || value === undefined) continue;
+    const normalized = String(value).trim();
+    if (normalized) return normalized;
+  }
+  return "";
+};
+
 /**
  * Get environment variable value from database
  * Falls back to process.env if not found in database
@@ -89,8 +98,18 @@ export async function getRazorpayCredentials() {
   const secretKey = await getEnvVar("RAZORPAY_SECRET_KEY");
 
   return {
-    keyId: apiKey || process.env.RAZORPAY_API_KEY || "",
-    keySecret: secretKey || process.env.RAZORPAY_SECRET_KEY || ""
+    keyId: pickFirstNonEmpty(
+      apiKey,
+      process.env.RAZORPAY_API_KEY,
+      process.env.RAZORPAY_KEY_ID,
+      process.env.RAZORPAY_KEY
+    ),
+    keySecret: pickFirstNonEmpty(
+      secretKey,
+      process.env.RAZORPAY_SECRET_KEY,
+      process.env.RAZORPAY_KEY_SECRET,
+      process.env.RAZORPAY_SECRET
+    )
   };
 }
 
@@ -99,10 +118,9 @@ export async function getRazorpayCredentials() {
  * @returns {Promise<string>}
  */
 export async function getRazorpayWebhookSecret() {
-  return (
-    process.env.RAZORPAY_WEBHOOK_SECRET ||
-    process.env.RAZORPAY_WEBHOOK_SECRET_KEY ||
-    ""
+  return pickFirstNonEmpty(
+    process.env.RAZORPAY_WEBHOOK_SECRET,
+    process.env.RAZORPAY_WEBHOOK_SECRET_KEY
   );
 }
 
