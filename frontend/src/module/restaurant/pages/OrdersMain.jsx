@@ -1272,7 +1272,7 @@ export default function OrdersMain() {
   const renderContent = () => {
     // If restaurant is not active but onboarding is complete, don't show order lists
     // This prevents frequent 401 API errors from polling within these components
-    if (!restaurantStatus.isActive && restaurantStatus.onboarding?.completedSteps === 4) {
+    if (!restaurantStatus.isActive && Number(restaurantStatus.onboarding?.completedSteps || 0) >= 3) {
       return null;
     }
 
@@ -1422,7 +1422,7 @@ export default function OrdersMain() {
       {expiryNotice.isVisible && !expiryNotice.loading && <SubscriptionExpiryBanner daysLeft={expiryNotice.daysLeft} isExpired={expiryNotice.isExpired} type={expiryNotice.type} planName={expiryNotice.planName} onBuyNow={() => navigate("/restaurant/subscription")} />}
 
       {/* Verification Pending Card - Show if onboarding is complete (all 4 steps) and restaurant is not active */}
-      {!restaurantStatus.isLoading && !restaurantStatus.isActive && restaurantStatus.onboarding?.completedSteps === 4 && <motion.div initial={{
+      {!restaurantStatus.isLoading && !restaurantStatus.isActive && Number(restaurantStatus.onboarding?.completedSteps || 0) >= 3 && <motion.div initial={{
         opacity: 0,
         y: 20
       }} animate={{

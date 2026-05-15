@@ -9,6 +9,7 @@ import {
 import { restaurantAPI } from "@/lib/api";
 import FeatureLockedScreen from "@/module/restaurant/components/FeatureLockedScreen";
 import NoPlanPopup from "@/module/restaurant/components/NoPlanPopup";
+import UnderReviewScreen from "@/module/restaurant/components/UnderReviewScreen";
 import { determineStepToShow } from "@/module/restaurant/utils/onboardingUtils";
 
 /**
@@ -26,6 +27,11 @@ export default function ProtectedRoute({ children, requiredRole, loginPath }) {
   const [hasActiveSubscription, setHasActiveSubscription] = useState(true);
   const [featureLock, setFeatureLock] = useState(null);
   const [onboardingStepToShow, setOnboardingStepToShow] = useState(null);
+  const [restaurantApproval, setRestaurantApproval] = useState({
+    isActive: true,
+    rejectedAt: null,
+    restaurantId: null,
+  });
 
   const gatedRestaurantPaths = useMemo(
     () => [
@@ -76,6 +82,11 @@ export default function ProtectedRoute({ children, requiredRole, loginPath }) {
         const restaurant = response?.data?.data?.restaurant;
         const stepToShow = determineStepToShow(restaurant?.onboarding);
         setOnboardingStepToShow(stepToShow);
+        setRestaurantApproval({
+          isActive: restaurant?.isActive !== false,
+          rejectedAt: restaurant?.rejectedAt || null,
+          restaurantId: restaurant?.restaurantId || restaurant?.id || restaurant?._id || null,
+        });
 
         if (stepToShow && !bypassRestaurantOnboardingForLogin) {
           setHasActiveSubscription(true);
@@ -124,6 +135,11 @@ export default function ProtectedRoute({ children, requiredRole, loginPath }) {
           setHasActiveSubscription(false);
           setFeatureLock(null);
           setOnboardingStepToShow(1);
+          setRestaurantApproval({
+            isActive: false,
+            rejectedAt: null,
+            restaurantId: null,
+          });
         }
       })
       .finally(() => {
@@ -205,7 +221,25 @@ export default function ProtectedRoute({ children, requiredRole, loginPath }) {
     const isRestaurantHome = path === "/restaurant";
     const needsSubscription =
       isRestaurantHome || gatedRestaurantPaths.some((prefix) => path.startsWith(prefix));
-    const shouldRenderNoPlanPopup = needsSubscription && !isAllowedPath && !hasActiveSubscription;
+    const isApprovalPending =
+      onboardingStepToShow === null &&
+      restaurantApproval.isActive === false &&
+      !restaurantApproval.rejectedAt;
+    const shouldRenderNoPlanPopup =
+      needsSubscription && !isAllowedPath && !hasActiveSubscription && !isApprovalPending;
+
+    if (isApprovalPending && path.startsWith("/restaurant/onboarding")) {
+      return <Navigate to="/restaurant" replace />;
+    }
+
+    if (isApprovalPending) {
+      return <UnderReviewScreen restaurantId={restaurantApproval.restaurantId} />;
+    }
+
+    if (needsSubscription && !isAllowedPath && !hasActiveSubscription && restaurantApproval.isActive) {
+      return <Navigate to="/restaurant/subscription" replace />;
+    }
+
     if (featureLock) {
       return <FeatureLockedScreen requiredFeature={featureLock} />;
     }

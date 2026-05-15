@@ -175,11 +175,30 @@ export default function SubscriptionPlans() {
         : "N/A";
     const hasQueuedPlan = !!queuedSubscription?.planId;
 
+    const handleBack = () => {
+        if (isSubscribed) {
+            navigate("/restaurant", { replace: true });
+            return;
+        }
+        navigate(-1);
+    };
+
+    useEffect(() => {
+        if (!isSubscribed) return;
+
+        const handleBrowserBack = () => {
+            navigate("/restaurant", { replace: true });
+        };
+
+        window.addEventListener("popstate", handleBrowserBack);
+        return () => window.removeEventListener("popstate", handleBrowserBack);
+    }, [isSubscribed, navigate]);
+
     return (
         <div className="min-h-screen bg-gray-50/50 flex flex-col">
             <div className="sticky top-0 z-40 bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3">
                 <button
-                    onClick={() => navigate(-1)}
+                    onClick={handleBack}
                     className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
                     aria-label="Go back"
                 >

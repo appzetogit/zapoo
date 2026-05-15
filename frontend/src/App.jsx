@@ -130,7 +130,14 @@ export default function App() {
         <Route path="/restaurant/legal/code-of-conduct" element={<RestaurantLegalCodeOfConduct />} />
 
         {/* Restaurant Protected Routes */}
-        <Route path="/restaurant/onboarding" element={<RestaurantOnboarding />} />
+        <Route
+          path="/restaurant/onboarding"
+          element={
+            <ProtectedRoute requiredRole="restaurant" loginPath="/restaurant/login">
+              <RestaurantOnboarding />
+            </ProtectedRoute>
+          }
+        />
 
         {/* Restaurant Protected Routes - Old Routes */}
         <Route
