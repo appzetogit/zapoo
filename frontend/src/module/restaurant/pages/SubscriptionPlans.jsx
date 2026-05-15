@@ -153,14 +153,6 @@ export default function SubscriptionPlans() {
         }
     };
 
-    if (loading) {
-        return (
-            <div className="flex items-center justify-center min-h-screen bg-white">
-                <Loader2 className="w-10 h-10 animate-spin text-orange-500" />
-            </div>
-        );
-    }
-
     const activePlanId = currentSubscription?.planId?._id || currentSubscription?.planId;
     const endDateObj = currentSubscription?.endDate ? new Date(currentSubscription.endDate) : null;
     const hasValidEndDate = !!endDateObj && !Number.isNaN(endDateObj.getTime());
@@ -193,6 +185,14 @@ export default function SubscriptionPlans() {
         window.addEventListener("popstate", handleBrowserBack);
         return () => window.removeEventListener("popstate", handleBrowserBack);
     }, [isSubscribed, navigate]);
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center min-h-screen bg-white">
+                <Loader2 className="w-10 h-10 animate-spin text-orange-500" />
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-gray-50/50 flex flex-col">
