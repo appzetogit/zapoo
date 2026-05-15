@@ -50,6 +50,31 @@ function getTokenForContext(requestUrl = "") {
   const path = window.location.pathname;
   const url = requestUrl.toLowerCase();
   const isDeliveryPath = path.startsWith("/delivery") || path.startsWith("/food/delivery");
+  const cleanUrl = (url.split("?")[0] || "").trim();
+  const isRestaurantSubscriptionUrl =
+    cleanUrl.startsWith("/subscription") || cleanUrl.startsWith("/subscriptions");
+
+  const resolveModuleFromRequestUrl = () => {
+    if (cleanUrl.startsWith("/admin/") || cleanUrl.includes("tokens/admin")) return "admin";
+    if (
+      (cleanUrl.startsWith("/restaurant/") || cleanUrl.includes("tokens/restaurant")) &&
+      !cleanUrl.startsWith("/restaurant/list") &&
+      !cleanUrl.startsWith("/restaurant/under-250")
+    ) {
+      return "restaurant";
+    }
+    if (isRestaurantSubscriptionUrl && !cleanUrl.startsWith("/admin/")) return "restaurant";
+    if (cleanUrl.startsWith("/delivery/") || cleanUrl.includes("tokens/delivery")) return "delivery";
+    if (cleanUrl.startsWith("/user/") || cleanUrl.includes("tokens/user") || cleanUrl.startsWith("/auth/")) {
+      return "user";
+    }
+    return null;
+  };
+
+  const moduleFromRequest = resolveModuleFromRequestUrl();
+  if (moduleFromRequest) {
+    return localStorage.getItem(`${moduleFromRequest}_accessToken`);
+  }
 
   // 1. Check Request URL first (priority) - this ensures background tasks like 
   // FCM registration use the correct token regardless of active page
@@ -104,6 +129,22 @@ apiClient.interceptors.request.use(config => {
 
   // Determine if this is an authenticated route
   const path = window.location.pathname;
+  const requestUrlLower = (requestUrl || "").toLowerCase();
+  const requestPath = (requestUrlLower.split("?")[0] || "").trim();
+  const requestModule = (() => {
+    if (requestPath.startsWith("/admin/") || requestPath.includes("tokens/admin")) return "admin";
+    if (
+      (requestPath.startsWith("/restaurant/") || requestPath.includes("tokens/restaurant")) &&
+      !requestPath.startsWith("/restaurant/list") &&
+      !requestPath.startsWith("/restaurant/under-250")
+    ) return "restaurant";
+    if ((requestPath.startsWith("/subscription") || requestPath.startsWith("/subscriptions")) && !requestPath.startsWith("/admin/")) {
+      return "restaurant";
+    }
+    if (requestPath.startsWith("/delivery/") || requestPath.includes("tokens/delivery")) return "delivery";
+    if (requestPath.startsWith("/user/") || requestPath.includes("tokens/user") || requestPath.startsWith("/auth/")) return "user";
+    return null;
+  })();
 
   // Exclude auth-related pages from authentication requirements to avoid false warnings
   const isAuthPage =
@@ -146,7 +187,10 @@ apiClient.interceptors.request.use(config => {
         requestUrl.match(/\/restaurant\/[^/]+\/offers/)));
 
   const isDeliveryPath = path.startsWith("/delivery") || path.startsWith("/food/delivery");
-  const isAuthenticatedRoute = !isAuthPage && (path.startsWith("/admin") || path.startsWith("/restaurant") && !path.startsWith("/restaurants") && !isPublicRestaurantRoute || isDeliveryPath) && !isPublicRestaurantRoute;
+  const isAuthenticatedRoute = !isAuthPage && (
+    requestModule !== null ||
+    (path.startsWith("/admin") || path.startsWith("/restaurant") && !path.startsWith("/restaurants") && !isPublicRestaurantRoute || isDeliveryPath)
+  ) && !isPublicRestaurantRoute;
 
   // For authenticated routes, ALWAYS ensure Authorization header is set if we have a token
   // This ensures FormData requests and other requests always have the token
@@ -282,17 +326,23 @@ apiClient.interceptors.response.use(response => {
   if (error.response?.status === 401 && !originalRequest._retry) {
     originalRequest._retry = true;
     try {
-      // Determine which module's refresh endpoint to use based on current route
+      // Determine which module's refresh endpoint using request module first (works in WebView too)
       const currentPath = window.location.pathname;
       const isDeliveryPath = currentPath.startsWith("/delivery") || currentPath.startsWith("/food/delivery");
       let refreshEndpoint = "/auth/refresh-token"; // default to user auth
 
-      if (currentPath.startsWith("/admin")) {
+      const requestPath = (originalRequest?.url || "").toLowerCase().split("?")[0];
+      const moduleFromRequest =
+        requestPath.startsWith("/admin/") ? "admin" :
+          ((requestPath.startsWith("/restaurant/") || requestPath.startsWith("/subscription") || requestPath.startsWith("/subscriptions")) ? "restaurant" :
+            (requestPath.startsWith("/delivery/") ? "delivery" : null));
+
+      if (moduleFromRequest === "admin" || currentPath.startsWith("/admin")) {
         refreshEndpoint = "/admin/auth/refresh-token";
-      } else if (currentPath.startsWith("/restaurant") && !currentPath.startsWith("/restaurants")) {
+      } else if (moduleFromRequest === "restaurant" || (currentPath.startsWith("/restaurant") && !currentPath.startsWith("/restaurants"))) {
         // /restaurant/* is for restaurant module, /restaurants/* is for user module viewing restaurants
         refreshEndpoint = "/restaurant/auth/refresh-token";
-      } else if (isDeliveryPath) {
+      } else if (moduleFromRequest === "delivery" || isDeliveryPath) {
         refreshEndpoint = "/delivery/auth/refresh-token";
       }
 
@@ -305,19 +355,19 @@ apiClient.interceptors.response.use(response => {
         accessToken
       } = response.data.data || response.data;
       if (accessToken) {
-        // Determine which module's token to update based on current route
+        // Determine which module's token to update (prefer request module over current route)
         const currentPath = window.location.pathname;
         const isDeliveryPath = currentPath.startsWith("/delivery") || currentPath.startsWith("/food/delivery");
         let tokenKey = "accessToken"; // fallback
         let expectedRole = "user";
-        if (currentPath.startsWith("/admin")) {
+        if (moduleFromRequest === "admin" || currentPath.startsWith("/admin")) {
           tokenKey = "admin_accessToken";
           expectedRole = "admin";
-        } else if (currentPath.startsWith("/restaurant") && !currentPath.startsWith("/restaurants")) {
+        } else if (moduleFromRequest === "restaurant" || (currentPath.startsWith("/restaurant") && !currentPath.startsWith("/restaurants"))) {
           // /restaurant/* is for restaurant module, /restaurants/* is for user module viewing restaurants
           tokenKey = "restaurant_accessToken";
           expectedRole = "restaurant";
-        } else if (isDeliveryPath) {
+        } else if (moduleFromRequest === "delivery" || isDeliveryPath) {
           tokenKey = "delivery_accessToken";
           expectedRole = "delivery";
         } else if (currentPath.startsWith("/user") || currentPath === "/" || currentPath.startsWith("/restaurants")) {
