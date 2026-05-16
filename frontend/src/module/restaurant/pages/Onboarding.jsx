@@ -93,16 +93,20 @@ const clearOnboardingFromLocalStorage = () => {
 
 const hasMeaningfulOnboardingDraft = data => {
   if (!data) return false;
-  const serialized = JSON.stringify({
-    step1: data.step1 || {},
-    step2: data.step2 || {},
-    step3: data.step3 || {}
-  });
-  return serialized !== JSON.stringify({
-    step1: {},
-    step2: {},
-    step3: {}
-  });
+
+  const hasMeaningfulValue = value => {
+    if (value == null) return false;
+    if (typeof value === "string") return value.trim().length > 0;
+    if (typeof value === "number") return Number.isFinite(value) && value !== 0;
+    if (typeof value === "boolean") return value === true;
+    if (Array.isArray(value)) return value.some(item => hasMeaningfulValue(item));
+    if (typeof value === "object") {
+      return Object.values(value).some(entry => hasMeaningfulValue(entry));
+    }
+    return false;
+  };
+
+  return hasMeaningfulValue(data.step1) || hasMeaningfulValue(data.step2) || hasMeaningfulValue(data.step3);
 };
 
 // Helper function to convert "HH:mm" string to Date object

@@ -2232,7 +2232,7 @@ export const subscriptionAPI = {
     return apiClient.post(API_ENDPOINTS.SUBSCRIPTION.ADMIN_CREATE_PLAN, data);
   },
   updatePlan: (id, data) => {
-    return apiClient.put(API_ENDPOINTS.SUBSCRIPTION.PLAN_BY_ID.replace(":id", id), data);
+    return apiClient.put(API_ENDPOINTS.SUBSCRIPTION.ADMIN_UPDATE_PLAN.replace(":id", id), data);
   },
   deletePlan: (id) => {
     return apiClient.delete(API_ENDPOINTS.SUBSCRIPTION.PLAN_BY_ID.replace(":id", id));

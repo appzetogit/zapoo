@@ -7,6 +7,7 @@ const router = express.Router();
 router.use(authenticateAdmin);
 
 router.get("/plans", subscriptionController.getPlans);
+router.put("/plans/:id", subscriptionController.updatePlan);
 router.get("/features/catalog", subscriptionController.getFeatureCatalog);
 router.post("/create-plan", subscriptionController.createPlan);
 router.patch("/update-price", subscriptionController.updatePlanPrice);

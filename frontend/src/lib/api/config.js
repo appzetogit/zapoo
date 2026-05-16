@@ -464,6 +464,7 @@ export const API_ENDPOINTS = {
     HISTORY: "/subscription/history",
     ADMIN_PLANS: "/admin/subscriptions/plans",
     ADMIN_CREATE_PLAN: "/admin/subscriptions/create-plan",
+    ADMIN_UPDATE_PLAN: "/admin/subscriptions/plans/:id",
     ADMIN_UPDATE_PRICE: "/admin/subscriptions/update-price",
     ADMIN_TOGGLE_PLAN: "/admin/subscriptions/toggle-plan",
     ADMIN_FEATURE_CATALOG: "/admin/subscriptions/features/catalog",
