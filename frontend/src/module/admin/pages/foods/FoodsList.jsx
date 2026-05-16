@@ -222,7 +222,7 @@ export default function FoodsList() {
         // Try using restaurant menu update endpoint
         // This might fail if backend doesn't allow admin to update restaurant menus
         const response = await apiClient.put(
-          `/restaurant/menu`,
+          `/admin/restaurants/${food.restaurantId}/menu`,
           { sections: updatedSections }
         )
         
