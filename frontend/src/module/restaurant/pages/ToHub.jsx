@@ -2446,6 +2446,8 @@ export default function ToHub() {
           </AreaChart> : null}
       </div>;
   };
+  const isSalesLocked = activeTopTab === "sales" && !hasAdvancedAnalytics;
+
   return <div className="min-h-screen bg-gray-100 flex flex-col">
       <style>{`
         .chart-shell *, .chart-shell, .chart-shell-mini *, .chart-shell-mini,
@@ -2544,7 +2546,7 @@ export default function ToHub() {
         y: 10
       }} transition={{
         duration: 0.2
-      }} className="flex-1 pb-[calc(5.5rem+env(safe-area-inset-bottom))]" onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd} onMouseDown={e => {
+      }} className={`flex-1 pb-[calc(5.5rem+env(safe-area-inset-bottom))] ${isSalesLocked ? "overflow-hidden" : ""}`} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd} onMouseDown={e => {
         const target = e.target;
         // Don't handle swipe if starting on topbar or chart
         if (topTabBarRef.current?.contains(target)) return;
@@ -2578,9 +2580,9 @@ export default function ToHub() {
           isSwiping.current = false;
         }
       }}>
-          {activeTopTab === "my-feed" ? <MyFeedContent /> : activeTopTab === "sales" ? hasAdvancedAnalytics ? <SalesTabContent /> : <div className="p-4 bg-gray-100 min-h-screen">
+          {activeTopTab === "my-feed" ? <MyFeedContent /> : activeTopTab === "sales" ? hasAdvancedAnalytics ? <SalesTabContent /> : <div className="p-4 bg-gray-100 h-full overflow-hidden">
                 <SubscriptionFeatureOverlay fullscreen isLocked title="Advanced Analytics" message="Upgrade to GROWTH to unlock Advanced Analytics insights and reports." onGoBack={() => setActiveTopTab("my-feed")}>
-                  <SalesTabContent />
+                  <div className="h-full w-full" />
                 </SubscriptionFeatureOverlay>
               </div> : activeTopTab === "growth" ? <div className="p-4 bg-gray-100 min-h-screen">
               <div className="space-y-4">
@@ -2623,4 +2625,3 @@ export default function ToHub() {
       <BottomNavOrders />
     </div>;
 }
-

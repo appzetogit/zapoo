@@ -385,7 +385,17 @@ export default function SubscriptionPlans() {
 
                 <div className="text-center pt-4 pb-2 border-t border-gray-200">
                     <p className="text-gray-400 text-sm">
-                        Need help choosing? <a href="#" className="text-orange-500 font-medium underline-offset-4 hover:underline">Contact our sales team</a> for a custom quote.
+                        Need help choosing? <button
+                            type="button"
+                            onClick={() =>
+                                navigate("/restaurant/support", {
+                                    state: { backTo: "/restaurant/subscription" },
+                                })
+                            }
+                            className="text-orange-500 font-medium underline-offset-4 hover:underline"
+                        >
+                            Contact our sales team
+                        </button> for a custom quote.
                     </p>
                 </div>
             </div>

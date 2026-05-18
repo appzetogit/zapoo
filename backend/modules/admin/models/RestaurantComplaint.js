@@ -24,7 +24,7 @@ const restaurantComplaintSchema = new mongoose.Schema({
   },
   customerPhone: {
     type: String,
-    required: true
+    default: ''
   },
   customerEmail: {
     type: String,

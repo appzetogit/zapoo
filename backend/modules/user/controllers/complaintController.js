@@ -51,7 +51,7 @@ export const submitComplaint = asyncHandler(async (req, res) => {
     }
 
     // Check if complaint already exists for this order
-    const existingComplaint = await RestaurantComplaint.findOne({ orderId, customerId: userId });
+    const existingComplaint = await RestaurantComplaint.findOne({ orderId: order._id, customerId: userId });
     if (existingComplaint) {
       return errorResponse(res, 400, 'You have already submitted a complaint for this order');
     }
@@ -62,13 +62,16 @@ export const submitComplaint = asyncHandler(async (req, res) => {
       return errorResponse(res, 404, 'Restaurant not found');
     }
 
+    const resolvedCustomerName = req.user.name || order.customerName || 'Customer';
+    const resolvedCustomerPhone = req.user.phone || order.customerPhone || '';
+
     // Create complaint
     const complaintData = {
       orderId: order._id,
       orderNumber: order.orderId || order.orderNumber || `ORD-${order._id.toString().slice(-8)}`,
       customerId: userId,
-      customerName: req.user.name || 'Customer',
-      customerPhone: req.user.phone || '',
+      customerName: resolvedCustomerName,
+      customerPhone: resolvedCustomerPhone,
       customerEmail: req.user.email || '',
       restaurantId: restaurant._id,
       restaurantName: restaurant.name || 'Restaurant',

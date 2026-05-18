@@ -3575,6 +3575,17 @@ export default function DeliveryHome() {
     return `${minutes} mins`;
   }, []);
 
+  // Delivery request popup should exclude prep buffer from ETA display.
+  const getDeliveryEtaWithoutPrepBuffer = useCallback((etaLabel, bufferMinutes = 5) => {
+    if (!etaLabel || typeof etaLabel !== 'string') return etaLabel;
+    const match = etaLabel.match(/(\d+)\s*min/i);
+    if (!match) return etaLabel;
+    const originalMinutes = Number(match[1]);
+    if (!Number.isFinite(originalMinutes)) return etaLabel;
+    const adjustedMinutes = Math.max(0, originalMinutes - bufferMinutes);
+    return `${adjustedMinutes} mins`;
+  }, []);
+
   const getDeliveryUiStep = useCallback((restaurantInfo = selectedRestaurant) => {
     if (!restaurantInfo) return null;
     if (showPaymentPage) return DELIVERY_UI_STEP.PAYMENT;
@@ -7752,7 +7763,7 @@ export default function DeliveryHome() {
             <div className="flex items-center gap-1.5 text-gray-500 text-sm mb-2">
               <Clock className="w-4 h-4" />
               <span>
-                {selectedRestaurant?.timeAway && selectedRestaurant.timeAway !== 'Calculating...' ? `${selectedRestaurant.timeAway} away` : newOrder?.pickupDistance && newOrder.pickupDistance !== '0 km' && newOrder.pickupDistance !== 'Calculating...' ? `${calculateTimeAway(newOrder.pickupDistance)} away` : 'Calculating...'}
+                {selectedRestaurant?.timeAway && selectedRestaurant.timeAway !== 'Calculating...' ? `${getDeliveryEtaWithoutPrepBuffer(selectedRestaurant.timeAway)} away` : newOrder?.pickupDistance && newOrder.pickupDistance !== '0 km' && newOrder.pickupDistance !== 'Calculating...' ? `${getDeliveryEtaWithoutPrepBuffer(calculateTimeAway(newOrder.pickupDistance))} away` : 'Calculating...'}
               </span>
             </div>
 

@@ -1137,8 +1137,16 @@ export default function HubMenu() {
           </motion.div>}
         </AnimatePresence>
 
-        {/* Horizontally scrollable filters */}
-        <div className="flex pl-4 relative items-center gap-2 overflow-x-auto pb-2" ref={scrollContainerRef} style={{
+        {/* Filter actions */}
+        <div className="px-4 pb-2">
+          <button onClick={() => setIsFilterOpen(true)} className="bg-[#3B82F6] text-white border border-[#3B82F6] flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap shadow-sm">
+            <SlidersHorizontal className="w-4 h-4" />
+            <span>Filter</span>
+          </button>
+        </div>
+
+        {/* Horizontally scrollable quick filters */}
+        <div className="flex px-4 items-center gap-2 overflow-x-auto pb-2" ref={scrollContainerRef} style={{
           scrollbarWidth: 'none',
           msOverflowStyle: 'none'
         }}>
@@ -1150,20 +1158,16 @@ export default function HubMenu() {
           {activeFilter && <button onClick={() => {
             setActiveFilter(null);
             setSelectedFilter(null);
-          }} className="flex items-center gap-2 px-2 py-1 text-semibold border-2 border-gray-300 rounded-md text-sm font-medium whitespace-nowrap shrink-0 bg-white text-gray-900">
-            <X className="w-3 h-3" />
+          }} className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 rounded-full text-xs font-semibold whitespace-nowrap shrink-0 bg-white text-gray-700">
+            <X className="w-3.5 h-3.5" />
             <span>Clear</span>
           </button>}
-          {quickFilters.map(filter => <button key={filter.id} onClick={() => handleFilterSelect(filter.id)} className={`flex items-center gap-2 px-2 py-1 text-semibold border-2 rounded-md text-sm font-medium whitespace-nowrap shrink-0 ${activeFilter === filter.id ? "bg-[#3B82F6] text-white border-[#3B82F6]" : "bg-white border-gray-200 text-gray-900"}`}>
+          {quickFilters.map(filter => <button key={filter.id} onClick={() => handleFilterSelect(filter.id)} className={`flex items-center gap-1.5 px-3 py-1.5 border rounded-full text-xs font-semibold whitespace-nowrap shrink-0 transition-colors ${activeFilter === filter.id ? "bg-[#3B82F6] text-white border-[#3B82F6]" : "bg-white border-gray-200 text-gray-800 hover:border-gray-300"}`}>
             <span>{filter.label}</span>
-            <span className="bg-red-100 border-2 border-red-400 text-red-400 text-xs  font-bold p-0.5 py-0.25 rounded-sm">
+            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${activeFilter === filter.id ? "bg-white/20 text-white" : "bg-red-100 text-red-600"}`}>
               {filter.count}
             </span>
           </button>)}
-          <button onClick={() => setIsFilterOpen(true)} className="sticky right-0 z-10 bg-[#3B82F6] p-2 text-white border-2 border-[#3B82F6] flex items-center gap-2 px-2 py-1 text-semibold rounded-l-lg text-sm font-medium whitespace-nowrap">
-            <SlidersHorizontal className="w-4 h-4" />
-            <span>Filter</span>
-          </button>
         </div>
       </div>
 

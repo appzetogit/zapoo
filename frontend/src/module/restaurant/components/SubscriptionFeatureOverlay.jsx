@@ -24,7 +24,7 @@ export default function SubscriptionFeatureOverlay({
     if (!isLocked) return <div className="h-full w-full">{children}</div>
 
     const overlayClass = fullscreen
-        ? "fixed inset-0 bg-white/25 backdrop-blur-[1px] flex flex-col items-center justify-center p-6 text-center z-50"
+        ? "absolute inset-0 bg-white/25 backdrop-blur-[1px] flex flex-col items-center justify-center p-6 text-center z-10"
         : "absolute inset-0 bg-white/30 backdrop-blur-[1px] flex flex-col items-center justify-center p-6 text-center z-10"
 
     const handleGoBack = (e) => {
@@ -48,7 +48,7 @@ export default function SubscriptionFeatureOverlay({
     }
 
     return (
-        <div className={`relative overflow-hidden rounded-2xl border border-gray-100 group ${fullscreen ? "min-h-screen" : ""}`}>
+        <div className={`relative overflow-hidden rounded-2xl border border-gray-100 group ${fullscreen ? "h-full min-h-[420px]" : ""}`}>
             {/* Blurred content */}
             <div className="blur-[8px] grayscale-[0.2] pointer-events-none select-none opacity-40 transition-all duration-500 group-hover:blur-[10px]">
                 {children}
