@@ -1,5 +1,5 @@
 import { Outlet, useLocation } from "react-router-dom"
-import { useEffect, createContext, useContext, lazy, Suspense, useState } from "react"
+import { useEffect, createContext, useContext, lazy, Suspense, useState, useRef } from "react"
 import { ProfileProvider } from "../context/ProfileContext"
 import LocationPrompt from "./LocationPrompt"
 import { CartProvider } from "../context/CartContext"
@@ -79,6 +79,8 @@ export function useLocationSelector() {
 function LocationSelectorProvider({ children }) {
   const [isLocationSelectorOpen, setIsLocationSelectorOpen] = useState(false)
   const [locationSelectorLabel, setLocationSelectorLabel] = useState(null)
+  const programmaticHistoryBackRef = useRef(false)
+  const hasPushedHistoryRef = useRef(false)
 
   const openLocationSelector = (label = null) => {
     setLocationSelectorLabel(label)
@@ -86,9 +88,39 @@ function LocationSelectorProvider({ children }) {
   }
 
   const closeLocationSelector = () => {
+    if (hasPushedHistoryRef.current && window.history.state?.locationSelectorOverlay) {
+      programmaticHistoryBackRef.current = true
+      window.history.back()
+    }
     setIsLocationSelectorOpen(false)
     setLocationSelectorLabel(null)
+    hasPushedHistoryRef.current = false
   }
+
+  useEffect(() => {
+    if (!isLocationSelectorOpen) return
+
+    window.history.pushState(
+      { ...(window.history.state || {}), locationSelectorOverlay: true },
+      ""
+    )
+    hasPushedHistoryRef.current = true
+
+    const handlePopState = () => {
+      if (programmaticHistoryBackRef.current) {
+        programmaticHistoryBackRef.current = false
+        return
+      }
+      setIsLocationSelectorOpen(false)
+      setLocationSelectorLabel(null)
+      hasPushedHistoryRef.current = false
+    }
+
+    window.addEventListener("popstate", handlePopState)
+    return () => {
+      window.removeEventListener("popstate", handlePopState)
+    }
+  }, [isLocationSelectorOpen])
 
   const value = {
     isLocationSelectorOpen,

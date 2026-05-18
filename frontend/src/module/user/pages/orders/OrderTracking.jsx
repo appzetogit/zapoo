@@ -2,7 +2,7 @@ import { useParams, Link, useSearchParams } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
-import { ArrowLeft, Share2, RefreshCw, Phone, ChevronRight, MapPin, Home as HomeIcon, MessageSquare, X, Check, Receipt, CircleSlash, Loader2 } from "lucide-react";
+import { ArrowLeft, RefreshCw, Phone, ChevronRight, MapPin, Home as HomeIcon, MessageSquare, X, Check, Receipt, CircleSlash, Loader2 } from "lucide-react";
 import AnimatedPage from "../../components/AnimatedPage";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -854,11 +854,7 @@ export default function OrderTracking() {
             </motion.button>
           </Link>
           <h2 className="font-semibold text-lg">{order.restaurant}</h2>
-          <motion.button className="w-10 h-10 flex items-center justify-center" whileTap={{
-          scale: 0.9
-        }}>
-            <Share2 className="w-5 h-5" />
-          </motion.button>
+          <div className="w-10 h-10" />
         </div>
 
         {/* Status section */}

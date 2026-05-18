@@ -1,5 +1,4 @@
 import { useState, useEffect, useLayoutEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
 import { ChevronLeft, Search, ChevronRight, Plus, MapPin, MoreHorizontal, Navigation, Home, Building2, Briefcase, X, Crosshair } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -70,7 +69,6 @@ export default function LocationSelectorOverlay({
   onClose,
   initialLabel = null
 }) {
-  const navigate = useNavigate();
   const inputRef = useRef(null);
   const [searchValue, setSearchValue] = useState("");
   const {
@@ -974,10 +972,9 @@ export default function LocationSelectorOverlay({
         duration: 2000
       });
 
-      // Wait 2 seconds then redirect to home page
+      // Close overlay and return to previous screen context
       setTimeout(() => {
         onClose();
-        navigate("/");
       }, 2000);
     } catch (error) {
       // Handle permission denied or other errors
@@ -2101,15 +2098,8 @@ export default function LocationSelectorOverlay({
       setShowAddressForm(false);
       setLoadingAddress(false);
 
-      // Close overlay and redirect to home page
+      // Close overlay and return to previous screen context
       onClose();
-      // Use window.location.reload() or similar if needed to refresh the page state
-      // navigate("/") // Redirecting to home might be disruptive if on checkout
-      if (window.location.pathname.includes('/cart') || window.location.pathname.includes('/checkout')) {
-        // Just let the context update handle it
-      } else {
-        navigate("/");
-      }
     } catch (error) {
       console.error("❌ Error saving address:", error);
       console.error("❌ Error details:", {
@@ -2145,7 +2135,6 @@ export default function LocationSelectorOverlay({
       phone: "",
       receiverName: ""
     });
-    navigate("/");
   };
   const handleSelectSavedAddress = async address => {
     try {
@@ -2460,7 +2449,6 @@ export default function LocationSelectorOverlay({
           <div className="flex items-center gap-4">
             <Button type="button" variant="ghost" size="icon" onClick={() => {
             onClose();
-            navigate("/");
           }} className="rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 -ml-2">
               <ChevronLeft className="h-6 w-6 text-gray-700 dark:text-gray-300" />
             </Button>

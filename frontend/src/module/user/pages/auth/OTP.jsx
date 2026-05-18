@@ -24,6 +24,7 @@ export default function OTP() {
   const [contactInfo, setContactInfo] = useState("")
   const [contactType, setContactType] = useState("phone")
   const inputRefs = useRef([])
+  const hasPushedNameStepHistoryRef = useRef(false)
 
   useEffect(() => {
     // Redirect to home if already authenticated
@@ -80,6 +81,28 @@ export default function OTP() {
     // Focus first input on mount
     if (inputRefs.current[0] && !showNameInput) {
       inputRefs.current[0].focus()
+    }
+  }, [showNameInput])
+
+  useEffect(() => {
+    if (!showNameInput) return
+
+    window.history.pushState(
+      { ...(window.history.state || {}), otpNameStep: true },
+      ""
+    )
+    hasPushedNameStepHistoryRef.current = true
+
+    const handlePopState = () => {
+      setShowNameInput(false)
+      setNameError("")
+      setError("")
+      setTimeout(() => inputRefs.current[0]?.focus(), 0)
+    }
+
+    window.addEventListener("popstate", handlePopState)
+    return () => {
+      window.removeEventListener("popstate", handlePopState)
     }
   }, [showNameInput])
 
@@ -312,6 +335,22 @@ export default function OTP() {
     }
   }
 
+  const handleBack = () => {
+    if (isLoading) return
+    if (showNameInput) {
+      if (hasPushedNameStepHistoryRef.current) {
+        hasPushedNameStepHistoryRef.current = false
+        window.history.back()
+        return
+      }
+      setShowNameInput(false)
+      setNameError("")
+      setError("")
+      return
+    }
+    navigate("/user/auth/sign-in")
+  }
+
   const handleResend = async () => {
     if (resendTimer > 0) return
 
@@ -366,7 +405,7 @@ export default function OTP() {
       <div className="relative pt-12 pb-16 px-6 text-center">
         {/* Back Button */}
         <button
-          onClick={() => navigate("/user/auth/sign-in")}
+          onClick={handleBack}
           className="absolute left-6 top-6 p-2 hover:bg-white/10 rounded-full transition-colors"
           disabled={isLoading}
         >
@@ -531,7 +570,7 @@ export default function OTP() {
               </Button>
 
               <button
-                onClick={() => navigate("/user/auth/sign-in")}
+                onClick={handleBack}
                 className="block w-full text-sm text-gray-400 font-semibold hover:text-[#CB202D] transition-colors py-2"
               >
                 {t("user.auth.otp.changeMobileNumber")}
