@@ -2,6 +2,7 @@ import Order from '../order/models/Order.js';
 import Payment from './models/Payment.js';
 import OrderSettlement from '../order/models/OrderSettlement.js';
 import AdRequest from '../marketing/models/AdRequest.js';
+import crypto from 'crypto';
 import { getRazorpayWebhookSecret } from '../../shared/utils/envService.js';
 import { calculateOrderSettlement } from '../order/services/orderSettlementService.js';
 import { holdEscrow } from '../order/services/escrowWalletService.js';
@@ -277,6 +278,7 @@ const handlePaymentCaptured = async ({ paymentEntity, payload }) => {
       }
       : {
         $set: {
+          status: 'pending',
           'payment.method': 'razorpay',
           'payment.status': 'completed',
           'payment.razorpayOrderId': razorpayOrderId || order.payment?.razorpayOrderId || null,
@@ -357,6 +359,12 @@ const handlePaymentCaptured = async ({ paymentEntity, payload }) => {
     const alreadyNotifiedAt = updatedOrder.payment?.restaurantNotifiedAt ? new Date(updatedOrder.payment.restaurantNotifiedAt).getTime() : 0;
     if (restaurantId && !alreadyNotifiedAt) {
       const result = await notifyRestaurantNewOrder(updatedOrder, restaurantId);
+      console.log('🍽️ [RAZORPAY_WEBHOOK] notifyRestaurantNewOrder result', {
+        orderId: updatedOrder.orderId,
+        orderMongoId: updatedOrder._id?.toString?.(),
+        restaurantId,
+        result
+      });
       if (result?.success) {
         await Order.findOneAndUpdate(
           {
@@ -411,7 +419,7 @@ const handlePaymentFailed = async ({ paymentEntity, payload }) => {
   const updatedOrder = await Order.findOneAndUpdate(
     {
       _id: order._id,
-      status: { $in: ['pending', 'failed'] }
+      status: { $in: ['payment_pending', 'pending', 'failed'] }
     },
     {
       $set: {
@@ -660,6 +668,12 @@ export const handleRazorpayWebhook = async (req, res) => {
     }
 
     const { event, payload = {} } = body;
+    console.log('[RAZORPAY_WEBHOOK] Event received', {
+      event,
+      paymentId: payload?.payment?.entity?.id || null,
+      razorpayOrderId: payload?.payment?.entity?.order_id || null,
+      notesOrderId: payload?.payment?.entity?.notes?.orderId || null
+    });
     webhookDebug('webhook_event_received', {
       event,
       hasPaymentEntity: Boolean(payload?.payment?.entity),
@@ -686,6 +700,7 @@ export const handleRazorpayWebhook = async (req, res) => {
     }
 
     webhookDebug('webhook_event_processed', { event });
+    console.log('[RAZORPAY_WEBHOOK] Event processed', { event });
     return res.status(200).json({ success: true, received: true, event });
   } catch (error) {
     console.error('[RAZORPAY_WEBHOOK] Handler error:', error);

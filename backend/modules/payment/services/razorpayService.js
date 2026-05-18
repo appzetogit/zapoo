@@ -186,6 +186,32 @@ const fetchPayment = async paymentId => {
   }
 };
 
+const capturePayment = async (paymentId, amount, currency = 'INR') => {
+  const razorpay = await getRazorpayInstance();
+  if (!razorpay) {
+    throw new Error('Razorpay is not initialized');
+  }
+  try {
+    if (!paymentId) {
+      throw new Error('Payment ID missing for capture');
+    }
+    if (!Number.isFinite(Number(amount)) || Number(amount) <= 0) {
+      throw new Error('Valid amount in paise is required for payment capture');
+    }
+    return await razorpay.payments.capture(paymentId, Number(amount), currency || 'INR');
+  } catch (error) {
+    logger.error(`Error capturing Razorpay payment: ${error.message}`, {
+      paymentId,
+      amount,
+      currency,
+      description: error?.error?.description || error?.description || null,
+      code: error?.error?.code || null,
+      statusCode: error?.statusCode || null
+    });
+    throw error;
+  }
+};
+
 /**
  * Create a refund
  * @param {String} paymentId - Razorpay payment ID
@@ -308,4 +334,4 @@ const fetchPaymentLink = async paymentLinkId => {
   }
 };
 
-export { initializeRazorpay, getRazorpayInstance, createOrder, verifyPayment, fetchPayment, createRefund, createPaymentLink, fetchPaymentLink };
+export { initializeRazorpay, getRazorpayInstance, createOrder, verifyPayment, fetchPayment, capturePayment, createRefund, createPaymentLink, fetchPaymentLink };

@@ -49,11 +49,11 @@ export async function notifyRestaurantNewOrder(order, restaurantId, paymentMetho
     }
     if (!restaurant) {
       restaurant = await Restaurant.findOne({
-        $or: [{
-          restaurantId: restaurantId
-        }, {
-          _id: restaurantId
-        }]
+        $or: [
+          { restaurantId: restaurantId },
+          { slug: restaurantId },
+          ...(mongoose.Types.ObjectId.isValid(restaurantId) ? [{ _id: restaurantId }] : [])
+        ]
       }).lean();
     }
 
@@ -109,16 +109,52 @@ export async function notifyRestaurantNewOrder(order, restaurantId, paymentMetho
     // Get restaurant namespace
     const restaurantNamespace = io.of('/restaurant');
 
-    // Normalize restaurantId to string (handle both ObjectId and string)
+    // Build comprehensive room identifiers to handle _id / restaurantId / slug mismatches.
     const normalizedRestaurantId = restaurantId?.toString() || restaurantId;
+    const candidateIds = Array.from(new Set([
+      normalizedRestaurantId,
+      order.restaurantId?.toString?.() || order.restaurantId || null,
+      restaurant?._id?.toString?.() || null,
+      restaurant?.restaurantId?.toString?.() || restaurant?.restaurantId || null,
+      restaurant?.slug?.toString?.() || restaurant?.slug || null
+    ].filter(Boolean)));
+    const roomVariations = Array.from(new Set(
+      candidateIds.flatMap((id) => {
+        const baseRoom = `restaurant:${id}`;
+        if (mongoose.Types.ObjectId.isValid(id)) {
+          return [baseRoom, `restaurant:${new mongoose.Types.ObjectId(id).toString()}`];
+        }
+        return [baseRoom];
+      })
+    ));
 
-    // Try multiple room formats to ensure we find the restaurant
-    const roomVariations = [`restaurant:${normalizedRestaurantId}`, `restaurant:${restaurantId}`, ...(mongoose.Types.ObjectId.isValid(normalizedRestaurantId) ? [`restaurant:${new mongoose.Types.ObjectId(normalizedRestaurantId).toString()}`] : [])];
+    console.log('🍽️ [RestaurantNotify] Attempting new_order emit', {
+      orderId: order.orderId,
+      orderMongoId: order._id?.toString?.(),
+      paymentStatus: order.payment?.status,
+      paymentMethod: resolvedPaymentMethod,
+      orderRestaurantId: order.restaurantId,
+      providedRestaurantId: restaurantId,
+      resolvedRestaurant: restaurant
+        ? {
+            _id: restaurant._id?.toString?.() || restaurant._id,
+            restaurantId: restaurant.restaurantId || null,
+            slug: restaurant.slug || null,
+            name: restaurant.name || null
+          }
+        : null,
+      roomVariations
+    });
 
     // Get all connected sockets in the restaurant room
     let socketsInRoom = [];
+    const roomProbe = [];
     for (const room of roomVariations) {
       const sockets = await restaurantNamespace.in(room).fetchSockets();
+      roomProbe.push({
+        room,
+        sockets: sockets.map((socket) => socket.id)
+      });
       if (sockets.length > 0) {
         socketsInRoom = sockets;
         break;
@@ -128,6 +164,12 @@ export async function notifyRestaurantNewOrder(order, restaurantId, paymentMetho
     // CRITICAL: Only emit to the specific restaurant room - NEVER broadcast to all restaurants
     // This ensures orders only go to the correct restaurant
     if (socketsInRoom.length > 0) {
+      console.log('🍽️ [RestaurantNotify] Restaurant sockets found', {
+        orderId: order.orderId,
+        primaryRoom,
+        sockets: socketsInRoom.map((socket) => socket.id),
+        roomProbe
+      });
       // Found sockets in the restaurant room - send notification only to that room
       roomVariations.forEach(room => {
         restaurantNamespace.to(room).emit('new_order', orderNotification);
@@ -148,6 +190,7 @@ export async function notifyRestaurantNewOrder(order, restaurantId, paymentMetho
 
       // Log all connected restaurant sockets for debugging (but don't send to them)
       const allSockets = await restaurantNamespace.fetchSockets();
+      console.error('❌ [RestaurantNotify] Room probe result:', roomProbe);
       if (allSockets.length > 0) {
         // Get room information for each socket
         const socketRooms = [];
@@ -158,6 +201,7 @@ export async function notifyRestaurantNewOrder(order, restaurantId, paymentMetho
             rooms: rooms.filter(r => r.startsWith('restaurant:'))
           });
         }
+        console.error('❌ [RestaurantNotify] Connected restaurant sockets snapshot:', socketRooms);
       }
 
       // Still try to emit to room variations (in case socket connects later)

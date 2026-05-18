@@ -1,6 +1,6 @@
 import Order from '../models/Order.js';
 import Payment from '../../payment/models/Payment.js';
-import { createOrder as createRazorpayOrder, verifyPayment, fetchPayment } from '../../payment/services/razorpayService.js';
+import { createOrder as createRazorpayOrder, verifyPayment, fetchPayment, capturePayment } from '../../payment/services/razorpayService.js';
 import Restaurant from '../../restaurant/models/Restaurant.js';
 import Zone from '../../admin/models/Zone.js';
 import mongoose from 'mongoose';
@@ -203,6 +203,8 @@ export const createOrder = async (req, res) => {
       (pricingData?.recommendedItemIds || []).map((id) => String(id))
     );
 
+    const initialOrderStatus = normalizedPaymentMethod === 'razorpay' ? 'payment_pending' : 'pending';
+
     const order = new Order({
       orderId: generatedOrderId,
       // Re-added orderId generation
@@ -243,7 +245,7 @@ export const createOrder = async (req, res) => {
       deliveryFleet: deliveryFleet || 'standard',
       note: note || '',
       sendCutlery: sendCutlery !== false,
-      status: 'pending',
+      status: initialOrderStatus,
       payment: {
         method: normalizedPaymentMethod,
         status: 'pending'
@@ -309,6 +311,26 @@ export const createOrder = async (req, res) => {
       // Continue with order creation even if ETA calculation fails
     }
     await order.save();
+
+    try {
+      const orderSnapshot = order.toObject({ depopulate: true });
+      logger.info('🧾 ORDER_CREATED_DEBUG_SNAPSHOT', {
+        orderId: order.orderId,
+        orderMongoId: order._id?.toString?.(),
+        paymentMethod: order.payment?.method,
+        paymentStatus: order.payment?.status,
+        status: order.status,
+        restaurantId: order.restaurantId,
+        restaurantName: order.restaurantName,
+        userId: order.userId?.toString?.() || order.userId,
+        fullOrder: orderSnapshot
+      });
+    } catch (orderLogError) {
+      logger.warn('⚠️ Failed to log ORDER_CREATED_DEBUG_SNAPSHOT', {
+        orderId: order.orderId,
+        error: orderLogError?.message
+      });
+    }
 
     const buildOrderResponse = () => {
       const etaMin = Number(order?.eta?.min);
@@ -675,6 +697,11 @@ export const verifyOrderPayment = async (req, res) => {
       razorpayPaymentId,
       razorpaySignature
     } = req.body;
+    logger.info('💳 verifyOrderPayment request received', {
+      orderId,
+      razorpayOrderId,
+      razorpayPaymentId
+    });
     if (!orderId || !razorpayOrderId || !razorpayPaymentId || !razorpaySignature) {
       return res.status(400).json({
         success: false,
@@ -862,13 +889,44 @@ export const verifyOrderPayment = async (req, res) => {
 
     // Fallback: confirm capture from Razorpay and notify restaurant even if webhook is missing.
     let capturedByGateway = false;
+    let authorizedByGateway = false;
     try {
-      const gatewayPayment = await fetchPayment(razorpayPaymentId);
-      const gatewayStatus = String(gatewayPayment?.status || '').toLowerCase().trim();
+      let gatewayPayment = await fetchPayment(razorpayPaymentId);
+      let gatewayStatus = String(gatewayPayment?.status || '').toLowerCase().trim();
+      authorizedByGateway = gatewayStatus === 'authorized';
       capturedByGateway = gatewayStatus === 'captured';
+
+      logger.info('💳 verifyOrderPayment gateway status', {
+        orderId: order.orderId,
+        razorpayPaymentId,
+        gatewayStatus
+      });
+
+      if (!capturedByGateway && authorizedByGateway) {
+        try {
+          const captureAmountPaise = Math.round(Number(order.pricing?.total || 0) * 100);
+          await capturePayment(razorpayPaymentId, captureAmountPaise, 'INR');
+          gatewayPayment = await fetchPayment(razorpayPaymentId);
+          gatewayStatus = String(gatewayPayment?.status || '').toLowerCase().trim();
+          capturedByGateway = gatewayStatus === 'captured';
+          logger.info('💳 verifyOrderPayment manual capture attempted', {
+            orderId: order.orderId,
+            razorpayPaymentId,
+            captureAmountPaise,
+            postCaptureStatus: gatewayStatus
+          });
+        } catch (captureErr) {
+          logger.warn('⚠️ verifyOrderPayment manual capture failed; relying on webhook/settings', {
+            orderId: order.orderId,
+            razorpayPaymentId,
+            message: captureErr?.message || captureErr
+          });
+        }
+      }
 
       if (capturedByGateway) {
         // Upgrade order payment state to completed (webhook-equivalent)
+        order.status = 'pending';
         order.payment.status = 'completed';
         order.payment.method = 'razorpay';
         order.payment.razorpayOrderId = razorpayOrderId || order.payment.razorpayOrderId;
@@ -920,6 +978,12 @@ export const verifyOrderPayment = async (req, res) => {
             const restaurantId = order.restaurantId?.toString?.() || order.restaurantId;
             if (restaurantId) {
               const result = await notifyRestaurantNewOrder(order, restaurantId, 'razorpay');
+              logger.info('🍽️ verifyOrderPayment fallback notifyRestaurantNewOrder result', {
+                orderId: order.orderId,
+                orderMongoId: order._id?.toString?.(),
+                restaurantId,
+                result
+              });
               if (result?.success) {
                 order.payment.restaurantNotifiedAt = new Date();
                 await order.save();
@@ -984,7 +1048,8 @@ export const getUserOrders = async (req, res) => {
     // But we'll try both formats to be safe
     const mongoose = (await import('mongoose')).default;
     const query = {
-      userId
+      userId,
+      status: { $ne: 'payment_pending' }
     };
 
     // If userId is a string that looks like ObjectId, also try ObjectId format
@@ -999,6 +1064,7 @@ export const getUserOrders = async (req, res) => {
 
     // Add status filter if provided
     if (status) {
+      delete query.status;
       if (query.$or) {
         // Add status to each $or condition
         query.$or = query.$or.map(condition => ({
@@ -1008,9 +1074,6 @@ export const getUserOrders = async (req, res) => {
       } else {
         query.status = status;
       }
-    }
-    if (status) {
-      query.status = status;
     }
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const orders = await Order.find(query)
