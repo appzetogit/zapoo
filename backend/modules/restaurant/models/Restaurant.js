@@ -516,6 +516,11 @@ const restaurantSchema = new mongoose.Schema(
         type: Boolean,
         default: false,
       },
+      baseSlabFlatFee: {
+        type: Number,
+        default: 0,
+        min: 0,
+      },
       orderValueSlabs: {
         type: [orderValueSlabSchema],
         default: [],

@@ -1153,6 +1153,7 @@ export const getDeliveryPricingConfig = asyncHandler(async (req, res) => {
     return successResponse(res, 200, 'Delivery pricing config fetched successfully', {
       deliveryPricingConfig: restaurant.deliveryPricingConfig || {
         isEnabled: false,
+        baseSlabFlatFee: 0,
         orderValueSlabs: [],
         customerDeliveryRates: [],
         lastUpdatedAt: null
@@ -1185,7 +1186,8 @@ export const updateDeliveryPricingConfig = asyncHandler(async (req, res) => {
     const {
       isEnabled,
       orderValueSlabs,
-      customerDeliveryRates
+      customerDeliveryRates,
+      baseSlabFlatFee
     } = req.body;
     const restaurant = await Restaurant.findById(req.restaurant._id);
     if (!restaurant) {
@@ -1232,11 +1234,12 @@ export const updateDeliveryPricingConfig = asyncHandler(async (req, res) => {
       distanceSlabs = [];
     }
     const activeDistanceSlabs = (distanceSlabs || []).filter(s => s.isActive !== false);
+    const nonBaseActiveSlabs = activeDistanceSlabs.filter((slab) => slab?.isBaseSlab !== true);
     const activeDistanceSlabIds = new Set(activeDistanceSlabs.map(s => String(s._id)));
-    if (!Array.isArray(orderValueSlabs) || orderValueSlabs.length === 0) {
-      return errorResponse(res, 400, 'orderValueSlabs must be a non-empty array');
+    if (nonBaseActiveSlabs.length > 0 && (!Array.isArray(orderValueSlabs) || orderValueSlabs.length === 0)) {
+      return errorResponse(res, 400, 'orderValueSlabs must be a non-empty array when non-base distance slabs are active');
     }
-    for (const slab of orderValueSlabs) {
+    for (const slab of (orderValueSlabs || [])) {
       if (!slab._id) {
         return errorResponse(res, 400, 'Each order value slab must include an _id for rate mapping');
       }
@@ -1250,19 +1253,32 @@ export const updateDeliveryPricingConfig = asyncHandler(async (req, res) => {
     if (!Array.isArray(customerDeliveryRates)) {
       return errorResponse(res, 400, 'customerDeliveryRates must be an array');
     }
-    const normalizedOrderValueSlabs = orderValueSlabs.map(slab => ({
+    const normalizedBaseSlabFlatFee = Number(baseSlabFlatFee ?? restaurant?.deliveryPricingConfig?.baseSlabFlatFee ?? 0);
+    if (!Number.isFinite(normalizedBaseSlabFlatFee) || normalizedBaseSlabFlatFee < 0) {
+      return errorResponse(res, 400, 'baseSlabFlatFee must be >= 0');
+    }
+    const normalizedOrderValueSlabs = (orderValueSlabs || []).map(slab => ({
       _id: slab._id,
       label: slab.label || '',
       minOrderValue: Number(slab.minOrderValue),
       maxOrderValue: slab.maxOrderValue === null || slab.maxOrderValue === undefined ? null : Number(slab.maxOrderValue)
     }));
     const orderValueSlabIds = new Set(normalizedOrderValueSlabs.map(slab => slab._id).filter(Boolean).map(id => String(id)));
+    const baseSlabIds = new Set(
+      activeDistanceSlabs
+        .filter((slab) => slab?.isBaseSlab === true)
+        .map((slab) => String(slab._id))
+    );
     for (const rate of customerDeliveryRates) {
       const distanceSlabId = String(rate.distanceSlabId || '');
       const orderValueSlabId = String(rate.orderValueSlabId || '');
       const perKmRate = Number(rate.perKmRate);
       if (!distanceSlabId || !activeDistanceSlabIds.has(distanceSlabId)) {
         return errorResponse(res, 400, `Invalid distanceSlabId: ${distanceSlabId || '(empty)'}`);
+      }
+      // Base slab is always flat fee for customer pricing; ignore per-km rows on base slab.
+      if (baseSlabIds.has(distanceSlabId)) {
+        continue;
       }
       if (!orderValueSlabId || !orderValueSlabIds.has(orderValueSlabId)) {
         return errorResponse(res, 400, `Invalid orderValueSlabId: ${orderValueSlabId || '(empty)'}`);
@@ -1274,16 +1290,22 @@ export const updateDeliveryPricingConfig = asyncHandler(async (req, res) => {
     const hasRates = Array.isArray(customerDeliveryRates) && customerDeliveryRates.length > 0;
     const resolvedEnabled =
       typeof isEnabled === 'boolean' ? isEnabled : hasRates ? true : false;
+    if (resolvedEnabled && normalizedBaseSlabFlatFee < 0) {
+      return errorResponse(res, 400, 'baseSlabFlatFee must be >= 0 when delivery pricing is enabled');
+    }
 
     restaurant.deliveryPricingConfig = {
       isEnabled: resolvedEnabled,
+      baseSlabFlatFee: normalizedBaseSlabFlatFee,
       orderValueSlabs: normalizedOrderValueSlabs,
-      customerDeliveryRates: customerDeliveryRates.map(rate => ({
-        _id: rate._id,
-        distanceSlabId: String(rate.distanceSlabId),
-        orderValueSlabId: String(rate.orderValueSlabId),
-        perKmRate: Number(rate.perKmRate)
-      })),
+      customerDeliveryRates: customerDeliveryRates
+        .filter((rate) => !baseSlabIds.has(String(rate.distanceSlabId || '')))
+        .map(rate => ({
+          _id: rate._id,
+          distanceSlabId: String(rate.distanceSlabId),
+          orderValueSlabId: String(rate.orderValueSlabId),
+          perKmRate: Number(rate.perKmRate)
+        })),
       lastUpdatedAt: new Date()
     };
     await restaurant.save();

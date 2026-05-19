@@ -374,8 +374,26 @@ const calculateRestaurantCustomerDeliveryFee = ({
     };
   }
 
+  if (!matchedDistanceSlab) {
+    return {
+      customerDeliveryFee: 0,
+      customerPerKmRate: 0,
+      matchedOrderValueSlab: null,
+    };
+  }
+
+  // Base slab pricing is always a flat fee set by restaurant (not per-km).
+  if (matchedDistanceSlab?.isBaseSlab === true) {
+    const baseSlabFlatFee = Number(config?.baseSlabFlatFee || 0);
+    return {
+      customerDeliveryFee: roundCurrency(baseSlabFlatFee),
+      customerPerKmRate: 0,
+      matchedOrderValueSlab: null,
+    };
+  }
+
   const matchedOrderValueSlab = findOrderValueSlab(config.orderValueSlabs, subtotal);
-  if (!matchedOrderValueSlab || !matchedDistanceSlab) {
+  if (!matchedOrderValueSlab) {
     return {
       customerDeliveryFee: 0,
       customerPerKmRate: 0,

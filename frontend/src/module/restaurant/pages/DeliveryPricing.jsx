@@ -29,12 +29,37 @@ const formatDistanceRange = (slab) => {
 };
 
 const formatCurrency = (value) => `Rs ${Number(value || 0).toFixed(2)}`;
+const getFriendlyDeliveryPricingError = (message) => {
+  const msg = String(message || "").toLowerCase();
+  if (msg.includes("ordervalueslabs") && msg.includes("non-base")) {
+    return "Please add at least one order value slab for non-base distance ranges, then save again.";
+  }
+  if (msg.includes("customersdeliveryrates") || msg.includes("customerdeliveryrates")) {
+    return "Please fill delivery rates for all non-base distance slabs.";
+  }
+  if (msg.includes("baseslabflatfee")) {
+    return "Please enter a valid base slab flat fee (0 or more).";
+  }
+  if (msg.includes("invalid distanceslabid")) {
+    return "Distance slab setup changed. Please refresh this page and try again.";
+  }
+  if (msg.includes("invalid ordervalueslabid")) {
+    return "Order value slab data is invalid. Please recheck slabs and save again.";
+  }
+  return message || "Unable to save delivery setup. Please check the form and try again.";
+};
 
 const getAdminReferencePrice = (distanceSlab, tier) => {
   if (distanceSlab?.isBaseSlab) {
     return Number(tier?.baseFee || 0);
   }
   return Number(distanceSlab?.adminPerKmRate || 0);
+};
+const getAdminReferenceLabel = (distanceSlab, tier) => {
+  if (distanceSlab?.isBaseSlab) {
+    return `Admin tier charge: ${formatCurrency(getAdminReferencePrice(distanceSlab, tier))}`;
+  }
+  return `Admin tier price: ${formatCurrency(getAdminReferencePrice(distanceSlab, tier))}/km`;
 };
 
 const buildSlabLabel = (slab) => {
@@ -53,10 +78,19 @@ export default function DeliveryPricing() {
   const [distanceSlabs, setDistanceSlabs] = useState([]);
   const [orderValueSlabs, setOrderValueSlabs] = useState([]);
   const [rateMap, setRateMap] = useState({});
+  const [baseSlabFlatFee, setBaseSlabFlatFee] = useState("0");
 
   const activeDistanceSlabs = useMemo(
     () => distanceSlabs.filter((slab) => slab?.isActive !== false),
     [distanceSlabs]
+  );
+  const baseDistanceSlab = useMemo(
+    () => activeDistanceSlabs.find((slab) => slab?.isBaseSlab === true) || null,
+    [activeDistanceSlabs]
+  );
+  const nonBaseDistanceSlabs = useMemo(
+    () => activeDistanceSlabs.filter((slab) => slab?.isBaseSlab !== true),
+    [activeDistanceSlabs]
   );
 
   useEffect(() => {
@@ -69,19 +103,28 @@ export default function DeliveryPricing() {
         const fetchedDistanceSlabs = Array.isArray(data.distanceSlabs) ? data.distanceSlabs : [];
         const fetchedOrderSlabs = Array.isArray(config.orderValueSlabs) ? config.orderValueSlabs : [];
         const fetchedRates = Array.isArray(config.customerDeliveryRates) ? config.customerDeliveryRates : [];
+        const hasNonBaseDistanceSlabs = fetchedDistanceSlabs.some(
+          (slab) => slab?.isActive !== false && slab?.isBaseSlab !== true
+        );
 
         setTier(data.tier || null);
         setDistanceSlabs(fetchedDistanceSlabs);
-        setOrderValueSlabs(
-          fetchedOrderSlabs.map((slab) => ({
-            _id: String(slab._id || createClientId()),
-            minOrderValue: String(slab.minOrderValue ?? 0),
-            maxOrderValue:
-              slab.maxOrderValue === null || slab.maxOrderValue === undefined
-                ? ""
-                : String(slab.maxOrderValue),
-          }))
-        );
+        const normalizedOrderValueSlabs = fetchedOrderSlabs.map((slab) => ({
+          _id: String(slab._id || createClientId()),
+          minOrderValue: String(slab.minOrderValue ?? 0),
+          maxOrderValue:
+            slab.maxOrderValue === null || slab.maxOrderValue === undefined
+              ? ""
+              : String(slab.maxOrderValue),
+        }));
+        if (normalizedOrderValueSlabs.length === 0 && hasNonBaseDistanceSlabs) {
+          normalizedOrderValueSlabs.push({
+            _id: createClientId(),
+            minOrderValue: "0",
+            maxOrderValue: "",
+          });
+        }
+        setOrderValueSlabs(normalizedOrderValueSlabs);
 
         const nextRateMap = {};
         fetchedRates.forEach((rate) => {
@@ -89,6 +132,7 @@ export default function DeliveryPricing() {
           nextRateMap[key] = String(rate.perKmRate ?? 0);
         });
         setRateMap(nextRateMap);
+        setBaseSlabFlatFee(String(config.baseSlabFlatFee ?? 0));
       } catch (error) {
         console.error("Error loading delivery pricing:", error);
         toast.error(error?.response?.data?.message || "Failed to load delivery setup");
@@ -145,6 +189,11 @@ export default function DeliveryPricing() {
     }
 
     const normalizedOrderSlabs = [];
+    const normalizedBaseFlatFee = Number(baseSlabFlatFee || 0);
+    if (!Number.isFinite(normalizedBaseFlatFee) || normalizedBaseFlatFee < 0) {
+      toast.error("Base slab flat fee must be 0 or more");
+      return;
+    }
     for (let index = 0; index < orderValueSlabs.length; index += 1) {
       const slab = orderValueSlabs[index];
       const minOrderValue = Number(slab.minOrderValue);
@@ -174,6 +223,9 @@ export default function DeliveryPricing() {
     for (const orderSlab of normalizedOrderSlabs) {
       for (const distanceSlab of activeDistanceSlabs) {
         const key = `${orderSlab._id}::${String(distanceSlab._id)}`;
+        if (distanceSlab?.isBaseSlab === true) {
+          continue;
+        }
         const perKmRate = Number(rateMap[key] || 0);
         if (!Number.isFinite(perKmRate) || perKmRate < 0) {
           toast.error(`Invalid rate for ${buildSlabLabel(orderSlab)} and ${formatDistanceRange(distanceSlab)}`);
@@ -191,13 +243,16 @@ export default function DeliveryPricing() {
       setSaving(true);
       await restaurantAPI.updateDeliveryPricing({
         isEnabled: true,
+        baseSlabFlatFee: normalizedBaseFlatFee,
         orderValueSlabs: normalizedOrderSlabs,
         customerDeliveryRates,
       });
       toast.success("Delivery setup updated successfully");
     } catch (error) {
       console.error("Error saving delivery pricing:", error);
-      toast.error(error?.response?.data?.message || "Failed to save delivery setup");
+      toast.error(
+        getFriendlyDeliveryPricingError(error?.response?.data?.message)
+      );
     } finally {
       setSaving(false);
     }
@@ -233,8 +288,31 @@ export default function DeliveryPricing() {
                 <p className="text-xs text-gray-500 mt-1">
                   Base fee: Rs {Number(tier?.baseFee || 0).toFixed(2)}
                 </p>
+                {baseDistanceSlab && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    Base slab: {formatDistanceRange(baseDistanceSlab)}
+                  </p>
+                )}
               </div>
             </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-5 shadow-sm">
+          <h2 className="text-base font-semibold text-gray-900">
+            Base Slab Charge {baseDistanceSlab ? `(${formatDistanceRange(baseDistanceSlab)})` : ""}
+          </h2>
+          <p className="text-xs text-gray-500 mt-1">
+            Admin charge to restaurant for base slab: {formatCurrency(Number(tier?.baseFee || 0))}
+          </p>
+          <div className="mt-3 max-w-xs relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">Rs</span>
+            <input
+              value={baseSlabFlatFee}
+              onChange={(e) => setBaseSlabFlatFee(normalizeNumberInput(e.target.value))}
+              placeholder="0"
+              className="w-full rounded-lg border border-gray-300 pl-9 pr-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
           </div>
         </div>
 
@@ -242,8 +320,13 @@ export default function DeliveryPricing() {
           <div className="flex items-start sm:items-center justify-between gap-3">
             <div>
               <h2 className="text-base font-semibold text-gray-900">Order value slabs</h2>
-              <p className="text-xs text-gray-500 mt-1">Create the bill amount ranges you want to price separately.</p>
-            </div>
+                <p className="text-xs text-gray-500 mt-1">Create the bill amount ranges you want to price separately.</p>
+                {nonBaseDistanceSlabs.length > 0 && orderValueSlabs.length === 0 && (
+                  <p className="text-xs text-amber-600 mt-1">
+                    Add at least one order value slab to set rates for non-base distance ranges.
+                  </p>
+                )}
+              </div>
             <Button type="button" onClick={addOrderSlab} className="hidden sm:inline-flex gap-2 shrink-0 h-10 px-3 sm:px-4">
               <Plus className="w-4 h-4" />
               <span>Add slab</span>
@@ -308,13 +391,17 @@ export default function DeliveryPricing() {
           <div className="mb-4">
             <h2 className="text-base font-semibold text-gray-900">Rate matrix</h2>
             <p className="text-xs text-gray-500 mt-1">
-              Fill customer per-km rate for each order-value slab against each admin-defined distance slab.
+              Fill customer per-km rate for non-base distance slabs. Base slab uses flat customer charge above.
             </p>
           </div>
 
           {activeDistanceSlabs.length === 0 ? (
             <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
               No active distance slabs are available for your assigned tier. Ask admin to configure tier delivery slabs first.
+            </div>
+          ) : nonBaseDistanceSlabs.length === 0 ? (
+            <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-700">
+              Only base slab is active in your tier. Customer delivery will use base flat charge only.
             </div>
           ) : (
             <>
@@ -326,14 +413,14 @@ export default function DeliveryPricing() {
                       <p className="text-xs text-gray-500 mt-1">Per-km customer charge</p>
                     </div>
                     <div className="space-y-3">
-                      {activeDistanceSlabs.map((distanceSlab) => {
+                      {nonBaseDistanceSlabs.map((distanceSlab) => {
                         const cellKey = `${orderSlab._id}::${String(distanceSlab._id)}`;
                         return (
                           <div key={cellKey} className="rounded-lg bg-gray-50 border border-gray-200 p-3">
                             <div className="mb-2">
                               <p className="text-xs font-semibold text-gray-900">{formatDistanceRange(distanceSlab)}</p>
                               <p className="text-[11px] text-gray-500 mt-1">
-                                Admin tier price: {formatCurrency(getAdminReferencePrice(distanceSlab, tier))}/km
+                                {getAdminReferenceLabel(distanceSlab, tier)}
                               </p>
                             </div>
                             <div className="relative">
@@ -365,14 +452,14 @@ export default function DeliveryPricing() {
                     <th className="sticky left-0 bg-white z-10 text-left text-xs font-semibold text-gray-500 p-3 border-b border-gray-200 min-w-[220px]">
                       Order value slab
                     </th>
-                    {activeDistanceSlabs.map((distanceSlab) => (
+                    {nonBaseDistanceSlabs.map((distanceSlab) => (
                       <th
                         key={String(distanceSlab._id)}
                         className="text-left text-xs font-semibold text-gray-500 p-3 border-b border-gray-200 min-w-[170px]"
                       >
                         <div>{formatDistanceRange(distanceSlab)}</div>
                         <div className="text-[11px] font-normal text-gray-400 mt-1">
-                          Admin: {formatCurrency(getAdminReferencePrice(distanceSlab, tier))}/km
+                          {getAdminReferenceLabel(distanceSlab, tier)}
                         </div>
                       </th>
                     ))}
@@ -385,12 +472,12 @@ export default function DeliveryPricing() {
                         <div className="text-sm font-medium text-gray-900">{buildSlabLabel(orderSlab)}</div>
                         <div className="text-xs text-gray-500 mt-1">Per-km customer charge</div>
                       </td>
-                      {activeDistanceSlabs.map((distanceSlab) => {
+                      {nonBaseDistanceSlabs.map((distanceSlab) => {
                         const cellKey = `${orderSlab._id}::${String(distanceSlab._id)}`;
                         return (
                           <td key={cellKey} className="p-3 border-b border-gray-100 align-top">
                             <p className="text-[11px] text-gray-500 mb-2">
-                              Admin tier price: {formatCurrency(getAdminReferencePrice(distanceSlab, tier))}/km
+                              {getAdminReferenceLabel(distanceSlab, tier)}
                             </p>
                             <div className="relative">
                               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">Rs</span>
@@ -404,14 +491,14 @@ export default function DeliveryPricing() {
                           </td>
                         );
                       })}
-                    </tr>
-                  ))}
-                  {orderValueSlabs.length === 0 && (
-                    <tr>
-                      <td colSpan={activeDistanceSlabs.length + 1} className="p-4 text-sm text-gray-600">
-                        No order value slab found. Add a slab to set per-km customer rates.
-                      </td>
-                    </tr>
+                  </tr>
+                ))}
+                {orderValueSlabs.length === 0 && (
+                  <tr>
+                    <td colSpan={nonBaseDistanceSlabs.length + 1} className="p-4 text-sm text-gray-600">
+                      No order value slab found. Add a slab to set per-km customer rates.
+                    </td>
+                  </tr>
                   )}
                 </tbody>
               </table>
