@@ -895,6 +895,7 @@ export const processWalletRefund = async (orderId, adminId = null, refundAmount 
     const refundAmountToProcess = finalRefundAmount;
 
     // Update refund status to 'initiated'
+    settlement.cancellationDetails = settlement.cancellationDetails || {};
     settlement.cancellationDetails.refundStatus = 'initiated';
     settlement.cancellationDetails.refundInitiatedAt = new Date();
     if (adminId) {
@@ -978,6 +979,7 @@ export const processWalletRefund = async (orderId, adminId = null, refundAmount 
     }
 
     // Update refund status to 'processed' (wallet refunds are instant)
+    settlement.cancellationDetails = settlement.cancellationDetails || {};
     settlement.cancellationDetails.refundStatus = 'processed';
     settlement.cancellationDetails.refundProcessedAt = new Date();
     if (adminId) {

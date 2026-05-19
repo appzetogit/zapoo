@@ -198,7 +198,6 @@ import {
   getOrderById,
   getSearchingDeliverymanOrders,
   getRefundRequests,
-  processRefund,
   getOngoingOrders,
   getTransactionReport,
   getRestaurantReport,
@@ -481,9 +480,10 @@ router.get("/orders/restaurant-report", getRestaurantReport);
 // Order Refund - MUST be before /orders/:id to avoid route conflicts
 // Using explicit pattern /orders/refund/:orderId
 router.post("/orders/refund/:orderId", async (req, res, next) => {
-
-  // Call processRefund - it's already wrapped with asyncHandler
-  return processRefund(req, res, next);
+  return res.status(410).json({
+    success: false,
+    message: "Manual refund endpoint is deprecated. Refunds are now handled automatically by cancellation flow.",
+  });
 });
 
 // Refund Requests - MUST be registered before any catch-all routes
@@ -491,18 +491,10 @@ router.post("/orders/refund/:orderId", async (req, res, next) => {
 
 // Register the refund route handler directly
 router.post("/refund-requests/:orderId/process", async (req, res, next) => {
-
-  // Ensure orderId is passed correctly
-  if (!req.params.orderId) {
-    console.error("❌ [ROUTE] orderId parameter is missing!");
-    return res.status(400).json({
-      success: false,
-      message: "Order ID is required",
-    });
-  }
-
-  // Call processRefund - it's already wrapped with asyncHandler
-  return processRefund(req, res, next);
+  return res.status(410).json({
+    success: false,
+    message: "Manual refund processing is deprecated. Refunds are now handled automatically by cancellation flow.",
+  });
 });
 
 router.get("/refund-requests", getRefundRequests);
@@ -553,3 +545,4 @@ router.post("/withdrawal/:id/approve", approveWithdrawalRequest);
 router.post("/withdrawal/:id/reject", rejectWithdrawalRequest);
 
 export default router;
+

@@ -518,16 +518,22 @@ export const rejectOrder = asyncHandler(async (req, res) => {
     order.cancelledAt = new Date();
     await order.save();
 
-    // Trigger Razorpay refund automatically for restaurant rejection.
+    // Trigger payment-source specific auto-refund for restaurant rejection.
     try {
       const {
-        initiateRazorpayRefundForOrder
+        initiateRazorpayRefundForOrder,
+        processWalletRefund
       } = await import('../../order/services/cancellationRefundService.js');
-      const refundResult = await initiateRazorpayRefundForOrder({
-        orderId: order._id,
-        trigger: 'restaurant',
-        reason: reason || 'Rejected by restaurant'
-      });
+      const paymentMethod = String(order?.payment?.method || '').toLowerCase().trim();
+      if (paymentMethod === 'wallet') {
+        await processWalletRefund(order._id, null);
+      } else if (['razorpay', 'upi', 'card'].includes(paymentMethod)) {
+        await initiateRazorpayRefundForOrder({
+          orderId: order._id,
+          trigger: 'restaurant',
+          reason: reason || 'Rejected by restaurant'
+        });
+      }
     } catch (refundError) {
       console.error(`❌ Error calculating cancellation refund for order ${order.orderId}:`, refundError);
       // Don't fail order cancellation if refund calculation fails

@@ -3,7 +3,6 @@ import { adminAPI } from "@/lib/api"
 import { toast } from "sonner"
 import { Loader2 } from "lucide-react"
 import OrdersTopbar from "../../components/orders/OrdersTopbar"
-import OrdersTable from "../../components/orders/OrdersTable"
 import FilterPanel from "../../components/orders/FilterPanel"
 import ViewOrderDialog from "../../components/orders/ViewOrderDialog"
 import SettingsDialog from "../../components/orders/SettingsDialog"
@@ -13,7 +12,6 @@ export default function NewRefundRequests() {
   const [orders, setOrders] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [totalCount, setTotalCount] = useState(0)
-  const [processingRefund, setProcessingRefund] = useState(null)
   const [visibleColumns, setVisibleColumns] = useState({
     si: true,
     orderId: true,
@@ -82,7 +80,6 @@ export default function NewRefundRequests() {
     handleResetFilters,
     handleExport,
     handleViewOrder,
-    handlePrintOrder,
     toggleColumn,
   } = useGenericTableManagement(
     orders,
@@ -93,36 +90,6 @@ export default function NewRefundRequests() {
   const restaurants = useMemo(() => {
     return [...new Set(orders.map(o => o.restaurant))]
   }, [orders])
-
-  // Handle refund processing
-  const handleProcessRefund = async (order) => {
-    if (!confirm(`Are you sure you want to process refund for order ${order.orderId}?`)) {
-      return
-    }
-
-    try {
-      setProcessingRefund(order.id)
-      const response = await adminAPI.processRefund(order.id, {})
-      
-      if (response.data?.success) {
-        toast.success(`Refund processed successfully for order ${order.orderId}`)
-        // Refresh the list
-        const params = { page: 1, limit: 1000 }
-        const refreshResponse = await adminAPI.getRefundRequests(params)
-        if (refreshResponse.data?.success && refreshResponse.data?.data?.orders) {
-          setOrders(refreshResponse.data.data.orders)
-          setTotalCount(refreshResponse.data.data.pagination?.total || refreshResponse.data.data.orders.length)
-        }
-      } else {
-        toast.error(response.data?.message || "Failed to process refund")
-      }
-    } catch (error) {
-      console.error("Error processing refund:", error)
-      toast.error(error.response?.data?.message || "Failed to process refund")
-    } finally {
-      setProcessingRefund(null)
-    }
-  }
 
   const resetColumns = () => {
     setVisibleColumns({
@@ -254,20 +221,6 @@ export default function NewRefundRequests() {
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                             </svg>
                           </button>
-                          {order.refundStatus !== 'processed' && (
-                            <button 
-                              onClick={() => handleProcessRefund(order)}
-                              disabled={processingRefund === order.id}
-                              className="p-1.5 rounded bg-emerald-600 text-white hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
-                              title="Process Refund"
-                            >
-                              {processingRefund === order.id ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <span className="text-sm">₹</span>
-                              )}
-                            </button>
-                          )}
                         </div>
                       </td>
                     </tr>
@@ -281,3 +234,4 @@ export default function NewRefundRequests() {
     </div>
   )
 }
+
