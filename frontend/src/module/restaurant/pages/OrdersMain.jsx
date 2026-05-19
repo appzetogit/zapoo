@@ -853,7 +853,18 @@ export default function OrdersMain() {
         const latestOrderResponse = await restaurantAPI.getOrderById(orderId);
         const latestOrder = latestOrderResponse?.data?.data?.order;
         const latestStatus = String(latestOrder?.status || '').toLowerCase().trim();
-        if (['cancelled', 'ready', 'out_for_delivery', 'delivered', 'refunded', 'failed'].includes(latestStatus)) {
+        if (latestStatus === 'cancelled') {
+          toast.success('Order rejected successfully');
+          setShowRejectPopup(false);
+          setShowNewOrderPopup(false);
+          setPopupOrder(null);
+          clearNewOrder();
+          setRejectReason("");
+          setCountdown(240);
+          setPrepTime(11);
+          return;
+        }
+        if (['ready', 'out_for_delivery', 'delivered', 'refunded', 'failed'].includes(latestStatus)) {
           toast.error(`Order cannot be rejected. Current status: ${latestOrder?.status || latestStatus}`);
           setShowRejectPopup(false);
           setShowNewOrderPopup(false);
@@ -865,10 +876,16 @@ export default function OrdersMain() {
           return;
         }
         await restaurantAPI.rejectOrder(orderId, rejectReason);
+        toast.success('Order rejected successfully');
       } catch (error) {
         console.error('❌ Error rejecting order:', error);
-        alert('Failed to reject order. Please try again.');
-        return;
+        const serverMessage = String(error?.response?.data?.message || '').toLowerCase();
+        if (error?.response?.status === 400 && serverMessage.includes('current status: cancelled')) {
+          toast.success('Order rejected successfully');
+        } else {
+          toast.error(error.response?.data?.message || 'Failed to reject order. Please try again.');
+          return;
+        }
       }
     }
     if (audioRef.current) {

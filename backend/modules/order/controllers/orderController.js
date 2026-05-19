@@ -1080,7 +1080,7 @@ export const getUserOrders = async (req, res) => {
       .sort({ createdAt: -1 })
       .limit(parseInt(limit))
       .skip(skip)
-      .select('orderId status pricing items address createdAt deliveredAt restaurantName restaurantId estimatedDeliveryTime eta review cancelledBy cancellationReason tracking')
+      .select('orderId status pricing items address createdAt deliveredAt restaurantName restaurantId estimatedDeliveryTime eta review cancelledBy cancellationReason tracking payment')
       .populate('restaurantId', 'name slug profileImage address location')
       .lean();
     const total = await Order.countDocuments(query);

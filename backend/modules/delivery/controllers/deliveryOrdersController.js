@@ -1855,6 +1855,13 @@ export const completeDelivery = asyncHandler(async (req, res) => {
             completedAt: new Date()
           }
         });
+        await Order.updateOne({
+          _id: orderMongoId
+        }, {
+          $set: {
+            'payment.status': 'completed'
+          }
+        });
       } catch (paymentUpdateError) {
         console.warn('⚠️ Could not update COD payment status:', paymentUpdateError.message);
       }

@@ -94,6 +94,30 @@ export default function Orders() {
     return t("user.orders.paymentStatus.unknown");
   };
 
+  const normalizePaymentMethod = value => {
+    const method = String(value || "").toLowerCase().trim();
+    if (!method) return "";
+    if (method === "cash on delivery" || method === "cod") return "cash";
+    if (["cash", "wallet", "razorpay", "upi", "card"].includes(method)) return method;
+    return "";
+  };
+
+  const resolvePaymentMethod = order => {
+    const direct = normalizePaymentMethod(order?.payment?.method || order?.paymentMethod);
+    if (direct) return direct;
+
+    if (order?.payment?.razorpayPaymentId || order?.payment?.razorpayOrderId || order?.payment?.transactionId) {
+      return "razorpay";
+    }
+
+    const paymentStatus = String(order?.payment?.status || "").toLowerCase().trim();
+    if (["completed", "processing", "refunded", "failed", "authorized", "created"].includes(paymentStatus)) {
+      return "razorpay";
+    }
+
+    return "";
+  };
+
   // Auto-show rating popup when order is delivered (only once per order)
   useEffect(() => {
     if (orders.length === 0 || ratingModal.open) {
@@ -175,6 +199,7 @@ export default function Orders() {
 
             // Get original status from backend before transformation
             const originalStatus = order.status;
+            const resolvedPaymentMethod = resolvePaymentMethod(order);
             return {
               id: order.orderId || order._id?.toString() || `ORD-${order._id}`,
               mongoId: order._id,
@@ -203,7 +228,7 @@ export default function Orders() {
               pricing: order.pricing || {},
               // Keep full pricing object for discounts, coupons
               payment: order.payment || {},
-              paymentMethod: order.payment?.method || order.paymentMethod,
+              paymentMethod: resolvedPaymentMethod || order.payment?.method || order.paymentMethod,
               restaurant: order.restaurantId?.name || order.restaurantName || t("user.orders.restaurantFallback"),
               restaurantId: order.restaurantId?._id || order.restaurantId,
               restaurantImage: order.restaurantId?.profileImage?.url || order.restaurantId?.profileImage || null,
@@ -571,11 +596,24 @@ export default function Orders() {
                     {order.deliveredAt && <p className="text-xs text-gray-400 mt-0.5">{t("user.orders.deliveredOn")} {formatDate(order.deliveredAt)}</p>}
                     {order.payment && <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                         {t("user.orders.payment")} <span className="font-medium capitalize">
-                          {order.payment.method === 'cash' || order.payment.method === 'cod' ? t("user.orders.paymentMethod.cashOnDelivery") : order.payment.method === 'wallet' ? t("user.orders.paymentMethod.wallet") : order.payment.method === 'razorpay' ? t("user.orders.paymentMethod.online") : order.payment.method || t("user.orders.paymentMethod.na")}
+                          {(() => {
+                            const method = normalizePaymentMethod(order.paymentMethod || order.payment?.method);
+                            if (method === 'cash') return t("user.orders.paymentMethod.cashOnDelivery");
+                            if (method === 'wallet') return t("user.orders.paymentMethod.wallet");
+                            if (method === 'razorpay' || method === 'upi' || method === 'card') return t("user.orders.paymentMethod.online");
+                            return t("user.orders.paymentMethod.na");
+                          })()}
                         </span>
-                        {order.payment.status && <span className={`ml-2 px-1.5 py-0.5 rounded text-[10px] font-medium ${order.payment.status === 'completed' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : order.payment.status === 'failed' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : order.payment.status === 'pending' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'}`}>
-                            {getPaymentStatusLabel(order.payment.status)}
-                          </span>}
+                        {(() => {
+                          const method = normalizePaymentMethod(order.paymentMethod || order.payment?.method);
+                          const status = String(order?.payment?.status || '').toLowerCase().trim();
+                          const isCancelled = String(order?.originalStatus || order?.status || '').toLowerCase().trim() === 'cancelled' || String(order?.status || '').toLowerCase().trim() === 'restaurant_cancelled';
+                          const hideMisleadingCodPending = method === 'cash' && isCancelled && status === 'pending';
+                          if (!order.payment.status || hideMisleadingCodPending) return null;
+                          return <span className={`ml-2 px-1.5 py-0.5 rounded text-[10px] font-medium ${order.payment.status === 'completed' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : order.payment.status === 'failed' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : order.payment.status === 'pending' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'}`}>
+                              {getPaymentStatusLabel(order.payment.status)}
+                            </span>;
+                        })()}
                       </p>}
                     {isDelivered && !paymentFailed && <p className="text-xs font-medium text-green-600 mt-1">{t("user.orders.status.deliveredWithIcon")}</p>}
                     {isRestaurantCancelled && <p className="text-xs font-medium text-red-500 mt-1">{t("user.orders.status.restaurantCancelledWithIcon")}</p>}
