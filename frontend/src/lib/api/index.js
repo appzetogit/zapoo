@@ -1408,8 +1408,11 @@ export const adminAPI = {
     return getCachedResource(
       ["admin:dashboard-stats", params],
       () => apiClient.get(API_ENDPOINTS.ADMIN.DASHBOARD_STATS, { params }),
-      { ttl: 30 * 1000 }
+      { ttl: 5 * 1000 }
     );
+  },
+  getDeliveryRetentionByTier: (params = {}) => {
+    return apiClient.get(API_ENDPOINTS.ADMIN.DASHBOARD_DELIVERY_RETENTION_BY_TIER, { params });
   },
 
   // Get users

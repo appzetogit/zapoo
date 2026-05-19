@@ -77,9 +77,6 @@ deliveryBoyCommissionSchema.index({ minDistance: 1, maxDistance: 1 });
 deliveryBoyCommissionSchema.index({ status: 1 });
 deliveryBoyCommissionSchema.index({ createdAt: -1 });
 
-const DELIVERY_SLAB_MARGIN_KM = 0.2;
-const roundKm = (value) => Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
-
 // Method to check if a distance falls within this commission range
 deliveryBoyCommissionSchema.methods.isDistanceInRange = function(distance) {
   if (distance < this.minDistance) return false;
@@ -96,7 +93,7 @@ const buildActiveRulesQuery = (tier) => {
   return query;
 };
 
-const buildShiftedEntries = (items, minKey, maxKey) =>
+const buildRuleEntries = (items, minKey, maxKey) =>
   items.map((item, index) => {
     const originalMin = Number(item[minKey] || 0);
     const originalMax = item[maxKey] === null || item[maxKey] === undefined
@@ -106,22 +103,20 @@ const buildShiftedEntries = (items, minKey, maxKey) =>
     return {
       rule: item,
       index,
-      effectiveMin: index === 0 ? originalMin : roundKm(originalMin + DELIVERY_SLAB_MARGIN_KM),
-      effectiveMax: originalMax === null ? null : roundKm(originalMax + DELIVERY_SLAB_MARGIN_KM)
+      effectiveMin: originalMin,
+      effectiveMax: originalMax
     };
   });
 
-const resolveCommissionFromShiftedEntries = (shiftedEntries, normalizedDistance) => {
+const resolveCommissionFromEntries = (entries, normalizedDistance) => {
   const baseRuleEntry =
-    shiftedEntries.find((entry) => entry.rule.isBaseSlab === true) ||
-    shiftedEntries.find((entry) => Number(entry.rule.minDistance) === 0) ||
-    shiftedEntries[0];
+    entries.find((entry) => entry.rule.isBaseSlab === true) ||
+    entries.find((entry) => Number(entry.rule.minDistance) === 0) ||
+    entries[0];
 
   let applicableRuleEntry = null;
-  for (const entry of shiftedEntries) {
-    const lowerBoundOk = entry.index === 0
-      ? normalizedDistance >= entry.effectiveMin
-      : normalizedDistance > entry.effectiveMin;
+  for (const entry of entries) {
+    const lowerBoundOk = normalizedDistance >= entry.effectiveMin;
     const upperBoundOk = entry.effectiveMax === null || normalizedDistance <= entry.effectiveMax;
 
     if (lowerBoundOk && upperBoundOk) {
@@ -131,7 +126,7 @@ const resolveCommissionFromShiftedEntries = (shiftedEntries, normalizedDistance)
   }
 
   if (!applicableRuleEntry) {
-    applicableRuleEntry = shiftedEntries[shiftedEntries.length - 1] || baseRuleEntry;
+    applicableRuleEntry = entries[entries.length - 1] || baseRuleEntry;
   }
 
   const inBaseSlab = normalizedDistance >= baseRuleEntry.effectiveMin &&
@@ -161,8 +156,7 @@ const resolveCommissionFromShiftedEntries = (shiftedEntries, normalizedDistance)
       maxDistance: appliedEntry.effectiveMax,
       commissionPerKm: Number(appliedRule.commissionPerKm || 0),
       distanceCommission,
-      perKmApplied: !inBaseSlab,
-      slabShiftKm: DELIVERY_SLAB_MARGIN_KM
+      perKmApplied: !inBaseSlab
     }
   };
 };
@@ -215,8 +209,7 @@ deliveryBoyCommissionSchema.statics.calculateCommission = async function(distanc
         maxDistance: 0,
         commissionPerKm: 0,
         distanceCommission: 0,
-        perKmApplied: false,
-        slabShiftKm: DELIVERY_SLAB_MARGIN_KM
+        perKmApplied: false
       }
     };
   }
@@ -249,8 +242,8 @@ deliveryBoyCommissionSchema.statics.calculateCommission = async function(distanc
           }
         }));
 
-      const shiftedTierRules = buildShiftedEntries(tierRules, 'minDistance', 'maxDistance');
-      return resolveCommissionFromShiftedEntries(shiftedTierRules, normalizedDistance);
+      const tierRuleEntries = buildRuleEntries(tierRules, 'minDistance', 'maxDistance');
+      return resolveCommissionFromEntries(tierRuleEntries, normalizedDistance);
     }
   }
 
@@ -261,10 +254,8 @@ deliveryBoyCommissionSchema.statics.calculateCommission = async function(distanc
     throw new Error('No commission rules found');
   }
 
-  // Delivery partner slabs are shifted by +0.2 km (Option A)
-  // Example: 0-4 -> 0-4.2, 4-6 -> 4.2-6.2
-  const shiftedRules = buildShiftedEntries(rules, 'minDistance', 'maxDistance');
-  return resolveCommissionFromShiftedEntries(shiftedRules, normalizedDistance);
+  const ruleEntries = buildRuleEntries(rules, 'minDistance', 'maxDistance');
+  return resolveCommissionFromEntries(ruleEntries, normalizedDistance);
 };
 
 const DeliveryBoyCommission = mongoose.model('DeliveryBoyCommission', deliveryBoyCommissionSchema);

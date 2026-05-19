@@ -343,6 +343,7 @@ export const API_ENDPOINTS = {
     BUSINESS_SETTINGS_PUBLIC: "/business-settings/public",
     ANALYTICS: "/admin/analytics",
     DASHBOARD_STATS: "/admin/dashboard/stats",
+    DASHBOARD_DELIVERY_RETENTION_BY_TIER: "/admin/dashboard/delivery-retention-by-tier",
     CATEGORIES: "/admin/categories",
     CATEGORIES_PUBLIC: "/categories/public",
     CATEGORY_BY_ID: "/admin/categories/:id",

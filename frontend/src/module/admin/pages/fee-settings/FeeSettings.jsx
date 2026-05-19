@@ -31,6 +31,7 @@ export default function FeeSettings() {
   const [selectedTierId, setSelectedTierId] = useState("");
   const [selectedTierSlabs, setSelectedTierSlabs] = useState([]);
   const [selectedTierPlatformFee, setSelectedTierPlatformFee] = useState(5);
+  const [selectedTierAdminRetentionPercent, setSelectedTierAdminRetentionPercent] = useState(0);
 
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -82,10 +83,14 @@ export default function FeeSettings() {
         setSelectedTierPlatformFee(
           tier?.platformFee ?? data?.platformFee ?? 5,
         );
+        setSelectedTierAdminRetentionPercent(
+          Number(tier?.deliveryPricing?.adminRetentionPercent ?? 0),
+        );
       } else {
         setSelectedTierId("");
         setSelectedTierSlabs([]);
         setSelectedTierPlatformFee(data?.platformFee ?? 5);
+        setSelectedTierAdminRetentionPercent(0);
       }
     } catch (error) {
       console.error("Error fetching fee settings/tier data:", error);
@@ -108,6 +113,9 @@ export default function FeeSettings() {
     const tier = tiers.find((t) => String(t._id) === String(selectedTierId));
     setSelectedTierSlabs(Array.isArray(tier?.deliveryPricing?.distanceSlabs) ? tier.deliveryPricing.distanceSlabs : []);
     setSelectedTierPlatformFee(tier?.platformFee ?? feeSettings.platformFee ?? 5);
+    setSelectedTierAdminRetentionPercent(
+      Number(tier?.deliveryPricing?.adminRetentionPercent ?? 0),
+    );
   }, [selectedTierId, tiers, feeSettings.platformFee]);
 
   const hasOverlap = (candidate, slabs, skipId = null, skipIndex = -1) => {
@@ -210,6 +218,11 @@ export default function FeeSettings() {
         toast.error("Exactly one base slab is required for selected tier");
         return;
       }
+      const retentionPercent = Number(selectedTierAdminRetentionPercent);
+      if (!Number.isFinite(retentionPercent) || retentionPercent < 0 || retentionPercent > 100) {
+        toast.error("Admin retention % must be between 0 and 100");
+        return;
+      }
 
       for (let i = 0; i < selectedTierSlabs.length; i += 1) {
         const slab = selectedTierSlabs[i];
@@ -244,6 +257,7 @@ export default function FeeSettings() {
         tierAPI.updateTier(selectedTierId, {
           distanceSlabs: tierSlabsPayload,
           platformFee: Number(selectedTierPlatformFee),
+          adminRetentionPercent: retentionPercent,
           recommendedItemFee: Number(feeSettings.recommendedItemFee || 0),
           baseFee: Number(feeSettings.deliveryFee),
           freeDeliveryThreshold: Number(feeSettings.freeDeliveryThreshold),
@@ -482,6 +496,22 @@ export default function FeeSettings() {
                     step="1"
                     className="w-full px-4 py-2 border border-slate-300 rounded-lg"
                   />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-sm font-semibold text-slate-700">Admin Retention % (Selected Tier)</label>
+                  <input
+                    type="number"
+                    value={selectedTierAdminRetentionPercent}
+                    onChange={(e) => setSelectedTierAdminRetentionPercent(e.target.value)}
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg"
+                  />
+                  <p className="text-xs text-slate-500">
+                    Remaining percentage goes to delivery partner.
+                  </p>
                 </div>
 
                 <div className="space-y-2">

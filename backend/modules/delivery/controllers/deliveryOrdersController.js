@@ -66,6 +66,33 @@ const mapPaymentStatusForDeliveryClient = (status) => {
 };
 
 const generateDropOtpCode = () => String(Math.floor(1000 + Math.random() * 9000));
+const roundCurrency = (value) => Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
+const clampPercent = (value) => {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return 0;
+  if (numeric < 0) return 0;
+  if (numeric > 100) return 100;
+  return numeric;
+};
+const calculateDeliverySplit = (adminDeliveryCost, adminRetentionPercent) => {
+  const normalizedCost = Math.max(0, Number(adminDeliveryCost) || 0);
+  const retention = clampPercent(adminRetentionPercent);
+  let adminRetained = roundCurrency(normalizedCost * (retention / 100));
+  let deliveryPartnerShare = roundCurrency(normalizedCost - adminRetained);
+  if (deliveryPartnerShare < 0) {
+    deliveryPartnerShare = 0;
+    adminRetained = roundCurrency(normalizedCost);
+  }
+  const delta = roundCurrency(normalizedCost - (adminRetained + deliveryPartnerShare));
+  if (delta !== 0) {
+    deliveryPartnerShare = roundCurrency(deliveryPartnerShare + delta);
+  }
+  return {
+    adminRetentionPercent: retention,
+    adminRetainedDelivery: adminRetained,
+    deliveryPartnerShare
+  };
+};
 
 /**
  * Get Delivery Partner Orders
@@ -748,8 +775,9 @@ export const acceptOrder = asyncHandler(async (req, res) => {
     try {
       const DeliveryBoyCommission = (await import('../../admin/models/DeliveryBoyCommission.js')).default;
 
-      // Resolve tier name from restaurant zone if available
+      // Resolve tier details from restaurant zone if available
       let tierName = null;
+      let adminRetentionPercent = 0;
       try {
         const Zone = (await import('../../admin/models/Zone.js')).default;
         const Tier = (await import('../../admin/models/Tier.js')).default;
@@ -757,8 +785,9 @@ export const acceptOrder = asyncHandler(async (req, res) => {
         if (restaurantZoneId) {
           const zone = await Zone.findById(restaurantZoneId).select('tierId').lean();
           if (zone?.tierId) {
-            const tier = await Tier.findById(zone.tierId).select('name').lean();
+            const tier = await Tier.findById(zone.tierId).select('name deliveryPricing.adminRetentionPercent').lean();
             tierName = tier?.name || null;
+            adminRetentionPercent = clampPercent(tier?.deliveryPricing?.adminRetentionPercent ?? 0);
           }
         }
       } catch (tierError) {
@@ -778,18 +807,24 @@ export const acceptOrder = asyncHandler(async (req, res) => {
       const rule = commissionResult.rule || {
         minDistance: 4
       };
+      const split = calculateDeliverySplit(
+        updatedOrder?.pricing?.adminDeliveryCost ?? updatedOrder?.pricing?.deliveryFee ?? 0,
+        adminRetentionPercent
+      );
       estimatedEarnings = {
         basePayout: Math.round((Number(breakdown.basePayout ?? 0)) * 100) / 100,
         distance: Math.round(deliveryDistance * 100) / 100,
         commissionPerKm: Math.round((Number(breakdown.commissionPerKm ?? 0)) * 100) / 100,
         distanceCommission: Math.round((Number(breakdown.distanceCommission ?? 0)) * 100) / 100,
-        totalEarning: Math.round(Number(commissionResult.commission ?? 0) * 100) / 100,
+        totalEarning: Math.round(Number(split.deliveryPartnerShare ?? 0) * 100) / 100,
         breakdown: {
           basePayout: Number(breakdown.basePayout ?? 0),
           distance: deliveryDistance,
           commissionPerKm: Number(breakdown.commissionPerKm ?? 0),
           distanceCommission: Number(breakdown.distanceCommission ?? 0),
-          minDistance: Number(rule.minDistance ?? 0)
+          minDistance: Number(rule.minDistance ?? 0),
+          adminRetentionPercent: Number(split.adminRetentionPercent || 0),
+          adminRetainedDelivery: Number(split.adminRetainedDelivery || 0)
         }
       };
     } catch (earningsError) {
@@ -1977,9 +2012,28 @@ export const completeDelivery = asyncHandler(async (req, res) => {
     let commissionBreakdown = null;
     try {
       const tierName = order.pricing?.pricingMeta?.tierName || null;
+      let adminRetentionPercent = 0;
+      if (tierName) {
+        try {
+          const Tier = (await import('../../admin/models/Tier.js')).default;
+          const tierDoc = await Tier.findOne({ name: tierName }).select('deliveryPricing.adminRetentionPercent').lean();
+          adminRetentionPercent = clampPercent(tierDoc?.deliveryPricing?.adminRetentionPercent ?? 0);
+        } catch (tierLookupError) {
+          console.error('Error resolving tier retention for delivery earning:', tierLookupError.message);
+        }
+      }
       const commissionResult = await DeliveryBoyCommission.calculateCommission(deliveryDistance, tierName);
-      totalEarning = Number(commissionResult.commission || 0);
-      commissionBreakdown = commissionResult.breakdown;
+      const split = calculateDeliverySplit(
+        order?.pricing?.adminDeliveryCost ?? order?.pricing?.deliveryFee ?? 0,
+        adminRetentionPercent
+      );
+      totalEarning = Number(split.deliveryPartnerShare || 0);
+      commissionBreakdown = {
+        ...(commissionResult.breakdown || {}),
+        adminRetentionPercent: Number(split.adminRetentionPercent || 0),
+        adminRetainedDelivery: Number(split.adminRetainedDelivery || 0),
+        payoutSource: 'adminDeliveryCost_split'
+      };
     } catch (commissionError) {
       console.error('⚠️ Error calculating commission using rules:', commissionError.message);
       totalEarning = 0;

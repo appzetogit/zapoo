@@ -50,6 +50,14 @@ const resolveCouponSourceForSettlement = async (order, restaurant) => {
   return null;
 };
 
+const clampPercent = (value) => {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return 0;
+  if (numeric < 0) return 0;
+  if (numeric > 100) return 100;
+  return numeric;
+};
+
 /**
  * Calculate comprehensive order settlement breakdown
  * This calculates earnings for User, Restaurant, Delivery Partner, and Admin
@@ -86,13 +94,14 @@ export const calculateOrderSettlement = async (orderId) => {
     if (restaurant.zoneId) {
       const zone = await Zone.findById(restaurant.zoneId).select('tierId').lean();
       if (zone?.tierId) {
-        const tier = await Tier.findById(zone.tierId).select('name deliveryPricing.distanceSlabs').lean();
+        const tier = await Tier.findById(zone.tierId).select('name deliveryPricing.distanceSlabs deliveryPricing.adminRetentionPercent').lean();
         if (tier) {
           // Needed for settlement snapshot/debug + tier-based delivery commission.
           tierMeta = {
             id: tier._id,
             name: tier.name,
-            distanceSlabs: tier.deliveryPricing?.distanceSlabs || null
+            distanceSlabs: tier.deliveryPricing?.distanceSlabs || null,
+            adminRetentionPercent: clampPercent(tier.deliveryPricing?.adminRetentionPercent ?? 0)
           };
         }
       }
@@ -136,9 +145,7 @@ export const calculateOrderSettlement = async (orderId) => {
     );
     const restaurantNetEarning = roundCurrency(restaurantGrossCollection - payableToAdmin - recommendedItemFee);
     const adminRecommendedFee = roundCurrency(recommendedItemFee);
-    const adminBaseEarning = roundCurrency(platformFee + adminDeliveryCost + gstCollected + adminRecommendedFee);
     const adminCouponSubsidy = roundCurrency(adminCouponDiscount);
-    const adminNetEarning = roundCurrency(Math.max(0, adminBaseEarning - adminCouponSubsidy));
 
     const restaurantEarning = {
       foodPrice,
@@ -172,20 +179,34 @@ export const calculateOrderSettlement = async (orderId) => {
         ? Number(order.assignmentInfo.distance)
         : null;
 
-    if (order.deliveryPartnerId && settlementDeliveryKm > 0) {
+    const adminRetentionPercent = clampPercent(tierMeta?.adminRetentionPercent ?? 0);
+    let adminRetainedDelivery = roundCurrency(adminDeliveryCost * (adminRetentionPercent / 100));
+    let deliveryPartnerShare = roundCurrency(adminDeliveryCost - adminRetainedDelivery);
+    if (deliveryPartnerShare < 0) {
+      deliveryPartnerShare = 0;
+      adminRetainedDelivery = roundCurrency(adminDeliveryCost);
+    }
+    // Ensure exact paise-level reconciliation
+    const splitDelta = roundCurrency(adminDeliveryCost - (adminRetainedDelivery + deliveryPartnerShare));
+    if (splitDelta !== 0) {
+      deliveryPartnerShare = roundCurrency(deliveryPartnerShare + splitDelta);
+    }
+    const adminBaseEarning = roundCurrency(platformFee + adminRetainedDelivery + gstCollected + adminRecommendedFee);
+    const adminNetEarning = roundCurrency(Math.max(0, adminBaseEarning - adminCouponSubsidy));
+
+    if (order.deliveryPartnerId && settlementDeliveryKm > 0 && deliveryPartnerShare > 0) {
       try {
         const deliveryCommission = await DeliveryBoyCommission.calculateCommission(
           settlementDeliveryKm,
           tierMeta?.name || null
         );
-        const baseEarning = deliveryCommission.commission;
 
         deliveryPartnerEarning = {
           basePayout: deliveryCommission.breakdown.basePayout,
           distance: settlementDeliveryKm,
           commissionPerKm: deliveryCommission.breakdown.commissionPerKm,
           distanceCommission: deliveryCommission.breakdown.distanceCommission,
-          totalEarning: roundCurrency(baseEarning),
+          totalEarning: roundCurrency(deliveryPartnerShare),
           status: 'pending'
         };
       } catch (commissionErr) {
@@ -194,8 +215,8 @@ export const calculateOrderSettlement = async (orderId) => {
           basePayout: 0,
           distance: settlementDeliveryKm,
           commissionPerKm: 0,
-          distanceCommission: 0,
-          totalEarning: 0,
+          distanceCommission: roundCurrency(deliveryPartnerShare),
+          totalEarning: roundCurrency(deliveryPartnerShare),
           status: 'pending'
         };
       }
@@ -258,6 +279,9 @@ export const calculateOrderSettlement = async (orderId) => {
           distanceKm: order.pricing.distanceKm || 0,
           customerDeliveryFee: userPayment.deliveryFee,
           adminDeliveryCost,
+          adminRetentionPercent,
+          adminRetainedDelivery,
+          deliveryPartnerShare,
           adminDeliveryGst,
           platformFee,
           gstCollected,

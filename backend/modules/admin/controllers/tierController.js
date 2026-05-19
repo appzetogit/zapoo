@@ -36,6 +36,13 @@ const validateDistanceSlabs = (distanceSlabs = []) => {
   }
   return null;
 };
+
+const normalizeAdminRetentionPercent = (value) => {
+  if (value === undefined || value === null || value === "") return 0;
+  const normalized = Number(value);
+  if (!Number.isFinite(normalized)) return NaN;
+  return normalized;
+};
 const checkTierOverlap = async (minArea, maxArea, excludeTierId = null) => {
   const query = {
     minArea: {
@@ -83,7 +90,8 @@ export const createTier = async (req, res) => {
       baseDistance,
       extraKmCharge,
       basePay,
-      distanceSlabs
+      distanceSlabs,
+      adminRetentionPercent
     } = req.body;
 
     const feeSettings = await getActiveFeeSettingsForTierSync();
@@ -109,6 +117,10 @@ export const createTier = async (req, res) => {
       if (validationError) {
         return errorResponse(res, 400, validationError);
       }
+    }
+    const normalizedAdminRetentionPercent = normalizeAdminRetentionPercent(adminRetentionPercent);
+    if (!Number.isFinite(normalizedAdminRetentionPercent) || normalizedAdminRetentionPercent < 0 || normalizedAdminRetentionPercent > 100) {
+      return errorResponse(res, 400, "adminRetentionPercent must be a number between 0 and 100");
     }
     if (Number(minArea) < 0) {
       return errorResponse(res, 400, "minArea must be greater than or equal to 0");
@@ -136,7 +148,8 @@ export const createTier = async (req, res) => {
         freeDeliveryThreshold: feeSettings.freeDeliveryThreshold,
         baseDistance: baseDistance || 3,
         extraKmCharge: extraKmCharge || 10,
-        distanceSlabs: normalizeDistanceSlabs(safeDistanceSlabs)
+        distanceSlabs: normalizeDistanceSlabs(safeDistanceSlabs),
+        adminRetentionPercent: normalizedAdminRetentionPercent
       },
       recommendedItemFee: feeSettings.recommendedItemFee,
       platformFee: platformFee !== undefined ? Number(platformFee) : feeSettings.platformFee,
@@ -216,7 +229,8 @@ export const updateTier = async (req, res) => {
       baseDistance,
       extraKmCharge,
       basePay,
-      distanceSlabs
+      distanceSlabs,
+      adminRetentionPercent
     } = req.body;
     const tier = await Tier.findById(id);
     if (!tier) {
@@ -280,6 +294,12 @@ export const updateTier = async (req, res) => {
         return errorResponse(res, 400, validationError);
       }
     }
+    if (adminRetentionPercent !== undefined) {
+      const normalizedAdminRetentionPercent = normalizeAdminRetentionPercent(adminRetentionPercent);
+      if (!Number.isFinite(normalizedAdminRetentionPercent) || normalizedAdminRetentionPercent < 0 || normalizedAdminRetentionPercent > 100) {
+        return errorResponse(res, 400, "adminRetentionPercent must be a number between 0 and 100");
+      }
+    }
 
     // Update delivery pricing (distance slabs can be updated without touching fees)
     if (
@@ -293,6 +313,10 @@ export const updateTier = async (req, res) => {
       if (baseDistance !== undefined) tier.deliveryPricing.baseDistance = baseDistance;
       if (extraKmCharge !== undefined) tier.deliveryPricing.extraKmCharge = extraKmCharge;
       if (distanceSlabs !== undefined) tier.deliveryPricing.distanceSlabs = normalizeDistanceSlabs(distanceSlabs);
+    }
+    if (adminRetentionPercent !== undefined) {
+      if (!tier.deliveryPricing) tier.deliveryPricing = {};
+      tier.deliveryPricing.adminRetentionPercent = normalizeAdminRetentionPercent(adminRetentionPercent);
     }
 
     // Set fees only when the caller provides them.

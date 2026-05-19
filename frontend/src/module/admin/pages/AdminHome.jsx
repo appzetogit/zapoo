@@ -228,6 +228,18 @@ export default function AdminHome() {
           <MetricCard title="Orders processed" value={ordersTotal.toLocaleString("en-IN")} helper="Fulfilled & billed" icon={<Activity className="h-5 w-5 text-amber-600" />} accent="bg-amber-200/40" onClick={() => navigate("/admin/orders/all")} />
           <MetricCard title="Platform fee" value={`₹${platformFeeTotal.toLocaleString("en-IN")}`} helper="Total platform fees" icon={<CreditCard className="h-5 w-5 text-purple-600" />} accent="bg-purple-200/40" onClick={() => navigate("/admin/transaction-report")} />
           <MetricCard title="Delivery fee" value={`₹${deliveryFeeTotal.toLocaleString("en-IN")}`} helper="Total delivery fees" icon={<Truck className="h-5 w-5 text-blue-600" />} accent="bg-blue-200/40" onClick={() => navigate("/admin/transaction-report")} />
+          <MetricCard
+            title="Delivery retention"
+            value={`₹${(dashboardData?.deliveryRetention?.total || 0).toLocaleString("en-IN")}`}
+            helper="Admin share from delivery collection"
+            icon={<DollarSign className="h-5 w-5 text-teal-600" />}
+            accent="bg-teal-200/40"
+            onClick={() => {
+              const params = new URLSearchParams();
+              if (selectedPeriod && selectedPeriod !== "overall") params.set("period", selectedPeriod);
+              navigate(`/admin/reports/delivery-retention-by-tier${params.toString() ? `?${params.toString()}` : ""}`);
+            }}
+          />
           <MetricCard title="GST" value={`₹${gstTotal.toLocaleString("en-IN")}`} helper="Total GST collected" icon={<Receipt className="h-5 w-5 text-orange-600" />} accent="bg-orange-200/40" onClick={() => navigate("/admin/tax-report")} />
           <MetricCard title="Recommended Item fees" value={`₹${recommendedItemFeeTotal.toLocaleString("en-IN")}`} helper="Total recommended fees" icon={<Plus className="h-5 w-5 text-pink-600" />} accent="bg-pink-200/40" onClick={() => navigate("/admin/transaction-report")} />
           <MetricCard title="Total revenue" value={`₹${totalAdminEarnings.toLocaleString("en-IN", {

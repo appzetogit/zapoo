@@ -6,6 +6,7 @@ import AdminCommission from "../models/AdminCommission.js";
 import OrderSettlement from "../../order/models/OrderSettlement.js";
 import AdminWallet from "../models/AdminWallet.js";
 import Zone from "../models/Zone.js";
+import Tier from "../models/Tier.js";
 import SubscriptionPlan from "../models/SubscriptionPlan.js";
 import RestaurantSubscription from "../../restaurant/models/RestaurantSubscription.js";
 import User from "../../auth/models/User.js";
@@ -169,6 +170,7 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
           totalDeliveryFee: { $sum: { $ifNull: ["$settlement.adminEarning.deliveryFee", 0] } },
           totalGST: { $sum: { $ifNull: ["$settlement.adminEarning.gst", 0] } },
           totalRecommendedFee: { $sum: { $ifNull: ["$settlement.adminEarning.recommendedItemFee", 0] } },
+          totalDeliveryRetention: { $sum: { $ifNull: ["$settlement.adminEarning.deliveryMargin", 0] } },
           count: { $sum: 1 },
           // Last 30 days sub-metrics (if needed for the specific 'total' display)
           last30DaysRevenue: {
@@ -218,6 +220,15 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
                 0
               ]
             }
+          },
+          last30DaysDeliveryRetention: {
+            $sum: {
+              $cond: [
+                { $gte: ["$createdAt", last30Days] },
+                { $ifNull: ["$settlement.adminEarning.deliveryMargin", 0] },
+                0
+              ]
+            }
           }
         }
       }
@@ -225,7 +236,9 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
 
     const stats = financialStats[0] || {
       totalRevenue: 0, totalCommission: 0, totalPlatformFee: 0, totalDeliveryFee: 0, totalGST: 0, totalRecommendedFee: 0,
+      totalDeliveryRetention: 0,
       last30DaysRevenue: 0, last30DaysCommission: 0, last30DaysPlatformFee: 0, last30DaysDeliveryFee: 0, last30DaysGST: 0, last30DaysRecommendedFee: 0,
+      last30DaysDeliveryRetention: 0,
       count: 0
     };
 
@@ -688,6 +701,11 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
       deliveryFee: {
         total: Math.round(stats.totalDeliveryFee * 100) / 100,
         last30Days: Math.round(stats.last30DaysDeliveryFee * 100) / 100,
+        currency: "INR"
+      },
+      deliveryRetention: {
+        total: Math.round(stats.totalDeliveryRetention * 100) / 100,
+        last30Days: Math.round(stats.last30DaysDeliveryRetention * 100) / 100,
         currency: "INR"
       },
       gst: {
@@ -1530,6 +1548,162 @@ export const getRestaurants = asyncHandler(async (req, res) => {
       error: error.stack
     });
     return errorResponse(res, 500, "Failed to fetch restaurants");
+  }
+});
+
+/**
+ * Get admin delivery-retention collection split by tier
+ * GET /api/admin/dashboard/delivery-retention-by-tier
+ */
+export const getDeliveryRetentionByTier = asyncHandler(async (req, res) => {
+  try {
+    const { period } = req.query;
+
+    const now = new Date();
+    let startDate = null;
+    if (period === "today") {
+      startDate = new Date(new Date().setHours(0, 0, 0, 0));
+    } else if (period === "week") {
+      startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    } else if (period === "month") {
+      startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    } else if (period === "year") {
+      startDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
+    }
+
+    const deliveredOrderMatchExpr = {
+      $eq: [{ $toLower: { $ifNull: ["$order.status", ""] } }, "delivered"]
+    };
+    const deliveredDateMatchExpr = startDate
+      ? {
+          $gte: [
+            { $ifNull: ["$order.deliveredAt", "$order.createdAt"] },
+            startDate
+          ]
+        }
+      : null;
+
+    const tierRowsRaw = await OrderSettlement.aggregate([
+      {
+        $lookup: {
+          from: "orders",
+          localField: "orderId",
+          foreignField: "_id",
+          as: "order"
+        }
+      },
+      { $unwind: { path: "$order", preserveNullAndEmptyArrays: false } },
+      {
+        $match: deliveredDateMatchExpr
+          ? {
+              $expr: {
+                $and: [deliveredOrderMatchExpr, deliveredDateMatchExpr]
+              }
+            }
+          : {
+              $expr: deliveredOrderMatchExpr
+            }
+      },
+      {
+        $addFields: {
+          tierIdText: {
+            $toString: {
+              $ifNull: ["$calculationSnapshot.feeSettings.tier.id", "unknown"]
+            }
+          },
+          tierName: {
+            $ifNull: ["$calculationSnapshot.feeSettings.tier.name", "Unknown Tier"]
+          },
+          adminRetentionAmount: {
+            $ifNull: [
+              "$calculationSnapshot.pricingSnapshot.adminRetainedDelivery",
+              {
+                $max: [
+                  0,
+                  {
+                    $subtract: [
+                      { $ifNull: ["$adminEarning.adminDeliveryCost", { $ifNull: ["$adminEarning.deliveryFee", 0] }] },
+                      { $ifNull: ["$deliveryPartnerEarning.totalEarning", 0] }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            tierId: "$tierIdText",
+            tierName: "$tierName"
+          },
+          totalRetention: { $sum: "$adminRetentionAmount" },
+          orderCount: { $sum: 1 }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          tierId: "$_id.tierId",
+          tierName: "$_id.tierName",
+          totalRetention: { $round: ["$totalRetention", 2] },
+          orderCount: 1
+        }
+      },
+      { $sort: { totalRetention: -1, tierName: 1 } }
+    ]);
+
+    // Ensure all tiers are present even when collection is 0 for selected period.
+    const allTiers = await Tier.find({}).select("_id name").sort({ rank: 1, name: 1 }).lean();
+    const rowMap = new Map(
+      (tierRowsRaw || []).map((row) => [String(row.tierId || ""), row])
+    );
+
+    const tierRows = allTiers.map((tier) => {
+      const key = String(tier._id);
+      const row = rowMap.get(key);
+      return {
+        tierId: key,
+        tierName: tier.name,
+        totalRetention: row ? Number(row.totalRetention || 0) : 0,
+        orderCount: row ? Number(row.orderCount || 0) : 0
+      };
+    });
+
+    // Append unknown/legacy tiers (if any settlement has missing tier snapshot)
+    const knownTierIds = new Set(allTiers.map((tier) => String(tier._id)));
+    for (const row of tierRowsRaw || []) {
+      const rowTierId = String(row.tierId || "");
+      if (!knownTierIds.has(rowTierId)) {
+        tierRows.push({
+          tierId: rowTierId,
+          tierName: row.tierName || "Unknown Tier",
+          totalRetention: Number(row.totalRetention || 0),
+          orderCount: Number(row.orderCount || 0)
+        });
+      }
+    }
+
+    tierRows.sort((a, b) => {
+      if (b.totalRetention !== a.totalRetention) return b.totalRetention - a.totalRetention;
+      return String(a.tierName || "").localeCompare(String(b.tierName || ""));
+    });
+
+    const totalRetention = tierRows.reduce((sum, row) => sum + Number(row.totalRetention || 0), 0);
+    const totalOrders = tierRows.reduce((sum, row) => sum + Number(row.orderCount || 0), 0);
+
+    return successResponse(res, 200, "Delivery retention by tier retrieved successfully", {
+      period: period || "overall",
+      summary: {
+        totalRetention: Math.round(totalRetention * 100) / 100,
+        totalOrders
+      },
+      tiers: tierRows
+    });
+  } catch (error) {
+    logger.error(`Error fetching delivery retention by tier: ${error.message}`);
+    return errorResponse(res, 500, "Failed to fetch delivery retention by tier");
   }
 });
 

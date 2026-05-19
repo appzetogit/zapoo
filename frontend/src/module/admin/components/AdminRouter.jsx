@@ -86,6 +86,7 @@ const RestaurantReport = lazy(() => import("../pages/reports/RestaurantReport"))
 const FeedbackExperienceReport = lazy(() => import("../pages/reports/FeedbackExperienceReport"));
 const TaxReport = lazy(() => import("../pages/reports/TaxReport"));
 const RestaurantVATReport = lazy(() => import("../pages/reports/RestaurantVATReport"));
+const DeliveryRetentionByTierReport = lazy(() => import("../pages/reports/DeliveryRetentionByTierReport"));
 // Transaction Management
 const RestaurantWithdraws = lazy(() => import("../pages/transactions/RestaurantWithdraws"));
 const WithdrawMethod = lazy(() => import("../pages/transactions/WithdrawMethod"));
@@ -295,6 +296,7 @@ export default function AdminRouter() {
           <Route path="customer-report/feedback-experience" element={<FeedbackExperienceReport />} />
           <Route path="tax-report" element={<TaxReport />} />
           <Route path="restaurant-vat-report" element={<RestaurantVATReport />} />
+          <Route path="reports/delivery-retention-by-tier" element={<DeliveryRetentionByTierReport />} />
 
           {/* TRANSACTION MANAGEMENT */}
           <Route path="restaurant-withdraws" element={<RestaurantWithdraws />} />

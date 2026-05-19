@@ -98,6 +98,13 @@ const tierSchema = new mongoose.Schema(
                 default: [],
                 comment: "Tier-level distance slabs used for delivery pricing and settlements",
             },
+            adminRetentionPercent: {
+                type: Number,
+                default: 0,
+                min: 0,
+                max: 100,
+                comment: "Percentage of adminDeliveryCost retained by admin; remaining goes to delivery partner"
+            },
         },
         maxBanners: {
             type: Number,

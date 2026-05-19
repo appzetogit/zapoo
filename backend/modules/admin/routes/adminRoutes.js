@@ -7,6 +7,7 @@ import {
 import { getRestaurantDeliveryDiagnostics } from "../controllers/restaurantDeliveryDiagnosticsController.js";
 import {
   getDashboardStats,
+  getDeliveryRetentionByTier,
   getAdmins,
   getAdminById,
   createAdmin,
@@ -248,6 +249,7 @@ router.use(authenticateAdmin);
 
 // Dashboard
 router.get("/dashboard/stats", getDashboardStats);
+router.get("/dashboard/delivery-retention-by-tier", getDeliveryRetentionByTier);
 
 // Delivery Partner global cash limit (applies to all delivery boys)
 router.get("/delivery-cash-limit", getDeliveryCashLimit);

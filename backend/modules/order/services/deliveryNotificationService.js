@@ -237,16 +237,21 @@ export async function notifyDeliveryBoyNewOrder(order, deliveryPartnerId) {
 
     // Resolve tier name from restaurant zone if available
     let tierName = orderWithUser?.pricing?.pricingMeta?.tierName || null;
+    let adminRetentionPercent = 0;
     try {
-      if (!tierName) {
+      const Tier = (await import('../../admin/models/Tier.js')).default;
+      if (tierName) {
+        const tierByName = await Tier.findOne({ name: tierName }).select('deliveryPricing.adminRetentionPercent').lean();
+        adminRetentionPercent = clampPercent(tierByName?.deliveryPricing?.adminRetentionPercent ?? 0);
+      } else {
         const Zone = (await import('../../admin/models/Zone.js')).default;
-        const Tier = (await import('../../admin/models/Tier.js')).default;
         const restaurantZoneId = restaurant?.zoneId;
         if (restaurantZoneId) {
           const zone = await Zone.findById(restaurantZoneId).select('tierId').lean();
           if (zone?.tierId) {
-            const tier = await Tier.findById(zone.tierId).select('name').lean();
+            const tier = await Tier.findById(zone.tierId).select('name deliveryPricing.adminRetentionPercent').lean();
             tierName = tier?.name || null;
+            adminRetentionPercent = clampPercent(tier?.deliveryPricing?.adminRetentionPercent ?? 0);
           }
         }
       }
@@ -256,9 +261,12 @@ export async function notifyDeliveryBoyNewOrder(order, deliveryPartnerId) {
 
     // Calculate estimated earnings strictly from delivery commission rules
     const deliveryFeeFromOrder = order.pricing?.deliveryFee ?? 0;
+    const adminDeliveryCost = order.pricing?.adminDeliveryCost ?? deliveryFeeFromOrder;
     let estimatedEarnings = await calculateEstimatedEarnings(
       deliveryDistance || 0,
-      tierName
+      tierName,
+      adminDeliveryCost,
+      adminRetentionPercent
     );
 
     // Prepare order notification data
@@ -502,11 +510,24 @@ export async function notifyMultipleDeliveryBoys(order, deliveryPartnerIds, phas
     // Calculate estimated earnings based on delivery distance
     let estimatedEarnings = null;
     const deliveryFeeFromOrder = orderWithUser.pricing?.deliveryFee ?? 0;
+    const adminDeliveryCost = orderWithUser?.pricing?.adminDeliveryCost ?? deliveryFeeFromOrder;
     const tierName = orderWithUser?.pricing?.pricingMeta?.tierName || null;
+    let adminRetentionPercent = 0;
+    if (tierName) {
+      try {
+        const Tier = (await import('../../admin/models/Tier.js')).default;
+        const tierDoc = await Tier.findOne({ name: tierName }).select('deliveryPricing.adminRetentionPercent').lean();
+        adminRetentionPercent = clampPercent(tierDoc?.deliveryPricing?.adminRetentionPercent ?? 0);
+      } catch (tierLookupError) {
+        console.error('Error resolving tier retention for multi-notify earnings:', tierLookupError.message);
+      }
+    }
     try {
       estimatedEarnings = await calculateEstimatedEarnings(
         deliveryDistance,
-        tierName
+        tierName,
+        adminDeliveryCost,
+        adminRetentionPercent
       );
       const earnedValue = typeof estimatedEarnings === 'object' ? estimatedEarnings.totalEarning ?? 0 : Number(estimatedEarnings) || 0;
       if (!(earnedValue > 0)) {
@@ -775,11 +796,39 @@ function calculateDistance(lat1, lng1, lat2, lng2) {
   return R * c; // Distance in kilometers
 }
 
+const roundCurrency = (value) => Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
+const clampPercent = (value) => {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return 0;
+  if (numeric < 0) return 0;
+  if (numeric > 100) return 100;
+  return numeric;
+};
+const calculateDeliverySplit = (adminDeliveryCost, adminRetentionPercent) => {
+  const normalizedCost = Math.max(0, Number(adminDeliveryCost) || 0);
+  const retention = clampPercent(adminRetentionPercent);
+  let adminRetained = roundCurrency(normalizedCost * (retention / 100));
+  let deliveryPartnerShare = roundCurrency(normalizedCost - adminRetained);
+  if (deliveryPartnerShare < 0) {
+    deliveryPartnerShare = 0;
+    adminRetained = roundCurrency(normalizedCost);
+  }
+  const delta = roundCurrency(normalizedCost - (adminRetained + deliveryPartnerShare));
+  if (delta !== 0) {
+    deliveryPartnerShare = roundCurrency(deliveryPartnerShare + delta);
+  }
+  return {
+    adminRetentionPercent: retention,
+    adminRetainedDelivery: adminRetained,
+    deliveryPartnerShare
+  };
+};
+
 /**
- * Calculate estimated earnings for delivery boy based on admin commission rules.
+ * Calculate estimated earnings for delivery boy based on admin commission rules (net of admin retention).
  * Rule: payout is either base slab OR per-km slab as resolved by DeliveryBoyCommission.
  */
-async function calculateEstimatedEarnings(deliveryDistance, tierName = null) {
+async function calculateEstimatedEarnings(deliveryDistance, tierName = null, adminDeliveryCost = 0, adminRetentionPercent = 0) {
   try {
     const DeliveryBoyCommission = (await import('../../admin/models/DeliveryBoyCommission.js')).default;
 
@@ -811,7 +860,8 @@ async function calculateEstimatedEarnings(deliveryDistance, tierName = null) {
     const distance = deliveryDistance;
     const commissionPerKm = commissionResult.breakdown.commissionPerKm;
     const distanceCommission = commissionResult.breakdown.distanceCommission;
-    const totalEarning = commissionResult.commission;
+    const split = calculateDeliverySplit(adminDeliveryCost, adminRetentionPercent);
+    const totalEarning = split.deliveryPartnerShare;
 
     // Create breakdown text
     let breakdown = `Base payout: ₹${basePayout}`;
@@ -829,7 +879,9 @@ async function calculateEstimatedEarnings(deliveryDistance, tierName = null) {
       totalEarning: Math.round(totalEarning * 100) / 100,
       breakdown: breakdown,
       minDistance: commissionResult.rule.minDistance,
-      maxDistance: commissionResult.rule.maxDistance
+      maxDistance: commissionResult.rule.maxDistance,
+      adminRetentionPercent: split.adminRetentionPercent,
+      adminRetainedDelivery: split.adminRetainedDelivery
     };
   } catch (error) {
     console.error('Error calculating estimated earnings:', error);

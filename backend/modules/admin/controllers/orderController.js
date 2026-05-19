@@ -1512,14 +1512,24 @@ export const getTransactionReport = asyncHandler(async (req, res) => {
     // For simplicity, we'll use restaurantEarning from AdminCommission if available
     const restaurantEarning = adminCommissions.reduce((sum, comm) => sum + (comm.restaurantEarning || 0), 0);
 
-    // Calculate deliveryman earning (from delivery commissions)
-    // This would need to be calculated from delivery wallet transactions or order assignment info
-    // For now, we'll estimate based on delivery fee or use a placeholder
-    const deliverymanEarning = completedOrders.reduce((sum, order) => {
-      // Delivery commission is typically calculated from distance
-      // For now, we'll use a simple estimate or fetch from delivery wallet
-      return sum + (order.pricing?.deliveryFee || 0) * 0.8; // Estimate 80% of delivery fee goes to deliveryman
-    }, 0);
+    // Calculate deliveryman earning from settlement truth (fallback to 0 when unavailable)
+    let deliverymanEarning = 0;
+    if (completedOrders.length > 0) {
+      try {
+        const OrderSettlement = (await import('../../order/models/OrderSettlement.js')).default;
+        const completedOrderIds = completedOrders.map((o) => o._id);
+        const deliverySettlements = await OrderSettlement.find({
+          orderId: { $in: completedOrderIds }
+        }).select('deliveryPartnerEarning.totalEarning').lean();
+        deliverymanEarning = deliverySettlements.reduce(
+          (sum, settlement) => sum + (Number(settlement?.deliveryPartnerEarning?.totalEarning) || 0),
+          0
+        );
+      } catch (deliveryEarningErr) {
+        console.warn('Could not compute deliverymanEarning from settlements:', deliveryEarningErr.message);
+        deliverymanEarning = 0;
+      }
+    }
 
     // Transform orders to match frontend format
     const transformedTransactions = orders.map((order, index) => {
