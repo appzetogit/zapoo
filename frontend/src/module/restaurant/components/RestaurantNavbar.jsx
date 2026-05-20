@@ -253,7 +253,7 @@ export default function RestaurantNavbar({
     {/* Right Side - Interactive Elements */}
     <div className="flex items-center gap-1.5">
       {/* Offline/Online Status Tag */}
-      {showOfflineOnlineTag && <button onClick={handleStatusClick} className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 border rounded-full hover:opacity-90 transition-all ${status === "Online" ? "bg-emerald-50 border-emerald-200" : "bg-slate-100 border-slate-200"}`}>
+      {showOfflineOnlineTag && <button onClick={handleStatusClick} className={`flex items-center gap-1.5 px-2.5 py-1.5 border rounded-full hover:opacity-90 transition-all ${status === "Online" ? "bg-emerald-50 border-emerald-200" : "bg-slate-100 border-slate-200"}`}>
         <span className={`w-1.5 h-1.5 rounded-full ${status === "Online" ? "bg-green-500" : "bg-gray-500"}`}></span>
         <span className={`text-xs font-semibold ${status === "Online" ? "text-emerald-700" : "text-slate-700"}`}>
           {status}
