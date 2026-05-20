@@ -858,6 +858,9 @@ export const addAddon = asyncHandler(async (req, res) => {
 
   // Normalize images array
   const normalizedImages = Array.isArray(images) && images.length > 0 ? images.filter(img => img && typeof img === 'string' && img.trim() !== '') : image && image.trim() !== '' ? [image] : [];
+  if (normalizedImages.length === 0) {
+    return errorResponse(res, 400, 'Add-on image is required');
+  }
 
   // Create new add-on
   const newAddon = {
@@ -1019,6 +1022,9 @@ export const updateAddon = asyncHandler(async (req, res) => {
 
   // Normalize images array
   const normalizedImages = Array.isArray(images) && images.length > 0 ? images.filter(img => img && typeof img === 'string' && img.trim() !== '') : image && image.trim() !== '' ? [image] : [];
+  if (normalizedImages.length === 0) {
+    return errorResponse(res, 400, 'Add-on image is required');
+  }
 
   // Update add-on (preserve approval status if already approved/rejected)
   addon.name = name.trim();

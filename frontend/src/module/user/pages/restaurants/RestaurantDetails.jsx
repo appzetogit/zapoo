@@ -1524,10 +1524,8 @@ export default function RestaurantDetails() {
                             </div>
 
                             {/* Right Side - Image and Add Button */}
-                            <div className="relative w-32 h-32 flex-shrink-0 overflow-visible">
-                              {item.image || item.images && item.images.length > 0 ? <img src={item.image || item.images[0]} alt={item.name} className="w-full h-full object-cover rounded-2xl shadow-sm" /> : <div className="w-full h-full bg-gray-200 dark:bg-gray-700 rounded-2xl flex items-center justify-center">
-                                  <span className="text-xs text-gray-400">{t("user.restaurantDetails.noImage")}</span>
-                                </div>}
+                            <div className={`relative flex-shrink-0 overflow-visible ${item.image || item.images && item.images.length > 0 ? 'w-32 h-32' : 'w-auto h-auto pr-2'}`}>
+                              {item.image || item.images && item.images.length > 0 ? <img src={item.image || item.images[0]} alt={item.name} className="w-full h-full object-cover rounded-2xl shadow-sm" /> : null}
                               {quantity > 0 ? <motion.div initial={{
                       opacity: 0,
                       scale: 0.8
@@ -1568,7 +1566,7 @@ export default function RestaurantDetails() {
                       if (!shouldShowGrayscale) {
                         updateItemQuantity(item, 1, e);
                       }
-                    }} disabled={shouldShowGrayscale} className={`absolute bottom-2 left-1/2 -translate-x-1/2 z-20 bg-white border font-bold px-6 py-1.5 rounded-lg shadow-md flex items-center gap-1 transition-colors ${shouldShowGrayscale ? 'border-gray-300 text-gray-400 cursor-not-allowed opacity-50' : 'border-green-600 text-green-600 hover:bg-green-50'}`}>
+                    }} disabled={shouldShowGrayscale} className={`${item.image || item.images && item.images.length > 0 ? 'absolute bottom-2 left-1/2 -translate-x-1/2' : ''} z-20 bg-white border font-bold px-6 py-1.5 rounded-lg shadow-md flex items-center gap-1 transition-colors ${shouldShowGrayscale ? 'border-gray-300 text-gray-400 cursor-not-allowed opacity-50' : 'border-green-600 text-green-600 hover:bg-green-50'}`}>
                                   {t("user.restaurantDetails.add")} <Plus size={14} className="stroke-[3px]" />
                                 </motion.button>}
                             </div>
@@ -1671,10 +1669,8 @@ export default function RestaurantDetails() {
                                       </div>
 
                                       {/* Right Side - Image and Add Button */}
-                                      <div className="relative w-32 h-32 flex-shrink-0 overflow-visible">
-                                        {item.image || item.images && item.images.length > 0 ? <img src={item.image || item.images[0]} alt={item.name} className="w-full h-full object-cover rounded-2xl shadow-sm" /> : <div className="w-full h-full bg-gray-200 dark:bg-gray-700 rounded-2xl flex items-center justify-center">
-                                            <span className="text-xs text-gray-400">{t("user.restaurantDetails.noImage")}</span>
-                                          </div>}
+                                      <div className={`relative flex-shrink-0 overflow-visible ${item.image || item.images && item.images.length > 0 ? 'w-32 h-32' : 'w-auto h-auto pr-2'}`}>
+                                        {item.image || item.images && item.images.length > 0 ? <img src={item.image || item.images[0]} alt={item.name} className="w-full h-full object-cover rounded-2xl shadow-sm" /> : null}
                                         {quantity > 0 ? <motion.div initial={{
                             opacity: 0,
                             scale: 0.8
@@ -1715,10 +1711,10 @@ export default function RestaurantDetails() {
                       if (!shouldShowGrayscale) {
                         updateItemQuantity(item, 1, e);
                       }
-                    }} disabled={shouldShowGrayscale} className={`absolute bottom-2 left-1/2 -translate-x-1/2 z-20 bg-white border font-bold px-6 py-1.5 rounded-lg shadow-md flex items-center gap-1 transition-colors ${shouldShowGrayscale ? 'border-gray-300 text-gray-400 cursor-not-allowed opacity-50' : 'border-green-600 text-green-600 hover:bg-green-50'}`}>
-                                  {t("user.restaurantDetails.add")} <Plus size={14} className="stroke-[3px]" />
-                                </motion.button>}
-                            </div>
+                    }} disabled={shouldShowGrayscale} className={`${item.image || item.images && item.images.length > 0 ? 'absolute bottom-2 left-1/2 -translate-x-1/2' : ''} z-20 bg-white border font-bold px-6 py-1.5 rounded-lg shadow-md flex items-center gap-1 transition-colors ${shouldShowGrayscale ? 'border-gray-300 text-gray-400 cursor-not-allowed opacity-50' : 'border-green-600 text-green-600 hover:bg-green-50'}`}>
+                                              {t("user.restaurantDetails.add")} <Plus size={14} className="stroke-[3px]" />
+                                            </motion.button>}
+                                      </div>
                                     </div>;
                     })}
                               </div>}
@@ -2070,10 +2066,8 @@ export default function RestaurantDetails() {
                   </div>
 
                   {/* Image Section */}
-                  <div className="relative w-full h-64 overflow-hidden rounded-t-3xl">
-                    {selectedItem.image ? <img src={selectedItem.image} alt={selectedItem.name} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
-                        <span className="text-sm text-gray-400">{t("user.restaurantDetails.noImageAvailable")}</span>
-                      </div>}
+                  {(selectedItem.image || selectedItem.images && selectedItem.images.length > 0) && <div className="relative w-full h-64 overflow-hidden rounded-t-3xl">
+                    <img src={selectedItem.image || selectedItem.images[0]} alt={selectedItem.name} className="w-full h-full object-cover" />
                     {/* Bookmark and Share Icons Overlay */}
                     <div className="absolute bottom-4 right-4 flex items-center gap-3">
                       <button onClick={e => {
@@ -2086,7 +2080,7 @@ export default function RestaurantDetails() {
                         <Share2 className="h-5 w-5" />
                       </button>
                     </div>
-                  </div>
+                  </div>}
 
                   {/* Content Section */}
                   <div className="flex-1 overflow-y-auto px-4 py-4">

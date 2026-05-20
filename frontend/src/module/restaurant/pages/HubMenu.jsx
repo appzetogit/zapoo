@@ -556,6 +556,11 @@ export default function HubMenu() {
       toast.error("Please select add-on food type");
       return;
     }
+    const hasExistingAddonImage = addonImages.some(img => typeof img === 'string' && img.trim() !== '');
+    if (!hasExistingAddonImage && addonImageFiles.size === 0) {
+      toast.error("Please upload add-on image");
+      return;
+    }
     try {
       setUploadingAddonImages(true);
 
@@ -579,6 +584,11 @@ export default function HubMenu() {
         }
       }
       const finalImageUrl = uploadedImageUrl || existingImageUrl || '';
+      if (!finalImageUrl) {
+        toast.error("Please upload add-on image");
+        setUploadingAddonImages(false);
+        return;
+      }
       const addonData = {
         name: addonName.trim(),
         description: addonDescription.trim(),
