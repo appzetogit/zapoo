@@ -1226,8 +1226,8 @@ export default function RestaurantDetails() {
       </AnimatedPage>;
   }
 
-  // Zone-based grayscale is disabled: if restaurant is visible on Home, details must remain orderable.
-  const shouldShowGrayscale = false;
+  const isRestaurantOffline = restaurant?.isAcceptingOrders === false;
+  const shouldShowGrayscale = isRestaurantOffline;
   return <AnimatedPage id="scrollingelement" className={`min-h-screen bg-white dark:bg-[#0a0a0a] flex flex-col transition-all duration-300 ${shouldShowGrayscale ? 'grayscale opacity-75' : ''}`}>
       {/* Header - Back, Search, Menu (like reference image) */}
       <div className="px-4 sm:px-6 md:px-8 lg:px-10 xl:px-12 pt-3 md:pt-4 lg:pt-5 pb-2 md:pb-3 bg-white dark:bg-[#1a1a1a]">
@@ -1286,6 +1286,12 @@ export default function RestaurantDetails() {
                 <Badge variant="secondary" className="w-fit flex items-center gap-1 px-2 py-0.5 bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200 border border-amber-300 dark:border-amber-700">
                   <AlertCircle className="h-3.5 w-3.5" />
                   {t("user.restaurantDetails.outOfDeliveryRangeBadge")}
+                </Badge>
+              )}
+              {isRestaurantOffline && (
+                <Badge variant="secondary" className="w-fit flex items-center gap-1 px-2 py-0.5 bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200 border border-gray-300 dark:border-gray-700">
+                  <AlertCircle className="h-3.5 w-3.5" />
+                  Restaurant is offline
                 </Badge>
               )}
             </div>
@@ -1730,6 +1736,11 @@ export default function RestaurantDetails() {
             <Button className="bg-amber-600 hover:bg-amber-700 text-white flex items-center gap-2 shadow-lg px-6 py-2.5 rounded-lg cursor-not-allowed" size="lg" disabled>
               <AlertCircle className="h-5 w-5" />
               {t("user.restaurantDetails.outOfDeliveryRange")}
+            </Button>
+          ) : shouldShowGrayscale ? (
+            <Button className="bg-gray-500 text-white flex items-center gap-2 shadow-lg px-6 py-2.5 rounded-lg cursor-not-allowed" size="lg" disabled>
+              <AlertCircle className="h-5 w-5" />
+              Restaurant is offline
             </Button>
           ) : (
             <Button className="bg-gray-800 hover:bg-gray-900 text-white flex items-center gap-2 shadow-lg px-6 py-2.5 rounded-lg" size="lg" onClick={() => setShowMenuSheet(true)}>

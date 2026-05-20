@@ -214,6 +214,7 @@ export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchCh
         const params = {
           includeBeyondDeliveryRange: "true",
           includeInactiveForSearch: "true",
+          includeOfflineForSearch: "true",
           limit: 80,
         }
         const pureVegOnlySelected =
@@ -238,13 +239,14 @@ export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchCh
 
         const eligibleForMenu = transformed.filter((r) => {
           const inRange = isWithinDeliveryRangeKm(r.distanceInKm, r.deliveryRange, { userHasLocation })
+          const isAcceptingOrders = r.isAcceptingOrders !== false
           const isOpen = isOpenForDeliveryNow({
             openDays: r.openDays,
             deliveryTimings: r.deliveryTimings,
             weeklyTimings: r.weeklyTimings,
             outletTimingsActive: r.outletTimingsActive,
           })
-          return inRange && isOpen
+          return inRange && isOpen && isAcceptingOrders
         })
 
         // Fetch menus for dish suggestions (only eligible restaurants)
@@ -293,13 +295,14 @@ export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchCh
     const results = []
     allRestaurants.forEach((restaurant) => {
       const inRange = isWithinDeliveryRangeKm(restaurant.distanceInKm, restaurant.deliveryRange, { userHasLocation })
+      const isAcceptingOrders = restaurant.isAcceptingOrders !== false
       const isOpen = isOpenForDeliveryNow({
         openDays: restaurant.openDays,
         deliveryTimings: restaurant.deliveryTimings,
         weeklyTimings: restaurant.weeklyTimings,
         outletTimingsActive: restaurant.outletTimingsActive,
       })
-      if (!inRange || !isOpen) return
+      if (!inRange || !isOpen || !isAcceptingOrders) return
       const menu = restaurant.menu
       if (!menu || !menu.sections) return
       menu.sections.forEach((section) => {
@@ -448,7 +451,8 @@ export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchCh
                   weeklyTimings: r.weeklyTimings,
                   outletTimingsActive: r.outletTimingsActive,
                 })
-                const isDisabled = !inRange || isClosed
+                const isOffline = r.isAcceptingOrders === false
+                const isDisabled = isOffline || !inRange || isClosed
                 const slug = r.slug || r.name?.toLowerCase().replace(/\s+/g, "-")
                 const content = (
                   <div className={`flex items-center gap-3 rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50/80 dark:bg-[#141414] p-3 transition-colors ${
@@ -471,12 +475,12 @@ export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchCh
                     </div>
                     {isDisabled && (
                       <span className="text-[10px] font-semibold text-gray-500 border border-gray-200 rounded-full px-2 py-0.5">
-                        {!inRange ? "Out of range" : "Closed"}
+                        {isOffline ? "Restaurant is offline" : !inRange ? "Out of range" : "Closed"}
                       </span>
                     )}
                   </div>
                 )
-                return isDisabled ? (
+                return isDisabled && !isOffline ? (
                   <div key={String(r.id)}>{content}</div>
                 ) : (
                   <Link

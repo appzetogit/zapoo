@@ -101,7 +101,7 @@ export const createOrder = async (req, res) => {
         { restaurantId: restaurantId },
         { slug: restaurantId }
       ]
-    }).select('name location deliveryRange isActive').lean();
+    }).select('name location deliveryRange isActive isAcceptingOrders').lean();
 
     if (!restaurant) {
       logger.error('❌ Restaurant not found:', { searchedRestaurantId: restaurantId, searchedRestaurantName: restaurantName });
@@ -111,6 +111,10 @@ export const createOrder = async (req, res) => {
     if (!restaurant.isActive) {
       logger.warn('⚠️ Restaurant is inactive:', { restaurantId: restaurant._id, restaurantName: restaurant.name });
       return res.status(403).json({ success: false, message: 'Restaurant is currently inactive' });
+    }
+    if (restaurant.isAcceptingOrders !== true) {
+      logger.warn('Restaurant is offline/not accepting orders:', { restaurantId: restaurant._id, restaurantName: restaurant.name });
+      return res.status(403).json({ success: false, message: 'Restaurant is offline and not accepting orders.' });
     }
 
     // CRITICAL: Validate restaurant location

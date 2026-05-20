@@ -184,6 +184,7 @@ export const getRestaurants = async (req, res) => {
       latitude,
       longitude,
       includeInactiveForSearch,
+      includeOfflineForSearch,
       includeBeyondDeliveryRange,
       pureVeg
     } = req.query;
@@ -193,6 +194,7 @@ export const getRestaurants = async (req, res) => {
     const hasGeoFilter = userLat != null && userLng != null && Number.isFinite(userLat) && Number.isFinite(userLng);
     // Search page only: include inactive / beyond deliveryRange (client greys + labels)
     const allowInactive = includeInactiveForSearch === 'true';
+    const allowOfflineForSearch = includeOfflineForSearch === 'true';
     const skipDeliveryRangeMatch = includeBeyondDeliveryRange === 'true';
 
     // Optional: Zone-based filtering - if zoneId is provided, validate and filter by zone
@@ -212,6 +214,9 @@ export const getRestaurants = async (req, res) => {
     const queryAndConditions = [];
     if (!allowInactive) {
       queryAndConditions.push({ isActive: true });
+    }
+    if (!allowOfflineForSearch) {
+      queryAndConditions.push({ isAcceptingOrders: true });
     }
     queryAndConditions.push({
       $or: [
@@ -1421,8 +1426,8 @@ export const getRestaurantsWithDishesUnder250 = async (req, res) => {
       });
     };
 
-    // Get all active restaurants
-    const baseQuery = { isActive: true, zoneId: { $in: activeZoneIds } };
+    // Get all active + online restaurants
+    const baseQuery = { isActive: true, isAcceptingOrders: true, zoneId: { $in: activeZoneIds } };
 
     let restaurants = await Restaurant.find(baseQuery)
       .select('-owner -createdAt -updatedAt')

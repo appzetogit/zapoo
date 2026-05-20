@@ -244,6 +244,7 @@ export default function SearchResults() {
         }
         if (query.trim().length > 0) {
           params.includeInactiveForSearch = "true";
+          params.includeOfflineForSearch = "true";
         }
         if (zoneId) params.zoneId = zoneId;
         // If currently out of service and no resolved zoneId, avoid geo-based empty response.
@@ -592,13 +593,14 @@ export default function SearchResults() {
 
     restaurantsData.forEach(restaurant => {
       const inRange = isWithinDeliveryRangeKm(restaurant.distanceInKm, restaurant.deliveryRange, { userHasLocation });
+      const isAcceptingOrders = restaurant.isAcceptingOrders !== false;
       const isOpen = isOpenForDeliveryNow({
         openDays: restaurant.openDays,
         deliveryTimings: restaurant.deliveryTimings,
         weeklyTimings: restaurant.weeklyTimings,
         outletTimingsActive: restaurant.outletTimingsActive,
       });
-      if (!inRange || !isOpen) return;
+      if (!inRange || !isOpen || !isAcceptingOrders) return;
 
       if (restaurant.menu && restaurant.menu.sections) {
         restaurant.menu.sections.forEach(section => {
@@ -646,6 +648,7 @@ export default function SearchResults() {
     }).map(r => ({
       ...r,
       inRange: isWithinDeliveryRangeKm(r.distanceInKm, r.deliveryRange, { userHasLocation }),
+      isOffline: r.isAcceptingOrders === false,
       isClosed: !isOpenForDeliveryNow({
         openDays: r.openDays,
         deliveryTimings: r.deliveryTimings,
@@ -778,7 +781,7 @@ export default function SearchResults() {
 
             {matchingRestaurants.map(restaurant => {
               const restaurantSlug = restaurant.slug || restaurant.name.toLowerCase().replace(/\s+/g, "-");
-              const disabled = restaurant.isClosed || !restaurant.inRange;
+              const disabled = restaurant.isOffline || restaurant.isClosed || !restaurant.inRange;
               const content = (
                 <div className={`flex items-center gap-3 p-3 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#1a1a1a] shadow-sm transition-shadow ${disabled ? 'grayscale opacity-70 cursor-not-allowed' : 'hover:shadow-md'}`}>
                   <div className="w-11 h-11 rounded-full overflow-hidden bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
@@ -794,12 +797,12 @@ export default function SearchResults() {
                   </div>
                   {disabled && (
                     <span className="text-[10px] font-semibold text-gray-500 border border-gray-200 rounded-full px-2 py-0.5">
-                      {!restaurant.inRange ? "Out of range" : t("user.searchResults.closed")}
+                      {restaurant.isOffline ? "Restaurant is offline" : !restaurant.inRange ? "Out of range" : t("user.searchResults.closed")}
                     </span>
                   )}
                 </div>
               );
-              return disabled ? (
+              return disabled && !restaurant.isOffline ? (
                 <div key={restaurant.id}>{content}</div>
               ) : (
                 <Link key={restaurant.id} to={`/user/restaurants/${restaurant.slug || restaurantSlug}`} className="block">
