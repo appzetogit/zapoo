@@ -481,14 +481,14 @@ export default function Under250() {
     toast.success(t("user.restaurantDetails.toast.dishAdded"))
   }
 
-  // Check if should show grayscale (only when user is out of service)
-  const shouldShowGrayscale = isOutOfService
+  // Keep out-of-service action guards unchanged, but never apply page-level grayscale styling.
+  const disableUnder250Actions = isOutOfService
   const bannerImageUrl = typeof bannerImage === "string"
     ? bannerImage
     : bannerImage?.imageUrl || bannerImage?.url || bannerImage?.image || ""
 
   return (
-    <div className={`relative min-h-screen bg-white dark:bg-[#0a0a0a] ${shouldShowGrayscale ? 'grayscale opacity-75' : ''}`}>
+    <div className="relative min-h-screen bg-white dark:bg-[#0a0a0a]">
       {/* Sticky Navbar Section - same as Home */}
       <motion.div
         className="md:hidden sticky top-0 z-50 bg-white dark:bg-[#0a0a0a]"
@@ -751,14 +751,14 @@ export default function Under250() {
                                   <Button
                                     variant={"outline"}
                                     size="sm"
-                                    disabled={shouldShowGrayscale}
-                                    className={`h-7 md:h-8 lg:h-9 px-3 md:px-4 lg:px-5 text-xs md:text-sm lg:text-base ${shouldShowGrayscale
+                                    disabled={disableUnder250Actions}
+                                    className={`h-7 md:h-8 lg:h-9 px-3 md:px-4 lg:px-5 text-xs md:text-sm lg:text-base ${disableUnder250Actions
                                       ? 'bg-gray-100 dark:bg-gray-800 text-gray-400 border-gray-300 dark:border-gray-700 cursor-not-allowed opacity-50'
                                       : 'bg-green-600/10 text-green-500 border-green-500 hover:bg-green-700 hover:text-white'
                                       }`}
                                     onClick={(e) => {
                                       e.stopPropagation()
-                                      if (!shouldShowGrayscale) {
+                                      if (!disableUnder250Actions) {
                                         handleItemClick(item, restaurant)
                                       }
                                     }}
@@ -1014,25 +1014,25 @@ export default function Under250() {
               <div className="border-t dark:border-gray-800 border-gray-200 px-4 md:px-6 lg:px-8 xl:px-10 py-4 md:py-5 lg:py-6 bg-white dark:bg-[#1a1a1a]">
                 <div className="flex items-center gap-4 md:gap-5 lg:gap-6">
                   {/* Quantity Selector */}
-                  <div className={`flex items-center gap-3 md:gap-4 lg:gap-5 border-2 rounded-lg md:rounded-xl px-3 md:px-4 lg:px-5 h-[44px] md:h-[50px] lg:h-[56px] ${shouldShowGrayscale
+                  <div className={`flex items-center gap-3 md:gap-4 lg:gap-5 border-2 rounded-lg md:rounded-xl px-3 md:px-4 lg:px-5 h-[44px] md:h-[50px] lg:h-[56px] ${disableUnder250Actions
                     ? 'border-gray-300 dark:border-gray-700 opacity-50'
                     : 'border-gray-300 dark:border-gray-700'
                     }`}>
                     <button
                       onClick={(e) => {
-                        if (!shouldShowGrayscale) {
+                        if (!disableUnder250Actions) {
                           updateItemQuantity(selectedItem, Math.max(0, (quantities[selectedItem.id] || 0) - 1), e)
                         }
                       }}
-                      disabled={(quantities[selectedItem.id] || 0) === 0 || shouldShowGrayscale}
-                      className={`${shouldShowGrayscale
+                      disabled={(quantities[selectedItem.id] || 0) === 0 || disableUnder250Actions}
+                      className={`${disableUnder250Actions
                         ? 'text-gray-300 dark:text-gray-600 cursor-not-allowed'
                         : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 disabled:text-gray-300 dark:disabled:text-gray-600 disabled:cursor-not-allowed'
                         }`}
                     >
                       <Minus className="h-5 w-5 md:h-6 md:w-6 lg:h-7 lg:w-7" />
                     </button>
-                    <span className={`text-lg md:text-xl lg:text-2xl font-semibold min-w-[2rem] md:min-w-[2.5rem] lg:min-w-[3rem] text-center ${shouldShowGrayscale
+                    <span className={`text-lg md:text-xl lg:text-2xl font-semibold min-w-[2rem] md:min-w-[2.5rem] lg:min-w-[3rem] text-center ${disableUnder250Actions
                       ? 'text-gray-400 dark:text-gray-600'
                       : 'text-gray-900 dark:text-white'
                       }`}>
@@ -1040,12 +1040,12 @@ export default function Under250() {
                     </span>
                     <button
                       onClick={(e) => {
-                        if (!shouldShowGrayscale) {
+                        if (!disableUnder250Actions) {
                           updateItemQuantity(selectedItem, (quantities[selectedItem.id] || 0) + 1, e)
                         }
                       }}
-                      disabled={shouldShowGrayscale}
-                      className={shouldShowGrayscale
+                      disabled={disableUnder250Actions}
+                      className={disableUnder250Actions
                         ? 'text-gray-300 dark:text-gray-600 cursor-not-allowed'
                         : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
                       }
@@ -1056,17 +1056,17 @@ export default function Under250() {
 
                   {/* Add Item Button */}
                   <Button
-                    className={`flex-1 h-[44px] md:h-[50px] lg:h-[56px] rounded-lg md:rounded-xl font-semibold flex items-center justify-center gap-2 text-sm md:text-base lg:text-lg ${shouldShowGrayscale
+                    className={`flex-1 h-[44px] md:h-[50px] lg:h-[56px] rounded-lg md:rounded-xl font-semibold flex items-center justify-center gap-2 text-sm md:text-base lg:text-lg ${disableUnder250Actions
                       ? 'bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-600 cursor-not-allowed opacity-50'
                       : 'bg-red-500 hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-700 text-white'
                       }`}
                     onClick={(e) => {
-                      if (!shouldShowGrayscale) {
+                      if (!disableUnder250Actions) {
                         updateItemQuantity(selectedItem, (quantities[selectedItem.id] || 0) + 1, e)
                         setShowItemDetail(false)
                       }
                     }}
-                    disabled={shouldShowGrayscale}
+                    disabled={disableUnder250Actions}
                   >
                     <span>{t("user.restaurantDetails.addItem")}</span>
                     <div className="flex items-center gap-1 md:gap-2">
