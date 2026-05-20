@@ -551,7 +551,7 @@ export default function JoiningRequest() {
                         {restaurantDetails?.name || selectedRequest?.restaurantName || "N/A"}
                       </h3>
                       <div className="flex items-center gap-4 flex-wrap">
-                        {restaurantDetails?.rating && <div className="flex items-center gap-1">
+                        {typeof restaurantDetails?.rating === "number" && restaurantDetails.rating > 0 && <div className="flex items-center gap-1">
                             <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
                             <span className="text-sm font-medium text-slate-700">
                               {restaurantDetails.rating.toFixed(1)} ({restaurantDetails.totalRatings || 0} reviews)

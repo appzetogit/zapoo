@@ -99,11 +99,11 @@ export default function AdminLogin() {
         <Card className="w-full max-w-lg bg-white/90 backdrop-blur border-neutral-200 shadow-2xl">
           <CardHeader className="pb-4">
             <div className="flex w-full items-center gap-4 sm:gap-5">
-              <div className="flex h-14 w-28 shrink-0 items-center justify-center rounded-xl bg-gray-900/5 ring-1 ring-neutral-200">
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-white ring-1 ring-neutral-200 shadow-sm overflow-hidden">
                 <img
                   src={logoUrl}
                   alt="Logo"
-                  className="h-10 w-24 object-contain"
+                  className="h-full w-full rounded-full object-cover"
                   loading="lazy"
                   onError={(e) => {
                     // Fallback to default logo if business logo fails to load
@@ -212,4 +212,3 @@ export default function AdminLogin() {
     </div>
   )
 }
-

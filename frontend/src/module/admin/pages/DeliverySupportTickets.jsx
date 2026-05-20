@@ -332,13 +332,13 @@ export default function DeliverySupportTickets() {
 
       {/* View Ticket Dialog - Full Details */}
       <Dialog open={isViewOpen} onOpenChange={setIsViewOpen}>
-        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
-          <DialogHeader className="pb-4 border-b border-gray-200">
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto p-0">
+          <DialogHeader className="px-6 pt-6 pb-4 border-b border-gray-200">
             <DialogTitle className="text-xl font-semibold text-gray-900">Ticket Details</DialogTitle>
             <p className="text-sm text-gray-600 mt-1">Complete information about the support ticket</p>
           </DialogHeader>
           {selectedTicket && (
-            <div className="space-y-6 py-4">
+            <div className="space-y-6 px-6 py-5">
               {/* Ticket Information Section */}
               <div>
                 <div className="flex items-center gap-3 mb-4">
@@ -520,4 +520,3 @@ export default function DeliverySupportTickets() {
     </div>
   )
 }
-
