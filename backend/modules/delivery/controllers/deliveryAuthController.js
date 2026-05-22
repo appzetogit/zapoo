@@ -121,7 +121,9 @@ export const verifyOTP = asyncHandler(async (req, res) => {
     phone,
     otp,
     purpose = 'login',
-    name
+    name,
+    fcmToken,
+    platform = 'web'
   } = req.body;
 
   // Validate inputs
@@ -131,6 +133,8 @@ export const verifyOTP = asyncHandler(async (req, res) => {
 
   // Normalize name - convert null/undefined to empty string for optional field
   const normalizedName = name && typeof name === 'string' ? name.trim() : null;
+  const normalizedFcmToken = fcmToken && typeof fcmToken === 'string' ? fcmToken.trim() : null;
+  const normalizedPlatform = String(platform || 'web').toLowerCase();
   try {
     let delivery;
     let isExistingDeliveryLogin = false;
@@ -218,6 +222,13 @@ export const verifyOTP = asyncHandler(async (req, res) => {
     }
 
     const signupStatus = getSignupStatus(delivery);
+    if (normalizedFcmToken) {
+      if (['mobile', 'android', 'ios', 'app'].includes(normalizedPlatform)) {
+        delivery.fcmTokenApp = normalizedFcmToken;
+      } else {
+        delivery.fcmTokenWeb = normalizedFcmToken;
+      }
+    }
     // Existing registered delivery partners should not be forced back into onboarding on login.
     // Keep onboarding flow only for new/registration flows.
     if (signupStatus.needsSignup && !isExistingDeliveryLogin) {

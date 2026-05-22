@@ -994,11 +994,17 @@ export const deliveryAPI = {
       purpose,
     });
   },
-  verifyOTP: (phone, otp, purpose = "login", name = null) => {
+  verifyOTP: (phone, otp, purpose = "login", name = null, fcmToken = null, platform = null) => {
     const payload = { phone, otp, purpose };
     // Only include name if it's provided and is a string
     if (name && typeof name === "string" && name.trim()) {
       payload.name = name.trim();
+    }
+    if (typeof fcmToken === "string" && fcmToken.trim()) {
+      payload.fcmToken = fcmToken.trim();
+    }
+    if (typeof platform === "string" && platform.trim()) {
+      payload.platform = platform.trim();
     }
     return apiClient.post(API_ENDPOINTS.DELIVERY.AUTH.VERIFY_OTP, payload);
   },

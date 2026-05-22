@@ -2,6 +2,7 @@ import React, { Suspense, lazy, useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute';
 import Loader from "@food/components/Loader";
+import { useFCMNotification } from "@/hooks/useFCMNotification";
 
 // Auth Pages (Lazy loaded)
 const Welcome = lazy(() => import("./pages/auth/Welcome"))
@@ -35,6 +36,13 @@ import Support from './pages/Support';
 
 
 const DeliveryV2Router = () => {
+  const isLoggedIn =
+    typeof window !== "undefined" &&
+    (localStorage.getItem("delivery_authenticated") === "true" ||
+      !!localStorage.getItem("delivery_accessToken"));
+
+  useFCMNotification({ isLoggedIn, role: "delivery" });
+
   // Safely enforce light mode for the Delivery app to prevent User dark mode bleeding
   useEffect(() => {
     document.documentElement.classList.remove('dark');
