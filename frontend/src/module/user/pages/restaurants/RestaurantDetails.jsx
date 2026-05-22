@@ -187,14 +187,15 @@ export default function RestaurantDetails() {
             setOutOfRange(Boolean(data.outOfRange));
           }
         } catch (lookupError) {
-          // Only search if zoneId is available
-          if (!zoneId) {
-            console.warn('⚠️ User zone not available, cannot search restaurants.');
-          } else {
-            const searchParams = {
-              limit: 100,
-              zoneId: zoneId
-            };
+          // Fallback: search by slug/name. Prefer zone-aware search when zone exists,
+          // but do not block first-load experience when zone detection is still in progress.
+          const searchParams = {
+            limit: 100
+          };
+          if (zoneId) {
+            searchParams.zoneId = zoneId;
+          }
+          try {
             if (pureVegOnlySelected) {
               searchParams.pureVeg = "true";
             }
@@ -216,6 +217,8 @@ export default function RestaurantDetails() {
                 setOutOfRange(Boolean(fullData.outOfRange));
               }
             }
+          } catch (searchError) {
+            console.error("Error while searching restaurant fallback:", searchError);
           }
         }
         if (apiRestaurant) {
@@ -595,13 +598,8 @@ export default function RestaurantDetails() {
       fetchedRestaurantRef.current = false;
     }
 
-    // Wait for zone to load before fetching (if zone-based search might be needed)
-    // But don't block if we're fetching by direct ID
-    if (loadingZone) {
-      return;
-    }
     fetchRestaurant();
-  }, [slug, zoneId, loadingZone, pureVegOnlySelected, userLocation?.latitude, userLocation?.longitude]);
+  }, [slug, zoneId, pureVegOnlySelected]);
 
   // Track previous values to prevent unnecessary recalculations
   const prevCoordsRef = useRef({

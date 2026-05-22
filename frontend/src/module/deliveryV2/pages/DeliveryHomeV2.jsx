@@ -554,6 +554,33 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
 
     const hydrateAvailableOrder = async () => {
       try {
+        const getLoc = (ref, keysLat = ['latitude', 'lat'], keysLng = ['longitude', 'lng']) => {
+          if (!ref) return null;
+          if (ref.location) {
+            if (Array.isArray(ref.location.coordinates) && ref.location.coordinates.length >= 2) {
+              const lat = Number(ref.location.coordinates[1]);
+              const lng = Number(ref.location.coordinates[0]);
+              if (Number.isFinite(lat) && Number.isFinite(lng)) return { lat, lng };
+            }
+            const lat = Number(ref.location.latitude ?? ref.location.lat);
+            const lng = Number(ref.location.longitude ?? ref.location.lng);
+            if (Number.isFinite(lat) && Number.isFinite(lng)) return { lat, lng };
+          }
+          if (Array.isArray(ref.coordinates) && ref.coordinates.length >= 2) {
+            const lat = Number(ref.coordinates[1]);
+            const lng = Number(ref.coordinates[0]);
+            if (Number.isFinite(lat) && Number.isFinite(lng)) return { lat, lng };
+          }
+          for (const k of keysLat) {
+            if (ref[k] != null) {
+              const lat = Number(ref[k]);
+              const lng = Number(ref[keysLng[keysLat.indexOf(k)]]);
+              if (Number.isFinite(lat) && Number.isFinite(lng)) return { lat, lng };
+            }
+          }
+          return null;
+        };
+
         const currentResponse = await deliveryAPI.getCurrentDelivery();
         const currentPayload =
           currentResponse?.data?.data?.activeOrder ||
@@ -561,7 +588,20 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
           null;
 
         if (!cancelled && currentPayload && (currentPayload._id || currentPayload.orderId)) {
-          setActiveOrder(currentPayload);
+          const normalizedOrder = {
+            ...currentPayload,
+            restaurantLocation:
+              getLoc(currentPayload.restaurantLocation) ||
+              getLoc(currentPayload.restaurantId) ||
+              getLoc(currentPayload.restaurant) ||
+              getLoc(currentPayload, ['restaurant_lat', 'restaurantLat', 'latitude'], ['restaurant_lng', 'restaurantLng', 'longitude']),
+            customerLocation:
+              getLoc(currentPayload.customerLocation) ||
+              getLoc(currentPayload.deliveryAddress) ||
+              getLoc(currentPayload.address) ||
+              getLoc(currentPayload, ['customer_lat', 'customerLat', 'latitude'], ['customer_lng', 'customerLng', 'longitude']),
+          };
+          setActiveOrder(normalizedOrder);
           return;
         }
 

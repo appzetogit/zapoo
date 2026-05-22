@@ -37,7 +37,8 @@ export const useOrderManager = () => {
       const response = await deliveryAPI.acceptOrder(orderId);
       
       if (response?.data?.success) {
-        const fullOrder = response.data.data?.order || order;
+        const responsePayload = response.data?.data || {};
+        const fullOrder = responsePayload?.order || order;
         
         // Robustly determine locations from multiple possible formats (Populated API vs Socket)
         const getLoc = (ref, keysLat, keysLng) => {
@@ -83,17 +84,40 @@ export const useOrderManager = () => {
 
         console.log('[OrderManager] Raw Full Order Data:', fullOrder);
 
-        const resLoc =
+        let resLoc =
           getLoc(fullOrder.restaurantId, ['latitude', 'lat'], ['longitude', 'lng']) ||
           getLoc(fullOrder.restaurantLocation, ['latitude', 'lat'], ['longitude', 'lng']) ||
           getLoc(fullOrder, ['restaurant_lat', 'restaurantLat', 'latitude'], ['restaurant_lng', 'restaurantLng', 'longitude']);
                        
-        const cusLoc =
+        let cusLoc =
           getLoc(fullOrder.address, ['latitude', 'lat'], ['longitude', 'lng']) ||
           getLoc(fullOrder.address?.location, ['latitude', 'lat'], ['longitude', 'lng']) ||
           getLoc(fullOrder.deliveryAddress, ['latitude', 'lat'], ['longitude', 'lng']) ||
           getLoc(fullOrder.customerLocation, ['latitude', 'lat'], ['longitude', 'lng']) ||
           getLoc(fullOrder, ['customer_lat', 'customerLat', 'latitude'], ['customer_lng', 'customerLng', 'longitude']);
+
+        // Safety fallback: backend accept API returns route for rider -> restaurant.
+        // If restaurant location is missing in order payload (common in lightweight socket payloads),
+        // derive it from the route end-point to keep pickup polyline working.
+        if (!resLoc) {
+          const routeCoords = responsePayload?.route?.coordinates;
+          if (Array.isArray(routeCoords) && routeCoords.length > 0) {
+            const last = routeCoords[routeCoords.length - 1];
+            const rLat = Number(last?.[0]);
+            const rLng = Number(last?.[1]);
+            if (Number.isFinite(rLat) && Number.isFinite(rLng)) {
+              resLoc = { lat: rLat, lng: rLng };
+            }
+          }
+        }
+
+        // Extra fallback for customer drop pin from raw payload shapes
+        if (!cusLoc) {
+          cusLoc =
+            getLoc(fullOrder.userAddress, ['latitude', 'lat'], ['longitude', 'lng']) ||
+            getLoc(fullOrder?.deliveryAddress?.location, ['latitude', 'lat'], ['longitude', 'lng']) ||
+            null;
+        }
 
         console.log('[OrderManager] Locations Mapped Result:', { resLoc, cusLoc });
         console.log('🧭 [CoordDebug][Accept][ResolvedLocations]', {
