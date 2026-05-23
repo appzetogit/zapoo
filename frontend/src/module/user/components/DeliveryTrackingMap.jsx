@@ -258,29 +258,60 @@ const DeliveryTrackingMap = ({
   // Check if delivery partner is assigned (memoized to avoid dependency issues)
   // MUST be defined BEFORE any useEffect that uses it
   const hasDeliveryPartner = useMemo(() => {
-    const deliveryStateStatus = order?.deliveryState?.status;
-    const currentPhase = order?.deliveryState?.currentPhase;
+    const deliveryStateStatusRaw = order?.deliveryState?.status;
+    const currentPhaseRaw = order?.deliveryState?.currentPhase;
+    const deliveryStateStatus = typeof deliveryStateStatusRaw === 'string' ? deliveryStateStatusRaw.toLowerCase() : '';
+    const currentPhase = typeof currentPhaseRaw === 'string' ? currentPhaseRaw.toLowerCase() : '';
 
     // Check if delivery partner has accepted (key condition)
     const hasAccepted = deliveryStateStatus === 'accepted';
-    const hasPartner = !!(order?.deliveryPartnerId || order?.deliveryPartner || order?.assignmentInfo?.deliveryPartnerId || hasAccepted || deliveryStateStatus && deliveryStateStatus !== 'pending' || currentPhase && currentPhase !== 'assigned' && currentPhase !== 'pending' || currentPhase === 'en_route_to_pickup' || currentPhase === 'at_pickup' || currentPhase === 'en_route_to_delivery');
+    const hasPartner = !!(order?.deliveryPartnerId || order?.deliveryPartner || order?.assignmentInfo?.deliveryPartnerId || hasAccepted || deliveryStateStatus && deliveryStateStatus !== 'pending' || currentPhase && currentPhase !== 'assigned' && currentPhase !== 'pending' || currentPhase === 'en_route_to_pickup' || currentPhase === 'picking_up' || currentPhase === 'at_pickup' || currentPhase === 'en_route_to_delivery');
     return hasPartner;
   }, [order?.deliveryPartnerId, order?.deliveryPartner, order?.assignmentInfo?.deliveryPartnerId, order?.deliveryState?.status, order?.deliveryState?.currentPhase]);
+
+  const locationDebugSnapshot = useCallback(() => ({
+    delivery: deliveryBoyLocation ? {
+      lat: deliveryBoyLocation.lat,
+      lng: deliveryBoyLocation.lng
+    } : null,
+    restaurant: restaurantCoords ? {
+      lat: restaurantCoords.lat,
+      lng: restaurantCoords.lng
+    } : null,
+    user: customerCoords ? {
+      lat: customerCoords.lat,
+      lng: customerCoords.lng
+    } : null
+  }), [deliveryBoyLocation, restaurantCoords, customerCoords]);
 
   // Determine which route to show based on order phase
   const getRouteToShow = useCallback(() => {
     if (!order || !deliveryBoyLocation) {
       // No delivery boy location yet, show restaurant to customer
+      console.log('[DeliveryTrackingMap][RouteDebug] Missing order/delivery location, fallback route restaurant->user', {
+        orderId,
+        hasOrder: Boolean(order),
+        hasDeliveryLocation: Boolean(deliveryBoyLocation),
+        locations: locationDebugSnapshot()
+      });
       return {
         start: restaurantCoords,
         end: customerCoords
       };
     }
-    const currentPhase = order.deliveryState?.currentPhase || 'assigned';
-    const status = order.deliveryState?.status || 'pending';
+    const currentPhaseRaw = order.deliveryState?.currentPhase || 'assigned';
+    const statusRaw = order.deliveryState?.status || 'pending';
+    const currentPhase = typeof currentPhaseRaw === 'string' ? currentPhaseRaw.toLowerCase() : 'assigned';
+    const status = typeof statusRaw === 'string' ? statusRaw.toLowerCase() : 'pending';
 
     // Phase 1: Delivery boy going to restaurant (en_route_to_pickup)
-    if (currentPhase === 'en_route_to_pickup' || status === 'accepted') {
+    if (currentPhase === 'en_route_to_pickup' || currentPhase === 'picking_up' || status === 'accepted' || status === 'picking_up') {
+      console.log('[DeliveryTrackingMap][RouteDebug] Selected route delivery->restaurant', {
+        orderId,
+        currentPhase,
+        status,
+        locations: locationDebugSnapshot()
+      });
       return {
         start: {
           lat: deliveryBoyLocation.lat,
@@ -292,6 +323,12 @@ const DeliveryTrackingMap = ({
 
     // Phase 2: Delivery boy at restaurant (at_pickup) - show route to customer
     if (currentPhase === 'at_pickup' || status === 'reached_pickup' || status === 'order_confirmed') {
+      console.log('[DeliveryTrackingMap][RouteDebug] Selected route restaurant->user (pickup reached)', {
+        orderId,
+        currentPhase,
+        status,
+        locations: locationDebugSnapshot()
+      });
       return {
         start: restaurantCoords,
         end: customerCoords
@@ -300,6 +337,12 @@ const DeliveryTrackingMap = ({
 
     // Phase 3: Delivery boy going to customer (en_route_to_delivery)
     if (currentPhase === 'en_route_to_delivery' || status === 'en_route_to_delivery' || order.status === 'out_for_delivery') {
+      console.log('[DeliveryTrackingMap][RouteDebug] Selected route delivery->user', {
+        orderId,
+        currentPhase,
+        status,
+        locations: locationDebugSnapshot()
+      });
       return {
         start: {
           lat: deliveryBoyLocation.lat,
@@ -310,11 +353,17 @@ const DeliveryTrackingMap = ({
     }
 
     // Default: Show restaurant to customer
+    console.log('[DeliveryTrackingMap][RouteDebug] Default route restaurant->user', {
+      orderId,
+      currentPhase,
+      status,
+      locations: locationDebugSnapshot()
+    });
     return {
       start: restaurantCoords,
       end: customerCoords
     };
-  }, [order, deliveryBoyLocation, restaurantCoords, customerCoords]);
+  }, [order, deliveryBoyLocation, restaurantCoords, customerCoords, orderId, locationDebugSnapshot]);
 
   // Move bike smoothly with rotation
   const moveBikeSmoothly = useCallback((lat, lng, heading) => {
@@ -1077,8 +1126,9 @@ const DeliveryTrackingMap = ({
     if (!isMapLoaded) return;
 
     // Check if delivery partner is assigned based on phase
-    const currentPhase = order?.deliveryState?.currentPhase;
-    const hasDeliveryPartnerByPhase = currentPhase === 'en_route_to_pickup' || currentPhase === 'at_pickup' || currentPhase === 'en_route_to_delivery';
+    const currentPhaseRaw = order?.deliveryState?.currentPhase;
+    const currentPhase = typeof currentPhaseRaw === 'string' ? currentPhaseRaw.toLowerCase() : '';
+    const hasDeliveryPartnerByPhase = currentPhase === 'en_route_to_pickup' || currentPhase === 'picking_up' || currentPhase === 'at_pickup' || currentPhase === 'en_route_to_delivery';
 
     // If delivery partner is assigned but bike marker doesn't exist, create it
     if (hasDeliveryPartnerByPhase && !bikeMarkerRef.current && mapInstance.current) {
@@ -1097,9 +1147,11 @@ const DeliveryTrackingMap = ({
     }
 
     // Only draw route if delivery partner is assigned
-    const routePhase = order?.deliveryState?.currentPhase;
-    const routeStatus = order?.deliveryState?.status;
-    const hasDeliveryPartnerForRoute = routeStatus === 'accepted' || routePhase === 'en_route_to_pickup' || routePhase === 'at_pickup' || routePhase === 'en_route_to_delivery' || routeStatus && routeStatus !== 'pending';
+    const routePhaseRaw = order?.deliveryState?.currentPhase;
+    const routeStatusRaw = order?.deliveryState?.status;
+    const routePhase = typeof routePhaseRaw === 'string' ? routePhaseRaw.toLowerCase() : '';
+    const routeStatus = typeof routeStatusRaw === 'string' ? routeStatusRaw.toLowerCase() : '';
+    const hasDeliveryPartnerForRoute = routeStatus === 'accepted' || routeStatus === 'picking_up' || routePhase === 'en_route_to_pickup' || routePhase === 'picking_up' || routePhase === 'at_pickup' || routePhase === 'en_route_to_delivery' || routeStatus && routeStatus !== 'pending';
 
     // Only draw route if delivery partner is assigned
     if (!hasDeliveryPartnerForRoute) {
@@ -1117,6 +1169,14 @@ const DeliveryTrackingMap = ({
     }
     const route = getRouteToShow();
     if (route.start && route.end) {
+      console.log('[DeliveryTrackingMap][RouteDebug] Drawing polyline request', {
+        orderId,
+        routePhase,
+        routeStatus,
+        start: route.start,
+        end: route.end,
+        locations: locationDebugSnapshot()
+      });
       lastRouteUpdateRef.current = now;
       drawRoute(route.start, route.end);
       // Force show bike if delivery partner is assigned but bike marker doesn't exist
@@ -1143,8 +1203,16 @@ const DeliveryTrackingMap = ({
           }
         }
       }
+    } else {
+      console.warn('[DeliveryTrackingMap][RouteDebug] Polyline skipped: missing start/end route coordinates', {
+        orderId,
+        routePhase,
+        routeStatus,
+        route,
+        locations: locationDebugSnapshot()
+      });
     }
-  }, [isMapLoaded, deliveryBoyLat, deliveryBoyLng, order?.deliveryState?.currentPhase, order?.deliveryState?.status, restaurantLat, restaurantLng, customerCoords?.lat, customerCoords?.lng, moveBikeSmoothly, getRouteToShow, drawRoute, hasDeliveryPartner]);
+  }, [isMapLoaded, deliveryBoyLat, deliveryBoyLng, order?.deliveryState?.currentPhase, order?.deliveryState?.status, restaurantLat, restaurantLng, customerCoords?.lat, customerCoords?.lng, moveBikeSmoothly, getRouteToShow, drawRoute, hasDeliveryPartner, orderId, locationDebugSnapshot]);
 
   // Update bike when REAL location changes (from socket)
   useEffect(() => {
@@ -1168,12 +1236,14 @@ const DeliveryTrackingMap = ({
     }
 
     // Also check phase directly as fallback
-    const currentPhase = order?.deliveryState?.currentPhase;
-    const deliveryStateStatus = order?.deliveryState?.status;
+    const currentPhaseRaw = order?.deliveryState?.currentPhase;
+    const deliveryStateStatusRaw = order?.deliveryState?.status;
+    const currentPhase = typeof currentPhaseRaw === 'string' ? currentPhaseRaw.toLowerCase() : '';
+    const deliveryStateStatus = typeof deliveryStateStatusRaw === 'string' ? deliveryStateStatusRaw.toLowerCase() : '';
 
     // Key check: If status is 'accepted', definitely show bike
     const isAccepted = deliveryStateStatus === 'accepted';
-    const hasPartnerByPhase = isAccepted || currentPhase === 'en_route_to_pickup' || currentPhase === 'at_pickup' || currentPhase === 'en_route_to_delivery' || deliveryStateStatus === 'reached_pickup' || deliveryStateStatus === 'order_confirmed' || deliveryStateStatus === 'en_route_to_delivery';
+    const hasPartnerByPhase = isAccepted || currentPhase === 'en_route_to_pickup' || currentPhase === 'picking_up' || currentPhase === 'at_pickup' || currentPhase === 'en_route_to_delivery' || deliveryStateStatus === 'picking_up' || deliveryStateStatus === 'reached_pickup' || deliveryStateStatus === 'order_confirmed' || deliveryStateStatus === 'en_route_to_delivery';
     const shouldShowBike = hasDeliveryPartner || hasPartnerByPhase;
     if (shouldShowBike && !bikeMarkerRef.current) {
       // Priority 1: ALWAYS use delivery boy's REAL location if available (from socket)
