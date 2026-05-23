@@ -591,8 +591,13 @@ export default function Orders() {
                 </div>
 
                 {/* Date and Payment Info */}                <div className="px-4 py-2">
-                  <div className="flex-1">
+                  <div className="flex items-start justify-between gap-3">
                     <p className="text-xs text-gray-400">{t("user.orders.orderPlacedOn")} {formatDate(order.createdAt)}</p>
+                    <button type="button" onClick={() => navigate(`${order.id}`)} className="text-xs font-medium text-red-500 hover:text-red-600 underline underline-offset-2 whitespace-nowrap">
+                      Track order
+                    </button>
+                  </div>
+                  <div className="flex-1">
                     {order.deliveredAt && <p className="text-xs text-gray-400 mt-0.5">{t("user.orders.deliveredOn")} {formatDate(order.deliveredAt)}</p>}
                     {order.payment && <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                         {t("user.orders.payment")} <span className="font-medium capitalize">
