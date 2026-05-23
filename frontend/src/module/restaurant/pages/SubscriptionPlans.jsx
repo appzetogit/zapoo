@@ -162,6 +162,12 @@ export default function SubscriptionPlans() {
         currentSubscription?.subscriptionDisplayName ||
         currentSubscription?.planId?.name ||
         "Active";
+    const subscriptionPaymentId = String(currentSubscription?.paymentId || "").toUpperCase();
+    const subscriptionType = String(currentSubscription?.subscriptionType || "").toLowerCase();
+    const hasUsedTrial =
+        trialUsed ||
+        subscriptionType === "trial" ||
+        subscriptionPaymentId.startsWith("TRIAL_");
     const expiresLabel = hasValidEndDate
         ? endDateObj.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })
         : "N/A";
@@ -228,7 +234,7 @@ export default function SubscriptionPlans() {
                     </p>
                 </div>
 
-                {!isSubscribed && !trialUsed && (
+                {!isSubscribed && !hasUsedTrial && (
                     <div className="max-w-md mx-auto">
                         <Button
                             onClick={handleClaimTrial}

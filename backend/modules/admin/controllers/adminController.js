@@ -320,35 +320,7 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
       },
       {
         $addFields: {
-          effectiveAmount: {
-            $cond: [
-              { $gt: [{ $ifNull: ["$amount", 0] }, 0] },
-              { $ifNull: ["$amount", 0] },
-              {
-                $switch: {
-                  branches: [
-                    {
-                      case: { $eq: ["$tier.rank", 1] },
-                      then: { $ifNull: ["$plan.pricing.tier1", 0] }
-                    },
-                    {
-                      case: { $eq: ["$tier.rank", 2] },
-                      then: { $ifNull: ["$plan.pricing.tier2", { $ifNull: ["$plan.pricing.tier1", 0] }] }
-                    },
-                    {
-                      case: { $eq: ["$tier.rank", 3] },
-                      then: { $ifNull: ["$plan.pricing.tier3", { $ifNull: ["$plan.pricing.tier1", 0] }] }
-                    },
-                    {
-                      case: { $eq: ["$tier.rank", 4] },
-                      then: { $ifNull: ["$plan.pricing.tier4", { $ifNull: ["$plan.pricing.tier1", 0] }] }
-                    }
-                  ],
-                  default: { $ifNull: ["$plan.pricing.tier1", 0] }
-                }
-              }
-            ]
-          }
+          effectiveAmount: { $ifNull: ["$amount", 0] }
         }
       }
     ];
