@@ -19,6 +19,15 @@ function loadRazorpayScript() {
 }
 
 const roundToTwo = (value) => Math.round((Number(value) || 0) * 100) / 100;
+const formatFeatureLabel = (feature) => {
+    if (!feature) return "";
+    const readable = String(feature)
+        .replace(/([a-z])([A-Z])/g, "$1 $2")
+        .replace(/[_-]+/g, " ")
+        .toLowerCase()
+        .trim();
+    return readable.charAt(0).toUpperCase() + readable.slice(1);
+};
 
 export default function SubscriptionCheckout() {
     const navigate = useNavigate();
@@ -250,7 +259,7 @@ export default function SubscriptionCheckout() {
                                         <div className="mt-0.5 w-4 h-4 rounded-full bg-green-100 flex items-center justify-center shrink-0">
                                             <Check className="w-2.5 h-2.5 text-green-600" />
                                         </div>
-                                        <span>{feature}</span>
+                                        <span>{formatFeatureLabel(feature)}</span>
                                     </div>
                                 ))}
                             </div>
