@@ -1269,21 +1269,12 @@ export const updateDeliveryPricingConfig = asyncHandler(async (req, res) => {
       maxOrderValue: slab.maxOrderValue === null || slab.maxOrderValue === undefined ? null : Number(slab.maxOrderValue)
     }));
     const orderValueSlabIds = new Set(normalizedOrderValueSlabs.map(slab => slab._id).filter(Boolean).map(id => String(id)));
-    const baseSlabIds = new Set(
-      activeDistanceSlabs
-        .filter((slab) => slab?.isBaseSlab === true)
-        .map((slab) => String(slab._id))
-    );
     for (const rate of customerDeliveryRates) {
       const distanceSlabId = String(rate.distanceSlabId || '');
       const orderValueSlabId = String(rate.orderValueSlabId || '');
       const perKmRate = Number(rate.perKmRate);
       if (!distanceSlabId || !activeDistanceSlabIds.has(distanceSlabId)) {
         return errorResponse(res, 400, `Invalid distanceSlabId: ${distanceSlabId || '(empty)'}`);
-      }
-      // Base slab is always flat fee for customer pricing; ignore per-km rows on base slab.
-      if (baseSlabIds.has(distanceSlabId)) {
-        continue;
       }
       if (!orderValueSlabId || !orderValueSlabIds.has(orderValueSlabId)) {
         return errorResponse(res, 400, `Invalid orderValueSlabId: ${orderValueSlabId || '(empty)'}`);
@@ -1303,14 +1294,12 @@ export const updateDeliveryPricingConfig = asyncHandler(async (req, res) => {
       isEnabled: resolvedEnabled,
       baseSlabFlatFee: normalizedBaseSlabFlatFee,
       orderValueSlabs: normalizedOrderValueSlabs,
-      customerDeliveryRates: customerDeliveryRates
-        .filter((rate) => !baseSlabIds.has(String(rate.distanceSlabId || '')))
-        .map(rate => ({
-          _id: rate._id,
-          distanceSlabId: String(rate.distanceSlabId),
-          orderValueSlabId: String(rate.orderValueSlabId),
-          perKmRate: Number(rate.perKmRate)
-        })),
+      customerDeliveryRates: customerDeliveryRates.map(rate => ({
+        _id: rate._id,
+        distanceSlabId: String(rate.distanceSlabId),
+        orderValueSlabId: String(rate.orderValueSlabId),
+        perKmRate: Number(rate.perKmRate)
+      })),
       lastUpdatedAt: new Date()
     };
     await restaurant.save();

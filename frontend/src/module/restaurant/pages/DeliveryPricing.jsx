@@ -223,12 +223,14 @@ export default function DeliveryPricing() {
     for (const orderSlab of normalizedOrderSlabs) {
       for (const distanceSlab of activeDistanceSlabs) {
         const key = `${orderSlab._id}::${String(distanceSlab._id)}`;
-        if (distanceSlab?.isBaseSlab === true) {
+        const rawRateValue = rateMap[key];
+        if (distanceSlab?.isBaseSlab === true && (rawRateValue === "" || rawRateValue === undefined)) {
           continue;
         }
-        const perKmRate = Number(rateMap[key] || 0);
+        const perKmRate = Number(rawRateValue || 0);
         if (!Number.isFinite(perKmRate) || perKmRate < 0) {
-          toast.error(`Invalid rate for ${buildSlabLabel(orderSlab)} and ${formatDistanceRange(distanceSlab)}`);
+          const rateLabel = distanceSlab?.isBaseSlab === true ? "flat charge" : "rate";
+          toast.error(`Invalid ${rateLabel} for ${buildSlabLabel(orderSlab)} and ${formatDistanceRange(distanceSlab)}`);
           return;
         }
         customerDeliveryRates.push({
@@ -259,37 +261,39 @@ export default function DeliveryPricing() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="sticky top-0 z-20 bg-white border-b border-gray-200">
+    <div className="min-h-screen bg-slate-100">
+      <div className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/95 backdrop-blur">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
           <button
             onClick={() => navigate("/restaurant/explore")}
-            className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+            className="p-2 rounded-full text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors"
           >
-            <ArrowLeft className="w-5 h-5 text-gray-700" />
+            <ArrowLeft className="w-5 h-5" />
           </button>
           <div className="min-w-0">
-            <h1 className="text-base sm:text-lg font-bold text-gray-900">Delivery setup</h1>
-            <p className="text-[11px] sm:text-xs text-gray-500">Set customer delivery rates by order amount and distance slabs</p>
+            <h1 className="text-base sm:text-lg font-semibold tracking-tight text-slate-900">Delivery Setup</h1>
+            <p className="text-[11px] sm:text-xs text-slate-500">Configure customer delivery charges by order value and distance slabs</p>
           </div>
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto p-3 sm:p-4 space-y-3 sm:space-y-4">
+      <div className="max-w-5xl mx-auto p-3 sm:p-4 space-y-4 sm:space-y-5">
         <div className="grid gap-4">
-          <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-5 shadow-sm">
+          <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm">
             <div className="flex items-start gap-3">
-              <Layers className="w-5 h-5 text-blue-600 mt-0.5" />
+              <div className="mt-0.5 rounded-lg bg-blue-50 p-2">
+                <Layers className="w-4 h-4 text-blue-700" />
+              </div>
               <div>
-                <p className="text-sm text-gray-500">Assigned tier</p>
-                <p className="text-base font-semibold text-gray-900 mt-1">
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Assigned tier</p>
+                <p className="text-base font-semibold text-slate-900 mt-1">
                   {loading ? "Loading..." : tier?.name || "Not assigned"}
                 </p>
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-slate-600 mt-2 inline-block rounded-full bg-slate-100 px-2.5 py-1">
                   Base fee: Rs {Number(tier?.baseFee || 0).toFixed(2)}
                 </p>
                 {baseDistanceSlab && (
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-slate-600 mt-2 inline-block rounded-full bg-slate-100 px-2.5 py-1 ml-2">
                     Base slab: {formatDistanceRange(baseDistanceSlab)}
                   </p>
                 )}
@@ -298,36 +302,18 @@ export default function DeliveryPricing() {
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-5 shadow-sm">
-          <h2 className="text-base font-semibold text-gray-900">
-            Base Slab Charge {baseDistanceSlab ? `(${formatDistanceRange(baseDistanceSlab)})` : ""}
-          </h2>
-          <p className="text-xs text-gray-500 mt-1">
-            Admin charge to restaurant for base slab: {formatCurrency(Number(tier?.baseFee || 0))}
-          </p>
-          <div className="mt-3 max-w-xs relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">Rs</span>
-            <input
-              value={baseSlabFlatFee}
-              onChange={(e) => setBaseSlabFlatFee(normalizeNumberInput(e.target.value))}
-              placeholder="0"
-              className="w-full rounded-lg border border-gray-300 pl-9 pr-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-        </div>
-
-        <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-5 shadow-sm space-y-4">
+        <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm space-y-4">
           <div className="flex items-start sm:items-center justify-between gap-3">
             <div>
-              <h2 className="text-base font-semibold text-gray-900">Order value slabs</h2>
-                <p className="text-xs text-gray-500 mt-1">Create the bill amount ranges you want to price separately.</p>
+              <h2 className="text-base font-semibold text-slate-900">Order value slabs</h2>
+                <p className="text-xs text-slate-500 mt-1">Create the bill amount ranges you want to price separately.</p>
                 {nonBaseDistanceSlabs.length > 0 && orderValueSlabs.length === 0 && (
                   <p className="text-xs text-amber-600 mt-1">
                     Add at least one order value slab to set rates for non-base distance ranges.
                   </p>
                 )}
               </div>
-            <Button type="button" onClick={addOrderSlab} className="hidden sm:inline-flex gap-2 shrink-0 h-10 px-3 sm:px-4">
+            <Button type="button" onClick={addOrderSlab} className="hidden sm:inline-flex gap-2 shrink-0 h-10 px-3 sm:px-4 rounded-xl bg-slate-900 text-white hover:bg-slate-800">
               <Plus className="w-4 h-4" />
               <span>Add slab</span>
             </Button>
@@ -335,13 +321,13 @@ export default function DeliveryPricing() {
 
           <div className="space-y-3">
             {orderValueSlabs.map((slab, index) => (
-              <div key={slab._id} className="border border-gray-200 rounded-xl p-3">
+              <div key={slab._id} className="border border-slate-200 rounded-xl p-3 bg-slate-50/60">
                 <div className="flex items-center justify-between gap-3 mb-3">
-                  <p className="text-sm font-semibold text-gray-900">Slab {index + 1}</p>
+                  <p className="text-sm font-semibold text-slate-900">Slab {index + 1}</p>
                   <button
                     type="button"
                     onClick={() => removeOrderSlab(slab._id)}
-                    className="h-9 w-9 rounded-lg border border-red-200 text-red-600 flex items-center justify-center hover:bg-red-50"
+                    className="h-9 w-9 rounded-lg border border-red-200 text-red-600 flex items-center justify-center hover:bg-red-50 transition-colors"
                     title={`Remove slab ${index + 1}`}
                   >
                     <Trash2 className="w-4 h-4" />
@@ -349,28 +335,28 @@ export default function DeliveryPricing() {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr] gap-3">
                   <div>
-                  <label className="block text-xs text-gray-500 mb-1">Min order value</label>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Min order value</label>
                   <input
                     value={slab.minOrderValue}
                     onChange={(e) => updateOrderSlab(slab._id, "minOrderValue", e.target.value)}
                     placeholder="0"
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-500 mb-1">Max order value</label>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Max order value</label>
                   <input
                     value={slab.maxOrderValue}
                     onChange={(e) => updateOrderSlab(slab._id, "maxOrderValue", e.target.value)}
                     placeholder="Leave blank for open ended"
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
                   />
                 </div>
                 </div>
               </div>
             ))}
             {orderValueSlabs.length === 0 && (
-              <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-4 text-sm text-gray-600">
+              <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600">
                 No price slab added yet. Tap <span className="font-semibold">Add slab</span> to create one.
               </div>
             )}
@@ -380,18 +366,18 @@ export default function DeliveryPricing() {
             type="button"
             variant="outline"
             onClick={addOrderSlab}
-            className="sm:hidden w-full h-11 rounded-xl border-dashed border-gray-300 text-gray-700 gap-2"
+            className="sm:hidden w-full h-11 rounded-xl border-dashed border-slate-300 text-slate-700 gap-2"
           >
             <Plus className="w-4 h-4" />
             Add more pricing slab
           </Button>
         </div>
 
-        <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-5 shadow-sm">
+        <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm">
           <div className="mb-4">
-            <h2 className="text-base font-semibold text-gray-900">Rate matrix</h2>
-            <p className="text-xs text-gray-500 mt-1">
-              Fill customer per-km rate for non-base distance slabs. Base slab uses flat customer charge above.
+            <h2 className="text-base font-semibold text-slate-900">Rate matrix</h2>
+            <p className="text-xs text-slate-500 mt-1">
+              Configure customer charges for all active distance slabs. Base slab takes flat amount; non-base uses per-km rates.
             </p>
           </div>
 
@@ -399,37 +385,36 @@ export default function DeliveryPricing() {
             <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
               No active distance slabs are available for your assigned tier. Ask admin to configure tier delivery slabs first.
             </div>
-          ) : nonBaseDistanceSlabs.length === 0 ? (
-            <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-700">
-              Only base slab is active in your tier. Customer delivery will use base flat charge only.
-            </div>
           ) : (
             <>
               <div className="space-y-3 md:hidden">
                 {orderValueSlabs.map((orderSlab) => (
-                  <div key={orderSlab._id} className="rounded-xl border border-gray-200 p-3">
+                  <div key={orderSlab._id} className="rounded-xl border border-slate-200 bg-slate-50/40 p-3">
                     <div className="mb-3">
-                      <p className="text-sm font-semibold text-gray-900">{buildSlabLabel(orderSlab)}</p>
-                      <p className="text-xs text-gray-500 mt-1">Per-km customer charge</p>
+                      <p className="text-sm font-semibold text-slate-900">{buildSlabLabel(orderSlab)}</p>
+                      <p className="text-xs text-slate-500 mt-1">Slab-wise customer charge</p>
                     </div>
                     <div className="space-y-3">
-                      {nonBaseDistanceSlabs.map((distanceSlab) => {
+                      {activeDistanceSlabs.map((distanceSlab) => {
                         const cellKey = `${orderSlab._id}::${String(distanceSlab._id)}`;
                         return (
-                          <div key={cellKey} className="rounded-lg bg-gray-50 border border-gray-200 p-3">
+                          <div key={cellKey} className="rounded-lg bg-white border border-slate-200 p-3">
                             <div className="mb-2">
-                              <p className="text-xs font-semibold text-gray-900">{formatDistanceRange(distanceSlab)}</p>
-                              <p className="text-[11px] text-gray-500 mt-1">
+                              <p className="text-xs font-semibold text-slate-900">{formatDistanceRange(distanceSlab)}</p>
+                              <p className="text-[11px] text-slate-500 mt-1">
                                 {getAdminReferenceLabel(distanceSlab, tier)}
+                              </p>
+                              <p className="text-[11px] text-slate-500 mt-1">
+                                {distanceSlab?.isBaseSlab === true ? "Flat charge" : "Per-km charge"}
                               </p>
                             </div>
                             <div className="relative">
-                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">Rs</span>
+                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-500">Rs</span>
                               <input
                                 value={rateMap[cellKey] ?? ""}
                                 onChange={(e) => setRateValue(orderSlab._id, String(distanceSlab._id), e.target.value)}
                                 placeholder="0"
-                                className="w-full rounded-lg border border-gray-300 bg-white pl-9 pr-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="w-full rounded-xl border border-slate-300 bg-white pl-9 pr-3 py-2.5 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
                               />
                             </div>
                           </div>
@@ -439,26 +424,26 @@ export default function DeliveryPricing() {
                   </div>
                 ))}
                 {orderValueSlabs.length === 0 && (
-                  <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-4 text-sm text-gray-600">
+                  <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600">
                     No order value slab found. Add a slab to set per-km customer rates.
                   </div>
                 )}
               </div>
 
-              <div className="hidden md:block overflow-x-auto">
-              <table className="min-w-full border-separate border-spacing-0">
+              <div className="hidden md:block overflow-x-auto rounded-xl border border-slate-200">
+              <table className="min-w-full border-separate border-spacing-0 bg-white">
                 <thead>
-                  <tr>
-                    <th className="sticky left-0 bg-white z-10 text-left text-xs font-semibold text-gray-500 p-3 border-b border-gray-200 min-w-[220px]">
+                  <tr className="bg-slate-50">
+                    <th className="sticky left-0 bg-slate-50 z-10 text-left text-xs font-semibold text-slate-600 p-3 border-b border-slate-200 min-w-[220px]">
                       Order value slab
                     </th>
-                    {nonBaseDistanceSlabs.map((distanceSlab) => (
+                    {activeDistanceSlabs.map((distanceSlab) => (
                       <th
                         key={String(distanceSlab._id)}
-                        className="text-left text-xs font-semibold text-gray-500 p-3 border-b border-gray-200 min-w-[170px]"
+                        className="text-left text-xs font-semibold text-slate-600 p-3 border-b border-slate-200 min-w-[170px]"
                       >
                         <div>{formatDistanceRange(distanceSlab)}</div>
-                        <div className="text-[11px] font-normal text-gray-400 mt-1">
+                        <div className="text-[11px] font-normal text-slate-400 mt-1">
                           {getAdminReferenceLabel(distanceSlab, tier)}
                         </div>
                       </th>
@@ -468,24 +453,27 @@ export default function DeliveryPricing() {
                 <tbody>
                   {orderValueSlabs.map((orderSlab) => (
                     <tr key={orderSlab._id}>
-                      <td className="sticky left-0 bg-white z-10 p-3 border-b border-gray-100 align-top">
-                        <div className="text-sm font-medium text-gray-900">{buildSlabLabel(orderSlab)}</div>
-                        <div className="text-xs text-gray-500 mt-1">Per-km customer charge</div>
+                      <td className="sticky left-0 bg-white z-10 p-3 border-b border-slate-100 align-top">
+                        <div className="text-sm font-medium text-slate-900">{buildSlabLabel(orderSlab)}</div>
+                        <div className="text-xs text-slate-500 mt-1">Slab-wise customer charge</div>
                       </td>
-                      {nonBaseDistanceSlabs.map((distanceSlab) => {
+                      {activeDistanceSlabs.map((distanceSlab) => {
                         const cellKey = `${orderSlab._id}::${String(distanceSlab._id)}`;
                         return (
-                          <td key={cellKey} className="p-3 border-b border-gray-100 align-top">
-                            <p className="text-[11px] text-gray-500 mb-2">
+                          <td key={cellKey} className="p-3 border-b border-slate-100 align-top">
+                            <p className="text-[11px] text-slate-500 mb-2">
                               {getAdminReferenceLabel(distanceSlab, tier)}
                             </p>
+                            <p className="text-[11px] text-slate-500 mb-2">
+                              {distanceSlab?.isBaseSlab === true ? "Flat charge" : "Per-km charge"}
+                            </p>
                             <div className="relative">
-                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">Rs</span>
+                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-500">Rs</span>
                               <input
                                 value={rateMap[cellKey] ?? ""}
                                 onChange={(e) => setRateValue(orderSlab._id, String(distanceSlab._id), e.target.value)}
                                 placeholder="0"
-                                className="w-full rounded-lg border border-gray-300 pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="w-full rounded-xl border border-slate-300 pl-9 pr-3 py-2 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
                               />
                             </div>
                           </td>
@@ -495,8 +483,8 @@ export default function DeliveryPricing() {
                 ))}
                 {orderValueSlabs.length === 0 && (
                   <tr>
-                    <td colSpan={nonBaseDistanceSlabs.length + 1} className="p-4 text-sm text-gray-600">
-                      No order value slab found. Add a slab to set per-km customer rates.
+                    <td colSpan={activeDistanceSlabs.length + 1} className="p-4 text-sm text-slate-600">
+                      No order value slab found. Add a slab to set customer rates.
                     </td>
                   </tr>
                   )}
@@ -507,12 +495,12 @@ export default function DeliveryPricing() {
           )}
         </div>
 
-        <div className="sticky bottom-0 bg-gray-50/95 backdrop-blur py-3">
+        <div className="sticky bottom-0 z-20 bg-white/95 border-t border-slate-200 backdrop-blur py-3">
           <Button
             type="button"
             onClick={handleSave}
             disabled={loading || saving}
-            className="w-full h-12 rounded-xl gap-2 bg-gray-900 hover:bg-gray-800 text-white shadow-lg"
+            className="w-full h-12 rounded-xl gap-2 bg-slate-900 hover:bg-slate-800 text-white shadow-lg"
           >
             <Save className="w-4 h-4" />
             {saving ? "Saving..." : "Save"}

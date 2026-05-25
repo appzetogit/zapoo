@@ -382,17 +382,29 @@ const calculateRestaurantCustomerDeliveryFee = ({
     };
   }
 
-  // Base slab pricing is always a flat fee set by restaurant (not per-km).
+  const matchedOrderValueSlab = findOrderValueSlab(config.orderValueSlabs, subtotal);
   if (matchedDistanceSlab?.isBaseSlab === true) {
-    const baseSlabFlatFee = Number(config?.baseSlabFlatFee || 0);
+    if (!matchedOrderValueSlab) {
+      return {
+        customerDeliveryFee: 0,
+        customerPerKmRate: 0,
+        matchedOrderValueSlab: null,
+      };
+    }
+
+    const baseSlabRateRule = (config.customerDeliveryRates || []).find((rate) =>
+      String(rate.distanceSlabId) === String(matchedDistanceSlab._id) &&
+      String(rate.orderValueSlabId) === String(matchedOrderValueSlab._id)
+    );
+    const slabWiseBaseFlatFee = Number(baseSlabRateRule?.perKmRate);
+    const resolvedBaseFee = Number.isFinite(slabWiseBaseFlatFee) ? slabWiseBaseFlatFee : 0;
     return {
-      customerDeliveryFee: roundCurrency(baseSlabFlatFee),
+      customerDeliveryFee: roundCurrency(resolvedBaseFee),
       customerPerKmRate: 0,
-      matchedOrderValueSlab: null,
+      matchedOrderValueSlab,
     };
   }
 
-  const matchedOrderValueSlab = findOrderValueSlab(config.orderValueSlabs, subtotal);
   if (!matchedOrderValueSlab) {
     return {
       customerDeliveryFee: 0,
