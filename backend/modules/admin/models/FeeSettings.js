@@ -73,6 +73,12 @@ const feeSettingsSchema = new mongoose.Schema(
       min: 0,
       comment: 'Free delivery if order value is above this amount'
     },
+    codOrderLimit: {
+      type: Number,
+      default: null,
+      min: 0,
+      comment: 'Maximum order total allowed for COD. COD is disabled above this amount.'
+    },
     platformFee: {
       type: Number,
       required: [true, 'Platform fee is required'],

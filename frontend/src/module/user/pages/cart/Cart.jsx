@@ -225,6 +225,7 @@ export default function Cart() {
   const [feeSettings, setFeeSettings] = useState({
     deliveryFee: 25,
     freeDeliveryThreshold: 149,
+    codOrderLimit: null,
     platformFee: 5,
     gstRate: 5
   });
@@ -284,6 +285,12 @@ export default function Cart() {
       return normalizeIndianPhoneForOrder(fallbackPhone);
     });
   }, [savedAddress?.phone, userProfile?.name, userProfile?.phone]);
+  const codLimitExceeded = feeSettings?.codOrderLimit !== null
+    && feeSettings?.codOrderLimit !== undefined
+    && feeSettings?.codOrderLimit !== ""
+    && Number.isFinite(Number(feeSettings.codOrderLimit))
+    && Number(totalForCoupons) > Number(feeSettings.codOrderLimit);
+
   const paymentOptions = [{
     value: "razorpay",
     label: t("user.cart.paymentOptions.razorpay.label"),
@@ -300,7 +307,10 @@ export default function Cart() {
     description: t("user.cart.paymentOptions.cash.description"),
     accent: "bg-orange-100 text-orange-700"
   }];
-  const selectedPaymentOption = paymentOptions.find(option => option.value === selectedPaymentMethod) || paymentOptions[0];
+  const visiblePaymentOptions = codLimitExceeded
+    ? paymentOptions.filter((option) => option.value !== "cash")
+    : paymentOptions;
+  const selectedPaymentOption = visiblePaymentOptions.find(option => option.value === selectedPaymentMethod) || visiblePaymentOptions[0];
 
   // Get restaurant ID from cart or restaurant data
   // Priority: restaurantData > cart[0].restaurantId
@@ -768,6 +778,7 @@ export default function Cart() {
           setFeeSettings({
             deliveryFee: response.data.data.feeSettings.deliveryFee || 25,
             freeDeliveryThreshold: response.data.data.feeSettings.freeDeliveryThreshold || 149,
+            codOrderLimit: response.data.data.feeSettings.codOrderLimit ?? null,
             platformFee: response.data.data.feeSettings.platformFee ?? 5,
             gstRate: response.data.data.feeSettings.gstRate || 5
           });
@@ -779,6 +790,12 @@ export default function Cart() {
     };
     fetchFeeSettings();
   }, []);
+
+  useEffect(() => {
+    if (codLimitExceeded && selectedPaymentMethod === "cash") {
+      setSelectedPaymentMethod("razorpay");
+    }
+  }, [codLimitExceeded, selectedPaymentMethod]);
 
   // Use backend pricing if available, otherwise fallback to database settings
   const subtotal = pricing?.subtotal || cart.reduce((sum, item) => sum + (item.price || 0) * (item.quantity || 1), 0);
@@ -1846,7 +1863,7 @@ export default function Cart() {
             </p>
 
             <div className="mt-4 space-y-3">
-              {paymentOptions.map(option => {
+              {visiblePaymentOptions.map(option => {
               const isActive = selectedPaymentMethod === option.value;
               return <button key={option.value} type="button" onClick={() => {
                 setSelectedPaymentMethod(option.value);
@@ -1873,7 +1890,6 @@ export default function Cart() {
                   </button>;
             })}
             </div>
-
             <button type="button" onClick={() => setShowPaymentSheet(false)} className="mt-4 w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-[#202020]">
               {t("common.cancel")}
             </button>

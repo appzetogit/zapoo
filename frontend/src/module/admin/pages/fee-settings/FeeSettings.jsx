@@ -23,6 +23,7 @@ export default function FeeSettings() {
   const [feeSettings, setFeeSettings] = useState({
     deliveryFee: 25,
     freeDeliveryThreshold: 149,
+    codOrderLimit: "",
     platformFee: 5,
     gstRate: 5,
     recommendedItemFee: 0,
@@ -63,6 +64,7 @@ export default function FeeSettings() {
         setFeeSettings({
           deliveryFee: data.deliveryFee ?? 25,
           freeDeliveryThreshold: data.freeDeliveryThreshold ?? 149,
+          codOrderLimit: data.codOrderLimit ?? "",
           platformFee: data.platformFee ?? 5,
           gstRate: data.gstRate ?? 5,
           recommendedItemFee: data.recommendedItemFee ?? 0,
@@ -236,6 +238,7 @@ export default function FeeSettings() {
       const globalPayload = {
         deliveryFee: Number(feeSettings.deliveryFee),
         freeDeliveryThreshold: Number(feeSettings.freeDeliveryThreshold),
+        codOrderLimit: feeSettings.codOrderLimit === "" ? null : Number(feeSettings.codOrderLimit),
         platformFee: Number(feeSettings.platformFee),
         gstRate: Number(feeSettings.gstRate),
         recommendedItemFee: Number(feeSettings.recommendedItemFee || 0),
@@ -484,6 +487,22 @@ export default function FeeSettings() {
                     step="1"
                     className="w-full px-4 py-2 border border-slate-300 rounded-lg"
                   />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-sm font-semibold text-slate-700">COD Order Limit (Rs)</label>
+                  <input
+                    type="number"
+                    value={feeSettings.codOrderLimit}
+                    onChange={(e) => setFeeSettings((prev) => ({ ...prev, codOrderLimit: e.target.value }))}
+                    min="0"
+                    step="1"
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg"
+                    placeholder="Leave empty for no COD limit"
+                  />
+                  <p className="text-xs text-slate-500">
+                    COD will be hidden for cart totals above this amount.
+                  </p>
                 </div>
 
                 <div className="space-y-2">

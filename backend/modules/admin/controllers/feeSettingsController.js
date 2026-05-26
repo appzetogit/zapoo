@@ -65,7 +65,7 @@ export const getFeeSettings = asyncHandler(async (req, res) => {
  */
 export const createOrUpdateFeeSettings = asyncHandler(async (req, res) => {
   try {
-    const { deliveryFee, deliveryFeeRanges, freeDeliveryThreshold, platformFee, gstRate, recommendedItemFee, distanceSlabs, isActive } = req.body;
+    const { deliveryFee, deliveryFeeRanges, freeDeliveryThreshold, codOrderLimit, platformFee, gstRate, recommendedItemFee, distanceSlabs, isActive } = req.body;
 
     // Validate platform fee
     if (platformFee === undefined || platformFee < 0) {
@@ -74,6 +74,9 @@ export const createOrUpdateFeeSettings = asyncHandler(async (req, res) => {
 
     if (gstRate === undefined || gstRate < 0 || gstRate > 100) {
       return errorResponse(res, 400, 'GST rate must be between 0 and 100');
+    }
+    if (codOrderLimit !== undefined && codOrderLimit !== null && Number(codOrderLimit) < 0) {
+      return errorResponse(res, 400, 'COD order limit must be 0 or more');
     }
 
     // Validate delivery fee ranges if provided
@@ -132,6 +135,9 @@ export const createOrUpdateFeeSettings = asyncHandler(async (req, res) => {
     const feeSettingsData = {
       deliveryFee: deliveryFee !== undefined ? Number(deliveryFee) : 25,
       freeDeliveryThreshold: freeDeliveryThreshold ? Number(freeDeliveryThreshold) : 149,
+      codOrderLimit: codOrderLimit === null || codOrderLimit === undefined || codOrderLimit === ''
+        ? null
+        : Number(codOrderLimit),
       platformFee: Number(platformFee),
       gstRate: Number(gstRate),
       recommendedItemFee: recommendedItemFee !== undefined ? Number(recommendedItemFee) : 0,
@@ -180,7 +186,7 @@ export const createOrUpdateFeeSettings = asyncHandler(async (req, res) => {
 export const updateFeeSettings = asyncHandler(async (req, res) => {
   try {
     const { id } = req.params;
-    const { deliveryFee, deliveryFeeRanges, freeDeliveryThreshold, platformFee, gstRate, recommendedItemFee, distanceSlabs, isActive } = req.body;
+    const { deliveryFee, deliveryFeeRanges, freeDeliveryThreshold, codOrderLimit, platformFee, gstRate, recommendedItemFee, distanceSlabs, isActive } = req.body;
 
     const feeSettings = await FeeSettings.findById(id);
 
@@ -266,6 +272,12 @@ export const updateFeeSettings = asyncHandler(async (req, res) => {
     if (freeDeliveryThreshold !== undefined) {
       feeSettings.freeDeliveryThreshold = Number(freeDeliveryThreshold);
     }
+    if (codOrderLimit !== undefined) {
+      if (codOrderLimit !== null && codOrderLimit !== '' && Number(codOrderLimit) < 0) {
+        return errorResponse(res, 400, 'COD order limit must be 0 or more');
+      }
+      feeSettings.codOrderLimit = codOrderLimit === null || codOrderLimit === '' ? null : Number(codOrderLimit);
+    }
 
     if (platformFee !== undefined) {
       if (platformFee < 0) {
@@ -338,7 +350,7 @@ export const getPublicFeeSettings = asyncHandler(async (req, res) => {
   try {
     const feeSettings = await FeeSettings.findOne({ isActive: true })
       .sort({ createdAt: -1 })
-      .select('deliveryFee freeDeliveryThreshold platformFee gstRate recommendedItemFee distanceSlabs')
+      .select('deliveryFee freeDeliveryThreshold codOrderLimit platformFee gstRate recommendedItemFee distanceSlabs')
       .lean();
 
     // If no active settings, return default values
@@ -347,6 +359,7 @@ export const getPublicFeeSettings = asyncHandler(async (req, res) => {
         feeSettings: {
           deliveryFee: 25,
           freeDeliveryThreshold: 149,
+          codOrderLimit: null,
           platformFee: 5,
           gstRate: 5,
           recommendedItemFee: 0,

@@ -3,6 +3,7 @@ import Payment from '../../payment/models/Payment.js';
 import { createOrder as createRazorpayOrder, verifyPayment, fetchPayment, capturePayment } from '../../payment/services/razorpayService.js';
 import Restaurant from '../../restaurant/models/Restaurant.js';
 import Zone from '../../admin/models/Zone.js';
+import FeeSettings from '../../admin/models/FeeSettings.js';
 import mongoose from 'mongoose';
 import winston from 'winston';
 import { calculateOrderPricing, calculateDistance } from '../services/orderCalculationService.js';
@@ -201,6 +202,29 @@ export const createOrder = async (req, res) => {
       userId,
       locale,
     });
+
+    if (normalizedPaymentMethod === 'cash') {
+      const activeFeeSettings = await FeeSettings.findOne({ isActive: true })
+        .sort({ createdAt: -1 })
+        .select('codOrderLimit')
+        .lean();
+      const codOrderLimit = activeFeeSettings?.codOrderLimit;
+      const orderTotal = Number(pricingData?.total || 0);
+      if (codOrderLimit !== null && codOrderLimit !== undefined && Number.isFinite(Number(codOrderLimit))) {
+        const normalizedCodLimit = Number(codOrderLimit);
+        if (orderTotal > normalizedCodLimit) {
+          return res.status(400).json({
+            success: false,
+            code: 'COD_LIMIT_EXCEEDED',
+            message: `Cash on Delivery is not available for orders above Rs ${normalizedCodLimit.toFixed(2)}`,
+            data: {
+              codOrderLimit: normalizedCodLimit,
+              orderTotal,
+            },
+          });
+        }
+      }
+    }
 
     // Create the order
     const recommendedItemIdSet = new Set(
