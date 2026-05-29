@@ -23,6 +23,7 @@ export default function ExploreMore() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleteConfirmationText, setDeleteConfirmationText] = useState("");
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [testPushSending, setTestPushSending] = useState(false);
 
   // Restaurant data state
   const [restaurantData, setRestaurantData] = useState(null);
@@ -274,6 +275,19 @@ export default function ExploreMore() {
     } catch (error) {
       toast.error(error?.response?.data?.message || "Failed to delete account. Please try again.");
       setIsDeletingAccount(false);
+    }
+  };
+
+  const handleTestPush = async () => {
+    if (testPushSending) return;
+    try {
+      setTestPushSending(true);
+      await restaurantAPI.triggerTestPush();
+      toast.success("Test push sent. Check notification tray and notifications page.");
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Failed to send test push");
+    } finally {
+      setTestPushSending(false);
     }
   };
   // Prevent body scroll when popup is open
@@ -757,6 +771,10 @@ export default function ExploreMore() {
 
               {/* Logout Buttons */}
               <div className="px-6 pb-6 space-y-3">
+                <button onClick={handleTestPush} disabled={testPushSending || isLoggingOut} className="w-full bg-black hover:bg-black/90 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-3 px-4 rounded-lg transition-colors">
+                  {testPushSending ? "Sending..." : "Test Push Notification"}
+                </button>
+
                 {/* Logout Button */}
                 <button onClick={handleLogout} disabled={isLoggingOut} className="w-full bg-red-600 hover:bg-red-700 disabled:bg-red-400 disabled:cursor-not-allowed text-white font-semibold py-3 px-4 rounded-lg transition-colors">
                   {isLoggingOut ? t("restaurant.exploreMore.profile.loggingOut") : t("restaurant.exploreMore.profile.logout")}

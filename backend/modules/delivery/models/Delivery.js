@@ -134,9 +134,17 @@ const deliverySchema = new mongoose.Schema(
     // --- Profile ---
     name: { type: String, required: true, trim: true },
     email: { type: String, lowercase: true, trim: true, sparse: true },
-    // FCM tokens (separate web/app slots for deterministic targeting)
-    fcmTokenWeb: { type: String, trim: true, default: null, select: false },
-    fcmTokenApp: { type: String, trim: true, default: null, select: false },
+    // FCM Web Push tokens — one per browser/device, stored for sending push notifications
+    fcmTokens: {
+      type: [String],
+      default: [],
+      select: false,
+    },
+    fcmTokenWeb: { type: String, trim: true, select: false, default: null },
+    fcmTokenApp: { type: String, trim: true, select: false, default: null },
+    // Legacy alias retained for backward compatibility
+    // New app/mobile clients should use fcmTokenApp
+    fcmTokenMobile: { type: String, trim: true, select: false, default: null },
     profileImage: { url: String, publicId: String },
     dateOfBirth: Date,
     gender: { type: String, enum: ['male', 'female', 'other', 'prefer-not-to-say'] },

@@ -222,13 +222,33 @@ export const verifyOTP = asyncHandler(async (req, res) => {
     }
 
     const signupStatus = getSignupStatus(delivery);
+    
+    // Save FCM token if provided
     if (normalizedFcmToken) {
+      const previousTokenWeb = delivery.fcmTokenWeb;
+      const previousTokenApp = delivery.fcmTokenApp;
+      
       if (['mobile', 'android', 'ios', 'app'].includes(normalizedPlatform)) {
         delivery.fcmTokenApp = normalizedFcmToken;
+        delivery.fcmTokenMobile = normalizedFcmToken; // Keep legacy alias in sync
+        console.log(`[DeliveryAuth] FCM Token Updated (App): ${previousTokenApp ? 'updated' : 'created'}`);
       } else {
         delivery.fcmTokenWeb = normalizedFcmToken;
+        console.log(`[DeliveryAuth] FCM Token Updated (Web): ${previousTokenWeb ? 'updated' : 'created'}`);
       }
+      
+      // Add to fcmTokens array (max 10)
+      if (!delivery.fcmTokens) delivery.fcmTokens = [];
+      if (!delivery.fcmTokens.includes(normalizedFcmToken)) {
+        delivery.fcmTokens.push(normalizedFcmToken);
+        if (delivery.fcmTokens.length > 10) {
+          delivery.fcmTokens = delivery.fcmTokens.slice(-10);
+        }
+      }
+    } else {
+      console.warn(`[DeliveryAuth] No FCM token provided in OTP verification. Phone: ${phone}, Platform: ${normalizedPlatform}`);
     }
+    
     // Existing registered delivery partners should not be forced back into onboarding on login.
     // Keep onboarding flow only for new/registration flows.
     if (signupStatus.needsSignup && !isExistingDeliveryLogin) {
@@ -282,6 +302,8 @@ export const verifyOTP = asyncHandler(async (req, res) => {
     // Store refresh token in database
     delivery.refreshToken = tokens.refreshToken;
     await delivery.save();
+    
+    console.log(`[DeliveryAuth] Login - Tokens saved. DeliveryID: ${delivery.deliveryId}, fcmTokenWeb: ${delivery.fcmTokenWeb ? 'stored' : 'null'}, fcmTokenApp: ${delivery.fcmTokenApp ? 'stored' : 'null'}, fcmTokenMobile: ${delivery.fcmTokenMobile ? 'stored' : 'null'}, fcmTokensCount: ${delivery.fcmTokens?.length || 0}`);
 
     // Set refresh token in httpOnly cookie
     res.cookie('refreshToken', tokens.refreshToken, {

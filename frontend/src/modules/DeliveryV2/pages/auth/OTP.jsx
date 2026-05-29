@@ -158,7 +158,10 @@ export default function DeliveryOTP() {
                 if (t?.length > 20) { fcmToken = t.trim(); break; }
               } catch (e) {}
             }
-          } else { fcmToken = localStorage.getItem("fcm_web_registered_token_delivery") || null; }
+          } else { 
+            // Correct localStorage key used by useFCMNotification hook
+            fcmToken = localStorage.getItem("fcm_token_registered_at_delivery_VAL") || null; 
+          }
         }
       } catch (e) {}
       setDeviceToken(fcmToken);

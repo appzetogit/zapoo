@@ -34,6 +34,7 @@ export default function Profile() {
   const [appearanceOpen, setAppearanceOpen] = useState(false);
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [testPushSending, setTestPushSending] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleteConfirmationText, setDeleteConfirmationText] = useState("");
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
@@ -236,6 +237,19 @@ export default function Profile() {
     } catch (error) {
       toast.error(error?.response?.data?.message || "Failed to delete account. Please try again.");
       setIsDeletingAccount(false);
+    }
+  };
+
+  const handleTestPush = async () => {
+    if (testPushSending) return;
+    try {
+      setTestPushSending(true);
+      await userAPI.triggerTestPush();
+      toast.success("Test push sent. Check notification tray and notifications page.");
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Failed to send test push");
+    } finally {
+      setTestPushSending(false);
     }
   };
 
@@ -762,6 +776,34 @@ export default function Profile() {
                 </Card>
               </motion.div>
             </Link>
+
+            <motion.div whileHover={{
+            x: 4,
+            scale: 1.01
+          }} transition={{
+            duration: 0.2,
+            type: "spring",
+            stiffness: 300
+          }}>
+              <Card className="bg-white dark:bg-[#1a1a1a] py-0 rounded-xl shadow-sm border-0 dark:border-gray-800">
+                <CardContent className="p-4 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <motion.div className="bg-gray-100 dark:bg-gray-800 rounded-full p-2">
+                      <SettingsIcon className="h-5 w-5 text-gray-700 dark:text-gray-300" />
+                    </motion.div>
+                    <span className="text-base font-medium text-gray-900 dark:text-white">Test Push Notification</span>
+                  </div>
+                  <Button
+                    type="button"
+                    onClick={handleTestPush}
+                    disabled={testPushSending}
+                    className="h-9 px-3 bg-black hover:bg-black/90 text-white"
+                  >
+                    {testPushSending ? "Sending..." : "Test Push"}
+                  </Button>
+                </CardContent>
+              </Card>
+            </motion.div>
 
             <motion.div whileHover={{
             x: 4,

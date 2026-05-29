@@ -266,6 +266,10 @@ export const userAPI = {
   updateLocation: (locationData) => {
     return apiClient.put(API_ENDPOINTS.USER.LOCATION, locationData);
   },
+
+  triggerTestPush: () => {
+    return apiClient.post('/notification/test/user');
+  },
 };
 
 // Export location API helper functions
@@ -386,6 +390,10 @@ export const restaurantAPI = {
       otp,
       newPassword,
     });
+  },
+
+  triggerTestPush: () => {
+    return apiClient.post('/notification/test/restaurant');
   },
 
   // Get restaurant profile
@@ -1086,6 +1094,10 @@ export const deliveryAPI = {
   // Get emergency help numbers
   getEmergencyHelp: () => {
     return apiClient.get(API_ENDPOINTS.DELIVERY.EMERGENCY_HELP);
+  },
+
+  triggerTestPush: () => {
+    return apiClient.post('/notification/test/delivery');
   },
 
   // Support Tickets

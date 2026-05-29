@@ -19,6 +19,7 @@ import {
   saveDeviceToken,
   removeDeviceToken
 } from './controllers/fcmTokenController.js';
+import { sendNotificationToUser } from './utils/pushNotificationHelper.js';
 
 const router = express.Router();
 
@@ -43,6 +44,112 @@ router.post('/tokens/delivery', authenticateDelivery, (req, res, next) => {
 router.post('/tokens/admin', authenticateAdmin, (req, res, next) => {
   req.body.role = 'admin';
   return saveDeviceToken(req, res, next);
+});
+
+// Test push routes
+router.post('/test/user', authenticate, async (req, res) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User not resolved'
+      });
+    }
+
+    const now = new Date().toISOString();
+    await sendNotificationToUser(
+      String(userId),
+      'user',
+      'FCM Test Notification',
+      `Push is working for your user account at ${now}`,
+      {
+        clickUrl: '/user/notifications',
+        type: 'fcm_test',
+        notificationId: `user_test_${userId}_${Date.now()}`
+      }
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: 'User test push triggered'
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to trigger user test push'
+    });
+  }
+});
+
+router.post('/test/restaurant', authenticateRestaurant, async (req, res) => {
+  try {
+    const restaurantId = req.restaurant?._id || req.user?._id;
+    if (!restaurantId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Restaurant user not resolved'
+      });
+    }
+
+    const now = new Date().toISOString();
+    await sendNotificationToUser(
+      String(restaurantId),
+      'restaurant',
+      'FCM Test Notification',
+      `Push is working for your restaurant account at ${now}`,
+      {
+        clickUrl: '/restaurant/notifications',
+        type: 'fcm_test',
+        notificationId: `restaurant_test_${restaurantId}_${Date.now()}`
+      }
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: 'Restaurant test push triggered'
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to trigger restaurant test push'
+    });
+  }
+});
+
+router.post('/test/delivery', authenticateDelivery, async (req, res) => {
+  try {
+    const deliveryId = req.delivery?._id;
+    if (!deliveryId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Delivery user not resolved'
+      });
+    }
+
+    const now = new Date().toISOString();
+    await sendNotificationToUser(
+      String(deliveryId),
+      'delivery',
+      'FCM Test Notification',
+      `Push is working for your account at ${now}`,
+      {
+        clickUrl: '/food/delivery/notifications',
+        type: 'fcm_test',
+        notificationId: `delivery_test_${deliveryId}_${Date.now()}`
+      }
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: 'Test push triggered'
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to trigger test push'
+    });
+  }
 });
 
 router.delete('/tokens', removeDeviceToken);

@@ -170,7 +170,12 @@ const restaurantSchema = new mongoose.Schema(
       trim: true,
     },
     primaryContactNumber: String,
-    // FCM tokens (separate web/app slots for deterministic targeting)
+    // FCM Web Push tokens — one per browser/device, stored for sending push notifications
+    fcmTokens: {
+      type: [String],
+      default: [],
+      select: false,
+    },
     fcmTokenWeb: {
       type: String,
       trim: true,
@@ -178,6 +183,14 @@ const restaurantSchema = new mongoose.Schema(
       select: false,
     },
     fcmTokenApp: {
+      type: String,
+      trim: true,
+      default: null,
+      select: false,
+    },
+    // Legacy alias retained for backward compatibility
+    // New app/mobile clients should use fcmTokenApp
+    fcmTokenMobile: {
       type: String,
       trim: true,
       default: null,

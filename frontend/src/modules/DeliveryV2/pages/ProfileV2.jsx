@@ -31,6 +31,7 @@ export const ProfileV2 = () => {
   const [referralReward, setReferralReward] = useState(0)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   const [logoutSubmitting, setLogoutSubmitting] = useState(false)
+  const [testPushSending, setTestPushSending] = useState(false)
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [walletBalance, setWalletBalance] = useState(0);
 
@@ -104,6 +105,19 @@ export const ProfileV2 = () => {
     toast.success("Logged out successfully")
     navigate("/food/delivery/login", { replace: true })
     setLogoutSubmitting(false)
+  }
+
+  const handleTestPush = async () => {
+    if (testPushSending) return
+    try {
+      setTestPushSending(true)
+      await deliveryAPI.triggerTestPush()
+      toast.success("Test push sent. Check notification tray and app notifications page.")
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Failed to send test push")
+    } finally {
+      setTestPushSending(false)
+    }
   }
 
   if (loading) {
@@ -191,6 +205,21 @@ export const ProfileV2 = () => {
           {/* Support Section */}
           <div>
             <h3 className="text-gray-400 text-[10px] font-black uppercase tracking-[0.2em] mb-3 px-1">Support</h3>
+            <div className="bg-white rounded-xl p-4 mb-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-gray-900">Test Push Notification</p>
+                  <p className="text-xs text-gray-500">Send a test Firebase push to this delivery account.</p>
+                </div>
+                <button
+                  onClick={handleTestPush}
+                  disabled={testPushSending}
+                  className="shrink-0 bg-black text-white px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-widest shadow-md disabled:opacity-60"
+                >
+                  {testPushSending ? "Sending..." : "Test Push"}
+                </button>
+              </div>
+            </div>
             <div 
               onClick={() => navigate("/food/delivery/help/tickets")}
               className="bg-white rounded-xl p-4 flex items-center justify-between cursor-pointer active:bg-gray-50 transition-colors"

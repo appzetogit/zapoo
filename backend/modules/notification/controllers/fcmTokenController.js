@@ -92,9 +92,22 @@ export const saveDeviceToken = asyncHandler(async (req, res) => {
             });
         } else if (role === 'delivery') {
             const { default: Delivery } = await import('../../delivery/models/Delivery.js');
+            const setPayload = { [legacyTokenField]: deviceToken };
+            // Keep legacy alias in sync for older reads
+            if (legacyTokenField === 'fcmTokenApp') {
+                setPayload.fcmTokenMobile = deviceToken;
+            }
+
             await Delivery.findByIdAndUpdate(userId, {
-                $set: { [legacyTokenField]: deviceToken }
+                $addToSet: { fcmTokens: deviceToken },
+                $set: setPayload
             });
+
+            const delivery = await Delivery.findById(userId).select('fcmTokens');
+            if (delivery?.fcmTokens?.length > 10) {
+                delivery.fcmTokens = delivery.fcmTokens.slice(-10);
+                await delivery.save();
+            }
         }
     } catch (syncErr) {
         // Do not break token registration if legacy/module-field sync fails.
