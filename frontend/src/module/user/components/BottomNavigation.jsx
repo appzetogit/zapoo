@@ -19,7 +19,7 @@ export default function BottomNavigation() {
         !location.pathname.startsWith("/admin")))
 
   return (
-    <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 px-3 pb-2">
+    <div className="md:hidden fixed bottom-0 left-0 right-0 z-[70] px-3 pb-2">
       <div className="overflow-hidden rounded-2xl border border-white/60 dark:border-white/10 bg-white/95 dark:bg-[#111111]/95 backdrop-blur-xl shadow-[0_-12px_35px_rgba(0,0,0,0.14)] dark:shadow-[0_-12px_35px_rgba(0,0,0,0.45)]">
         <div className="flex items-stretch h-auto divide-x divide-gray-200/80 dark:divide-gray-700/80">
         {/* Delivery Tab */}

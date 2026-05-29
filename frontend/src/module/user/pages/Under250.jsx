@@ -1088,7 +1088,7 @@ export default function Under250() {
       </AnimatePresence>
 
       {/* Add to Cart Animation */}
-      <AddToCartAnimation bottomOffset={10} hideWhileScrolling={true} showAfterScrollDelay={180} />
+      <AddToCartAnimation bottomOffset={86} hideWhileScrolling={true} showAfterScrollDelay={180} />
     </div>
   )
 }

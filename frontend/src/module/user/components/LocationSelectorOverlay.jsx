@@ -972,10 +972,8 @@ export default function LocationSelectorOverlay({
         duration: 2000
       });
 
-      // Close overlay and return to previous screen context
-      setTimeout(() => {
-        onClose();
-      }, 2000);
+      // Close overlay immediately after successful location update
+      onClose();
     } catch (error) {
       // Handle permission denied or other errors
       if (error.code === 1 || error.message?.includes("denied") || error.message?.includes("permission")) {
