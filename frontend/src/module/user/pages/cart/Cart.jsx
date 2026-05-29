@@ -161,7 +161,8 @@ export default function Cart() {
     addToCart,
     getCartCount,
     clearCart,
-    cleanCartForRestaurant
+    cleanCartForRestaurant,
+    validateCartAgainstLocation
   } = cartContext;
   const {
     getDefaultAddress,
@@ -968,6 +969,17 @@ export default function Cart() {
       alert(t("user.cart.toast.cartEmpty"));
       return;
     }
+
+    // Final guard: if location changed and restaurant is no longer serviceable,
+    // auto-clear cart and block order placement.
+    const validation = await validateCartAgainstLocation(currentLocation, {
+      clearOnInvalid: true,
+      source: "checkout_guard"
+    });
+    if (!validation?.ok) {
+      return;
+    }
+
     setIsPlacingOrder(true);
     setPlacedOrderEtaText("");
 

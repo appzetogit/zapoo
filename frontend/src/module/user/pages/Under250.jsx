@@ -43,6 +43,11 @@ export default function Under250() {
   const [loadingBanner, setLoadingBanner] = useState(true)
   const [under250Restaurants, setUnder250Restaurants] = useState([])
   const [loadingRestaurants, setLoadingRestaurants] = useState(true)
+  const hasValidUserCoords =
+    location?.latitude != null &&
+    location?.longitude != null &&
+    Number.isFinite(Number(location.latitude)) &&
+    Number.isFinite(Number(location.longitude))
 
   const sortOptions = useMemo(() => [
     { id: null, label: t("user.categoryPage.sortOptions.relevance") },
@@ -173,6 +178,11 @@ export default function Under250() {
     const fetchRestaurantsUnder250 = async () => {
       try {
         setLoadingRestaurants(true)
+        if (!hasValidUserCoords) {
+          setUnder250Restaurants([])
+          return
+        }
+
         const params = {}
         const pureVegOnlySelected =
           vegMode === true &&
@@ -181,10 +191,8 @@ export default function Under250() {
           params.pureVeg = "true"
         }
         if (zoneId) params.zoneId = zoneId
-        if (location?.latitude != null && location?.longitude != null) {
-          params.latitude = location.latitude
-          params.longitude = location.longitude
-        }
+        params.latitude = location.latitude
+        params.longitude = location.longitude
         const response = await restaurantAPI.getRestaurantsUnder250(params)
         if (response.data.success && response.data.data.restaurants) {
           const restaurantsArray = response.data.data.restaurants
@@ -280,7 +288,7 @@ export default function Under250() {
     }
 
     fetchRestaurantsUnder250()
-  }, [zoneId, isOutOfService, location?.latitude, location?.longitude, vegMode])
+  }, [zoneId, isOutOfService, hasValidUserCoords, location?.latitude, location?.longitude, vegMode])
 
   // Fetch categories from admin API
   useEffect(() => {
@@ -496,7 +504,7 @@ export default function Under250() {
         animate={{ y: 0 }}
         transition={{ duration: 0.5, ease: "easeOut" }}
       >
-        <PageNavbar textColor="black" zIndex={50} />
+        <PageNavbar textColor="black" zIndex={50} disableLocationClickWhileLoading={false} />
       </motion.div>
 
       {/* Banner Section */}
@@ -1088,7 +1096,7 @@ export default function Under250() {
       </AnimatePresence>
 
       {/* Add to Cart Animation */}
-      <AddToCartAnimation bottomOffset={10} hideWhileScrolling={true} showAfterScrollDelay={180} />
+      <AddToCartAnimation bottomOffset={86} hideWhileScrolling={true} showAfterScrollDelay={180} />
     </div>
   )
 }

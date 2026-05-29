@@ -1,6 +1,7 @@
 // src/context/cart-context.jsx
-import { createContext, useContext, useEffect, useMemo, useState } from "react"
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react"
 import { getUserIdFromToken } from "@/lib/utils/auth"
+import { USER_LOCATION_UPDATED_EVENT } from "../constants/locationEvents.js"
 
 // Default cart context value to prevent errors during initial render
 const defaultCartContext = {
@@ -29,6 +30,7 @@ const defaultCartContext = {
   cleanCartForRestaurant: () => {
     console.warn('CartProvider not available - cleanCartForRestaurant called');
   },
+  validateCartAgainstLocation: async () => ({ ok: true, reason: "noop" }),
 }
 
 const CartContext = createContext(defaultCartContext)
@@ -88,6 +90,7 @@ export function CartProvider({ children }) {
   // Track last remove event for animation
   const [lastRemoveEvent, setLastRemoveEvent] = useState(null)
   const [isCartHydrated, setIsCartHydrated] = useState(false)
+  const cartValidationSeqRef = useRef(0)
 
   useEffect(() => {
     setCart(loadCartFromStorage(cartStorageKey))
@@ -247,6 +250,97 @@ export function CartProvider({ children }) {
 
   const clearCart = () => setCart([])
 
+  const validateCartAgainstLocation = async (locationPayload = null, options = {}) => {
+    const {
+      clearOnInvalid = true,
+      source = "unknown",
+    } = options || {}
+
+    if (!Array.isArray(cart) || cart.length === 0) {
+      return { ok: true, reason: "empty_cart" }
+    }
+
+    const lat = Number(locationPayload?.latitude)
+    const lng = Number(locationPayload?.longitude)
+    const hasCoords = Number.isFinite(lat) && Number.isFinite(lng)
+    if (!hasCoords) {
+      return { ok: true, reason: "missing_coords" }
+    }
+
+    const firstItem = cart[0] || {}
+    const restaurantIdOrSlug =
+      firstItem.restaurantId ||
+      (typeof firstItem.restaurant === "string"
+        ? firstItem.restaurant.trim().toLowerCase().replace(/\s+/g, "-")
+        : null)
+
+    if (!restaurantIdOrSlug) {
+      return { ok: true, reason: "missing_restaurant_reference" }
+    }
+
+    const validationId = Date.now()
+    cartValidationSeqRef.current = validationId
+
+    try {
+      const { restaurantAPI } = await import("@/lib/api")
+      const response = await restaurantAPI.getRestaurantById(restaurantIdOrSlug, {
+        latitude: lat,
+        longitude: lng,
+      })
+
+      // Ignore stale async result
+      if (cartValidationSeqRef.current > validationId) {
+        return { ok: true, reason: "stale_validation" }
+      }
+
+      const responseData = response?.data?.data || {}
+      const restaurant = responseData?.restaurant || response?.data?.restaurant || null
+      if (!restaurant) {
+        return { ok: true, reason: "restaurant_unresolved" }
+      }
+
+      // Backend returns outOfRange at response data level, not inside restaurant object.
+      const outOfRange = responseData?.outOfRange === true || restaurant?.outOfRange === true
+      const inactive = restaurant?.isActive === false
+      const notAccepting = restaurant?.isAcceptingOrders === false
+      const invalid = outOfRange || inactive || notAccepting
+
+      if (!invalid) {
+        return { ok: true, reason: "serviceable" }
+      }
+
+      if (clearOnInvalid) {
+        setCart([])
+        import("sonner").then(({ toast }) => {
+          const msg = outOfRange
+            ? "Cart cleared because this restaurant is not deliverable at your current location."
+            : "Cart cleared because this restaurant is currently unavailable."
+          toast.error(msg, { id: "cart-location-invalid" })
+        }).catch(() => {})
+      }
+
+      return {
+        ok: false,
+        reason: outOfRange ? "out_of_range" : inactive ? "inactive" : "not_accepting",
+        source,
+      }
+    } catch (err) {
+      // If backend confirms restaurant is not resolvable (e.g., inactive/not found),
+      // clear stale cart items tied to the previous location/availability.
+      if (err?.response?.status === 404 && clearOnInvalid) {
+        setCart([])
+        import("sonner").then(({ toast }) => {
+          toast.error("Cart cleared because this restaurant is currently unavailable.", {
+            id: "cart-location-invalid"
+          })
+        }).catch(() => {})
+        return { ok: false, reason: "restaurant_not_found", source }
+      }
+      // Network/temporary failure should not clear cart
+      return { ok: true, reason: "validation_error", error: err?.message || "unknown" }
+    }
+  }
+
   // Clean cart to remove items from different restaurants
   // Keeps only items from the specified restaurant
   const cleanCartForRestaurant = (restaurantId, restaurantName) => {
@@ -342,6 +436,40 @@ export function CartProvider({ children }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []) // Only run once on mount to clean up localStorage data
 
+  useEffect(() => {
+    const onLocationUpdated = (event) => {
+      const loc = event?.detail || null
+      // Run async validation safely; do not block UI.
+      validateCartAgainstLocation(loc, {
+        clearOnInvalid: true,
+        source: "location_event",
+      }).catch(() => {})
+    }
+
+    window.addEventListener(USER_LOCATION_UPDATED_EVENT, onLocationUpdated)
+    return () => {
+      window.removeEventListener(USER_LOCATION_UPDATED_EVENT, onLocationUpdated)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cart.length])
+
+  useEffect(() => {
+    if (!isCartHydrated || cart.length === 0) return
+    let parsed = null
+    try {
+      const raw = localStorage.getItem("userLocation")
+      parsed = raw ? JSON.parse(raw) : null
+    } catch {
+      parsed = null
+    }
+
+    validateCartAgainstLocation(parsed, {
+      clearOnInvalid: true,
+      source: "cart_hydration",
+    }).catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isCartHydrated, cart.length, cartStorageKey])
+
   // Transform cart to match AddToCartAnimation expected structure
   const cartForAnimation = useMemo(() => {
     const items = cart.map(item => ({
@@ -382,6 +510,7 @@ export function CartProvider({ children }) {
       getCartItem,
       clearCart,
       cleanCartForRestaurant,
+      validateCartAgainstLocation,
     }),
     [cart, cartForAnimation, lastAddEvent, lastRemoveEvent]
   )

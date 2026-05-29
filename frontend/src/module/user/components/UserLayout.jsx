@@ -79,11 +79,14 @@ export function useLocationSelector() {
 function LocationSelectorProvider({ children }) {
   const [isLocationSelectorOpen, setIsLocationSelectorOpen] = useState(false)
   const [locationSelectorLabel, setLocationSelectorLabel] = useState(null)
+  const [locationSelectorReturnPath, setLocationSelectorReturnPath] = useState("/")
   const programmaticHistoryBackRef = useRef(false)
   const hasPushedHistoryRef = useRef(false)
 
   const openLocationSelector = (label = null) => {
     setLocationSelectorLabel(label)
+    const currentPath = `${window.location.pathname || "/"}${window.location.search || ""}`
+    setLocationSelectorReturnPath(currentPath)
     setIsLocationSelectorOpen(true)
   }
 
@@ -94,6 +97,7 @@ function LocationSelectorProvider({ children }) {
     }
     setIsLocationSelectorOpen(false)
     setLocationSelectorLabel(null)
+    setLocationSelectorReturnPath("/")
     hasPushedHistoryRef.current = false
   }
 
@@ -113,6 +117,7 @@ function LocationSelectorProvider({ children }) {
       }
       setIsLocationSelectorOpen(false)
       setLocationSelectorLabel(null)
+      setLocationSelectorReturnPath("/")
       hasPushedHistoryRef.current = false
     }
 
@@ -138,6 +143,7 @@ function LocationSelectorProvider({ children }) {
             isOpen={isLocationSelectorOpen}
             onClose={closeLocationSelector}
             initialLabel={locationSelectorLabel}
+            returnPath={locationSelectorReturnPath}
           />
         )}
       </Suspense>

@@ -11,7 +11,8 @@ export default function PageNavbar({
   textColor = "white",
   zIndex = 20,
   showProfile = false,
-  onNavClick
+  onNavClick,
+  disableLocationClickWhileLoading = true
 }) {
   const {
     location,
@@ -604,7 +605,7 @@ export default function PageNavbar({
         {/* Left: Location - Hidden on desktop, shown on mobile */}
         <div className="flex md:hidden items-center gap-2 sm:gap-3 min-w-0 flex-1">
           {/* Location Button */}
-          <Button variant="ghost" onClick={handleLocationClick} disabled={loading} className={`h-auto w-full px-2.5 py-1.5 rounded-xl transition-colors flex-shrink-0 max-w-full border justify-start text-left ${isDarkTheme ? "border-[#2c2c2c] bg-[#1b1b1b]/90 hover:bg-[#242424]" : "border-[#e6dccb] bg-white/95 hover:bg-[#faf5ec]"}`}>
+          <Button variant="ghost" onClick={handleLocationClick} disabled={disableLocationClickWhileLoading && loading} className={`h-auto w-full px-2.5 py-1.5 rounded-xl transition-colors flex-shrink-0 max-w-full border justify-start text-left ${isDarkTheme ? "border-[#2c2c2c] bg-[#1b1b1b]/90 hover:bg-[#242424]" : "border-[#e6dccb] bg-white/95 hover:bg-[#faf5ec]"}`}>
             {loading ? <span className={`text-sm font-bold ${textColorClass} ${textColor === "white" ? "drop-shadow-lg" : ""}`}>
                 Loading...
               </span> : <div className="flex items-start gap-2 min-w-0">

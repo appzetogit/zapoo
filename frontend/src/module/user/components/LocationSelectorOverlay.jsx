@@ -1,4 +1,5 @@
 import { useState, useEffect, useLayoutEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { ChevronLeft, Search, ChevronRight, Plus, MapPin, MoreHorizontal, Navigation, Home, Building2, Briefcase, X, Crosshair } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -67,8 +68,43 @@ const getAddressIcon = address => {
 export default function LocationSelectorOverlay({
   isOpen,
   onClose,
-  initialLabel = null
+  initialLabel = null,
+  returnPath = "/"
 }) {
+  const navigate = useNavigate();
+  const redirectToOriginPage = () => {
+    onClose?.();
+    const target = typeof returnPath === "string" && returnPath.trim() ? returnPath : "/";
+    navigate(target, {
+      replace: false
+    });
+  };
+  const logLocationPerf = (step, meta = {}) => {
+    try {
+      const payload = {
+        step,
+        ts: Date.now(),
+        ...meta
+      };
+      window.__locationPerf = window.__locationPerf || [];
+      window.__locationPerf.push(payload);
+      // Keep memory bounded
+      if (window.__locationPerf.length > 100) {
+        window.__locationPerf = window.__locationPerf.slice(-100);
+      }
+      console.info("[LocationPerf]", payload);
+    } catch {
+      // no-op
+    }
+  };
+
+  const hasDetailedAddress = (loc) => {
+    const formatted = String(loc?.formattedAddress || "").trim();
+    if (!formatted || formatted === "Select location") return false;
+    if (/^-?\d+\.\d+,\s*-?\d+\.\d+$/.test(formatted)) return false;
+    return formatted.split(",").map((p) => p.trim()).filter(Boolean).length >= 3;
+  };
+
   const inputRef = useRef(null);
   const [searchValue, setSearchValue] = useState("");
   const {
@@ -784,6 +820,7 @@ export default function LocationSelectorOverlay({
     };
   }, [isOpen, onClose]);
   const handleUseCurrentLocation = async () => {
+    const flowStart = performance.now();
     try {
       // Check if geolocation is supported
       if (!navigator.geolocation) {
@@ -808,6 +845,10 @@ export default function LocationSelectorOverlay({
       let locationData;
       try {
         locationData = await Promise.race([locationPromise, timeoutPromise]);
+        logLocationPerf("requestLocation.success", {
+          ms: Math.round(performance.now() - flowStart),
+          source: "fresh_or_cached"
+        });
 
         // Check if we got valid location data
         if (!locationData || !locationData.latitude || !locationData.longitude) {
@@ -823,6 +864,9 @@ export default function LocationSelectorOverlay({
             const cachedLocation = JSON.parse(stored);
             if (cachedLocation?.latitude && cachedLocation?.longitude) {
               locationData = cachedLocation;
+              logLocationPerf("requestLocation.fallback_cached", {
+                ms: Math.round(performance.now() - flowStart)
+              });
 
               // Show info toast that we're using cached location
               toast.info("Using your last known location", {
@@ -950,18 +994,30 @@ export default function LocationSelectorOverlay({
               });
             }
 
-            // Fetch detailed address using Places API
-            setTimeout(async () => {
-              await handleMapMoveEnd(locationData.latitude, locationData.longitude);
-            }, 500);
+            // Fetch detailed address only when needed (avoid duplicate reverse-geocode)
+            if (!hasDetailedAddress(locationData)) {
+              setTimeout(async () => {
+                await handleMapMoveEnd(locationData.latitude, locationData.longitude);
+              }, 500);
+            } else {
+              logLocationPerf("reverseGeocode.skipped_already_detailed", {
+                ms: Math.round(performance.now() - flowStart)
+              });
+            }
           } catch (mapError) {
             console.error("Error updating map:", mapError);
           }
         } else {
-          // Map not initialized, fetch address directly
-          setTimeout(async () => {
-            await handleMapMoveEnd(locationData.latitude, locationData.longitude);
-          }, 300);
+          // Map not initialized, fetch address directly only when needed
+          if (!hasDetailedAddress(locationData)) {
+            setTimeout(async () => {
+              await handleMapMoveEnd(locationData.latitude, locationData.longitude);
+            }, 300);
+          } else {
+            logLocationPerf("reverseGeocode.skipped_no_map_detailed_address", {
+              ms: Math.round(performance.now() - flowStart)
+            });
+          }
         }
       }
 
@@ -972,11 +1028,16 @@ export default function LocationSelectorOverlay({
         duration: 2000
       });
 
-      // Close overlay and return to previous screen context
-      setTimeout(() => {
-        onClose();
-      }, 2000);
+      // Close overlay and return to page where selector was opened from.
+      redirectToOriginPage();
+      logLocationPerf("flow.completed", {
+        ms: Math.round(performance.now() - flowStart)
+      });
     } catch (error) {
+      logLocationPerf("flow.failed", {
+        ms: Math.round(performance.now() - flowStart),
+        message: error?.message || "unknown"
+      });
       // Handle permission denied or other errors
       if (error.code === 1 || error.message?.includes("denied") || error.message?.includes("permission")) {
         toast.error("Location permission denied. Please enable location access in your browser settings.", {
@@ -1740,6 +1801,11 @@ export default function LocationSelectorOverlay({
 
       // Keep reverse-geocode sync so form/map stay consistent with selected point.
       handleMapMoveEnd(lat, lng);
+
+      // For searched location selection in list flow, return user to source page.
+      if (!showAddressForm) {
+        redirectToOriginPage();
+      }
     });
   };
 
@@ -2230,9 +2296,8 @@ export default function LocationSelectorOverlay({
         }, 300);
       }
 
-      // Don't close overlay - keep user on select location page
-      // onClose()
-      // window.location.reload()
+      // Close overlay and return to page where selector was opened from.
+      redirectToOriginPage();
     } catch (error) {
       console.error("Error selecting saved address:", error);
       toast.error("Failed to update location. Please try again.");
