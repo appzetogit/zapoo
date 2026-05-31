@@ -517,6 +517,12 @@ export const getRestaurantById = async (req, res) => {
     const userLat = latitude != null ? parseFloat(latitude) : null;
     const userLng = longitude != null ? parseFloat(longitude) : null;
 
+    const activeZones = await Zone.find({ isActive: true }).select('_id').lean();
+    const activeZoneIds = activeZones.map((zone) => zone._id);
+    if (activeZoneIds.length === 0) {
+      return errorResponse(res, 404, 'Restaurant not found');
+    }
+
     // Build query conditions
     const orConditions = [{
       restaurantId: id
@@ -533,6 +539,7 @@ export const getRestaurantById = async (req, res) => {
 
     const queryConditions = {
       isActive: true,
+      zoneId: { $in: activeZoneIds },
       $and: [
         { $or: orConditions },
         {

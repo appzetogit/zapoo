@@ -37,6 +37,7 @@ const CartContext = createContext(defaultCartContext)
 
 const LEGACY_CART_STORAGE_KEY = "cart"
 const GUEST_CART_STORAGE_KEY = "cart_guest"
+const HELD_ZONE_SUFFIX = "__held_zone_inactive"
 
 const getStoredUserCartOwner = () => {
   if (typeof window === "undefined") return null
@@ -80,30 +81,47 @@ const loadCartFromStorage = (storageKey) => {
   }
 }
 
+const getHeldCartStorageKey = (storageKey) => `${storageKey}${HELD_ZONE_SUFFIX}`
+
 export function CartProvider({ children }) {
   const [cartStorageKey, setCartStorageKey] = useState(() => getCartStorageKey())
+  const [heldCartStorageKey, setHeldCartStorageKey] = useState(() =>
+    getHeldCartStorageKey(getCartStorageKey())
+  )
   // Safe init (works with SSR and bad JSON)
   const [cart, setCart] = useState(() => loadCartFromStorage(getCartStorageKey()))
+  const [heldItems, setHeldItems] = useState(() =>
+    loadCartFromStorage(getHeldCartStorageKey(getCartStorageKey()))
+  )
 
   // Track last add event for animation
   const [lastAddEvent, setLastAddEvent] = useState(null)
   // Track last remove event for animation
   const [lastRemoveEvent, setLastRemoveEvent] = useState(null)
   const [isCartHydrated, setIsCartHydrated] = useState(false)
+  const [isHeldHydrated, setIsHeldHydrated] = useState(false)
   const cartValidationSeqRef = useRef(0)
 
   useEffect(() => {
     setCart(loadCartFromStorage(cartStorageKey))
+    setHeldItems(loadCartFromStorage(heldCartStorageKey))
     setIsCartHydrated(true)
-  }, [cartStorageKey])
+    setIsHeldHydrated(true)
+  }, [cartStorageKey, heldCartStorageKey])
 
   useEffect(() => {
     const syncCartOwner = () => {
       const nextStorageKey = getCartStorageKey()
+      const nextHeldStorageKey = getHeldCartStorageKey(nextStorageKey)
       setCartStorageKey((prev) => {
         if (prev === nextStorageKey) return prev
         setIsCartHydrated(false)
         return nextStorageKey
+      })
+      setHeldCartStorageKey((prev) => {
+        if (prev === nextHeldStorageKey) return prev
+        setIsHeldHydrated(false)
+        return nextHeldStorageKey
       })
     }
 
@@ -126,6 +144,15 @@ export function CartProvider({ children }) {
       // ignore storage errors (private mode, quota, etc.)
     }
   }, [cart, cartStorageKey, isCartHydrated])
+
+  useEffect(() => {
+    if (!isHeldHydrated) return
+    try {
+      localStorage.setItem(heldCartStorageKey, JSON.stringify(heldItems))
+    } catch {
+      // ignore storage errors
+    }
+  }, [heldItems, heldCartStorageKey, isHeldHydrated])
 
   const addToCart = (item, sourcePosition = null) => {
     // 1. Validate item has required info
@@ -250,6 +277,51 @@ export function CartProvider({ children }) {
 
   const clearCart = () => setCart([])
 
+  const holdCurrentCartForInactiveZone = () => {
+    if (!Array.isArray(cart) || cart.length === 0) return
+    setHeldItems((prev) => {
+      const next = Array.isArray(prev) ? [...prev] : []
+      for (const item of cart) {
+        const idx = next.findIndex((i) => String(i?.id) === String(item?.id))
+        if (idx >= 0) {
+          next[idx] = { ...next[idx], quantity: item.quantity ?? next[idx].quantity ?? 1 }
+        } else {
+          next.push({ ...item, __holdReason: "zone_inactive" })
+        }
+      }
+      return next
+    })
+    setCart([])
+  }
+
+  const tryRestoreHeldItems = () => {
+    if (!Array.isArray(heldItems) || heldItems.length === 0) return
+    if (!Array.isArray(cart) || cart.length === 0) {
+      setCart(heldItems.map((item) => ({ ...item })))
+      setHeldItems([])
+      return
+    }
+
+    const normalizeName = (name) => (name ? String(name).trim().toLowerCase() : "")
+    const activeRestaurant = normalizeName(cart[0]?.restaurant)
+    const heldRestaurant = normalizeName(heldItems[0]?.restaurant)
+    if (!activeRestaurant || !heldRestaurant || activeRestaurant !== heldRestaurant) {
+      return
+    }
+
+    const merged = [...cart]
+    for (const held of heldItems) {
+      const idx = merged.findIndex((i) => String(i?.id) === String(held?.id))
+      if (idx >= 0) {
+        merged[idx] = { ...merged[idx], quantity: (merged[idx].quantity || 0) + (held.quantity || 0) }
+      } else {
+        merged.push({ ...held })
+      }
+    }
+    setCart(merged)
+    setHeldItems([])
+  }
+
   const validateCartAgainstLocation = async (locationPayload = null, options = {}) => {
     const {
       clearOnInvalid = true,
@@ -306,11 +378,18 @@ export function CartProvider({ children }) {
       const invalid = outOfRange || inactive || notAccepting
 
       if (!invalid) {
+        if (Array.isArray(heldItems) && heldItems.length > 0) {
+          tryRestoreHeldItems()
+        }
         return { ok: true, reason: "serviceable" }
       }
 
       if (clearOnInvalid) {
-        setCart([])
+        if (inactive) {
+          holdCurrentCartForInactiveZone()
+        } else {
+          setCart([])
+        }
         import("sonner").then(({ toast }) => {
           const msg = outOfRange
             ? "Cart cleared because this restaurant is not deliverable at your current location."
@@ -328,9 +407,9 @@ export function CartProvider({ children }) {
       // If backend confirms restaurant is not resolvable (e.g., inactive/not found),
       // clear stale cart items tied to the previous location/availability.
       if (err?.response?.status === 404 && clearOnInvalid) {
-        setCart([])
+        holdCurrentCartForInactiveZone()
         import("sonner").then(({ toast }) => {
-          toast.error("Cart cleared because this restaurant is currently unavailable.", {
+          toast.error("Cart is temporarily unavailable for this restaurant right now.", {
             id: "cart-location-invalid"
           })
         }).catch(() => {})
@@ -469,6 +548,43 @@ export function CartProvider({ children }) {
     }).catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isCartHydrated, cart.length, cartStorageKey])
+
+  useEffect(() => {
+    if (!isCartHydrated) return
+    if (cart.length > 0) return
+    if (!Array.isArray(heldItems) || heldItems.length === 0) return
+
+    let loc = null
+    try {
+      const raw = localStorage.getItem("userLocation")
+      loc = raw ? JSON.parse(raw) : null
+    } catch {
+      loc = null
+    }
+
+    const probeReference =
+      heldItems[0]?.restaurantId ||
+      (typeof heldItems[0]?.restaurant === "string"
+        ? heldItems[0].restaurant.trim().toLowerCase().replace(/\s+/g, "-")
+        : null)
+
+    if (!probeReference) return
+
+    import("@/lib/api")
+      .then(async ({ restaurantAPI }) => {
+        const params = {}
+        const lat = Number(loc?.latitude)
+        const lng = Number(loc?.longitude)
+        if (Number.isFinite(lat) && Number.isFinite(lng)) {
+          params.latitude = lat
+          params.longitude = lng
+        }
+        await restaurantAPI.getRestaurantById(probeReference, params)
+        tryRestoreHeldItems()
+      })
+      .catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [heldItems.length, cart.length, isCartHydrated, cartStorageKey])
 
   // Transform cart to match AddToCartAnimation expected structure
   const cartForAnimation = useMemo(() => {

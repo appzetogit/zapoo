@@ -267,9 +267,10 @@ export async function findNearestDeliveryBoys(restaurantLat, restaurantLng, rest
     if (restaurantId) {
       try {
         const restaurantIdObj = restaurantId.toString ? restaurantId.toString() : restaurantId;
+        // Dispatch for already placed orders must not depend on zone active flag.
+        // New-order blocking is handled upstream during order creation.
         zone = await Zone.findOne({
-          restaurantId: restaurantIdObj,
-          isActive: true
+          restaurantId: restaurantIdObj
         }).lean();
         if (zone) {}
       } catch (zoneError) {
@@ -518,9 +519,10 @@ export async function findNearestDeliveryBoy(restaurantLat, restaurantLng, resta
       try {
         // Try to find zone by restaurantId
         const restaurantIdObj = restaurantId.toString ? restaurantId.toString() : restaurantId;
+        // Dispatch for already placed orders must not depend on zone active flag.
+        // New-order blocking is handled upstream during order creation.
         zone = await Zone.findOne({
-          restaurantId: restaurantIdObj,
-          isActive: true
+          restaurantId: restaurantIdObj
         }).lean();
         if (zone) {
           // Option A: Filter by zoneId if Delivery model has zoneId field
