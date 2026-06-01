@@ -22,6 +22,19 @@ export function useFCMNotification({
   role = 'user'
 } = {}) {
   const initialized = useRef(false);
+  const rolePrefixMap = {
+    user: '[USER]',
+    restaurant: '[RESTAURANT]',
+    delivery: '[DELIVERY PARTNER]',
+    admin: '[ADMIN]'
+  };
+
+  const ensureRolePrefix = (rawTitle, fallbackRole) => {
+    const title = String(rawTitle || 'Zapoo').trim();
+    if (title.startsWith('[')) return title;
+    const prefix = rolePrefixMap[fallbackRole] || '[NOTIFICATION]';
+    return `${prefix} ${title}`;
+  };
   useEffect(() => {
     if (!isLoggedIn) {
       // Reset initialization when user logs out so they can re-register on next login
@@ -107,7 +120,17 @@ export function useFCMNotification({
         // ── 6. Foreground message handler ────────────────────────────
         // When app tab is focused, show browser notification for foreground FCM.
         onMessage(messaging, payload => {
-          const title = payload?.notification?.title || payload?.data?.title || 'Zapoo';
+          const notificationId = payload?.data?.notificationId;
+          if (notificationId) {
+            const seenKey = `fcm_seen_${role}_${notificationId}`;
+            if (sessionStorage.getItem(seenKey)) {
+              return;
+            }
+            sessionStorage.setItem(seenKey, '1');
+          }
+          const rawTitle = payload?.notification?.title || payload?.data?.title || 'Zapoo';
+          const dataTargetRole = payload?.data?.target || role;
+          const title = ensureRolePrefix(rawTitle, dataTargetRole);
           const body = payload?.notification?.body || payload?.data?.body || '';
           const image = payload?.notification?.image || payload?.data?.imageUrl;
           try {

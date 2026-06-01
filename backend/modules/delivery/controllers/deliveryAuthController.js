@@ -225,26 +225,38 @@ export const verifyOTP = asyncHandler(async (req, res) => {
     
     // Save FCM token if provided
     if (normalizedFcmToken) {
-      const previousTokenWeb = delivery.fcmTokenWeb;
-      const previousTokenApp = delivery.fcmTokenApp;
-      
       if (['mobile', 'android', 'ios', 'app'].includes(normalizedPlatform)) {
-        delivery.fcmTokenApp = normalizedFcmToken;
-        delivery.fcmTokenMobile = normalizedFcmToken; // Keep legacy alias in sync
-        console.log(`[DeliveryAuth] FCM Token Updated (App): ${previousTokenApp ? 'updated' : 'created'}`);
-      } else {
-        delivery.fcmTokenWeb = normalizedFcmToken;
-        console.log(`[DeliveryAuth] FCM Token Updated (Web): ${previousTokenWeb ? 'updated' : 'created'}`);
-      }
-      
-      // Add to fcmTokens array (max 10)
-      if (!delivery.fcmTokens) delivery.fcmTokens = [];
-      if (!delivery.fcmTokens.includes(normalizedFcmToken)) {
-        delivery.fcmTokens.push(normalizedFcmToken);
-        if (delivery.fcmTokens.length > 10) {
-          delivery.fcmTokens = delivery.fcmTokens.slice(-10);
+        delivery.fcmTokensMobile = Array.isArray(delivery.fcmTokensMobile) ? delivery.fcmTokensMobile.filter(t => t !== normalizedFcmToken) : [];
+        delivery.fcmTokensMobile.push(normalizedFcmToken);
+        if (delivery.fcmTokensMobile.length > 10) {
+          delivery.fcmTokensMobile = delivery.fcmTokensMobile.slice(-10);
         }
+        console.log('[DeliveryAuth] FCM Token Updated (Mobile Array)');
+      } else {
+        delivery.fcmTokensWeb = Array.isArray(delivery.fcmTokensWeb) ? delivery.fcmTokensWeb.filter(t => t !== normalizedFcmToken) : [];
+        delivery.fcmTokensWeb.push(normalizedFcmToken);
+        if (delivery.fcmTokensWeb.length > 10) {
+          delivery.fcmTokensWeb = delivery.fcmTokensWeb.slice(-10);
+        }
+        console.log('[DeliveryAuth] FCM Token Updated (Web Array)');
       }
+      // Keep unified DeviceToken collection in sync for pushNotificationHelper lookups.
+      const mappedPlatform = ['mobile', 'android', 'app'].includes(normalizedPlatform)
+        ? 'android'
+        : normalizedPlatform === 'ios'
+          ? 'ios'
+          : 'web';
+      await DeviceToken.findOneAndUpdate(
+        { userId: delivery._id, role: 'delivery', deviceToken: normalizedFcmToken },
+        {
+          userId: delivery._id,
+          role: 'delivery',
+          deviceToken: normalizedFcmToken,
+          platform: mappedPlatform,
+          isActive: true
+        },
+        { upsert: true, new: true }
+      );
     } else {
       console.warn(`[DeliveryAuth] No FCM token provided in OTP verification. Phone: ${phone}, Platform: ${normalizedPlatform}`);
     }
@@ -303,7 +315,7 @@ export const verifyOTP = asyncHandler(async (req, res) => {
     delivery.refreshToken = tokens.refreshToken;
     await delivery.save();
     
-    console.log(`[DeliveryAuth] Login - Tokens saved. DeliveryID: ${delivery.deliveryId}, fcmTokenWeb: ${delivery.fcmTokenWeb ? 'stored' : 'null'}, fcmTokenApp: ${delivery.fcmTokenApp ? 'stored' : 'null'}, fcmTokenMobile: ${delivery.fcmTokenMobile ? 'stored' : 'null'}, fcmTokensCount: ${delivery.fcmTokens?.length || 0}`);
+    console.log(`[DeliveryAuth] Login - Tokens saved. DeliveryID: ${delivery.deliveryId}, webCount: ${delivery.fcmTokensWeb?.length || 0}, mobileCount: ${delivery.fcmTokensMobile?.length || 0}`);
 
     // Set refresh token in httpOnly cookie
     res.cookie('refreshToken', tokens.refreshToken, {
@@ -418,8 +430,8 @@ export const logout = asyncHandler(async (req, res) => {
         DeviceToken.deleteMany({ userId: deliveryId, role: 'delivery' }),
         Delivery.findByIdAndUpdate(deliveryId, {
           $set: {
-            fcmTokenWeb: null,
-            fcmTokenApp: null
+            fcmTokensWeb: [],
+            fcmTokensMobile: []
           }
         })
       ]);
@@ -492,3 +504,4 @@ export const getCurrentDelivery = asyncHandler(async (req, res) => {
     }
   });
 });
+

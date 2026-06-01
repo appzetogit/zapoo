@@ -163,6 +163,8 @@ export async function notifyRestaurantNewOrder(order, restaurantId, paymentMetho
     const primaryRoom = roomVariations[0];
     // CRITICAL: Only emit to the specific restaurant room - NEVER broadcast to all restaurants
     // This ensures orders only go to the correct restaurant
+    let socketDeliveryFailed = false;
+    let socketFailureMessage = null;
     if (socketsInRoom.length > 0) {
       console.log('🍽️ [RestaurantNotify] Restaurant sockets found', {
         orderId: order.orderId,
@@ -215,14 +217,8 @@ export async function notifyRestaurantNewOrder(order, restaurantId, paymentMetho
         });
       });
 
-      // Return error instead of success
-      return {
-        success: false,
-        restaurantId,
-        orderId: order.orderId,
-        error: 'Restaurant not connected to Socket.IO',
-        message: `Restaurant ${normalizedRestaurantId} (${order.restaurantName}) is not connected. Order notification not sent.`
-      };
+      socketDeliveryFailed = true;
+      socketFailureMessage = `Restaurant ${normalizedRestaurantId} (${order.restaurantName}) is not connected to Socket.IO room.`;
     }
 
     // Send FCM notification to restaurant (always send)
@@ -243,9 +239,15 @@ export async function notifyRestaurantNewOrder(order, restaurantId, paymentMetho
       console.error('❌ [FCM] Error sending restaurant new order notification:', pushError);
     }
     return {
-      success: true,
+      success: !socketDeliveryFailed,
       restaurantId,
-      orderId: order.orderId
+      orderId: order.orderId,
+      ...(socketDeliveryFailed
+        ? {
+            warning: 'socket_delivery_failed',
+            message: socketFailureMessage
+          }
+        : {})
     };
   } catch (error) {
     console.error('Error notifying restaurant:', error);
@@ -312,9 +314,12 @@ export async function notifyRestaurantOrderUpdate(orderId, status) {
       } else if (normalizedStatus === 'ready') {
         title = '🥡 Order Ready';
         body = `Order #${order.orderId} is ready for pickup.`;
-      } else if (normalizedStatus === 'preparing' || normalizedStatus === 'confirmed') {
-        title = '🍳 Order Accepted';
-        body = `Order #${order.orderId} is being prepared.`;
+      } else if (normalizedStatus === 'confirmed') {
+        title = '✅ Order Confirmed';
+        body = `Order #${order.orderId} has been confirmed by restaurant.`;
+      } else if (normalizedStatus === 'preparing') {
+        title = '🍳 Order Preparing';
+        body = `Order #${order.orderId} is now being prepared.`;
       } else if (normalizedStatus === 'out_for_delivery') {
         title = '🚴 Out for Delivery';
         body = `Order #${order.orderId} is out for delivery.`;

@@ -544,6 +544,11 @@ export const rejectOrder = asyncHandler(async (req, res) => {
     try {
       await notifyRestaurantOrderUpdate(order._id.toString(), 'cancelled');
       await notifyUserOrderUpdate(order._id.toString(), 'cancelled');
+      const assignedDeliveryId = order.deliveryPartnerId?._id?.toString?.() || order.deliveryPartnerId?.toString?.() || order.deliveryPartnerId;
+      if (assignedDeliveryId) {
+        const { notifyDeliveryOrderLifecycle } = await import('../../order/services/deliveryNotificationService.js');
+        await notifyDeliveryOrderLifecycle(assignedDeliveryId, order, 'cancelled');
+      }
     } catch (notifError) {
       console.error('Error sending notification:', notifError);
     }

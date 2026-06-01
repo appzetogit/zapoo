@@ -785,6 +785,65 @@ export async function notifyDeliveryBoyOrderReady(order, deliveryPartnerId) {
 }
 
 /**
+ * Notify delivery partner about lifecycle status updates for accepted orders.
+ * @param {string} deliveryPartnerId
+ * @param {Object} order
+ * @param {string} status
+ */
+export async function notifyDeliveryOrderLifecycle(deliveryPartnerId, order, status) {
+  try {
+    const normalizedDeliveryPartnerId = deliveryPartnerId?.toString?.() || String(deliveryPartnerId || '');
+    if (!normalizedDeliveryPartnerId) return;
+
+    const normalizedStatus = String(status || '').toLowerCase();
+    const orderNumber = order?.orderId || order?._id?.toString?.() || 'order';
+
+    let title = 'Order Update';
+    let body = `Order #${orderNumber} status is now ${normalizedStatus}`;
+    let type = 'delivery_order_update';
+
+    if (normalizedStatus === 'accepted') {
+      title = 'Order Accepted';
+      body = `You accepted Order #${orderNumber}`;
+      type = 'delivery_order_accepted';
+    } else if (normalizedStatus === 'confirmed') {
+      title = 'Order Confirmed';
+      body = `Order #${orderNumber} has been confirmed`;
+      type = 'delivery_order_confirmed';
+    } else if (normalizedStatus === 'preparing') {
+      title = 'Order Preparing';
+      body = `Order #${orderNumber} is being prepared`;
+      type = 'delivery_order_preparing';
+    } else if (normalizedStatus === 'out_for_delivery') {
+      title = 'Out for Delivery';
+      body = `Order #${orderNumber} is now out for delivery`;
+      type = 'delivery_order_out_for_delivery';
+    } else if (normalizedStatus === 'delivered') {
+      title = 'Order Delivered';
+      body = `Order #${orderNumber} marked as delivered`;
+      type = 'delivery_order_delivered';
+    } else if (normalizedStatus === 'cancelled') {
+      title = 'Order Cancelled';
+      body = `Order #${orderNumber} was cancelled`;
+      type = 'delivery_order_cancelled';
+    } else if (normalizedStatus === 'reassigned') {
+      title = 'Order Reassigned';
+      body = `Order #${orderNumber} was reassigned`;
+      type = 'delivery_order_reassigned';
+    }
+
+    await sendNotificationToUser(normalizedDeliveryPartnerId, 'delivery', title, body, {
+      orderId: order?.orderId || null,
+      orderMongoId: order?._id?.toString?.() || null,
+      status: normalizedStatus,
+      type
+    });
+  } catch (error) {
+    console.error('❌ [FCM] Error sending delivery lifecycle notification:', error);
+  }
+}
+
+/**
  * Calculate distance between two coordinates using Haversine formula
  */
 function calculateDistance(lat1, lng1, lat2, lng2) {

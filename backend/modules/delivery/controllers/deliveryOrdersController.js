@@ -860,6 +860,16 @@ export const acceptOrder = asyncHandler(async (req, res) => {
       ...updatedOrder,
       paymentMethod
     };
+    // Fire-and-forget FCM lifecycle notification for delivery partner.
+    (async () => {
+      try {
+        const { notifyDeliveryOrderLifecycle } = await import('../../order/services/deliveryNotificationService.js');
+        await notifyDeliveryOrderLifecycle(delivery._id?.toString(), updatedOrder, 'accepted');
+      } catch (deliveryPushErr) {
+        console.error('Error sending delivery accepted notification:', deliveryPushErr);
+      }
+    })();
+
     return successResponse(res, 200, 'Order accepted successfully', {
       order: orderWithPayment,
       route: {
@@ -959,6 +969,12 @@ export const rejectOrder = asyncHandler(async (req, res) => {
           if (!result?.notified) {
             console.warn(`⚠️ [DeliveryAssign] No next delivery partner notified after reject for order ${freshOrderDoc.orderId || freshOrderDoc._id}`);
           }
+          try {
+            const { notifyDeliveryOrderLifecycle } = await import('../../order/services/deliveryNotificationService.js');
+            await notifyDeliveryOrderLifecycle(currentDeliveryId, { _id: freshOrderDoc._id, orderId: freshOrderDoc.orderId }, 'reassigned');
+          } catch (deliveryNotifErr) {
+            console.error('Error notifying delivery reassign after reject:', deliveryNotifErr);
+          }
         } else {
           console.warn(`⚠️ [DeliveryAssign] Restaurant location missing while advancing reject flow for order ${freshOrderDoc.orderId || freshOrderDoc._id}`);
         }
@@ -1005,6 +1021,12 @@ export const rejectOrder = asyncHandler(async (req, res) => {
           type: 'delivery_assignment_failed',
           message: `All notified delivery partners rejected Order #${orderDoc.orderId}. You can tap Resend to notify nearby delivery partners again.`
         });
+      }
+      try {
+        const { notifyDeliveryOrderLifecycle } = await import('../../order/services/deliveryNotificationService.js');
+        await notifyDeliveryOrderLifecycle(currentDeliveryId, { _id: orderDoc._id, orderId: orderDoc.orderId }, 'reassigned');
+      } catch (deliveryNotifErr) {
+        console.error('Error notifying delivery reassign after broadcast reject:', deliveryNotifErr);
       }
     }
 
@@ -1450,6 +1472,14 @@ export const confirmOrderId = asyncHandler(async (req, res) => {
           }
         } catch (notifError) {
           console.error('Error sending customer FCM notification:', notifError);
+        }
+
+        // Also notify delivery app for lifecycle visibility.
+        try {
+          const { notifyDeliveryOrderLifecycle } = await import('../../order/services/deliveryNotificationService.js');
+          await notifyDeliveryOrderLifecycle(delivery._id?.toString(), updatedOrder, 'out_for_delivery');
+        } catch (notifError) {
+          console.error('Error sending delivery FCM notification:', notifError);
         }
 
       } catch (notifError) {
@@ -1972,6 +2002,13 @@ export const completeDelivery = asyncHandler(async (req, res) => {
         } catch (notifError) {
           console.error('Error sending user notification:', notifError);
         }
+      })(), (async () => {
+        try {
+          const { notifyDeliveryOrderLifecycle } = await import('../../order/services/deliveryNotificationService.js');
+          await notifyDeliveryOrderLifecycle(delivery._id?.toString(), updatedOrder, 'delivered');
+        } catch (notifError) {
+          console.error('Error sending delivery notification:', notifError);
+        }
       })()]).catch(error => {
         console.error('Error in notification promises:', error);
       });
@@ -2229,6 +2266,12 @@ export const completeDelivery = asyncHandler(async (req, res) => {
         }
       } catch (notifError) {
         console.error('Error sending user notification:', notifError);
+      }
+      try {
+        const { notifyDeliveryOrderLifecycle } = await import('../../order/services/deliveryNotificationService.js');
+        await notifyDeliveryOrderLifecycle(delivery._id?.toString(), updatedOrder, 'delivered');
+      } catch (notifError) {
+        console.error('Error sending delivery notification:', notifError);
       }
     })()]).catch(error => {
       console.error('Error in notification promises:', error);

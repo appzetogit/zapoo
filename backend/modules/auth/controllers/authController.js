@@ -339,11 +339,8 @@ export const logout = asyncHandler(async (req, res) => {
       await Promise.all([
         DeviceToken.deleteMany({ userId, role: "user" }),
         User.findByIdAndUpdate(userId, {
-          $set: {
-            fcmTokens: [],
-            fcmTokenWeb: null,
-            fcmTokenApp: null,
-            fcmTokenMobile: null
+          $set: {            fcmTokensWeb: [],
+            fcmTokensMobile: []
           }
         })
       ]);
@@ -1072,3 +1069,4 @@ export const googleCallback = asyncHandler(async (req, res) => {
     return res.redirect(`${process.env.FRONTEND_URL || "http://localhost:5173"}/restaurant/login?error=auth_failed`);
   }
 });
+

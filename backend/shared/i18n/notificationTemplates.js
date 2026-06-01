@@ -42,6 +42,10 @@ const notificationTemplates = {
     title: 'New Order Assigned',
     body: ({ orderId, restaurantName }) => `Order #${orderId} from ${restaurantName || 'restaurant'}`
   },
+  delivery_new_order_available: {
+    title: 'New Order Available',
+    body: ({ orderId, restaurantName }) => `Order #${orderId} from ${restaurantName || 'restaurant'}`
+  },
   delivery_order_ready_for_pickup: {
     title: 'Order Ready for Pickup',
     body: ({ orderId }) => `Order #${orderId} is ready for pickup`

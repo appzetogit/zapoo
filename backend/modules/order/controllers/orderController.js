@@ -1471,6 +1471,15 @@ export const cancelOrder = async (req, res) => {
     } catch (notifyError) {
       logger.error(`Error notifying restaurant after cancellation for order ${order.orderId}:`, notifyError);
     }
+    try {
+      const assignedDeliveryId = order.deliveryPartnerId?.toString?.() || order.deliveryPartnerId;
+      if (assignedDeliveryId) {
+        const { notifyDeliveryOrderLifecycle } = await import('../services/deliveryNotificationService.js');
+        await notifyDeliveryOrderLifecycle(assignedDeliveryId, order, 'cancelled');
+      }
+    } catch (notifyError) {
+      logger.error(`Error notifying delivery after cancellation for order ${order.orderId}:`, notifyError);
+    }
 
     if (actualPaymentMethod === 'wallet') {
       try {

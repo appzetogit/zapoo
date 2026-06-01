@@ -9,8 +9,8 @@ function normalizeDevicePlatform(platform) {
     return 'web';
 }
 
-function getLegacyFieldByPlatform(normalizedPlatform) {
-    return normalizedPlatform === 'web' ? 'fcmTokenWeb' : 'fcmTokenApp';
+function getArrayFieldByPlatform(normalizedPlatform) {
+    return normalizedPlatform === 'web' ? 'fcmTokensWeb' : 'fcmTokensMobile';
 }
 
 /**
@@ -58,56 +58,41 @@ export const saveDeviceToken = asyncHandler(async (req, res) => {
 
     // Update if exists, or create new
     await DeviceToken.findOneAndUpdate(
-        { deviceToken },
-        { userId, role, platform: normalizedPlatform, isActive: true },
+        { userId, role, deviceToken },
+        { userId, role, deviceToken, platform: normalizedPlatform, isActive: true },
         { upsert: true, new: true }
     );
 
     // Sync role-specific document fields so web/app tokens are visible in each module collection.
     try {
-        const legacyTokenField = getLegacyFieldByPlatform(normalizedPlatform);
+        const tokenArrayField = getArrayFieldByPlatform(normalizedPlatform);
 
         if (role === 'user') {
             const { default: User } = await import('../../auth/models/User.js');
-            const setPayload = { [legacyTokenField]: deviceToken };
-            // Keep legacy alias in sync for older reads.
-            if (legacyTokenField === 'fcmTokenApp') {
-                setPayload.fcmTokenMobile = deviceToken;
-            }
+            const pullPayload = { [tokenArrayField]: deviceToken };
+            const pushPayload = { [tokenArrayField]: { $each: [deviceToken], $slice: -10 } };
 
             await User.findByIdAndUpdate(userId, {
-                $addToSet: { fcmTokens: deviceToken },
-                $set: setPayload
+                $pull: pullPayload,
+                $push: pushPayload
             });
-
-            const user = await User.findById(userId).select('fcmTokens');
-            if (user?.fcmTokens?.length > 10) {
-                user.fcmTokens = user.fcmTokens.slice(-10);
-                await user.save();
-            }
         } else if (role === 'restaurant') {
             const { default: Restaurant } = await import('../../restaurant/models/Restaurant.js');
+            const pullPayload = { [tokenArrayField]: deviceToken };
+            const pushPayload = { [tokenArrayField]: { $each: [deviceToken], $slice: -10 } };
             await Restaurant.findByIdAndUpdate(userId, {
-                $set: { [legacyTokenField]: deviceToken }
+                $pull: pullPayload,
+                $push: pushPayload
             });
         } else if (role === 'delivery') {
             const { default: Delivery } = await import('../../delivery/models/Delivery.js');
-            const setPayload = { [legacyTokenField]: deviceToken };
-            // Keep legacy alias in sync for older reads
-            if (legacyTokenField === 'fcmTokenApp') {
-                setPayload.fcmTokenMobile = deviceToken;
-            }
+            const pullPayload = { [tokenArrayField]: deviceToken };
+            const pushPayload = { [tokenArrayField]: { $each: [deviceToken], $slice: -10 } };
 
             await Delivery.findByIdAndUpdate(userId, {
-                $addToSet: { fcmTokens: deviceToken },
-                $set: setPayload
+                $pull: pullPayload,
+                $push: pushPayload
             });
-
-            const delivery = await Delivery.findById(userId).select('fcmTokens');
-            if (delivery?.fcmTokens?.length > 10) {
-                delivery.fcmTokens = delivery.fcmTokens.slice(-10);
-                await delivery.save();
-            }
         }
     } catch (syncErr) {
         // Do not break token registration if legacy/module-field sync fails.

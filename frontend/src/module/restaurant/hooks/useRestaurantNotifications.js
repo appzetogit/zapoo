@@ -19,6 +19,49 @@ export const useRestaurantNotifications = () => {
   const lastConnectErrorLogRef = useRef(0);
   const CONNECT_ERROR_LOG_THROTTLE_MS = 10000;
 
+  const hydrateLatestActionableOrder = async (preferredOrderId = null) => {
+    try {
+      const response = await restaurantAPI.getOrders();
+      const orders = response?.data?.data?.orders || [];
+      if (!Array.isArray(orders) || orders.length === 0) return;
+
+      const actionableOrders = orders.filter(order =>
+        ['pending', 'confirmed'].includes(String(order?.status || '').toLowerCase())
+      );
+      if (actionableOrders.length === 0) return;
+
+      let selected = actionableOrders[0];
+      if (preferredOrderId) {
+        const match = actionableOrders.find(order =>
+          String(order?.orderId || '') === String(preferredOrderId) ||
+          String(order?._id || '') === String(preferredOrderId)
+        );
+        if (match) selected = match;
+      }
+
+      setNewOrder({
+        orderId: selected.orderId,
+        orderMongoId: selected._id,
+        restaurantId: selected.restaurantId,
+        restaurantName: selected.restaurantName,
+        items: selected.items || [],
+        total: selected.pricing?.total || selected.total || 0,
+        customerAddress: selected.address,
+        status: selected.status,
+        createdAt: selected.createdAt,
+        estimatedDeliveryTime: selected.estimatedDeliveryTime || 30,
+        note: selected.note || '',
+        sendCutlery: selected.sendCutlery,
+        paymentMethod: selected.paymentMethod ?? selected.payment?.method,
+        payment: selected.payment
+      });
+    } catch (error) {
+      if (error?.response?.status !== 401) {
+        console.warn('Unable to hydrate order from sound event:', error?.message || error);
+      }
+    }
+  };
+
   // Get restaurant ID from API
   useEffect(() => {
     const fetchRestaurantId = async () => {
@@ -260,6 +303,9 @@ export const useRestaurantNotifications = () => {
     // Listen for sound notification event
     socketRef.current.on('play_notification_sound', data => {
       playNotificationSound();
+      // Some backend paths emit only sound (without new_order payload).
+      // Hydrate latest actionable order so UI popup can still be shown.
+      hydrateLatestActionableOrder(data?.orderId);
     });
 
     // Listen for order status updates

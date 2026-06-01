@@ -8,6 +8,19 @@ import { renderNotificationTemplate } from '../../../shared/i18n/notificationTem
 import { normalizeLocale } from '../../../shared/i18n/localeConstants.js';
 import { resolveLocalizedText } from '../../../shared/i18n/localizedText.js';
 
+function buildNotificationId(data = {}) {
+  if (data?.notificationId && String(data.notificationId).trim()) {
+    return String(data.notificationId).trim();
+  }
+  const role = String(data?.target || 'user');
+  const entity = String(data?.orderId || data?.orderMongoId || data?.withdrawalRequestId || 'event');
+  return `${role}_${entity}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function looksLikeMongoObjectId(value) {
+  return typeof value === 'string' && /^[a-fA-F0-9]{24}$/.test(value);
+}
+
 /**
  * Resolve a Firebase Admin app instance that has messaging enabled.
  * Prefers the named "zapoo-rtdb" app used for RTDB/FCM; falls back to the
@@ -65,6 +78,7 @@ export async function sendPushNotification(tokens, payload) {
     imageUrl,
     data = {}
   } = payload;
+  const notificationId = buildNotificationId(data);
 
   const message = {
     notification: {
@@ -74,6 +88,7 @@ export async function sendPushNotification(tokens, payload) {
     },
     data: {
       ...data,
+      notificationId,
       title,
       body,
       clickUrl: data.clickUrl || '/',
@@ -102,6 +117,7 @@ export async function sendPushNotification(tokens, payload) {
       tokens,
       ...message
     });
+    console.log(`[FCM] Multicast response: success=${response.successCount}, failure=${response.failureCount}`);
 
     // Handle invalid tokens
     if (response.failureCount > 0) {
@@ -144,6 +160,7 @@ export async function sendPushNotification(tokens, payload) {
  */
 export async function sendNotificationToUser(userId, role, title, body, data = {}) {
   try {
+    console.log(`[FCM-TRACE] sendNotificationToUser:start role=${role} userId=${userId} type=${data?.type || 'na'} template=${data?.templateKey || 'na'}`);
     const defaultClickUrlByRole = {
       user: '/orders',
       restaurant: '/orders',
@@ -163,16 +180,46 @@ export async function sendNotificationToUser(userId, role, title, body, data = {
     let resolvedBody = body;
 
     if (data?.templateKey) {
-      const rendered = await renderNotificationTemplate(
-        data.templateKey,
-        data.templateVars || {},
-        recipientLocale
-      );
-      resolvedTitle = rendered.title;
-      resolvedBody = rendered.body;
+      try {
+        const rendered = await renderNotificationTemplate(
+          data.templateKey,
+          data.templateVars || {},
+          recipientLocale
+        );
+        resolvedTitle = rendered?.title || resolvedTitle;
+        resolvedBody = rendered?.body || resolvedBody;
+      } catch (templateError) {
+        console.warn(
+          `[FCM] Template render failed for key="${data.templateKey}", using raw title/body fallback:`,
+          templateError?.message || templateError
+        );
+      }
     } else {
       resolvedTitle = resolveLocalizedText(title, recipientLocale, typeof title === 'string' ? title : '');
       resolvedBody = resolveLocalizedText(body, recipientLocale, typeof body === 'string' ? body : '');
+    }
+
+    const roleTitleMap = {
+      user: 'USER',
+      restaurant: 'RESTAURANT',
+      delivery: 'DELIVERY PARTNER',
+      admin: 'ADMIN'
+    };
+    const roleTitleLabel = roleTitleMap[normalizedRole] || String(normalizedRole || 'NOTIFICATION').toUpperCase();
+    resolvedTitle = `[${roleTitleLabel}] ${resolvedTitle || 'Notification'}`;
+
+    let resolvedUserId = userId;
+    if (role === 'restaurant' && !looksLikeMongoObjectId(String(userId || ''))) {
+      const restaurantDoc = await Restaurant.findOne({
+        $or: [
+          { restaurantId: String(userId || '') },
+          { slug: String(userId || '') }
+        ]
+      }).select('_id').lean();
+      if (restaurantDoc?._id) {
+        resolvedUserId = restaurantDoc._id.toString();
+        console.log(`[FCM-TRACE] restaurantId resolved: input=${userId} resolved=${resolvedUserId}`);
+      }
     }
 
     const payload = {
@@ -181,24 +228,50 @@ export async function sendNotificationToUser(userId, role, title, body, data = {
       data: enrichedData
     };
     const tokensRaw = await DeviceToken.find({
-      userId,
+      userId: resolvedUserId,
       role,
       isActive: true
     }).select('deviceToken').lean();
     let tokens = tokensRaw.map(t => t.deviceToken).filter(Boolean);
+    console.log(`[FCM-TRACE] tokenLookup role=${role} userId=${resolvedUserId} activeTokens=${tokens.length}`);
 
-    // Fallback to User model legacy fields if no tokens in DeviceToken and role is 'user'
+    // Fallback to role-model legacy fields when DeviceToken rows are missing.
     if (tokens.length === 0 && role === 'user') {
-      const user = await User.findById(userId).select('fcmTokenWeb fcmTokenApp fcmTokenMobile fcmTokens').lean();
+      const user = await User.findById(userId).select('fcmTokensWeb fcmTokensMobile').lean();
       if (user) {
-        tokens = [user.fcmTokenWeb, user.fcmTokenApp, user.fcmTokenMobile, ...(Array.isArray(user.fcmTokens) ? user.fcmTokens : [])].filter(Boolean);
+        tokens = [
+          ...(Array.isArray(user.fcmTokensWeb) ? user.fcmTokensWeb : []),
+          ...(Array.isArray(user.fcmTokensMobile) ? user.fcmTokensMobile : [])
+        ].filter(Boolean);
+        console.log(`[FCM-TRACE] userLegacyFallback userId=${userId} fallbackTokens=${tokens.length}`);
+      }
+    } else if (tokens.length === 0 && role === 'delivery') {
+      const delivery = await Delivery.findById(userId).select('fcmTokensWeb fcmTokensMobile').lean();
+      if (delivery) {
+        tokens = [
+          ...(Array.isArray(delivery.fcmTokensWeb) ? delivery.fcmTokensWeb : []),
+          ...(Array.isArray(delivery.fcmTokensMobile) ? delivery.fcmTokensMobile : [])
+        ].filter(Boolean);
+        console.log(`[FCM-TRACE] deliveryLegacyFallback userId=${userId} fallbackTokens=${tokens.length}`);
+      }
+    } else if (tokens.length === 0 && role === 'restaurant') {
+      const restaurant = await Restaurant.findById(userId).select('fcmTokensWeb fcmTokensMobile').lean();
+      if (restaurant) {
+        tokens = [
+          ...(Array.isArray(restaurant.fcmTokensWeb) ? restaurant.fcmTokensWeb : []),
+          ...(Array.isArray(restaurant.fcmTokensMobile) ? restaurant.fcmTokensMobile : [])
+        ].filter(Boolean);
+        console.log(`[FCM-TRACE] restaurantLegacyFallback userId=${userId} fallbackTokens=${tokens.length}`);
       }
     }
     if (tokens.length > 0) {
       // Deduplicate
       const uniqueTokens = Array.from(new Set(tokens));
+      console.log(`[FCM-TRACE] send role=${role} userId=${userId} uniqueTokens=${uniqueTokens.length} clickUrl=${enrichedData.clickUrl || '/'}`);
       await sendPushNotification(uniqueTokens, payload);
-    } else {}
+    } else {
+      console.warn(`[FCM-TRACE] noTokens role=${role} userId=${resolvedUserId}`);
+    }
   } catch (error) {
     console.error(`[FCM] Error in sendNotificationToUser for ${userId}:`, error);
   }
@@ -226,3 +299,4 @@ async function resolveRecipientLocale(userId, role) {
 
   return 'en';
 }
+

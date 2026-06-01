@@ -210,26 +210,18 @@ export const adminApproveRequest = asyncHandler(async (req, res) => {
     role: 'user',
     isActive: true,
     $or: [{
-      fcmTokens: {
+      fcmTokensWeb: {
         $exists: true,
         $not: {
           $size: 0
         }
       }
     }, {
-      fcmTokenWeb: {
+      fcmTokensMobile: {
         $exists: true,
-        $nin: [null, '']
-      }
-    }, {
-      fcmTokenApp: {
-        $exists: true,
-        $nin: [null, '']
-      }
-    }, {
-      fcmTokenMobile: {
-        $exists: true,
-        $nin: [null, '']
+        $not: {
+          $size: 0
+        }
       }
     }]
   };
@@ -244,15 +236,16 @@ export const adminApproveRequest = asyncHandler(async (req, res) => {
   };
   const usersWithTokens = await User.find(userFilter, {
     _id: 1,
-    fcmTokens: 1,
-    fcmTokenWeb: 1,
-    fcmTokenApp: 1,
-    fcmTokenMobile: 1
+    fcmTokensWeb: 1,
+    fcmTokensMobile: 1
   }).lean();
   const recipientUserIds = usersWithTokens.map(u => u._id?.toString()).filter(Boolean);
   const tokenSet = new Set();
   for (const user of usersWithTokens) {
-    const rawTokens = [...(Array.isArray(user.fcmTokens) ? user.fcmTokens : []), user.fcmTokenWeb, user.fcmTokenApp, user.fcmTokenMobile];
+    const rawTokens = [
+      ...(Array.isArray(user.fcmTokensWeb) ? user.fcmTokensWeb : []),
+      ...(Array.isArray(user.fcmTokensMobile) ? user.fcmTokensMobile : [])
+    ];
     for (const rawToken of rawTokens) {
       if (!rawToken || typeof rawToken !== 'string') continue;
       const token = rawToken.trim();
@@ -305,38 +298,24 @@ export const adminApproveRequest = asyncHandler(async (req, res) => {
         if (invalidTokens.size > 0) {
           const staleTokens = Array.from(invalidTokens);
           await Promise.all([User.updateMany({
-            fcmTokens: {
+            fcmTokensWeb: {
               $in: staleTokens
             }
           }, {
             $pull: {
-              fcmTokens: {
+              fcmTokensWeb: {
                 $in: staleTokens
               }
             }
           }), User.updateMany({
-            fcmTokenWeb: {
+            fcmTokensMobile: {
               $in: staleTokens
             }
           }, {
-            $unset: {
-              fcmTokenWeb: ''
-            }
-          }), User.updateMany({
-            fcmTokenApp: {
-              $in: staleTokens
-            }
-          }, {
-            $unset: {
-              fcmTokenApp: ''
-            }
-          }), User.updateMany({
-            fcmTokenMobile: {
-              $in: staleTokens
-            }
-          }, {
-            $unset: {
-              fcmTokenMobile: ''
+            $pull: {
+              fcmTokensMobile: {
+                $in: staleTokens
+              }
             }
           })]);
         }

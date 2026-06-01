@@ -116,10 +116,10 @@ const buildDeliveryOrderNotification = (orderData = {}) => {
   const total = Number(orderData.total || orderData.pricing?.total || orderData.orderTotal || 0);
 
   return {
-    title: `New order #${orderId}`,
+    title: `[DELIVERY PARTNER] New order #${orderId}`,
     body: itemCount > 0
       ? `${itemCount} item${itemCount === 1 ? '' : 's'} - ₹${total.toFixed(2)}`
-      : 'A new order is available to accept',
+      : '[DELIVERY PARTNER] A new order is available to accept',
     tag: `delivery-order-${orderId}`,
     data: {
       orderId,
@@ -132,7 +132,7 @@ const triggerWebViewNativeNotification = async (orderData = {}) => {
   if (typeof window === 'undefined') return false;
 
   const bridgePayload = {
-    title: 'New delivery order',
+    title: '[DELIVERY PARTNER] New delivery order',
     body: `Order #${orderData?.orderId || orderData?.orderMongoId || orderData?.id || ''}`.trim(),
     orderId: orderData?.orderId || orderData?.order_id || '',
     orderMongoId: orderData?.orderMongoId || orderData?.order_mongo_id || '',
@@ -1055,5 +1055,6 @@ export const useDeliveryNotifications = () => {
     emitLocation
   };
 };
+
 
 

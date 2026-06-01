@@ -71,6 +71,11 @@ export async function processAutoRejectOrders() {
           // Notify about status update
           try {
             await notifyRestaurantOrderUpdate(currentOrder._id.toString(), 'cancelled');
+            const assignedDeliveryId = currentOrder.deliveryPartnerId?.toString?.() || currentOrder.deliveryPartnerId;
+            if (assignedDeliveryId) {
+              const { notifyDeliveryOrderLifecycle } = await import('./deliveryNotificationService.js');
+              await notifyDeliveryOrderLifecycle(assignedDeliveryId, currentOrder, 'cancelled');
+            }
           } catch (notifError) {
             console.error(`❌ Error sending notification for order ${currentOrder.orderId}:`, notifError);
           }

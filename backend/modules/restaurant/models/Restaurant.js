@@ -170,30 +170,14 @@ const restaurantSchema = new mongoose.Schema(
       trim: true,
     },
     primaryContactNumber: String,
-    // FCM Web Push tokens — one per browser/device, stored for sending push notifications
-    fcmTokens: {
+    fcmTokensWeb: {
       type: [String],
       default: [],
       select: false,
     },
-    fcmTokenWeb: {
-      type: String,
-      trim: true,
-      default: null,
-      select: false,
-    },
-    fcmTokenApp: {
-      type: String,
-      trim: true,
-      default: null,
-      select: false,
-    },
-    // Legacy alias retained for backward compatibility
-    // New app/mobile clients should use fcmTokenApp
-    fcmTokenMobile: {
-      type: String,
-      trim: true,
-      default: null,
+    fcmTokensMobile: {
+      type: [String],
+      default: [],
       select: false,
     },
     location: locationSchema,
@@ -719,3 +703,4 @@ restaurantSchema.methods.comparePassword = async function (candidatePassword) {
 };
 
 export default mongoose.model("Restaurant", restaurantSchema);
+

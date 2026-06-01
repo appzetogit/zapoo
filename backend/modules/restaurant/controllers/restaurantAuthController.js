@@ -848,9 +848,8 @@ export const logout = asyncHandler(async (req, res) => {
       await Promise.all([
         DeviceToken.deleteMany({ userId: restaurantId, role: 'restaurant' }),
         Restaurant.findByIdAndUpdate(restaurantId, {
-          $set: {
-            fcmTokenWeb: null,
-            fcmTokenApp: null
+          $set: {            fcmTokensWeb: [],
+            fcmTokensMobile: []
           }
         })
       ]);
@@ -1241,3 +1240,4 @@ export const googleNativeLogin = asyncHandler(async (req, res) => {
     return errorResponse(res, 400, error.message || 'Native Google authentication failed');
   }
 });
+

@@ -178,31 +178,15 @@ const userSchema = new mongoose.Schema({
       }
     }
   },
-  // FCM Web Push tokens — one per browser/device, stored for sending push notifications
-  fcmTokens: {
+  fcmTokensWeb: {
     type: [String],
     default: [],
-    select: false, // Don't expose tokens in regular profile reads
-  },
-  fcmTokenWeb: {
-    type: String,
-    trim: true,
     select: false,
-    default: null,
   },
-  fcmTokenApp: {
-    type: String,
-    trim: true,
+  fcmTokensMobile: {
+    type: [String],
+    default: [],
     select: false,
-    default: null,
-  },
-  // Legacy alias retained for backward compatibility.
-  // New app/mobile clients should use fcmTokenApp.
-  fcmTokenMobile: {
-    type: String,
-    trim: true,
-    select: false,
-    default: null,
   },
   isActive: {
     type: Boolean,
@@ -261,3 +245,4 @@ userSchema.methods.comparePassword = async function (candidatePassword) {
 const User = mongoose.model('User', userSchema);
 
 export default User;
+

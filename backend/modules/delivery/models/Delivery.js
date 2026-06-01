@@ -134,17 +134,8 @@ const deliverySchema = new mongoose.Schema(
     // --- Profile ---
     name: { type: String, required: true, trim: true },
     email: { type: String, lowercase: true, trim: true, sparse: true },
-    // FCM Web Push tokens — one per browser/device, stored for sending push notifications
-    fcmTokens: {
-      type: [String],
-      default: [],
-      select: false,
-    },
-    fcmTokenWeb: { type: String, trim: true, select: false, default: null },
-    fcmTokenApp: { type: String, trim: true, select: false, default: null },
-    // Legacy alias retained for backward compatibility
-    // New app/mobile clients should use fcmTokenApp
-    fcmTokenMobile: { type: String, trim: true, select: false, default: null },
+    fcmTokensWeb: { type: [String], select: false, default: [] },
+    fcmTokensMobile: { type: [String], select: false, default: [] },
     profileImage: { url: String, publicId: String },
     dateOfBirth: Date,
     gender: { type: String, enum: ['male', 'female', 'other', 'prefer-not-to-say'] },
@@ -267,3 +258,4 @@ deliverySchema.methods.comparePassword = async function (candidatePassword) {
 };
 
 export default mongoose.model('Delivery', deliverySchema);
+

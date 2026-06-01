@@ -58,35 +58,25 @@ router.post('/fcm-token', async (req, res) => {
 
     const normalizedPlatform = String(platform || 'web').toLowerCase().trim();
     const isWebPlatform = normalizedPlatform === 'web';
-    const tokenField = isWebPlatform ? 'fcmTokenWeb' : 'fcmTokenApp';
+    const tokenArrayField = isWebPlatform ? 'fcmTokensWeb' : 'fcmTokensMobile';
 
     const User = (await import('../../auth/models/User.js')).default;
-    // Keep legacy token array for backward compatibility and also store platform-specific token.
-    const setPayload = { [tokenField]: normalizedToken };
-    if (!isWebPlatform) {
-      // Keep legacy alias in sync for old reads.
-      setPayload.fcmTokenMobile = normalizedToken;
-    }
+    const pullPayload = { [tokenArrayField]: normalizedToken };
+    const pushPayload = { [tokenArrayField]: { $each: [normalizedToken], $slice: -10 } };
 
     await User.findByIdAndUpdate(req.user._id, {
-      $addToSet: { fcmTokens: normalizedToken },
-      $set: setPayload,
+      $pull: pullPayload,
+      $push: pushPayload,
     });
-
-    // If over 10 tokens, trim oldest
-    const user = await User.findById(req.user._id).select('fcmTokens');
-    if (user.fcmTokens.length > 10) {
-      user.fcmTokens = user.fcmTokens.slice(-10);
-      await user.save();
-    }
 
     // Also persist into unified DeviceToken collection for cross-platform broadcasts
     try {
       await DeviceToken.findOneAndUpdate(
-        { deviceToken: normalizedToken },
+        { userId: req.user._id, role: 'user', deviceToken: normalizedToken },
         {
           userId: req.user._id,
           role: 'user',
+          deviceToken: normalizedToken,
           platform: normalizedPlatform === 'ios' ? 'ios' : (isWebPlatform ? 'web' : 'android'),
           isActive: true
         },
