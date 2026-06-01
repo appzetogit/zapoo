@@ -520,11 +520,13 @@ export default function Under250() {
                 {/* Full image area */}
                 <div className="relative w-full h-full overflow-hidden bg-white dark:bg-[#1a1a1a]">
                   {bannerImageUrl ? (
-                    <img
+                    <OptimizedImage
                       src={bannerImageUrl}
                       alt={t("user.under250.bannerAlt")}
-                      style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center', display: 'block' }}
-                      loading="eager"
+                      className="w-full h-full"
+                      objectFit="cover"
+                      priority={true}
+                      sizes="100vw"
                     />
                   ) : (
                     <div className="w-full h-full bg-gradient-to-br from-green-100 to-blue-100 dark:from-green-900 dark:to-blue-900" />
@@ -681,10 +683,7 @@ export default function Under250() {
                             key={item.id}
                             className="flex-shrink-0 w-[200px] sm:w-[220px] md:w-full bg-white dark:bg-[#1a1a1a] rounded-lg md:rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden cursor-pointer"
                             onClick={() => handleItemClick(item, restaurant)}
-                            initial={{ opacity: 0, y: 20 }}
-                            whileInView={{ opacity: 1, y: 0 }}
-                            viewport={{ once: true, margin: "-50px" }}
-                            transition={{ duration: 0.4, delay: itemIndex * 0.05 }}
+                            initial={false}
                             whileHover={{ y: -8, scale: 1.02 }}
                             style={{ boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)" }}
                           >
