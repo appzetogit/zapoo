@@ -465,18 +465,23 @@ export default function Home() {
 
   // Lenis smooth scrolling initialization
   useEffect(() => {
+    let rafId = null;
     const lenis = new Lenis({
       duration: 1.2,
       easing: t => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
       smoothWheel: true,
-      smoothTouch: true
+      // Keep native touch scroll for better performance on mobile.
+      smoothTouch: false
     });
     function raf(time) {
       lenis.raf(time);
-      requestAnimationFrame(raf);
+      rafId = requestAnimationFrame(raf);
     }
-    requestAnimationFrame(raf);
+    rafId = requestAnimationFrame(raf);
     return () => {
+      if (rafId) {
+        cancelAnimationFrame(rafId);
+      }
       lenis.destroy();
     };
   }, []);
@@ -1565,13 +1570,7 @@ export default function Home() {
                     width: `${100 / heroBannerImages.length}%`,
                     height: '100%'
                   }}>
-                            <img src={image} alt={`Banner ${index + 1}`} style={{
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'cover',
-                      objectPosition: 'center',
-                      display: 'block'
-                    }} loading={index === 0 ? 'eager' : 'lazy'} />
+                            <OptimizedImage src={image} alt={`Banner ${index + 1}`} className="w-full h-full" objectFit="cover" priority={index === 0} sizes="100vw" />
                           </div>)}
                       </motion.div>
 
@@ -1703,22 +1702,7 @@ export default function Home() {
                 <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
               </div> : visibleRealCategories.length > 0 ? <>
                 {/* Show only first 10 categories */}
-                {visibleRealCategories.slice(0, 10).map((category, index) => <motion.div key={category.id || index} className="flex-shrink-0" initial={{
-              opacity: 0,
-              y: 20,
-              scale: 0.9
-            }} whileInView={{
-              opacity: 1,
-              y: 0,
-              scale: 1
-            }} viewport={{
-              once: true
-            }} transition={{
-              duration: 0.4,
-              delay: index * 0.05,
-              type: "spring",
-              stiffness: 100
-            }} whileHover={{
+                {visibleRealCategories.slice(0, 10).map((category, index) => <motion.div key={category.id || index} className="flex-shrink-0" initial={false} whileHover={{
               scale: 1.05,
               y: -5
             }} whileTap={{
@@ -1734,18 +1718,7 @@ export default function Home() {
                     </Link>
                   </motion.div>)}
                 {/* See All button - show if there are more than 10 categories */}
-                {visibleRealCategories.length > 10 && <motion.div className="flex-shrink-0 cursor-pointer" initial={{
-              opacity: 0,
-              scale: 0.8
-            }} whileInView={{
-              opacity: 1,
-              scale: 1
-            }} viewport={{
-              once: true
-            }} transition={{
-              duration: 0.4,
-              delay: 0.1
-            }} whileHover={{
+                {visibleRealCategories.length > 10 && <motion.div className="flex-shrink-0 cursor-pointer" initial={false} whileHover={{
               scale: 1.1
             }} whileTap={{
               scale: 0.95
@@ -2016,22 +1989,7 @@ export default function Home() {
             label: t("user.home.exploreItems.collections"),
             image: exploreCollection,
             href: '/user/profile/favorites'
-          }].map((item, index) => <motion.div key={item.id} initial={{
-            opacity: 0,
-            y: 20,
-            scale: 0.9
-          }} whileInView={{
-            opacity: 1,
-            y: 0,
-            scale: 1
-          }} viewport={{
-            once: true
-          }} transition={{
-            duration: 0.4,
-            delay: index * 0.1,
-            type: "spring",
-            stiffness: 100
-          }} whileHover={{
+          }].map(item => <motion.div key={item.id} initial={false} whileHover={{
             scale: 1.1,
             y: -5
           }} whileTap={{
@@ -2047,22 +2005,7 @@ export default function Home() {
                       </span>
                     </div>
                   </Link>
-                </motion.div>) : landingExploreMore.filter(item => item.id !== 'giftcard' && item.label?.toLowerCase() !== 'gift card').map((item, index) => <motion.div key={item._id} initial={{
-            opacity: 0,
-            y: 20,
-            scale: 0.9
-          }} whileInView={{
-            opacity: 1,
-            y: 0,
-            scale: 1
-          }} viewport={{
-            once: true
-          }} transition={{
-            duration: 0.4,
-            delay: index * 0.1,
-            type: "spring",
-            stiffness: 100
-          }} whileHover={{
+                </motion.div>) : landingExploreMore.filter(item => item.id !== 'giftcard' && item.label?.toLowerCase() !== 'gift card').map(item => <motion.div key={item._id} initial={false} whileHover={{
             scale: 1.1,
             y: -5
           }} whileTap={{

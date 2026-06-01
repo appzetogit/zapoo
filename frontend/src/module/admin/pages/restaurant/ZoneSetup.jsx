@@ -8,6 +8,7 @@ export default function ZoneSetup() {
   const [zones, setZones] = useState([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
+  const [togglingZoneId, setTogglingZoneId] = useState(null)
 
   useEffect(() => {
     fetchZones()
@@ -40,6 +41,28 @@ export default function ZoneSetup() {
     } catch (error) {
       console.error("Error deleting zone:", error)
       alert(error.response?.data?.message || "Failed to delete zone")
+    }
+  }
+
+  const handleToggleZoneStatus = async (zone) => {
+    const zoneId = zone?._id || zone?.id
+    if (!zoneId) return
+
+    const nextLabel = zone?.isActive ? "inactive" : "active"
+    const isConfirmed = window.confirm(
+      `Change zone status to ${nextLabel}? This will immediately affect ordering availability for this zone.`
+    )
+    if (!isConfirmed) return
+
+    try {
+      setTogglingZoneId(zoneId)
+      await adminAPI.toggleZoneStatus(zoneId)
+      await fetchZones()
+    } catch (error) {
+      console.error("Error toggling zone status:", error)
+      alert(error.response?.data?.message || "Failed to update zone status")
+    } finally {
+      setTogglingZoneId(null)
     }
   }
 
@@ -175,10 +198,35 @@ export default function ZoneSetup() {
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-slate-600">Status:</span>
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${zone.isActive ? "bg-green-100 text-green-800" : "bg-slate-100 text-slate-800"
-                      }`}>
-                      {zone.isActive ? "Active" : "Inactive"}
-                    </span>
+                    <div className="flex items-center gap-3">
+                      <span className={`px-2 py-1 rounded-full text-xs font-semibold tracking-wide ${zone.isActive ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-600"
+                        }`}>
+                        {zone.isActive ? "LIVE" : "PAUSED"}
+                      </span>
+
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={zone.isActive}
+                        aria-label={`Toggle ${zone.name || "zone"} status`}
+                        onClick={() => handleToggleZoneStatus(zone)}
+                        disabled={togglingZoneId === (zone._id || zone.id)}
+                        className={`relative inline-flex h-7 w-12 items-center rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-offset-1 disabled:opacity-60 disabled:cursor-not-allowed ${zone.isActive
+                          ? "bg-emerald-500 focus:ring-emerald-300"
+                          : "bg-slate-300 focus:ring-slate-300"
+                          }`}
+                        title={zone.isActive ? "Set Inactive" : "Set Active"}
+                      >
+                        <span
+                          className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform ${zone.isActive ? "translate-x-6" : "translate-x-1"
+                            }`}
+                        />
+                      </button>
+
+                      {togglingZoneId === (zone._id || zone.id) && (
+                        <span className="text-[11px] font-medium text-slate-500">Updating...</span>
+                      )}
+                    </div>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-slate-600">Zone Area:</span>

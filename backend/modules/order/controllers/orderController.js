@@ -102,7 +102,7 @@ export const createOrder = async (req, res) => {
         { restaurantId: restaurantId },
         { slug: restaurantId }
       ]
-    }).select('name location deliveryRange isActive isAcceptingOrders').lean();
+    }).select('name location deliveryRange isActive isAcceptingOrders zoneId').lean();
 
     if (!restaurant) {
       logger.error('❌ Restaurant not found:', { searchedRestaurantId: restaurantId, searchedRestaurantName: restaurantName });
@@ -128,7 +128,8 @@ export const createOrder = async (req, res) => {
     }
 
     // Parallelize Zone Validation and Wallet check
-    const [restaurantZone, wallet] = await Promise.all([
+    const [mappedZone, fallbackIntersectZone, wallet] = await Promise.all([
+      restaurant?.zoneId ? Zone.findById(restaurant.zoneId).select('_id isActive').lean() : Promise.resolve(null),
       Zone.findOne({
         isActive: true,
         boundary: {
@@ -139,11 +140,15 @@ export const createOrder = async (req, res) => {
             }
           }
         }
-      }).lean(),
+      }).select('_id').lean(),
       normalizedPaymentMethod === 'wallet' ? UserWallet.findOne({ userId }).lean() : Promise.resolve(null)
     ]);
 
-    if (!restaurantZone) {
+    const zoneIsActiveForOrdering = mappedZone
+      ? mappedZone.isActive === true
+      : Boolean(fallbackIntersectZone);
+
+    if (!zoneIsActiveForOrdering) {
       logger.warn('⚠️ Restaurant location is not within any active zone:', {
         restaurantId: restaurant._id,
         restaurantName: restaurant.name,
