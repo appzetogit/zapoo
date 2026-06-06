@@ -15,7 +15,7 @@ export const useRestaurantNotifications = () => {
   const [isConnected, setIsConnected] = useState(false);
   const audioRef = useRef(null);
   const userInteractedRef = useRef(false); // Track user interaction for autoplay policy
-  const [restaurantId, setRestaurantId] = useState(null);
+  const [restaurantRoomIds, setRestaurantRoomIds] = useState([]);
   const lastConnectErrorLogRef = useRef(0);
   const CONNECT_ERROR_LOG_THROTTLE_MS = 10000;
 
@@ -69,8 +69,13 @@ export const useRestaurantNotifications = () => {
         const response = await restaurantAPI.getCurrentRestaurant();
         if (response.data?.success && response.data.data?.restaurant) {
           const restaurant = response.data.data.restaurant;
-          const id = restaurant._id?.toString() || restaurant.restaurantId;
-          setRestaurantId(id);
+          const roomIds = Array.from(new Set([
+            restaurant?.id?.toString?.() || restaurant?.id || null,
+            restaurant?._id?.toString?.() || restaurant?._id || null,
+            restaurant?.restaurantId?.toString?.() || restaurant?.restaurantId || null,
+            restaurant?.slug?.toString?.() || restaurant?.slug || null
+          ].filter(Boolean)));
+          setRestaurantRoomIds(roomIds);
         }
       } catch (error) {
         console.error('Error fetching restaurant:', error);
@@ -79,7 +84,7 @@ export const useRestaurantNotifications = () => {
     fetchRestaurantId();
   }, []);
   useEffect(() => {
-    if (!restaurantId) {
+    if (!restaurantRoomIds.length) {
       return;
     }
 
@@ -228,14 +233,18 @@ export const useRestaurantNotifications = () => {
       setIsConnected(true);
 
       // Join restaurant room immediately after connection with retry
-      if (restaurantId) {
+      if (restaurantRoomIds.length > 0) {
         const joinRoom = () => {
-          socketRef.current.emit('join-restaurant', restaurantId);
+          restaurantRoomIds.forEach((roomId) => {
+            socketRef.current.emit('join-restaurant', roomId);
+          });
 
           // Retry join after 2 seconds if no confirmation received
           setTimeout(() => {
             if (socketRef.current?.connected) {
-              socketRef.current.emit('join-restaurant', restaurantId);
+              restaurantRoomIds.forEach((roomId) => {
+                socketRef.current.emit('join-restaurant', roomId);
+              });
             }
           }, 2000);
         };
@@ -287,8 +296,10 @@ export const useRestaurantNotifications = () => {
       setIsConnected(true);
 
       // Rejoin restaurant room after reconnection
-      if (restaurantId) {
-        socketRef.current.emit('join-restaurant', restaurantId);
+      if (restaurantRoomIds.length > 0) {
+        restaurantRoomIds.forEach((roomId) => {
+          socketRef.current.emit('join-restaurant', roomId);
+        });
       }
     });
 
@@ -333,7 +344,7 @@ export const useRestaurantNotifications = () => {
         audioRef.current = null;
       }
     };
-  }, [restaurantId]);
+  }, [restaurantRoomIds]);
 
   // Track user interaction for autoplay policy
   useEffect(() => {

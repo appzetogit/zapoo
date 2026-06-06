@@ -468,7 +468,7 @@ export default function OrdersMain() {
             rejectionReason: restaurant.rejectionReason || null,
             onboarding: restaurant.onboarding || null,
             isLoading: false,
-            restaurantId: restaurant._id || null,
+            restaurantId: restaurant.id || restaurant._id || restaurant.restaurantId || null,
           });
 
           // Keep onboarding routing aligned with shared 3-step utility logic.

@@ -106,6 +106,9 @@ export default function PushNotification() {
     } else if (formData.sendTo === "Restaurant") {
       targetRole = "restaurant";
     }
+    const normalizedZone = String(formData.zone || "All").trim().toLowerCase() === "all"
+      ? "all"
+      : formData.zone;
 
     try {
       setIsSubmitting(true);
@@ -114,9 +117,9 @@ export default function PushNotification() {
       payload.append("title", formData.title.trim());
       payload.append("body", formData.description.trim());
       payload.append("targetRole", targetRole);
-      payload.append("targetZone", formData.zone || "All");
+      payload.append("targetZone", normalizedZone);
       payload.append("data", JSON.stringify({
-        zone: formData.zone || "All",
+        zone: normalizedZone,
       }));
 
       if (imageFile) {

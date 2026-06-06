@@ -33,6 +33,10 @@ export const broadcastNotification = asyncHandler(async (req, res) => {
     targetZone = 'all',
     data = {}
   } = req.body;
+  const normalizedTargetRole = String(targetRole || 'all').trim().toLowerCase();
+  const normalizedTargetZone = String(targetZone || 'all').trim().toLowerCase() === 'all'
+    ? 'all'
+    : String(targetZone || '').trim();
 
   // Handle image upload with Cloudinary fallback
   let imageUrl = req.body.imageUrl;
@@ -60,7 +64,7 @@ export const broadcastNotification = asyncHandler(async (req, res) => {
   let notificationTarget = 'all_users';
   let deviceRoleFilter = undefined;
 
-  switch (targetRole) {
+  switch (normalizedTargetRole) {
     case 'customer':
     case 'user':
       notificationTarget = 'all_users';
@@ -90,7 +94,7 @@ export const broadcastNotification = asyncHandler(async (req, res) => {
     imageUrl,
     target: notificationTarget,
     sourceType: 'admin_direct',
-    targetZone: targetZone !== 'all' ? targetZone : null
+    targetZone: normalizedTargetZone !== 'all' ? normalizedTargetZone : null
   });
 
   // Fetch tokens from DeviceToken collection
@@ -107,8 +111,8 @@ export const broadcastNotification = asyncHandler(async (req, res) => {
   }
 
   // Zone filtering
-  if (targetZone && targetZone !== 'all') {
-    const zone = await Zone.findById(targetZone);
+  if (normalizedTargetZone !== 'all') {
+    const zone = await Zone.findById(normalizedTargetZone);
     if (!zone) {
       return errorResponse(res, 404, 'Target zone not found');
     }
@@ -140,13 +144,13 @@ export const broadcastNotification = asyncHandler(async (req, res) => {
 
     // Filter Restaurants by zoneId
     if (deviceRoleFilter === 'all' || deviceRoleFilter === 'restaurant') {
-      const restaurantsInZone = await Restaurant.find({ zoneId: targetZone }).select('_id').lean();
+      const restaurantsInZone = await Restaurant.find({ zoneId: normalizedTargetZone }).select('_id').lean();
       matchedUserIds.push(...restaurantsInZone.map(r => r._id));
     }
 
     // Filter Delivery Partners by zoneId (availability.zones)
     if (deviceRoleFilter === 'all' || deviceRoleFilter === 'delivery') {
-      const deliveryInZone = await Delivery.find({ 'availability.zones': targetZone }).select('_id').lean();
+      const deliveryInZone = await Delivery.find({ 'availability.zones': normalizedTargetZone }).select('_id').lean();
       matchedUserIds.push(...deliveryInZone.map(d => d._id));
     }
 
@@ -162,7 +166,7 @@ export const broadcastNotification = asyncHandler(async (req, res) => {
     query.userId = { $in: matchedUserIds };
   }
 
-  console.log(`[Broadcast] targetRole=${targetRole}, targetZone=${targetZone}, deviceRoleFilter=${deviceRoleFilter}, query=${JSON.stringify(query)}`);
+  console.log(`[Broadcast] targetRole=${normalizedTargetRole}, targetZone=${normalizedTargetZone}, deviceRoleFilter=${deviceRoleFilter}, query=${JSON.stringify(query)}`);
   console.log(`[AdminBroadcast] Query: ${JSON.stringify(query)}`);
   const tokensRaw = await DeviceToken.find(query).select('deviceToken role userId').lean();
   const tokens = tokensRaw.map(t => t.deviceToken).filter(Boolean);
@@ -178,7 +182,7 @@ export const broadcastNotification = asyncHandler(async (req, res) => {
       return acc;
     }, {});
 
-    console.log(`[Broadcast] targetRole="${targetRole}" | Total Unique Tokens: ${uniqueTokens.length}`);
+    console.log(`[Broadcast] targetRole="${normalizedTargetRole}" | Total Unique Tokens: ${uniqueTokens.length}`);
     console.log(`[Broadcast] Breakdown by Role: ${JSON.stringify(roleCounts)}`);
 
     // Background/foreground logic is handled inside pushNotificationHelper
