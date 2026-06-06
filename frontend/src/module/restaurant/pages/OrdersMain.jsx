@@ -17,6 +17,7 @@ import SubscriptionExpiryBanner from "../components/SubscriptionExpiryBanner";
 import useSubscriptionExpiryNotice from "../hooks/useSubscriptionExpiryNotice";
 const STORAGE_KEY = "restaurant_online_status";
 const ORDERS_FILTER_STORAGE_KEY = "restaurant_orders_active_filter";
+const ONBOARDING_SESSION_KEY = "restaurant_onboarding_session";
 
 // Top filter tabs
 const filterTabs = [{
@@ -439,7 +440,6 @@ export default function OrdersMain() {
     isLoading: true,
     restaurantId: null,
   });
-  const [isReverifying, setIsReverifying] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -506,51 +506,8 @@ export default function OrdersMain() {
 
   // Handle reverify (resubmit for approval)
   const handleReverify = async () => {
-    try {
-      setIsReverifying(true);
-      await restaurantAPI.reverify();
-
-      // Refresh restaurant status
-      const response = await restaurantAPI.getCurrentRestaurant();
-      const restaurant = response?.data?.data?.restaurant || response?.data?.restaurant;
-      if (restaurant) {
-        setRestaurantStatus({
-          isActive: restaurant.isActive,
-          rejectionReason: restaurant.rejectionReason || null,
-          onboarding: restaurant.onboarding || null,
-          isLoading: false
-        });
-      }
-
-      // Trigger profile refresh event
-      window.dispatchEvent(new Event('restaurantProfileRefresh'));
-      alert('Restaurant reverified successfully! Verification will be done in 24 hours.');
-    } catch (error) {
-      // Don't log network/timeout errors (backend might be down)
-      if (error.code !== 'ERR_NETWORK' && error.code !== 'ECONNABORTED' && !error.message?.includes('timeout')) {
-        console.error("Error reverifying restaurant:", error);
-      }
-
-      // Handle 401 Unauthorized errors (token expired/invalid)
-      if (error.response?.status === 401) {
-        const errorMessage = error.response?.data?.message || 'Your session has expired. Please login again.';
-        alert(errorMessage);
-        // The axios interceptor should handle redirecting to login
-        // But if it doesn't, we can manually redirect
-        if (!error.response?.data?.message?.includes('inactive')) {
-          // Only redirect if it's not an "inactive" error (which we handle differently)
-          setTimeout(() => {
-            window.location.href = '/restaurant/login';
-          }, 1500);
-        }
-      } else {
-        // Other errors (400, 500, etc.)
-        const errorMessage = error.response?.data?.message || "Failed to reverify restaurant. Please try again.";
-        alert(errorMessage);
-      }
-    } finally {
-      setIsReverifying(false);
-    }
+    sessionStorage.setItem(ONBOARDING_SESSION_KEY, "1");
+    navigate("/restaurant/onboarding?step=1", { replace: true });
   };
 
   // Lenis smooth scrolling
@@ -1467,13 +1424,10 @@ export default function OrdersMain() {
             </div>
           </div>
           <p className="text-sm text-gray-700 mb-3">
-            Please correct the above issues and click "Reverify" to resubmit your request for approval.
+            Please review the rejection reason, update your onboarding details, and resubmit for approval.
           </p>
-          <button onClick={handleReverify} disabled={isReverifying} className="w-full px-6 py-2.5 bg-blue-600 text-white rounded-lg font-semibold text-sm hover:bg-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
-            {isReverifying ? <>
-              <Loader2 className="w-4 h-4 animate-spin" />
-              Submitting...
-            </> : "Reverify"}
+          <button onClick={handleReverify} className="w-full px-6 py-2.5 bg-blue-600 text-white rounded-lg font-semibold text-sm hover:bg-blue-700 transition-all flex items-center justify-center gap-2">
+            Review & Resubmit
           </button>
         </> : <>
           <h3 className="text-lg font-bold text-gray-900 mb-1">Verification Done in 24 Hours</h3>

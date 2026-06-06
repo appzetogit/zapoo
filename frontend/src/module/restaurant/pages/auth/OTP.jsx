@@ -242,6 +242,12 @@ export default function RestaurantOTP() {
               replace: true
             });
           } else {
+            if (restaurant?.rejectionReason || restaurant?.rejectedAt) {
+              navigate("/restaurant/rejected", {
+                replace: true
+              });
+              return;
+            }
             // For login, prefer onboarding status from verify response to avoid
             // fallback redirects on transient onboarding API failures.
             const incompleteStep = determineStepToShow(restaurant?.onboarding);

@@ -15,13 +15,15 @@ export const getOnboarding = async (req, res) => {
       return errorResponse(res, 401, "Restaurant not authenticated");
     }
     const restaurantId = req.restaurant._id;
-    const restaurant = await Restaurant.findById(restaurantId).select("name onboarding").lean();
+    const restaurant = await Restaurant.findById(restaurantId).select("name onboarding rejectionReason rejectedAt").lean();
     if (!restaurant) {
       return errorResponse(res, 404, "Restaurant not found");
     }
     return successResponse(res, 200, "Onboarding data retrieved", {
       onboarding: restaurant.onboarding || null,
-      restaurantName: restaurant.name || ""
+      restaurantName: restaurant.name || "",
+      rejectionReason: restaurant.rejectionReason || null,
+      rejectedAt: restaurant.rejectedAt || null
     });
   } catch (error) {
     console.error("Error fetching restaurant onboarding:", error);
@@ -276,6 +278,18 @@ export const upsertOnboarding = async (req, res) => {
           name: completeRestaurant?.name,
           slug: completeRestaurant?.slug,
           isActive: completeRestaurant?.isActive
+        }
+      });
+    }
+    if (existingRestaurant?.rejectionReason && finalCompletedSteps >= 3) {
+      await Restaurant.findByIdAndUpdate(restaurantId, {
+        $set: {
+          isActive: false
+        },
+        $unset: {
+          rejectionReason: 1,
+          rejectedAt: 1,
+          rejectedBy: 1
         }
       });
     }

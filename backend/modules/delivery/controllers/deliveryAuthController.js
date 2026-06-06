@@ -80,6 +80,43 @@ const getSignupStatus = delivery => {
   return { needsSignup: false, signupStep: null };
 };
 
+const buildResumeSignupData = delivery => ({
+  details: {
+    name: delivery?.name || "",
+    phone: String(delivery?.phone || "").replace(/\D/g, "").slice(-10),
+    countryCode: "+91",
+    ref: "",
+    email: delivery?.email || "",
+    address: delivery?.location?.addressLine1 || "",
+    city: delivery?.location?.city || "",
+    state: delivery?.location?.state || "",
+    vehicleType: delivery?.vehicle?.type || "bike",
+    vehicleName: delivery?.vehicle?.model || delivery?.vehicle?.brand || "",
+    vehicleNumber: delivery?.vehicle?.number || "",
+    drivingLicenseNumber: delivery?.documents?.drivingLicense?.number || "",
+    panNumber: delivery?.documents?.pan?.number || "",
+    aadharNumber: delivery?.documents?.aadhar?.number || ""
+  },
+  documents: {
+    profilePhoto: delivery?.profileImage?.url ? {
+      url: delivery.profileImage.url,
+      publicId: delivery.profileImage.publicId || null
+    } : null,
+    aadharPhoto: delivery?.documents?.aadhar?.document ? {
+      url: delivery.documents.aadhar.document,
+      publicId: null
+    } : null,
+    panPhoto: delivery?.documents?.pan?.document ? {
+      url: delivery.documents.pan.document,
+      publicId: null
+    } : null,
+    drivingLicensePhoto: delivery?.documents?.drivingLicense?.document ? {
+      url: delivery.documents.drivingLicense.document,
+      publicId: null
+    } : null
+  }
+});
+
 /**
  * Send OTP for delivery boy phone number
  * POST /api/delivery/auth/send-otp
@@ -222,6 +259,7 @@ export const verifyOTP = asyncHandler(async (req, res) => {
     }
 
     const signupStatus = getSignupStatus(delivery);
+    const isRejectedAccount = delivery.status === 'blocked';
     
     // Save FCM token if provided
     if (normalizedFcmToken) {
@@ -261,6 +299,42 @@ export const verifyOTP = asyncHandler(async (req, res) => {
       console.warn(`[DeliveryAuth] No FCM token provided in OTP verification. Phone: ${phone}, Platform: ${normalizedPlatform}`);
     }
     
+    if (isRejectedAccount) {
+      const tokens = jwtService.generateTokens({
+        userId: delivery._id.toString(),
+        role: 'delivery',
+        email: delivery.email || delivery.phone || delivery.deliveryId
+      });
+
+      delivery.refreshToken = tokens.refreshToken;
+      await delivery.save();
+
+      res.cookie('refreshToken', tokens.refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 7 * 24 * 60 * 60 * 1000
+      });
+
+      return successResponse(res, 200, 'OTP verified. Please update and resubmit your profile.', {
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+        user: {
+          id: delivery._id,
+          name: delivery.name,
+          phone: delivery.phone,
+          email: delivery.email,
+          deliveryId: delivery.deliveryId,
+          status: delivery.status,
+          rejectionReason: delivery.rejectionReason || null
+        },
+        needsSignup: true,
+        signupStep: signupStatus.signupStep || 'details',
+        resumeRejectedOnboarding: true,
+        resumeSignupData: buildResumeSignupData(delivery)
+      });
+    }
+
     // Existing registered delivery partners should not be forced back into onboarding on login.
     // Keep onboarding flow only for new/registration flows.
     if (signupStatus.needsSignup && !isExistingDeliveryLogin) {

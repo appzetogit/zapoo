@@ -70,6 +70,10 @@ export default function RestaurantGoogleCallback() {
 
         // Redirect to restaurant home after short delay
         setTimeout(() => {
+          if (user?.rejectionReason || user?.rejectedAt) {
+            navigate("/restaurant/rejected")
+            return
+          }
           navigate("/restaurant")
         }, 1200)
       } catch (err) {
@@ -155,4 +159,3 @@ export default function RestaurantGoogleCallback() {
     </div>
   )
 }
-

@@ -148,7 +148,7 @@ export default function JoinRequest() {
 
   const handleDeny = (request) => {
     setSelectedRequest(request)
-    setRejectionReason("")
+    setRejectionReason(request?.rejectionReason || "")
     setIsDenyOpen(true)
   }
 
@@ -912,6 +912,16 @@ export default function JoinRequest() {
             )}
           </div>
           <DialogFooter className="px-6 pb-6 border-t border-slate-200">
+            <button
+              onClick={() => {
+                setIsViewOpen(false)
+                handleDeny(selectedRequest)
+              }}
+              disabled={processing || !selectedRequest}
+              className="px-4 py-2 text-sm font-medium rounded-lg bg-red-600 text-white hover:bg-red-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {viewDetails?.rejectionReason ? "Update Rejection Reason" : "Reject Request"}
+            </button>
             <button
               onClick={() => setIsViewOpen(false)}
               className="px-4 py-2 text-sm font-medium rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition-all"

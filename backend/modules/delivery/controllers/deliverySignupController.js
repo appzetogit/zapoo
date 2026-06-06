@@ -119,19 +119,19 @@ export const submitSignupDetails = asyncHandler(async (req, res) => {
 const signupDocumentsSchema = Joi.object({
   profilePhoto: Joi.object({
     url: Joi.string().uri().required(),
-    publicId: Joi.string().trim().required()
+    publicId: Joi.string().trim().optional().allow(null, '')
   }).required(),
   aadharPhoto: Joi.object({
     url: Joi.string().uri().required(),
-    publicId: Joi.string().trim().required()
+    publicId: Joi.string().trim().optional().allow(null, '')
   }).required(),
   panPhoto: Joi.object({
     url: Joi.string().uri().required(),
-    publicId: Joi.string().trim().required()
+    publicId: Joi.string().trim().optional().allow(null, '')
   }).required(),
   drivingLicensePhoto: Joi.object({
     url: Joi.string().uri().required(),
-    publicId: Joi.string().trim().required()
+    publicId: Joi.string().trim().optional().allow(null, '')
   }).required()
 });
 export const submitSignupDocuments = asyncHandler(async (req, res) => {
@@ -165,7 +165,7 @@ export const submitSignupDocuments = asyncHandler(async (req, res) => {
       // Store profile image with URL and publicId
       profileImage: {
         url: profilePhoto.url,
-        publicId: profilePhoto.publicId
+        publicId: profilePhoto.publicId || null
       },
       // Store all documents in documents schema (profile photo is only in profileImage)
       documents: {
@@ -189,7 +189,12 @@ export const submitSignupDocuments = asyncHandler(async (req, res) => {
       status: 'pending'
     };
     const updatedDelivery = await Delivery.findByIdAndUpdate(delivery._id, {
-      $set: updateData
+      $set: updateData,
+      $unset: {
+        rejectionReason: 1,
+        rejectedAt: 1,
+        rejectedBy: 1
+      }
     }, {
       new: true,
       runValidators: true

@@ -8,6 +8,7 @@ import { useFCMNotification } from "@/hooks/useFCMNotification";
 const Welcome = lazy(() => import("./pages/auth/Welcome"))
 const SignIn = lazy(() => import("./pages/auth/SignIn"))
 const OTP = lazy(() => import("./pages/auth/OTP"))
+const Rejected = lazy(() => import("./pages/auth/Rejected"))
 const SignupStep1 = lazy(() => import("./pages/auth/SignupStep1"))
 const SignupStep2 = lazy(() => import("./pages/auth/SignupStep2"))
 const DeliveryChallenges = lazy(() => import("@/module/delivery/pages/Challenges"))
@@ -61,6 +62,7 @@ const DeliveryV2Router = () => {
         <Route path="welcome" element={<Welcome />} />
         <Route path="login" element={<SignIn />} />
         <Route path="otp" element={<OTP />} />
+        <Route path="rejected" element={<Rejected />} />
         <Route path="signup" element={<Navigate to="../login" relative="path" replace />} />
         <Route path="signup/details" element={<SignupStep1 />} />
         <Route path="signup/documents" element={<SignupStep2 />} />

@@ -30,6 +30,7 @@ export default function ProtectedRoute({ children, requiredRole, loginPath }) {
   const [restaurantApproval, setRestaurantApproval] = useState({
     isActive: true,
     rejectedAt: null,
+    rejectionReason: null,
     restaurantId: null,
   });
 
@@ -85,6 +86,7 @@ export default function ProtectedRoute({ children, requiredRole, loginPath }) {
         setRestaurantApproval({
           isActive: restaurant?.isActive !== false,
           rejectedAt: restaurant?.rejectedAt || null,
+          rejectionReason: restaurant?.rejectionReason || null,
           restaurantId: restaurant?.restaurantId || restaurant?.id || restaurant?._id || null,
         });
 
@@ -138,6 +140,7 @@ export default function ProtectedRoute({ children, requiredRole, loginPath }) {
           setRestaurantApproval({
             isActive: false,
             rejectedAt: null,
+            rejectionReason: null,
             restaurantId: null,
           });
         }
@@ -221,15 +224,34 @@ export default function ProtectedRoute({ children, requiredRole, loginPath }) {
     const isRestaurantHome = path === "/restaurant";
     const needsSubscription =
       isRestaurantHome || gatedRestaurantPaths.some((prefix) => path.startsWith(prefix));
+    const isRejectedRestaurant = Boolean(
+      restaurantApproval.rejectedAt || restaurantApproval.rejectionReason
+    );
     const isApprovalPending =
       onboardingStepToShow === null &&
       restaurantApproval.isActive === false &&
-      !restaurantApproval.rejectedAt;
+      !isRejectedRestaurant;
     const shouldRenderNoPlanPopup =
-      needsSubscription && !isAllowedPath && !hasActiveSubscription && !isApprovalPending;
+      needsSubscription && !isAllowedPath && !hasActiveSubscription && !isApprovalPending && !isRejectedRestaurant;
 
     if (isApprovalPending && path.startsWith("/restaurant/onboarding")) {
       return <Navigate to="/restaurant" replace />;
+    }
+
+    if (
+      isRejectedRestaurant &&
+      !path.startsWith("/restaurant/onboarding") &&
+      path !== "/restaurant/rejected"
+    ) {
+      return <Navigate to="/restaurant/rejected" replace />;
+    }
+
+    if (
+      isRejectedRestaurant &&
+      path.startsWith("/restaurant/onboarding") &&
+      !hasOnboardingSession
+    ) {
+      return <Navigate to="/restaurant/rejected" replace />;
     }
 
     if (isApprovalPending) {

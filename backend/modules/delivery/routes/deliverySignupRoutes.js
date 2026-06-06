@@ -37,19 +37,19 @@ router.post('/signup/details', validate(Joi.object({
 router.post('/signup/documents', validate(Joi.object({
   profilePhoto: Joi.object({
     url: Joi.string().uri().required(),
-    publicId: Joi.string().trim().required()
+    publicId: Joi.string().trim().optional().allow(null, '')
   }).required(),
   aadharPhoto: Joi.object({
     url: Joi.string().uri().required(),
-    publicId: Joi.string().trim().required()
+    publicId: Joi.string().trim().optional().allow(null, '')
   }).required(),
   panPhoto: Joi.object({
     url: Joi.string().uri().required(),
-    publicId: Joi.string().trim().required()
+    publicId: Joi.string().trim().optional().allow(null, '')
   }).required(),
   drivingLicensePhoto: Joi.object({
     url: Joi.string().uri().required(),
-    publicId: Joi.string().trim().required()
+    publicId: Joi.string().trim().optional().allow(null, '')
   }).required()
 })), submitSignupDocuments);
 

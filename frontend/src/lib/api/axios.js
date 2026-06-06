@@ -397,11 +397,16 @@ apiClient.interceptors.response.use(response => {
       if (import.meta.env.DEV) {
         const refreshErrorMessage = refreshError.response?.data?.message || refreshError.response?.data?.error || refreshError.message || "Token refresh failed";
         const refreshErrorMessageLower = String(refreshErrorMessage).toLowerCase();
+        const isRestaurantRejectedPath = currentPath.startsWith("/restaurant/rejected");
         const isOnboardingInactiveRefreshError =
           currentPath.startsWith("/restaurant/onboarding") &&
           refreshErrorMessageLower.includes("restaurant account is inactive");
+        const isRejectedInactiveRefreshError =
+          isRestaurantRejectedPath &&
+          (refreshErrorMessageLower.includes("restaurant account is inactive") ||
+            refreshErrorMessageLower.includes("wait for admin approval"));
 
-        if (!isOnboardingInactiveRefreshError) {
+        if (!isOnboardingInactiveRefreshError && !isRejectedInactiveRefreshError) {
           toast.error(refreshErrorMessage, {
             duration: 3000,
             style: {
@@ -627,6 +632,7 @@ apiClient.interceptors.response.use(response => {
     window._errorToastCache = toastCache;
     const currentPath = window.location.pathname;
     const isOnboardingPath = currentPath.startsWith("/restaurant/onboarding");
+    const isRejectedPath = currentPath.startsWith("/restaurant/rejected");
     const isAuthPath =
       currentPath.includes("/login") ||
       currentPath.includes("/otp") ||
@@ -647,6 +653,10 @@ apiClient.interceptors.response.use(response => {
         isAuthPath &&
         (errorMessageLower.includes("restaurant account is inactive") ||
           errorMessageLower.includes("wait for admin approval"));
+      const isRejectedInactiveMessage =
+        isRejectedPath &&
+        (errorMessageLower.includes("restaurant account is inactive") ||
+          errorMessageLower.includes("wait for admin approval"));
 
       // During onboarding, suppress inactive-account toasts so the flow isn't blocked/noisy.
       // The onboarding page will handle its own validation/errors.
@@ -655,6 +665,10 @@ apiClient.interceptors.response.use(response => {
       }
       // On auth pages, suppress inactive-account toasts from background preference calls.
       if (isAuthInactiveMessage) {
+        return;
+      }
+      // On the dedicated rejected screen, suppress pending/inactive approval toasts.
+      if (isRejectedInactiveMessage) {
         return;
       }
 

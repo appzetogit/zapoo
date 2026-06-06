@@ -26,6 +26,7 @@ const RestaurantSignup = lazy(() => import("@/module/restaurant/pages/auth/Signu
 const RestaurantSignupEmail = lazy(() => import("@/module/restaurant/pages/auth/SignupEmail"))
 const RestaurantForgotPassword = lazy(() => import("@/module/restaurant/pages/auth/ForgotPassword"))
 const RestaurantOTP = lazy(() => import("@/module/restaurant/pages/auth/OTP"))
+const RestaurantRejected = lazy(() => import("@/module/restaurant/pages/auth/Rejected"))
 const RestaurantGoogleCallback = lazy(() => import("@/module/restaurant/pages/auth/GoogleCallback"))
 const RestaurantWelcome = lazy(() => import("@/module/restaurant/pages/auth/Welcome"))
 const RestaurantLegalTerms = lazy(() => import("@/module/restaurant/pages/legal/TermsPage"))
@@ -123,6 +124,7 @@ export default function App() {
         <Route path="/restaurant/signup-email" element={<RestaurantSignupEmail />} />
         <Route path="/restaurant/forgot-password" element={<RestaurantForgotPassword />} />
         <Route path="/restaurant/otp" element={<RestaurantOTP />} />
+        <Route path="/restaurant/rejected" element={<RestaurantRejected />} />
         <Route path="/restaurant/auth/google-callback" element={<RestaurantGoogleCallback />} />
         <Route path="/restaurant/legal/terms" element={<RestaurantLegalTerms />} />
         <Route path="/restaurant/legal/privacy" element={<RestaurantLegalPrivacy />} />

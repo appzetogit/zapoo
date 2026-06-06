@@ -182,7 +182,18 @@ export default function DeliveryOTP() {
         }
         sessionStorage.removeItem("deliveryAuthData")
         sessionStorage.setItem("deliveryNeedsRegistration", "true")
-        sessionStorage.setItem("deliverySignupDetails", JSON.stringify({ name: "", phone: phone.replace(/\D/g, "").slice(-10), countryCode: "+91" }))
+        const resumeSignupData = data?.resumeSignupData || null
+        const signupDetails = resumeSignupData?.details || { name: "", phone: phone.replace(/\D/g, "").slice(-10), countryCode: "+91" }
+        sessionStorage.setItem("deliverySignupDetails", JSON.stringify(signupDetails))
+        if (resumeSignupData?.documents) {
+          sessionStorage.setItem("deliverySignupDocs", JSON.stringify(resumeSignupData.documents))
+        } else {
+          sessionStorage.removeItem("deliverySignupDocs")
+        }
+        if (data?.resumeRejectedOnboarding === true || user?.status === "blocked") {
+          setIsLoading(false); navigate("/food/delivery/rejected", { replace: true });
+          return
+        }
         const signupStep = data?.signupStep === "documents" ? "documents" : "details"
         const signupPath = signupStep === "documents" ? "/food/delivery/signup/documents" : "/food/delivery/signup/details"
         setIsLoading(false); navigate(signupPath, { replace: true });

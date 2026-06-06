@@ -210,6 +210,10 @@ export default function RestaurantLogin() {
     setIsSending(true)
 
     const navigatePostGoogleLogin = (restaurant) => {
+      if (restaurant?.rejectionReason || restaurant?.rejectedAt) {
+        navigate("/restaurant/rejected", { replace: true })
+        return
+      }
       const onboardingStep = determineStepToShow(restaurant?.onboarding)
       if (onboardingStep) {
         sessionStorage.setItem(ONBOARDING_SESSION_KEY, "1")

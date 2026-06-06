@@ -730,12 +730,14 @@ export default function RestaurantOnboarding() {
         const payload = res?.data?.data || {};
         const data = payload?.onboarding;
         const baseRestaurantName = payload?.restaurantName || "";
+        const isRejectedAccount = Boolean(payload?.rejectionReason || payload?.rejectedAt);
+        const stepParam = new URLSearchParams(window.location.search).get("step");
 
         // If user has local step/draft state, don't let API step-computation override refresh state.
         if (hasLocalDraftRef.current || hasLocalStepRef.current) {
           // Don't overwrite data but still fetch to check if onboarding is complete
           // Only redirect if onboarding is complete
-          if (data && determineStepToShow(data) === null) {
+          if (data && determineStepToShow(data) === null && !isRejectedAccount) {
             clearOnboardingFromLocalStorage();
             proceedAfterOnboarding();
           }
@@ -781,18 +783,15 @@ export default function RestaurantOnboarding() {
             setStep3(prev => ({
               panNumber: data.step3.pan?.panNumber || prev.panNumber || "",
               nameOnPan: data.step3.pan?.nameOnPan || prev.nameOnPan || "",
-              panImage: prev.panImage || null,
-              // Don't load images from API, user needs to re-upload
+              panImage: prev.panImage || data.step3.pan?.image || null,
               gstRegistered: data.step3.gst?.isRegistered ?? prev.gstRegistered ?? false,
               gstNumber: data.step3.gst?.gstNumber || prev.gstNumber || "",
               gstLegalName: data.step3.gst?.legalName || prev.gstLegalName || "",
               gstAddress: data.step3.gst?.address || prev.gstAddress || "",
-              gstImage: prev.gstImage || null,
-              // Don't load images from API, user needs to re-upload
+              gstImage: prev.gstImage || data.step3.gst?.image || null,
               fssaiNumber: data.step3.fssai?.registrationNumber || prev.fssaiNumber || "",
               fssaiExpiry: data.step3.fssai?.expiryDate ? data.step3.fssai.expiryDate.slice(0, 10) : prev.fssaiExpiry || "",
-              fssaiImage: prev.fssaiImage || null,
-              // Don't load images from API, user needs to re-upload
+              fssaiImage: prev.fssaiImage || data.step3.fssai?.image || null,
               accountNumber: data.step3.bank?.accountNumber || prev.accountNumber || "",
               confirmAccountNumber: data.step3.bank?.accountNumber || prev.confirmAccountNumber || "",
               ifscCode: data.step3.bank?.ifscCode || prev.ifscCode || "",
@@ -803,10 +802,13 @@ export default function RestaurantOnboarding() {
           // Determine which step to show based on completeness
           const stepToShow = determineStepToShow(data);
           if (stepToShow == null) {
-            // Onboarding already complete (step 3 is final).
-            clearOnboardingFromLocalStorage();
-            proceedAfterOnboarding();
-            return;
+            if (isRejectedAccount) {
+              setStep(normalizeStep(stepParam || 1));
+            } else {
+              clearOnboardingFromLocalStorage();
+              proceedAfterOnboarding();
+              return;
+            }
           } else {
             setStep(normalizeStep(stepToShow));
           }

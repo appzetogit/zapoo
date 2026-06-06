@@ -582,7 +582,9 @@ export const verifyOTP = asyncHandler(async (req, res) => {
         signupMethod: restaurant.signupMethod,
         profileImage: restaurant.profileImage,
         isActive: restaurant.isActive,
-        onboarding: restaurant.onboarding
+        onboarding: restaurant.onboarding,
+        rejectionReason: restaurant.rejectionReason || null,
+        rejectedAt: restaurant.rejectedAt || null
       }
     });
   } catch (error) {
@@ -700,7 +702,9 @@ export const login = asyncHandler(async (req, res) => {
   if (!restaurant) {
     return errorResponse(res, 401, 'Invalid email or password');
   }
-  if (!restaurant.isActive) {
+  const isRejectedRestaurant = Boolean(restaurant.rejectionReason || restaurant.rejectedAt);
+  const isPendingRestaurant = !restaurant.isActive && !restaurant.approvedAt && !isRejectedRestaurant;
+  if (!restaurant.isActive && !isRejectedRestaurant && !isPendingRestaurant) {
     return errorResponse(res, 401, 'Restaurant account is inactive. Please contact support.');
   }
 
@@ -741,7 +745,9 @@ export const login = asyncHandler(async (req, res) => {
       signupMethod: restaurant.signupMethod,
       profileImage: restaurant.profileImage,
       isActive: restaurant.isActive,
-      onboarding: restaurant.onboarding
+      onboarding: restaurant.onboarding,
+      rejectionReason: restaurant.rejectionReason || null,
+      rejectedAt: restaurant.rejectedAt || null
     }
   });
 });
@@ -1102,8 +1108,9 @@ const finalizeRestaurantGoogleLogin = async ({
 
   // Distinguish pending approval from truly deactivated accounts.
   // Pending restaurants can login to continue onboarding.
-  const isPendingApproval = !restaurant.isActive && !restaurant.approvedAt && !restaurant.rejectedAt;
-  if (!restaurant.isActive && !isPendingApproval) {
+  const isRejectedRestaurant = Boolean(restaurant.rejectionReason || restaurant.rejectedAt);
+  const isPendingApproval = !restaurant.isActive && !restaurant.approvedAt && !isRejectedRestaurant;
+  if (!restaurant.isActive && !isPendingApproval && !isRejectedRestaurant) {
     logger.warn('Deactivated restaurant attempted Google login', {
       restaurantId: restaurant._id,
       email
@@ -1144,7 +1151,9 @@ const finalizeRestaurantGoogleLogin = async ({
         profileImage: restaurant.profileImage,
         isActive: restaurant.isActive,
         isPendingApproval,
-        onboarding: restaurant.onboarding
+        onboarding: restaurant.onboarding,
+        rejectionReason: restaurant.rejectionReason || null,
+        rejectedAt: restaurant.rejectedAt || null
       }
     }
   );

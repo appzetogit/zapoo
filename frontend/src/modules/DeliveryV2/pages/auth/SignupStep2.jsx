@@ -113,6 +113,9 @@ export default function SignupStep2() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [uploading, setUploading] = useState({})
 
+  const hasResolvedDocument = (docType) =>
+    Boolean(documents[docType] || sanitizeUploadedDocValue(uploadedDocs[docType]))
+
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: "auto" })
     document.documentElement.scrollTop = 0
@@ -211,7 +214,7 @@ export default function SignupStep2() {
   const handleSubmit = async (e) => {
     e.preventDefault()
 
-    if (!documents.profilePhoto || !documents.aadharPhoto || !documents.panPhoto || !documents.drivingLicensePhoto) {
+    if (!hasResolvedDocument("profilePhoto") || !hasResolvedDocument("aadharPhoto") || !hasResolvedDocument("panPhoto") || !hasResolvedDocument("drivingLicensePhoto")) {
       toast.error("Please upload all required documents")
       return
     }
@@ -237,6 +240,29 @@ export default function SignupStep2() {
     setIsSubmitting(true)
 
     try {
+      const resolveDocumentPayload = async (docType) => {
+        const localFile = documents[docType]
+        if (localFile instanceof File) {
+          const uploaded = await uploadAPI.uploadMedia(localFile, { folder: "delivery/docs" })
+          return {
+            url: uploaded?.data?.data?.url,
+            publicId: uploaded?.data?.data?.publicId || null
+          }
+        }
+
+        const existing = sanitizeUploadedDocValue(uploadedDocs[docType])
+        if (typeof existing === "string") {
+          return { url: existing, publicId: null }
+        }
+        if (existing?.url) {
+          return {
+            url: existing.url,
+            publicId: existing.publicId || null
+          }
+        }
+        return null
+      }
+
       debugLog("Submitting signup documents", {
         phone: String(details?.phone || ""),
         hasEmail: Boolean(details?.email),
@@ -249,29 +275,17 @@ export default function SignupStep2() {
         }
       })
       const [profileUpload, aadharUpload, panUpload, dlUpload] = await Promise.all([
-        uploadAPI.uploadMedia(documents.profilePhoto, { folder: "delivery/docs" }),
-        uploadAPI.uploadMedia(documents.aadharPhoto, { folder: "delivery/docs" }),
-        uploadAPI.uploadMedia(documents.panPhoto, { folder: "delivery/docs" }),
-        uploadAPI.uploadMedia(documents.drivingLicensePhoto, { folder: "delivery/docs" })
+        resolveDocumentPayload("profilePhoto"),
+        resolveDocumentPayload("aadharPhoto"),
+        resolveDocumentPayload("panPhoto"),
+        resolveDocumentPayload("drivingLicensePhoto")
       ])
 
       const payload = {
-        profilePhoto: {
-          url: profileUpload?.data?.data?.url,
-          publicId: profileUpload?.data?.data?.publicId
-        },
-        aadharPhoto: {
-          url: aadharUpload?.data?.data?.url,
-          publicId: aadharUpload?.data?.data?.publicId
-        },
-        panPhoto: {
-          url: panUpload?.data?.data?.url,
-          publicId: panUpload?.data?.data?.publicId
-        },
-        drivingLicensePhoto: {
-          url: dlUpload?.data?.data?.url,
-          publicId: dlUpload?.data?.data?.publicId
-        }
+        profilePhoto: profileUpload,
+        aadharPhoto: aadharUpload,
+        panPhoto: panUpload,
+        drivingLicensePhoto: dlUpload
       }
 
       if (!payload.profilePhoto.url || !payload.aadharPhoto.url || !payload.panPhoto.url || !payload.drivingLicensePhoto.url) {
@@ -432,8 +446,8 @@ export default function SignupStep2() {
           {/* Submit Button */}
           <button
             type="submit"
-            disabled={isSubmitting || !uploadedDocs.profilePhoto || !uploadedDocs.aadharPhoto || !uploadedDocs.panPhoto || !uploadedDocs.drivingLicensePhoto}
-            className={`w-full py-4 rounded-lg font-bold text-white text-base transition-colors mt-6 ${isSubmitting || !uploadedDocs.profilePhoto || !uploadedDocs.aadharPhoto || !uploadedDocs.panPhoto || !uploadedDocs.drivingLicensePhoto
+            disabled={isSubmitting || !hasResolvedDocument("profilePhoto") || !hasResolvedDocument("aadharPhoto") || !hasResolvedDocument("panPhoto") || !hasResolvedDocument("drivingLicensePhoto")}
+            className={`w-full py-4 rounded-lg font-bold text-white text-base transition-colors mt-6 ${isSubmitting || !hasResolvedDocument("profilePhoto") || !hasResolvedDocument("aadharPhoto") || !hasResolvedDocument("panPhoto") || !hasResolvedDocument("drivingLicensePhoto")
               ? "bg-gray-400 cursor-not-allowed"
               : "bg-[#ff525d] hover:bg-[#ff3e4c]"
               }`}

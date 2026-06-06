@@ -239,11 +239,18 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
         }
         if (profileRes?.data?.success && profileRes.data.data?.profile) {
           const profile = profileRes.data.data.profile;
+          try {
+            localStorage.setItem("delivery_user", JSON.stringify(profile));
+          } catch {}
+          if (profile?.status === "blocked" || profile?.rejectionReason) {
+            navigate("/food/delivery/rejected", { replace: true });
+            return;
+          }
           setProfileImage(profile.profileImage?.url || profile.documents?.photo || null);
         }
       } catch (err) { console.warn('Navbar Data Fetch Error:', err); }
     })();
-  }, []);
+  }, [navigate]);
 
   const emergencyOptions = [
     { title: "Medical Emergency", subtitle: "Call an ambulance", icon: <AlertTriangle className="text-red-600" />, phone: emergencyNumbers.medicalEmergency },

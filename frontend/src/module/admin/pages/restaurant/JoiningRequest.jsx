@@ -150,7 +150,7 @@ export default function JoiningRequest() {
   };
   const handleReject = request => {
     setSelectedRequest(request);
-    setRejectionReason("");
+    setRejectionReason(request?.rejectionReason || "");
     setShowRejectDialog(true);
   };
   const confirmReject = async () => {
@@ -160,7 +160,7 @@ export default function JoiningRequest() {
     }
     try {
       setProcessing(true);
-      await adminAPI.rejectRestaurant(selectedRequest._id, rejectionReason);
+      await adminAPI.rejectRestaurant(selectedRequest._id, rejectionReason.trim());
 
       // Refresh the list
       await fetchRequests();
@@ -886,6 +886,20 @@ export default function JoiningRequest() {
                   <p className="text-lg font-semibold text-slate-700 mb-2">No Details Available</p>
                   <p className="text-sm text-slate-500">Unable to load restaurant details</p>
                 </div>}
+            </div>
+            <div className="mt-6 pt-4 border-t border-slate-200 flex items-center justify-end gap-3">
+              <button onClick={() => {
+                const request = selectedRequest;
+                closeDetailsModal();
+                if (request) {
+                  handleReject(request);
+                }
+              }} disabled={processing || !selectedRequest} className="px-4 py-2.5 text-sm font-medium rounded-lg bg-red-600 hover:bg-red-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                {restaurantDetails?.rejectionReason ? "Update Rejection Reason" : "Reject Request"}
+              </button>
+              <button onClick={closeDetailsModal} className="px-4 py-2.5 text-sm font-medium rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition-colors">
+                Close
+              </button>
             </div>
           </div>
         </div>}
