@@ -57,6 +57,9 @@ messaging.onBackgroundMessage((payload) => {
             : {}),
         // Explicitly disable notification action buttons (Accept/Reject, etc.)
         actions: [],
+        // Web push cannot reliably play a custom sound when the app is closed,
+        // but vibration helps make background alerts more noticeable on supported devices.
+        vibrate: [250, 120, 250],
         // Use per-notification tag so later pushes don't overwrite earlier ones.
         tag: `zapoo-${data.target || 'user'}-${notificationId}`,
         renotify: false,
