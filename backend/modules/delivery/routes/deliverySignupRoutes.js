@@ -21,7 +21,11 @@ router.post('/signup/details', validate(Joi.object({
   state: Joi.string().trim().required(),
   vehicleType: Joi.string().valid('bike', 'scooter', 'bicycle', 'car').required(),
   vehicleName: Joi.string().trim().optional().allow(null, ''),
-  vehicleNumber: Joi.string().trim().required(),
+  vehicleNumber: Joi.when('vehicleType', {
+    is: 'bicycle',
+    then: Joi.string().trim().optional().allow(null, ''),
+    otherwise: Joi.string().trim().required()
+  }),
   panNumber: Joi.string().trim().uppercase().pattern(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/).required().messages({
     'string.pattern.base': 'Invalid PAN number format (e.g., ABCDE1234F)'
   }),

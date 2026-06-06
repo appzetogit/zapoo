@@ -24,7 +24,11 @@ const signupDetailsSchema = Joi.object({
   state: Joi.string().trim().required(),
   vehicleType: Joi.string().valid('bike', 'scooter', 'bicycle', 'car').required(),
   vehicleName: Joi.string().trim().optional().allow(null, ''),
-  vehicleNumber: Joi.string().trim().required(),
+  vehicleNumber: Joi.when('vehicleType', {
+    is: 'bicycle',
+    then: Joi.string().trim().optional().allow(null, ''),
+    otherwise: Joi.string().trim().required()
+  }),
   panNumber: Joi.string().trim().uppercase().pattern(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/).required().messages({
     'string.pattern.base': 'Invalid PAN number format (e.g., ABCDE1234F)'
   }),
@@ -47,6 +51,7 @@ export const submitSignupDetails = asyncHandler(async (req, res) => {
       panNumber,
       aadharNumber
     } = req.body;
+    const normalizedVehicleNumber = vehicleType === 'bicycle' ? null : vehicleNumber.trim();
 
     // Validate input
     const {
@@ -67,7 +72,7 @@ export const submitSignupDetails = asyncHandler(async (req, res) => {
       },
       vehicle: {
         type: vehicleType,
-        number: vehicleNumber.trim(),
+        number: normalizedVehicleNumber,
         model: vehicleName ? vehicleName.trim() : null,
         brand: vehicleName ? vehicleName.trim() : null // Use vehicleName as brand if provided
       },
