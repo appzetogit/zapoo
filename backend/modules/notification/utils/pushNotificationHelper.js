@@ -79,6 +79,8 @@ export async function sendPushNotification(tokens, payload) {
     data = {}
   } = payload;
   const notificationId = buildNotificationId(data);
+  const normalizedPriority = String(data.notificationPriority || 'high').toLowerCase();
+  const isHighPriority = normalizedPriority !== 'normal';
 
   const message = {
     notification: {
@@ -96,15 +98,21 @@ export async function sendPushNotification(tokens, payload) {
     },
     // Ensure background notifications work on Android/iOS
     android: {
-      priority: 'high',
+      priority: isHighPriority ? 'high' : 'normal',
       notification: {
+        priority: isHighPriority ? 'max' : 'default',
         sound: 'default'
       }
     },
     apns: {
+      headers: {
+        'apns-priority': isHighPriority ? '10' : '5',
+        'apns-push-type': 'alert'
+      },
       payload: {
         aps: {
           contentAvailable: true,
+          badge: 1,
           sound: 'default'
         }
       }

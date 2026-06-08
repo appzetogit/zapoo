@@ -23,9 +23,9 @@ async function getIOInstance() {
 export async function notifyRestaurantNewOrder(order, restaurantId, paymentMethodOverride) {
   try {
     const io = await getIOInstance();
-    if (!io) {
-      console.warn('Socket.IO not initialized, skipping restaurant notification');
-      return;
+    const socketAvailable = Boolean(io);
+    if (!socketAvailable) {
+      console.warn('Socket.IO not initialized, skipping restaurant socket notification but continuing with push.');
     }
 
     // CRITICAL: Validate restaurantId matches order's restaurantId
@@ -106,8 +106,8 @@ export async function notifyRestaurantNewOrder(order, restaurantId, paymentMetho
       adminDeliveryCost: order.pricing?.adminDeliveryCost ?? 0,
       distanceKm: order.pricing?.distanceKm ?? 0,
     };
-    // Get restaurant namespace
-    const restaurantNamespace = io.of('/restaurant');
+    // Get restaurant namespace when Socket.IO is available.
+    const restaurantNamespace = socketAvailable ? io.of('/restaurant') : null;
 
     // Build comprehensive room identifiers to handle _id / restaurantId / slug mismatches.
     const normalizedRestaurantId = restaurantId?.toString() || restaurantId;
@@ -149,15 +149,17 @@ export async function notifyRestaurantNewOrder(order, restaurantId, paymentMetho
     // Get all connected sockets in the restaurant room
     let socketsInRoom = [];
     const roomProbe = [];
-    for (const room of roomVariations) {
-      const sockets = await restaurantNamespace.in(room).fetchSockets();
-      roomProbe.push({
-        room,
-        sockets: sockets.map((socket) => socket.id)
-      });
-      if (sockets.length > 0) {
-        socketsInRoom = sockets;
-        break;
+    if (restaurantNamespace) {
+      for (const room of roomVariations) {
+        const sockets = await restaurantNamespace.in(room).fetchSockets();
+        roomProbe.push({
+          room,
+          sockets: sockets.map((socket) => socket.id)
+        });
+        if (sockets.length > 0) {
+          socketsInRoom = sockets;
+          break;
+        }
       }
     }
     const primaryRoom = roomVariations[0];
@@ -165,7 +167,7 @@ export async function notifyRestaurantNewOrder(order, restaurantId, paymentMetho
     // This ensures orders only go to the correct restaurant
     let socketDeliveryFailed = false;
     let socketFailureMessage = null;
-    if (socketsInRoom.length > 0) {
+    if (restaurantNamespace && socketsInRoom.length > 0) {
       console.log('🍽️ [RestaurantNotify] Restaurant sockets found', {
         orderId: order.orderId,
         primaryRoom,
@@ -181,7 +183,7 @@ export async function notifyRestaurantNewOrder(order, restaurantId, paymentMetho
           message: `New order received: ${order.orderId}`
         });
       });
-    } else {
+    } else if (restaurantNamespace) {
       // No sockets found in restaurant room - log error but DO NOT broadcast to all restaurants
       console.error(`❌ CRITICAL: No sockets found for restaurant ${normalizedRestaurantId} in any room!`);
       console.error(`❌ Order ${order.orderId} will NOT be delivered to restaurant ${normalizedRestaurantId}`);
@@ -219,6 +221,9 @@ export async function notifyRestaurantNewOrder(order, restaurantId, paymentMetho
 
       socketDeliveryFailed = true;
       socketFailureMessage = `Restaurant ${normalizedRestaurantId} (${order.restaurantName}) is not connected to Socket.IO room.`;
+    } else {
+      socketDeliveryFailed = true;
+      socketFailureMessage = 'Socket.IO is not initialized for restaurant notifications.';
     }
 
     // Send FCM notification to restaurant (always send)
@@ -229,6 +234,7 @@ export async function notifyRestaurantNewOrder(order, restaurantId, paymentMetho
         orderMongoId: order._id?.toString(),
         status: order.status,
         type: 'new_order',
+        notificationPriority: 'high',
         templateKey: 'restaurant_new_order',
         templateVars: {
           orderId: order.orderId,
