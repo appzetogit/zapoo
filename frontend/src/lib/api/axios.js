@@ -91,11 +91,12 @@ function getTokenForContext(requestUrl = "") {
 
   // 2. Fallback to Browser Path if request URL is ambiguous
   if (path.startsWith("/admin")) {
-    return localStorage.getItem("admin_accessToken");
+    return localStorage.getItem("admin_accessToken") || localStorage.getItem("user_accessToken");
   } else if (path.startsWith("/restaurant") && !path.startsWith("/restaurants") && !path.startsWith("/restaurant/list") && !path.startsWith("/restaurant/under-250")) {
-    return localStorage.getItem("restaurant_accessToken");
+    // If a user is browsing a restaurant page, they won't have a restaurant token, so fallback to user token
+    return localStorage.getItem("restaurant_accessToken") || localStorage.getItem("user_accessToken");
   } else if (isDeliveryPath) {
-    return localStorage.getItem("delivery_accessToken");
+    return localStorage.getItem("delivery_accessToken") || localStorage.getItem("user_accessToken");
   } else if (path.startsWith("/user/") || path === "/") {
     return localStorage.getItem("user_accessToken");
   }

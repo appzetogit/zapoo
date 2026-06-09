@@ -13,6 +13,8 @@ const INITIAL_FORM = {
   discountValue: "",
   maxDiscountAmount: "",
   minOrderValue: "",
+  perUserLimit: "",
+  globalUsageLimit: "",
   eligibilityType: "first_delivered_order",
   validFrom: "",
   validUntil: "",
@@ -134,6 +136,8 @@ export default function Coupons() {
         discountValue: Number(form.discountValue),
         maxDiscountAmount: form.maxDiscountAmount === "" ? null : Number(form.maxDiscountAmount),
         minOrderValue: form.minOrderValue === "" ? 0 : Number(form.minOrderValue),
+        perUserLimit: Number(form.perUserLimit),
+        globalUsageLimit: Number(form.globalUsageLimit),
         validFrom: form.validFrom || undefined,
         validUntil: form.validUntil || null,
       };
@@ -177,6 +181,8 @@ export default function Coupons() {
       discountValue: coupon.discountValue ?? "",
       maxDiscountAmount: coupon.maxDiscountAmount ?? "",
       minOrderValue: coupon.minOrderValue ?? "",
+      perUserLimit: coupon.perUserLimit ?? "",
+      globalUsageLimit: coupon.globalUsageLimit ?? "",
       eligibilityType: coupon.eligibilityType || "first_delivered_order",
       validFrom: coupon.validFrom ? new Date(coupon.validFrom).toISOString().slice(0, 16) : "",
       validUntil: coupon.validUntil ? new Date(coupon.validUntil).toISOString().slice(0, 16) : "",
@@ -310,8 +316,14 @@ export default function Coupons() {
                 <Field label={t("admin.coupons.form.fields.maxDiscountAmount")}>
                   <input type="number" min="0" step="0.01" value={form.maxDiscountAmount} onChange={(e) => handleInputChange("maxDiscountAmount", e.target.value)} className="field" placeholder={t("admin.coupons.form.placeholders.optional")} />
                 </Field>
-                <Field label={t("admin.coupons.form.fields.minOrderValue")}>
+                <Field label={t("admin.coupons.form.fields.minOrderValue", "Min Order Value")}>
                   <input type="number" min="0" step="0.01" value={form.minOrderValue} onChange={(e) => handleInputChange("minOrderValue", e.target.value)} className="field" placeholder="0" />
+                </Field>
+                <Field label="Per User Limit">
+                  <input type="number" min="1" step="1" value={form.perUserLimit} onChange={(e) => handleInputChange("perUserLimit", e.target.value)} className="field" placeholder="e.g. 1" required />
+                </Field>
+                <Field label="Global Usage Limit">
+                  <input type="number" min="1" step="1" value={form.globalUsageLimit} onChange={(e) => handleInputChange("globalUsageLimit", e.target.value)} className="field" placeholder="e.g. 100" required />
                 </Field>
                 <Field label={t("admin.coupons.form.fields.validFrom")}>
                   <input type="datetime-local" value={form.validFrom} onChange={(e) => handleInputChange("validFrom", e.target.value)} className="field" />
@@ -372,8 +384,10 @@ export default function Coupons() {
                           t("admin.coupons.table.title"),
                           t("admin.coupons.table.eligibility"),
                           t("admin.coupons.table.discount"),
-                          t("admin.coupons.table.minOrder"),
-                          t("admin.coupons.table.deliveredUses"),
+                          t("admin.coupons.table.minOrder", "Min Order"),
+                          "Per User Limit",
+                          "Global Limit",
+                          t("admin.coupons.table.deliveredUses", "Delivered Uses"),
                           t("admin.coupons.table.status"),
                           t("admin.coupons.table.validUntil"),
                           t("admin.coupons.table.actions"),
@@ -399,6 +413,8 @@ export default function Coupons() {
                               : `${t("admin.coupons.currency.rs")} ${coupon.discountValue}`}
                           </td>
                           <td className="px-4 py-4 text-sm text-slate-700">{t("admin.coupons.currency.rs")} {coupon.minOrderValue || 0}</td>
+                          <td className="px-4 py-4 text-sm text-slate-700">{coupon.perUserLimit}</td>
+                          <td className="px-4 py-4 text-sm text-slate-700">{coupon.globalUsageCount || 0} / {coupon.globalUsageLimit}</td>
                           <td className="px-4 py-4 text-sm text-slate-700">{coupon.deliveredUses || 0}</td>
                           <td className="px-4 py-4">
                             <select

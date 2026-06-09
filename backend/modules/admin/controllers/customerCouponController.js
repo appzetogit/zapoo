@@ -70,6 +70,8 @@ export const createCustomerCoupon = asyncHandler(async (req, res) => {
     maxDiscountAmount = null,
     minOrderValue = 0,
     eligibilityType = "all_users",
+    perUserLimit,
+    globalUsageLimit,
     validFrom,
     validUntil = null,
     status = "active",
@@ -82,6 +84,16 @@ export const createCustomerCoupon = asyncHandler(async (req, res) => {
   const normalizedCode = normalizeCouponCode(code);
   if (!normalizedCode || !title || !discountType) {
     return errorResponse(res, 400, "Code, title, and discount type are required");
+  }
+
+  const parsedPerUserLimit = Number(perUserLimit);
+  if (!Number.isFinite(parsedPerUserLimit) || parsedPerUserLimit < 1) {
+    return errorResponse(res, 400, "Per User Limit is required and must be at least 1");
+  }
+
+  const parsedGlobalUsageLimit = Number(globalUsageLimit);
+  if (!Number.isFinite(parsedGlobalUsageLimit) || parsedGlobalUsageLimit < 1) {
+    return errorResponse(res, 400, "Global Usage Limit is required and must be at least 1");
   }
 
   const parsedDiscountValue = Number(discountValue);
@@ -153,6 +165,8 @@ export const createCustomerCoupon = asyncHandler(async (req, res) => {
     maxDiscountAmount: parsedMaxDiscount,
     minOrderValue: parsedMinOrderValue,
     eligibilityType,
+    perUserLimit: parsedPerUserLimit,
+    globalUsageLimit: parsedGlobalUsageLimit,
     status,
     validFrom: validFromDate,
     validUntil: validUntilDate,
@@ -257,6 +271,8 @@ export const updateCustomerCoupon = asyncHandler(async (req, res) => {
     maxDiscountAmount,
     minOrderValue,
     eligibilityType,
+    perUserLimit,
+    globalUsageLimit,
     validFrom,
     validUntil,
     localizedTitle,
@@ -341,6 +357,22 @@ export const updateCustomerCoupon = asyncHandler(async (req, res) => {
   }
 
   if (eligibilityType !== undefined) coupon.eligibilityType = eligibilityType;
+
+  if (perUserLimit !== undefined) {
+    const parsedPerUserLimit = Number(perUserLimit);
+    if (!Number.isFinite(parsedPerUserLimit) || parsedPerUserLimit < 1) {
+      return errorResponse(res, 400, "Per User Limit must be at least 1");
+    }
+    coupon.perUserLimit = parsedPerUserLimit;
+  }
+
+  if (globalUsageLimit !== undefined) {
+    const parsedGlobalUsageLimit = Number(globalUsageLimit);
+    if (!Number.isFinite(parsedGlobalUsageLimit) || parsedGlobalUsageLimit < 1) {
+      return errorResponse(res, 400, "Global Usage Limit must be at least 1");
+    }
+    coupon.globalUsageLimit = parsedGlobalUsageLimit;
+  }
 
   if (validFrom !== undefined) {
     const validFromDate = new Date(validFrom);

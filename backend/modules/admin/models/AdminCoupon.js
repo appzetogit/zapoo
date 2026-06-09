@@ -54,6 +54,21 @@ const adminCouponSchema = new mongoose.Schema(
       enum: ["all_users", "first_delivered_order"],
       default: "all_users",
     },
+    perUserLimit: {
+      type: Number,
+      required: true,
+      min: 1,
+    },
+    globalUsageLimit: {
+      type: Number,
+      required: true,
+      min: 1,
+    },
+    globalUsageCount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
     status: {
       type: String,
       enum: ["draft", "active", "paused", "expired", "cancelled"],

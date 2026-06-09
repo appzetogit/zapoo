@@ -345,6 +345,8 @@ export const createOrder = async (req, res) => {
     }
     await order.save();
 
+    // globalUsageCount increment is now handled dynamically in the Order model's pre-save hook based on status transitions.
+
     try {
       const orderSnapshot = order.toObject({ depopulate: true });
       logger.info('🧾 ORDER_CREATED_DEBUG_SNAPSHOT', {

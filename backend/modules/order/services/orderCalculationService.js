@@ -158,9 +158,34 @@ const getDeliveredOrderCountForUser = async (userId) => {
   });
 };
 
+const getCouponUsageCountsForUser = async (userId, couponCodes) => {
+  if (!userId || !couponCodes || couponCodes.length === 0) return {};
+  const usages = await Order.aggregate([
+    {
+      $match: {
+        userId: new mongoose.Types.ObjectId(userId),
+        'pricing.couponCode': { $in: couponCodes },
+        status: { $nin: ['cancelled', 'failed', 'payment_pending'] }
+      }
+    },
+    {
+      $group: {
+        _id: '$pricing.couponCode',
+        count: { $sum: 1 }
+      }
+    }
+  ]);
+  const usageMap = {};
+  usages.forEach(u => {
+    usageMap[u._id] = u.count;
+  });
+  return usageMap;
+};
+
 const isAdminCouponValidForUser = ({
   coupon,
   deliveredOrderCount,
+  userUsageCount = 0,
   subtotal,
   enforceMinOrder = false,
 }) => {
@@ -176,6 +201,12 @@ const isAdminCouponValidForUser = ({
     return false;
   }
   if (enforceMinOrder && Number(subtotal || 0) < Number(coupon.minOrderValue || 0)) {
+    return false;
+  }
+  if (coupon.globalUsageLimit && coupon.globalUsageCount >= coupon.globalUsageLimit) {
+    return false;
+  }
+  if (coupon.perUserLimit && userUsageCount >= coupon.perUserLimit) {
     return false;
   }
 
@@ -204,14 +235,17 @@ const getAvailableAdminCoupons = async ({
     .sort({ createdAt: -1 })
     .lean();
 
+  const couponCodes = coupons.map(c => c.code);
+  const usageMap = await getCouponUsageCountsForUser(userId, couponCodes);
+
   return coupons
     .filter((coupon) => isAdminCouponValidForUser({
       coupon,
       deliveredOrderCount,
+      userUsageCount: usageMap[coupon.code] || 0,
       subtotal,
       enforceMinOrder: false,
-    }))
-    .map((coupon) => ({
+    })).map((coupon) => ({
       code: coupon.code,
       title: resolveLocalizedText(coupon.localizedTitle, normalizedLocale, coupon.title || ''),
       description: resolveLocalizedText(coupon.localizedDescription, normalizedLocale, coupon.description || ''),
@@ -733,9 +767,13 @@ export const calculateOrderPricing = async ({
                 }).lean()
               ]);
 
+              const usageMap = adminCoupon ? await getCouponUsageCountsForUser(userId, [adminCoupon.code]) : {};
+              const userUsageCount = adminCoupon ? (usageMap[adminCoupon.code] || 0) : 0;
+
               if (adminCoupon && isAdminCouponValidForUser({
                 coupon: adminCoupon,
                 deliveredOrderCount,
+                userUsageCount,
                 subtotal,
                 enforceMinOrder: true,
               })) {
@@ -756,11 +794,13 @@ export const calculateOrderPricing = async ({
             }
           }
 
+          console.log('[DEBUG] Calling getAvailableAdminCoupons');
           availableAdminCoupons = await getAvailableAdminCoupons({
             userId,
             subtotal,
             locale: normalizedLocale,
           });
+          console.log(`[DEBUG] getAvailableAdminCoupons returned: ${availableAdminCoupons.length} coupons`);
         }
       } catch (error) {
         console.error(`Error fetching coupon from database: ${error.message}`);

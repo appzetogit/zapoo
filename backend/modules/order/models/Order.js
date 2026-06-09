@@ -455,11 +455,64 @@ orderSchema.pre('save', async function (next) {
   next();
 });
 
-// Update tracking when status changes
-orderSchema.pre('save', function (next) {
+// Update tracking and handle coupon global usage count when status changes
+orderSchema.pre('save', async function (next) {
   const now = new Date();
 
   if (this.isModified('status')) {
+    let originalStatus = undefined;
+    if (!this.isNew) {
+      try {
+        const originalDoc = await this.constructor.findById(this._id).select('status').lean();
+        if (originalDoc) {
+          originalStatus = originalDoc.status;
+        }
+      } catch (err) {
+        console.error(`Error fetching original status in pre-save hook: ${err.message}`);
+      }
+    }
+
+    // Determine coupon adjustments
+    const isCouponAdmin = this.pricing?.couponSource === 'admin' && this.pricing?.couponCode;
+    
+    if (isCouponAdmin) {
+      const isTransitionFromPaymentPending = originalStatus === 'payment_pending';
+      
+      // We increment if:
+      // - The order is brand new and NOT initially in payment_pending status (e.g. COD/Wallet order starting as pending).
+      // - OR the order is transitioning from payment_pending to a placed status (any status other than payment_pending, cancelled, failed, refunded).
+      const shouldIncrement = (this.isNew && this.status !== 'payment_pending') ||
+                              (isTransitionFromPaymentPending && !['payment_pending', 'cancelled', 'failed', 'refunded'].includes(this.status));
+
+      // We decrement if:
+      // - The status becomes cancelled or failed, and it was previously successfully placed (which means originalStatus was NOT payment_pending, and the order is not brand new in a cancelled/failed state).
+      const shouldDecrement = !this.isNew && 
+                              ['cancelled', 'failed'].includes(this.status) && 
+                              originalStatus !== 'payment_pending';
+
+      if (shouldIncrement) {
+        try {
+          const { default: AdminCoupon } = await import('../../admin/models/AdminCoupon.js');
+          await AdminCoupon.updateOne(
+            { code: this.pricing.couponCode },
+            { $inc: { globalUsageCount: 1 } }
+          );
+        } catch (err) {
+          console.error(`Error incrementing coupon global usage count: ${err.message}`);
+        }
+      } else if (shouldDecrement) {
+        try {
+          const { default: AdminCoupon } = await import('../../admin/models/AdminCoupon.js');
+          await AdminCoupon.updateOne(
+            { code: this.pricing.couponCode },
+            { $inc: { globalUsageCount: -1 } }
+          );
+        } catch (err) {
+          console.error(`Error decrementing coupon global usage count: ${err.message}`);
+        }
+      }
+    }
+
     switch (this.status) {
       case 'confirmed':
         if (!this.tracking.confirmed.status) {
