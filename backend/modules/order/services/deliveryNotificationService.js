@@ -162,9 +162,9 @@ export async function notifyDeliveryBoyNewOrder(order, deliveryPartnerId) {
   }
   try {
     const io = await getIOInstance();
-    if (!io) {
-      console.warn('Socket.IO not initialized, skipping delivery boy notification');
-      return;
+    const socketAvailable = Boolean(io);
+    if (!socketAvailable) {
+      console.warn('Socket.IO not initialized, skipping delivery socket notification but continuing with push.');
     }
 
     // Populate userId if it's not already populated
@@ -196,7 +196,9 @@ export async function notifyDeliveryBoyNewOrder(order, deliveryPartnerId) {
       console.warn(`⚠️ Delivery partner ${deliveryPartnerId} (${deliveryPartner.name}) has no valid location.`);
     }
     // Check if delivery partner is connected to socket BEFORE trying to notify
-    const connectionStatus = await checkDeliveryPartnerConnection(deliveryPartnerId);
+    const connectionStatus = socketAvailable
+      ? await checkDeliveryPartnerConnection(deliveryPartnerId)
+      : { connected: false, room: null, socketCount: 0 };
     if (!connectionStatus.connected) {
       console.warn(`⚠️ Delivery partner ${deliveryPartnerId} (${deliveryPartner.name}) is NOT connected to socket!`);
       console.warn(`⚠️ Notification will be sent but may not be received until they reconnect.`);
@@ -323,13 +325,16 @@ export async function notifyDeliveryBoyNewOrder(order, deliveryPartnerId) {
     let foundRoom = null;
 
     // First, get all connected sockets in delivery namespace for debugging
-    const allSocketsByEmitter = await Promise.all(
-      getDeliverySocketEmitters(io).map(async (emitter) => {
-        const sockets = await emitter.fetchSockets();
-        return { emitter: emitter?.name || '/', sockets };
-      })
-    );
+    const allSocketsByEmitter = socketAvailable
+      ? await Promise.all(
+          getDeliverySocketEmitters(io).map(async (emitter) => {
+            const sockets = await emitter.fetchSockets();
+            return { emitter: emitter?.name || '/', sockets };
+          })
+        )
+      : [];
     // Check each room variation
+    if (socketAvailable) {
     for (const room of roomVariations) {
       const { sockets, emitter } = await fetchSocketsInAnyDeliveryEmitter(io, room);
       if (sockets.length > 0) {
@@ -345,21 +350,24 @@ export async function notifyDeliveryBoyNewOrder(order, deliveryPartnerId) {
         // noop
       }
     }
+    }
     const primaryRoom = roomVariations[0];
     // Emit new order notification to all room variations (even if no sockets found, in case they connect)
     let notificationSent = false;
-    roomVariations.forEach(room => {
-      emitToDeliveryRoomAll(io, room, 'new_order', orderNotification);
-      emitToDeliveryRoomAll(io, room, 'play_notification_sound', {
-        type: 'new_order',
-        orderId: order.orderId,
-        message: `New order assigned: ${order.orderId}`
+    if (socketAvailable) {
+      roomVariations.forEach(room => {
+        emitToDeliveryRoomAll(io, room, 'new_order', orderNotification);
+        emitToDeliveryRoomAll(io, room, 'play_notification_sound', {
+          type: 'new_order',
+          orderId: order.orderId,
+          message: `New order assigned: ${order.orderId}`
+        });
+        notificationSent = true;
       });
-      notificationSent = true;
-    });
+    }
 
     // Also emit to all sockets in the delivery namespace (fallback if no specific room found)
-    if (socketsInRoom.length === 0) {
+    if (socketAvailable && socketsInRoom.length === 0) {
       console.warn(`⚠️ No sockets connected in any delivery room for partner ${normalizedDeliveryPartnerId}`);
       console.warn(`⚠️ Delivery partner details:`, {
         id: normalizedDeliveryPartnerId,
@@ -392,7 +400,7 @@ export async function notifyDeliveryBoyNewOrder(order, deliveryPartnerId) {
         notificationSent = true;
       }
     } else {}
-    if (notificationSent) {} else {
+    if (notificationSent) {} else if (socketAvailable) {
       console.error(`❌ Failed to send notification - no sockets found and broadcast failed`);
     }
 
@@ -403,6 +411,7 @@ export async function notifyDeliveryBoyNewOrder(order, deliveryPartnerId) {
         orderMongoId: order._id?.toString(),
         status: order.status,
         type: 'new_order',
+        notificationPriority: 'high',
         templateKey: 'delivery_new_order',
         templateVars: {
           orderId: order.orderId,
@@ -440,12 +449,9 @@ export async function notifyMultipleDeliveryBoys(order, deliveryPartnerIds, phas
       };
     }
     const io = await getIOInstance();
-    if (!io) {
-      console.warn('Socket.IO not initialized, skipping delivery boy notifications');
-      return {
-        success: false,
-        notified: 0
-      };
+    const socketAvailable = Boolean(io);
+    if (!socketAvailable) {
+      console.warn('Socket.IO not initialized, skipping delivery socket notifications but continuing with push.');
     }
     let notifiedCount = 0;
 
@@ -613,6 +619,7 @@ export async function notifyMultipleDeliveryBoys(order, deliveryPartnerIds, phas
         const roomVariations = [`delivery:${normalizedId}`, `delivery:${deliveryPartnerId}`, ...(mongoose.Types.ObjectId.isValid(normalizedId) ? [`delivery:${new mongoose.Types.ObjectId(normalizedId).toString()}`] : [])];
         let notificationSent = false;
         for (const room of roomVariations) {
+          if (!socketAvailable) break;
           const { sockets } = await fetchSocketsInAnyDeliveryEmitter(io, room);
           if (sockets.length > 0) {
             emitToDeliveryRoomAll(io, room, 'new_order', orderNotification);
@@ -628,13 +635,15 @@ export async function notifyMultipleDeliveryBoys(order, deliveryPartnerIds, phas
             break;
           }
         }
-        if (!notificationSent) {
+        if (!notificationSent && socketAvailable) {
           console.warn(`⚠️ Delivery partner ${normalizedId} not connected, but will receive notification when they connect`);
           // Still emit to room for when they connect
           roomVariations.forEach(room => {
             emitToDeliveryRoomAll(io, room, 'new_order', orderNotification);
             emitToDeliveryRoomAll(io, room, 'new_order_available', orderNotification);
           });
+          notifiedCount++;
+        } else if (!socketAvailable) {
           notifiedCount++;
         }
 
@@ -646,6 +655,7 @@ export async function notifyMultipleDeliveryBoys(order, deliveryPartnerIds, phas
             status: orderWithUser.status,
             type: 'new_order_available',
             phase,
+            notificationPriority: 'high',
             templateKey: 'delivery_new_order_available',
             templateVars: {
               orderId: orderWithUser.orderId,
@@ -713,9 +723,9 @@ export async function notifyDeliveryPartnersOrderTaken(data, deliveryPartnerIds 
 export async function notifyDeliveryBoyOrderReady(order, deliveryPartnerId) {
   try {
     const io = await getIOInstance();
-    if (!io) {
-      console.warn('Socket.IO not initialized, skipping delivery boy notification');
-      return;
+    const socketAvailable = Boolean(io);
+    if (!socketAvailable) {
+      console.warn('Socket.IO not initialized, skipping delivery socket notification but continuing with push.');
     }
     const normalizedDeliveryPartnerId = deliveryPartnerId?.toString() || deliveryPartnerId;
 
@@ -739,15 +749,17 @@ export async function notifyDeliveryBoyOrderReady(order, deliveryPartnerId) {
     let notificationSent = false;
     let foundRoom = null;
     let socketsInRoom = [];
-    for (const room of roomVariations) {
-      const { sockets } = await fetchSocketsInAnyDeliveryEmitter(io, room);
-      if (sockets.length > 0) {
-        foundRoom = room;
-        socketsInRoom = sockets;
-        break;
+    if (socketAvailable) {
+      for (const room of roomVariations) {
+        const { sockets } = await fetchSocketsInAnyDeliveryEmitter(io, room);
+        if (sockets.length > 0) {
+          foundRoom = room;
+          socketsInRoom = sockets;
+          break;
+        }
       }
     }
-    if (foundRoom && socketsInRoom.length > 0) {
+    if (socketAvailable && foundRoom && socketsInRoom.length > 0) {
       // Send to specific delivery partner room
       emitToDeliveryRoomAll(io, foundRoom, 'order_ready', orderReadyNotification);
       notificationSent = true;
@@ -765,6 +777,7 @@ export async function notifyDeliveryBoyOrderReady(order, deliveryPartnerId) {
         orderMongoId: order._id?.toString(),
         status: 'ready',
         type: 'order_ready',
+        notificationPriority: 'high',
         templateKey: 'delivery_order_ready_for_pickup',
         templateVars: {
           orderId: order.orderId

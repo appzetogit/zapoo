@@ -815,6 +815,10 @@ export async function notifyNextDeliveryPartner(orderDoc, restaurantLat, restaur
       socketCount: connection?.socketCount || 0
     });
     if (!connection?.connected) {
+      console.warn('[DeliveryAssign] Candidate has no active socket. Falling back to FCM push delivery.');
+      connection.connected = true;
+    }
+    if (!connection?.connected) {
       console.warn(`⚠️ [DeliveryAssign] Candidate ${nextId} not connected. Skipping.`);
       if (!orderDoc.assignmentInfo.rejectedDeliveryPartnerIds) {
         orderDoc.assignmentInfo.rejectedDeliveryPartnerIds = [];
