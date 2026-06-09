@@ -178,15 +178,15 @@ const userSchema = new mongoose.Schema({
       }
     }
   },
-  fcmTokensWeb: {
+  fcmTokenWeb: {
     type: [String],
     default: [],
-    select: false,
+    select: false
   },
-  fcmTokensMobile: {
+  fcmTokenMobile: {
     type: [String],
     default: [],
-    select: false,
+    select: false
   },
   isActive: {
     type: Boolean,

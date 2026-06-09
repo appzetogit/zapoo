@@ -16,34 +16,55 @@ import {
   getUserNotifications
 } from './controllers/notificationRequestController.js';
 import {
-  saveDeviceToken,
+  saveWebToken,
+  saveMobileToken,
   removeDeviceToken
 } from './controllers/fcmTokenController.js';
 import { sendNotificationToUser } from './utils/pushNotificationHelper.js';
+import jwtService from '../auth/services/jwtService.js';
 
 const router = express.Router();
 
+const universalAuth = (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) {
+      return res.status(401).json({ success: false, message: 'No token provided' });
+    }
+    const token = authHeader.split(' ')[1];
+    const decoded = jwtService.verifyAccessToken(token);
+    req.user = { userId: decoded.userId, role: decoded.role };
+    next();
+  } catch (error) {
+    return res.status(401).json({ success: false, message: 'Invalid token' });
+  }
+};
+
 // ── Device token routes (/api/notification/...) ────────────────────────────
-// Generic FCM device token registration per role
+// Generic FCM device token registration
+router.post('/save-web-token', universalAuth, saveWebToken);
+router.post('/save-mobile-token', universalAuth, saveMobileToken);
+
+// Deprecated routes kept for backward compatibility (temporarily)
 router.post('/tokens/user', authenticate, (req, res, next) => {
-  req.body.role = 'user';
-  return saveDeviceToken(req, res, next);
+  req.user = { userId: req.user._id, role: 'user' };
+  req.body.token = req.body.token; // Ensure token is present
+  return req.body.platform === 'web' ? saveWebToken(req, res, next) : saveMobileToken(req, res, next);
 });
 
 router.post('/tokens/restaurant', authenticateRestaurant, (req, res, next) => {
-  req.body.role = 'restaurant';
-  return saveDeviceToken(req, res, next);
+  req.user = { userId: req.restaurant._id, role: 'restaurant' };
+  return req.body.platform === 'web' ? saveWebToken(req, res, next) : saveMobileToken(req, res, next);
 });
 
 router.post('/tokens/delivery', authenticateDelivery, (req, res, next) => {
-  // For delivery partner apps using delivery auth, extend here when needed.
-  req.body.role = 'delivery';
-  return saveDeviceToken(req, res, next);
+  req.user = { userId: req.delivery._id, role: 'delivery' };
+  return req.body.platform === 'web' ? saveWebToken(req, res, next) : saveMobileToken(req, res, next);
 });
 
 router.post('/tokens/admin', authenticateAdmin, (req, res, next) => {
-  req.body.role = 'admin';
-  return saveDeviceToken(req, res, next);
+  req.user = { userId: req.admin._id, role: 'admin' };
+  return req.body.platform === 'web' ? saveWebToken(req, res, next) : saveMobileToken(req, res, next);
 });
 
 // Test push routes

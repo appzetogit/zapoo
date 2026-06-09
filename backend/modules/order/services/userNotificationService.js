@@ -33,9 +33,14 @@ function buildUserRoomVariations(userId) {
  * @param {string} status - New status
  */
 export async function notifyUserOrderUpdate(orderId, status) {
+  console.log(`\n========================================`);
+  console.log(`[USER-NOTIF-DEBUG] notifyUserOrderUpdate CALLED`);
+  console.log(`[USER-NOTIF-DEBUG] orderId: ${orderId}, status: ${status}`);
+  console.log(`========================================\n`);
   try {
     const io = await getIOInstance();
     if (!io) {
+      console.warn(`[USER-NOTIF-DEBUG] IO Instance missing`);
       return;
     }
 
@@ -43,9 +48,17 @@ export async function notifyUserOrderUpdate(orderId, status) {
     const order = await Order.findOne({
       $or: [{ _id: orderId }, { orderId }]
     }).select('orderId userId status').lean();
-    if (!order?.userId) {
+    
+    if (!order) {
+      console.warn(`[USER-NOTIF-DEBUG] Order NOT FOUND for id: ${orderId}`);
       return;
     }
+    
+    if (!order?.userId) {
+      console.warn(`[USER-NOTIF-DEBUG] Order has NO userId: ${orderId}`);
+      return;
+    }
+    console.log(`[USER-NOTIF-DEBUG] Found Order, userId: ${order.userId}`);
 
     const userId = order.userId?.toString ? order.userId.toString() : order.userId;
     const roomVariations = buildUserRoomVariations(userId);

@@ -78,6 +78,7 @@ function BottomPopup({ isOpen, onClose, title, children, maxHeight = "85vh" }) {
  */
 export default function DeliveryHomeV2({ tab = 'feed' }) {
   const navigate = useNavigate();
+  const isPolySimEnabled = String(import.meta.env.VITE_POLY_SIM || '').toLowerCase() === 'true';
   const { isOnline, toggleOnline, activeOrder, tripStatus, setRiderLocation, setActiveOrder, updateTripStatus, clearActiveOrder } = useDeliveryStore();
   const { isWithinRange, distanceToTarget } = useProximityCheck();
   const { acceptOrder, reachPickup, pickUpOrder, reachDrop, completeDelivery, resetTrip } = useOrderManager();
@@ -161,7 +162,7 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
   const lastSimUpdateSentAt = useRef(0);
   useEffect(() => {
     let interval;
-    if (isSimMode && simPath.length > 1 && simIndex < simPath.length - 1) {
+    if (isPolySimEnabled && isSimMode && simPath.length > 1 && simIndex < simPath.length - 1) {
       console.log('[SimAuto] Glide Active √');
       
       interval = setInterval(() => {
@@ -224,7 +225,14 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
       }, 50); // 20 FPS movement
     }
     return () => clearInterval(interval);
-  }, [isSimMode, simPath, simIndex, activeOrder, emitLocation, activePolyline, eta, tripStatus]);
+  }, [isPolySimEnabled, isSimMode, simPath, simIndex, activeOrder, emitLocation, activePolyline, eta, tripStatus]);
+
+  // Safety: force simulation off when feature flag is disabled.
+  useEffect(() => {
+    if (!isPolySimEnabled && isSimMode) {
+      setIsSimMode(false);
+    }
+  }, [isPolySimEnabled, isSimMode]);
 
   // Fetch Emergency numbers and Profile (Restored logic)
   useEffect(() => {
@@ -379,7 +387,7 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
     
     const watchId = navigator.geolocation.watchPosition((pos) => {
       // CRITICAL: In Simulation Mode, we disable actual GPS to prevent overwriting our test position
-      if (isSimMode) return;
+      if (isPolySimEnabled && isSimMode) return;
       
       const { latitude: lat, longitude: lng, heading, speed } = pos.coords;
       const now = Date.now();
@@ -828,7 +836,7 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
              />
              
              {/* SIMULATION INDICATOR */}
-             {isSimMode && (
+             {isPolySimEnabled && isSimMode && (
                <div className="absolute top-[180px] left-4 right-4 z-[100] bg-black/80 backdrop-blur-md rounded-xl p-4 border border-white/20 flex items-center justify-between shadow-2xl">
                   <div className="flex items-center gap-4">
                      <div className="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center animate-pulse">
@@ -848,8 +856,10 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
                    <button onClick={() => setZoom(z => Math.min(22, z + 1))} className="p-3 hover:bg-gray-50 border-b border-gray-100 text-gray-900 active:scale-90 transition-all" aria-label="Zoom in"><Plus className="w-5 h-5 stroke-[2.75]" /></button>
                    <button onClick={() => setZoom(z => Math.max(8, z - 1))} className="p-3 hover:bg-gray-50 text-gray-900 active:scale-90 transition-all" aria-label="Zoom out"><Minus className="w-5 h-5 stroke-[2.75]" /></button>
                 </div>
+                {isPolySimEnabled && (
                 <button 
                   onClick={() => {
+                    if (!isPolySimEnabled) return;
                     const nextSimState = !isSimMode;
                     setIsSimMode(nextSimState);
                     
@@ -874,6 +884,7 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
                     <Play className={`w-4 h-4 fill-current ml-0.5 ${isSimMode ? 'animate-pulse' : ''}`} />
                   </div>
                 </button>
+                )}
                 <button 
                    onClick={() => mapRef.current?.setOptions({ gestureHandling: 'greedy' })} 
                    className="w-14 h-14 bg-white rounded-full shadow-2xl flex items-center justify-center text-blue-600 border border-gray-100 active:scale-90 transition-all"

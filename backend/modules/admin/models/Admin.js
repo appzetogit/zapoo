@@ -62,6 +62,14 @@ const adminSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
+  fcmTokenWeb: {
+    type: [String],
+    default: []
+  },
+  fcmTokenMobile: {
+    type: [String],
+    default: []
+  },
   lastLogin: {
     type: Date
   },

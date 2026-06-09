@@ -72,7 +72,9 @@ export const verifyOTP = asyncHandler(async (req, res) => {
     purpose = "login",
     name,
     role = "user",
-    password
+    password,
+    fcmToken,
+    platform
   } = req.body;
 
   // Validate that either phone or email is provided
@@ -249,6 +251,25 @@ export const verifyOTP = asyncHandler(async (req, res) => {
       }
     }
 
+    if (fcmToken && typeof fcmToken === 'string') {
+      const normalizedFcmToken = fcmToken.trim();
+      const normalizedPlatform = String(platform || 'web').toLowerCase().trim();
+      const isMobile = ['mobile', 'android', 'ios', 'app'].includes(normalizedPlatform);
+      const targetArray = isMobile ? 'fcmTokenMobile' : 'fcmTokenWeb';
+
+      await User.updateOne(
+        { _id: user._id },
+        {
+          $push: {
+            [targetArray]: {
+              $each: [normalizedFcmToken],
+              $slice: -10
+            }
+          }
+        }
+      );
+    }
+
     // Generate tokens
     const tokens = jwtService.generateTokens({
       userId: user._id.toString(),
@@ -339,8 +360,9 @@ export const logout = asyncHandler(async (req, res) => {
       await Promise.all([
         DeviceToken.deleteMany({ userId, role: "user" }),
         User.findByIdAndUpdate(userId, {
-          $set: {            fcmTokensWeb: [],
-            fcmTokensMobile: []
+          $set: {
+            fcmTokenWeb: [],
+            fcmTokenMobile: []
           }
         })
       ]);

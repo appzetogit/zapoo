@@ -55,7 +55,9 @@ const verifyOTPSchema = Joi.object({
       then: Joi.required(),
       otherwise: Joi.optional()
     }),
-  password: Joi.string().min(6).max(100).optional()
+  password: Joi.string().min(6).max(100).optional(),
+  fcmToken: Joi.string().optional(),
+  platform: Joi.string().optional()
 }).or('phone', 'email');
 
 const registerSchema = Joi.object({

@@ -494,14 +494,21 @@ class ETACalculationService {
    * Get restaurant location
    */
   async getRestaurantLocation(restaurantId, passedRestaurant = null) {
-    const restaurant = passedRestaurant || await this.resolveRestaurant(restaurantId);
+    let restaurant = null;
+    // Check if passedRestaurant is actually a populated document
+    if (passedRestaurant && passedRestaurant.location) {
+      restaurant = passedRestaurant;
+    } else {
+      restaurant = await this.resolveRestaurant(restaurantId);
+    }
+
     if (!restaurant || !restaurant.location) {
       throw new Error('Restaurant location not found');
     }
 
     return {
-      latitude: restaurant.location.latitude,
-      longitude: restaurant.location.longitude
+      latitude: restaurant.location.latitude || restaurant.location.coordinates?.[1],
+      longitude: restaurant.location.longitude || restaurant.location.coordinates?.[0]
     };
   }
 

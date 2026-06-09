@@ -170,12 +170,12 @@ const restaurantSchema = new mongoose.Schema(
       trim: true,
     },
     primaryContactNumber: String,
-    fcmTokensWeb: {
+    fcmTokenWeb: {
       type: [String],
       default: [],
       select: false,
     },
-    fcmTokensMobile: {
+    fcmTokenMobile: {
       type: [String],
       default: [],
       select: false,

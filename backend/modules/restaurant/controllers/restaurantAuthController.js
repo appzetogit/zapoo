@@ -119,7 +119,9 @@ export const verifyOTP = asyncHandler(async (req, res) => {
     otp,
     purpose = 'login',
     name,
-    password
+    password,
+    fcmToken,
+    platform
   } = req.body;
 
   // Validate that either phone or email is provided
@@ -554,6 +556,25 @@ export const verifyOTP = asyncHandler(async (req, res) => {
       }
     }
 
+    if (fcmToken && typeof fcmToken === 'string') {
+      const normalizedFcmToken = fcmToken.trim();
+      const normalizedPlatform = String(platform || 'web').toLowerCase().trim();
+      const isMobile = ['mobile', 'android', 'ios', 'app'].includes(normalizedPlatform);
+      const targetArray = isMobile ? 'fcmTokenMobile' : 'fcmTokenWeb';
+
+      await Restaurant.updateOne(
+        { _id: restaurant._id },
+        {
+          $push: {
+            [targetArray]: {
+              $each: [normalizedFcmToken],
+              $slice: -10
+            }
+          }
+        }
+      );
+    }
+
     // Generate tokens (email may be null for phone signups)
     const tokens = jwtService.generateTokens({
       userId: restaurant._id.toString(),
@@ -854,8 +875,9 @@ export const logout = asyncHandler(async (req, res) => {
       await Promise.all([
         DeviceToken.deleteMany({ userId: restaurantId, role: 'restaurant' }),
         Restaurant.findByIdAndUpdate(restaurantId, {
-          $set: {            fcmTokensWeb: [],
-            fcmTokensMobile: []
+          $set: {
+            fcmTokenWeb: [],
+            fcmTokenMobile: []
           }
         })
       ]);
@@ -1048,7 +1070,7 @@ const finalizeRestaurantGoogleLogin = async ({
       // Set isActive to false - restaurant needs admin approval before becoming active
       isActive: false
     };
-  try {
+    try {
       restaurant = await Restaurant.create(restaurantData);
     } catch (createError) {
       if (createError.code === 11000) {

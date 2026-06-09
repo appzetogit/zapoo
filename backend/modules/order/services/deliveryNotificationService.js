@@ -101,7 +101,11 @@ export async function checkDeliveryPartnerConnection(deliveryPartnerId) {
     }
     // Fallback: also try deliveryId-based room if available
     if (mongoose.Types.ObjectId.isValid(normalizedId)) {
-      const delivery = await Delivery.findById(normalizedId).select('deliveryId').lean();
+      const { FoodDeliveryPartner } = await import('../../deliveryV2/models/deliveryPartner.model.js');
+      let delivery = await FoodDeliveryPartner.findById(normalizedId).select('deliveryId').lean();
+      if (!delivery) {
+        delivery = await Delivery.findById(normalizedId).select('deliveryId').lean();
+      }
       if (delivery?.deliveryId) {
         roomVariations = buildDeliveryRoomVariations(normalizedId, delivery.deliveryId);
         console.log('🔎 [DeliverySocketCheck] Retrying with deliveryId-based rooms', {
@@ -153,8 +157,14 @@ export async function checkDeliveryPartnerConnection(deliveryPartnerId) {
  * @param {string} deliveryPartnerId - Delivery partner ID
  */
 export async function notifyDeliveryBoyNewOrder(order, deliveryPartnerId) {
+  console.log(`\n========================================`);
+  console.log(`[DELIVERY-NOTIF-DEBUG] notifyDeliveryBoyNewOrder CALLED`);
+  console.log(`[DELIVERY-NOTIF-DEBUG] deliveryPartnerId: ${deliveryPartnerId}, orderId: ${order._id}`);
+  console.log(`========================================\n`);
+
   // CRITICAL: Don't notify if order is cancelled
   if (order.status === 'cancelled') {
+    console.warn(`[DELIVERY-NOTIF-DEBUG] Order cancelled, aborting.`);
     return {
       success: false,
       reason: 'Order is cancelled'
@@ -179,7 +189,14 @@ export async function notifyDeliveryBoyNewOrder(order, deliveryPartnerId) {
     }
 
     // Get delivery partner details
-    const deliveryPartner = await Delivery.findById(deliveryPartnerId).select('name phone availability.currentLocation availability.isOnline status isActive').lean();
+    let deliveryPartner = null;
+    const { FoodDeliveryPartner } = await import('../../deliveryV2/models/deliveryPartner.model.js');
+    deliveryPartner = await FoodDeliveryPartner.findById(deliveryPartnerId).select('name phone availability.currentLocation availability.isOnline status isActive').lean();
+    
+    if (!deliveryPartner) {
+      deliveryPartner = await Delivery.findById(deliveryPartnerId).select('name phone availability.currentLocation availability.isOnline status isActive').lean();
+    }
+    
     if (!deliveryPartner) {
       console.error(`❌ Delivery partner not found: ${deliveryPartnerId}`);
       return;

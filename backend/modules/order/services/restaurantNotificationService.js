@@ -75,7 +75,7 @@ export async function notifyRestaurantNewOrder(order, restaurantId, paymentMetho
           orderId: order._id
         }).select('method').lean();
         if (paymentRecord?.method === 'cash') resolvedPaymentMethod = 'cash';
-      } catch (e) {/* ignore */}
+      } catch (e) {/* ignore */ }
     }
 
     // Prepare order notification data
@@ -137,11 +137,11 @@ export async function notifyRestaurantNewOrder(order, restaurantId, paymentMetho
       providedRestaurantId: restaurantId,
       resolvedRestaurant: restaurant
         ? {
-            _id: restaurant._id?.toString?.() || restaurant._id,
-            restaurantId: restaurant.restaurantId || null,
-            slug: restaurant.slug || null,
-            name: restaurant.name || null
-          }
+          _id: restaurant._id?.toString?.() || restaurant._id,
+          restaurantId: restaurant.restaurantId || null,
+          slug: restaurant.slug || null,
+          name: restaurant.name || null
+        }
         : null,
       roomVariations
     });
@@ -218,17 +218,12 @@ export async function notifyRestaurantNewOrder(order, restaurantId, paymentMetho
           message: `New order received: ${order.orderId}`
         });
       });
-
-      socketDeliveryFailed = true;
-      socketFailureMessage = `Restaurant ${normalizedRestaurantId} (${order.restaurantName}) is not connected to Socket.IO room.`;
-    } else {
-      socketDeliveryFailed = true;
-      socketFailureMessage = 'Socket.IO is not initialized for restaurant notifications.';
     }
 
-    // Send FCM notification to restaurant (always send)
+    // Send FCM notification to restaurant (always send, even if sockets are disconnected)
     try {
       const normalizedRestaurantId = restaurantId?.toString() || restaurantId;
+      console.log(`[RESTAURANT-NOTIF-DEBUG] Calling sendNotificationToUser for New Order: ${order.orderId} to ${normalizedRestaurantId}`);
       await sendNotificationToUser(normalizedRestaurantId, 'restaurant', 'New Order Received!', `Order #${order.orderId} for ₹${order.pricing?.total ?? 0}`, {
         orderId: order.orderId,
         orderMongoId: order._id?.toString(),
@@ -241,18 +236,31 @@ export async function notifyRestaurantNewOrder(order, restaurantId, paymentMetho
           total: order.pricing?.total ?? 0
         }
       });
+      console.log(`[RESTAURANT-NOTIF-DEBUG] SUCCESS sending new order FCM to ${normalizedRestaurantId}`);
     } catch (pushError) {
       console.error('❌ [FCM] Error sending restaurant new order notification:', pushError);
     }
+
+    if (socketsInRoom.length === 0) {
+      // Return error instead of success
+      return {
+        success: false,
+        restaurantId,
+        orderId: order.orderId,
+        error: 'Restaurant not connected to Socket.IO',
+        message: `Restaurant ${normalizedRestaurantId} (${order.restaurantName}) is not connected. Order notification not sent.`
+      };
+    }
+
     return {
       success: !socketDeliveryFailed,
       restaurantId,
       orderId: order.orderId,
       ...(socketDeliveryFailed
         ? {
-            warning: 'socket_delivery_failed',
-            message: socketFailureMessage
-          }
+          warning: 'socket_delivery_failed',
+          message: socketFailureMessage
+        }
         : {})
     };
   } catch (error) {
@@ -332,16 +340,16 @@ export async function notifyRestaurantOrderUpdate(orderId, status) {
       }
       const payloadData = shouldUseSafePayload
         ? {
-            status: normalizedStatus,
-            type: 'restaurant_status_update',
-            clickUrl: '/restaurant/orders/all'
-          }
+          status: normalizedStatus,
+          type: 'restaurant_status_update',
+          clickUrl: '/restaurant/orders/all'
+        }
         : {
-            orderId: order.orderId,
-            orderMongoId: order._id?.toString(),
-            status: normalizedStatus,
-            type: 'order_update'
-          };
+          orderId: order.orderId,
+          orderMongoId: order._id?.toString(),
+          status: normalizedStatus,
+          type: 'order_update'
+        };
 
       await sendNotificationToUser(order.restaurantId?.toString() || order.restaurantId, 'restaurant', title, body, payloadData);
     } catch (pushError) {

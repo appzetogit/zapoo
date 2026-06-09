@@ -66,7 +66,7 @@ export const registerDeliveryPartner = async (payload, files) => {
         if (platform === 'mobile') {
             partner.fcmTokenMobile = [fcmToken];
         } else {
-            partner.fcmTokens = [fcmToken];
+            partner.fcmTokenWeb = [fcmToken];
         }
     }
 
@@ -133,9 +133,9 @@ export const updateDeliveryPartnerProfile = async (userId, payload, files) => {
                 partner.fcmTokenMobile.push(fcmToken);
             }
         } else {
-            if (!partner.fcmTokens) partner.fcmTokens = [];
-            if (!partner.fcmTokens.includes(fcmToken)) {
-                partner.fcmTokens.push(fcmToken);
+            if (!partner.fcmTokenWeb) partner.fcmTokenWeb = [];
+            if (!partner.fcmTokenWeb.includes(fcmToken)) {
+                partner.fcmTokenWeb.push(fcmToken);
             }
         }
     }

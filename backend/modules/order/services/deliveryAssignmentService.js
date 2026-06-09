@@ -136,9 +136,15 @@ async function getRiderPresenceSnapshot(deliveryPartnerId) {
   };
 
   try {
-    const rider = await Delivery.findById(riderId)
+    const { FoodDeliveryPartner } = await import('../../deliveryV2/models/deliveryPartner.model.js');
+    let rider = await FoodDeliveryPartner.findById(riderId)
       .select('isActive status availability.isOnline availability.lastLocationUpdate')
       .lean();
+    if (!rider) {
+      rider = await Delivery.findById(riderId)
+        .select('isActive status availability.isOnline availability.lastLocationUpdate')
+        .lean();
+    }
     if (rider) {
       snapshot.db.exists = true;
       snapshot.db.isOnline = Boolean(rider?.availability?.isOnline);

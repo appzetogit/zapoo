@@ -2,7 +2,6 @@ import admin from 'firebase-admin';
 import DeviceToken from '../models/DeviceToken.js';
 import User from '../../auth/models/User.js';
 import Restaurant from '../../restaurant/models/Restaurant.js';
-import Delivery from '../../delivery/models/Delivery.js';
 import Admin from '../../admin/models/Admin.js';
 import { renderNotificationTemplate } from '../../../shared/i18n/notificationTemplates.js';
 import { normalizeLocale } from '../../../shared/i18n/localeConstants.js';
@@ -26,7 +25,7 @@ function looksLikeMongoObjectId(value) {
  * Prefers the named "zapoo-rtdb" app used for RTDB/FCM; falls back to the
  * default app if available.
  */
-function getFirebaseMessagingApp() { 
+function getFirebaseMessagingApp() {
   // Prefer the explicitly configured RTDB app
   let app = admin.apps.find(a => a?.name === 'zapoo-rtdb');
 
@@ -133,6 +132,7 @@ export async function sendPushNotification(tokens, payload) {
       response.responses.forEach((resp, idx) => {
         if (!resp.success) {
           const errorCode = resp.error?.code || '';
+          console.warn(`[FCM-DEBUG] Token Failed: ${tokens[idx]} | Error: ${errorCode} - ${resp.error?.message}`);
           if (
             errorCode === 'messaging/invalid-registration-token' ||
             errorCode === 'messaging/registration-token-not-registered' ||
@@ -145,7 +145,7 @@ export async function sendPushNotification(tokens, payload) {
       });
 
       if (invalidTokens.length > 0) {
-        console.warn(`[FCM] Cleaning up ${invalidTokens.length} invalid tokens from DeviceToken collection.`);
+        console.warn(`[FCM-DEBUG] Firebase rejected ${invalidTokens.length} tokens. Invalid tokens: ${invalidTokens.join(', ')}`);
         await DeviceToken.deleteMany({
           deviceToken: {
             $in: invalidTokens
@@ -168,14 +168,25 @@ export async function sendPushNotification(tokens, payload) {
  */
 export async function sendNotificationToUser(userId, role, title, body, data = {}) {
   try {
-    console.log(`[FCM-TRACE] sendNotificationToUser:start role=${role} userId=${userId} type=${data?.type || 'na'} template=${data?.templateKey || 'na'}`);
+    const normalizedRole = role || 'user';
+    console.log(`\n========================================`);
+    console.log(`[FCM-STRICT-DEBUG] INCOMING NOTIFICATION`);
+    console.log(`[FCM-STRICT-DEBUG] Recipient ID: ${userId} (Type: ${typeof userId})`);
+    console.log(`[FCM-STRICT-DEBUG] Role: ${normalizedRole}`);
+    console.log(`[FCM-STRICT-DEBUG] Title: ${title}`);
+    console.log(`========================================\n`);
+
+    if (!userId || userId === 'undefined' || userId === 'null') {
+      console.warn(`[FCM-STRICT-DEBUG] ABORTING: Invalid userId passed: ${userId}`);
+      return;
+    }
+
     const defaultClickUrlByRole = {
       user: '/orders',
       restaurant: '/orders',
       delivery: '/delivery',
       admin: '/admin'
     };
-    const normalizedRole = role || 'user';
     const clickUrl = data.clickUrl || defaultClickUrlByRole[normalizedRole] || '/';
     const enrichedData = {
       target: normalizedRole,
@@ -207,78 +218,69 @@ export async function sendNotificationToUser(userId, role, title, body, data = {
       resolvedBody = resolveLocalizedText(body, recipientLocale, typeof body === 'string' ? body : '');
     }
 
-    const roleTitleMap = {
-      user: 'USER',
-      restaurant: 'RESTAURANT',
-      delivery: 'DELIVERY PARTNER',
-      admin: 'ADMIN'
-    };
-    const roleTitleLabel = roleTitleMap[normalizedRole] || String(normalizedRole || 'NOTIFICATION').toUpperCase();
-    resolvedTitle = `[${roleTitleLabel}] ${resolvedTitle || 'Notification'}`;
-
-    let resolvedUserId = userId;
-    if (role === 'restaurant' && !looksLikeMongoObjectId(String(userId || ''))) {
-      const restaurantDoc = await Restaurant.findOne({
-        $or: [
-          { restaurantId: String(userId || '') },
-          { slug: String(userId || '') }
-        ]
-      }).select('_id').lean();
-      if (restaurantDoc?._id) {
-        resolvedUserId = restaurantDoc._id.toString();
-        console.log(`[FCM-TRACE] restaurantId resolved: input=${userId} resolved=${resolvedUserId}`);
+    const sanitizedData = {};
+    for (const [key, value] of Object.entries(enrichedData)) {
+      if (value !== null && value !== undefined) {
+        sanitizedData[key] = typeof value === 'object' ? JSON.stringify(value) : String(value);
       }
     }
 
     const payload = {
-      title: resolvedTitle,
+      title: `[${normalizedRole}] ${resolvedTitle}`,
       body: resolvedBody,
-      data: enrichedData
+      data: sanitizedData
     };
-    const tokensRaw = await DeviceToken.find({
-      userId: resolvedUserId,
-      role,
-      isActive: true
-    }).select('deviceToken').lean();
-    let tokens = tokensRaw.map(t => t.deviceToken).filter(Boolean);
-    console.log(`[FCM-TRACE] tokenLookup role=${role} userId=${resolvedUserId} activeTokens=${tokens.length}`);
+    let tokens = [];
+    let modelDoc = null;
 
-    // Fallback to role-model legacy fields when DeviceToken rows are missing.
-    if (tokens.length === 0 && role === 'user') {
-      const user = await User.findById(userId).select('fcmTokensWeb fcmTokensMobile').lean();
-      if (user) {
-        tokens = [
-          ...(Array.isArray(user.fcmTokensWeb) ? user.fcmTokensWeb : []),
-          ...(Array.isArray(user.fcmTokensMobile) ? user.fcmTokensMobile : [])
-        ].filter(Boolean);
-        console.log(`[FCM-TRACE] userLegacyFallback userId=${userId} fallbackTokens=${tokens.length}`);
+    if (role === 'user') {
+      modelDoc = await User.findById(userId).select('fcmTokenWeb fcmTokenMobile').lean();
+    } else if (role === 'delivery' || role === 'DELIVERY_PARTNER') {
+      const { FoodDeliveryPartner } = await import('../../deliveryV2/models/deliveryPartner.model.js');
+      const Delivery = (await import('../../delivery/models/Delivery.js')).default;
+
+      // Try V2 first
+      modelDoc = await FoodDeliveryPartner.findById(userId).select('fcmTokenWeb fcmTokenMobile').lean();
+
+      // If not found in V2, fallback to V1
+      if (!modelDoc) {
+        modelDoc = await Delivery.findById(userId).select('fcmTokenWeb fcmTokenMobile').lean();
       }
-    } else if (tokens.length === 0 && role === 'delivery') {
-      const delivery = await Delivery.findById(userId).select('fcmTokensWeb fcmTokensMobile').lean();
-      if (delivery) {
-        tokens = [
-          ...(Array.isArray(delivery.fcmTokensWeb) ? delivery.fcmTokensWeb : []),
-          ...(Array.isArray(delivery.fcmTokensMobile) ? delivery.fcmTokensMobile : [])
-        ].filter(Boolean);
-        console.log(`[FCM-TRACE] deliveryLegacyFallback userId=${userId} fallbackTokens=${tokens.length}`);
-      }
-    } else if (tokens.length === 0 && role === 'restaurant') {
-      const restaurant = await Restaurant.findById(userId).select('fcmTokensWeb fcmTokensMobile').lean();
-      if (restaurant) {
-        tokens = [
-          ...(Array.isArray(restaurant.fcmTokensWeb) ? restaurant.fcmTokensWeb : []),
-          ...(Array.isArray(restaurant.fcmTokensMobile) ? restaurant.fcmTokensMobile : [])
-        ].filter(Boolean);
-        console.log(`[FCM-TRACE] restaurantLegacyFallback userId=${userId} fallbackTokens=${tokens.length}`);
-      }
+    } else if (role === 'restaurant') {
+      modelDoc = await Restaurant.findById(userId).select('fcmTokenWeb fcmTokenMobile').lean();
+    } else if (role === 'admin') {
+      // Assuming Admin model hasn't been updated to the array format, but try reading it
+      const Admin = (await import('../../admin/models/Admin.js')).default;
+      modelDoc = await Admin.findById(userId).select('fcmTokenWeb fcmTokenMobile fcmTokenApp fcmTokens').lean();
     }
+
+    if (modelDoc) {
+      const getTokens = (field) => {
+        if (!field) return [];
+        if (Array.isArray(field)) return field;
+        if (typeof field === 'string') return [field];
+        return [];
+      };
+
+      tokens = [
+        ...getTokens(modelDoc.fcmTokenWeb),
+        ...getTokens(modelDoc.fcmTokenMobile),
+        ...getTokens(modelDoc.fcmTokenApp),
+        ...getTokens(modelDoc.fcmTokens),
+        ...getTokens(modelDoc.deviceToken)
+      ].filter(Boolean);
+      console.log(`[FCM-DEBUG] Found tokens for ${role} ${userId}: ${tokens.length} tokens found in model.`);
+    } else {
+      console.log(`[FCM-DEBUG] No tokens found for ${role} ${userId} in model. Document exists: ${!!modelDoc}`);
+    }
+
     if (tokens.length > 0) {
       // Deduplicate
       const uniqueTokens = Array.from(new Set(tokens));
-      console.log(`[FCM-TRACE] send role=${role} userId=${userId} uniqueTokens=${uniqueTokens.length} clickUrl=${enrichedData.clickUrl || '/'}`);
+      console.log(`[FCM-DEBUG] Sending push to ${uniqueTokens.length} unique tokens for ${role} ${userId}`);
       await sendPushNotification(uniqueTokens, payload);
     } else {
-      console.warn(`[FCM-TRACE] noTokens role=${role} userId=${resolvedUserId}`);
+      console.warn(`[FCM-DEBUG] FAILED to send push: No tokens available for ${role} ${userId}`);
     }
   } catch (error) {
     console.error(`[FCM] Error in sendNotificationToUser for ${userId}:`, error);
@@ -296,8 +298,14 @@ async function resolveRecipientLocale(userId, role) {
     const restaurant = await Restaurant.findById(userId).select('preferences.language').lean();
     return normalizeLocale(restaurant?.preferences?.language);
   }
-  if (normalizedRole === 'delivery') {
-    const delivery = await Delivery.findById(userId).select('preferences.language').lean();
+  if (normalizedRole === 'delivery' || normalizedRole === 'DELIVERY_PARTNER') {
+    const { FoodDeliveryPartner } = await import('../../deliveryV2/models/deliveryPartner.model.js');
+    const Delivery = (await import('../../delivery/models/Delivery.js')).default;
+
+    let delivery = await FoodDeliveryPartner.findById(userId).select('preferences.language').lean();
+    if (!delivery) {
+      delivery = await Delivery.findById(userId).select('preferences.language').lean();
+    }
     return normalizeLocale(delivery?.preferences?.language);
   }
   if (normalizedRole === 'admin') {
