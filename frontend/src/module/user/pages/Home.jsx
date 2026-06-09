@@ -2,7 +2,7 @@ import { useSearchParams, Link, useNavigate } from "react-router-dom";
 import React, { useRef, useEffect, useState, useMemo, useCallback } from "react";
 import { createPortal } from "react-dom";
 import Lenis from "lenis";
-import { Star, Clock, MapPin, Heart, Search, Tag, Flame, ShoppingBag, ShoppingCart, Mic, SlidersHorizontal, CheckCircle2, Bookmark, BadgePercent, X, ArrowDownUp, Timer, CalendarClock, ShieldCheck, IndianRupee, UtensilsCrossed, Leaf, AlertCircle, Loader2, Plus, Check, Share2, Zap } from "lucide-react";
+import { Star, Clock, MapPin, Heart, Search, Tag, Flame, ShoppingBag, ShoppingCart, Mic, SlidersHorizontal, CheckCircle2, Bookmark, BadgePercent, X, ArrowDownUp, Timer, CalendarClock, ShieldCheck, IndianRupee, UtensilsCrossed, Leaf, AlertCircle, Loader2, Plus, Check, Share2, Zap, ChevronDown } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Footer from "../components/Footer";
 import AddToCartButton from "../components/AddToCartButton";
@@ -1717,21 +1717,20 @@ export default function Home() {
                       </span>
                     </Link>
                   </motion.div>)}
-                {/* See All button - show if there are more than 10 categories */}
-                {visibleRealCategories.length > 10 && <motion.div className="flex-shrink-0 cursor-pointer" initial={false} whileHover={{
-              scale: 1.1
+                {/* See All button - show if there are more than 4 categories */}
+                {visibleRealCategories.length > 4 && <motion.div className="flex-shrink-0 cursor-pointer" initial={false} whileHover={{
+              scale: 1.05,
+              y: -5
             }} whileTap={{
               scale: 0.95
             }} onClick={() => setShowAllCategoriesModal(true)}>
-                    <div className="relative w-32 h-36 sm:w-36 sm:h-40 md:w-40 md:h-44 bg-white dark:bg-[#1a1a1a] rounded-2xl shadow-sm border border-slate-100 dark:border-gray-800 overflow-hidden group hover:shadow-md transition-all flex items-center justify-center">
-                      <div className="flex flex-col items-center gap-2">
-                        <div className="w-10 h-10 sm:w-12 sm:h-12 bg-pink-100 dark:bg-pink-900/50 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
-                          <UtensilsCrossed className="w-5 h-5 sm:w-6 sm:h-6 text-pink-600 dark:text-pink-400" />
-                        </div>
-                        <span className="text-sm sm:text-base font-bold text-gray-900 dark:text-white">
-                          {t("user.home.seeAll")}
-                        </span>
+                    <div className="flex flex-col items-center gap-2 group">
+                      <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full overflow-hidden shadow-sm border border-emerald-100 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center relative">
+                        <UtensilsCrossed className="w-6 h-6 sm:w-8 sm:h-8 text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform duration-300" />
                       </div>
+                      <span className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 text-center whitespace-nowrap flex items-center justify-center gap-0.5">
+                        {t("user.home.seeAll")} <ChevronDown className="w-3 h-3 text-emerald-600 dark:text-emerald-400 mt-0.5" />
+                      </span>
                     </div>
                   </motion.div>}
               </> : landingCategories.length > 0 ? <>
@@ -1746,8 +1745,8 @@ export default function Home() {
                       </span>
                     </Link>
                   </div>)}
-                {/* See All button - show if there are more than 10 categories */}
-                {landingCategories.length > 10 && <motion.div className="flex-shrink-0 cursor-pointer" initial={{
+                {/* See All button - show if there are more than 4 categories */}
+                {landingCategories.length > 4 && <motion.div className="flex-shrink-0 cursor-pointer" initial={{
               opacity: 0,
               scale: 0.8
             }} whileInView={{
@@ -1759,19 +1758,18 @@ export default function Home() {
               duration: 0.4,
               delay: 0.1
             }} whileHover={{
-              scale: 1.1
+              scale: 1.05,
+              y: -5
             }} whileTap={{
               scale: 0.95
             }} onClick={() => setShowAllCategoriesModal(true)}>
-                    <div className="relative w-32 h-36 sm:w-36 sm:h-40 md:w-40 md:h-44 bg-white dark:bg-[#1a1a1a] rounded-2xl shadow-sm border border-slate-100 dark:border-gray-800 overflow-hidden group hover:shadow-md transition-all flex items-center justify-center">
-                      <div className="flex flex-col items-center gap-2">
-                        <div className="w-10 h-10 sm:w-12 sm:h-12 bg-pink-100 dark:bg-pink-900/50 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
-                          <UtensilsCrossed className="w-5 h-5 sm:w-6 sm:h-6 text-pink-600 dark:text-pink-400" />
-                        </div>
-                        <span className="text-sm sm:text-base font-bold text-gray-900 dark:text-white">
-                          {t("user.home.seeAll")}
-                        </span>
+                    <div className="flex flex-col items-center gap-2 group">
+                      <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full overflow-hidden shadow-sm border border-emerald-100 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center relative">
+                        <UtensilsCrossed className="w-6 h-6 sm:w-8 sm:h-8 text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform duration-300" />
                       </div>
+                      <span className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 text-center whitespace-nowrap flex items-center justify-center gap-0.5">
+                        {t("user.home.seeAll")} <ChevronDown className="w-3 h-3 text-emerald-600 dark:text-emerald-400 mt-0.5" />
+                      </span>
                     </div>
                   </motion.div>}
               </> :

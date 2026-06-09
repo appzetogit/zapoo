@@ -631,6 +631,8 @@ export default function OrdersMain() {
           // Accept flow supports both 'pending' and 'confirmed', so popup should appear for both.
           const pendingOrders = response.data.data.orders.filter(order =>
             ['pending', 'confirmed'].includes(String(order.status || '').toLowerCase()) &&
+            !order.tracking?.confirmed?.status &&
+            !order.tracking?.preparing?.status &&
             !shownOrdersRef.current.has(order.orderId || order._id)
           );
 
