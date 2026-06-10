@@ -67,8 +67,8 @@ export const ProfileDocsV2 = () => {
   const docs = [
     { label: "Aadhar Card", field: "aadharPhoto", data: profile?.documents?.aadhar },
     { label: "PAN Card", field: "panPhoto", data: profile?.documents?.pan },
-    { label: "Driving License", field: "drivingLicensePhoto", data: profile?.documents?.drivingLicense }
-  ];
+    profile?.vehicle?.type !== "bicycle" && { label: "Driving License", field: "drivingLicensePhoto", data: profile?.documents?.drivingLicense }
+  ].filter(Boolean);
 
   return (
     <div className="min-h-screen bg-gray-50 font-poppins pb-20">

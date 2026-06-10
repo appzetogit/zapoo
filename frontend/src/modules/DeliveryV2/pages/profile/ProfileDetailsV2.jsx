@@ -733,8 +733,8 @@ export const ProfileDetailsV2 = () => {
              {[
                { icon: FileText, label: "Aadhar Card", doc: profile?.documents?.aadhar },
                { icon: FileText, label: "PAN Card", doc: profile?.documents?.pan },
-               { icon: Truck, label: "Driving License", doc: profile?.documents?.drivingLicense, number: getDrivingLicenseNumber() }
-             ].map((item, i) => (
+               profile?.vehicle?.type !== "bicycle" && { icon: Truck, label: "Driving License", doc: profile?.documents?.drivingLicense, number: getDrivingLicenseNumber() }
+             ].filter(Boolean).map((item, i) => (
                <div key={i} className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
                   <div className="flex items-center gap-4">
                      <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center text-gray-400"><item.icon className="w-5 h-5" /></div>
@@ -830,7 +830,14 @@ export const ProfileDetailsV2 = () => {
                         <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Vehicle Type</p>
                         <select 
                             value={vehicleInput.type} 
-                            onChange={(e) => setVehicleInput({...vehicleInput, type: e.target.value})} 
+                            onChange={(e) => {
+                                const newType = e.target.value;
+                                setVehicleInput({
+                                    ...vehicleInput,
+                                    type: newType,
+                                    number: newType === "bicycle" ? "" : vehicleInput.number
+                                });
+                            }} 
                             className="w-full bg-transparent text-lg font-black text-black outline-none border-b-2 border-transparent focus:border-orange-500 cursor-pointer"
                         >
                             <option value="bike">Bike</option>
@@ -858,22 +865,26 @@ export const ProfileDetailsV2 = () => {
                     </div>
                 </div>
 
-                <div className="h-px bg-gray-200 w-full" />
+                {vehicleInput.type !== "bicycle" && (
+                  <>
+                    <div className="h-px bg-gray-200 w-full" />
 
-                {/* Number Input */}
-                <div className="flex items-center gap-4 w-full">
-                    <div className="w-8 h-8 flex items-center justify-center"><QrCode className="w-4 h-4 text-orange-500/50" /></div>
-                    <div className="flex-1">
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Vehicle Number</p>
-                        <input 
-                            type="text" 
-                            value={vehicleInput.number} 
-                            onChange={(e) => setVehicleInput({...vehicleInput, number: e.target.value.toUpperCase()})} 
-                            placeholder="E.g. UP 80 AB 1234"
-                            className="w-full bg-transparent text-lg font-black text-black outline-none border-b-2 border-transparent focus:border-orange-500 placeholder:text-gray-200"
-                        />
+                    {/* Number Input */}
+                    <div className="flex items-center gap-4 w-full">
+                        <div className="w-8 h-8 flex items-center justify-center"><QrCode className="w-4 h-4 text-orange-500/50" /></div>
+                        <div className="flex-1">
+                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Vehicle Number</p>
+                            <input 
+                                type="text" 
+                                value={vehicleInput.number} 
+                                onChange={(e) => setVehicleInput({...vehicleInput, number: e.target.value.toUpperCase()})} 
+                                placeholder="E.g. UP 80 AB 1234"
+                                className="w-full bg-transparent text-lg font-black text-black outline-none border-b-2 border-transparent focus:border-orange-500 placeholder:text-gray-200"
+                            />
+                        </div>
                     </div>
-                </div>
+                  </>
+                )}
             </div>
 
             <button 
@@ -881,26 +892,29 @@ export const ProfileDetailsV2 = () => {
                  const num = vehicleInput.number.trim();
                  const brand = vehicleInput.brand.trim();
                  const type = vehicleInput.type;
+                 const isBicycle = type === "bicycle";
 
-                 if (!num) return toast.error("Vehicle number is required");
+                 if (!isBicycle && !num) return toast.error("Vehicle number is required");
                  if (!brand) return toast.error("Vehicle brand is required");
 
-                 // Improved validation for Indian vehicle numbers
-                 // Accept common formats like MH12AB1234 or MH12A1234
-                 const numRegex = /^[A-Z]{2}[0-9]{1,2}[A-Z]{0,2}[0-9]{4}$/i;
-                 if (!numRegex.test(num.replace(/\s+/g, ""))) {
-                    return toast.error("Please enter a valid vehicle number (e.g. MH12AB1234)");
+                 if (!isBicycle) {
+                   // Improved validation for Indian vehicle numbers
+                   // Accept common formats like MH12AB1234 or MH12A1234
+                   const numRegex = /^[A-Z]{2}[0-9]{1,2}[A-Z]{0,2}[0-9]{4}$/i;
+                   if (!numRegex.test(num.replace(/\s+/g, ""))) {
+                      return toast.error("Please enter a valid vehicle number (e.g. MH12AB1234)");
+                   }
                  }
 
                  try {
                      await deliveryAPI.updateProfile({ 
                          vehicle: { 
-                             number: num,
+                             number: isBicycle ? "" : num,
                              brand: brand,
                              type: type
                          } 
                      })
-                     setVehicleNumber(num)
+                     setVehicleNumber(isBicycle ? "" : num)
                      setVehicleBrand(brand)
                      setVehicleType(type)
                      setShowVehiclePopup(false)

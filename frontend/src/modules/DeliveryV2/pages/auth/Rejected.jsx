@@ -9,13 +9,15 @@ import { useCompanyName } from "@food/hooks/useCompanyName"
 const getDeliverySignupStepFromUser = (user) => {
   if (!user || typeof user !== "object") return null
 
+  const isBicycle = user?.vehicle?.type === "bicycle"
+
   const hasBasicDetails = Boolean(
     user?.name?.trim?.() &&
     user?.location?.addressLine1?.trim?.() &&
     user?.location?.city?.trim?.() &&
     user?.location?.state?.trim?.() &&
     user?.vehicle?.type &&
-    user?.vehicle?.number?.trim?.() &&
+    (isBicycle || user?.vehicle?.number?.trim?.()) &&
     user?.documents?.pan?.number?.trim?.() &&
     user?.documents?.aadhar?.number?.trim?.()
   )
@@ -26,7 +28,7 @@ const getDeliverySignupStepFromUser = (user) => {
     user?.profileImage?.url &&
     user?.documents?.aadhar?.document &&
     user?.documents?.pan?.document &&
-    user?.documents?.drivingLicense?.document
+    (isBicycle || user?.documents?.drivingLicense?.document)
   )
 
   return hasAllDocuments ? null : "documents"

@@ -120,7 +120,8 @@ export default function SignupStep1() {
         return {
           ...prev,
           vehicleType: updatedValue,
-          vehicleNumber: updatedValue === "bicycle" ? "" : prev.vehicleNumber
+          vehicleNumber: updatedValue === "bicycle" ? "" : prev.vehicleNumber,
+          drivingLicenseNumber: updatedValue === "bicycle" ? "" : prev.drivingLicenseNumber
         }
       }
 
@@ -136,10 +137,11 @@ export default function SignupStep1() {
         [name]: ""
       }))
     }
-    if (name === "vehicleType" && errors.vehicleNumber) {
+    if (name === "vehicleType") {
       setErrors(prev => ({
         ...prev,
-        vehicleNumber: ""
+        vehicleNumber: "",
+        drivingLicenseNumber: ""
       }))
     }
   }
@@ -181,10 +183,12 @@ export default function SignupStep1() {
       }
     }
 
-    if (!formData.drivingLicenseNumber.trim()) {
-      newErrors.drivingLicenseNumber = "Driving license number is required"
-    } else if (!drivingLicenseRegex.test(formData.drivingLicenseNumber)) {
-      newErrors.drivingLicenseNumber = "Invalid DL format (e.g., DL0120110012345)"
+    if (!isBicycle) {
+      if (!formData.drivingLicenseNumber.trim()) {
+        newErrors.drivingLicenseNumber = "Driving license number is required"
+      } else if (!drivingLicenseRegex.test(formData.drivingLicenseNumber)) {
+        newErrors.drivingLicenseNumber = "Invalid DL format (e.g., DL0120110012345)"
+      }
     }
 
     if (!formData.panNumber.trim()) {
@@ -226,7 +230,7 @@ export default function SignupStep1() {
         vehicleType: formData.vehicleType || "bike",
         vehicleName: formData.vehicleName?.trim() || "",
         vehicleNumber: isBicycle ? "" : formData.vehicleNumber.trim(),
-        drivingLicenseNumber: formData.drivingLicenseNumber.trim().toUpperCase(),
+        drivingLicenseNumber: isBicycle ? "" : formData.drivingLicenseNumber.trim().toUpperCase(),
         panNumber: formData.panNumber.trim().toUpperCase(),
         aadharNumber: formData.aadharNumber.replace(/\s/g, "")
       }
@@ -408,22 +412,24 @@ export default function SignupStep1() {
           )}
 
           {/* Driving License Number */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Driving License Number <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              name="drivingLicenseNumber"
-              value={formData.drivingLicenseNumber}
-              onChange={handleChange}
-              maxLength={16}
-              className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 uppercase ${errors.drivingLicenseNumber ? "border-red-500" : "border-gray-300"
-                }`}
-              placeholder="e.g., MH1220110012345"
-            />
-            {errors.drivingLicenseNumber && <p className="text-red-500 text-sm mt-1">{errors.drivingLicenseNumber}</p>}
-          </div>
+          {!isBicycle && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Driving License Number <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                name="drivingLicenseNumber"
+                value={formData.drivingLicenseNumber}
+                onChange={handleChange}
+                maxLength={16}
+                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 uppercase ${errors.drivingLicenseNumber ? "border-red-500" : "border-gray-300"
+                  }`}
+                placeholder="e.g., MH1220110012345"
+              />
+              {errors.drivingLicenseNumber && <p className="text-red-500 text-sm mt-1">{errors.drivingLicenseNumber}</p>}
+            </div>
+          )}
 
           {/* PAN Number */}
           <div>

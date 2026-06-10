@@ -6,6 +6,7 @@ import { uploadAPI } from "@food/api"
 import { toast } from "sonner"
 import { isFlutterBridgeAvailable, openCamera } from "@food/utils/imageUploadUtils"
 import useDeliveryBackNavigation from "../../hooks/useDeliveryBackNavigation"
+
 const isDebugEnabled = import.meta.env.DEV
 const debugLog = (...args) => {
   if (isDebugEnabled) console.log("[DeliveryV2][SignupStep2]", ...args)
@@ -86,6 +87,19 @@ export default function SignupStep2() {
   const isMobileDevice =
     typeof navigator !== "undefined" &&
     /android|iphone|ipad|ipod|mobile/i.test(navigator.userAgent || "")
+
+  const [isBicycle, setIsBicycle] = useState(() => {
+    try {
+      const raw = sessionStorage.getItem("deliverySignupDetails")
+      if (raw) {
+        const details = JSON.parse(raw)
+        return details?.vehicleType === "bicycle"
+      }
+    } catch (e) {
+      debugError("Error parsing signup details for isBicycle:", e)
+    }
+    return false
+  })
   const fileInputRefs = useRef({
     profilePhoto: null,
     aadharPhoto: null,
@@ -214,7 +228,13 @@ export default function SignupStep2() {
   const handleSubmit = async (e) => {
     e.preventDefault()
 
-    if (!hasResolvedDocument("profilePhoto") || !hasResolvedDocument("aadharPhoto") || !hasResolvedDocument("panPhoto") || !hasResolvedDocument("drivingLicensePhoto")) {
+    const requiredDocs = ["profilePhoto", "aadharPhoto", "panPhoto"]
+    if (!isBicycle) {
+      requiredDocs.push("drivingLicensePhoto")
+    }
+
+    const missingDocs = requiredDocs.filter(docType => !hasResolvedDocument(docType))
+    if (missingDocs.length > 0) {
       toast.error("Please upload all required documents")
       return
     }
@@ -278,7 +298,7 @@ export default function SignupStep2() {
         resolveDocumentPayload("profilePhoto"),
         resolveDocumentPayload("aadharPhoto"),
         resolveDocumentPayload("panPhoto"),
-        resolveDocumentPayload("drivingLicensePhoto")
+        isBicycle ? Promise.resolve(null) : resolveDocumentPayload("drivingLicensePhoto")
       ])
 
       const payload = {
@@ -288,7 +308,7 @@ export default function SignupStep2() {
         drivingLicensePhoto: dlUpload
       }
 
-      if (!payload.profilePhoto.url || !payload.aadharPhoto.url || !payload.panPhoto.url || !payload.drivingLicensePhoto.url) {
+      if (!payload.profilePhoto.url || !payload.aadharPhoto.url || !payload.panPhoto.url || (!isBicycle && !payload.drivingLicensePhoto?.url)) {
         throw new Error("Document upload failed. Please retry.")
       }
 
@@ -441,13 +461,13 @@ export default function SignupStep2() {
           <DocumentUpload docType="profilePhoto" label="Profile Photo" required={true} />
           <DocumentUpload docType="aadharPhoto" label="Aadhar Card Photo" required={true} />
           <DocumentUpload docType="panPhoto" label="PAN Card Photo" required={true} />
-          <DocumentUpload docType="drivingLicensePhoto" label="Driving License Photo" required={true} />
+          {!isBicycle && <DocumentUpload docType="drivingLicensePhoto" label="Driving License Photo" required={true} />}
 
           {/* Submit Button */}
           <button
             type="submit"
-            disabled={isSubmitting || !hasResolvedDocument("profilePhoto") || !hasResolvedDocument("aadharPhoto") || !hasResolvedDocument("panPhoto") || !hasResolvedDocument("drivingLicensePhoto")}
-            className={`w-full py-4 rounded-lg font-bold text-white text-base transition-colors mt-6 ${isSubmitting || !hasResolvedDocument("profilePhoto") || !hasResolvedDocument("aadharPhoto") || !hasResolvedDocument("panPhoto") || !hasResolvedDocument("drivingLicensePhoto")
+            disabled={isSubmitting || !hasResolvedDocument("profilePhoto") || !hasResolvedDocument("aadharPhoto") || !hasResolvedDocument("panPhoto") || (!isBicycle && !hasResolvedDocument("drivingLicensePhoto"))}
+            className={`w-full py-4 rounded-lg font-bold text-white text-base transition-colors mt-6 ${isSubmitting || !hasResolvedDocument("profilePhoto") || !hasResolvedDocument("aadharPhoto") || !hasResolvedDocument("panPhoto") || (!isBicycle && !hasResolvedDocument("drivingLicensePhoto"))
               ? "bg-gray-400 cursor-not-allowed"
               : "bg-[#ff525d] hover:bg-[#ff3e4c]"
               }`}
