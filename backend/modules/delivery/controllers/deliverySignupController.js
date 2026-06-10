@@ -132,7 +132,7 @@ const signupDocumentsSchema = Joi.object({
   drivingLicensePhoto: Joi.object({
     url: Joi.string().uri().required(),
     publicId: Joi.string().trim().optional().allow(null, '')
-  }).required()
+  }).optional().allow(null, '')
 });
 export const submitSignupDocuments = asyncHandler(async (req, res) => {
   try {
@@ -152,8 +152,10 @@ export const submitSignupDocuments = asyncHandler(async (req, res) => {
       return errorResponse(res, 400, error.details[0].message);
     }
 
+    const isBicycle = delivery?.vehicle?.type === 'bicycle';
+
     // Validate that all required documents are provided
-    if (!profilePhoto || !aadharPhoto || !panPhoto || !drivingLicensePhoto) {
+    if (!profilePhoto || !aadharPhoto || !panPhoto || (!isBicycle && !drivingLicensePhoto)) {
       return errorResponse(res, 400, 'All documents are required');
     }
 
@@ -182,7 +184,7 @@ export const submitSignupDocuments = asyncHandler(async (req, res) => {
         // Driving license document
         drivingLicense: {
           ...delivery.documents?.drivingLicense,
-          document: drivingLicensePhoto.url
+          document: drivingLicensePhoto?.url || null
         }
       },
       // Mark signup as complete - status remains pending until admin approval
