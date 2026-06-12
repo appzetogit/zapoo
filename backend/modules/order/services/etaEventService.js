@@ -78,18 +78,28 @@ class ETAEventService {
         throw new Error('Order not found');
       }
 
-      const rider = await Delivery.findById(riderId);
+      let rider = await Delivery.findById(riderId);
+      if (!rider) {
+        const { FoodDeliveryPartner } = await import('../../deliveryV2/models/deliveryPartner.model.js');
+        rider = await FoodDeliveryPartner.findById(riderId);
+      }
       if (!rider) {
         throw new Error('Rider not found');
       }
 
       // Get rider location
-      const riderLocation = rider.availability?.currentLocation
-        ? {
+      let riderLocation = null;
+      if (rider.availability?.currentLocation) {
+        riderLocation = {
           latitude: rider.availability.currentLocation.coordinates[1],
           longitude: rider.availability.currentLocation.coordinates[0]
-        }
-        : null;
+        };
+      } else if (rider.lastLocation) {
+        riderLocation = {
+          latitude: rider.lastLocation.coordinates[1],
+          longitude: rider.lastLocation.coordinates[0]
+        };
+      }
 
       // Check if assignment was delayed
       const orderCreatedAt = order.createdAt;

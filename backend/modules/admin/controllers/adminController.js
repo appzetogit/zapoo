@@ -366,6 +366,9 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
           isActive: false
         },
         {
+          approvedAt: null
+        },
+        {
           $or: [{
             rejectionReason: { $exists: false }
           }, {
@@ -407,7 +410,7 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
               { $count: "total" }
             ],
             total: [
-              { $match: restaurantScopeFilter },
+              { $match: { ...restaurantScopeFilter, approvedAt: { $ne: null } } },
               { $count: "total" }
             ],
             pending: [
@@ -1425,6 +1428,7 @@ export const getRestaurants = asyncHandler(async (req, res) => {
     // Only show inactive if explicitly requested via status filter
     // IMPORTANT: Restaurants should only appear in main list AFTER admin approval
     // Inactive restaurants (pending approval) should only appear in "New Joining Request" section
+    query.approvedAt = { $ne: null };
     if (status === "inactive") {
       query.isActive = false;
     } else {
@@ -1825,6 +1829,8 @@ export const getRestaurantJoinRequests = asyncHandler(async (req, res) => {
       // Check for rejectionReason: either doesn't exist OR is null
       const conditions = [{
         isActive: false
+      }, {
+        approvedAt: null
       }, {
         $or: [{
           rejectionReason: {

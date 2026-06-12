@@ -4,6 +4,7 @@ import Zone from '../../admin/models/Zone.js';
 import Restaurant from '../../restaurant/models/Restaurant.js';
 import DeliveryWallet from '../../delivery/models/DeliveryWallet.js';
 import BusinessSettings from '../../admin/models/BusinessSettings.js';
+import { FoodDeliveryPartner } from '../../deliveryV2/models/deliveryPartner.model.js';
 import mongoose from 'mongoose';
 import { notifyDeliveryBoyNewOrder, checkDeliveryPartnerConnection, notifyMultipleDeliveryBoys } from './deliveryNotificationService.js';
 import { notifyRestaurantOrderMessage } from './restaurantNotificationService.js';
@@ -322,15 +323,18 @@ export async function findNearestDeliveryBoys(restaurantLat, restaurantLng, rest
       const ids = deliveryPartners
         .map(p => (p?._idStr && mongoose.Types.ObjectId.isValid(p._idStr) ? new mongoose.Types.ObjectId(p._idStr) : null))
         .filter(Boolean);
-      const dbPartners = await Delivery.find({
-        ...(ids.length > 0
-          ? { _id: { $in: ids } }
-          : { _id: { $in: [] } }),
-        isActive: true,
-        status: {
-          $in: ['approved', 'active']
-        }
-      }).select('_id name phone zoneId').lean();
+      const [v1Partners, v2Partners] = await Promise.all([
+        Delivery.find({
+          ...(ids.length > 0 ? { _id: { $in: ids } } : { _id: { $in: [] } }),
+          isActive: true,
+          status: { $in: ['approved', 'active'] }
+        }).select('_id name phone zoneId').lean(),
+        FoodDeliveryPartner.find({
+          ...(ids.length > 0 ? { _id: { $in: ids } } : { _id: { $in: [] } }),
+          status: 'approved'
+        }).select('_id name phone').lean()
+      ]);
+      const dbPartners = [...v1Partners, ...v2Partners];
       const dbPartnerMap = dbPartners.reduce((acc, p) => {
         acc[p._id.toString()] = p;
         return acc;
@@ -353,12 +357,28 @@ export async function findNearestDeliveryBoys(restaurantLat, restaurantLng, rest
           .map(p => p?._idStr || (p?._id?.toString ? p._id.toString() : String(p?._id || '')))
           .filter(Boolean)
       );
-      const mongoOnlyPartners = await Delivery.find({
-        isActive: true,
-        status: { $in: ['approved', 'active'] },
-        'availability.isOnline': true,
-        'availability.currentLocation.coordinates': { $exists: true, $ne: [0, 0] }
-      }).select('_id name phone zoneId availability.currentLocation').lean();
+      const [v1MongoOnly, v2MongoOnly] = await Promise.all([
+        Delivery.find({
+          isActive: true,
+          status: { $in: ['approved', 'active'] },
+          'availability.isOnline': true,
+          'availability.currentLocation.coordinates': { $exists: true, $ne: [0, 0] }
+        }).select('_id name phone zoneId availability.currentLocation').lean(),
+        FoodDeliveryPartner.find({
+          status: 'approved',
+          availabilityStatus: 'online',
+          'lastLocation.coordinates': { $exists: true, $ne: [0, 0] }
+        }).select('_id name phone lastLocation').lean()
+      ]);
+      const mongoOnlyPartners = [
+        ...v1MongoOnly,
+        ...v2MongoOnly.map(p => ({
+          ...p,
+          availability: {
+            currentLocation: p.lastLocation
+          }
+        }))
+      ];
 
       for (const partner of mongoOnlyPartners) {
         const key = partner?._id?.toString?.() || String(partner?._id || '');
@@ -446,12 +466,28 @@ export async function findNearestDeliveryBoys(restaurantLat, restaurantLng, rest
     }
     // Fallback to MongoDB location data if Firebase-based list is empty
     if (deliveryPartnersWithDistance.length === 0) {
-      const fallbackPartners = await Delivery.find({
-        isActive: true,
-        status: { $in: ['approved', 'active'] },
-        'availability.isOnline': true,
-        'availability.currentLocation.coordinates': { $exists: true, $ne: [0, 0] }
-      }).select('_id name phone availability.currentLocation').lean();
+      const [v1Fallback, v2Fallback] = await Promise.all([
+        Delivery.find({
+          isActive: true,
+          status: { $in: ['approved', 'active'] },
+          'availability.isOnline': true,
+          'availability.currentLocation.coordinates': { $exists: true, $ne: [0, 0] }
+        }).select('_id name phone availability.currentLocation').lean(),
+        FoodDeliveryPartner.find({
+          status: 'approved',
+          availabilityStatus: 'online',
+          'lastLocation.coordinates': { $exists: true, $ne: [0, 0] }
+        }).select('_id name phone lastLocation').lean()
+      ]);
+      const fallbackPartners = [
+        ...v1Fallback,
+        ...v2Fallback.map(p => ({
+          ...p,
+          availability: {
+            currentLocation: p.lastLocation
+          }
+        }))
+      ];
 
       deliveryPartnersWithDistance = (fallbackPartners || []).map(partner => {
         const coords = partner?.availability?.currentLocation?.coordinates || [];
@@ -592,10 +628,25 @@ export async function findNearestDeliveryBoy(restaurantLat, restaurantLng, resta
       if (excludeIds && excludeIds.length > 0) {
         const excludeObjectIds = excludeIds.filter(id => mongoose.Types.ObjectId.isValid(id)).map(id => new mongoose.Types.ObjectId(id));
         if (excludeObjectIds.length > 0) {
-          finalDbQuery._id.$nin = excludeObjectIds;
+          finalDbQuery._id = { ...finalDbQuery._id, $nin: excludeObjectIds };
         }
       }
-      const dbPartners = await Delivery.find(finalDbQuery).select('_id name phone zoneId').lean();
+      const v2DbQuery = {
+        ...(ids.length > 0 ? { _id: { $in: ids } } : { _id: { $in: [] } }),
+        status: 'approved'
+      };
+      if (excludeIds && excludeIds.length > 0) {
+        const excludeObjectIds = excludeIds.filter(id => mongoose.Types.ObjectId.isValid(id)).map(id => new mongoose.Types.ObjectId(id));
+        if (excludeObjectIds.length > 0) {
+          v2DbQuery._id = { ...v2DbQuery._id, $nin: excludeObjectIds };
+        }
+      }
+
+      const [v1Partners, v2Partners] = await Promise.all([
+        Delivery.find(finalDbQuery).select('_id name phone zoneId').lean(),
+        FoodDeliveryPartner.find(v2DbQuery).select('_id name phone').lean()
+      ]);
+      const dbPartners = [...v1Partners, ...v2Partners];
       const dbPartnerMap = dbPartners.reduce((acc, p) => {
         acc[p._id.toString()] = p;
         return acc;
@@ -618,12 +669,28 @@ export async function findNearestDeliveryBoy(restaurantLat, restaurantLng, resta
           .map(p => p?._idStr || (p?._id?.toString ? p._id.toString() : String(p?._id || '')))
           .filter(Boolean)
       );
-      const mongoOnlyPartners = await Delivery.find({
-        isActive: true,
-        status: { $in: ['approved', 'active'] },
-        'availability.isOnline': true,
-        'availability.currentLocation.coordinates': { $exists: true, $ne: [0, 0] }
-      }).select('_id name phone zoneId availability.currentLocation').lean();
+      const [v1MongoOnly, v2MongoOnly] = await Promise.all([
+        Delivery.find({
+          isActive: true,
+          status: { $in: ['approved', 'active'] },
+          'availability.isOnline': true,
+          'availability.currentLocation.coordinates': { $exists: true, $ne: [0, 0] }
+        }).select('_id name phone zoneId availability.currentLocation').lean(),
+        FoodDeliveryPartner.find({
+          status: 'approved',
+          availabilityStatus: 'online',
+          'lastLocation.coordinates': { $exists: true, $ne: [0, 0] }
+        }).select('_id name phone lastLocation').lean()
+      ]);
+      const mongoOnlyPartners = [
+        ...v1MongoOnly,
+        ...v2MongoOnly.map(p => ({
+          ...p,
+          availability: {
+            currentLocation: p.lastLocation
+          }
+        }))
+      ];
 
       for (const partner of mongoOnlyPartners) {
         const key = partner?._id?.toString?.() || String(partner?._id || '');
@@ -910,17 +977,39 @@ export async function broadcastDeliveryRequest(orderId, restaurantLat, restauran
 
   // Emergency fallback: if geo shortlist is empty, use currently online approved riders from MongoDB.
   if (!candidateIds.length) {
-    const mongoOnlineFallback = await Delivery.find({
-      isActive: true,
-      status: { $in: ['approved', 'active'] },
-      'availability.isOnline': true
-    })
-      .select('_id availability.lastLocationUpdate')
-      .sort({ 'availability.lastLocationUpdate': -1, updatedAt: -1 })
-      .limit(40)
-      .lean();
+    const [v1Fallback, v2Fallback] = await Promise.all([
+      Delivery.find({
+        isActive: true,
+        status: { $in: ['approved', 'active'] },
+        'availability.isOnline': true
+      })
+        .select('_id availability.lastLocationUpdate')
+        .sort({ 'availability.lastLocationUpdate': -1, updatedAt: -1 })
+        .limit(40)
+        .lean(),
+      FoodDeliveryPartner.find({
+        status: 'approved',
+        availabilityStatus: 'online'
+      })
+        .select('_id lastLocationAt')
+        .sort({ lastLocationAt: -1, updatedAt: -1 })
+        .limit(40)
+        .lean()
+    ]);
+    const combinedFallback = [
+      ...v1Fallback.map(p => ({
+        _id: p._id,
+        lastLocationUpdate: p.availability?.lastLocationUpdate || p.updatedAt
+      })),
+      ...v2Fallback.map(p => ({
+        _id: p._id,
+        lastLocationUpdate: p.lastLocationAt || p.updatedAt
+      }))
+    ];
+    combinedFallback.sort((a, b) => new Date(b.lastLocationUpdate) - new Date(a.lastLocationUpdate));
 
-    candidateIds = (mongoOnlineFallback || [])
+    candidateIds = combinedFallback
+      .slice(0, 40)
       .map(p => p?._id?.toString?.() || String(p?._id || ''))
       .filter(Boolean);
 

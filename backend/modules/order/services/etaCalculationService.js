@@ -255,7 +255,12 @@ class ETACalculationService {
                 latitude: order.deliveryPartnerId.availability.currentLocation.coordinates[1],
                 longitude: order.deliveryPartnerId.availability.currentLocation.coordinates[0]
               }
-              : null,
+              : order.deliveryPartnerId?.lastLocation
+                ? {
+                  latitude: order.deliveryPartnerId.lastLocation.coordinates[1],
+                  longitude: order.deliveryPartnerId.lastLocation.coordinates[0]
+                }
+                : null,
             prepTimeMinutes: (Number(order.preparationTime || 0) + Number(order.eta?.additionalTime || 0))
           });
           reason = 'MANUAL_UPDATE';
@@ -306,7 +311,12 @@ class ETACalculationService {
           latitude: order.deliveryPartnerId.availability.currentLocation.coordinates[1],
           longitude: order.deliveryPartnerId.availability.currentLocation.coordinates[0]
         }
-        : null);
+        : order.deliveryPartnerId?.lastLocation
+          ? {
+            latitude: order.deliveryPartnerId.lastLocation.coordinates[1],
+            longitude: order.deliveryPartnerId.lastLocation.coordinates[0]
+          }
+          : null);
 
     if (!riderLocation) {
       return await this.calculateInitialETA({
@@ -351,7 +361,12 @@ class ETACalculationService {
         latitude: order.deliveryPartnerId.availability.currentLocation.coordinates[1],
         longitude: order.deliveryPartnerId.availability.currentLocation.coordinates[0]
       }
-      : restaurantLocation; // Assume at restaurant
+      : order.deliveryPartnerId?.lastLocation
+        ? {
+          latitude: order.deliveryPartnerId.lastLocation.coordinates[1],
+          longitude: order.deliveryPartnerId.lastLocation.coordinates[0]
+        }
+        : restaurantLocation; // Assume at restaurant
 
     // Calculate only restaurant to user time
     const travelTime = await googleMapsService.getTravelTime(
