@@ -464,6 +464,7 @@ export default function ToHub() {
     count: 0,
     revenue: 0,
     fees: 0,
+    netRevenue: 0,
     contribution: 0
   });
   const [complaintsView, setComplaintsView] = useState("all");
@@ -1345,6 +1346,7 @@ export default function ToHub() {
       const recommendedCount = Number(recommendedItems.count || 0);
       const recommendedRevenue = Number(recommendedItems.revenue || 0);
       const recommendedFees = Number(recommendedItems.fees || 0);
+      const recommendedNetRevenue = Number(recommendedItems.netRevenue || 0);
       const recommendedContribution = totalSalesValue > 0
         ? Number(((recommendedRevenue / totalSalesValue) * 100).toFixed(1))
         : 0;
@@ -1353,6 +1355,7 @@ export default function ToHub() {
         count: recommendedCount,
         revenue: recommendedRevenue,
         fees: recommendedFees,
+        netRevenue: recommendedNetRevenue,
         contribution: recommendedContribution
       });
       setLastUpdated(new Date());
@@ -2367,7 +2370,7 @@ export default function ToHub() {
                   </div>
                   <div className="bg-green-50/60 p-3 rounded-lg border border-green-100/60">
                     <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-1">Your Earnings</p>
-                    <p className="text-xl font-bold text-green-600">INR {(recommendedStats.revenue - recommendedStats.fees).toLocaleString('en-IN')}</p>
+                    <p className="text-xl font-bold text-green-600">INR {(recommendedStats.netRevenue || 0).toLocaleString('en-IN')}</p>
                     <p className="text-[10px] text-green-400 mt-1">After platform fee</p>
                   </div>
                 </div>

@@ -953,7 +953,7 @@ export default function HubFinance() {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto px-4 py-6">
+      <div className="flex-1 overflow-y-auto px-4 pt-6 pb-32">
         {activeTab === "payouts" && <div className="space-y-6">
             <div className={`rounded-lg px-4 py-3 flex items-start gap-3 ${isAllowedToday ? "bg-green-100 text-green-900" : "bg-yellow-400 text-black"}`}>
               <AlertTriangle className="h-5 w-5 mt-0.5" />
@@ -1288,6 +1288,21 @@ export default function HubFinance() {
                             </div>
                           </div>)}
                       </div>}
+
+                    {/* Show placeholder if no orders are available in past cycles or current cycle */}
+                    {(!pastCyclesData || !pastCyclesData.orders || pastCyclesData.orders.length === 0) &&
+                     (!financeData?.currentCycle?.orders || financeData.currentCycle.orders.length === 0) &&
+                     !loadingPastCycles && (
+                      <div className="bg-white rounded-xl p-8 text-center border border-gray-100 shadow-sm flex flex-col items-center justify-center">
+                        <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center mb-3">
+                          <FileText className="w-6 h-6 text-blue-500" />
+                        </div>
+                        <p className="text-sm font-bold text-gray-900">No orders available</p>
+                        <p className="text-xs text-gray-500 mt-1 max-w-[200px] mx-auto leading-relaxed">
+                          There are no payouts or order histories for the selected date range.
+                        </p>
+                      </div>
+                    )}
                   </>}
               </div>
             </div>

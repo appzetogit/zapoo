@@ -2170,15 +2170,22 @@ export const completeDelivery = asyncHandler(async (req, res) => {
           if (existingRestaurantTransaction) {
             console.warn(`⚠️ Restaurant earning already added for order ${orderIdForLog}, skipping wallet update`);
           } else {
-            // Add payment transaction to restaurant wallet
-            restaurantWalletTransaction = restaurantWallet.addTransaction({
-              amount: restaurantEarning,
-              type: 'payment',
-              status: 'Completed',
-              description: `Order #${orderIdForLog} - Amount: ₹${orderTotal.toFixed(2)}, Commission: ₹${commissionAmount.toFixed(2)}`,
-              orderId: orderMongoId || order._id
-            });
-            await restaurantWallet.save();
+            // Get settlement to find net Earning (restaurant payout) - Only credit from real settlement data
+            const { default: OrderSettlement } = await import('../../order/models/OrderSettlement.js');
+            const settlement = await OrderSettlement.findOne({ orderId: orderMongoId || order._id }).lean();
+            const actualPayout = settlement?.restaurantEarning?.netEarning;
+
+            if (Number.isFinite(actualPayout) && actualPayout > 0) {
+              // Add payment transaction to restaurant wallet
+              restaurantWalletTransaction = restaurantWallet.addTransaction({
+                amount: actualPayout,
+                type: 'payment',
+                status: 'Completed',
+                description: `Order #${orderIdForLog} - Amount: ₹${orderTotal.toFixed(2)}, Commission: ₹${commissionAmount.toFixed(2)}`,
+                orderId: orderMongoId || order._id
+              });
+              await restaurantWallet.save();
+            }
           }
         }
 

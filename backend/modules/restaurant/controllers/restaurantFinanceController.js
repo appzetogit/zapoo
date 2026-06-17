@@ -148,7 +148,7 @@ export const getRestaurantFinance = asyncHandler(async (req, res) => {
       const orderIds = orders.map(order => order._id).filter(Boolean);
       const settlements = orderIds.length > 0
         ? await OrderSettlement.find({ orderId: { $in: orderIds } })
-          .select('orderId userPayment.deliveryFee userPayment.platformFee restaurantEarning.adminDeliveryCost restaurantEarning.adminDeliveryGst restaurantEarning.platformFee restaurantEarning.gstCollected')
+          .select('orderId userPayment.deliveryFee userPayment.platformFee restaurantEarning.adminDeliveryCost restaurantEarning.adminDeliveryGst restaurantEarning.platformFee restaurantEarning.gstCollected restaurantEarning.netEarning')
           .lean()
         : [];
       const settlementByOrderId = new Map(
@@ -160,6 +160,7 @@ export const getRestaurantFinance = asyncHandler(async (req, res) => {
       let recCount = 0;
       let recRev = 0;
       let recFees = 0;
+      let recPayoutSum = 0;
       let totalTaxCollected = 0; // food GST + platform GST + customer delivery GST + admin delivery GST
       let totalPlatformFeeExclGst = 0; // platform fee only
       let totalCustomerDeliveryFeeExclGst = 0; // user charged delivery fee only
@@ -233,12 +234,21 @@ export const getRestaurantFinance = asyncHandler(async (req, res) => {
           : 0;
         recFees += internalFee;
 
+        if (recommendedItemQuantity > 0) {
+          const orderPayout = (settlement && Number.isFinite(settlement.restaurantEarning?.netEarning))
+            ? settlement.restaurantEarning.netEarning
+            : 0;
+          recPayoutSum += orderPayout;
+        }
+
         return {
           orderId: order.orderId || order._id.toString(),
           orderTotal: foodPrice,
           totalAmount: order.pricing?.total || 0,
           commission,
-          payout: foodPrice - commission,
+          payout: (settlement && Number.isFinite(settlement.restaurantEarning?.netEarning))
+            ? settlement.restaurantEarning.netEarning
+            : 0,
           receivedAt: order?.tracking?.confirmed?.timestamp || order?.createdAt,
           deliveredAt: order.deliveredAt || order.createdAt,
           customerName: order.userId?.name || 'N/A',
@@ -270,7 +280,9 @@ export const getRestaurantFinance = asyncHandler(async (req, res) => {
         recommendedItems: {
           count: recCount,
           revenue: Math.round(recRev * 100) / 100,
-          fees: Math.round(recFees * 100) / 100
+          fees: Math.round(recFees * 100) / 100,
+          netRevenue: Math.round(recPayoutSum * 100) / 100,
+          contributionPct: totalValue > 0 ? Math.round((recRev / totalValue) * 100) : 0
         }
       };
     };
@@ -286,7 +298,7 @@ export const getRestaurantFinance = asyncHandler(async (req, res) => {
     const [currentStats, pastStats] = await Promise.all([currentStatsPromise, pastStatsPromise]);
 
     const totalWithdrawals = allWithdrawals.reduce((sum, req) => sum + (req.amount || 0), 0);
-    const currentCyclePayout = Math.round((currentStats.totalOrderValue - currentStats.totalCommission) * 100) / 100;
+    const currentCyclePayout = Math.round(currentStats.orders.reduce((sum, o) => sum + (o.payout || 0), 0) * 100) / 100;
     const availablePayout = Math.max(0, Math.round((currentCyclePayout - totalWithdrawals) * 100) / 100);
 
     // Format cycle dates
