@@ -118,7 +118,7 @@ const deliveryPartnerSchema = new mongoose.Schema(
         totalRatings: { type: Number, default: 0, min: 0 }
     },
     {
-        collection: 'food_delivery_partners',
+        collection: 'deliveries',
         timestamps: true
     }
 );

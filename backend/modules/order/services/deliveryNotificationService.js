@@ -428,6 +428,7 @@ export async function notifyDeliveryBoyNewOrder(order, deliveryPartnerId) {
         orderMongoId: order._id?.toString(),
         status: order.status,
         type: 'new_order',
+        clickUrl: `/delivery?orderId=${order._id?.toString()}`,
         notificationPriority: 'high',
         templateKey: 'delivery_new_order',
         templateVars: {
@@ -671,6 +672,7 @@ export async function notifyMultipleDeliveryBoys(order, deliveryPartnerIds, phas
             orderMongoId: orderWithUser._id?.toString(),
             status: orderWithUser.status,
             type: 'new_order_available',
+            clickUrl: `/delivery?orderId=${orderWithUser._id?.toString()}`,
             phase,
             notificationPriority: 'high',
             templateKey: 'delivery_new_order_available',

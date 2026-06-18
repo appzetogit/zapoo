@@ -26,7 +26,13 @@ export const authenticate = async (req, res, next) => {
     }
 
     // Get delivery boy from database
-    const delivery = await Delivery.findById(decoded.userId).select('-password -refreshToken');
+    let delivery = await Delivery.findById(decoded.userId).select('-password -refreshToken');
+    
+    if (!delivery) {
+      // Try V2 FoodDeliveryPartner as fallback
+      const { FoodDeliveryPartner } = await import('../../deliveryV2/models/deliveryPartner.model.js');
+      delivery = await FoodDeliveryPartner.findById(decoded.userId);
+    }
     
     if (!delivery) {
       console.error('❌ Delivery boy not found in database:', {
@@ -37,14 +43,18 @@ export const authenticate = async (req, res, next) => {
       return errorResponse(res, 401, 'Delivery boy not found');
     }
 
-    // Allow blocked/pending status partners to access (they can see rejection reason or verification message)
-    // Only block if account is inactive AND not blocked/pending (blocked/pending partners can login)
-    if (!delivery.isActive && delivery.status !== 'blocked' && delivery.status !== 'pending') {
+    // Allow blocked/pending/rejected status partners to access (they can see rejection reason or verification message)
+    // Only block if account is inactive AND not blocked/pending/rejected
+    const isActive = delivery.isActive !== false;
+    const status = delivery.status;
+    const isBlockedOrPending = status === 'blocked' || status === 'pending' || status === 'rejected';
+
+    if (!isActive && !isBlockedOrPending) {
       console.error('❌ Delivery boy account is inactive:', {
         deliveryId: delivery._id,
         deliveryName: delivery.name,
-        isActive: delivery.isActive,
-        status: delivery.status,
+        isActive,
+        status,
       });
       return errorResponse(res, 401, 'Delivery boy account is inactive');
     }

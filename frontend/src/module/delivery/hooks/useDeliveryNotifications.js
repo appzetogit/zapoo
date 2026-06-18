@@ -373,6 +373,43 @@ export const useDeliveryNotifications = () => {
     if (!deliveryPartnerId) return;
 
     try {
+      // Check if there is an orderId in the URL query parameters (triggered by native deep link click)
+      let orderIdFromUrl = null;
+      if (typeof window !== 'undefined' && window.location) {
+        const queryParams = new URLSearchParams(window.location.search);
+        orderIdFromUrl = queryParams.get('orderId') || queryParams.get('orderMongoId');
+      }
+
+      if (orderIdFromUrl) {
+        try {
+          debugLog('Notification deep link click detected. Fetching order details:', orderIdFromUrl);
+          const detailsRes = await deliveryAPI.getOrderDetails(orderIdFromUrl);
+          const details = detailsRes.data?.data?.order || detailsRes.data?.data || detailsRes.data?.order;
+          
+          if (details) {
+            const status = details.status || details.orderStatus;
+            // Only popup if the order is still active and awaiting acceptance
+            if (['confirmed', 'preparing', 'ready', 'ready_for_pickup'].includes(status)) {
+              debugLog('Recovered specific order from clickUrl:', details);
+              setNewOrder(details);
+              handleIncomingOrderAlert(details);
+              
+              // Clear the orderId from URL search parameters to avoid re-triggering on page refresh
+              if (window.history && window.history.replaceState) {
+                const url = new URL(window.location.href);
+                url.searchParams.delete('orderId');
+                url.searchParams.delete('orderMongoId');
+                window.history.replaceState({}, '', url.pathname + url.search);
+              }
+              return; // Stop recovery here as we found the targeted deep-linked order
+            } else {
+              debugWarn('Recovered order is no longer in a valid assignment state:', status);
+            }
+          }
+        } catch (detailsErr) {
+          debugWarn('Failed to fetch specific order details from URL deep link:', detailsErr.message);
+        }
+      }
       const [availableResult, currentTripResult] = await Promise.allSettled([
         deliveryAPI.getOrders({ limit: 20, page: 1 }),
         deliveryAPI.getCurrentDelivery(),
@@ -1015,8 +1052,8 @@ export const useDeliveryNotifications = () => {
         socketId: socketRef.current?.id,
       });
       socketRef.current.emit('resync');
-      void recoverDeliveryState();
     }
+    void recoverDeliveryState();
   }, [deliveryPartnerId, joinDeliveryRoomIfPossible, recoverDeliveryState]);
 
   // Helper functions
