@@ -650,6 +650,7 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
   };
 
   const handleContentTouchStart = (event) => {
+    if (currentTab === 'feed') return;
     if (!event.touches?.length) return;
     const scroller = contentScrollRef.current;
     if (!scroller) return;
