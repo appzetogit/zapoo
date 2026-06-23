@@ -21,6 +21,10 @@ import { isModuleAuthenticated } from "@/lib/utils/auth";
 import DynamicEtaText from "../../components/DynamicEtaText";
 import { useTranslation } from "react-i18next";
 import { handleShare } from "@/lib/utils/share";
+import {
+  isRestaurantUnavailableForUser,
+  getSearchUnavailableLabel,
+} from "../../utils/restaurantAvailability";
 
 const PLACEHOLDER_OFFER_TEXTS = new Set([
   "UPTO 50% OFF",
@@ -189,8 +193,9 @@ export default function RestaurantDetails() {
         } catch (lookupError) {
           // Fallback: search by slug/name. Prefer zone-aware search when zone exists,
           // but do not block first-load experience when zone detection is still in progress.
-          const searchParams = {
-            limit: 100
+            const searchParams = {
+            limit: 100,
+            includeOfflineForSearch: "true"
           };
           if (zoneId) {
             searchParams.zoneId = zoneId;
@@ -395,15 +400,28 @@ export default function RestaurantDetails() {
               openingTime: "09:00",
               closingTime: "22:00"
             },
+            weeklyTimings: Array.isArray(actualRestaurant?.weeklyTimings)
+              ? actualRestaurant.weeklyTimings
+              : Array.isArray(apiRestaurant?.weeklyTimings)
+                ? apiRestaurant.weeklyTimings
+                : [],
+            outletTimingsActive:
+              actualRestaurant?.outletTimingsActive ?? apiRestaurant?.outletTimingsActive,
             cuisines: Array.isArray(apiRestaurant?.cuisines) ? apiRestaurant.cuisines : [],
             profileImage: apiRestaurant?.profileImage || null,
             menuImages: Array.isArray(apiRestaurant?.menuImages) ? apiRestaurant.menuImages : [],
             // Menu sections for display (will be populated from menu API)
             menuSections: [],
             // Availability fields for grayscale styling
-            isActive: actualRestaurant?.isActive !== false,
-            // Default to true if not specified
-            isAcceptingOrders: actualRestaurant?.isAcceptingOrders !== false // Default to true if not specified
+            isActive: actualRestaurant?.isActive === false ? false : actualRestaurant?.isActive !== false,
+            isAcceptingOrders:
+              actualRestaurant?.isAcceptingOrders === false
+                ? false
+                : actualRestaurant?.isAcceptingOrders === true
+                  ? true
+                  : apiRestaurant?.isAcceptingOrders === false
+                    ? false
+                    : true,
           };
           if (!transformedRestaurant.id) {
             console.error('❌ No restaurant ID found! Cannot fetch menu.');
@@ -427,7 +445,8 @@ export default function RestaurantDetails() {
               // Include zoneId for zone-based filtering
               const searchParams = {
                 limit: 100,
-                zoneId: zoneId
+                zoneId: zoneId,
+                includeOfflineForSearch: "true"
               };
               if (pureVegOnlySelected) {
                 searchParams.pureVeg = "true";
@@ -1224,8 +1243,25 @@ export default function RestaurantDetails() {
       </AnimatedPage>;
   }
 
-  const isRestaurantOffline = restaurant?.isAcceptingOrders === false;
-  const shouldShowGrayscale = isRestaurantOffline;
+  const userHasLocationForAvailability =
+    userLocation?.latitude != null &&
+    userLocation?.longitude != null &&
+    !Number.isNaN(Number(userLocation.latitude)) &&
+    !Number.isNaN(Number(userLocation.longitude));
+
+  const shouldShowGrayscale =
+    outOfRange ||
+    isRestaurantUnavailableForUser(
+      { ...restaurant, distanceInKm: 0, deliveryRange: 99999 },
+      { userHasLocation: true }
+    );
+
+  const unavailableLabel = outOfRange
+    ? t("user.restaurantDetails.outOfDeliveryRangeBadge")
+    : getSearchUnavailableLabel(restaurant, {
+        userHasLocation: userHasLocationForAvailability,
+      });
+
   return <AnimatedPage id="scrollingelement" className={`min-h-screen bg-white dark:bg-[#0a0a0a] flex flex-col transition-all duration-300 ${shouldShowGrayscale ? 'grayscale opacity-75' : ''}`}>
       {/* Header - Back, Search, Menu (like reference image) */}
       <div className="px-4 sm:px-6 md:px-8 lg:px-10 xl:px-12 pt-3 md:pt-4 lg:pt-5 pb-2 md:pb-3 bg-white dark:bg-[#1a1a1a]">
@@ -1286,10 +1322,10 @@ export default function RestaurantDetails() {
                   {t("user.restaurantDetails.outOfDeliveryRangeBadge")}
                 </Badge>
               )}
-              {isRestaurantOffline && (
+              {shouldShowGrayscale && !outOfRange && (
                 <Badge variant="secondary" className="w-fit flex items-center gap-1 px-2 py-0.5 bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200 border border-gray-300 dark:border-gray-700">
                   <AlertCircle className="h-3.5 w-3.5" />
-                  Restaurant is offline
+                  {unavailableLabel}
                 </Badge>
               )}
             </div>
@@ -1734,7 +1770,7 @@ export default function RestaurantDetails() {
           ) : shouldShowGrayscale ? (
             <Button className="bg-gray-500 text-white flex items-center gap-2 shadow-lg px-6 py-2.5 rounded-lg cursor-not-allowed" size="lg" disabled>
               <AlertCircle className="h-5 w-5" />
-              Restaurant is offline
+              {unavailableLabel}
             </Button>
           ) : (
             <Button className="bg-gray-800 hover:bg-gray-900 text-white flex items-center gap-2 shadow-lg px-6 py-2.5 rounded-lg" size="lg" onClick={() => setShowMenuSheet(true)}>

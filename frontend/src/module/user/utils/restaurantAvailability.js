@@ -172,7 +172,7 @@ export function getSearchUnavailableLabel(
     return "Inactive on platform";
   }
   if (restaurant.isAcceptingOrders === false) {
-    return "Not accepting orders";
+    return "Restaurant is offline";
   }
 
   const rangeKm =
@@ -201,10 +201,15 @@ export function getSearchUnavailableLabel(
   ) {
     const open = restaurant.deliveryTimings?.openingTime;
     if (open && String(open).trim()) {
-      return `Closed · Opens at ${String(open).trim()}`;
+      return `Closed - Opens at ${String(open).trim()}`;
     }
     return "Closed for delivery";
   }
 
   return "Unavailable";
+}
+
+/** True when the restaurant must render greyed out and block ordering (offline, closed, inactive, or out of range). */
+export function isRestaurantUnavailableForUser(restaurant, opts = {}) {
+  return !isRestaurantDeliverableNow(restaurant, opts);
 }

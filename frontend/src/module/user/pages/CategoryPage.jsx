@@ -295,6 +295,7 @@ export default function CategoryPage() {
           params.latitude = location.latitude
           params.longitude = location.longitude
         }
+        params.includeOfflineForSearch = "true"
         const response = await restaurantAPI.getRestaurants(params)
         
         if (response.data && response.data.success && response.data.data && response.data.data.restaurants) {
@@ -452,7 +453,7 @@ export default function CategoryPage() {
                 slug: restaurant.slug || restaurant.name?.toLowerCase().replace(/\s+/g, '-'),
                 restaurantId: restaurantId,
                 isActive: restaurant.isActive,
-                isAcceptingOrders: restaurant.isAcceptingOrders,
+                isAcceptingOrders: restaurant.isAcceptingOrders !== false,
                 openDays: restaurant.openDays,
                 deliveryTimings: restaurant.deliveryTimings,
                 hasPaneer: false,
@@ -1034,6 +1035,7 @@ export default function CategoryPage() {
             <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-5 lg:gap-6 xl:gap-7 items-stretch ${isLoadingFilterResults ? 'opacity-50' : 'opacity-100'} transition-opacity duration-300`}>
               {filteredAllRestaurants.map((restaurant) => {
                 const restaurantSlug = restaurant.name.toLowerCase().replace(/\s+/g, "-")
+                const isRestaurantOffline = restaurant.isAcceptingOrders === false
                 const isFavorite = favorites.has(restaurant.id)
                 const dishName = restaurant.categoryDishName || ""
                 const restaurantUrl = dishName
@@ -1055,7 +1057,7 @@ export default function CategoryPage() {
                     className="h-full flex"
                   >
                     <Card className={`overflow-hidden cursor-pointer gap-0 border-0 dark:border-gray-800 group bg-white dark:bg-[#1a1a1a] shadow-md hover:shadow-xl transition-all duration-300 py-0 rounded-md h-full flex flex-col w-full ${
-                      shouldShowGrayscale ? 'grayscale opacity-75' : ''
+                      shouldShowGrayscale || isRestaurantOffline ? 'grayscale opacity-75' : ''
                     }`}>
                       {/* Image Section */}
                       <div className="relative h-44 sm:h-52 md:h-60 lg:h-64 xl:h-72 w-full overflow-hidden rounded-t-md flex-shrink-0">

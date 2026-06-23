@@ -41,7 +41,12 @@ import exploreCollection from "@/assets/explore more icons/collection.png";
 import ZoneAdBanner from "../components/ZoneAdBanner";
 import DynamicEtaText from "../components/DynamicEtaText";
 import RecommendedItemsBadge, { ActiveRecommendedItemBadge } from "../components/RecommendedItemsBadge";
-import { isRestaurantDeliverableNow } from "../utils/restaurantAvailability";
+import {
+  isRestaurantDeliverableNow,
+  isRestaurantUnavailableForUser,
+  getSearchUnavailableLabel,
+  isWithinDeliveryRangeKm,
+} from "../utils/restaurantAvailability";
 import { useTranslation } from "react-i18next";
 
 // Banner images for hero carousel - will be fetched from API
@@ -919,7 +924,9 @@ export default function Home() {
         params.latitude = location.latitude;
         params.longitude = location.longitude;
       }
-      // Note: We show all restaurants regardless of zone, but apply grayscale styling if user is out of service
+      // Include offline/inactive restaurants — client greys them and sorts after serviceable ones
+      params.includeOfflineForSearch = "true";
+      params.includeInactiveForSearch = "true";
 
       const response = await restaurantAPI.getRestaurants(params);
       if (response.data && response.data.success && response.data.data && response.data.data.restaurants) {
@@ -1026,10 +1033,12 @@ export default function Home() {
             location: restaurant.location,
             // Store location for distance recalculation
             isActive: restaurant.isActive !== false,
-            // Default to true if not specified
-            isAcceptingOrders: restaurant.isAcceptingOrders !== false, // Default to true if not specified
+            isAcceptingOrders:
+              restaurant.isAcceptingOrders === false ? false : restaurant.isAcceptingOrders === true ? true : true,
             openDays: restaurant.openDays,
             deliveryTimings: restaurant.deliveryTimings,
+            weeklyTimings: restaurant.weeklyTimings,
+            outletTimingsActive: restaurant.outletTimingsActive,
             deliveryRange:
               restaurant.deliveryRange != null && Number.isFinite(Number(restaurant.deliveryRange))
                 ? Number(restaurant.deliveryRange)
@@ -1223,10 +1232,49 @@ export default function Home() {
     !Number.isNaN(Number(location.longitude));
 
   const featuredGridRestaurants = useMemo(() => {
-    return filteredRestaurants.filter((r) =>
-      isRestaurantDeliverableNow(r, { userHasLocation })
-    );
+    const availabilityOpts = { userHasLocation };
+    const getRangeKm = (r) =>
+      r.deliveryRange != null && Number.isFinite(Number(r.deliveryRange))
+        ? Number(r.deliveryRange)
+        : 5;
+
+    const inRange = filteredRestaurants.filter((r) => {
+      if (!userHasLocation) return true;
+      return isWithinDeliveryRangeKm(r.distanceInKm, getRangeKm(r), availabilityOpts);
+    });
+
+    const serviceable = [];
+    const unavailable = [];
+    for (const r of inRange) {
+      if (isRestaurantDeliverableNow(r, availabilityOpts)) {
+        serviceable.push(r);
+      } else {
+        unavailable.push(r);
+      }
+    }
+    return [...serviceable, ...unavailable];
   }, [filteredRestaurants, userHasLocation]);
+
+  const top10DeliverableRestaurants = useMemo(() => {
+    const availabilityOpts = { userHasLocation };
+    const statusById = new Map(
+      (restaurantsData || []).map((r) => [String(r._id || r.id || ""), r])
+    );
+    const statusBySlug = new Map(
+      (restaurantsData || []).map((r) => [
+        String(r.slug || r.name?.toLowerCase().replace(/\s+/g, "-") || ""),
+        r,
+      ])
+    );
+
+    return (top10Restaurants || []).filter((item) => {
+      const raw = item.restaurant || item;
+      const id = String(raw._id || raw.id || "");
+      const slug = String(raw.slug || raw.name?.toLowerCase().replace(/\s+/g, "-") || "");
+      const merged = statusById.get(id) || statusBySlug.get(slug) || raw;
+      return isRestaurantDeliverableNow(merged, availabilityOpts);
+    });
+  }, [top10Restaurants, restaurantsData, userHasLocation]);
 
   // Fetch recommended preview items for visible restaurants (batch)
   useEffect(() => {
@@ -1847,7 +1895,7 @@ export default function Home() {
         </motion.section>
 
         {/* Top Restaurants Horizontal Scroll Section */}
-        {!loadingTop10 && top10Restaurants.length > 0 && <div className="mb-6 sm:mb-7 lg:mb-8">
+        {!loadingTop10 && top10DeliverableRestaurants.length > 0 && <div className="mb-6 sm:mb-7 lg:mb-8">
             <div className="px-1 mb-4 flex items-center justify-between">
               <div className="flex flex-col gap-0.5">
                 <h2 className="text-xs sm:text-sm lg:text-base font-semibold text-gray-400 tracking-widest uppercase">
@@ -1864,7 +1912,7 @@ export default function Home() {
           scrollbarWidth: "none",
           msOverflowStyle: "none"
         }}>
-              {top10Restaurants.map((item, index) => {
+              {top10DeliverableRestaurants.map((item, index) => {
             const restaurant = item.restaurant || item;
             const restaurantSlug = restaurant.slug || restaurant.name?.toLowerCase().replace(/\s+/g, "-");
             return <Link key={restaurant._id || index} to={`/user/restaurants/${restaurantSlug}`} className="flex-shrink-0 w-[240px] sm:w-[280px] group">
@@ -2107,6 +2155,11 @@ export default function Home() {
             <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3  gap-3 sm:gap-4 lg:gap-5 xl:gap-6 pt-1 sm:pt-1.5 lg:pt-2 items-stretch ${isLoadingFilterResults || loadingRestaurants ? 'opacity-50' : 'opacity-100'} transition-opacity duration-300`}>
               {featuredGridRestaurants.map((restaurant, index) => {
               const restaurantSlug = restaurant.slug || restaurant.name.toLowerCase().replace(/\s+/g, "-");
+              const isUnavailable = isRestaurantUnavailableForUser(restaurant, { userHasLocation });
+              const unavailableLabel = getSearchUnavailableLabel(restaurant, {
+                distanceInKm: restaurant.distanceInKm,
+                userHasLocation,
+              });
               // Direct favorite check - isFavorite is already memoized in context
               const favorite = isFavorite(restaurantSlug);
               const handleToggleFavorite = e => {
@@ -2140,9 +2193,16 @@ export default function Home() {
               }}>
                     <div className="h-full group">
                       <Link to={`/user/restaurants/${restaurantSlug}`} className="h-full flex">
-                        <Card className="overflow-hidden gap-0 cursor-pointer border-0 dark:border-gray-800 group bg-white dark:bg-[#1a1a1a] border-background transition-all duration-500 py-0 rounded-md flex flex-col h-full w-full relative">
+                        <Card className={`overflow-hidden gap-0 cursor-pointer border-0 dark:border-gray-800 group bg-white dark:bg-[#1a1a1a] border-background transition-all duration-500 py-0 rounded-md flex flex-col h-full w-full relative ${isUnavailable ? "grayscale opacity-75" : ""}`}>
                           {/* Image Section with Carousel */}
                           <div className="relative">
+                            {isUnavailable && (
+                              <div className="absolute top-3 left-3 z-10">
+                                <span className="text-[10px] sm:text-xs font-semibold text-gray-600 bg-white/95 border border-gray-200 rounded-full px-2 py-0.5 shadow-sm">
+                                  {unavailableLabel}
+                                </span>
+                              </div>
+                            )}
                             <RestaurantImageCarousel
                               restaurant={restaurant}
                               recommendedItems={recommendedPreviewByRestaurantId[String(restaurant?._id || restaurant?.id)]}
