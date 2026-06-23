@@ -474,18 +474,24 @@ export const refreshToken = asyncHandler(async (req, res) => {
  * POST /api/delivery/auth/logout
  */
 export const logout = asyncHandler(async (req, res) => {
-  // Best-effort token cleanup so logout consistently removes FCM tokens from DB.
   try {
     const deliveryId = req.delivery?._id ? String(req.delivery._id) : null;
-    if (deliveryId) {
-      await Promise.all([
-        DeviceToken.deleteMany({ userId: deliveryId, role: 'delivery' }),
-        Delivery.findByIdAndUpdate(deliveryId, {
-          $set: {
-            fcmTokenWeb: [],
-            fcmTokenMobile: []
-          }
-        })
+    const token = req.body?.token || req.body?.fcmToken || null;
+
+    if (deliveryId && token) {
+      const normalizedToken = String(token).trim();
+      const { FoodDeliveryPartner } = await import('../../deliveryV2/models/deliveryPartner.model.js');
+      const pullUpdate = {
+        $pull: {
+          fcmTokenWeb: normalizedToken,
+          fcmTokenMobile: normalizedToken,
+        },
+      };
+
+      await Promise.allSettled([
+        DeviceToken.deleteMany({ userId: deliveryId, role: 'delivery', deviceToken: normalizedToken }),
+        FoodDeliveryPartner.findByIdAndUpdate(deliveryId, pullUpdate),
+        Delivery.findByIdAndUpdate(deliveryId, pullUpdate),
       ]);
     }
   } catch (cleanupErr) {

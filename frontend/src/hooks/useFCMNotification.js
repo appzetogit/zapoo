@@ -120,7 +120,31 @@ export function useFCMNotification({
         // ── 6. Foreground message handler ────────────────────────────
         // When app tab is focused, show browser notification for foreground FCM.
         onMessage(messaging, payload => {
-          const notificationId = payload?.data?.notificationId;
+          const data = payload?.data || {};
+          const type = String(data?.type || '').toLowerCase();
+          const targetRole = data?.target || role;
+
+          if (role === 'delivery' && ['new_order', 'new_order_available'].includes(type)) {
+            const notificationId = data.notificationId;
+            if (notificationId) {
+              const seenKey = `fcm_seen_${role}_${notificationId}`;
+              if (sessionStorage.getItem(seenKey)) {
+                return;
+              }
+              sessionStorage.setItem(seenKey, '1');
+            }
+
+            window.dispatchEvent(new CustomEvent('delivery-fcm-order', {
+              detail: {
+                ...data,
+                type,
+                notification: payload?.notification || null,
+              },
+            }));
+            return;
+          }
+
+          const notificationId = data.notificationId;
           if (notificationId) {
             const seenKey = `fcm_seen_${role}_${notificationId}`;
             if (sessionStorage.getItem(seenKey)) {
@@ -128,20 +152,21 @@ export function useFCMNotification({
             }
             sessionStorage.setItem(seenKey, '1');
           }
-          const rawTitle = payload?.notification?.title || payload?.data?.title || 'Zapoo';
-          const dataTargetRole = payload?.data?.target || role;
-          const title = ensureRolePrefix(rawTitle, dataTargetRole);
-          const body = payload?.notification?.body || payload?.data?.body || '';
-          const image = payload?.notification?.image || payload?.data?.imageUrl;
+          const rawTitle = payload?.notification?.title || data?.title || 'Zapoo';
+          const title = ensureRolePrefix(rawTitle, targetRole);
+          const body = payload?.notification?.body || data?.body || '';
+          const image = payload?.notification?.image || data?.imageUrl;
+
+          if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+            return;
+          }
+
           try {
             new Notification(title, {
               body,
               icon: '/zapoo-icon.png',
-              // Explicitly disable notification action buttons.
               actions: [],
-              ...(image ? {
-                image
-              } : {})
+              ...(image ? { image } : {}),
             });
           } catch (notifyErr) {
             console.warn('[FCM] Foreground notification display failed:', notifyErr.message);

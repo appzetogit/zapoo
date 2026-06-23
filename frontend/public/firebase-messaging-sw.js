@@ -5,7 +5,6 @@
 importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js');
 
-// Must use the zapoo-d23ea project config (same project that sends FCM)
 firebase.initializeApp({
     apiKey: "AIzaSyAO32xTBf-xq4cjzRfbtzyCUny8zY_j3WM",
     authDomain: "zapoo-d23ea.firebaseapp.com",
@@ -16,6 +15,8 @@ firebase.initializeApp({
 });
 
 const messaging = firebase.messaging();
+const PENDING_OFFER_KEY = 'deliveryPendingOffer';
+
 const rolePrefixMap = {
     user: '[USER]',
     restaurant: '[RESTAURANT]',
@@ -30,15 +31,43 @@ function ensureRolePrefix(rawTitle, targetRole) {
     return `${prefix} ${title}`;
 }
 
-// Handle background messages (app is closed or tab is not in focus)
+function savePendingDeliveryOffer(data = {}) {
+    const orderKey = String(data.orderMongoId || data.orderId || '').trim();
+    if (!orderKey) return;
+    try {
+        const offerExpiresAt = data.offerExpiresAt || null;
+        localStorage.setItem(PENDING_OFFER_KEY, JSON.stringify({
+            orderKey,
+            orderId: data.orderId || null,
+            orderMongoId: data.orderMongoId || null,
+            offerExpiresAt,
+            savedAt: Date.now(),
+            source: 'fcm_sw',
+        }));
+    } catch (err) {
+        console.warn('[SW] Failed to persist pending delivery offer:', err?.message || err);
+    }
+}
+
+function buildDeliveryClickUrl(data = {}) {
+    const orderMongoId = data.orderMongoId || data.orderId;
+    if (!orderMongoId) return '/food/delivery/feed';
+    return `/food/delivery/feed?orderId=${encodeURIComponent(orderMongoId)}`;
+}
+
 messaging.onBackgroundMessage((payload) => {
     console.log('[SW] Background message received:', payload);
 
     const { title, body, image } = payload.notification || {};
     const data = payload.data || {};
     const notificationId = data.notificationId || `sw_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const type = String(data.type || '').toLowerCase();
+    const isDeliveryOffer = data.target === 'delivery' && ['new_order', 'new_order_available'].includes(type);
 
-    // Pick role-specific icon
+    if (isDeliveryOffer) {
+        savePendingDeliveryOffer(data);
+    }
+
     const iconMap = {
         restaurant: '/zapoo-restaurant-icon.png',
         delivery: '/zapoo-delivery-icon.png',
@@ -48,26 +77,27 @@ messaging.onBackgroundMessage((payload) => {
     const icon = iconMap[data.target] || '/zapoo-logo.png';
 
     const notificationTitle = ensureRolePrefix(title || data.title || 'Zapoo', data.target);
+    const orderTagKey = data.orderMongoId || data.orderId || notificationId;
     const notificationOptions = {
         body: body || data.body || '',
         icon,
-        badge: icon, // same icon for badge
+        badge: icon,
         ...((image || data.imageUrl) && String(image || data.imageUrl).startsWith('http')
             ? { image: image || data.imageUrl }
             : {}),
-        // Explicitly disable notification action buttons (Accept/Reject, etc.)
         actions: [],
-        // Web push cannot reliably play a custom sound when the app is closed,
-        // but vibration helps make background alerts more noticeable on supported devices.
-        vibrate: [250, 120, 250],
-        // Use per-notification tag so later pushes don't overwrite earlier ones.
-        tag: `zapoo-${data.target || 'user'}-${notificationId}`,
-        renotify: false,
+        vibrate: [250, 120, 250, 120, 250],
+        tag: isDeliveryOffer ? `delivery-order-${orderTagKey}` : `zapoo-${data.target || 'user'}-${notificationId}`,
+        renotify: true,
         requireInteraction: true,
         silent: false,
         data: {
-            url: data.clickUrl || '/',
+            url: data.clickUrl || buildDeliveryClickUrl(data),
             notificationId,
+            orderMongoId: data.orderMongoId || null,
+            orderId: data.orderId || null,
+            type,
+            target: data.target || 'user',
         },
     };
 
@@ -87,20 +117,26 @@ messaging.onBackgroundMessage((payload) => {
         });
 });
 
-// Open the app (or focus existing tab) when notification is clicked
 self.addEventListener('notificationclick', (event) => {
     event.notification.close();
-    const targetUrl = event.notification.data?.url || '/';
+    const data = event.notification.data || {};
+    const targetUrl = data.url || buildDeliveryClickUrl(data) || '/food/delivery/feed';
 
     event.waitUntil(
         clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-            // Focus an existing tab at the target URL
             for (const client of clientList) {
-                if (client.url.includes(targetUrl) && 'focus' in client) {
-                    return client.focus();
+                if ('focus' in client) {
+                    client.postMessage({
+                        type: 'delivery-offer-click',
+                        orderMongoId: data.orderMongoId,
+                        orderId: data.orderId,
+                        url: targetUrl,
+                    });
+                    if (client.url.includes('/delivery') || client.url.includes('/food/delivery')) {
+                        return client.focus();
+                    }
                 }
             }
-            // Otherwise open a new tab
             if (clients.openWindow) {
                 return clients.openWindow(targetUrl);
             }

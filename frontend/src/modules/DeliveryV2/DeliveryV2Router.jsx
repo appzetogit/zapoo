@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute';
 import Loader from "@food/components/Loader";
 import { useFCMNotification } from "@/hooks/useFCMNotification";
+import DeliveryNotificationProvider from './components/DeliveryNotificationProvider';
 
 // Auth Pages (Lazy loaded)
 const Welcome = lazy(() => import("./pages/auth/Welcome"))
@@ -56,8 +57,9 @@ const DeliveryV2Router = () => {
   }, []);
 
   return (
-    <Suspense fallback={<Loader />}>
-      <Routes>
+    <DeliveryNotificationProvider>
+      <Suspense fallback={<Loader />}>
+        <Routes>
         {/* Auth routes */}
         <Route path="welcome" element={<Welcome />} />
         <Route path="login" element={<SignIn />} />
@@ -103,6 +105,7 @@ const DeliveryV2Router = () => {
         <Route path="*" element={<Navigate to=".." relative="path" replace />} />
       </Routes>
     </Suspense>
+    </DeliveryNotificationProvider>
   );
 };
 

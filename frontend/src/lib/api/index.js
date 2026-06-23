@@ -1019,8 +1019,9 @@ export const deliveryAPI = {
   refreshToken: () => {
     return apiClient.post(API_ENDPOINTS.DELIVERY.AUTH.REFRESH_TOKEN);
   },
-  logout: () => {
-    return apiClient.post(API_ENDPOINTS.DELIVERY.AUTH.LOGOUT);
+  logout: (token = null) => {
+    const payload = typeof token === 'string' && token.trim() ? { token: token.trim() } : {};
+    return apiClient.post(API_ENDPOINTS.DELIVERY.AUTH.LOGOUT, payload);
   },
   getCurrentDelivery: () => {
     return apiClient.get(API_ENDPOINTS.DELIVERY.AUTH.ME);

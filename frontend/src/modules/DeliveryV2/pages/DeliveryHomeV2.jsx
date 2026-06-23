@@ -3,14 +3,13 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useDeliveryStore } from '@/modules/DeliveryV2/store/useDeliveryStore';
 import { useProximityCheck } from '@/modules/DeliveryV2/hooks/useProximityCheck';
 import { useOrderManager } from '@/modules/DeliveryV2/hooks/useOrderManager';
-import { useDeliveryNotifications } from '@food/hooks/useDeliveryNotifications';
+import { useDeliveryNotificationContext } from '@/modules/DeliveryV2/components/DeliveryNotificationProvider';
 import { writeOrderTracking } from '@food/realtimeTracking';
 import { deliveryAPI, telephonyAPI } from '@food/api';
 import { toast } from 'sonner';
 
 // Components
 import LiveMap from '@/modules/DeliveryV2/components/map/LiveMap';
-import { NewOrderModal } from '@/modules/DeliveryV2/components/modals/NewOrderModal';
 import { PickupActionModal } from '@/modules/DeliveryV2/components/modals/PickupActionModal';
 import { DeliveryVerificationModal } from '@/modules/DeliveryV2/components/modals/DeliveryVerificationModal';
 import { OrderSummaryModal } from '@/modules/DeliveryV2/components/modals/OrderSummaryModal';
@@ -82,11 +81,18 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
   const { isOnline, toggleOnline, activeOrder, tripStatus, setRiderLocation, setActiveOrder, updateTripStatus, clearActiveOrder } = useDeliveryStore();
   const { isWithinRange, distanceToTarget } = useProximityCheck();
   const { acceptOrder, reachPickup, pickUpOrder, reachDrop, completeDelivery, resetTrip } = useOrderManager();
-  const { newOrder, clearNewOrder, orderStatusUpdate, clearOrderStatusUpdate, isConnected: isSocketConnected, emitLocation } = useDeliveryNotifications();
+  const {
+    orderStatusUpdate,
+    clearOrderStatusUpdate,
+    isConnected: isSocketConnected,
+    emitLocation,
+    incomingOrder,
+    isModalMinimized: isOfferModalMinimized,
+    setIsModalMinimized: setOfferModalMinimized,
+  } = useDeliveryNotificationContext();
   const companyName = useCompanyName();
   const { unreadCount: notificationUnreadCount } = useNotificationInbox("delivery", { limit: 20 });
 
-  const [incomingOrder, setIncomingOrder] = useState(null);
   const [currentTab, setCurrentTab] = useState(tab);
   
   // Track URL changes (Prop changes) to update sub-page content
@@ -513,14 +519,6 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
     return () => clearInterval(pingInterval);
   }, [isOnline]);
 
-  useEffect(() => { setIncomingOrder(newOrder); }, [newOrder]);
-
-  useEffect(() => {
-    if (activeOrder && incomingOrder) {
-      setIncomingOrder(null);
-    }
-  }, [activeOrder, incomingOrder]);
-
   const handleCallCustomerMasked = useCallback(async () => {
     const orderId = activeOrder?.orderId || activeOrder?._id;
     if (!orderId || isCallingCustomer) return;
@@ -537,80 +535,6 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
       setIsCallingCustomer(false);
     }
   }, [activeOrder, isCallingCustomer]);
-
-  useEffect(() => {
-    if (!isOnline) return;
-    if (currentTab !== 'feed') return;
-    if (activeOrder) return;
-
-    let cancelled = false;
-
-    const hydrateAvailableOrder = async () => {
-      try {
-        const currentResponse = await deliveryAPI.getCurrentDelivery();
-        const currentPayload =
-          currentResponse?.data?.data?.activeOrder ||
-          currentResponse?.data?.data ||
-          null;
-
-        if (!cancelled && currentPayload && (currentPayload._id || currentPayload.orderId)) {
-          setActiveOrder(currentPayload);
-          return;
-        }
-
-        const availableResponse = await deliveryAPI.getOrders({ limit: 20, page: 1 });
-        const availablePayload =
-          availableResponse?.data?.data ||
-          availableResponse?.data ||
-          {};
-        const availableOrders = Array.isArray(availablePayload?.docs)
-          ? availablePayload.docs
-          : Array.isArray(availablePayload?.orders)
-            ? availablePayload.orders
-          : Array.isArray(availablePayload?.items)
-            ? availablePayload.items
-            : Array.isArray(availablePayload)
-              ? availablePayload
-              : [];
-
-        const nextIncomingOrder = availableOrders.find((order) => {
-          const dispatchStatus = String(order?.dispatch?.status || '').toLowerCase();
-          const orderStatus = String(order?.orderStatus || order?.status || '').toLowerCase();
-          const deliveryStateStatus = String(order?.deliveryState?.status || '').toLowerCase();
-          return (
-            ['unassigned', 'assigned'].includes(dispatchStatus) &&
-            ['confirmed', 'preparing', 'ready_for_pickup', 'ready'].includes(orderStatus) &&
-            !['cancelled', 'delivered'].includes(deliveryStateStatus)
-          );
-        });
-
-        if (!cancelled && nextIncomingOrder) {
-          setIncomingOrder((prev) => {
-            const prevId = prev?.orderId || prev?._id || prev?.orderMongoId;
-            const nextId =
-              nextIncomingOrder?.orderId ||
-              nextIncomingOrder?._id ||
-              nextIncomingOrder?.orderMongoId;
-            return prevId === nextId && prev ? prev : nextIncomingOrder;
-          });
-        }
-      } catch (error) {
-        console.warn('[DeliveryHomeV2] Available order fallback sync failed:', error?.message || error);
-      }
-    };
-
-    void hydrateAvailableOrder();
-    const poller = window.setInterval(() => {
-      if (!document.hidden) {
-        void hydrateAvailableOrder();
-      }
-    }, isSocketConnected ? 12000 : 5000);
-
-    return () => {
-      cancelled = true;
-      window.clearInterval(poller);
-    };
-  }, [activeOrder, currentTab, isOnline, isSocketConnected, setActiveOrder]);
 
   useEffect(() => {
     if (orderStatusUpdate) {
@@ -924,14 +848,6 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
               className="fixed inset-0 z-[300] pointer-events-none flex items-end"
             >
               <div className="w-full pointer-events-auto relative">
-                {incomingOrder && (
-                  <NewOrderModal 
-                    order={incomingOrder} 
-                    onAccept={(o) => { acceptOrder(o); setIncomingOrder(null); clearNewOrder(); }}
-                    onReject={() => { setIncomingOrder(null); clearNewOrder(); }}
-                    onMinimize={() => setIsModalMinimized(true)}
-                  />
-                )}
                 {(tripStatus === 'PICKING_UP' || tripStatus === 'REACHED_PICKUP') && (
                   <PickupActionModal 
                     order={activeOrder} 
@@ -1082,14 +998,17 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
       </BottomPopup>
 
       {/* Floating Minimize/Restore Toggle - Above navbar */}
-      {isModalMinimized && (activeOrder || incomingOrder || showVerification) && (
+      {(isModalMinimized || isOfferModalMinimized) && (activeOrder || incomingOrder || showVerification) && (
         <motion.div 
            initial={{ y: 100, opacity: 0 }}
            animate={{ y: 0, opacity: 1 }}
            className="fixed bottom-[100px] inset-x-0 z-[300] px-6"
         >
            <button 
-             onClick={() => setIsModalMinimized(false)}
+             onClick={() => {
+               setIsModalMinimized(false);
+               setOfferModalMinimized(false);
+             }}
              className="w-full bg-gray-900/90 text-white rounded-2xl py-4 flex items-center justify-between px-6 shadow-2xl backdrop-blur-md border border-white/10"
            >
               <div className="flex flex-col items-start gap-0.5">

@@ -18,6 +18,7 @@ import DeleteAccountModal from "@food/components/DeleteAccountModal";
 import { Trash2 } from "lucide-react";
 import { toast } from "sonner"
 import { clearModuleAuth } from "@food/utils/auth"
+import { revokeFcmTokenOnLogout } from "@/lib/utils/fcmTokenLifecycle"
 
 /**
  * ProfileV2 - 1:1 EXACT Restoration of the Legacy Profile Hub.
@@ -98,7 +99,9 @@ export const ProfileV2 = () => {
     setShowLogoutConfirm(false)
     try {
       setLogoutSubmitting(true)
-      await deliveryAPI.logout()
+      const savedFcmToken = localStorage.getItem("fcm_token_registered_delivery_VAL")
+      await revokeFcmTokenOnLogout("delivery")
+      await deliveryAPI.logout(savedFcmToken)
     } catch (error) {}
     clearModuleAuth("delivery")
     localStorage.removeItem("app:isOnline")

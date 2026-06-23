@@ -1,26 +1,36 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { User, MapPin, FastForward, Clock, Phone, ChefHat, ChevronDown } from 'lucide-react';
 import { ActionSlider } from '@/modules/DeliveryV2/components/ui/ActionSlider';
 import { useDeliveryStore } from '@/modules/DeliveryV2/store/useDeliveryStore';
 import { getHaversineDistance, calculateETA } from '@/modules/DeliveryV2/utils/geo';
+import { getRemainingAcceptanceSeconds } from '@food/utils/deliveryOfferStorage';
 
 /**
  * NewOrderModal - Ported to Original 1:1 Theme with Slider Accept.
  * Matches the Zomato/Swiggy style Green Header + White Card.
  */
-export const NewOrderModal = ({ order, onAccept, onReject, onMinimize }) => {
+export const NewOrderModal = ({ order, onAccept, onReject, onMinimize, isAccepting = false }) => {
   const { riderLocation } = useDeliveryStore();
-  const [timeLeft, setTimeLeft] = useState(30);
+  const [timeLeft, setTimeLeft] = useState(() => getRemainingAcceptanceSeconds(order));
+
+  const handleExpire = useCallback(() => {
+    onReject();
+  }, [onReject]);
 
   useEffect(() => {
-    if (timeLeft <= 0) {
-      onReject();
-      return;
-    }
-    const timer = setInterval(() => setTimeLeft((t) => t - 1), 1000);
+    const updateCountdown = () => {
+      const remaining = getRemainingAcceptanceSeconds(order);
+      setTimeLeft(remaining);
+      if (remaining <= 0) {
+        handleExpire();
+      }
+    };
+
+    updateCountdown();
+    const timer = setInterval(updateCountdown, 1000);
     return () => clearInterval(timer);
-  }, [timeLeft, onReject]);
+  }, [order, handleExpire]);
 
   const { distanceKm, etaMins } = useMemo(() => {
     if (!order) return { distanceKm: null, etaMins: null };
@@ -85,6 +95,7 @@ export const NewOrderModal = ({ order, onAccept, onReject, onMinimize }) => {
   };
 
   const earnings = resolveRiderEarning(order);
+  const orderNumber = order.orderId || order.order_id || order._id || '—';
   const restaurantName = order.restaurantName || order.restaurant_name || (order.restaurantId?.name) || 'Restaurant';
   const restaurantAddress = order.restaurantAddress || order.restaurant_address || (order.restaurantId?.location?.address) || 'Address not available';
   const deliveryAddress = (order?.deliveryAddress && typeof order.deliveryAddress === 'object') ? order.deliveryAddress : {};
@@ -164,7 +175,7 @@ export const NewOrderModal = ({ order, onAccept, onReject, onMinimize }) => {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="absolute inset-0 z-[150] bg-black/60 backdrop-blur-sm flex items-end justify-center"
+      className="fixed inset-0 z-[1500] bg-black/60 backdrop-blur-sm flex items-end justify-center"
     >
       <motion.div 
         initial={{ y: '100%' }}
@@ -187,6 +198,7 @@ export const NewOrderModal = ({ order, onAccept, onReject, onMinimize }) => {
           <div className="bg-linear-to-br from-emerald-500 via-green-500 to-emerald-600 px-6 py-5 flex justify-between items-center text-white">
             <div>
               <p className="text-white/80 text-[10px] font-black uppercase tracking-[0.2em] mb-1">New Order Request</p>
+              <p className="text-white/70 text-[10px] font-bold tracking-widest mb-1">#{orderNumber}</p>
               <div className="flex items-baseline gap-1">
                 <span className="text-xl font-bold opacity-80">₹</span>
                 <h2 className="text-4xl font-black tracking-tighter">{Number(earnings || 0).toFixed(2)}</h2>
@@ -262,6 +274,7 @@ export const NewOrderModal = ({ order, onAccept, onReject, onMinimize }) => {
             onConfirm={() => onAccept(order)} 
             color="bg-emerald-600"
             successLabel="Order Accepted ✓"
+            disabled={isAccepting}
           />
 
           <button 

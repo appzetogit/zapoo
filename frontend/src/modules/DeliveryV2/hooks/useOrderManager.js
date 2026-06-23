@@ -144,7 +144,12 @@ export const useOrderManager = () => {
       }
     } catch (error) {
       console.error('Accept Order Error:', error);
-      toast.error('Network error. Please try again.');
+      const message = error?.response?.data?.message;
+      if (message) {
+        toast.error(message);
+      } else {
+        toast.error('Network error. Please try again.');
+      }
       throw error;
     }
   };

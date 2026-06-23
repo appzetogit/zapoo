@@ -173,7 +173,7 @@ router.post('/test/delivery', authenticateDelivery, async (req, res) => {
   }
 });
 
-router.delete('/tokens', removeDeviceToken);
+router.delete('/tokens', universalAuth, removeDeviceToken);
 
 // ── Restaurant routes (/api/notification/...) ─────────────────────────────
 // Submit a new notification request (restaurant auth)

@@ -5,6 +5,17 @@ import { deliveryAPI } from '@food/api';
 import alertSound from '@food/assets/audio/alert.mp3';
 import originalSound from '@food/assets/audio/original.mp3';
 import { dispatchNotificationInboxRefresh } from '@food/hooks/useNotificationInbox';
+import {
+  clearPendingOffer,
+  enrichOrderWithOfferMeta,
+  getOrderOfferKey,
+  isRecoverableDeliveryOffer,
+  isOfferExpired,
+  readPendingOffer,
+  savePendingOffer,
+  wasOfferSeenRecently,
+  markOfferSeenInSession,
+} from '@food/utils/deliveryOfferStorage';
 
 const shouldLogDeliverySocket = () => {
   if (typeof window === 'undefined') return import.meta.env.DEV;
@@ -123,7 +134,7 @@ const buildDeliveryOrderNotification = (orderData = {}) => {
     tag: `delivery-order-${orderId}`,
     data: {
       orderId,
-      targetUrl: '/delivery',
+      targetUrl: '/food/delivery/feed',
     },
   };
 }
@@ -136,7 +147,7 @@ const triggerWebViewNativeNotification = async (orderData = {}) => {
     body: `Order #${orderData?.orderId || orderData?.orderMongoId || orderData?.id || ''}`.trim(),
     orderId: orderData?.orderId || orderData?.order_id || '',
     orderMongoId: orderData?.orderMongoId || orderData?.order_mongo_id || '',
-    targetUrl: '/delivery',
+    targetUrl: '/food/delivery/feed',
   };
 
   try {
@@ -188,7 +199,9 @@ export const useDeliveryNotifications = () => {
   const [orderStatusUpdate, setOrderStatusUpdate] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
   const [deliveryPartnerId, setDeliveryPartnerId] = useState(null);
+  const [orderTaken, setOrderTaken] = useState(null);
   const joinedDeliveryRoomRef = useRef(null);
+  const presentingOfferKeyRef = useRef(null);
   const ALERT_LOOP_INTERVAL_MS = 4500;
   const ALERT_LOOP_MAX_MS = 120000;
   const ALERT_DEDUPE_MS = 15000;
@@ -247,9 +260,7 @@ export const useDeliveryNotifications = () => {
         return;
       }
 
-      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
-        playSoundFn(activeOrderRef.current);
-      }
+      playSoundFn(activeOrderRef.current);
     }, ALERT_LOOP_INTERVAL_MS);
   }, [stopAlertLoop]);
   
@@ -365,64 +376,96 @@ export const useDeliveryNotifications = () => {
     startAlertLoop(playNotificationSound);
 
     if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
-      showBackgroundOrderNotification(orderData);
+      // Avoid duplicate tray notifications when FCM background push already handles delivery offers.
+      const source = String(orderData?.source || '').toLowerCase();
+      if (source !== 'fcm' && source !== 'fcm_sw') {
+        showBackgroundOrderNotification(orderData);
+      }
     }
   }, [playNotificationSound, showBackgroundOrderNotification, startAlertLoop]);
+
+  const presentIncomingOrder = useCallback((orderData = {}, { source = 'socket', playAlert = true } = {}) => {
+    const enriched = enrichOrderWithOfferMeta(orderData, source);
+    const offerKey = getOrderOfferKey(enriched);
+    if (!offerKey) return false;
+    if (isOfferExpired(enriched)) {
+      clearPendingOffer(enriched);
+      return false;
+    }
+    if (wasOfferSeenRecently(enriched)) {
+      return false;
+    }
+    if (presentingOfferKeyRef.current === offerKey) {
+      return false;
+    }
+
+    markOfferSeenInSession(enriched);
+    presentingOfferKeyRef.current = offerKey;
+    savePendingOffer(enriched);
+    setNewOrder(enriched);
+
+    if (playAlert) {
+      handleIncomingOrderAlert(enriched);
+    }
+    return true;
+  }, [handleIncomingOrderAlert]);
 
   const recoverDeliveryState = useCallback(async () => {
     if (!deliveryPartnerId) return;
 
     try {
-      // Check if there is an orderId in the URL query parameters (triggered by native deep link click)
       let orderIdFromUrl = null;
       if (typeof window !== 'undefined' && window.location) {
         const queryParams = new URLSearchParams(window.location.search);
         orderIdFromUrl = queryParams.get('orderId') || queryParams.get('orderMongoId');
       }
 
-      if (orderIdFromUrl) {
+      const pendingSnapshot = readPendingOffer();
+      const recoveryOrderId =
+        orderIdFromUrl ||
+        pendingSnapshot?.orderMongoId ||
+        pendingSnapshot?.orderId ||
+        null;
+
+      if (recoveryOrderId) {
         try {
-          debugLog('Notification deep link click detected. Fetching order details:', orderIdFromUrl);
-          const detailsRes = await deliveryAPI.getOrderDetails(orderIdFromUrl);
+          debugLog('Recovering delivery offer from deep link / pending snapshot:', recoveryOrderId);
+          const detailsRes = await deliveryAPI.getOrderDetails(recoveryOrderId);
           const details = detailsRes.data?.data?.order || detailsRes.data?.data || detailsRes.data?.order;
-          
-          if (details) {
-            const status = details.status || details.orderStatus;
-            // Only popup if the order is still active and awaiting acceptance
-            if (['confirmed', 'preparing', 'ready', 'ready_for_pickup'].includes(status)) {
-              debugLog('Recovered specific order from clickUrl:', details);
-              setNewOrder(details);
-              handleIncomingOrderAlert(details);
-              
-              // Clear the orderId from URL search parameters to avoid re-triggering on page refresh
-              if (window.history && window.history.replaceState) {
-                const url = new URL(window.location.href);
-                url.searchParams.delete('orderId');
-                url.searchParams.delete('orderMongoId');
-                window.history.replaceState({}, '', url.pathname + url.search);
-              }
-              return; // Stop recovery here as we found the targeted deep-linked order
-            } else {
-              debugWarn('Recovered order is no longer in a valid assignment state:', status);
+
+          if (details && isRecoverableDeliveryOffer(details, deliveryPartnerId)) {
+            presentIncomingOrder(details, { source: 'recovery', playAlert: true });
+
+            if (window.history?.replaceState) {
+              const url = new URL(window.location.href);
+              url.searchParams.delete('orderId');
+              url.searchParams.delete('orderMongoId');
+              window.history.replaceState({}, '', url.pathname + url.search);
             }
+            return;
           }
+
+          clearPendingOffer({ orderMongoId: recoveryOrderId, orderId: recoveryOrderId });
         } catch (detailsErr) {
-          debugWarn('Failed to fetch specific order details from URL deep link:', detailsErr.message);
+          debugWarn('Failed to recover order from deep link/pending snapshot:', detailsErr.message);
+          if (detailsErr?.response?.status === 403 || detailsErr?.response?.status === 404) {
+            clearPendingOffer({ orderMongoId: recoveryOrderId, orderId: recoveryOrderId });
+          }
         }
       }
+
       const [availableResult, currentTripResult] = await Promise.allSettled([
         deliveryAPI.getOrders({ limit: 20, page: 1 }),
         deliveryAPI.getCurrentDelivery(),
       ]);
 
-      const currentTrip =
+      const currentTripPayload =
         currentTripResult.status === 'fulfilled'
-          ? currentTripResult.value?.data?.data ??
-            currentTripResult.value?.data ??
-            null
+          ? currentTripResult.value?.data?.data ?? currentTripResult.value?.data ?? null
           : null;
+      const currentTrip = currentTripPayload?.activeOrder || null;
 
-      if (currentTrip) {
+      if (currentTrip && (currentTrip._id || currentTrip.orderId)) {
         debugLog('Recovered current delivery trip after reconnect/focus:', currentTrip);
         setOrderStatusUpdate({
           ...currentTrip,
@@ -433,35 +476,30 @@ export const useDeliveryNotifications = () => {
 
       const availablePayload =
         availableResult.status === 'fulfilled'
-          ? availableResult.value?.data?.data ??
-            availableResult.value?.data ??
-            {}
+          ? availableResult.value?.data?.data ?? availableResult.value?.data ?? {}
           : {};
-      const availableOrders = Array.isArray(availablePayload?.docs)
-        ? availablePayload.docs
-        : Array.isArray(availablePayload?.items)
-          ? availablePayload.items
-          : Array.isArray(availablePayload)
-            ? availablePayload
-            : [];
+      const availableOrders = Array.isArray(availablePayload?.orders)
+        ? availablePayload.orders
+        : Array.isArray(availablePayload?.docs)
+          ? availablePayload.docs
+          : Array.isArray(availablePayload?.items)
+            ? availablePayload.items
+            : Array.isArray(availablePayload)
+              ? availablePayload
+              : [];
 
-      const recoverableOrder = availableOrders.find((order) => {
-        const dispatchStatus = order?.dispatch?.status;
-        return (
-          ['unassigned', 'assigned'].includes(dispatchStatus) &&
-          ['preparing', 'ready_for_pickup'].includes(order?.orderStatus)
-        );
-      });
+      const recoverableOrder = availableOrders.find((order) =>
+        isRecoverableDeliveryOffer(order, deliveryPartnerId)
+      );
 
-      if (recoverableOrder && !activeOrderRef.current) {
+      if (recoverableOrder && !presentingOfferKeyRef.current) {
         debugLog('Recovered available delivery order after reconnect/focus:', recoverableOrder);
-        setNewOrder(recoverableOrder);
-        handleIncomingOrderAlert(recoverableOrder);
+        presentIncomingOrder(recoverableOrder, { source: 'recovery', playAlert: true });
       }
     } catch (error) {
       debugWarn('Delivery recovery sync failed:', error?.message || error);
     }
-  }, [deliveryPartnerId, handleIncomingOrderAlert]);
+  }, [deliveryPartnerId, presentIncomingOrder]);
 
   const joinDeliveryRoomIfPossible = useCallback(() => {
     if (!socketRef.current?.connected || !deliveryPartnerId) {
@@ -892,41 +930,37 @@ export const useDeliveryNotifications = () => {
     socketRef.current.on('new_order', (orderData) => {
       debugLog('New order received via socket', {
         orderId: orderData?.orderId || orderData?.orderMongoId || orderData?._id,
-        dispatchStatus: orderData?.dispatch?.status,
       });
-      setNewOrder(orderData);
-      handleIncomingOrderAlert(orderData);
+      presentIncomingOrder(orderData, { source: 'socket', playAlert: true });
     });
 
-    // Listen for priority-based order notifications (new_order_available)
     socketRef.current.on('new_order_available', (orderData) => {
       debugLog('New order available received via socket', {
         orderId: orderData?.orderId || orderData?.orderMongoId || orderData?._id,
         phase: orderData?.phase || 'unknown',
-        dispatchStatus: orderData?.dispatch?.status,
       });
-      // Treat it the same as new_order for now - delivery boy can accept it
-      setNewOrder(orderData);
-      handleIncomingOrderAlert(orderData);
+      presentIncomingOrder(orderData, { source: 'socket', playAlert: true });
     });
 
     socketRef.current.on('play_notification_sound', (data) => {
       debugLog('play_notification_sound received', {
         orderId: data?.orderId || data?.orderMongoId || data?.order_id,
       });
-      const normalizedData = {
+      const normalizedData = enrichOrderWithOfferMeta({
         orderId: data?.orderId || data?.order_id,
         orderMongoId: data?.orderMongoId || data?.order_mongo_id,
-        ...data
-      };
-      // Force immediate buzz for notification events, even if dedupe would skip.
-      activeOrderRef.current = normalizedData || { id: Date.now() };
+        ...data,
+      }, 'socket_sound');
+      const offerKey = getOrderOfferKey(normalizedData);
+      if (!offerKey || presentingOfferKeyRef.current === offerKey) {
+        return;
+      }
+      activeOrderRef.current = normalizedData;
       playNotificationSound(normalizedData);
       startAlertLoop(playNotificationSound);
       if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
         showBackgroundOrderNotification(normalizedData);
       }
-      handleIncomingOrderAlert(normalizedData);
     });
 
     socketRef.current.on('order_ready', (orderData) => {
@@ -959,14 +993,24 @@ export const useDeliveryNotifications = () => {
     });
 
     socketRef.current.on('order_claimed', (data) => {
-      debugLog('?? Order claimed by another partner:', data);
+      debugLog('Order claimed by another partner:', data);
       const currentActiveId = getOrderAlertKey(activeOrderRef.current);
       const claimedId = getOrderAlertKey(data);
       
       if (currentActiveId && claimedId && currentActiveId === claimedId) {
-        debugLog('?? Removing claimed order from local state');
+        debugLog('Removing claimed order from local state');
         clearNewOrder();
       }
+    });
+
+    socketRef.current.on('order_taken', (data) => {
+      debugLog('Order taken by another partner:', data);
+      const takenId = getOrderAlertKey(data);
+      const currentActiveId = getOrderAlertKey(activeOrderRef.current) || presentingOfferKeyRef.current;
+      if (takenId && currentActiveId && takenId === currentActiveId) {
+        clearNewOrder();
+      }
+      setOrderTaken(data || null);
     });
 
     socketRef.current.on('order_reassigned_elsewhere', (data) => {
@@ -1017,10 +1061,49 @@ export const useDeliveryNotifications = () => {
       }
     };
 
+    const handleOnline = () => {
+      void recoverDeliveryState();
+    };
+
+    const handleFcmDeliveryOrder = (event) => {
+      const payload = event?.detail || {};
+      const type = String(payload?.type || payload?.data?.type || '').toLowerCase();
+      if (!['new_order', 'new_order_available'].includes(type)) return;
+
+      const orderSeed = {
+        orderId: payload.orderId || payload.data?.orderId,
+        orderMongoId: payload.orderMongoId || payload.data?.orderMongoId,
+        offerExpiresAt: payload.offerExpiresAt || payload.data?.offerExpiresAt,
+        type,
+        ...payload.data,
+        ...payload,
+      };
+
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+        savePendingOffer(enrichOrderWithOfferMeta(orderSeed, 'fcm'));
+      }
+
+      presentIncomingOrder(orderSeed, {
+        source: 'fcm',
+        playAlert: document.visibilityState !== 'hidden',
+      });
+    };
+
+    const handleServiceWorkerMessage = (event) => {
+      const payload = event?.data || {};
+      if (payload?.type !== 'delivery-offer-click') return;
+      void recoverDeliveryState();
+    };
+
     window.addEventListener('deliveryAuthChanged', handleAuthChange);
     window.addEventListener('authRefreshed', handleAuthRefreshed);
     window.addEventListener('focus', handleWindowFocus);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('delivery-fcm-order', handleFcmDeliveryOrder);
     document.addEventListener('visibilitychange', handleVisibilityChange);
+    if (navigator.serviceWorker) {
+      navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage);
+    }
 
     return () => {
       debugLog('? Cleaning up socket connection...');
@@ -1029,14 +1112,19 @@ export const useDeliveryNotifications = () => {
       window.removeEventListener('deliveryAuthChanged', handleAuthChange);
       window.removeEventListener('authRefreshed', handleAuthRefreshed);
       window.removeEventListener('focus', handleWindowFocus);
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('delivery-fcm-order', handleFcmDeliveryOrder);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (navigator.serviceWorker) {
+        navigator.serviceWorker.removeEventListener('message', handleServiceWorkerMessage);
+      }
       if (socketRef.current) {
         socketRef.current.removeAllListeners();
         socketRef.current.disconnect();
         socketRef.current = null;
       }
     };
-  }, [deliveryPartnerId, handleIncomingOrderAlert, joinDeliveryRoomIfPossible, playNotificationSound, recoverDeliveryState, showBackgroundOrderNotification, startAlertLoop, stopAlertLoop]);
+  }, [deliveryPartnerId, joinDeliveryRoomIfPossible, playNotificationSound, presentIncomingOrder, recoverDeliveryState, showBackgroundOrderNotification, startAlertLoop, stopAlertLoop]);
 
   useEffect(() => {
     if (!deliveryPartnerId) {
@@ -1057,10 +1145,23 @@ export const useDeliveryNotifications = () => {
   }, [deliveryPartnerId, joinDeliveryRoomIfPossible, recoverDeliveryState]);
 
   // Helper functions
-  const clearNewOrder = () => {
+  const stopNotificationSound = useCallback(() => {
     stopAlertLoop();
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+  }, [stopAlertLoop]);
+
+  const clearNewOrder = () => {
+    stopNotificationSound();
     activeOrderRef.current = null;
+    presentingOfferKeyRef.current = null;
     setNewOrder(null);
+  };
+
+  const clearOrderTaken = () => {
+    setOrderTaken(null);
   };
 
   const clearOrderReady = () => {
@@ -1087,9 +1188,16 @@ export const useDeliveryNotifications = () => {
     clearOrderReady,
     orderStatusUpdate,
     clearOrderStatusUpdate,
+    orderTaken,
+    clearOrderTaken,
     isConnected,
+    deliveryPartnerId,
     playNotificationSound,
-    emitLocation
+    stopNotificationSound,
+    startAlertLoop,
+    emitLocation,
+    recoverDeliveryState,
+    presentIncomingOrder,
   };
 };
 

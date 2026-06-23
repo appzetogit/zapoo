@@ -4,6 +4,25 @@ import Restaurant from '../../restaurant/models/Restaurant.js';
 import mongoose from 'mongoose';
 import { sendNotificationToUser } from '../../notification/utils/pushNotificationHelper.js';
 
+const DELIVERY_OFFER_TIMEOUT_MS = 300000;
+
+function buildOfferExpiresAt(order = {}) {
+  const assignmentInfo = order?.assignmentInfo || {};
+  const notifiedAt =
+    assignmentInfo.lastNotifiedAt ||
+    assignmentInfo.broadcastNotifiedAt ||
+    assignmentInfo.priorityNotifiedAt ||
+    assignmentInfo.expandedNotifiedAt ||
+    order?.createdAt;
+  const baseMs = notifiedAt ? new Date(notifiedAt).getTime() : Date.now();
+  return new Date(baseMs + DELIVERY_OFFER_TIMEOUT_MS).toISOString();
+}
+
+function buildDeliveryOfferClickUrl(orderMongoId) {
+  if (!orderMongoId) return '/food/delivery/feed';
+  return `/food/delivery/feed?orderId=${orderMongoId}`;
+}
+
 // Dynamic import to avoid circular dependency
 let getIO = null;
 async function getIOInstance() {
@@ -323,6 +342,7 @@ export async function notifyDeliveryBoyNewOrder(order, deliveryPartnerId) {
       // Raw distance number for calculations
       estimatedEarnings
     };
+    orderNotification.offerExpiresAt = buildOfferExpiresAt(order);
 
     // Get delivery namespace
     // Normalize deliveryPartnerId to string
@@ -428,7 +448,8 @@ export async function notifyDeliveryBoyNewOrder(order, deliveryPartnerId) {
         orderMongoId: order._id?.toString(),
         status: order.status,
         type: 'new_order',
-        clickUrl: `/delivery?orderId=${order._id?.toString()}`,
+        clickUrl: buildDeliveryOfferClickUrl(order._id?.toString()),
+        offerExpiresAt: buildOfferExpiresAt(order),
         notificationPriority: 'high',
         templateKey: 'delivery_new_order',
         templateVars: {
@@ -618,6 +639,7 @@ export async function notifyMultipleDeliveryBoys(order, deliveryPartnerIds, phas
       // Include full order for frontend use
       fullOrder: orderWithUser
     };
+    orderNotification.offerExpiresAt = buildOfferExpiresAt(orderWithUser);
 
     console.log('🧭 [CoordDebug][Dispatch][OrderPayload]', {
       orderId: orderNotification.orderId,
@@ -672,7 +694,8 @@ export async function notifyMultipleDeliveryBoys(order, deliveryPartnerIds, phas
             orderMongoId: orderWithUser._id?.toString(),
             status: orderWithUser.status,
             type: 'new_order_available',
-            clickUrl: `/delivery?orderId=${orderWithUser._id?.toString()}`,
+            clickUrl: buildDeliveryOfferClickUrl(orderWithUser._id?.toString()),
+            offerExpiresAt: buildOfferExpiresAt(orderWithUser),
             phase,
             notificationPriority: 'high',
             templateKey: 'delivery_new_order_available',

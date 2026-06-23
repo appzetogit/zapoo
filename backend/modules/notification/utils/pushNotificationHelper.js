@@ -20,6 +20,38 @@ function looksLikeMongoObjectId(value) {
   return typeof value === 'string' && /^[a-fA-F0-9]{24}$/.test(value);
 }
 
+async function removeInvalidTokensFromModels(tokens = []) {
+  if (!Array.isArray(tokens) || tokens.length === 0) return;
+
+  const pullUpdate = {
+    $pull: {
+      fcmTokenWeb: { $in: tokens },
+      fcmTokenMobile: { $in: tokens },
+      fcmTokenApp: { $in: tokens },
+      fcmTokens: { $in: tokens },
+      deviceToken: { $in: tokens },
+    },
+  };
+
+  try {
+    const User = (await import('../../auth/models/User.js')).default;
+    const Restaurant = (await import('../../restaurant/models/Restaurant.js')).default;
+    const Delivery = (await import('../../delivery/models/Delivery.js')).default;
+    const { FoodDeliveryPartner } = await import('../../deliveryV2/models/deliveryPartner.model.js');
+    const Admin = (await import('../../admin/models/Admin.js')).default;
+
+    await Promise.allSettled([
+      User.updateMany({}, pullUpdate),
+      Restaurant.updateMany({}, pullUpdate),
+      Delivery.updateMany({}, pullUpdate),
+      FoodDeliveryPartner.updateMany({}, pullUpdate),
+      Admin.updateMany({}, pullUpdate),
+    ]);
+  } catch (err) {
+    console.warn('[FCM] Failed to purge invalid tokens from role models:', err?.message || err);
+  }
+}
+
 /**
  * Resolve a Firebase Admin app instance that has messaging enabled.
  * Prefers the named "zapoo-rtdb" app used for RTDB/FCM; falls back to the
@@ -151,6 +183,7 @@ export async function sendPushNotification(tokens, payload) {
             $in: invalidTokens
           }
         });
+        await removeInvalidTokensFromModels(invalidTokens);
       }
     }
   } catch (error) {
