@@ -10,7 +10,6 @@ import {
   enrichOrderWithOfferMeta,
   getOrderOfferKey,
   isRecoverableDeliveryOffer,
-  isOfferExpired,
   readPendingOffer,
   savePendingOffer,
   wasOfferSeenRecently,
@@ -388,10 +387,6 @@ export const useDeliveryNotifications = () => {
     const enriched = enrichOrderWithOfferMeta(orderData, source);
     const offerKey = getOrderOfferKey(enriched);
     if (!offerKey) return false;
-    if (isOfferExpired(enriched)) {
-      clearPendingOffer(enriched);
-      return false;
-    }
     if (wasOfferSeenRecently(enriched)) {
       return false;
     }

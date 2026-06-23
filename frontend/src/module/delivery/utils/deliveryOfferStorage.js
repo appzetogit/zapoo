@@ -61,10 +61,7 @@ export const computeOfferExpiresAt = (orderData = {}, fallbackMs = DELIVERY_ASSI
   return new Date(Date.now() + fallbackMs).toISOString();
 };
 
-export const isOfferExpired = (orderData = {}) => {
-  const expiresAt = computeOfferExpiresAt(orderData);
-  return Date.now() >= new Date(expiresAt).getTime();
-};
+export const isOfferExpired = () => false;
 
 export const getRemainingAcceptanceSeconds = (orderData = {}) => {
   const expiresAt = computeOfferExpiresAt(orderData);
@@ -98,10 +95,6 @@ export const readPendingOffer = () => {
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!parsed?.orderKey) return null;
-    if (parsed.offerExpiresAt && Date.now() >= new Date(parsed.offerExpiresAt).getTime()) {
-      clearPendingOffer();
-      return null;
-    }
     return parsed;
   } catch {
     return null;
@@ -175,8 +168,6 @@ export const isRecoverableDeliveryOffer = (order = {}, deliveryPartnerId = null)
   if (assignedPartnerId && deliveryPartnerId && assignedPartnerId !== String(deliveryPartnerId)) {
     return false;
   }
-
-  if (isOfferExpired(order)) return false;
 
   const assignmentInfo = order?.assignmentInfo || {};
   const normalizedPartnerId = deliveryPartnerId ? String(deliveryPartnerId) : null;

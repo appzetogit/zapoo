@@ -1,10 +1,11 @@
-import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { User, MapPin, FastForward, Clock, Phone, ChefHat, ChevronDown } from 'lucide-react';
 import { ActionSlider } from '@/modules/DeliveryV2/components/ui/ActionSlider';
 import { useDeliveryStore } from '@/modules/DeliveryV2/store/useDeliveryStore';
 import { getHaversineDistance, calculateETA } from '@/modules/DeliveryV2/utils/geo';
-import { getRemainingAcceptanceSeconds } from '@food/utils/deliveryOfferStorage';
+
+const ACCEPT_COUNTDOWN_SECONDS = 30;
 
 /**
  * NewOrderModal - Ported to Original 1:1 Theme with Slider Accept.
@@ -12,25 +13,31 @@ import { getRemainingAcceptanceSeconds } from '@food/utils/deliveryOfferStorage'
  */
 export const NewOrderModal = ({ order, onAccept, onReject, onMinimize, isAccepting = false }) => {
   const { riderLocation } = useDeliveryStore();
-  const [timeLeft, setTimeLeft] = useState(() => getRemainingAcceptanceSeconds(order));
+  const [timeLeft, setTimeLeft] = useState(ACCEPT_COUNTDOWN_SECONDS);
 
-  const handleExpire = useCallback(() => {
-    onReject();
-  }, [onReject]);
+  const orderKey =
+    order?.orderMongoId ||
+    order?.orderId ||
+    order?._id ||
+    order?.id ||
+    'order';
 
   useEffect(() => {
-    const updateCountdown = () => {
-      const remaining = getRemainingAcceptanceSeconds(order);
-      setTimeLeft(remaining);
-      if (remaining <= 0) {
-        handleExpire();
-      }
-    };
+    setTimeLeft(ACCEPT_COUNTDOWN_SECONDS);
 
-    updateCountdown();
-    const timer = setInterval(updateCountdown, 1000);
+    const timer = setInterval(() => {
+      setTimeLeft((current) => {
+        if (current <= 1) {
+          clearInterval(timer);
+          onReject();
+          return 0;
+        }
+        return current - 1;
+      });
+    }, 1000);
+
     return () => clearInterval(timer);
-  }, [order, handleExpire]);
+  }, [orderKey, onReject]);
 
   const { distanceKm, etaMins } = useMemo(() => {
     if (!order) return { distanceKm: null, etaMins: null };
