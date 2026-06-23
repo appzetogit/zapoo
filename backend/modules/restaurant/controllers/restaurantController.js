@@ -484,8 +484,13 @@ export const getRestaurants = async (req, res) => {
       total = await Restaurant.countDocuments(query);
     }
 
-    const currentlyOpenRestaurants = await filterRestaurantsByOutletTimings(restaurants);
-    const restaurantsWithRealRatings = await attachRealReviewStats(currentlyOpenRestaurants);
+    // When user browse passes includeOfflineForSearch / includeInactiveForSearch, return
+    // closed/offline/inactive outlets too — the client greys them and sorts to the end.
+    const restaurantsForUserListing =
+      allowOfflineForSearch || allowInactive
+        ? restaurants
+        : await filterRestaurantsByOutletTimings(restaurants);
+    const restaurantsWithRealRatings = await attachRealReviewStats(restaurantsForUserListing);
 
     return successResponse(res, 200, 'Restaurants retrieved successfully', {
       restaurants: restaurantsWithRealRatings,
@@ -1376,9 +1381,11 @@ export const getRestaurantsWithDishesUnder250 = async (req, res) => {
       zoneId,
       latitude,
       longitude,
-      pureVeg
+      pureVeg,
+      includeOfflineForSearch
     } = req.query; // User's zone ID (optional); latitude/longitude for deliveryRange filter
     const pureVegOnly = pureVeg === 'true';
+    const allowOfflineForSearch = includeOfflineForSearch === 'true';
     const userLat = latitude != null ? parseFloat(latitude) : null;
     const userLng = longitude != null ? parseFloat(longitude) : null;
     const hasGeoFilter = userLat != null && userLng != null && Number.isFinite(userLat) && Number.isFinite(userLng);
@@ -1423,8 +1430,11 @@ export const getRestaurantsWithDishesUnder250 = async (req, res) => {
       });
     };
 
-    // Get all active + online restaurants
-    const baseQuery = { isActive: true, isAcceptingOrders: true, zoneId: { $in: activeZoneIds } };
+    // Get all active restaurants (optionally include offline for grayscale display)
+    const baseQuery = { isActive: true, zoneId: { $in: activeZoneIds } };
+    if (!allowOfflineForSearch) {
+      baseQuery.isAcceptingOrders = true;
+    }
 
     let restaurants = await Restaurant.find(baseQuery)
       .select('-owner -createdAt -updatedAt')

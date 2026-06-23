@@ -635,10 +635,15 @@ export const restaurantAPI = {
 
   // Get all restaurants (for user module)
   getRestaurants: (params = {}) => {
+    const includesAvailabilityListing =
+      params?.includeOfflineForSearch === "true" ||
+      params?.includeOfflineForSearch === true ||
+      params?.includeInactiveForSearch === "true" ||
+      params?.includeInactiveForSearch === true;
     return getCachedResource(
       ["restaurant:list", params],
       () => apiClient.get(API_ENDPOINTS.RESTAURANT.LIST, { params }),
-      { ttl: 60 * 1000 }
+      { ttl: includesAvailabilityListing ? 15 * 1000 : 60 * 1000 }
     );
   },
 

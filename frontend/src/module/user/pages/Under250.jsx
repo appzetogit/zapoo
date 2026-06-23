@@ -93,14 +93,13 @@ export default function Under250() {
   const sortedAndFilteredRestaurants = useMemo(() => {
     let filtered = [...under250Restaurants]
 
-    // Apply availability filter (open + accepting orders)
+    // Apply availability filter (open now; offline restaurants stay visible in grayscale)
     filtered = filtered.filter((restaurant) => {
-      const accepting = restaurant.isAcceptingOrders !== false
       const openNow = isOpenForDeliveryNow({
         openDays: restaurant.openDays,
         deliveryTimings: restaurant.deliveryTimings,
       })
-      return accepting && openNow
+      return openNow
     })
 
     // Apply "Under 30 mins" filter
@@ -144,7 +143,15 @@ export default function Under250() {
       })
     } else {
       // Default: Relevance (keep original order from backend - already sorted by rating)
-      // No additional sorting needed
+      // Push offline restaurants to the end
+      filtered.sort((a, b) => {
+        const aAvailable = a.isAcceptingOrders !== false
+        const bAvailable = b.isAcceptingOrders !== false
+        if (aAvailable !== bAvailable) {
+          return aAvailable ? -1 : 1
+        }
+        return 0
+      })
     }
 
     return filtered
@@ -193,6 +200,7 @@ export default function Under250() {
         if (zoneId) params.zoneId = zoneId
         params.latitude = location.latitude
         params.longitude = location.longitude
+        params.includeOfflineForSearch = "true"
         const response = await restaurantAPI.getRestaurantsUnder250(params)
         if (response.data.success && response.data.data.restaurants) {
           const restaurantsArray = response.data.data.restaurants
@@ -269,7 +277,7 @@ export default function Under250() {
               distance,
               deliveryRange,
               isActive: restaurant.isActive,
-              isAcceptingOrders: restaurant.isAcceptingOrders,
+              isAcceptingOrders: restaurant.isAcceptingOrders !== false,
               openDays: restaurant.openDays,
               deliveryTimings: restaurant.deliveryTimings,
             }
@@ -435,6 +443,9 @@ export default function Under250() {
   }
 
   const handleItemClick = (item, restaurant) => {
+    if (restaurant?.isAcceptingOrders === false) {
+      return
+    }
     const restaurantId = restaurant?.restaurantId || restaurant?._id || restaurant?.id || null
     const dishId = item?.id || item?._id || null
     // Add restaurant info to item for display
@@ -631,14 +642,19 @@ export default function Under250() {
         ) : (
           sortedAndFilteredRestaurants.map((restaurant) => {
             const restaurantSlug = restaurant.slug || restaurant.name.toLowerCase().replace(/\s+/g, "-")
+            const isRestaurantOffline = restaurant.isAcceptingOrders === false
+            const disableRestaurantActions = disableUnder250Actions || isRestaurantOffline
             return (
-              <section key={restaurant.id} className="pt-4 sm:pt-6 md:pt-8 lg:pt-10">
+              <section key={restaurant.id} className={`pt-4 sm:pt-6 md:pt-8 lg:pt-10 ${isRestaurantOffline ? "grayscale opacity-75" : ""}`}>
                 {/* Restaurant Header */}
                 <div className="flex items-start justify-between mb-3 md:mb-4 lg:mb-6">
                   <div className="flex-1">
                     <h3 className="text-lg sm:text-xl md:text-2xl lg:text-3xl xl:text-4xl font-bold text-gray-900 dark:text-white mb-1 md:mb-2">
                       {restaurant.name}
                     </h3>
+                    {isRestaurantOffline && (
+                      <p className="text-xs md:text-sm font-semibold text-gray-500 mb-1">Restaurant is offline</p>
+                    )}
                     <div className="flex items-center gap-2 text-sm md:text-base lg:text-lg text-gray-500 dark:text-gray-400">
                       <Clock className="h-4 w-4 md:h-5 md:w-5 lg:h-6 lg:w-6" strokeWidth={1.5} />
                       <span className="font-medium">
@@ -758,14 +774,14 @@ export default function Under250() {
                                   <Button
                                     variant={"outline"}
                                     size="sm"
-                                    disabled={disableUnder250Actions}
-                                    className={`h-7 md:h-8 lg:h-9 px-3 md:px-4 lg:px-5 text-xs md:text-sm lg:text-base ${disableUnder250Actions
+                                    disabled={disableRestaurantActions}
+                                    className={`h-7 md:h-8 lg:h-9 px-3 md:px-4 lg:px-5 text-xs md:text-sm lg:text-base ${disableRestaurantActions
                                       ? 'bg-gray-100 dark:bg-gray-800 text-gray-400 border-gray-300 dark:border-gray-700 cursor-not-allowed opacity-50'
                                       : 'bg-green-600/10 text-green-500 border-green-500 hover:bg-green-700 hover:text-white'
                                       }`}
                                     onClick={(e) => {
                                       e.stopPropagation()
-                                      if (!disableUnder250Actions) {
+                                      if (!disableRestaurantActions) {
                                         handleItemClick(item, restaurant)
                                       }
                                     }}

@@ -861,11 +861,7 @@ export default function OrdersMain() {
   };
   const handleRejectCancel = () => {
     setShowRejectPopup(false);
-    setShowNewOrderPopup(false);
-    setPopupOrder(null);
-    clearNewOrder();
     setRejectReason("");
-    setCountdown(240);
   };
 
   // Handle cancel order (for preparing orders)

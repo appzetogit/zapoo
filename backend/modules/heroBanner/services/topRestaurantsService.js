@@ -87,7 +87,7 @@ export const getTopRestaurantsForUser = async ({
   }
 
   const restaurants = await Restaurant.find(query)
-    .select('name slug restaurantId profileImage coverImages menuImages cuisines estimatedDeliveryTime distance offer featuredDish featuredPrice location deliveryRange zoneId openDays deliveryTimings weeklyTimings outletTimingsActive')
+    .select('name slug restaurantId profileImage coverImages menuImages cuisines estimatedDeliveryTime distance offer featuredDish featuredPrice location deliveryRange zoneId openDays deliveryTimings weeklyTimings outletTimingsActive isActive isAcceptingOrders')
     .lean();
 
   let eligibleRestaurants = restaurants;
