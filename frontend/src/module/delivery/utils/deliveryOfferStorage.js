@@ -61,7 +61,11 @@ export const computeOfferExpiresAt = (orderData = {}, fallbackMs = DELIVERY_ASSI
   return new Date(Date.now() + fallbackMs).toISOString();
 };
 
-export const isOfferExpired = () => false;
+export const isOfferExpired = (orderData = {}) => {
+  const expiresAt = computeOfferExpiresAt(orderData);
+  const expiresMs = new Date(expiresAt).getTime();
+  return Number.isFinite(expiresMs) && Date.now() >= expiresMs;
+};
 
 export const getRemainingAcceptanceSeconds = (orderData = {}) => {
   const expiresAt = computeOfferExpiresAt(orderData);
@@ -153,6 +157,8 @@ export const enrichOrderWithOfferMeta = (orderData = {}, source = 'socket') => {
 export const isRecoverableDeliveryOffer = (order = {}, deliveryPartnerId = null) => {
   if (!order) return false;
 
+  if (isOfferExpired(order)) return false;
+
   const status = String(order?.status || order?.orderStatus || '').toLowerCase();
   if (['cancelled', 'delivered', 'completed', 'deleted'].includes(status)) return false;
 
@@ -197,10 +203,9 @@ export const isRecoverableDeliveryOffer = (order = {}, deliveryPartnerId = null)
   if (normalizedPartnerId && rejectedLists.includes(normalizedPartnerId)) return false;
 
   if (!assignedPartnerId) {
-    if (normalizedPartnerId && notifiedLists.length > 0) {
-      return notifiedLists.includes(normalizedPartnerId);
-    }
-    return ['confirmed', 'preparing', 'ready', 'ready_for_pickup'].includes(status);
+    if (!normalizedPartnerId) return false;
+    if (notifiedLists.length === 0) return false;
+    return notifiedLists.includes(normalizedPartnerId);
   }
 
   return normalizedPartnerId ? assignedPartnerId === normalizedPartnerId : true;

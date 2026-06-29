@@ -119,7 +119,7 @@ export default function ViewOrderDialog({
                   </span>
                   {order.cancellationReason && <p className="text-xs text-red-600 mt-1">
                       <span className="font-medium">
-                        {order.cancelledBy === 'user' ? 'Cancelled by User - ' : order.cancelledBy === 'restaurant' ? 'Cancelled by Restaurant - ' : 'Cancellation '}Reason:
+                        {order.cancelledBy === 'user' ? 'Cancelled by User - ' : order.cancelledBy === 'restaurant' ? 'Cancelled by Restaurant - ' : order.cancelledBy === 'admin' ? 'Cancelled by Admin - ' : 'Cancellation '}Reason:
                       </span> {order.cancellationReason}
                     </p>}
                   {order.cancelledAt && <p className="text-xs text-slate-500 mt-1">

@@ -139,9 +139,10 @@ export const matchesOrdersPageFilter = (orderStatus, filterTab) => {
     return normalized === ORDER_STATUS.DELIVERED || normalized === ORDER_STATUS.REFUNDED
   }
   
-  // For cancelled - return false (no orders match)
+  // For cancelled orders
   if (filterTab === 'cancelled') {
-    return false // No orders match this filter yet
+    const normalizedStatus = String(orderStatus || '').toLowerCase().trim();
+    return normalizedStatus === 'cancelled';
   }
   
   return false

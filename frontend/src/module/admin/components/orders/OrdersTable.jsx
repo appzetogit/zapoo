@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react"
 import { Eye, Printer, ArrowUpDown, Loader2 } from "lucide-react"
+import { canAdminCancelOrder } from "./canAdminCancelOrder"
 
 const getStatusColor = (orderStatus) => {
   const colors = {
@@ -12,6 +13,7 @@ const getStatusColor = (orderStatus) => {
     "Canceled": "bg-rose-100 text-rose-700",
     "Cancelled by Restaurant": "bg-red-100 text-red-700",
     "Cancelled by User": "bg-orange-100 text-orange-700",
+    "Cancelled by Admin": "bg-purple-100 text-purple-700",
     "Payment Failed": "bg-red-100 text-red-700",
     "Refunded": "bg-sky-100 text-sky-700",
     "Offline Payments": "bg-slate-100 text-slate-700",
@@ -30,6 +32,8 @@ export default function OrdersTable({
   visibleColumns,
   onViewOrder,
   onPrintOrder,
+  onCancelOrder,
+  cancellingOrderId = null,
   currentPage: currentPageProp,
   totalPages: totalPagesProp,
   totalItems: totalItemsProp,
@@ -166,6 +170,11 @@ export default function OrdersTable({
                     <span>Order Status</span>
                     <ArrowUpDown className="w-3 h-3 text-slate-400 cursor-pointer hover:text-slate-600" />
                   </div>
+                </th>
+              )}
+              {visibleColumns.cancelOrder && onCancelOrder && (
+                <th className="px-6 py-4 text-center text-[10px] font-bold text-slate-700 uppercase tracking-wider">
+                  Cancel Order
                 </th>
               )}
               {visibleColumns.actions && (
@@ -309,12 +318,36 @@ export default function OrdersTable({
                           <span className="font-medium">
                             {order.cancelledBy === 'user' ? 'Cancelled by User - ' : 
                              order.cancelledBy === 'restaurant' ? 'Cancelled by Restaurant - ' : 
+                             order.cancelledBy === 'admin' ? 'Cancelled by Admin - ' :
                              'Reason: '}
                           </span>
                           {order.cancellationReason}
                         </div>
                       )}
                     </div>
+                  </td>
+                )}
+                {visibleColumns.cancelOrder && onCancelOrder && (
+                  <td className="px-6 py-4 whitespace-nowrap text-center">
+                    {canAdminCancelOrder(order) ? (
+                      <button
+                        type="button"
+                        onClick={() => onCancelOrder(order)}
+                        disabled={cancellingOrderId === (order.id || order.orderId)}
+                        className="px-3 py-1.5 text-xs font-medium rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
+                      >
+                        {cancellingOrderId === (order.id || order.orderId) ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            Cancelling...
+                          </>
+                        ) : (
+                          "Cancel"
+                        )}
+                      </button>
+                    ) : (
+                      <span className="text-sm text-slate-400">—</span>
+                    )}
                   </td>
                 )}
                 {visibleColumns.actions && (

@@ -15,6 +15,8 @@ import {
   wasOfferSeenRecently,
   markOfferSeenInSession,
 } from '@food/utils/deliveryOfferStorage';
+import { normalizeDeliveryOfferOrder } from '@food/utils/normalizeDeliveryOfferOrder';
+import { isModuleAuthenticated } from '@food/utils/auth';
 
 const shouldLogDeliverySocket = () => {
   if (typeof window === 'undefined') return import.meta.env.DEV;
@@ -384,7 +386,7 @@ export const useDeliveryNotifications = () => {
   }, [playNotificationSound, showBackgroundOrderNotification, startAlertLoop]);
 
   const presentIncomingOrder = useCallback((orderData = {}, { source = 'socket', playAlert = true } = {}) => {
-    const enriched = enrichOrderWithOfferMeta(orderData, source);
+    const enriched = enrichOrderWithOfferMeta(normalizeDeliveryOfferOrder(orderData), source);
     const offerKey = getOrderOfferKey(enriched);
     if (!offerKey) return false;
     if (wasOfferSeenRecently(enriched)) {
@@ -715,6 +717,10 @@ export const useDeliveryNotifications = () => {
     }
 
     const fetchDeliveryPartnerId = async () => {
+      if (!isModuleAuthenticated("delivery")) {
+        return;
+      }
+
       try {
         const response = await deliveryAPI.getMe();
         if (response.data?.success && response.data.data) {
@@ -926,7 +932,7 @@ export const useDeliveryNotifications = () => {
       debugLog('New order received via socket', {
         orderId: orderData?.orderId || orderData?.orderMongoId || orderData?._id,
       });
-      presentIncomingOrder(orderData, { source: 'socket', playAlert: true });
+      presentIncomingOrder(orderData, { source: 'socket', playAlert: false });
     });
 
     socketRef.current.on('new_order_available', (orderData) => {
@@ -934,7 +940,7 @@ export const useDeliveryNotifications = () => {
         orderId: orderData?.orderId || orderData?.orderMongoId || orderData?._id,
         phase: orderData?.phase || 'unknown',
       });
-      presentIncomingOrder(orderData, { source: 'socket', playAlert: true });
+      presentIncomingOrder(orderData, { source: 'socket', playAlert: false });
     });
 
     socketRef.current.on('play_notification_sound', (data) => {
@@ -1063,6 +1069,18 @@ export const useDeliveryNotifications = () => {
     const handleFcmDeliveryOrder = (event) => {
       const payload = event?.detail || {};
       const type = String(payload?.type || payload?.data?.type || '').toLowerCase();
+
+      if (type === 'delivery_order_cancelled') {
+        setOrderStatusUpdate({
+          orderId: payload.orderId || payload.data?.orderId,
+          orderMongoId: payload.orderMongoId || payload.data?.orderMongoId,
+          status: 'cancelled',
+          cancelledBy: payload.cancelledBy || payload.data?.cancelledBy || null,
+          cancellationReason: payload.cancellationReason || payload.data?.cancellationReason || null,
+        });
+        return;
+      }
+
       if (!['new_order', 'new_order_available'].includes(type)) return;
 
       const orderSeed = {

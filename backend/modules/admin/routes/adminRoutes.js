@@ -201,6 +201,7 @@ import {
   getOngoingOrders,
   getTransactionReport,
   getRestaurantReport,
+  cancelOrderByAdmin,
 } from "../controllers/orderController.js";
 import {
   getAllReviews,
@@ -476,6 +477,9 @@ router.get("/orders/searching-deliveryman", getSearchingDeliverymanOrders);
 router.get("/orders/ongoing", getOngoingOrders);
 router.get("/orders/transaction-report", getTransactionReport);
 router.get("/orders/restaurant-report", getRestaurantReport);
+
+// Admin cancel order - MUST be before /orders/:id to avoid route conflicts
+router.patch("/orders/:orderId/cancel", cancelOrderByAdmin);
 
 // Order Refund - MUST be before /orders/:id to avoid route conflicts
 // Using explicit pattern /orders/refund/:orderId

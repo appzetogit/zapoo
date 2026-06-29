@@ -142,12 +142,14 @@ export const getRestaurantOrders = asyncHandler(async (req, res) => {
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
     // Strict field projection for order listing
-    const projection = 'orderId userId items pricing payment status address createdAt deliveredAt eta preparationTime note sendCutlery review deliveryPartnerId assignmentInfo deliveryState tracking';
+    const projection = 'orderId userId items pricing payment status address createdAt deliveredAt cancelledAt cancelledBy cancellationReason eta preparationTime note sendCutlery review deliveryPartnerId assignmentInfo deliveryState tracking';
+
+    const sortField = status === 'cancelled' ? { cancelledAt: -1, updatedAt: -1, createdAt: -1 } : { createdAt: -1 };
 
     const orders = await Order.find(query)
       .populate('userId', 'name email phone')
       .select(projection)
-      .sort({ createdAt: -1 })
+      .sort(sortField)
       .limit(parseInt(limit))
       .skip(skip)
       .lean();
@@ -518,6 +520,13 @@ export const rejectOrder = asyncHandler(async (req, res) => {
     order.cancelledAt = new Date();
     await order.save();
 
+    try {
+      const { clearAssignmentTimer } = await import('../../order/services/deliveryAssignmentService.js');
+      clearAssignmentTimer(order._id.toString());
+    } catch (timerError) {
+      console.error('Error clearing assignment timer after restaurant cancel:', timerError);
+    }
+
     // Trigger payment-source specific auto-refund for restaurant rejection.
     try {
       const {
@@ -545,10 +554,8 @@ export const rejectOrder = asyncHandler(async (req, res) => {
       await notifyRestaurantOrderUpdate(order._id.toString(), 'cancelled');
       await notifyUserOrderUpdate(order._id.toString(), 'cancelled');
       const assignedDeliveryId = order.deliveryPartnerId?._id?.toString?.() || order.deliveryPartnerId?.toString?.() || order.deliveryPartnerId;
-      if (assignedDeliveryId) {
-        const { notifyDeliveryOrderLifecycle } = await import('../../order/services/deliveryNotificationService.js');
-        await notifyDeliveryOrderLifecycle(assignedDeliveryId, order, 'cancelled');
-      }
+      const { notifyDeliveryPartnerOrderCancelled } = await import('../../order/services/deliveryNotificationService.js');
+      await notifyDeliveryPartnerOrderCancelled(assignedDeliveryId, order);
     } catch (notifError) {
       console.error('Error sending notification:', notifError);
     }

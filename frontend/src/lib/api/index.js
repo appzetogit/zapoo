@@ -1730,6 +1730,14 @@ export const adminAPI = {
     return apiClient.get(API_ENDPOINTS.ADMIN.ORDERS, { params });
   },
 
+  // Admin cancel order with partner settlement
+  cancelOrderByAdmin: (orderId, reason) => {
+    return apiClient.patch(
+      API_ENDPOINTS.ADMIN.ORDERS_CANCEL.replace(":orderId", encodeURIComponent(orderId)),
+      { reason },
+    );
+  },
+
   // Get orders searching for deliveryman
   getSearchingDeliverymanOrders: (params = {}) => {
     return apiClient.get(API_ENDPOINTS.ADMIN.ORDERS_SEARCHING_DELIVERYMAN, {

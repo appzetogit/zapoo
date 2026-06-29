@@ -17,6 +17,11 @@ import { getAllDeliveryOrders } from "../utils/deliveryOrderStatus";
 import { getUnreadDeliveryNotificationCount } from "../utils/deliveryNotifications";
 import { deliveryAPI, restaurantAPI, telephonyAPI, uploadAPI } from "@/lib/api";
 import { useDeliveryNotifications } from "../hooks/useDeliveryNotifications";
+import {
+  getCancellationToastMessage,
+  isCancelledOrderStatusUpdate,
+  orderCancellationAffects,
+} from "../utils/deliveryCancelUtils";
 import { getGoogleMapsApiKey } from "@/lib/utils/googleMapsApiKey";
 import { useCompanyName } from "@/lib/hooks/useCompanyName";
 import { Loader } from "@googlemaps/js-api-loader";
@@ -384,6 +389,8 @@ export default function DeliveryHome() {
     clearOrderReady,
     orderTaken,
     clearOrderTaken,
+    orderStatusUpdate,
+    clearOrderStatusUpdate,
     isConnected,
     stopNotificationSound
   } = useDeliveryNotifications();
@@ -2980,8 +2987,8 @@ export default function DeliveryHome() {
           return;
         }
 
-        // CRITICAL: Check if order ID is already confirmed - don't call API again
-        const isOrderIdAlreadyConfirmed = orderStatus === 'out_for_delivery' || deliveryPhase === 'en_route_to_delivery' || deliveryPhase === 'picked_up' || deliveryStateStatus === 'order_confirmed' || selectedRestaurant?.deliveryState?.orderIdConfirmedAt;
+        // CRITICAL: Only skip API when backend order status is already out_for_delivery.
+        const isOrderIdAlreadyConfirmed = orderStatus === 'out_for_delivery';
         if (isOrderIdAlreadyConfirmed) {
           console.warn('⚠️ Order ID is already confirmed, skipping confirmation:', {
             orderStatus,
@@ -6277,6 +6284,29 @@ export default function DeliveryHome() {
     setRoutePolyline([]);
     setShowRoutePath(false);
   }, [clearNewOrder, clearOrderReady, stopAlertSound]);
+
+  // Real-time + FCM cancel: dismiss all delivery popups for the affected order
+  useEffect(() => {
+    if (!orderStatusUpdate) return;
+
+    if (!isCancelledOrderStatusUpdate(orderStatusUpdate)) {
+      clearOrderStatusUpdate();
+      return;
+    }
+
+    const { affectsAny } = orderCancellationAffects(
+      orderStatusUpdate,
+      selectedRestaurant,
+      newOrder
+    );
+
+    if (affectsAny) {
+      toast.error(getCancellationToastMessage(orderStatusUpdate.cancelledBy));
+      clearOrderData();
+    }
+
+    clearOrderStatusUpdate();
+  }, [orderStatusUpdate, selectedRestaurant, newOrder, clearOrderData, clearOrderStatusUpdate]);
 
   // Periodically verify order still exists (every 30 seconds) to catch deletions
   useEffect(() => {

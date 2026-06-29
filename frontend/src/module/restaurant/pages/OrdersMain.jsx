@@ -218,7 +218,8 @@ function CompletedOrders({
 
 // Cancelled Orders List Component
 function CancelledOrders({
-  onSelectOrder
+  onSelectOrder,
+  refreshKey = 0,
 }) {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -227,11 +228,16 @@ function CancelledOrders({
     let intervalId = null;
     const fetchOrders = async () => {
       try {
-        const response = await restaurantAPI.getOrders();
+        const response = await restaurantAPI.getOrders({
+          status: 'cancelled',
+          limit: 200,
+          page: 1,
+        });
         if (!isMounted) return;
         if (response.data?.success && response.data.data?.orders) {
-          // Filter cancelled orders (both restaurant and user cancelled)
-          const cancelledOrders = response.data.data.orders.filter(order => order.status === 'cancelled');
+          const cancelledOrders = response.data.data.orders.filter(
+            (order) => String(order.status || '').toLowerCase() === 'cancelled'
+          );
           const transformedOrders = cancelledOrders.map(order => ({
             orderId: order.orderId || order._id,
             mongoId: order._id,
@@ -289,7 +295,7 @@ function CancelledOrders({
         clearInterval(intervalId);
       }
     };
-  }, []);
+  }, [refreshKey]);
   if (loading) {
     return <div className="pt-4 pb-6">
       <div className="flex items-baseline justify-between mb-3">
@@ -430,6 +436,7 @@ export default function OrdersMain() {
   const [showCancelPopup, setShowCancelPopup] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [orderToCancel, setOrderToCancel] = useState(null);
+  const [ordersListVersion, setOrdersListVersion] = useState(0);
   const audioRef = useRef(null);
   const audioUnlockedRef = useRef(false);
   const shownOrdersRef = useRef(new Set()); // Track orders already shown in popup
@@ -836,6 +843,11 @@ export default function OrdersMain() {
         }
         await restaurantAPI.rejectOrder(orderId, rejectReason);
         toast.success('Order rejected successfully');
+        setOrdersListVersion((version) => version + 1);
+        setActiveFilter('cancelled');
+        if (typeof window !== 'undefined') {
+          window.sessionStorage.setItem(ORDERS_FILTER_STORAGE_KEY, 'cancelled');
+        }
       } catch (error) {
         console.error('❌ Error rejecting order:', error);
         const serverMessage = String(error?.response?.data?.message || '').toLowerCase();
@@ -878,6 +890,11 @@ export default function OrdersMain() {
       setShowCancelPopup(false);
       setOrderToCancel(null);
       setCancelReason("");
+      setOrdersListVersion((version) => version + 1);
+      setActiveFilter('cancelled');
+      if (typeof window !== 'undefined') {
+        window.sessionStorage.setItem(ORDERS_FILTER_STORAGE_KEY, 'cancelled');
+      }
     } catch (error) {
       console.error('❌ Error cancelling order:', error);
       toast.error(error.response?.data?.message || 'Failed to cancel order');
@@ -1255,6 +1272,7 @@ export default function OrdersMain() {
             onSelectOrder={handleSelectOrder}
             onCancel={handleCancelClick}
             restaurantMongoId={restaurantStatus.restaurantId}
+            refreshKey={ordersListVersion}
           />
         );
       case "ready":
@@ -1269,7 +1287,7 @@ export default function OrdersMain() {
       case "completed":
         return <CompletedOrders onSelectOrder={handleSelectOrder} />;
       case "cancelled":
-        return <CancelledOrders onSelectOrder={handleSelectOrder} />;
+        return <CancelledOrders onSelectOrder={handleSelectOrder} refreshKey={ordersListVersion} />;
       default:
         return <EmptyState />;
     }
@@ -2005,8 +2023,8 @@ function OrderCard({
     }
   };
   return <div className="w-full bg-white rounded-2xl p-4 mb-3 border border-gray-200 hover:border-gray-400 transition-colors relative">
-    {/* Cancel button - only show for preparing orders */}
-    {status === 'preparing' && onCancel && <button type="button" onClick={e => {
+    {/* Cancel button - for confirmed or preparing orders (Option A: until before ready) */}
+    {['preparing', 'confirmed'].includes(status) && onCancel && <button type="button" onClick={e => {
       e.stopPropagation();
       onCancel({
         orderId,
@@ -2152,6 +2170,7 @@ function PreparingOrders({
   onSelectOrder,
   onCancel,
   restaurantMongoId,
+  refreshKey = 0,
 }) {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -2271,7 +2290,7 @@ function PreparingOrders({
         clearInterval(countdownIntervalId);
       }
     };
-  }, []); // Empty dependency array is correct here - we want this to run once on mount
+  }, [refreshKey]);
 
   // Track which orders have been marked as ready to avoid duplicate API calls
   const markedReadyOrdersRef = useRef(new Set());

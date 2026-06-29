@@ -347,11 +347,27 @@ apiClient.interceptors.response.use(response => {
         refreshEndpoint = "/delivery/auth/refresh-token";
       }
 
-      // Try to refresh the token
-      // The refresh token is sent via httpOnly cookie automatically
-      const response = await axios.post(`${API_BASE_URL}${refreshEndpoint}`, {}, {
-        withCredentials: true
-      });
+      // Try to refresh the token.
+      // Delivery: prefer module-specific refresh token from localStorage so a shared
+      // httpOnly `refreshToken` cookie (e.g. from admin login) cannot block refresh.
+      const isDeliveryRefresh = refreshEndpoint === "/delivery/auth/refresh-token";
+      const deliveryRefreshToken = isDeliveryRefresh
+        ? localStorage.getItem("delivery_refreshToken")
+        : null;
+      const refreshRequestConfig = {
+        withCredentials: true,
+        headers: {},
+      };
+      if (deliveryRefreshToken) {
+        refreshRequestConfig.headers["x-refresh-token"] = deliveryRefreshToken;
+        refreshRequestConfig.withCredentials = false;
+      }
+
+      const response = await axios.post(
+        `${API_BASE_URL}${refreshEndpoint}`,
+        {},
+        refreshRequestConfig
+      );
       const {
         accessToken
       } = response.data.data || response.data;

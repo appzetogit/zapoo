@@ -1,6 +1,11 @@
 import Order from '../../order/models/Order.js';
 import Refund from '../../refund/models/Refund.js';
 import { calculateOrderSettlement } from '../../order/services/orderSettlementService.js';
+import { isAdminCancellableOrder } from '../../order/services/adminOrderCancelService.js';
+import {
+  buildFoodOnTheWayQuery,
+  isEffectivelyOutForDelivery,
+} from '../../order/services/orderStatusSyncService.js';
 import { successResponse, errorResponse } from '../../../shared/utils/response.js';
 import asyncHandler from '../../../shared/middleware/asyncHandler.js';
 import mongoose from 'mongoose';
@@ -87,7 +92,12 @@ export const getOrders = asyncHandler(async (req, res) => {
             : { $in: [] };
         } else {
           const mappedStatus = statusMap[normalizedStatus] || normalizedStatus;
-          query.status = mappedStatus;
+          if (mappedStatus === 'out_for_delivery') {
+            query.$and = query.$and || [];
+            query.$and.push(buildFoodOnTheWayQuery());
+          } else {
+            query.status = mappedStatus;
+          }
         }
       }
     }
@@ -305,7 +315,7 @@ export const getOrders = asyncHandler(async (req, res) => {
         orderId: {
           $in: orderIds
         }
-      }).select('orderId userPayment.platformFee cancellationDetails.refundStatus adminCouponDiscount restaurantCouponDiscount couponDiscount').lean();
+      }).select('orderId userPayment.platformFee cancellationDetails.refundStatus adminCouponDiscount restaurantCouponDiscount couponDiscount escrowStatus').lean();
 
       // Create maps for quick lookup
       settlements.forEach(s => {
@@ -444,6 +454,8 @@ export const getOrders = asyncHandler(async (req, res) => {
           orderStatusDisplay = 'Cancelled by Restaurant';
         } else if (order.cancelledBy === 'user') {
           orderStatusDisplay = 'Cancelled by User';
+        } else if (order.cancelledBy === 'admin') {
+          orderStatusDisplay = 'Cancelled by Admin';
         } else {
           // Fallback: check cancellation reason pattern for old orders
           const cancellationReason = order.cancellationReason || '';
@@ -460,7 +472,10 @@ export const getOrders = asyncHandler(async (req, res) => {
           'delivered': 'Delivered',
           'scheduled': 'Scheduled'
         };
-        orderStatusDisplay = statusMap[order.status] || order.status;
+        const effectiveStatus = isEffectivelyOutForDelivery(order)
+          ? 'out_for_delivery'
+          : order.status;
+        orderStatusDisplay = statusMap[effectiveStatus] || effectiveStatus;
       }
 
       // Determine delivery type
@@ -522,6 +537,10 @@ export const getOrders = asyncHandler(async (req, res) => {
       const totalItemAmount = subtotal;
       // Order amount (final total)
       const orderAmount = order.pricing?.total || 0;
+      const settlementRecord = settlementCouponMap.get(order._id.toString()) || null;
+      const escrowStatus = settlementRecord?.escrowStatus || null;
+      const adminCancellable = isAdminCancellableOrder(order, settlementRecord);
+
       return {
         sl: skip + index + 1,
         orderId: order.orderId,
@@ -559,9 +578,14 @@ export const getOrders = asyncHandler(async (req, res) => {
             return 'Online';
           }
         })(),
+        payment: {
+          method: order.payment?.method || null,
+          status: order.payment?.status || null,
+        },
         paymentCollectionStatus: order.payment?.method === 'cash' || order.payment?.method === 'cod' ? order.status === 'delivered' ? 'Collected' : 'Not Collected' : 'Collected',
         orderStatus: orderStatusDisplay,
-        status: order.status,
+        status: isEffectivelyOutForDelivery(order) ? 'out_for_delivery' : order.status,
+        paymentMethod: order.payment?.method || null,
         // Backend status
         deliveryType: deliveryType,
         items: order.items || [],
@@ -585,7 +609,9 @@ export const getOrders = asyncHandler(async (req, res) => {
         // Refund status from settlement
         refundStatus: refundStatusMap.get(order._id.toString()) || null,
         refundedAmount: refundAmountMap.get(order._id.toString()) || 0,
-        refundIds: refundIdsMap.get(order._id.toString()) || []
+        refundIds: refundIdsMap.get(order._id.toString()) || [],
+        adminCancellable,
+        escrowStatus,
       };
     });
     return successResponse(res, 200, 'Orders retrieved successfully', {
@@ -2375,5 +2401,41 @@ export const processRefund = asyncHandler(async (req, res) => {
   } catch (error) {
     console.error('Error processing refund:', error);
     return errorResponse(res, 500, error.message || 'Failed to process refund');
+  }
+});
+
+/**
+ * Admin cancel order with partner settlement (like delivery completion)
+ * PATCH /api/admin/orders/:orderId/cancel
+ */
+export const cancelOrderByAdmin = asyncHandler(async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { reason } = req.body;
+    const adminId = req.user?.id || req.admin?._id?.toString?.() || req.admin?.id || null;
+
+    const { adminCancelOrderWithSettlement } = await import('../../order/services/adminOrderCancelService.js');
+    const updatedOrder = await adminCancelOrderWithSettlement({
+      orderId,
+      reason,
+      adminId,
+    });
+
+    return successResponse(res, 200, 'Order cancelled successfully. Restaurant and delivery partner settlements have been released.', {
+      order: {
+        orderId: updatedOrder.orderId,
+        id: updatedOrder._id.toString(),
+        status: updatedOrder.status,
+        cancelledBy: updatedOrder.cancelledBy,
+        cancellationReason: updatedOrder.cancellationReason,
+        cancelledAt: updatedOrder.cancelledAt,
+      },
+    });
+  } catch (error) {
+    const statusCode = error.statusCode || 500;
+    if (statusCode >= 500) {
+      console.error('Error cancelling order by admin:', error);
+    }
+    return errorResponse(res, statusCode, error.message || 'Failed to cancel order');
   }
 });

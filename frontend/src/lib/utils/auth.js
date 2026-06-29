@@ -138,6 +138,7 @@ export function isModuleAuthenticated(module) {
  */
 export function clearModuleAuth(module) {
   localStorage.removeItem(`${module}_accessToken`);
+  localStorage.removeItem(`${module}_refreshToken`);
   localStorage.removeItem(`${module}_authenticated`);
   localStorage.removeItem(`${module}_user`);
   if (module === "restaurant") {
@@ -211,9 +212,10 @@ export function clearAuthData() {
  * @param {string} module - Module name (admin, restaurant, delivery, user)
  * @param {string} token - Access token
  * @param {Object} user - User data
+ * @param {string|null} refreshToken - Optional refresh token (delivery WebView / multi-module cookie fallback)
  * @throws {Error} If localStorage is not available or quota exceeded
  */
-export function setAuthData(module, token, user) {
+export function setAuthData(module, token, user, refreshToken = null) {
   try {
     // Check if localStorage is available
     if (typeof Storage === 'undefined' || !localStorage) {
@@ -226,9 +228,13 @@ export function setAuthData(module, token, user) {
     }
     // Store module-specific token (don't clear other modules)
     const tokenKey = `${module}_accessToken`;
+    const refreshTokenKey = `${module}_refreshToken`;
     const authKey = `${module}_authenticated`;
     const userKey = `${module}_user`;
     localStorage.setItem(tokenKey, token);
+    if (refreshToken && typeof refreshToken === "string") {
+      localStorage.setItem(refreshTokenKey, refreshToken);
+    }
     localStorage.setItem(authKey, 'true');
     if (user) {
       try {
@@ -270,6 +276,9 @@ export function setAuthData(module, token, user) {
         // Retry storing
         localStorage.setItem(`${module}_accessToken`, token);
         localStorage.setItem(`${module}_authenticated`, 'true');
+        if (refreshToken && typeof refreshToken === "string") {
+          localStorage.setItem(`${module}_refreshToken`, refreshToken);
+        }
         if (user) {
           localStorage.setItem(`${module}_user`, JSON.stringify(user));
         }

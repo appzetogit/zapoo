@@ -331,6 +331,7 @@ export const API_ENDPOINTS = {
     SAFETY_EMERGENCY_CREATE: "/safety-emergency",
     ENV_VARIABLES: "/admin/env-variables",
     ORDERS: "/admin/orders",
+    ORDERS_CANCEL: "/admin/orders/:orderId/cancel",
     ORDERS_SEARCHING_DELIVERYMAN: "/admin/orders/searching-deliveryman",
     ORDERS_ONGOING: "/admin/orders/ongoing",
     ORDERS_TRANSACTION_REPORT: "/admin/orders/transaction-report",

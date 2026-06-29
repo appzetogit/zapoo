@@ -517,7 +517,7 @@ export default function TripHistory() {
                     })()}
                   </div>
                   <span className={`text-sm font-medium ${trip.status === 'Completed' ? 'text-green-600' :
-                    trip.status === 'Cancelled' ? 'text-red-600' :
+                    String(trip.status || '').toLowerCase().includes('cancelled') ? 'text-red-600' :
                       'text-yellow-600'
                     }`}>
                     {isOpeningThisTrip ? 'Opening...' : trip.status}

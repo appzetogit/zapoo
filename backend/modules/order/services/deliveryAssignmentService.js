@@ -942,7 +942,7 @@ export async function broadcastDeliveryRequest(orderId, restaurantLat, restauran
 
   const order = await Order.findById(orderId)
     .populate('userId', 'name phone')
-    .populate('restaurantId', 'name location address phone ownerPhone')
+    .populate('restaurantId', 'name location address phone ownerPhone zoneId')
     .lean();
   if (!order) {
     return { success: false, notifiedCount: 0, deliveryPartnerIds: [] };
@@ -975,51 +975,7 @@ export async function broadcastDeliveryRequest(orderId, restaurantLat, restauran
     .map(db => db.deliveryPartnerId?.toString?.() || String(db.deliveryPartnerId || ''))
     .filter(Boolean);
 
-  // Emergency fallback: if geo shortlist is empty, use currently online approved riders from MongoDB.
-  if (!candidateIds.length) {
-    const [v1Fallback, v2Fallback] = await Promise.all([
-      Delivery.find({
-        isActive: true,
-        status: { $in: ['approved', 'active'] },
-        'availability.isOnline': true
-      })
-        .select('_id availability.lastLocationUpdate')
-        .sort({ 'availability.lastLocationUpdate': -1, updatedAt: -1 })
-        .limit(40)
-        .lean(),
-      FoodDeliveryPartner.find({
-        status: 'approved',
-        availabilityStatus: 'online'
-      })
-        .select('_id lastLocationAt')
-        .sort({ lastLocationAt: -1, updatedAt: -1 })
-        .limit(40)
-        .lean()
-    ]);
-    const combinedFallback = [
-      ...v1Fallback.map(p => ({
-        _id: p._id,
-        lastLocationUpdate: p.availability?.lastLocationUpdate || p.updatedAt
-      })),
-      ...v2Fallback.map(p => ({
-        _id: p._id,
-        lastLocationUpdate: p.lastLocationAt || p.updatedAt
-      }))
-    ];
-    combinedFallback.sort((a, b) => new Date(b.lastLocationUpdate) - new Date(a.lastLocationUpdate));
-
-    candidateIds = combinedFallback
-      .slice(0, 40)
-      .map(p => p?._id?.toString?.() || String(p?._id || ''))
-      .filter(Boolean);
-
-    console.warn('⚠️ [DeliveryAssign] Geo shortlist empty. Using mongo online fallback for broadcast.', {
-      orderId: order.orderId || null,
-      orderMongoId: order._id?.toString?.() || String(orderId || ''),
-      trigger,
-      fallbackCount: candidateIds.length
-    });
-  } else {
+  if (candidateIds.length > 0) {
     console.log('🧭 [DeliveryAssign] Broadcast shortlist selected', {
       orderId: order.orderId || null,
       orderMongoId: order._id?.toString?.() || String(orderId || ''),
@@ -1027,9 +983,16 @@ export async function broadcastDeliveryRequest(orderId, restaurantLat, restauran
       selectedTierKm,
       candidateCount: candidateIds.length
     });
+  } else {
+    console.warn('⚠️ [DeliveryAssign] No nearby delivery partners found for broadcast', {
+      orderId: order.orderId || null,
+      orderMongoId: order._id?.toString?.() || String(orderId || ''),
+      trigger,
+      selectedTierKm
+    });
   }
 
-  // Safety fallback for manual resend:
+  // Safety fallback for manual resend only:
   // if geo shortlist + online fallback both are empty, retry with previously known candidates.
   if ((!candidateIds || candidateIds.length === 0) && trigger === 'manual_resend') {
     const previousKnownIds = [

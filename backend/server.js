@@ -320,7 +320,7 @@ app.use(cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'x-locale', 'x-Locale']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'x-locale', 'x-Locale', 'x-refresh-token', 'X-Refresh-Token']
 }));
 
 // Response compression (gzip) - reduce payload size for all responses

@@ -6,6 +6,7 @@ import OrdersTopbar from "../../components/orders/OrdersTopbar"
 import OrdersTable from "../../components/orders/OrdersTable"
 import FilterPanel from "../../components/orders/FilterPanel"
 import ViewOrderDialog from "../../components/orders/ViewOrderDialog"
+import AdminCancelOrderDialog from "../../components/orders/AdminCancelOrderDialog"
 import SettingsDialog from "../../components/orders/SettingsDialog"
 import { useOrdersManagement } from "../../components/orders/useOrdersManagement"
 
@@ -80,6 +81,28 @@ export default function OrdersPage({ statusKey = "all" }) {
   const [currentPage, setCurrentPage] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
   const [totalPages, setTotalPages] = useState(1)
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false)
+  const [orderToCancel, setOrderToCancel] = useState(null)
+  const [isCancelling, setIsCancelling] = useState(false)
+  const [cancellingOrderId, setCancellingOrderId] = useState(null)
+  const showAdminCancel = statusKey === "food-on-the-way"
+
+  const ordersColumnsConfig = showAdminCancel
+    ? {
+        si: "Serial Number",
+        orderId: "Order ID",
+        orderDate: "Order Date",
+        customer: "Customer Information",
+        restaurant: "Restaurant",
+        foodItems: "Food Items",
+        totalAmount: "Total Amount",
+        paymentType: "Payment Type",
+        paymentCollectionStatus: "Payment Status",
+        orderStatus: "Order Status",
+        cancelOrder: "Cancel Order",
+        actions: "Actions",
+      }
+    : undefined
 
   const buildOrdersParams = useCallback(
     (page) => ({
@@ -195,6 +218,34 @@ export default function OrdersPage({ statusKey = "all" }) {
     await fetchPage(page)
   }
 
+  const handleOpenCancelDialog = (order) => {
+    setOrderToCancel(order)
+    setCancelDialogOpen(true)
+  }
+
+  const handleConfirmCancel = async (order, reason) => {
+    const orderId = order.id || order.orderId
+    if (!orderId) return
+
+    setIsCancelling(true)
+    setCancellingOrderId(orderId)
+
+    try {
+      const response = await adminAPI.cancelOrderByAdmin(orderId, reason)
+      toast.success(response.data?.message || "Order cancelled successfully")
+      setCancelDialogOpen(false)
+      setOrderToCancel(null)
+      prefetchedPagesRef.current.clear()
+      await fetchPage(currentPage)
+    } catch (error) {
+      console.error("Error cancelling order:", error)
+      toast.error(error.response?.data?.message || "Failed to cancel order")
+    } finally {
+      setIsCancelling(false)
+      setCancellingOrderId(null)
+    }
+  }
+
   const {
     searchQuery,
     setSearchQuery,
@@ -261,15 +312,31 @@ export default function OrdersPage({ statusKey = "all" }) {
         visibleColumns={visibleColumns}
         toggleColumn={toggleColumn}
         resetColumns={resetColumns}
+        columnsConfig={ordersColumnsConfig}
       />
 
       <ViewOrderDialog isOpen={isViewOrderOpen} onOpenChange={setIsViewOrderOpen} order={selectedOrder} />
+
+      {showAdminCancel && (
+        <AdminCancelOrderDialog
+          isOpen={cancelDialogOpen}
+          onOpenChange={(open) => {
+            setCancelDialogOpen(open)
+            if (!open) setOrderToCancel(null)
+          }}
+          order={orderToCancel}
+          onConfirm={handleConfirmCancel}
+          isSubmitting={isCancelling}
+        />
+      )}
 
       <OrdersTable
         orders={filteredOrders}
         visibleColumns={visibleColumns}
         onViewOrder={handleViewOrder}
         onPrintOrder={handlePrintOrder}
+        onCancelOrder={showAdminCancel ? handleOpenCancelDialog : undefined}
+        cancellingOrderId={cancellingOrderId}
         currentPage={currentPage}
         totalPages={totalPages}
         totalItems={totalCount}

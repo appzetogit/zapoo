@@ -1,7 +1,24 @@
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { exportToCSV, exportToExcel, exportToPDF, exportToJSON } from "./ordersExportUtils"
 
 export function useOrdersManagement(orders, statusKey, title) {
+  const includeCancelColumn = statusKey === "food-on-the-way"
+
+  const buildDefaultColumns = () => ({
+    si: true,
+    orderId: true,
+    orderDate: true,
+    customer: true,
+    restaurant: true,
+    foodItems: true,
+    totalAmount: true,
+    paymentType: true,
+    paymentCollectionStatus: true,
+    orderStatus: true,
+    ...(includeCancelColumn ? { cancelOrder: true } : {}),
+    actions: true,
+  })
+
   const [searchQuery, setSearchQuery] = useState("")
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
@@ -16,19 +33,12 @@ export function useOrdersManagement(orders, statusKey, title) {
     toDate: "",
     restaurant: "",
   })
-  const [visibleColumns, setVisibleColumns] = useState({
-    si: true,
-    orderId: true,
-    orderDate: true,
-    customer: true,
-    restaurant: true,
-    foodItems: true,
-    totalAmount: true,
-    paymentType: true,
-    paymentCollectionStatus: true,
-    orderStatus: true,
-    actions: true,
-  })
+  const [visibleColumns, setVisibleColumns] = useState(buildDefaultColumns)
+
+  // OrdersPage is reused across /admin/orders/* routes; reset columns when tab changes.
+  useEffect(() => {
+    setVisibleColumns(buildDefaultColumns())
+  }, [statusKey])
 
   const restaurants = useMemo(() => {
     return [...new Set(orders.map((o) => o.restaurant))]
@@ -305,19 +315,7 @@ export function useOrdersManagement(orders, statusKey, title) {
   }
 
   const resetColumns = () => {
-    setVisibleColumns({
-      si: true,
-      orderId: true,
-      orderDate: true,
-      customer: true,
-      restaurant: true,
-      foodItems: true,
-      totalAmount: true,
-      paymentType: true,
-      paymentCollectionStatus: true,
-      orderStatus: true,
-      actions: true,
-    })
+    setVisibleColumns(buildDefaultColumns())
   }
 
   return {

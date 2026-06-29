@@ -12,13 +12,14 @@ import AdminCommission from '../../admin/models/AdminCommission.js';
 import BusinessSettings from '../../admin/models/BusinessSettings.js';
 import { calculateRoute } from '../../order/services/routeCalculationService.js';
 import { notifyNextDeliveryPartner, clearAssignmentTimer } from '../../order/services/deliveryAssignmentService.js';
-import { notifyDeliveryPartnersOrderTaken } from '../../order/services/deliveryNotificationService.js';
+import { notifyDeliveryPartnersOrderTaken, buildDeliveryOfferPresentation } from '../../order/services/deliveryNotificationService.js';
 import { notifyRestaurantOrderMessage } from '../../order/services/restaurantNotificationService.js';
 import {
   evaluateChallengesOnOrderCompleted,
   evaluateChallengesOnDeliveryCompleted,
   evaluateChallengesOnDeliveryAccepted
 } from '../../order/services/challengeEngineService.js';
+import { syncOutForDeliveryStatusIfNeeded } from '../../order/services/orderStatusSyncService.js';
 import { createPaymentLink, fetchPaymentLink } from '../../payment/services/razorpayService.js';
 import mongoose from 'mongoose';
 import winston from 'winston';
@@ -140,6 +141,10 @@ export const getOrders = asyncHandler(async (req, res) => {
       }, {
         deliveryPartnerId: currentDeliveryIdStr
       }, {
+        'assignmentInfo.currentCandidateId': {
+          $in: [currentDeliveryId, currentDeliveryIdStr]
+        }
+      }, {
         'assignmentInfo.priorityDeliveryPartnerIds': {
           $in: [currentDeliveryId, currentDeliveryIdStr]
         }
@@ -219,7 +224,7 @@ export const getOrderDetails = asyncHandler(async (req, res) => {
     }
 
     // First, try to find order (without deliveryPartnerId filter)
-    let order = await Order.findOne(query).populate('restaurantId', 'name slug profileImage address phone ownerPhone location').populate('userId', 'name phone email').lean();
+    let order = await Order.findOne(query).populate('restaurantId', 'name slug profileImage address phone ownerPhone location zoneId').populate('userId', 'name phone email').lean();
     if (!order) {
       return errorResponse(res, 404, 'Order not found');
     }
@@ -249,9 +254,6 @@ export const getOrderDetails = asyncHandler(async (req, res) => {
           return errorResponse(res, 403, 'Order not found or not available for you');
         }
       } else {
-        // Legacy fallback: allow access if order is in valid status OR delivery boy was notified
-        const validAcceptanceStatuses = ['confirmed', 'preparing', 'ready'];
-        const isInValidStatus = validAcceptanceStatuses.includes(order.status);
         const broadcastIds = assignmentInfo.broadcastDeliveryPartnerIds || [];
         const broadcastRejectedIds = assignmentInfo.broadcastRejectedDeliveryPartnerIds || [];
         const priorityIds = assignmentInfo.priorityDeliveryPartnerIds || [];
@@ -268,8 +270,8 @@ export const getOrderDetails = asyncHandler(async (req, res) => {
         if (isBroadcastRejected) {
           return errorResponse(res, 403, 'Order not found or not available for you');
         }
-        if (isInValidStatus || wasNotified) {} else {
-          console.warn(`⚠️ Delivery partner ${currentDeliveryId} cannot access order ${order.orderId} - Status: ${order.status}, Notified: ${wasNotified}`);
+        if (!wasNotified) {
+          console.warn(`⚠️ Delivery partner ${currentDeliveryId} cannot access order ${order.orderId} - Not notified for this request`);
           return errorResponse(res, 403, 'Order not found or not available for you');
         }
       }
@@ -294,8 +296,13 @@ export const getOrderDetails = asyncHandler(async (req, res) => {
       paymentMethod
     };
     const patchedOrderWithPayment = applyCustomerSnapshot(orderWithPayment);
+    const offerPresentation = await buildDeliveryOfferPresentation(patchedOrderWithPayment, delivery);
+    const enrichedOrder = {
+      ...patchedOrderWithPayment,
+      ...offerPresentation
+    };
     return successResponse(res, 200, 'Order details retrieved successfully', {
-      order: patchedOrderWithPayment
+      order: enrichedOrder
     });
   } catch (error) {
     logger.error(`Error fetching order details: ${error.message}`, {
@@ -1087,8 +1094,9 @@ export const confirmReachedPickup = asyncHandler(async (req, res) => {
     // If so, return success with current state (idempotent)
     const isPastPickupPhase = order.deliveryState.currentPhase === 'en_route_to_delivery' || order.deliveryState.currentPhase === 'picked_up' || order.deliveryState.status === 'order_confirmed' || order.status === 'out_for_delivery';
     if (isPastPickupPhase) {
+      const syncedOrder = await syncOutForDeliveryStatusIfNeeded(order);
       return successResponse(res, 200, 'Order is already past pickup phase', {
-        order,
+        order: syncedOrder || order,
         message: 'Order is already out for delivery'
       });
     }
@@ -1256,9 +1264,10 @@ export const confirmOrderId = asyncHandler(async (req, res) => {
     const isAlreadyConfirmed = order.deliveryState?.status === 'order_confirmed' || order.deliveryState?.currentPhase === 'en_route_to_delivery' || order.deliveryState?.currentPhase === 'picked_up' || order.status === 'out_for_delivery' || order.deliveryState?.orderIdConfirmedAt;
     if (isAlreadyConfirmed) {
       // Order ID is already confirmed - return success with current order data (idempotent)
+      let orderForResponse = await syncOutForDeliveryStatusIfNeeded(order) || order;
 
       // Get customer location for route calculation if not already calculated
-      const [customerLng, customerLat] = order.address.location.coordinates;
+      const [customerLng, customerLat] = orderForResponse.address.location.coordinates;
 
       // Get delivery boy's current location
       let deliveryLat = currentLat;
@@ -1284,13 +1293,13 @@ export const confirmOrderId = asyncHandler(async (req, res) => {
 
       // Return existing route if available, otherwise calculate new route
       let routeData = null;
-      if (order.deliveryState?.routeToDelivery?.coordinates?.length > 0) {
+      if (orderForResponse.deliveryState?.routeToDelivery?.coordinates?.length > 0) {
         // Use existing route
         routeData = {
-          coordinates: order.deliveryState.routeToDelivery.coordinates,
-          distance: order.deliveryState.routeToDelivery.distance,
-          duration: order.deliveryState.routeToDelivery.duration,
-          method: order.deliveryState.routeToDelivery.method || 'dijkstra'
+          coordinates: orderForResponse.deliveryState.routeToDelivery.coordinates,
+          distance: orderForResponse.deliveryState.routeToDelivery.distance,
+          duration: orderForResponse.deliveryState.routeToDelivery.duration,
+          method: orderForResponse.deliveryState.routeToDelivery.method || 'dijkstra'
         };
       } else if (deliveryLat && deliveryLng && customerLat && customerLng) {
         // Calculate new route if not available
@@ -1299,7 +1308,7 @@ export const confirmOrderId = asyncHandler(async (req, res) => {
         });
       }
       return successResponse(res, 200, 'Order ID already confirmed', {
-        order: order,
+        order: orderForResponse,
         route: routeData
       });
     }

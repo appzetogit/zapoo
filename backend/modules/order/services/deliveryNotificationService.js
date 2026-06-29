@@ -503,21 +503,17 @@ export async function notifyMultipleDeliveryBoys(order, deliveryPartnerIds, phas
       orderWithUser = await OrderModel.default.findById(order._id).populate('userId', 'name phone').lean();
     }
 
-    // Get restaurant details for complete address
-    let restaurantAddress = 'Restaurant address';
+    // Get restaurant details and offer presentation fields (address, distance, earnings)
     let restaurantLocation = null;
     if (orderWithUser.restaurantId) {
-      // If restaurantId is populated, use it directly
       if (typeof orderWithUser.restaurantId === 'object') {
-        restaurantAddress = orderWithUser.restaurantId.address || orderWithUser.restaurantId.location?.formattedAddress || orderWithUser.restaurantId.location?.address || 'Restaurant address';
         restaurantLocation = orderWithUser.restaurantId.location;
       } else {
-        // If restaurantId is just an ID, fetch restaurant details
         try {
-          const RestaurantModel = await import('../../restaurant/models/Restaurant.js');
-          const restaurant = await RestaurantModel.default.findById(orderWithUser.restaurantId).select('name address location').lean();
+          const restaurant = await Restaurant.findById(orderWithUser.restaurantId)
+            .select('name location zoneId')
+            .lean();
           if (restaurant) {
-            restaurantAddress = restaurant.address || restaurant.location?.formattedAddress || restaurant.location?.address || 'Restaurant address';
             restaurantLocation = restaurant.location;
           }
         } catch (e) {
@@ -526,76 +522,11 @@ export async function notifyMultipleDeliveryBoys(order, deliveryPartnerIds, phas
       }
     }
 
-    // Calculate delivery distance (restaurant to customer) for earnings calculation
-    // Keep it aligned with completion payout by preferring pricing snapshot distance.
-    const pricingDistanceKm = Number(orderWithUser?.pricing?.distanceKm);
-    let deliveryDistance = Number.isFinite(pricingDistanceKm) && pricingDistanceKm > 0 ? pricingDistanceKm : 0;
-    if (!(deliveryDistance > 0) && restaurantLocation?.coordinates && orderWithUser.address?.location?.coordinates) {
-      const [restaurantLng, restaurantLat] = restaurantLocation.coordinates;
-      const [customerLng, customerLat] = orderWithUser.address.location.coordinates;
-
-      // Validate coordinates
-      if (restaurantLat && restaurantLng && customerLat && customerLng && !isNaN(restaurantLat) && !isNaN(restaurantLng) && !isNaN(customerLat) && !isNaN(customerLng)) {
-        // Calculate distance using Haversine formula
-        const R = 6371; // Earth radius in km
-        const dLat = (customerLat - restaurantLat) * Math.PI / 180;
-        const dLng = (customerLng - restaurantLng) * Math.PI / 180;
-        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(restaurantLat * Math.PI / 180) * Math.cos(customerLat * Math.PI / 180) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        deliveryDistance = R * c;
-      } else {
-        console.warn('⚠️ Invalid coordinates for distance calculation');
-      }
-    } else {
-      if (!(deliveryDistance > 0)) {
-        console.warn('⚠️ Missing coordinates for distance calculation');
-      }
-    }
-
-    // Calculate estimated earnings based on delivery distance
-    let estimatedEarnings = null;
+    const basePresentation = await buildDeliveryOfferPresentation(orderWithUser, null);
+    const deliveryDistance = Number(basePresentation.deliveryDistanceRaw) || 0;
+    const estimatedEarnings = basePresentation.estimatedEarnings;
+    const restaurantAddress = basePresentation.restaurantAddress;
     const deliveryFeeFromOrder = orderWithUser.pricing?.deliveryFee ?? 0;
-    const adminDeliveryCost = orderWithUser?.pricing?.adminDeliveryCost ?? deliveryFeeFromOrder;
-    const tierName = orderWithUser?.pricing?.pricingMeta?.tierName || null;
-    let adminRetentionPercent = 0;
-    if (tierName) {
-      try {
-        const Tier = (await import('../../admin/models/Tier.js')).default;
-        const tierDoc = await Tier.findOne({ name: tierName }).select('deliveryPricing.adminRetentionPercent').lean();
-        adminRetentionPercent = clampPercent(tierDoc?.deliveryPricing?.adminRetentionPercent ?? 0);
-      } catch (tierLookupError) {
-        console.error('Error resolving tier retention for multi-notify earnings:', tierLookupError.message);
-      }
-    }
-    try {
-      estimatedEarnings = await calculateEstimatedEarnings(
-        deliveryDistance,
-        tierName,
-        adminDeliveryCost,
-        adminRetentionPercent
-      );
-      const earnedValue = typeof estimatedEarnings === 'object' ? estimatedEarnings.totalEarning ?? 0 : Number(estimatedEarnings) || 0;
-      if (!(earnedValue > 0)) {
-        // keep zero when commission result is zero; do not override from customer delivery fee
-      }
-    } catch (earningsError) {
-      console.error('❌ Error calculating estimated earnings in notification:', earningsError);
-      console.error('❌ Error stack:', earningsError.stack);
-      estimatedEarnings = {
-        basePayout: 0,
-        distance: deliveryDistance,
-        commissionPerKm: 0,
-        distanceCommission: 0,
-        totalEarning: 0,
-        breakdown: {
-          basePayout: 0,
-          distance: deliveryDistance,
-          commissionPerKm: 0,
-          distanceCommission: 0,
-          minDistance: 0
-        }
-      };
-    }
 
     // Prepare notification payload
     const orderNotification = {
@@ -604,39 +535,28 @@ export async function notifyMultipleDeliveryBoys(order, deliveryPartnerIds, phas
       orderMongoId: orderWithUser._id?.toString(),
       // Also include orderMongoId for compatibility
       status: orderWithUser.status || 'preparing',
-      restaurantName: orderWithUser.restaurantName || orderWithUser.restaurantId?.name,
-      restaurantAddress: restaurantAddress,
-      restaurantLocation: restaurantLocation ? {
-        latitude: restaurantLocation.coordinates?.[1],
-        longitude: restaurantLocation.coordinates?.[0],
-        address: restaurantLocation.formattedAddress || restaurantLocation.address || restaurantAddress,
-        formattedAddress: restaurantLocation.formattedAddress || restaurantLocation.address || restaurantAddress
-      } : null,
+      restaurantName: basePresentation.restaurantName,
+      restaurantAddress,
+      restaurantLocation: basePresentation.restaurantLocation,
       customerName: order?.customerName?.trim() || orderWithUser.userId?.name || 'Customer',
       customerPhone: order?.customerPhone?.trim() || orderWithUser.userId?.phone || '',
-      deliveryAddress: orderWithUser.address?.address || orderWithUser.address?.location?.address || orderWithUser.address?.formattedAddress,
-      customerLocation: orderWithUser.address?.location ? {
-        latitude: orderWithUser.address.location.coordinates?.[1],
-        longitude: orderWithUser.address.location.coordinates?.[0],
-        address: orderWithUser.address.formattedAddress || orderWithUser.address.address
-      } : null,
+      deliveryAddress: basePresentation.customerAddress || orderWithUser.address?.formattedAddress,
+      customerLocation: basePresentation.customerLocation,
+      customerAddress: basePresentation.customerAddress,
       totalAmount: orderWithUser.pricing?.total || 0,
       deliveryFee: deliveryFeeFromOrder,
-      estimatedEarnings: estimatedEarnings,
-      // Include calculated earnings
-      deliveryDistance: deliveryDistance > 0 ? `${deliveryDistance.toFixed(2)} km` : 'Calculating...',
+      estimatedEarnings,
+      deliveryDistance: basePresentation.deliveryDistance,
+      deliveryDistanceRaw: basePresentation.deliveryDistanceRaw,
+      distanceKm: basePresentation.distanceKm,
       paymentMethod: orderWithUser.payment?.method || 'cash',
       message: `New order available: ${orderWithUser.orderId || orderWithUser._id}`,
       timestamp: new Date().toISOString(),
       phase: phase,
-      // 'priority' or 'expanded'
-      // Include restaurant coordinates
-      restaurantLat: restaurantLocation?.coordinates?.[1] || orderWithUser.restaurantId?.location?.coordinates?.[1],
-      restaurantLng: restaurantLocation?.coordinates?.[0] || orderWithUser.restaurantId?.location?.coordinates?.[0],
-      // Include delivery coordinates
-      deliveryLat: orderWithUser.address?.location?.coordinates?.[1] || orderWithUser.address?.location?.latitude,
-      deliveryLng: orderWithUser.address?.location?.coordinates?.[0] || orderWithUser.address?.location?.longitude,
-      // Include full order for frontend use
+      restaurantLat: basePresentation.restaurantLat,
+      restaurantLng: basePresentation.restaurantLng,
+      deliveryLat: basePresentation.customerLocation?.latitude,
+      deliveryLng: basePresentation.customerLocation?.longitude,
       fullOrder: orderWithUser
     };
     orderNotification.offerExpiresAt = buildOfferExpiresAt(orderWithUser);
@@ -656,14 +576,31 @@ export async function notifyMultipleDeliveryBoys(order, deliveryPartnerIds, phas
     for (const deliveryPartnerId of deliveryPartnerIds) {
       try {
         const normalizedId = deliveryPartnerId?.toString() || deliveryPartnerId;
+        let partnerPayload = orderNotification;
+        try {
+          const partner = await Delivery.findById(normalizedId)
+            .select('availability.currentLocation')
+            .lean();
+          const partnerPresentation = await buildDeliveryOfferPresentation(orderWithUser, partner);
+          if (partnerPresentation.pickupDistanceKm != null) {
+            partnerPayload = {
+              ...orderNotification,
+              pickupDistanceKm: partnerPresentation.pickupDistanceKm,
+              pickupDistance: partnerPresentation.pickupDistance
+            };
+          }
+        } catch (pickupError) {
+          console.warn('⚠️ Could not build per-rider pickup distance:', pickupError.message);
+        }
+
         const roomVariations = [`delivery:${normalizedId}`, `delivery:${deliveryPartnerId}`, ...(mongoose.Types.ObjectId.isValid(normalizedId) ? [`delivery:${new mongoose.Types.ObjectId(normalizedId).toString()}`] : [])];
         let notificationSent = false;
         for (const room of roomVariations) {
           if (!socketAvailable) break;
           const { sockets } = await fetchSocketsInAnyDeliveryEmitter(io, room);
           if (sockets.length > 0) {
-            emitToDeliveryRoomAll(io, room, 'new_order', orderNotification);
-            emitToDeliveryRoomAll(io, room, 'new_order_available', orderNotification);
+            emitToDeliveryRoomAll(io, room, 'new_order', partnerPayload);
+            emitToDeliveryRoomAll(io, room, 'new_order_available', partnerPayload);
             emitToDeliveryRoomAll(io, room, 'play_notification_sound', {
               type: 'new_order_available',
               orderId: order.orderId,
@@ -679,8 +616,8 @@ export async function notifyMultipleDeliveryBoys(order, deliveryPartnerIds, phas
           console.warn(`⚠️ Delivery partner ${normalizedId} not connected, but will receive notification when they connect`);
           // Still emit to room for when they connect
           roomVariations.forEach(room => {
-            emitToDeliveryRoomAll(io, room, 'new_order', orderNotification);
-            emitToDeliveryRoomAll(io, room, 'new_order_available', orderNotification);
+            emitToDeliveryRoomAll(io, room, 'new_order', partnerPayload);
+            emitToDeliveryRoomAll(io, room, 'new_order_available', partnerPayload);
           });
           notifiedCount++;
         } else if (!socketAvailable) {
@@ -878,8 +815,20 @@ export async function notifyDeliveryOrderLifecycle(deliveryPartnerId, order, sta
       body = `Order #${orderNumber} marked as delivered`;
       type = 'delivery_order_delivered';
     } else if (normalizedStatus === 'cancelled') {
-      title = 'Order Cancelled';
-      body = `Order #${orderNumber} was cancelled`;
+      const cancelledBy = String(order?.cancelledBy || '').toLowerCase();
+      if (cancelledBy === 'admin') {
+        title = 'Cancelled by admin';
+        body = `Order #${orderNumber} was cancelled by admin`;
+      } else if (cancelledBy === 'restaurant') {
+        title = 'Cancelled by restaurant';
+        body = `Order #${orderNumber} was cancelled by restaurant`;
+      } else if (cancelledBy === 'user') {
+        title = 'Cancelled by user';
+        body = `Order #${orderNumber} was cancelled by user`;
+      } else {
+        title = 'Order Cancelled';
+        body = `Order #${orderNumber} was cancelled`;
+      }
       type = 'delivery_order_cancelled';
     } else if (normalizedStatus === 'reassigned') {
       title = 'Order Reassigned';
@@ -891,11 +840,254 @@ export async function notifyDeliveryOrderLifecycle(deliveryPartnerId, order, sta
       orderId: order?.orderId || null,
       orderMongoId: order?._id?.toString?.() || null,
       status: normalizedStatus,
-      type
+      type,
+      cancelledBy: order?.cancelledBy || null,
+      cancellationReason: order?.cancellationReason || null,
     });
   } catch (error) {
     console.error('❌ [FCM] Error sending delivery lifecycle notification:', error);
   }
+}
+
+/**
+ * Notify delivery partners in real time when an order is cancelled.
+ * FCM goes to the assigned partner; socket broadcast dismisses active trips and pending offers.
+ */
+export async function notifyDeliveryPartnerOrderCancelled(deliveryPartnerId, order) {
+  if (!order) return;
+
+  const normalizedDeliveryPartnerId = deliveryPartnerId?.toString?.() || String(deliveryPartnerId || '');
+  const payload = {
+    orderId: order?.orderId || null,
+    orderMongoId: order?._id?.toString?.() || null,
+    status: 'cancelled',
+    cancelledBy: order?.cancelledBy || null,
+    cancellationReason: order?.cancellationReason || null,
+  };
+
+  if (normalizedDeliveryPartnerId) {
+    try {
+      await notifyDeliveryOrderLifecycle(normalizedDeliveryPartnerId, order, 'cancelled');
+    } catch (error) {
+      console.error('❌ [FCM] Error sending delivery cancel notification:', error);
+    }
+  }
+
+  try {
+    const io = await getIOInstance();
+    if (!io) return;
+
+    if (normalizedDeliveryPartnerId) {
+      const rooms = buildDeliveryRoomVariations(normalizedDeliveryPartnerId);
+      rooms.forEach((room) => {
+        emitToDeliveryRoomAll(io, room, 'order_cancelled', payload);
+      });
+    }
+
+    emitToAllDeliverySockets(io, 'order_cancelled', payload);
+  } catch (error) {
+    console.error('❌ [Socket] Error emitting delivery order_cancelled:', error);
+  }
+}
+
+function resolveGeoPoint(location) {
+  if (!location || typeof location !== 'object') return null;
+
+  if (Array.isArray(location.coordinates) && location.coordinates.length >= 2) {
+    const lng = Number(location.coordinates[0]);
+    const lat = Number(location.coordinates[1]);
+    if (Number.isFinite(lat) && Number.isFinite(lng) && !(lat === 0 && lng === 0)) {
+      return { lat, lng };
+    }
+  }
+
+  const lat = Number(location.latitude ?? location.lat);
+  const lng = Number(location.longitude ?? location.lng);
+  if (Number.isFinite(lat) && Number.isFinite(lng) && !(lat === 0 && lng === 0)) {
+    return { lat, lng };
+  }
+
+  return null;
+}
+
+function formatRestaurantAddressFromDoc(restaurant) {
+  if (!restaurant || typeof restaurant !== 'object') return '';
+  const loc = restaurant.location || {};
+  const parts = [
+    restaurant.address,
+    loc.formattedAddress,
+    loc.address,
+    [loc.addressLine1, loc.addressLine2].filter(Boolean).join(', '),
+    loc.street,
+    loc.landmark,
+    loc.area,
+    loc.city,
+    loc.state,
+    loc.zipCode || loc.pincode || loc.postalCode
+  ]
+    .map((part) => String(part || '').trim())
+    .filter(Boolean);
+
+  return [...new Set(parts)].join(', ');
+}
+
+function resolveOrderDeliveryDistanceKm(order, restaurantGeo, customerGeo) {
+  const pricingDistanceKm = Number(order?.pricing?.distanceKm);
+  if (Number.isFinite(pricingDistanceKm) && pricingDistanceKm > 0) {
+    return pricingDistanceKm;
+  }
+  if (restaurantGeo && customerGeo) {
+    return calculateDistance(
+      restaurantGeo.lat,
+      restaurantGeo.lng,
+      customerGeo.lat,
+      customerGeo.lng
+    );
+  }
+  return 0;
+}
+
+function buildRestaurantLocationPayload(restaurantLocation, restaurantAddress) {
+  const geo = resolveGeoPoint(restaurantLocation);
+  if (!geo) return null;
+  return {
+    latitude: geo.lat,
+    longitude: geo.lng,
+    lat: geo.lat,
+    lng: geo.lng,
+    address: restaurantAddress,
+    formattedAddress: restaurantAddress
+  };
+}
+
+function buildCustomerLocationPayload(address) {
+  const geo = resolveGeoPoint(address?.location);
+  if (!geo) return null;
+
+  const customerAddress = [
+    address?.formattedAddress,
+    address?.street,
+    address?.additionalDetails,
+    address?.city,
+    address?.state,
+    address?.zipCode
+  ]
+    .map((part) => String(part || '').trim())
+    .filter(Boolean)
+    .join(', ');
+
+  return {
+    latitude: geo.lat,
+    longitude: geo.lng,
+    lat: geo.lat,
+    lng: geo.lng,
+    address: customerAddress
+  };
+}
+
+async function resolveTierContext(restaurant, order) {
+  let tierName = order?.pricing?.pricingMeta?.tierName || null;
+  let adminRetentionPercent = 0;
+
+  try {
+    const Tier = (await import('../../admin/models/Tier.js')).default;
+    if (tierName) {
+      const tierByName = await Tier.findOne({ name: tierName })
+        .select('deliveryPricing.adminRetentionPercent')
+        .lean();
+      adminRetentionPercent = clampPercent(tierByName?.deliveryPricing?.adminRetentionPercent ?? 0);
+    } else if (restaurant?.zoneId) {
+      const Zone = (await import('../../admin/models/Zone.js')).default;
+      const zone = await Zone.findById(restaurant.zoneId).select('tierId').lean();
+      if (zone?.tierId) {
+        const tier = await Tier.findById(zone.tierId)
+          .select('name deliveryPricing.adminRetentionPercent')
+          .lean();
+        tierName = tier?.name || null;
+        adminRetentionPercent = clampPercent(tier?.deliveryPricing?.adminRetentionPercent ?? 0);
+      }
+    }
+  } catch (tierError) {
+    console.error('Error resolving tier for offer presentation:', tierError.message);
+  }
+
+  return { tierName, adminRetentionPercent };
+}
+
+/**
+ * Build popup fields (earnings, addresses, distances) for delivery offer UI.
+ */
+export async function buildDeliveryOfferPresentation(order = {}, deliveryPartner = null) {
+  const restaurantRef =
+    order.restaurantId && typeof order.restaurantId === 'object' ? order.restaurantId : null;
+  let restaurantDoc = restaurantRef;
+  if (!restaurantDoc && order.restaurantId) {
+    restaurantDoc = await Restaurant.findById(order.restaurantId).select('name location zoneId').lean();
+  }
+
+  const restaurantLocation = restaurantDoc?.location || null;
+  const restaurantAddress = formatRestaurantAddressFromDoc(restaurantDoc) || 'Address not available';
+  const restaurantGeo = resolveGeoPoint(restaurantLocation);
+  const customerGeo = resolveGeoPoint(order.address?.location);
+  const deliveryDistanceKm = resolveOrderDeliveryDistanceKm(order, restaurantGeo, customerGeo);
+
+  let pickupDistanceKm = null;
+  const riderGeo = resolveGeoPoint(deliveryPartner?.availability?.currentLocation);
+  if (riderGeo && restaurantGeo) {
+    pickupDistanceKm =
+      Math.round(
+        calculateDistance(riderGeo.lat, riderGeo.lng, restaurantGeo.lat, restaurantGeo.lng) * 100
+      ) / 100;
+  }
+
+  const { tierName, adminRetentionPercent } = await resolveTierContext(restaurantDoc, order);
+  const deliveryFeeFromOrder = order.pricing?.deliveryFee ?? 0;
+  const adminDeliveryCost = order.pricing?.adminDeliveryCost ?? deliveryFeeFromOrder;
+
+  let estimatedEarnings = null;
+  try {
+    estimatedEarnings = await calculateEstimatedEarnings(
+      deliveryDistanceKm,
+      tierName,
+      adminDeliveryCost,
+      adminRetentionPercent
+    );
+  } catch (earningsError) {
+    console.error('Error building offer estimated earnings:', earningsError.message);
+  }
+
+  const customerLocation = buildCustomerLocationPayload(order.address);
+  const customerAddress =
+    customerLocation?.address ||
+    [
+      order.address?.formattedAddress,
+      order.address?.street,
+      order.address?.additionalDetails,
+      order.address?.city,
+      order.address?.state,
+      order.address?.zipCode
+    ]
+      .map((part) => String(part || '').trim())
+      .filter(Boolean)
+      .join(', ') ||
+    order.customerAddress ||
+    '';
+
+  return {
+    restaurantName: order.restaurantName || restaurantDoc?.name || 'Restaurant',
+    restaurantAddress,
+    restaurantLocation: buildRestaurantLocationPayload(restaurantLocation, restaurantAddress),
+    restaurantLat: restaurantGeo?.lat ?? null,
+    restaurantLng: restaurantGeo?.lng ?? null,
+    customerLocation,
+    customerAddress,
+    pickupDistanceKm,
+    pickupDistance: pickupDistanceKm != null ? `${pickupDistanceKm.toFixed(2)} km` : undefined,
+    distanceKm: deliveryDistanceKm > 0 ? deliveryDistanceKm : null,
+    deliveryDistanceRaw: deliveryDistanceKm,
+    deliveryDistance: deliveryDistanceKm > 0 ? `${deliveryDistanceKm.toFixed(2)} km` : 'Calculating...',
+    estimatedEarnings
+  };
 }
 
 /**

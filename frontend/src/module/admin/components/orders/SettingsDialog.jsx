@@ -33,7 +33,7 @@ export default function SettingsDialog({ isOpen, onOpenChange, visibleColumns, t
     actions: "Actions",
   }
 
-  const columnLabels = columnsConfig || adsColumnsConfig || defaultColumnsConfig
+  const columnLabels = columnsConfig || defaultColumnsConfig
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>

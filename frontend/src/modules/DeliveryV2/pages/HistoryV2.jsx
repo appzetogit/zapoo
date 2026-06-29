@@ -222,7 +222,7 @@ export const HistoryV2 = () => {
              <div className="space-y-4">
                 {trips.map((trip, idx) => {
                    const isCompleted = (trip.status || '').toLowerCase() === 'completed';
-                   const isCancelled = (trip.status || '').toLowerCase() === 'cancelled';
+                   const isCancelled = String(trip.status || '').toLowerCase().includes('cancelled');
                    const isPending = !isCompleted && !isCancelled;
                    const payout = Number(trip.deliveryEarning || trip.amount || trip.earningAmount || 0);
                    const collection = Number(trip.codCollectedAmount || trip.orderTotal || 0);

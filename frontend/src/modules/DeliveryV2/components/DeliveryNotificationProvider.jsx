@@ -16,30 +16,37 @@ import {
   ordersReferToSameOffer,
   savePendingOffer,
 } from '@food/utils/deliveryOfferStorage';
+import { normalizeDeliveryOfferOrder } from '@food/utils/normalizeDeliveryOfferOrder';
+import {
+  getCancellationToastMessage,
+  isCancelledOrderStatusUpdate,
+  orderCancellationAffects,
+} from '@food/utils/deliveryCancelUtils';
 
 const DeliveryNotificationContext = createContext(null);
 
 export const useDeliveryNotificationContext = () => useContext(DeliveryNotificationContext);
 
-const normalizeOrderFromApi = (order = {}) => ({
-  ...order,
-  orderMongoId: order.orderMongoId || order._id,
-  orderId: order.orderId || order._id,
-  restaurantName:
-    order.restaurantName ||
-    order.restaurantId?.name ||
-    order.restaurant_name,
-  restaurantAddress:
-    order.restaurantAddress ||
-    order.restaurantId?.address ||
-    order.restaurantId?.location?.formattedAddress ||
-    order.restaurantId?.location?.address,
-  pickupDistanceKm:
-    order.pickupDistanceKm ||
-    (typeof order.pickupDistance === 'string'
-      ? Number.parseFloat(order.pickupDistance)
-      : order.assignmentInfo?.distance),
-});
+const normalizeOrderFromApi = (order = {}, seed = {}) =>
+  normalizeDeliveryOfferOrder({
+    ...seed,
+    ...order,
+    restaurantId: order.restaurantId || seed.restaurantId,
+    address: order.address || seed.address,
+    estimatedEarnings: order.estimatedEarnings ?? seed.estimatedEarnings,
+    earnings: order.earnings ?? seed.earnings,
+    pickupDistance: order.pickupDistance ?? seed.pickupDistance,
+    deliveryDistance: order.deliveryDistance ?? seed.deliveryDistance,
+    pickupDistanceKm: order.pickupDistanceKm ?? seed.pickupDistanceKm,
+    distanceKm: order.distanceKm ?? seed.distanceKm,
+    deliveryDistanceRaw: order.deliveryDistanceRaw ?? seed.deliveryDistanceRaw,
+    restaurantLocation: order.restaurantLocation || seed.restaurantLocation,
+    customerLocation: order.customerLocation || seed.customerLocation,
+    restaurantAddress: order.restaurantAddress || seed.restaurantAddress,
+    customerAddress: order.customerAddress || seed.customerAddress,
+    restaurantLat: order.restaurantLat ?? seed.restaurantLat,
+    restaurantLng: order.restaurantLng ?? seed.restaurantLng,
+  });
 
 export function DeliveryNotificationProvider({ children }) {
   const navigate = useNavigate();
@@ -55,7 +62,7 @@ export function DeliveryNotificationProvider({ children }) {
     deliveryPartnerId,
   } = notifications;
 
-  const { acceptOrder } = useOrderManager();
+  const { acceptOrder, resetTrip } = useOrderManager();
   const { activeOrder } = useDeliveryStore();
 
   const [incomingOrder, setIncomingOrder] = useState(null);
@@ -94,7 +101,7 @@ export function DeliveryNotificationProvider({ children }) {
         }
 
         const normalized = enrichOrderWithOfferMeta(
-          normalizeOrderFromApi(apiOrder),
+          normalizeOrderFromApi(apiOrder, seed),
           source
         );
 
@@ -130,7 +137,7 @@ export function DeliveryNotificationProvider({ children }) {
     const key = getOrderOfferKey(newOrder);
     if (!key || presentingKeyRef.current === key) return;
 
-    void validateAndSetOffer(newOrder, { playAlert: false, source: newOrder?.source || 'socket' });
+    void validateAndSetOffer(newOrder, { playAlert: true, source: newOrder?.source || 'socket' });
   }, [newOrder, activeOrder, clearNewOrder, validateAndSetOffer]);
 
   useEffect(() => {
@@ -145,18 +152,40 @@ export function DeliveryNotificationProvider({ children }) {
 
   useEffect(() => {
     if (!orderStatusUpdate) return;
-    const status = String(orderStatusUpdate.status || '').toLowerCase();
 
-    if (
-      ['cancelled', 'deleted'].includes(status) &&
-      incomingOrder &&
-      ordersReferToSameOffer(orderStatusUpdate, incomingOrder)
-    ) {
-      toast.error('Order cancelled');
-      dismissOffer(incomingOrder);
+    if (!isCancelledOrderStatusUpdate(orderStatusUpdate)) {
+      clearOrderStatusUpdate();
+      return;
     }
+
+    const { affectsAny } = orderCancellationAffects(
+      orderStatusUpdate,
+      incomingOrder,
+      activeOrder
+    );
+
+    if (affectsAny) {
+      if (incomingOrder && ordersReferToSameOffer(orderStatusUpdate, incomingOrder)) {
+        dismissOffer(incomingOrder);
+      }
+      if (activeOrder && ordersReferToSameOffer(orderStatusUpdate, activeOrder)) {
+        stopNotificationSound();
+        resetTrip();
+      }
+      clearPendingOffer(orderStatusUpdate);
+      toast.error(getCancellationToastMessage(orderStatusUpdate.cancelledBy));
+    }
+
     clearOrderStatusUpdate();
-  }, [orderStatusUpdate, incomingOrder, dismissOffer, clearOrderStatusUpdate]);
+  }, [
+    orderStatusUpdate,
+    incomingOrder,
+    activeOrder,
+    dismissOffer,
+    resetTrip,
+    stopNotificationSound,
+    clearOrderStatusUpdate,
+  ]);
 
   useEffect(() => {
     if (activeOrder && incomingOrder) {
@@ -250,7 +279,7 @@ export function DeliveryNotificationProvider({ children }) {
             key={getOrderOfferKey(incomingOrder)}
             order={incomingOrder}
             onAccept={handleAccept}
-            onReject={() => handleReject(incomingOrder)}
+            onReject={handleReject}
             onMinimize={() => setIsModalMinimized(true)}
             isAccepting={isAccepting}
           />

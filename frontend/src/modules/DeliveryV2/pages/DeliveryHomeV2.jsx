@@ -82,8 +82,6 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
   const { isWithinRange, distanceToTarget } = useProximityCheck();
   const { acceptOrder, reachPickup, pickUpOrder, reachDrop, completeDelivery, resetTrip } = useOrderManager();
   const {
-    orderStatusUpdate,
-    clearOrderStatusUpdate,
     isConnected: isSocketConnected,
     emitLocation,
     incomingOrder,
@@ -536,16 +534,38 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
     }
   }, [activeOrder, isCallingCustomer]);
 
+  // Close verification UI when active trip is cleared (e.g. order cancelled)
   useEffect(() => {
-    if (orderStatusUpdate) {
-      if (orderStatusUpdate.status === 'cancelled') {
-        toast.error('Order cancelled');
-        resetTrip();
-      }
-      clearOrderStatusUpdate();
+    if (!activeOrder) {
+      setShowVerification(false);
+      setIsModalMinimized(false);
     }
-  }, [orderStatusUpdate, resetTrip, clearOrderStatusUpdate]);
+  }, [activeOrder]);
 
+  // Validate persisted active order on mount — clear cancelled trips
+  useEffect(() => {
+    const validatePersistedActiveOrder = async () => {
+      const persisted = useDeliveryStore.getState().activeOrder;
+      if (!persisted) return;
+
+      const lookupId = persisted.orderMongoId || persisted.orderId || persisted._id;
+      if (!lookupId) return;
+
+      try {
+        const response = await deliveryAPI.getOrderDetails(lookupId);
+        const order = response?.data?.data?.order || response?.data?.data;
+        if (order?.status === 'cancelled') {
+          resetTrip();
+          setShowVerification(false);
+          setIsModalMinimized(false);
+        }
+      } catch {
+        // Keep local trip state on transient network errors
+      }
+    };
+
+    void validatePersistedActiveOrder();
+  }, [resetTrip]);
 
   const handleCenterMap = () => {
     if (!mapRef.current) return;

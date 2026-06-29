@@ -183,10 +183,20 @@ export const getTripHistory = asyncHandler(async (req, res) => {
 
     // Format response
     const formattedTrips = orders.map((order, index) => {
+      const resolveCancelledDisplayStatus = () => {
+        if (order.status !== 'cancelled') return null;
+        if (order.cancelledBy === 'admin') return 'Cancelled by Admin';
+        if (order.cancelledBy === 'restaurant') return 'Cancelled by Restaurant';
+        if (order.cancelledBy === 'user') return 'Cancelled by User';
+        return 'Cancelled';
+      };
+
+      const cancelledDisplayStatus = resolveCancelledDisplayStatus();
+
       // Map backend status to frontend status
       const statusMap = {
         'delivered': 'Completed',
-        'cancelled': 'Cancelled',
+        'cancelled': cancelledDisplayStatus || 'Cancelled',
         'pending': 'Pending',
         'confirmed': 'Pending',
         'preparing': 'Pending',
@@ -218,9 +228,9 @@ export const getTripHistory = asyncHandler(async (req, res) => {
       const fallbackTotal = Number(order.pricing?.total) || 0;
       let amount = settlementAmount > 0 ? settlementAmount : (fallbackDeliveryFee > 0 ? fallbackDeliveryFee : fallbackTotal);
 
-      // Cancelled trips should not show payout amount in trip history
+      // Cancelled trips: show settlement for admin cancel; otherwise no payout in history
       if (order.status === 'cancelled') {
-        amount = 0;
+        amount = order.cancelledBy === 'admin' && settlementAmount > 0 ? settlementAmount : 0;
       }
 
       // Get payment method - check Payment collection as fallback (for COD orders)
@@ -241,6 +251,7 @@ export const getTripHistory = asyncHandler(async (req, res) => {
         restaurantName: restaurantName, // Also include for compatibility
         customer: order.userId?.name || 'Unknown Customer',
         status: displayStatus,
+        cancelledBy: order.cancelledBy || null,
         time,
         amount,
         paymentMethod: paymentMethod,

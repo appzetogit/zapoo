@@ -1474,16 +1474,21 @@ export const cancelOrder = async (req, res) => {
     await order.save();
 
     try {
+      const { clearAssignmentTimer } = await import('../services/deliveryAssignmentService.js');
+      clearAssignmentTimer(order._id.toString());
+    } catch (timerError) {
+      logger.error(`Error clearing assignment timer after user cancel for order ${order.orderId}:`, timerError);
+    }
+
+    try {
       await notifyRestaurantOrderUpdate(order._id.toString(), 'cancelled');
     } catch (notifyError) {
       logger.error(`Error notifying restaurant after cancellation for order ${order.orderId}:`, notifyError);
     }
     try {
       const assignedDeliveryId = order.deliveryPartnerId?.toString?.() || order.deliveryPartnerId;
-      if (assignedDeliveryId) {
-        const { notifyDeliveryOrderLifecycle } = await import('../services/deliveryNotificationService.js');
-        await notifyDeliveryOrderLifecycle(assignedDeliveryId, order, 'cancelled');
-      }
+      const { notifyDeliveryPartnerOrderCancelled } = await import('../services/deliveryNotificationService.js');
+      await notifyDeliveryPartnerOrderCancelled(assignedDeliveryId, order);
     } catch (notifyError) {
       logger.error(`Error notifying delivery after cancellation for order ${order.orderId}:`, notifyError);
     }

@@ -1,11 +1,20 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { User, MapPin, FastForward, Clock, Phone, ChefHat, ChevronDown } from 'lucide-react';
 import { ActionSlider } from '@/modules/DeliveryV2/components/ui/ActionSlider';
 import { useDeliveryStore } from '@/modules/DeliveryV2/store/useDeliveryStore';
 import { getHaversineDistance, calculateETA } from '@/modules/DeliveryV2/utils/geo';
+import { getRemainingAcceptanceSeconds } from '@food/utils/deliveryOfferStorage';
+import { normalizeDeliveryOfferOrder } from '@food/utils/normalizeDeliveryOfferOrder';
 
 const ACCEPT_COUNTDOWN_SECONDS = 30;
+
+const parseKmValue = (value) => {
+  if (value == null || value === '') return null;
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  const parsed = Number.parseFloat(String(value).replace(/[^\d.]/g, ''));
+  return Number.isFinite(parsed) ? parsed : null;
+};
 
 /**
  * NewOrderModal - Ported to Original 1:1 Theme with Slider Accept.
@@ -13,23 +22,31 @@ const ACCEPT_COUNTDOWN_SECONDS = 30;
  */
 export const NewOrderModal = ({ order, onAccept, onReject, onMinimize, isAccepting = false }) => {
   const { riderLocation } = useDeliveryStore();
+  const normalizedOrder = useMemo(() => normalizeDeliveryOfferOrder(order), [order]);
   const [timeLeft, setTimeLeft] = useState(ACCEPT_COUNTDOWN_SECONDS);
+  const onRejectRef = useRef(onReject);
+  onRejectRef.current = onReject;
+  const orderRef = useRef(normalizedOrder);
+  orderRef.current = normalizedOrder;
 
   const orderKey =
-    order?.orderMongoId ||
-    order?.orderId ||
-    order?._id ||
-    order?.id ||
+    normalizedOrder?.orderMongoId ||
+    normalizedOrder?.orderId ||
+    normalizedOrder?._id ||
+    normalizedOrder?.id ||
     'order';
 
   useEffect(() => {
-    setTimeLeft(ACCEPT_COUNTDOWN_SECONDS);
+    const remaining = getRemainingAcceptanceSeconds(orderRef.current);
+    const starting =
+      remaining > 0 ? Math.min(ACCEPT_COUNTDOWN_SECONDS, remaining) : ACCEPT_COUNTDOWN_SECONDS;
+    setTimeLeft(starting);
 
     const timer = setInterval(() => {
       setTimeLeft((current) => {
         if (current <= 1) {
           clearInterval(timer);
-          onReject();
+          onRejectRef.current?.(orderRef.current);
           return 0;
         }
         return current - 1;
@@ -37,46 +54,68 @@ export const NewOrderModal = ({ order, onAccept, onReject, onMinimize, isAccepti
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [orderKey, onReject]);
+  }, [orderKey]);
 
   const { distanceKm, etaMins } = useMemo(() => {
-    if (!order) return { distanceKm: null, etaMins: null };
+    if (!normalizedOrder) return { distanceKm: null, etaMins: null };
 
-    // A. Use provided data if available (Direct distance from socket)
-    const rawDist = order.pickupDistanceKm || order.distanceKm;
-    const rawEta = order.estimatedTime || order.duration || order.eta;
-    
+    const rawDist =
+      parseKmValue(normalizedOrder.pickupDistanceKm) ??
+      parseKmValue(normalizedOrder.distanceKm) ??
+      parseKmValue(normalizedOrder.deliveryDistanceRaw) ??
+      parseKmValue(normalizedOrder.pickupDistance) ??
+      parseKmValue(normalizedOrder.deliveryDistance);
+
+    const rawEta =
+      normalizedOrder.estimatedTime ||
+      normalizedOrder.estimatedDeliveryTime ||
+      normalizedOrder.duration ||
+      normalizedOrder.eta;
+
     if (rawDist != null) {
-      return { 
-        distanceKm: Number(rawDist).toFixed(1), 
-        etaMins: rawEta && rawEta > 0 ? Math.ceil(rawEta) : Math.ceil((rawDist * 1000) / 416) + 5
+      return {
+        distanceKm: Number(rawDist).toFixed(1),
+        etaMins:
+          rawEta && Number(rawEta) > 0
+            ? Math.ceil(Number(rawEta))
+            : Math.ceil((rawDist * 1000) / 416) + 5,
       };
     }
 
-    // B. Calculate from locations (Local calculation fallback)
-    const rest = order.restaurantLocation || order.restaurantId?.location || {};
-    const resLat = parseFloat(order.restaurant_lat || order.restaurantLat || rest.latitude || rest.lat);
-    const resLng = parseFloat(order.restaurant_lng || order.restaurantLng || rest.longitude || rest.lng);
+    const rest = normalizedOrder.restaurantLocation || normalizedOrder.restaurantId?.location || {};
+    const resLat = parseFloat(
+      normalizedOrder.restaurant_lat ||
+        normalizedOrder.restaurantLat ||
+        rest.latitude ||
+        rest.lat
+    );
+    const resLng = parseFloat(
+      normalizedOrder.restaurant_lng ||
+        normalizedOrder.restaurantLng ||
+        rest.longitude ||
+        rest.lng
+    );
 
-    if (riderLocation && !isNaN(resLat) && !isNaN(resLng)) {
+    if (riderLocation && !Number.isNaN(resLat) && !Number.isNaN(resLng)) {
       const distM = getHaversineDistance(
-        riderLocation.lat, riderLocation.lng,
-        resLat, resLng
+        riderLocation.lat,
+        riderLocation.lng,
+        resLat,
+        resLng
       );
       const km = distM / 1000;
-      // Assume 25km/h avg for initial estimate (roughly 416m/min)
-      const mins = Math.ceil(distM / 416) + (order.prepTime || 5);
-      
-      return { 
-        distanceKm: km.toFixed(1), 
-        etaMins: mins 
+      const mins = Math.ceil(distM / 416) + (normalizedOrder.prepTime || 5);
+
+      return {
+        distanceKm: km.toFixed(1),
+        etaMins: mins,
       };
     }
 
-    return { distanceKm: '??', etaMins: order.prepTime || 15 };
-  }, [order, riderLocation]);
+    return { distanceKm: '??', etaMins: normalizedOrder.prepTime || 15 };
+  }, [normalizedOrder, riderLocation]);
 
-  if (!order) return null;
+  if (!normalizedOrder) return null;
 
   const resolveRiderEarning = (payload) => {
     if (!payload) return 0;
@@ -101,11 +140,11 @@ export const NewOrderModal = ({ order, onAccept, onReject, onMinimize, isAccepti
     return Number.isFinite(legacyPercent) ? legacyPercent : 0;
   };
 
-  const earnings = resolveRiderEarning(order);
-  const orderNumber = order.orderId || order.order_id || order._id || '—';
-  const restaurantName = order.restaurantName || order.restaurant_name || (order.restaurantId?.name) || 'Restaurant';
-  const restaurantAddress = order.restaurantAddress || order.restaurant_address || (order.restaurantId?.location?.address) || 'Address not available';
-  const deliveryAddress = (order?.deliveryAddress && typeof order.deliveryAddress === 'object') ? order.deliveryAddress : {};
+  const earnings = resolveRiderEarning(normalizedOrder);
+  const orderNumber = normalizedOrder.orderId || normalizedOrder.order_id || normalizedOrder._id || '—';
+  const restaurantName = normalizedOrder.restaurantName || normalizedOrder.restaurant_name || (normalizedOrder.restaurantId?.name) || 'Restaurant';
+  const restaurantAddress = normalizedOrder.restaurantAddress || normalizedOrder.restaurant_address || (normalizedOrder.restaurantId?.location?.address) || 'Address not available';
+  const deliveryAddress = (normalizedOrder?.deliveryAddress && typeof normalizedOrder.deliveryAddress === 'object') ? normalizedOrder.deliveryAddress : {};
 
   const normalizeLocation = (loc) => {
     if (!loc) return null;
@@ -136,7 +175,7 @@ export const NewOrderModal = ({ order, onAccept, onReject, onMinimize, isAccepti
         }
       : null;
 
-  const customerLocation = normalizeLocation(order.customerLocation) || normalizeLocation(order.deliveryLocation) || normalizeLocation(geoCoords) || null;
+  const customerLocation = normalizeLocation(normalizedOrder.customerLocation) || normalizeLocation(normalizedOrder.deliveryLocation) || normalizeLocation(geoCoords) || null;
 
   const isCoordinateOnlyText = (value) => {
     const text = String(value || '').trim();
@@ -156,13 +195,13 @@ export const NewOrderModal = ({ order, onAccept, onReject, onMinimize, isAccepti
     .filter(Boolean);
 
   const rawCustomerAddress =
-    order.customerAddress ||
-    order.customer_address ||
-    order?.customerLocation?.address ||
-    order?.customerLocation?.formattedAddress ||
-    order?.deliveryAddress?.address ||
-    order?.deliveryAddress?.formattedAddress ||
-    (typeof order?.deliveryAddress === 'string' ? order.deliveryAddress : '') ||
+    normalizedOrder.customerAddress ||
+    normalizedOrder.customer_address ||
+    normalizedOrder?.customerLocation?.address ||
+    normalizedOrder?.customerLocation?.formattedAddress ||
+    normalizedOrder?.deliveryAddress?.address ||
+    normalizedOrder?.deliveryAddress?.formattedAddress ||
+    (typeof normalizedOrder?.deliveryAddress === 'string' ? normalizedOrder.deliveryAddress : '') ||
     (addressPartsFromSchema.length ? addressPartsFromSchema.join(', ') : '');
 
   const customerAddress =
@@ -278,14 +317,14 @@ export const NewOrderModal = ({ order, onAccept, onReject, onMinimize, isAccepti
         <div className="px-6 pb-8 pt-2 space-y-4 bg-white">
           <ActionSlider 
             label="Slide to Accept" 
-            onConfirm={() => onAccept(order)} 
+            onConfirm={() => onAccept(normalizedOrder)} 
             color="bg-emerald-600"
             successLabel="Order Accepted ✓"
             disabled={isAccepting}
           />
 
           <button 
-            onClick={onReject}
+            onClick={() => onReject(normalizedOrder)}
             className="w-full text-gray-400 font-black text-[11px] uppercase tracking-[0.2em] hover:text-red-500 transition-colors active:scale-95 py-2"
           >
             Pass this task

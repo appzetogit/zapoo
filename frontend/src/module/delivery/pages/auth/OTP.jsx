@@ -198,6 +198,7 @@ export default function DeliveryOTP() {
 
         // Store tokens for authenticated signup flow
         const accessToken = data.accessToken;
+        const refreshToken = data.refreshToken;
         const user = data.user;
         if (!accessToken || !user) {
           throw new Error("Invalid response from server");
@@ -205,7 +206,7 @@ export default function DeliveryOTP() {
 
         // Store auth data using utility function
         try {
-          storeAuthData("delivery", accessToken, user);
+          storeAuthData("delivery", accessToken, user, refreshToken);
           localStorage.setItem("delivery_authenticated", "false");
           setDeliverySignupPendingStep(signupStep);
         } catch (storageError) {
@@ -233,6 +234,7 @@ export default function DeliveryOTP() {
 
       // Otherwise, OTP verified and user logged in (existing user with complete profile)
       const accessToken = data.accessToken;
+      const refreshToken = data.refreshToken;
       const user = data.user;
       if (!accessToken || !user) {
         throw new Error("Invalid response from server");
@@ -246,7 +248,7 @@ export default function DeliveryOTP() {
       // Store auth data using utility function to ensure proper role handling
       // The setAuthData function includes error handling and verification
       try {
-        storeAuthData("delivery", accessToken, user);
+        storeAuthData("delivery", accessToken, user, refreshToken);
       } catch (storageError) {
         console.error("Failed to store authentication data:", storageError);
         setError("Failed to save authentication. Please try again or clear your browser storage.");
@@ -317,6 +319,7 @@ export default function DeliveryOTP() {
       const response = await deliveryAPI.verifyOTP(phone, verifiedOtp, "login", trimmedName);
       const data = response?.data?.data || {};
       const accessToken = data.accessToken;
+      const refreshToken = data.refreshToken;
       const user = data.user;
       if (!accessToken || !user) {
         throw new Error("Invalid response from server");
@@ -330,7 +333,7 @@ export default function DeliveryOTP() {
       // Store auth data using utility function to ensure proper role handling
       // The setAuthData function includes error handling and verification
       try {
-        storeAuthData("delivery", accessToken, user);
+        storeAuthData("delivery", accessToken, user, refreshToken);
       } catch (storageError) {
         console.error("Failed to store authentication data:", storageError);
         setError("Failed to save authentication. Please try again or clear your browser storage.");
